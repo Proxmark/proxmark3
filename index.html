@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html>
+
+  <head>
+    <meta charset='utf-8' />
+    <meta http-equiv="X-UA-Compatible" content="chrome=1" />
+    <meta name="description" content="Proxmark3 : Proxmark 3" />
+
+    <link rel="stylesheet" type="text/css" media="screen" href="stylesheets/stylesheet.css">
+
+    <title>Proxmark3</title>
+  </head>
+
+  <body>
+
+    <!-- HEADER -->
+    <div id="header_wrap" class="outer">
+        <header class="inner">
+          <a id="forkme_banner" href="https://github.com/Proxmark/proxmark3">View on GitHub</a>
+
+          <h1 id="project_title">Proxmark3</h1>
+          <h2 id="project_tagline">Proxmark 3</h2>
+
+            <section id="downloads">
+              <a class="zip_download_link" href="https://github.com/Proxmark/proxmark3/zipball/master">Download this project as a .zip file</a>
+              <a class="tar_download_link" href="https://github.com/Proxmark/proxmark3/tarball/master">Download this project as a tar.gz file</a>
+            </section>
+        </header>
+    </div>
+
+    <!-- MAIN CONTENT -->
+    <div id="main_content_wrap" class="outer">
+      <section id="main_content" class="inner">
+        <p>NOTICE:
+(2014-03-17)
+Moving the repository from google code to GitHub is up for discussion!
+Please check out the following thread and post your comments...
+<a href="http://www.proxmark.org/forum/viewtopic.php?id=1902">http://www.proxmark.org/forum/viewtopic.php?id=1902</a>
+Discussions will close on March 31st.</p>
+
+<h1>
+<a name="proxmark" class="anchor" href="#proxmark"><span class="octicon octicon-link"></span></a>Proxmark</h1>
+
+<p>The Proxmark III is a device developed by Jonathan Westhues that enables sniffing, reading and cloning of RFID (Radio Frequency Identification) tags. For my master thesis I wanted to look at the communication of Mifare Classic cards. Mifare Classic is used in many applications and is the most popular contactless card around. It is used in e-ticketing, public transport and access control. The higher-level protocol is kept secret by the manufacturer (NXP). I made an implementation of the ISO14443 type A standard for the Proxmark since Mifare is based on this communication standard.</p>
+
+<p>After a lot of debugging and many noisy traces the Proxmark was ready for some real analysis. I focused on the Mifare Classic card and was happy to let the communication between card and reader appear on my screen. I could see the anticollision phase where the reader selects the card to communicate with. This was followed by an authentication and after that all communication was encrypted. The findings of this research are published on arxiv.org as A Practical Attack on the Mifare Classic</p>
+
+<p>In December 2007 I saw the presentation of Karsten Nohl and Henryk Plotz where they showed how they reverse engineered the Mifare Classic chip. I was working on the same subject in Nijmegen. The Mifare system relied on security by obscurity and now the secrets are revealed there is no card-level security left. A video on youtube shows a demo that we gave on March 12th. It shows how we access a building with a cloned card.</p>
+
+<h2>
+<a name="checkout-the-repo" class="anchor" href="#checkout-the-repo"><span class="octicon octicon-link"></span></a>Checkout the repo...</h2>
+
+<pre><code>$ cd your_repo_root/repo_name
+$ git fetch origin
+$ git checkout gh-pages
+</code></pre>
+
+<p>If you're using the GitHub for Mac, simply sync your repository and you'll see the new branch.</p>
+
+<h1>
+<a name="intro-2" class="anchor" href="#intro-2"><span class="octicon octicon-link"></span></a>INTRO 2</h1>
+
+<p>This file contains enough software, logic (for the FPGA), and design
+documentation for the hardware that you could, at least in theory,
+do something useful with a proxmark3. It has commands to:</p>
+
+<pre><code>* read any kind of 125 kHz unidirectional tag
+* simulate any kind of 125 kHz unidirectional tag
+</code></pre>
+
+<p>(This is enough to perform all of the silly cloning attacks, like the
+ones that I did at the Capitol in Sacramento, or anything involving
+a Verichip. From a technical standpoint, these are not that exciting,
+although the `software radio' architecture of the proxmark3 makes it
+easy and fun to support new formats.)</p>
+
+<p>As a bonus, I include some code to use the 13.56 MHz hardware, so you can:</p>
+
+<pre><code>* do anything that a (medium-range) ISO 15693 reader could
+* read an ISO 14443 tag, if you know the higher-layer protocol
+* pretend to be an ISO 14443 tag, if you know the higher-layer protocol
+* snoop on an ISO 14443 transaction
+</code></pre>
+
+<p>I am not actively developing any of this. I have other projects that
+seem to be more useful.</p>
+
+<h2>
+<a name="using-the-package" class="anchor" href="#using-the-package"><span class="octicon octicon-link"></span></a>USING THE PACKAGE</h2>
+
+<p>The software tools required to build include:</p>
+
+<ul>
+<li>cygwin or other unix-like tools for Windows</li>
+<li>devkitPro (<a href="http://wiki.devkitpro.org/index.php/Getting_Started/devkitARM">http://wiki.devkitpro.org/index.php/Getting_Started/devkitARM</a>)</li>
+<li>Xilinx's WebPack tools</li>
+<li>Modelsim (for test only)</li>
+<li>perl</li>
+</ul><p>When installing devkitPro, you only need to install the compiler itself. Additional
+support libraries are  not required.</p>
+
+<p>Documentation is minimal, but see the doc/ directory for what exists. A
+previous familiarity with the ARM, with digital signal processing,
+and with embedded programming in general is assumed.</p>
+
+<p>The device is used through a specialized command line interface; for
+example, to clone a Verichip, you might type:</p>
+
+<pre><code>loread                          ; this reads the tag, and stores the
+                                ; raw samples in memory on the ARM
+
+losamples                       ; then we download the samples to
+                                ; the PC
+
+vchdemod clone                  ; demodulate the ID, and then put it
+                                ; back in a format that we can replay
+
+losim                           ; and then replay it
+</code></pre>
+
+<p>To read an ISO 15693 tag, you might type:</p>
+
+<pre><code>hiread                          ; read the tag; this involves sending a
+                                ; particular command, and then getting
+                                ; the response (which is stored as raw
+                                ; samples in memory on the ARM)
+
+hisamples                       ; then download those samples to the PC
+
+hi15demod                       ; and demod them to bits (and check the
+                                ; CRC etc. at the same time)
+</code></pre>
+
+<p>Notice that in both cases the signal processing mostly happened on the PC
+side; that is of course not practical for a real reader, but it is easier
+to initially write your code and debug on the PC side than on the ARM. As
+long as you use integer math (and I do), it's trivial to port it over
+when you're done.</p>
+
+<p>The USB driver and bootloader are documented (and available separately
+for download, if you wish to use them in another project) at</p>
+
+<pre><code>http://cq.cx/trivia.pl
+</code></pre>
+
+<h2>
+<a name="obtaining-hardware" class="anchor" href="#obtaining-hardware"><span class="octicon octicon-link"></span></a>OBTAINING HARDWARE:</h2>
+
+<p>Most of the ultra-low-volume contract assemblers that have sprung up
+(Screaming Circuits, the various cheap Asian suppliers, etc.) could put
+something like this together with a reasonable yield. A run of around
+a dozen units is probably cost-effective. The BOM includes (possibly-
+outdated) component pricing, and everything is available from Digikey
+and the usual distributors.</p>
+
+<p>If you've never assembled a modern circuit board by hand, then this is
+not a good place to start. Some of the components (e.g. the crystals)
+must not be assembled with a soldering iron, and require hot air.</p>
+
+<p>The schematics are included; the component values given are not
+necessarily correct for all situations, but it should be possible to do
+nearly anything you would want with appropriate population options.</p>
+
+<p>The printed circuit board artwork is also available, as Gerbers and an
+Excellon drill file.</p>
+
+<h2>
+<a name="future-plans-enhancements-that-you-could-make" class="anchor" href="#future-plans-enhancements-that-you-could-make"><span class="octicon octicon-link"></span></a>FUTURE PLANS, ENHANCEMENTS THAT YOU COULD MAKE:</h2>
+
+<p>At some point I should write software involving a proper real-time
+operating system for the ARM. I would then provide interrupt-driven
+drivers for many of the peripherals that are polled now (the USB,
+the data stream from the FPGA), which would make it easier to develop
+complex applications.</p>
+
+<p>It would not be all that hard to implement the ISO 15693 reader properly
+(with anticollision, all the commands supported, and so on)--the signal
+processing is already written, so it is all straightforward applications
+work.</p>
+
+<p>I have basic support for ISO 14443 as well: a sniffer, a simulated
+tag, and a reader. It won't do anything useful unless you fill in the
+high-layer protocol.</p>
+
+<p>Nicer (i.e., closer-to-optimal) implementations of all kinds of signal
+processing would be useful as well.</p>
+
+<p>A practical implementation of the learning-the-tag's-ID-from-what-the-
+reader-broadcasts-during-anticollision attacks would be relatively
+straightforward. This would involve some signal processing on the FPGA,
+but not much else after that.</p>
+
+<p>It would be neat to write a driver that could stream samples from the A/Ds
+over USB to the PC, using the full available bandwidth of USB. I am not
+yet sure what that would be good for, but surely something. This would
+require a kernel-mode driver under Windows, though, which is more work.</p>
+
+<h2>
+<a name="licensing" class="anchor" href="#licensing"><span class="octicon octicon-link"></span></a>LICENSING:</h2>
+
+<p>This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; either version 2 of the License, or
+(at your option) any later version.</p>
+
+<p>This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.</p>
+
+<p>You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA</p>
+
+<p>Jonathan Westhues
+user jwesthues, at host cq.cx</p>
+
+<p>May 2007, Cambridge MA</p>
+      </section>
+    </div>
+
+    <!-- FOOTER  -->
+    <div id="footer_wrap" class="outer">
+      <footer class="inner">
+        <p class="copyright">Proxmark3 maintained by <a href="https://github.com/Proxmark">Proxmark</a></p>
+        <p>Published with <a href="http://pages.github.com">GitHub Pages</a></p>
+      </footer>
+    </div>
+
+    
+
+  </body>
+</html>
