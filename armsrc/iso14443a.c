@@ -1783,7 +1783,8 @@ void iso14443a_setup(uint8_t fpga_minor_mode) {
 	DemodReset();
 	UartReset();
 	NextTransferTime = 2*DELAY_ARM2AIR_AS_READER;
-	iso14a_set_timeout(1050); // 10ms default
+	//iso14a_set_timeout(1050); // 10ms default
+	iso14a_set_timeout(10000); // fix for timeout of larger APDU commands
 }
 
 int iso14_apdu(uint8_t * cmd, size_t cmd_len, void * data) {
