@@ -58,6 +58,10 @@ CORESRCS = 	uart.c \
 CMDSRCS = 	nonce2key/crapto1.c\
 		nonce2key/crypto1.c\
 		nonce2key/nonce2key.c\
+		loclass/cipher.c \
+		loclass/cipherutils.c \
+		loclass/des.c \
+		loclass/ikeys.c \
 			mifarehost.c\
 			crc16.c \
 			iso14443crc.c \

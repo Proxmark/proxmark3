@@ -114,9 +114,13 @@ typedef struct {
 #define CMD_WRITER_LEGIC_RF                                               0x0389
 #define CMD_EPA_PACE_COLLECT_NONCE                                        0x038A
 
+//iclass
 #define CMD_SNOOP_ICLASS                                                  0x0392
 #define CMD_SIMULATE_TAG_ICLASS                                           0x0393
 #define CMD_READER_ICLASS                                                 0x0394
+#define CMD_READER_ICLASS_REPLAY                                          0x0395
+#define CMD_ICLASS_ISO14443A_GETPUBLIC                                    0x0396
+#define CMD_ICLASS_ISO14443A_WRITE                                        0x0397
 
 // For measurements of the antenna tuning
 #define CMD_MEASURE_ANTENNA_TUNING                                        0x0400

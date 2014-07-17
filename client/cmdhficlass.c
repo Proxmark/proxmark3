@@ -1,6 +1,7 @@
 //-----------------------------------------------------------------------------
 // Copyright (C) 2010 iZsh <izsh at fail0verflow.com>, Hagen Fritsch
 // Copyright (C) 2011 Gerhard de Koning Gans
+// Copyright (C) 2014 Midnitesnake & Andy Davies
 //
 // This code is licensed to you under the terms of the GNU GPL, version 2 or,
 // at your option, any later version. See the LICENSE.txt file for the text of
@@ -12,7 +13,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/stat.h>
 #include "iso14443crc.h" // Can also be used for iClass, using 0xE012 as CRC-type
 #include "data.h"
 //#include "proxusb.h"
@@ -22,137 +22,14 @@
 #include "cmdhficlass.h"
 #include "common.h"
 #include "util.h"
-#include "cmdmain.h"
+#include "loclass/des.h"
+#include "loclass/cipherutils.h"
+#include "loclass/cipher.h"
+#include "loclass/ikeys.h"
 
 static int CmdHelp(const char *Cmd);
 
-int xorbits_8(uint8_t val)
-{
-	uint8_t res = val ^ (val >> 1); //1st pass
-	res = res ^ (res >> 1); 		// 2nd pass
-	res = res ^ (res >> 2); 		// 3rd pass
-	res = res ^ (res >> 4); 			// 4th pass
-	return res & 1;
-}
-
 int CmdHFiClassList(const char *Cmd)
-{
-
-	bool ShowWaitCycles = false;
-	char param = param_getchar(Cmd, 0);
-
-	if (param != 0) {
-		PrintAndLog("List data in trace buffer.");
-		PrintAndLog("Usage:  hf iclass list");
-		PrintAndLog("h - help");
-		PrintAndLog("sample: hf iclass list");
-		return 0;
-	}
-
-	uint8_t got[1920];
-	GetFromBigBuf(got,sizeof(got),0);
-	WaitForResponse(CMD_ACK,NULL);
-
-	PrintAndLog("Recorded Activity");
-	PrintAndLog("");
-	PrintAndLog("Start = Start of Start Bit, End = End of last modulation. Src = Source of Transfer");
-	PrintAndLog("All times are in carrier periods (1/13.56Mhz)");
-	PrintAndLog("");
-	PrintAndLog("     Start |       End | Src | Data");
-	PrintAndLog("-----------|-----------|-----|--------");
-
-	int i;
-	uint32_t first_timestamp = 0;
-	uint32_t timestamp;
-	bool tagToReader;
-	uint32_t parityBits;
-	uint8_t len;
-	uint8_t *frame;
-	uint32_t EndOfTransmissionTimestamp = 0;
-
-
-	for( i=0; i < 1900;)
-	{
-		//First 32 bits contain
-		// isResponse (1 bit)
-		// timestamp (remaining)
-		//Then paritybits
-		//Then length
-		timestamp = *((uint32_t *)(got+i));
-		parityBits = *((uint32_t *)(got+i+4));
-		len = got[i+8];
-		frame = (got+i+9);
-		uint32_t next_timestamp = (*((uint32_t *)(got+i+9))) & 0x7fffffff;
-
-		tagToReader = timestamp & 0x80000000;
-		timestamp &= 0x7fffffff;
-
-		if(i==0) {
-			first_timestamp = timestamp;
-		}
-
-		// Break and stick with current result if buffer was not completely full
-		if (frame[0] == 0x44 && frame[1] == 0x44 && frame[2] == 0x44 && frame[3] == 0x44) break;
-
-		char line[1000] = "";
-
-		if(len)//We have some data to display
-		{
-			int j,oddparity;
-
-			for(j = 0; j < len ; j++)
-			{
-				oddparity = 0x01 ^ xorbits_8(frame[j] & 0xFF);
-
-				if (tagToReader && (oddparity != ((parityBits >> (len - j - 1)) & 0x01))) {
-					sprintf(line+(j*4), "%02x!  ", frame[j]);
-				} else {
-					sprintf(line+(j*4), "%02x   ", frame[j]);
-				}
-			}
-		}else
-		{
-			if (ShowWaitCycles) {
-				sprintf(line, "fdt (Frame Delay Time): %d", (next_timestamp - timestamp));
-			}
-		}
-
-		char *crc = "";
-
-		if(len > 2)
-		{
-			uint8_t b1, b2;
-			if(!tagToReader && len == 4) {
-				// Rough guess that this is a command from the reader
-				// For iClass the command byte is not part of the CRC
-					ComputeCrc14443(CRC_ICLASS, &frame[1], len-3, &b1, &b2);
-			}
-			else {
-				  // For other data.. CRC might not be applicable (UPDATE commands etc.)
-				ComputeCrc14443(CRC_ICLASS, frame, len-2, &b1, &b2);
-			}
-
-			if (b1 != frame[len-2] || b2 != frame[len-1]) {
-				crc = (tagToReader & (len < 8)) ? "" : " !crc";
-			}
-		}
-
-		i += (len + 9);
-		EndOfTransmissionTimestamp = (*((uint32_t *)(got+i))) & 0x7fffffff;
-
-		// Not implemented for iclass on the ARM-side
-		//if (!ShowWaitCycles) i += 9;
-
-		PrintAndLog(" %9d | %9d | %s | %s %s",
-			(timestamp - first_timestamp),
-			(EndOfTransmissionTimestamp - first_timestamp),
-			(len?(tagToReader ? "Tag" : "Rdr"):"   "),
-			line, crc);
-	}
-	return 0;
-}
-
-int CmdHFiClassListOld(const char *Cmd)
 {
   uint8_t got[1920];
   GetFromBigBuf(got,sizeof(got),0);
@@ -178,9 +55,7 @@ int CmdHFiClassListOld(const char *Cmd)
       isResponse = 0;
     }
 
-
     int metric = 0;
-
     int parityBits = *((uint32_t *)(got+i+4));
     // 4 bytes of additional information...
     // maximum of 32 additional parity bit information
@@ -290,11 +165,6 @@ int CmdHFiClassListOld(const char *Cmd)
   return 0;
 }
 
-/*void iso14a_set_timeout(uint32_t timeout) {
-	UsbCommand c = {CMD_READER_ISO_14443a, {ISO14A_SET_TIMEOUT, 0, timeout}};
-	SendCommand(&c);
-}*/
-
 int CmdHFiClassSnoop(const char *Cmd)
 {
   UsbCommand c = {CMD_SNOOP_ICLASS};
@@ -307,92 +177,23 @@ int CmdHFiClassSim(const char *Cmd)
   uint8_t simType = 0;
   uint8_t CSN[8] = {0, 0, 0, 0, 0, 0, 0, 0};
 
-  if (strlen(Cmd)<1) {
-	PrintAndLog("Usage:  hf iclass sim [0 <CSN>] | x");
-	PrintAndLog("        options");
-	PrintAndLog("                0 <CSN> simulate the given CSN");
-	PrintAndLog("                1       simulate default CSN");
-	PrintAndLog("                2       iterate CSNs, gather MACs");
+  if (strlen(Cmd)<2) {
+	PrintAndLog("Usage:  hf iclass sim    <sim type> <CSN (16 hex symbols)>");
 	PrintAndLog("        sample: hf iclass sim 0 031FEC8AF7FF12E0");
-	PrintAndLog("        sample: hf iclass sim 2");
 	return 0;
   }	
 
   simType = param_get8(Cmd, 0);
-
-  if(simType == 0)
-  {
-	  if (param_gethex(Cmd, 1, CSN, 16)) {
-		  PrintAndLog("A CSN should consist of 16 HEX symbols");
-		  return 1;
-	  }
-	  PrintAndLog("--simtype:%02x csn:%s", simType, sprint_hex(CSN, 8));
-
+  if (param_gethex(Cmd, 1, CSN, 16)) {
+	PrintAndLog("A CSN should consist of 16 HEX symbols");
+	return 1;
   }
-  if(simType > 2)
-  {
-	  PrintAndLog("Undefined simptype %d", simType);
-	  return 1;
-  }
-  uint8_t numberOfCSNs=0;
+  PrintAndLog("--simtype:%02x csn:%s", simType, sprint_hex(CSN, 8));
 
-	if(simType == 2)
-	{
-		UsbCommand c = {CMD_SIMULATE_TAG_ICLASS, {simType,63}};
-		UsbCommand resp = {0};
+  UsbCommand c = {CMD_SIMULATE_TAG_ICLASS, {simType}};
+  memcpy(c.d.asBytes, CSN, 8);
+  SendCommand(&c);
 
-		uint8_t csns[64] = {
-			 0x00,0x0B,0x0F,0xFF,0xF7,0xFF,0x12,0xE0 ,
-			 0x00,0x13,0x94,0x7e,0x76,0xff,0x12,0xe0 ,
-			 0x2a,0x99,0xac,0x79,0xec,0xff,0x12,0xe0 ,
-			 0x17,0x12,0x01,0xfd,0xf7,0xff,0x12,0xe0 ,
-			 0xcd,0x56,0x01,0x7c,0x6f,0xff,0x12,0xe0 ,
-			 0x4b,0x5e,0x0b,0x72,0xef,0xff,0x12,0xe0 ,
-			 0x00,0x73,0xd8,0x75,0x58,0xff,0x12,0xe0 ,
-			 0x0c,0x90,0x32,0xf3,0x5d,0xff,0x12,0xe0 };
-
-		memcpy(c.d.asBytes, csns, 64);
-
-		SendCommand(&c);
-		if (!WaitForResponseTimeout(CMD_ACK, &resp, -1)) {
-			PrintAndLog("Command timed out");
-			return 0;
-		}
-
-		uint8_t num_mac_responses  = resp.arg[1];
-		PrintAndLog("Mac responses: %d MACs obtained (should be 8)", num_mac_responses);
-
-		size_t datalen = 8*24;
-		/*
-		 * Now, time to dump to file. We'll use this format:
-		 * <8-byte CSN><8-byte CC><4 byte NR><4 byte MAC>....
-		 * So, it should wind up as
-		 * 8 * 24 bytes.
-		 *
-		 * The returndata from the pm3 is on the following format
-		 * <4 byte NR><4 byte MAC>
-		 * CC are all zeroes, CSN is the same as was sent in
-		 **/
-		void* dump = malloc(datalen);
-		memset(dump,0,datalen);//<-- Need zeroes for the CC-field
-		uint8_t i = 0;
-		for(i = 0 ; i < 8 ; i++)
-		{
-			memcpy(dump+i*24, csns+i*8,8); //CSN
-			//8 zero bytes here...
-			//Then comes NR_MAC (eight bytes from the response)
-			memcpy(dump+i*24+16,resp.d.asBytes+i*8,8);
-
-		}
-		/** Now, save to dumpfile **/
-		saveFile("iclass_mac_attack", "bin", dump,datalen);
-		free(dump);
-	}else
-	{
-		UsbCommand c = {CMD_SIMULATE_TAG_ICLASS, {simType,numberOfCSNs}};
-		memcpy(c.d.asBytes, CSN, 8);
-		SendCommand(&c);
-	}
   return 0;
 }
 
@@ -410,27 +211,130 @@ int CmdHFiClassReader(const char *Cmd)
   PrintAndLog("--readertype:%02x", readerType);
 
   UsbCommand c = {CMD_READER_ICLASS, {readerType}};
-  //memcpy(c.d.asBytes, CSN, 8);
   SendCommand(&c);
 
-  /*UsbCommand * resp = WaitForResponseTimeout(CMD_ACK, 1500);
-  if (resp != NULL) {
-	uint8_t                isOK  = resp->arg[0] & 0xff;
+  return 0;
+}
+
+int CmdHFiClassReader_Replay(const char *Cmd)
+{
+  uint8_t readerType = 0;
+  uint8_t MAC[4]={0x00, 0x00, 0x00, 0x00};
+
+  if (strlen(Cmd)<1) {
+    PrintAndLog("Usage:  hf iclass replay <MAC>");
+    PrintAndLog("        sample: hf iclass replay 00112233");
+    return 0;
+  }
+
+  if (param_gethex(Cmd, 0, MAC, 8)) {
+    PrintAndLog("MAC must include 8 HEX symbols");
+    return 1;
+  }
+
+  UsbCommand c = {CMD_READER_ICLASS_REPLAY, {readerType}};
+  memcpy(c.d.asBytes, MAC, 4);
+  SendCommand(&c);
+
+  return 0;
+}
+
+int CmdHFiClassReader_Dump(const char *Cmd)
+{
+  uint8_t readerType = 0;
+  uint8_t MAC[4]={0x00,0x00,0x00,0x00};
+  uint8_t KEY[8]={0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00};
+  uint8_t CSN[8]={0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00};
+  uint8_t CCNR[12]={0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00};
+  //uint8_t CC_temp[8]={0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00};
+  uint8_t result[8]={0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00};
+  uint8_t div_key[8]={0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00};
+  des_context ctx_enc;
+  uint64_t crypted_id=0;
+
+  if (strlen(Cmd)<1) 
+  {
+    //PrintAndLog("Usage:  hf iclass dump <Key> <CSN> <CC>");
+    //PrintAndLog("        sample: hf iclass dump 0011223344556677 aabbccddeeffgghh FFFFFFFFFFFFFFFF");
+    PrintAndLog("Usage:  hf iclass dump <Key>");
+    PrintAndLog("        sample: hf iclass dump 0011223344556677");
+    return 0;
+  }
+
+  if (param_gethex(Cmd, 0, KEY, 16)) 
+  {
+    PrintAndLog("KEY must include 16 HEX symbols");
+    return 1;
+  }
+  
+  /*if (param_gethex(Cmd, 1, CSN, 16)) 
+  {
+    PrintAndLog("CSN must include 16 HEX symbols");
+    return 1;
+  }
+  if (param_gethex(Cmd, 2, CC_temp, 16)) 
+  {
+    PrintAndLog("CC must include 16 HEX symbols");
+    return 1;
+  }*/
+  
+  UsbCommand c = {CMD_ICLASS_ISO14443A_GETPUBLIC, {0}};
+  //memcpy(c.d.asBytes, MAC, 4);
+  SendCommand(&c);
+  
+  UsbCommand resp;
+  if (WaitForResponseTimeout(CMD_ACK,&resp,4500)) {
+    uint8_t isOK    = resp.arg[0] & 0xff;
+    uint8_t * data  = resp.d.asBytes;
+    
+    memcpy(CSN,data,8);
+    memcpy(CCNR,data+8,8);
+    PrintAndLog("DEBUG: CSN %s",sprint_hex(CSN,8));
+    PrintAndLog("DEBUG: CC  %s",sprint_hex(CCNR,8));
 	PrintAndLog("isOk:%02x", isOK);
   } else {
 	PrintAndLog("Command execute timeout");
-  }*/
+  }
+  
+  //memcpy(CCNR,CC_temp,8);
+  des_setkey_enc( &ctx_enc, KEY);
+  des_crypt_ecb(&ctx_enc,CSN,result);
+  PrintAndLog("DES Key: %s",sprint_hex(result,8));
+  uint64_t newz=0;
+  crypted_id = bytes_to_num(result,8);
+  uint64_t x = (crypted_id & 0xFFFF000000000000 );
+  pushbackSixBitByte(&newz, getSixBitByte(crypted_id,0),7);
+  pushbackSixBitByte(&newz, getSixBitByte(crypted_id,1),6);
+  pushbackSixBitByte(&newz, getSixBitByte(crypted_id,2),5);
+  pushbackSixBitByte(&newz, getSixBitByte(crypted_id,3),4);
+  pushbackSixBitByte(&newz, getSixBitByte(crypted_id,4),3);
+  pushbackSixBitByte(&newz, getSixBitByte(crypted_id,5),2);
+  pushbackSixBitByte(&newz, getSixBitByte(crypted_id,6),1);
+  pushbackSixBitByte(&newz, getSixBitByte(crypted_id,7),0);
+  newz|= x;
+  crypted_id=newz;
+  num_to_bytes(crypted_id,8,result);
+  PrintAndLog("DESr Key: %s",sprint_hex(result,8));	
+  hash0(crypted_id,div_key);
+  PrintAndLog("Div Key: %s",sprint_hex(div_key,8));
+  calc_iclass_mac(CCNR,12,div_key,MAC);
+
+  UsbCommand d = {CMD_READER_ICLASS_REPLAY, {readerType}};
+  memcpy(d.d.asBytes, MAC, 4);
+  SendCommand(&d);
 
   return 0;
 }
 
 static command_t CommandTable[] = 
 {
-  {"help",    CmdHelp,        1, "This help"},
-  {"list",    CmdHFiClassList,   0, "List iClass history"},
-  {"snoop",   CmdHFiClassSnoop,  0, "Eavesdrop iClass communication"},
-  {"sim",     CmdHFiClassSim,    0, "Simulate iClass tag"},
-  {"reader",  CmdHFiClassReader, 0, "Read an iClass tag"},
+  {"help",	CmdHelp,		1,	"This help"},
+  {"list",	CmdHFiClassList,	0,	"List iClass history"},
+  {"snoop",	CmdHFiClassSnoop,	0,	"Eavesdrop iClass communication"},
+  {"sim",	CmdHFiClassSim,		0,	"Simulate iClass tag"},
+  {"reader",	CmdHFiClassReader,	0,	"Read an iClass tag"},
+  {"replay",	CmdHFiClassReader_Replay,0,	"Read an iClass tag via Reply Attack"},
+  {"dump",	CmdHFiClassReader_Dump,	0,	"Authenticate and Dump iClass tag"},
   {NULL, NULL, 0, NULL}
 };
 
@@ -446,52 +350,3 @@ int CmdHelp(const char *Cmd)
   return 0;
 }
 
-/**
- * @brief checks if a file exists
- * @param filename
- * @return
- */
-int fileExists(const char *filename) {
-	struct stat st;
-	int result = stat(filename, &st);
-	return result == 0;
-}
-/**
- * @brief Utility function to save data to a file. This method takes a preferred name, but if that
- * file already exists, it tries with another name until it finds something suitable.
- * E.g. dumpdata-15.txt
- * @param preferredName
- * @param suffix the file suffix. Leave out the ".".
- * @param data The binary data to write to the file
- * @param datalen the length of the data
- * @return 0 for ok, 1 for failz
- */
-int saveFile(const char *preferredName, const char *suffix, const void* data, size_t datalen)
-{
-	FILE *f = fopen(preferredName, "wb");
-	int size = sizeof(char) * (strlen(preferredName)+strlen(suffix)+5);
-	char * fileName = malloc(size);
-
-	memset(fileName,0,size);
-	int num = 1;
-	sprintf(fileName,"%s.%s", preferredName, suffix);
-	while(fileExists(fileName))
-	{
-		sprintf(fileName,"%s-%d.%s", preferredName, num, suffix);
-		num++;
-	}
-	/* We should have a valid filename now, e.g. dumpdata-3.bin */
-
-	/*Opening file for writing in binary mode*/
-	FILE *fileHandle=fopen(fileName,"wb");
-	if(!f) {
-		PrintAndLog("Failed to write to file '%s'", fileName);
-		return 0;
-	}
-	fwrite(data, 1,	datalen, fileHandle);
-	fclose(fileHandle);
-	PrintAndLog("Saved data to '%s'", fileName);
-
-	free(fileName);
-	return 0;
-}
