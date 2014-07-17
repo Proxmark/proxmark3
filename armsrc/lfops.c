@@ -927,98 +927,24 @@ void CmdIOdemodFSK(int findone, int *high, int *low, int ledcontrol)
 				} else {
 					n=(n+1)/6;			// fc/10 in sets of 6
 				}
-				switch (n) {			// stuff appropriate bits in buffer
-					case 0:
-					case 1:	// one bit
-						dest[i++]=dest[idx-1]^1;
-						//Dbprintf("%d",dest[idx-1]);
-						break;
-					case 2: // two bits
-						dest[i++]=dest[idx-1]^1;
-						dest[i++]=dest[idx-1]^1;
-						//Dbprintf("%d",dest[idx-1]);
-						//Dbprintf("%d",dest[idx-1]);
-						break;
-					case 3: // 3 bit start of frame markers
-						for(int j=0; j<3; j++){
-						  dest[i++]=dest[idx-1]^1;
-						//  Dbprintf("%d",dest[idx-1]);
-						}
-						break;
-					case 4:
-						for(int j=0; j<4; j++){
-						  dest[i++]=dest[idx-1]^1;
-						//  Dbprintf("%d",dest[idx-1]);
-						}
-						break;
-					case 5:
-						for(int j=0; j<5; j++){
-						  dest[i++]=dest[idx-1]^1;
-						//  Dbprintf("%d",dest[idx-1]);
-						}
-						break;
-					case 6:
-						for(int j=0; j<6; j++){
-						  dest[i++]=dest[idx-1]^1;
-						//  Dbprintf("%d",dest[idx-1]);
-						}
-						break;
-					case 7:
-						for(int j=0; j<7; j++){
-						  dest[i++]=dest[idx-1]^1;
-						//  Dbprintf("%d",dest[idx-1]);
-						}
-						break;
-					case 8:
-						for(int j=0; j<8; j++){
-						  dest[i++]=dest[idx-1]^1;
-						//  Dbprintf("%d",dest[idx-1]);
-						}
-						break;
-					case 9:
-						for(int j=0; j<9; j++){
-						  dest[i++]=dest[idx-1]^1;
-						//  Dbprintf("%d",dest[idx-1]);
-						}
-						break;
-					case 10:
-						for(int j=0; j<10; j++){
-						  dest[i++]=dest[idx-1]^1;
-						//  Dbprintf("%d",dest[idx-1]);
-						}
-						break;
-					case 11:
-						for(int j=0; j<11; j++){
-						  dest[i++]=dest[idx-1]^1;
-						//  Dbprintf("%d",dest[idx-1]);
-						}
-						break;
-					case 12:
-						for(int j=0; j<12; j++){
-						  dest[i++]=dest[idx-1]^1;
-						 // Dbprintf("%d",dest[idx-1]);
-						}
-						break;
-					default:	// this shouldn't happen, don't stuff any bits
-						//Dbprintf("%d",dest[idx-1]);
-						break;
-				}
+				if (n < 13){
+                  for(int j=0; j<n; j++){
+                    dest[i++]=dest[idx-1]^1;
+                  }
+                }
 				n=0;
 				lastval=dest[idx];
 			}
 		}//end for
-		/*for(int j=0; j<64;j+=8){
-		  Dbprintf("%d%d%d%d%d%d%d%d",dest[j],dest[j+1],dest[j+2],dest[j+3],dest[j+4],dest[j+5],dest[j+6],dest[j+7]);
-		}
-		Dbprintf("\n");*/
 		m=i;
 		WDT_HIT();
 		
-        for( idx=0; idx<m-9; idx++) {
-	  if ( !(dest[idx]) && !(dest[idx+1]) && !(dest[idx+2]) && !(dest[idx+3]) && !(dest[idx+4]) && !(dest[idx+5]) && !(dest[idx+6]) && !(dest[idx+7]) && !(dest[idx+8])&& (dest[idx+9])){
-		found=1;
-		//idx+=9;
-		if (found) {
+		uint8_t mask[] = {0,0,0,0,0,0,0,0,0,1};
+		for( idx=0; idx < m - 64; idx++) {
+
+ 	    	if ( memcmp(dest + idx, mask, sizeof(mask)) ) continue;
+ 	    	    found=1;
+                    m=idx;
 		    Dbprintf("%d%d%d%d%d%d%d%d",dest[idx],   dest[idx+1],   dest[idx+2],dest[idx+3],dest[idx+4],dest[idx+5],dest[idx+6],dest[idx+7]);
 		    Dbprintf("%d%d%d%d%d%d%d%d",dest[idx+8], dest[idx+9], dest[idx+10],dest[idx+11],dest[idx+12],dest[idx+13],dest[idx+14],dest[idx+15]);			  
 		    Dbprintf("%d%d%d%d%d%d%d%d",dest[idx+16],dest[idx+17],dest[idx+18],dest[idx+19],dest[idx+20],dest[idx+21],dest[idx+22],dest[idx+23]);
@@ -1036,7 +962,7 @@ void CmdIOdemodFSK(int findone, int *high, int *low, int ledcontrol)
 		       version <<=1;
 		       if (dest[idx+j]) version |= 1;
 		    }
-		    for(int j=19;j<27;j++){
+		    for(int j=18;j<26;j++){
 		       //Dbprintf("%d",dest[idx+j]);
 		       unknown <<=1;
 		       if (dest[idx+j]) unknown |= 1;
@@ -1065,20 +991,15 @@ void CmdIOdemodFSK(int findone, int *high, int *low, int ledcontrol)
 			LED_D_OFF();
 		}
 		// if we're only looking for one tag 
-		if (findone){
+		if (found){
 			//*high = hi;
 			//*low = lo;
 			LED_A_OFF();
 			return;
 		}
       
-		//hi=0;
-		//lo=0;
 		found=0;
-	  }
-		
-	}
-	}
+	  }		
 	WDT_HIT();
 }
 
