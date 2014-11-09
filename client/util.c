@@ -248,3 +248,13 @@ int param_getstr(const char *line, int paramnum, char * str)
 	
 	return en - bg + 1;
 }
+
+// Needed to Authenticate to Ultralight C tags & DESFIRE tags
+void rol (uint8_t *data, const size_t len){
+    uint8_t first = data[0];
+    for (size_t i = 0; i < len-1; i++) {
+        data[i] = data[i+1];
+    }
+    data[len-1] = first;
+}
+

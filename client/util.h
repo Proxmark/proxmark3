@@ -45,3 +45,5 @@ uint64_t param_get64ex(const char *line, int paramnum, int deflt, int base);
 int param_gethex(const char *line, int paramnum, uint8_t * data, int hexcnt);
 int param_getstr(const char *line, int paramnum, char * str);
 
+// Needed to Authenticate to Ultralight C tags & DESFIRE tags
+void rol (uint8_t *data, const size_t len);
