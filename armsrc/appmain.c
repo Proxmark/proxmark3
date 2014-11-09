@@ -801,7 +801,16 @@ void UsbPacketReceived(uint8_t *packet, int len)
 			MifareUReadBlock(c->arg[0],c->d.asBytes);
 			break;
 		case CMD_MIFAREU_READCARD:
-			MifareUReadCard(c->arg[0],c->d.asBytes);
+                        MifareUReadCard(c->arg[0],c->arg[1],c->d.asBytes);
+                        break;
+                case CMD_MIFAREUC_READCARD:
+                        MifareUReadCard(c->arg[0],c->arg[1],c->d.asBytes);
+                        break;
+                case CMD_MIFAREUC_AUTH1:
+                        MifareUC_Auth1(c->arg[0],c->d.asBytes);
+                        break;
+                case CMD_MIFAREUC_AUTH2:
+                        MifareUC_Auth2(c->arg[0],c->d.asBytes);
                         break;
 		case CMD_MIFARE_READSC:
 			MifareReadSector(c->arg[0], c->arg[1], c->arg[2], c->d.asBytes);
@@ -824,7 +833,12 @@ void UsbPacketReceived(uint8_t *packet, int len)
 		case CMD_SIMULATE_MIFARE_CARD:
 			Mifare1ksim(c->arg[0], c->arg[1], c->arg[2], c->d.asBytes);
 			break;
-		
+		case CMD_MIFARE_DES_AUTH1:
+                        Mifare_DES_Auth1(c->arg[0],c->d.asBytes);
+                        break;
+                case CMD_MIFARE_DES_AUTH2:
+                        Mifare_DES_Auth2(c->arg[0],c->d.asBytes);
+                        break;		
 		// emulator
 		case CMD_MIFARE_SET_DBGMODE:
 			MifareSetDbgLvl(c->arg[0], c->arg[1], c->arg[2], c->d.asBytes);

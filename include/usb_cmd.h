@@ -153,8 +153,15 @@ typedef struct {
 #define CMD_MIFAREU_WRITEBL_COMPAT					  0x0722
 #define CMD_MIFAREU_WRITEBL						  0x0723
 #define CMD_MIFARE_CHKKEYS                                                0x0623
-
 #define CMD_MIFARE_SNIFFER                                                0x0630
+
+//ultralightC
+#define CMD_MIFAREUC_AUTH1                                                0x0724
+#define CMD_MIFAREUC_AUTH2                                                0x0725
+#define CMD_MIFAREUC_READCARD                                             0x0726
+//desfire
+#define CMD_MIFARE_DES_AUTH1                                              0x0730
+#define CMD_MIFARE_DES_AUTH2                                              0x0731
 
 #define CMD_UNKNOWN                                                       0xFFFF
 
