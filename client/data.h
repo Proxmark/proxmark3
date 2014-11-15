@@ -12,9 +12,9 @@
 #define DATA_H__
 
 #include <stdint.h>
-
+//trace buffer size as defined in armsrc/apps.h TRACE_SIZE
+#define TRACE_BUFFER_SIZE 3000
 #define SAMPLE_BUFFER_SIZE 64
-
 extern uint8_t* sample_buf;
 extern size_t sample_buf_len;
 #define arraylen(x) (sizeof(x)/sizeof((x)[0]))

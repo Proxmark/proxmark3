@@ -30,7 +30,7 @@ size_t nbytes(size_t nbits) {
 
 int CmdLFHitagList(const char *Cmd)
 {
-  uint8_t got[3000];
+  uint8_t got[TRACE_BUFFER_SIZE];
   GetFromBigBuf(got,sizeof(got),0);
   WaitForResponse(CMD_ACK,NULL);
 
@@ -42,7 +42,8 @@ int CmdLFHitagList(const char *Cmd)
   int prev = -1;
 
   for (;;) {
-    if(i >= 1900) {
+    //if(i >= 1900) {
+    if(i >= TRACE_BUFFER_SIZE) {
       break;
     }
 
@@ -69,7 +70,8 @@ int CmdLFHitagList(const char *Cmd)
     if (len > 100) {
       break;
     }
-    if (i + len >= 1900) {
+    //if (i + len >= 1900) {
+    if (i + len >= TRACE_BUFFER_SIZE) {
       break;
     }
 
