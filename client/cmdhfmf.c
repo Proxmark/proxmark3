@@ -422,13 +422,13 @@ int CmdHF14AMfRestore(const char *Cmd)
 	
 	for (i=0 ; i<16 ; i++) {
 		if (fread(keyA[i], 1, 6, fkeys) == 0) {
-      PrintAndLog("File reading error.");
+			PrintAndLog("File reading error.");
 			return 2;
     }
 	}
 	for (i=0 ; i<16 ; i++) {
 		if (fread(keyB[i], 1, 6, fkeys) == 0) {
-      PrintAndLog("File reading error.");
+			PrintAndLog("File reading error.");
 			return 2;
     }
 	}
@@ -441,8 +441,8 @@ int CmdHF14AMfRestore(const char *Cmd)
 			memcpy(c.d.asBytes, key, 6);
 			
 			if (fread(bldata, 1, 16, fdump) == 0) {
-        PrintAndLog("File reading error.");
-        return 2;
+				PrintAndLog("File reading error.");
+				return 2;
       }
 					
 			if (j == 3) {
@@ -476,7 +476,7 @@ int CmdHF14AMfRestore(const char *Cmd)
 			SendCommand(&c);
 
 			UsbCommand resp;
-      if (WaitForResponseTimeout(CMD_ACK,&resp,1500)) {
+			if (WaitForResponseTimeout(CMD_ACK,&resp,1500)) {
 				uint8_t isOK  = resp.arg[0] & 0xff;
 				PrintAndLog("isOk:%02x", isOK);
 			} else {
@@ -1107,24 +1107,28 @@ int CmdHF14AMfESet(const char *Cmd)
 int CmdHF14AMfELoad(const char *Cmd)
 {
 	FILE * f;
-	char filename[20];
+	char filename[255];
 	char * fnameptr = filename;
 	char buf[64];
 	uint8_t buf8[64];
 	int i, len, blockNum;
+	bool 4kcard = 0;
 	
 	memset(filename, 0, sizeof(filename));
 	memset(buf, 0, sizeof(buf));
 
 	if (param_getchar(Cmd, 0) == 'h' || param_getchar(Cmd, 0)== 0x00) {
 		PrintAndLog("It loads emul dump from the file `filename.eml`");
-		PrintAndLog("Usage:  hf mf eload <file name w/o `.eml`>");
-		PrintAndLog(" sample: hf mf eload filename");
+		PrintAndLog("Usage:  hf mf eload <file name w/o `.eml`> <4 - 4kcard>");
+		PrintAndLog(" sample: hf mf eload filename [4]");
 		return 0;
 	}	
 
+	size = param_getchar(Cmd, 1);
+        if (size == '4') 4kcard = 1;
+
 	len = strlen(Cmd);
-	if (len > 14) len = 14;
+	if (len > 254) len = 254;
 
 	memcpy(filename, Cmd, len);
 	fnameptr += len;
@@ -1170,9 +1174,16 @@ int CmdHF14AMfELoad(const char *Cmd)
 	}
 	fclose(f);
 	
-	if (blockNum != 16 * 4 && blockNum != 32 * 4 + 8 * 16){
-		PrintAndLog("File content error. There must be 64 blocks");
-		return 4;
+	if(4kcard){
+		if (blockNum != 32 * 4 + 8 * 16){
+                	PrintAndLog("File content error. There must be 64 blocks");
+                	return 4;
+        	}
+	}else{
+		if (blockNum != 16 * 4 && blockNum != 32 * 4 + 8 * 16){
+			PrintAndLog("File content error. There must be 64 blocks");
+			return 4;
+		}
 	}
 	PrintAndLog("Loaded %d blocks from file: %s", blockNum, filename);
   return 0;
@@ -1181,7 +1192,7 @@ int CmdHF14AMfELoad(const char *Cmd)
 int CmdHF14AMfESave(const char *Cmd)
 {
 	FILE * f;
-	char filename[20];
+	char filename[255];
 	char * fnameptr = filename;
 	uint8_t buf[64];
 	int i, j, len;
@@ -1198,7 +1209,7 @@ int CmdHF14AMfESave(const char *Cmd)
 	}	
 
 	len = strlen(Cmd);
-	if (len > 14) len = 14;
+	if (len > 254) len = 254;
 	
 	if (len < 1) {
 		// get filename
@@ -1720,28 +1731,28 @@ int CmdHF14AMfSniff(const char *Cmd){
 static command_t CommandTable[] =
 {
   {"help",		CmdHelp,						1, "This help"},
-  {"dbg",			CmdHF14AMfDbg,			0, "Set default debug mode"},
+  {"dbg",		CmdHF14AMfDbg,			0, "Set default debug mode"},
   {"rdbl",		CmdHF14AMfRdBl,			0, "Read MIFARE classic block"},
   {"rdsc",		CmdHF14AMfRdSc,			0, "Read MIFARE classic sector"},
   {"dump",		CmdHF14AMfDump,			0, "Dump MIFARE classic tag to binary file"},
-  {"restore",	CmdHF14AMfRestore,	0, "Restore MIFARE classic binary file to BLANK tag"},
+  {"restore",		CmdHF14AMfRestore,	0, "Restore MIFARE classic binary file to BLANK tag"},
   {"wrbl",		CmdHF14AMfWrBl,			0, "Write MIFARE classic block"},
-  {"chk",			CmdHF14AMfChk,			0, "Test block keys"},
-  {"mifare",	CmdHF14AMifare,			0, "Read parity error messages."},
-  {"nested",	CmdHF14AMfNested,		0, "Test nested authentication"},
+  {"chk",		CmdHF14AMfChk,			0, "Test block keys"},
+  {"mifare",		CmdHF14AMifare,			0, "Read parity error messages."},
+  {"nested",		CmdHF14AMfNested,		0, "Test nested authentication"},
   {"sniff",		CmdHF14AMfSniff,		0, "Sniff card-reader communication"},
-  {"sim",			CmdHF14AMf1kSim,		0, "Simulate MIFARE card"},
+  {"sim",		CmdHF14AMf1kSim,		0, "Simulate MIFARE card"},
   {"eclr",		CmdHF14AMfEClear,		0, "Clear simulator memory block"},
   {"eget",		CmdHF14AMfEGet,			0, "Get simulator memory block"},
   {"eset",		CmdHF14AMfESet,			0, "Set simulator memory block"},
   {"eload",		CmdHF14AMfELoad,		0, "Load from file emul dump"},
   {"esave",		CmdHF14AMfESave,		0, "Save to file emul dump"},
-  {"ecfill",	CmdHF14AMfECFill,		0, "Fill simulator memory with help of keys from simulator"},
-  {"ekeyprn",	CmdHF14AMfEKeyPrn,	0, "Print keys from simulator memory"},
-  {"csetuid",	CmdHF14AMfCSetUID,	0, "Set UID for magic Chinese card"},
-  {"csetblk",	CmdHF14AMfCSetBlk,	0, "Write block into magic Chinese card"},
-  {"cgetblk",	CmdHF14AMfCGetBlk,	0, "Read block from magic Chinese card"},
-  {"cgetsc",	CmdHF14AMfCGetSc,		0, "Read sector from magic Chinese card"},
+  {"ecfill",		CmdHF14AMfECFill,		0, "Fill simulator memory with help of keys from simulator"},
+  {"ekeyprn",		CmdHF14AMfEKeyPrn,	0, "Print keys from simulator memory"},
+  {"csetuid",		CmdHF14AMfCSetUID,	0, "Set UID for magic Chinese card"},
+  {"csetblk",		CmdHF14AMfCSetBlk,	0, "Write block into magic Chinese card"},
+  {"cgetblk",		CmdHF14AMfCGetBlk,	0, "Read block from magic Chinese card"},
+  {"cgetsc",		CmdHF14AMfCGetSc,		0, "Read sector from magic Chinese card"},
   {"cload",		CmdHF14AMfCLoad,		0, "Load dump into magic Chinese card"},
   {"csave",		CmdHF14AMfCSave,		0, "Save dump from magic Chinese card into file or emulator"},
   {NULL, NULL, 0, NULL}
