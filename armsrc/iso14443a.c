@@ -125,6 +125,8 @@ uint32_t LastProxToAirDuration;
 #define	SEC_Y 0x00
 #define	SEC_Z 0xc0
 
+//replaced large parity table with small parity generation function - saves flash code 
+/*
 const uint8_t OddByteParity[256] = {
   1, 0, 0, 1, 0, 1, 1, 0, 0, 1, 1, 0, 1, 0, 0, 1,
   0, 1, 1, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 1, 1, 0,
@@ -143,8 +145,7 @@ const uint8_t OddByteParity[256] = {
   0, 1, 1, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 1, 1, 0,
   1, 0, 0, 1, 0, 1, 1, 0, 0, 1, 1, 0, 1, 0, 0, 1
 };
-
-
+*/
 void iso14a_set_trigger(bool enable) {
 	trigger = enable;
 }
@@ -166,10 +167,14 @@ void iso14a_set_timeout(uint32_t timeout) {
 // Generate the parity value for a byte sequence
 //
 //-----------------------------------------------------------------------------
+/*
 byte_t oddparity (const byte_t bt)
 {
 	return OddByteParity[bt];
 }
+*/
+
+
 
 uint32_t GetParity(const uint8_t * pbtCmd, int iLen)
 {
@@ -179,7 +184,8 @@ uint32_t GetParity(const uint8_t * pbtCmd, int iLen)
 	// Generate the parity bits
 	for (i = 0; i < iLen; i++) {
 		// and save them to a 32Bit word
-		dwPar |= ((OddByteParity[pbtCmd[i]]) << i);
+		//dwPar |= ((OddByteParity[pbtCmd[i]]) << i);
+		dwPar |= (oddparity(pbtCmd[i]) << i);
 	}
 	return dwPar;
 }
@@ -648,6 +654,7 @@ void RAMFUNC SnoopIso14443a(uint8_t param) {
 
 //-----------------------------------------------------------------------------
 // Prepare tag messages
+//16/11/2014 - changed to calculate parity on the fly - Peter Fillmore
 //-----------------------------------------------------------------------------
 static void CodeIso14443aAsTagPar(const uint8_t *cmd, int len, uint32_t dwParity)
 {
@@ -684,13 +691,16 @@ static void CodeIso14443aAsTagPar(const uint8_t *cmd, int len, uint32_t dwParity
 		}
 
 		// Get the parity bit
-		if ((dwParity >> i) & 0x01) {
+	    // changed to generate parity on the fly	
+        //if ((dwParity >> i) & 0x01) {
+        if (oddparity(cmd[i]) & 0x01) {
 			ToSend[++ToSendMax] = SEC_D;
 			LastProxToAirDuration = 8 * ToSendMax - 4;
 		} else {
 			ToSend[++ToSendMax] = SEC_E;
 			LastProxToAirDuration = 8 * ToSendMax;
 		}
+        
 	}
 
 	// Send stopbit
