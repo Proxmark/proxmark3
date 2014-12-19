@@ -44,7 +44,15 @@ uint64_t bytes_to_num(uint8_t* src, size_t len)
 	}
 	return num;
 }
+//added here for parity calulations
 
+uint8_t oddparity(uint8_t bt)
+{
+    uint16_t v = bt;
+    v ^= v >> 4;
+    v &= 0xF;
+    return ((0x9669 >> v) & 1);
+}
 void LEDsoff()
 {
 	LED_A_OFF();

@@ -226,7 +226,8 @@ static RAMFUNC int OutOfNDecoding(int bit)
 
 							// Calculate the parity bit for the client...
 							Uart.parityBits <<= 1;
-							Uart.parityBits ^= OddByteParity[(Uart.shiftReg & 0xff)];
+							//Uart.parityBits ^= OddByteParity[(Uart.shiftReg & 0xff)];
+							Uart.parityBits ^= oddparity(Uart.shiftReg & 0xff);
 
 							Uart.bitCnt = 0;
 							Uart.shiftReg = 0;
@@ -249,7 +250,8 @@ static RAMFUNC int OutOfNDecoding(int bit)
 
 					// Calculate the parity bit for the client...
 					Uart.parityBits <<= 1;
-					Uart.parityBits ^= OddByteParity[(Uart.dropPosition & 0xff)];
+					//Uart.parityBits ^= OddByteParity[(Uart.dropPosition & 0xff)];
+					Uart.parityBits ^= oddparity((Uart.dropPosition & 0xff));
 
 					Uart.bitCnt = 0;
 					Uart.shiftReg = 0;
@@ -486,7 +488,8 @@ static RAMFUNC int ManchesterDecoding(int v)
 					Demod.output[Demod.len] = 0x0f;
 					Demod.len++;
 					Demod.parityBits <<= 1;
-					Demod.parityBits ^= OddByteParity[0x0f];
+					//Demod.parityBits ^= OddByteParity[0x0f];
+					Demod.parityBits ^= oddparity(0x0f);
 					Demod.state = DEMOD_UNSYNCD;
 //					error = 0x0f;
 					return TRUE;
@@ -611,7 +614,8 @@ static RAMFUNC int ManchesterDecoding(int v)
 
 				// FOR ISO15639 PARITY NOT SEND OTA, JUST CALCULATE IT FOR THE CLIENT
 				Demod.parityBits <<= 1;
-				Demod.parityBits ^= OddByteParity[(Demod.shiftReg & 0xff)];
+				//Demod.parityBits ^= OddByteParity[(Demod.shiftReg & 0xff)];
+				Demod.parityBits ^= oddparity(Demod.shiftReg & 0xff);
 
 				Demod.bitCount = 0;
 				Demod.shiftReg = 0;

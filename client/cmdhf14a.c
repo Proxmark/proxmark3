@@ -31,7 +31,6 @@ int CmdHF14AList(const char *Cmd)
 {
 	bool ShowWaitCycles = false;
 	char param = param_getchar(Cmd, 0);
-	
 	if (param == 'h' || (param != 0 && param != 'f')) {
 		PrintAndLog("List data in trace buffer.");
 		PrintAndLog("Usage:  hf 14a list [f]");
@@ -44,7 +43,8 @@ int CmdHF14AList(const char *Cmd)
 		ShowWaitCycles = true;
 	}
 		
-	uint8_t got[1920];
+	//uint8_t got[1920];
+	uint8_t got[TRACE_BUFFER_SIZE]; //changed to retrieve actual trace buffer size in apps.h in armsrc
 	GetFromBigBuf(got,sizeof(got),0);
 	WaitForResponse(CMD_ACK,NULL);
 
@@ -62,7 +62,7 @@ int CmdHF14AList(const char *Cmd)
 	uint32_t EndOfTransmissionTimestamp = 0;
 	
 	for (;;) {
-		if(i >= 1900) {
+		if(i >= TRACE_BUFFER_SIZE) {
 			break;
 		}
 
@@ -86,7 +86,7 @@ int CmdHF14AList(const char *Cmd)
 		if (len > 100) {
 			break;
 		}
-		if (i + len >= 1900) {
+		if (i + len >= TRACE_BUFFER_SIZE) {
 			break;
 		}
 
