@@ -13,12 +13,16 @@
 #include <inttypes.h>
 #include "proxmark3.h"
 #include "ui.h"
-#include "util.h"
 #include "graph.h"
+#include "cmdmain.h"
 #include "cmdparser.h"
 #include "cmddata.h"
 #include "cmdlf.h"
 #include "cmdlfem4x.h"
+#include "util.h"
+#include "data.h"
+#define LF_TRACE_BUFF_SIZE 12000
+#define LF_BITSSTREAM_LEN 1000
 
 static int CmdHelp(const char *Cmd);
 
@@ -77,9 +81,9 @@ int CmdEM410xRead(const char *Cmd)
     /* Find out if we hit both high and low peaks */
     for (j = 0; j < clock; j++)
     {
-      if (GraphBuffer[(i * clock) + j] == high)
+      if (GraphBuffer[(i * clock) + j] >= high)
         hithigh = 1;
-      else if (GraphBuffer[(i * clock) + j] == low)
+      else if (GraphBuffer[(i * clock) + j] <= low)
         hitlow = 1;
 
       /* it doesn't count if it's the first part of our read
@@ -177,8 +181,10 @@ retest:
   }
 
   /* if we've already retested after flipping bits, return */
-  if (retested++)
+	if (retested++){
+		PrintAndLog("Failed to decode");
     return 0;
+	}
 
   /* if this didn't work, try flipping bits */
   for (i = 0; i < bit2idx; i++)
