@@ -26,33 +26,37 @@ static int CmdHelp(const char *Cmd);
 
 int CmdAmp(const char *Cmd)
 {
-	int i, rising, falling;
-	int max = INT_MIN, min = INT_MAX;
+  int i, rising, falling;
+  int max = INT_MIN, min = INT_MAX;
 
-	DetectHighLowInGraph( &max, &min, FALSE);
+  for (i = 10; i < GraphTraceLen; ++i) {
+    if (GraphBuffer[i] > max)
+      max = GraphBuffer[i];
+    if (GraphBuffer[i] < min)
+      min = GraphBuffer[i];
+  }
 
-	if (max != min) {
-		rising = falling = 0;
-		
-		for (i = 0; i < GraphTraceLen; ++i) {
-			if (GraphBuffer[i + 1] < GraphBuffer[i]) {
-				if (rising) {
-					GraphBuffer[i] = max;
-					rising = 0;
-				}
-				falling = 1;
-			}
-			if (GraphBuffer[i + 1] > GraphBuffer[i]) {
-				if (falling) {
-					GraphBuffer[i] = min;
-					falling = 0;
-				}
-				rising= 1;
-			}
-		}
-	}
-	RepaintGraphWindow();
-	return 0;
+  if (max != min) {
+    rising = falling= 0;
+    for (i = 0; i < GraphTraceLen; ++i) {
+      if (GraphBuffer[i + 1] < GraphBuffer[i]) {
+        if (rising) {
+          GraphBuffer[i] = max;
+          rising = 0;
+        }
+        falling = 1;
+      }
+      if (GraphBuffer[i + 1] > GraphBuffer[i]) {
+        if (falling) {
+          GraphBuffer[i] = min;
+          falling = 0;
+        }
+        rising= 1;
+      }
+    }
+  }
+  RepaintGraphWindow();
+  return 0;
 }
 
 /*
@@ -69,167 +73,171 @@ int CmdAmp(const char *Cmd)
  //this method is dependant on all highs and lows to be the same(or clipped)  this creates issues[marshmellow] it also ignores the clock
 int Cmdaskdemod(const char *Cmd)
 {
-	int i;
-	int c, high = 0, low = 0;
+  int i;
+  int c, high = 0, low = 0;
 
-	sscanf(Cmd, "%i", &c);
+  // TODO: complain if we do not give 2 arguments here !
+  // (AL - this doesn't make sense! we're only using one argument!!!)
+  sscanf(Cmd, "%i", &c);
 
-	if (c != 0 && c != 1) {
-		PrintAndLog("Invalid argument: %s", Cmd);
-		return 0;
-	}
-
-	DetectHighLowInGraph( &high, &low, FALSE);
-
-	high = abs(high * .75);
-	low = abs(low * .75);
-
-	//prime loop
-	if (GraphBuffer[0] > 0) {
-		GraphBuffer[0] = 1-c;
-	} else {
-		GraphBuffer[0] = c;
-	}
-	
-	for (i = 1; i < GraphTraceLen; ++i) {
-		/* Transitions are detected at each peak
-		 * Transitions are either:
-		 * - we're low: transition if we hit a high
-		 * - we're high: transition if we hit a low
-		 * (we need to do it this way because some tags keep high or
-		 * low for long periods, others just reach the peak and go
-		 * down)
-		 */
+  /* Detect high and lows and clock */
+  // (AL - clock???) 
+  for (i = 0; i < GraphTraceLen; ++i)
+  {
+    if (GraphBuffer[i] > high)
+      high = GraphBuffer[i];
+    else if (GraphBuffer[i] < low)
+      low = GraphBuffer[i];
+  }
+  high=abs(high*.75);
+  low=abs(low*.75);
+  if (c != 0 && c != 1) {
+    PrintAndLog("Invalid argument: %s", Cmd);
+    return 0;
+  }
+  //prime loop
+  if (GraphBuffer[0] > 0) {
+    GraphBuffer[0] = 1-c;
+  } else {
+    GraphBuffer[0] = c;
+  }
+  for (i = 1; i < GraphTraceLen; ++i) {
+    /* Transitions are detected at each peak
+     * Transitions are either:
+     * - we're low: transition if we hit a high
+     * - we're high: transition if we hit a low
+     * (we need to do it this way because some tags keep high or
+     * low for long periods, others just reach the peak and go
+     * down)
+     */
     //[marhsmellow] change == to >= for high and <= for low for fuzz
-		if ((GraphBuffer[i] == high) && (GraphBuffer[i - 1] == c)) {
-		  GraphBuffer[i] = 1 - c;
-		} else if ((GraphBuffer[i] == low) && (GraphBuffer[i - 1] == (1 - c))){
-		  GraphBuffer[i] = c;
-		} else {
-		  /* No transition */
-		  GraphBuffer[i] = GraphBuffer[i - 1];
-		}
-	}
+    if ((GraphBuffer[i] == high) && (GraphBuffer[i - 1] == c)) {
+      GraphBuffer[i] = 1 - c;
+    } else if ((GraphBuffer[i] == low) && (GraphBuffer[i - 1] == (1 - c))){
+      GraphBuffer[i] = c;
+    } else {
+      /* No transition */
+      GraphBuffer[i] = GraphBuffer[i - 1];
+    }
+  }
   RepaintGraphWindow();
   return 0;
 }
 
-void printBitStream(uint8_t bits[], uint32_t bitLen){
-
-	uint32_t i = 0;
-	if (bitLen < 16) {
-		PrintAndLog("Too few bits found: %d",bitLen);
-		return;
-	}
-	if (bitLen > 512) 
-		bitLen = 512;
-		
-	if ( ( bitLen % 16 ) > 0) {
-		bitLen = ((bitLen / 16) * 16);
-		PrintAndLog("ICE: equally divided with 16 = %d",bitLen);
-	}
-	
-	for (i = 0; i <= ( bitLen - 16); i += 16) {
-		PrintAndLog("%i%i%i%i%i%i%i%i%i%i%i%i%i%i%i%i",
-			bits[i],
-			bits[i+1],
-			bits[i+2],
-			bits[i+3],
-			bits[i+4],
-			bits[i+5],
-			bits[i+6],
-			bits[i+7],
-			bits[i+8],
-			bits[i+9],
-			bits[i+10],
-			bits[i+11],
-			bits[i+12],
-			bits[i+13],
-			bits[i+14],
-			bits[i+15]);
-	}
+//by marshmellow
+void printBitStream(uint8_t BitStream[], uint32_t bitLen)
+{
+  uint32_t i = 0;
+  if (bitLen<16) {
+    PrintAndLog("Too few bits found: %d",bitLen);
+    return;
+  }
+  if (bitLen>512) bitLen=512;
+   for (i = 0; i <= (bitLen-16); i+=16) {
+    PrintAndLog("%i%i%i%i%i%i%i%i%i%i%i%i%i%i%i%i",
+      BitStream[i],
+      BitStream[i+1],
+      BitStream[i+2],
+      BitStream[i+3],
+      BitStream[i+4],
+      BitStream[i+5],
+      BitStream[i+6],
+      BitStream[i+7],
+      BitStream[i+8],
+      BitStream[i+9],
+      BitStream[i+10],
+      BitStream[i+11],
+      BitStream[i+12],
+      BitStream[i+13],
+      BitStream[i+14],
+      BitStream[i+15]);
+  }
   return; 
 }
-
-void printEM410x(uint64_t id) {
-
-	if ( id <= 0 ) return;
-	
-	uint64_t id2lo = 0; 
-	uint32_t i,j;
-	i = j = 0;
-	
-	for (j = 5; j > 0; j--){
-		for (i = 0; i < 8; i++){
-			id2lo = ( id2lo << 1LL)|((id & ( 1 << ( i +( ( j-1 ) * 8 )))) >> ( i + (( j-1) *8 )));
-		}
-	}
-	//output em id
-	PrintAndLog("EM TAG ID    : %010llx", id);
-	PrintAndLog("Unique TAG ID: %010llx", id2lo);
-	PrintAndLog("DEZ 8        : %08lld", id & 0xFFFFFF);
-	PrintAndLog("DEZ 10       : %010lld", id & 0xFFFFFF);
-	PrintAndLog("DEZ 5.5      : %05lld.%05lld", (id>>16LL) & 0xFFFF, (id & 0xFFFF));
-	PrintAndLog("DEZ 3.5A     : %03lld.%05lld", (id>>32ll), (id & 0xFFFF));
-	PrintAndLog("DEZ 14/IK2   : %014lld", id);
-	PrintAndLog("DEZ 15/IK3   : %015lld", id2lo);
-	PrintAndLog("Other        : %05lld_%03lld_%08lld", (id & 0xFFFF), (( id >> 16LL) & 0xFF), (id & 0xFFFFFF));
-}
-
-int CmdEm410xDecode(const char *Cmd)
+//by marshmellow
+void printEM410x(uint64_t id)
 {
-	uint64_t id = 0;
-	uint8_t bits[MAX_GRAPH_TRACE_LEN] = {0x00};
-	uint32_t len = GetFromGraphBuf(bits);
-	id = Em410xDecode(bits, len);
-	printEM410x(id);
-	if ( id > 0 ) 
-		return 1;
-	return 0;
+  if (id !=0){
+      uint64_t iii=1;
+      uint64_t id2lo=0; //id2hi=0,
+      uint32_t ii=0;
+      uint32_t i=0;
+      for (ii=5; ii>0;ii--){
+        for (i=0;i<8;i++){
+          id2lo=(id2lo<<1LL)|((id & (iii<<(i+((ii-1)*8))))>>(i+((ii-1)*8)));
+        }
+      }
+      //output em id
+      PrintAndLog("EM TAG ID    : %010llx", id);
+      PrintAndLog("Unique TAG ID: %010llx",  id2lo); //id2hi,
+      PrintAndLog("DEZ 8        : %08lld",id & 0xFFFFFF);
+      PrintAndLog("DEZ 10       : %010lld",id & 0xFFFFFF);
+      PrintAndLog("DEZ 5.5      : %05lld.%05lld",(id>>16LL) & 0xFFFF,(id & 0xFFFF));
+      PrintAndLog("DEZ 3.5A     : %03lld.%05lld",(id>>32ll),(id & 0xFFFF));
+      PrintAndLog("DEZ 14/IK2   : %014lld",id);
+      PrintAndLog("DEZ 15/IK3   : %015lld",id2lo);
+      PrintAndLog("Other        : %05lld_%03lld_%08lld",(id&0xFFFF),((id>>16LL) & 0xFF),(id & 0xFFFFFF));
+    }  
+    return;
 }
 
 //by marshmellow
-//takes 2 arguments - clock and invert both as integers 
+int CmdEm410xDecode(const char *Cmd)
+{
+  uint64_t id=0;
+  uint8_t BitStream[MAX_GRAPH_TRACE_LEN]={0};
+  uint32_t i=0;
+  i=getFromGraphBuf(BitStream);
+  id = Em410xDecode(BitStream,i);
+  printEM410x(id);
+  if (id>0) return 1;
+  return 0;
+}
+
+
+//by marshmellow
+//takes 2 arguments - clock and invert both as integers
 //attempts to demodulate ask while decoding manchester 
 //prints binary found and saves in graphbuffer for further commands
 int Cmdaskmandemod(const char *Cmd)
 {
-	int invert = 0; 
-	int clk = 0; 
-
-	sscanf(Cmd, "%i %i", &clk, &invert);    
-
-	if (invert != 0 && invert != 1) {
-		PrintAndLog("Invalid argument: %s", Cmd);
-		return 0;
-	}
+  int invert=0; 
+  int clk=0; 
+  uint8_t BitStream[MAX_GRAPH_TRACE_LEN]={0};
+  sscanf(Cmd, "%i %i", &clk, &invert);    
+  if (invert != 0 && invert != 1) {
+    PrintAndLog("Invalid argument: %s", Cmd);
+    return 0;
+  }
+  uint32_t BitLen = getFromGraphBuf(BitStream);
+  //  PrintAndLog("DEBUG: Bitlen from grphbuff: %d",BitLen);
+  int errCnt=0;
+   errCnt = askmandemod(BitStream, &BitLen,&clk,&invert);
+  if (errCnt<0){  //if fatal error (or -1)
+    // PrintAndLog("no data found %d, errors:%d, bitlen:%d, clock:%d",errCnt,invert,BitLen,clk); 
+    return 0;
+  } 
+  if (BitLen<16) return 0;
+  PrintAndLog("\nUsing Clock: %d - Invert: %d - Bits Found: %d",clk,invert,BitLen);
   
-	uint8_t bits[MAX_GRAPH_TRACE_LEN] = {0x00};
-	uint32_t len = GetFromGraphBuf(bits);
-
-	int errCnt = askmandemod(bits, &len, &clk, &invert);
-
-	if (errCnt < 0) return 0;
-	if (len < 16) return 0;
-  
-	PrintAndLog("\nUsing Clock: %d - Invert: %d - Bits Found: %d",clk,invert,len);
-
-	if (errCnt > 0){
-		PrintAndLog("# Errors during Demoding (shown as 77 in bit stream): %d",errCnt);
-	}
-  
-	PrintAndLog("ASK/Manchester decoded bitstream:");
-
-	printBitStream(bits, len);
-
-	uint64_t tagid = Em410xDecode(bits, len);
-
-	if (tagid > 0){
-		SetGraphBuf(bits, len); 
-		printEM410x(tagid);
-		return 1;
-	}
-	return 0;
+  //output
+  if (errCnt>0){
+    PrintAndLog("# Errors during Demoding (shown as 77 in bit stream): %d",errCnt);
+  }
+  PrintAndLog("ASK/Manchester decoded bitstream:");
+  // Now output the bitstream to the scrollback by line of 16 bits
+  printBitStream(BitStream,BitLen);
+  uint64_t lo =0;
+  lo = Em410xDecode(BitStream,BitLen);
+  if (lo>0){
+    //set GraphBuffer for clone or sim command
+    setGraphBuf(BitStream,BitLen); 
+    PrintAndLog("EM410x pattern found: ");
+    printEM410x(lo);
+    return 1;
+  }
+  //if (BitLen>16) return 1;
+  return 0;
 }
 
 //by marshmellow
@@ -237,42 +245,41 @@ int Cmdaskmandemod(const char *Cmd)
 //stricktly take 10 and 01 and convert to 0 and 1
 int Cmdmandecoderaw(const char *Cmd)
 {
-	int i = 0;
-	int errCnt = 0;
-	int bitnum = 0;
-	uint8_t bits[MAX_GRAPH_TRACE_LEN] = {0x00};
-	int high = 0, low = 0;
-
-	for (; i < GraphTraceLen; ++i){
-		if (GraphBuffer[i] > high) high = GraphBuffer[i];
-		else if (GraphBuffer[i] < low) low = GraphBuffer[i];
-		bits[i] = GraphBuffer[i];
-	}
-	
-	if (high > 1 || low < 0 ){
-		PrintAndLog("Error: please raw demod the wave first then mancheseter raw decode");
-		return 0;
-	}
-
-	bitnum = i;
-	errCnt = manrawdecode(bits, &bitnum);
-
-	if (errCnt>=20){
-		PrintAndLog("Too many errors: %d",errCnt);
-		return 0;
-	}
-	
-	PrintAndLog("Manchester Decoded - # errors:%d - data:",errCnt);
-	printBitStream(bits,bitnum);
-
-	if (errCnt==0){
-	//put back in graphbuffer
-	SetGraphBuf(bits, bitnum);
-
-	uint64_t id = Em410xDecode(bits,i);
-	printEM410x(id);     
-	}
-	return 1;
+  int i =0;
+  int errCnt=0;
+  int bitnum=0;
+  uint8_t BitStream[MAX_GRAPH_TRACE_LEN]={0};
+  int high=0,low=0;
+  for (;i<GraphTraceLen;++i){
+    if (GraphBuffer[i]>high) high=GraphBuffer[i];
+    else if(GraphBuffer[i]<low) low=GraphBuffer[i];
+    BitStream[i]=GraphBuffer[i];
+  }
+  if (high>1 || low <0 ){
+    PrintAndLog("Error: please raw demod the wave first then mancheseter raw decode");
+    return 0;
+  }
+  bitnum=i;
+  errCnt=manrawdecode(BitStream,&bitnum);
+  if (errCnt>=20){
+    PrintAndLog("Too many errors: %d",errCnt);
+    return 0;
+  }
+  PrintAndLog("Manchester Decoded - # errors:%d - data:",errCnt);
+  printBitStream(BitStream,bitnum);
+  if (errCnt==0){
+    //put back in graphbuffer
+    ClearGraph(0);
+    for (i=0; i<bitnum;++i){
+      GraphBuffer[i]=BitStream[i];
+    }  
+    GraphTraceLen=bitnum;
+    RepaintGraphWindow();
+    uint64_t id = 0; 
+    id = Em410xDecode(BitStream,i);
+    printEM410x(id);     
+  }
+  return 1;
 }
 
 //by marshmellow
@@ -286,35 +293,33 @@ int Cmdmandecoderaw(const char *Cmd)
 //    width waves vs small width waves to help the decode positioning) or askbiphdemod
 int CmdBiphaseDecodeRaw(const char *Cmd)
 {
-	int i = 0;
-	int errCnt = 0;
-	int bitnum = 0;
-	int offset = 0;
-	int high = 0, low = 0;
-	sscanf(Cmd, "%i", &offset);    
-
-	uint8_t bits[MAX_GRAPH_TRACE_LEN]={0};
-
-	//get graphbuffer & high and low
-	for (; i<GraphTraceLen; ++i){
-		if (GraphBuffer[i] > high) high = GraphBuffer[i];
-		else if (GraphBuffer[i] < low) low = GraphBuffer[i];
-		bits[i] = GraphBuffer[i];
-	}
-	if (high > 1 || low < 0){
-		PrintAndLog("Error: please raw demod the wave first then decode");
-		return 0;
-	}
-	bitnum = i;
-	errCnt = BiphaseRawDecode(bits, &bitnum, offset);
-	if (errCnt >= 20){
-		PrintAndLog("Too many errors attempting to decode: %d", errCnt);
-		return 0;
-	}
-	PrintAndLog("Biphase Decoded using offset: %d - # errors:%d - data:", offset, errCnt);
-	printBitStream(bits, bitnum);
-	PrintAndLog("\nif bitstream does not look right try offset=1");
-	return 1;
+  int i = 0;
+  int errCnt=0;
+  int bitnum=0;
+  int offset=0;
+  int high=0, low=0;
+  sscanf(Cmd, "%i", &offset);    
+  uint8_t BitStream[MAX_GRAPH_TRACE_LEN]={0};
+  //get graphbuffer & high and low
+  for (;i<GraphTraceLen;++i){
+    if(GraphBuffer[i]>high)high=GraphBuffer[i];
+    else if(GraphBuffer[i]<low)low=GraphBuffer[i];
+    BitStream[i]=GraphBuffer[i];
+  }
+  if (high>1 || low <0){
+    PrintAndLog("Error: please raw demod the wave first then decode");
+    return 0;
+  }
+  bitnum=i;
+  errCnt=BiphaseRawDecode(BitStream,&bitnum, offset);
+  if (errCnt>=20){
+    PrintAndLog("Too many errors attempting to decode: %d",errCnt);
+    return 0;
+  }
+  PrintAndLog("Biphase Decoded using offset: %d - # errors:%d - data:",offset,errCnt);
+  printBitStream(BitStream,bitnum);
+  PrintAndLog("\nif bitstream does not look right try offset=1");
+  return 1;
 }
 
 
@@ -324,49 +329,38 @@ int CmdBiphaseDecodeRaw(const char *Cmd)
 //prints binary found and saves in graphbuffer for further commands
 int Cmdaskrawdemod(const char *Cmd)
 {
-	int invert = 0; 
-	int clk = 0; 
-
-	sscanf(Cmd, "%i %i", &clk, &invert);
-
-	if (invert != 0 && invert != 1 ) {
-		PrintAndLog("Invalid argument: %s", Cmd);
-		return 0;
-	}
+  
+  int invert=0; 
+  int clk=0; 
+  uint8_t BitStream[MAX_GRAPH_TRACE_LEN]={0};
+  sscanf(Cmd, "%i %i", &clk, &invert);    
+  if (invert != 0 && invert != 1) {
+    PrintAndLog("Invalid argument: %s", Cmd);
+    return 0;
+  }
+  int BitLen = getFromGraphBuf(BitStream);
+  int errCnt=0;
+  errCnt = askrawdemod(BitStream, &BitLen, &clk, &invert);
+  if (errCnt==-1){  //throw away static - allow 1 and -1 (in case of threshold command first)
+    PrintAndLog("no data found"); 
+    return 0;
+  } 
+  if (BitLen<16) return 0;
+  PrintAndLog("Using Clock: %d - invert: %d - Bits Found: %d",clk,invert,BitLen);
+    //PrintAndLog("Data start pos:%d, lastBit:%d, stop pos:%d, numBits:%d",iii,lastBit,i,bitnum);
+    //move BitStream back to GraphBuffer
+	setGraphBuf(BitStream, BitLen);
 	
-	if ( clock < 0 ) {
-		PrintAndLog("Wrong clock argument");
-		return 0;
-	}
+  if (errCnt>0){
+    PrintAndLog("# Errors during Demoding (shown as 77 in bit stream): %d",errCnt);
+  }
 
-	uint8_t bits[MAX_GRAPH_TRACE_LEN] = {0x00};
-	int len = GetFromGraphBuf(bits);
-	int errCnt = 0;
-
-	errCnt = askrawdemod(bits, &len, &clk, &invert);
+  PrintAndLog("ASK demoded bitstream:");
 	
-	//throw away static - allow 1 and -1 (in case of threshold command first)
-	if (errCnt == -1) {  
-		PrintAndLog("no data found"); 
-		return 0;
-	} 
-
-	if (len < 16) return 0;
-	
-	PrintAndLog("Using Clock: %d - invert: %d - Bits Found: %d",clk,invert,len);
-
-	//move BitStream back to GraphBuffer
-	SetGraphBuf(bits, len);
-	
-	if (errCnt > 0){
-	  PrintAndLog("# Errors during Demoding (shown as 77 in bit stream): %d",errCnt);
-	}
-
-	PrintAndLog("ASK demoded bitstream:");
-	
-	// Now output the bitstream to the scrollback by line of 16 bits
-	printBitStream(bits,len);
-	return 1;
+  // Now output the bitstream to the scrollback by line of 16 bits
+  printBitStream(BitStream,BitLen);
+  
+  return 1;
 }
 
 int CmdAutoCorr(const char *Cmd)
@@ -404,7 +398,7 @@ int CmdAutoCorr(const char *Cmd)
 int CmdBitsamples(const char *Cmd)
 {
   int cnt = 0;
-  uint8_t got[10000];
+  uint8_t got[12288];
   
   GetFromBigBuf(got,sizeof(got),0);
   WaitForResponse(CMD_ACK,NULL);
@@ -437,10 +431,16 @@ int CmdBitstream(const char *Cmd)
   int hithigh, hitlow, first;
 
   /* Detect high and lows and clock */
-  DetectHighLowInGraph( &high, &low, FALSE); 
+  for (i = 0; i < GraphTraceLen; ++i)
+  {
+    if (GraphBuffer[i] > high)
+      high = GraphBuffer[i];
+    else if (GraphBuffer[i] < low)
+      low = GraphBuffer[i];
+  }
 
   /* Get our clock */
-  clock = GetClock(Cmd, 0);
+  clock = GetClock(Cmd, high, 1);
   gtl = ClearGraph(0);
 
   bit = 0;
@@ -500,7 +500,7 @@ int CmdDec(const char *Cmd)
 // uses data from graphbuffer 
 int CmdDetectClockRate(const char *Cmd)
 {
-  GetClock("",1);
+  GetClock("",0,0);
   return 0;
 }
 
@@ -510,48 +510,43 @@ int CmdDetectClockRate(const char *Cmd)
 //defaults: clock = 50, invert=0, rchigh=10, rclow=8 (RF/10 RF/8 (fsk2a))
 int CmdFSKrawdemod(const char *Cmd)
 {
-	//raw fsk demod no manchester decoding no start bit finding just get binary from wave
-	int rfLen = 50;
-	int invert = 0;
-	int fchigh = 10;
-	int fclow = 8;
-
-	//set options from parameters entered with the command
-	sscanf(Cmd, "%i %i %i %i", &rfLen, &invert, &fchigh, &fclow);    
+  //raw fsk demod  no manchester decoding no start bit finding just get binary from wave
+  //set defaults
+  int rfLen = 50;
+  int invert=0;
+  int fchigh=10;
+  int fclow=8;
+  //set options from parameters entered with the command
+  sscanf(Cmd, "%i %i %i %i", &rfLen, &invert, &fchigh, &fclow);    
   
-	// A lots of checks if chigh, clow is out-of bounds.
-  
-	if (strlen(Cmd)>0 && strlen(Cmd)<=2) {
-		
-		rfLen = 50;
-		
-		//if invert option only is used
-		if (rfLen == 1){
-			invert=1;   
-		}
-	} 
-	
-	PrintAndLog("Args invert: %d - Clock:%d - FC high:%d - FC low: %d",invert,rfLen,fchigh, fclow);
-
-	uint8_t bits[MAX_GRAPH_TRACE_LEN] = {0x00};
-	uint32_t len = GetFromGraphBuf(bits);
-
-	int size  = fskdemod(bits, len,(uint8_t)rfLen, (uint8_t)invert, (uint8_t)fchigh, (uint8_t)fclow); 
-
-	if (size > 0) {
-		PrintAndLog("FSK decoded bitstream:");
-		
-		SetGraphBuf(bits, size);
-  
-		// Now output the bitstream to the scrollback by line of 16 bits
-		// only output a max of 8 blocks of 32 bits  most tags will have full bit stream inside that sample size
-		if(size > (8*32)+2)
-			size = (8*32)+2; 
-		printBitStream(bits,size);
-	} else {
-		PrintAndLog("no FSK data found");
-	}
-	return 0;
+  if (strlen(Cmd)>0 && strlen(Cmd)<=2) {
+     //rfLen=param_get8(Cmd, 0); //if rfLen option only is used
+     if (rfLen==1){
+      invert=1;   //if invert option only is used
+      rfLen = 50;
+     } else if(rfLen==0) rfLen=50;
+  } 
+  PrintAndLog("Args invert: %d - Clock:%d - fchigh:%d - fclow: %d",invert,rfLen,fchigh, fclow);
+  uint32_t i=0;
+  uint8_t BitStream[MAX_GRAPH_TRACE_LEN]={0};
+  uint32_t BitLen = getFromGraphBuf(BitStream);
+  int size  = fskdemod(BitStream,BitLen,(uint8_t)rfLen,(uint8_t)invert,(uint8_t)fchigh,(uint8_t)fclow); 
+  if (size>0){
+    PrintAndLog("FSK decoded bitstream:");
+    ClearGraph(0);
+    for (i=0;i<size;++i){
+      GraphBuffer[i]=BitStream[i];
+    }
+    GraphTraceLen=size;
+    RepaintGraphWindow();
+    
+    // Now output the bitstream to the scrollback by line of 16 bits
+    if(size > (8*32)+2) size = (8*32)+2; //only output a max of 8 blocks of 32 bits  most tags will have full bit stream inside that sample size
+    printBitStream(BitStream,size);
+  } else{
+    PrintAndLog("no FSK data found");
+  }
+  return 0;
 }
 
 //by marshmellow (based on existing demod + holiman's refactor)
@@ -559,91 +554,72 @@ int CmdFSKrawdemod(const char *Cmd)
 //print full HID Prox ID and some bit format details if found
 int CmdFSKdemodHID(const char *Cmd)
 {
-	//raw fsk demod no manchester decoding no start bit finding just get binary from wave
-	uint32_t hi2=0, hi=0, lo=0;
+  //raw fsk demod no manchester decoding no start bit finding just get binary from wave
+  uint32_t hi2=0, hi=0, lo=0;
 
-	uint8_t BitStream[MAX_GRAPH_TRACE_LEN] = {0x00};
-	uint32_t BitLen = GetFromGraphBuf(BitStream);
-
-	//get binary from fsk wave
-	size_t size  = HIDdemodFSK(BitStream,BitLen,&hi2,&hi,&lo); 
-
-	if (size < 0){
-		PrintAndLog("Error demoding fsk");
-		return 0;
-	}
-	
-	if (hi2==0 && hi==0 && lo==0) return 0;
-
-	//extra large HID tags	
-	if (hi2 != 0){
-		PrintAndLog("TAG ID: %x%08x%08x (%d)",
-						(unsigned int) hi2,
-						(unsigned int) hi,
-						(unsigned int) lo,
-						(unsigned int) (lo>>1) & 0xFFFF);
-		SetGraphBuf(BitStream,BitLen);
-		return 1;
-	} else {  
-		//standard HID tags <38 bits
-		uint8_t fmtLen = 0;
-		uint32_t fc = 0;
-		uint32_t cardnum = 0;
-		
-		//if bit 38 is set then < 37 bit format is used
-		if (((hi>>5) & 1)==1){
-			uint32_t lo2 = 0;
-			
-			 //get bits 21-37 to check for format len bit
-			lo2 = (((hi & 15) << 12) | (lo>>20));
-			uint8_t idx3 = 1;
-
-			//find last bit set to 1 (format len bit)
-			while( lo2 > 1){ 
-				lo2=lo2>>1;
-				idx3++;
-			}
-			fmtLen = idx3 + 19;  
-			fc = 0;
-			cardnum = 0;
-			
-			if(fmtLen==26){
-				cardnum = (lo>>1)&0xFFFF;
-				fc = (lo>>17)&0xFF;
-			}
-			if(fmtLen==37){
-                cardnum = (lo>>1)&0x7FFFF;
-                fc = ((hi&0xF)<<12)|(lo>>20);
-              }
-			if(fmtLen==34){
-                cardnum = (lo>>1)&0xFFFF;
-                fc= ((hi&1)<<15)|(lo>>17);
-			}
-			if(fmtLen==35){
-                cardnum = (lo>>1)&0xFFFFF;
-                fc = ((hi&1)<<11)|(lo>>21);
-			}
-		} else { 
-			//if bit 38 is not set then 37 bit format is used
-			fmtLen= 37;
-			fc =0;
-			cardnum=0;
-			
-			if (fmtLen==37){
-                cardnum = (lo>>1) & 0x7FFFF;
-                fc = ((hi&0xF) << 12) | (lo >> 20);
-              }
-		}
-		PrintAndLog("TAG ID: %x%08x (%d) - Format Len: %dbit - FC: %d - Card: %d",
-						(unsigned int) hi,
-						(unsigned int) lo,
-						(unsigned int) (lo>>1) & 0xFFFF,
-						(unsigned int) fmtLen, 
-						(unsigned int) fc, 
-						(unsigned int) cardnum);
-    SetGraphBuf(BitStream,BitLen);
+  uint8_t BitStream[MAX_GRAPH_TRACE_LEN]={0};
+  uint32_t BitLen = getFromGraphBuf(BitStream);
+  //get binary from fsk wave
+  size_t size  = HIDdemodFSK(BitStream,BitLen,&hi2,&hi,&lo); 
+  if (size<0){
+    PrintAndLog("Error demoding fsk");
+    return 0;
+  }
+  if (hi2==0 && hi==0 && lo==0) return 0;
+  if (hi2 != 0){ //extra large HID tags
+    PrintAndLog("TAG ID: %x%08x%08x (%d)",
+       (unsigned int) hi2, (unsigned int) hi, (unsigned int) lo, (unsigned int) (lo>>1) & 0xFFFF);
+    setGraphBuf(BitStream,BitLen);
     return 1;
-          }
+  }
+  else {  //standard HID tags <38 bits
+    //Dbprintf("TAG ID: %x%08x (%d)",(unsigned int) hi, (unsigned int) lo, (unsigned int) (lo>>1) & 0xFFFF); //old print cmd
+    uint8_t fmtLen = 0;
+    uint32_t fc = 0;
+    uint32_t cardnum = 0;
+    if (((hi>>5)&1)==1){//if bit 38 is set then < 37 bit format is used
+      uint32_t lo2=0;
+      lo2=(((hi & 15) << 12) | (lo>>20)); //get bits 21-37 to check for format len bit
+      uint8_t idx3 = 1;
+      while(lo2>1){ //find last bit set to 1 (format len bit)
+        lo2=lo2>>1;
+        idx3++;
+      }
+      fmtLen =idx3+19;  
+      fc =0;
+      cardnum=0;
+      if(fmtLen==26){
+        cardnum = (lo>>1)&0xFFFF;
+        fc = (lo>>17)&0xFF;
+      }
+      if(fmtLen==37){
+        cardnum = (lo>>1)&0x7FFFF;
+        fc = ((hi&0xF)<<12)|(lo>>20);
+      }
+      if(fmtLen==34){
+        cardnum = (lo>>1)&0xFFFF;
+        fc= ((hi&1)<<15)|(lo>>17);
+      }
+      if(fmtLen==35){
+        cardnum = (lo>>1)&0xFFFFF;
+        fc = ((hi&1)<<11)|(lo>>21);
+      }
+    }
+    else { //if bit 38 is not set then 37 bit format is used
+      fmtLen= 37;
+      fc =0;
+      cardnum=0;
+      if(fmtLen==37){
+        cardnum = (lo>>1)&0x7FFFF;
+        fc = ((hi&0xF)<<12)|(lo>>20);
+      }
+    }    
+    PrintAndLog("TAG ID: %x%08x (%d) - Format Len: %dbit - FC: %d - Card: %d",
+      (unsigned int) hi, (unsigned int) lo, (unsigned int) (lo>>1) & 0xFFFF,
+      (unsigned int) fmtLen, (unsigned int) fc, (unsigned int) cardnum);
+    setGraphBuf(BitStream,BitLen);
+    return 1;
+  }
   return 0;
 }
 
@@ -652,67 +628,54 @@ int CmdFSKdemodHID(const char *Cmd)
 //print ioprox ID and some format details
 int CmdFSKdemodIO(const char *Cmd)
 {
-	if (GraphTraceLen < 65) {
-		PrintAndLog("data samples size is too small");
-		return 0;
-	}
+  //raw fsk demod no manchester decoding no start bit finding just get binary from wave
+  //set defaults
+  int idx=0; 
+  //something in graphbuffer
+  if (GraphTraceLen < 65) return 0;
+  uint8_t BitStream[MAX_GRAPH_TRACE_LEN]={0};
+  uint32_t BitLen = getFromGraphBuf(BitStream);
+  //get binary from fsk wave
+ // PrintAndLog("DEBUG: got buff");
+  idx = IOdemodFSK(BitStream,BitLen); 
+  if (idx<0){
+    //PrintAndLog("Error demoding fsk");
+    return 0;
+  }
+ // PrintAndLog("DEBUG: Got IOdemodFSK");
+  if (idx==0){
+    //PrintAndLog("IO Prox Data not found - FSK Data:");
+    //if (BitLen > 92) printBitStream(BitStream,92);
+    return 0;
+  }
+    //Index map
+    //0           10          20          30          40          50          60
+    //|           |           |           |           |           |           |
+    //01234567 8 90123456 7 89012345 6 78901234 5 67890123 4 56789012 3 45678901 23
+    //-----------------------------------------------------------------------------
+    //00000000 0 11110000 1 facility 1 version* 1 code*one 1 code*two 1 ???????? 11
+    //
+    //XSF(version)facility:codeone+codetwo (raw)
+    //Handle the data
+  if (idx+64>BitLen) return 0;
+  PrintAndLog("%d%d%d%d%d%d%d%d %d",BitStream[idx],    BitStream[idx+1],  BitStream[idx+2], BitStream[idx+3], BitStream[idx+4], BitStream[idx+5], BitStream[idx+6], BitStream[idx+7], BitStream[idx+8]);
+  PrintAndLog("%d%d%d%d%d%d%d%d %d",BitStream[idx+9],  BitStream[idx+10], BitStream[idx+11],BitStream[idx+12],BitStream[idx+13],BitStream[idx+14],BitStream[idx+15],BitStream[idx+16],BitStream[idx+17]);       
+  PrintAndLog("%d%d%d%d%d%d%d%d %d facility",BitStream[idx+18], BitStream[idx+19], BitStream[idx+20],BitStream[idx+21],BitStream[idx+22],BitStream[idx+23],BitStream[idx+24],BitStream[idx+25],BitStream[idx+26]);
+  PrintAndLog("%d%d%d%d%d%d%d%d %d version",BitStream[idx+27], BitStream[idx+28], BitStream[idx+29],BitStream[idx+30],BitStream[idx+31],BitStream[idx+32],BitStream[idx+33],BitStream[idx+34],BitStream[idx+35]);
+  PrintAndLog("%d%d%d%d%d%d%d%d %d code1",BitStream[idx+36], BitStream[idx+37], BitStream[idx+38],BitStream[idx+39],BitStream[idx+40],BitStream[idx+41],BitStream[idx+42],BitStream[idx+43],BitStream[idx+44]);
+  PrintAndLog("%d%d%d%d%d%d%d%d %d code2",BitStream[idx+45], BitStream[idx+46], BitStream[idx+47],BitStream[idx+48],BitStream[idx+49],BitStream[idx+50],BitStream[idx+51],BitStream[idx+52],BitStream[idx+53]);
+  PrintAndLog("%d%d%d%d%d%d%d%d %d%d checksum",BitStream[idx+54],BitStream[idx+55],BitStream[idx+56],BitStream[idx+57],BitStream[idx+58],BitStream[idx+59],BitStream[idx+60],BitStream[idx+61],BitStream[idx+62],BitStream[idx+63]);
 
-	//raw fsk demod no manchester decoding no start bit finding just get binary from wave
-	//set defaults
-	int idx = 0; 
-	uint8_t bits[MAX_GRAPH_TRACE_LEN] = {0x00};
-	uint32_t bitlen = GetFromGraphBuf(bits);
-
-	//get binary from fsk wave
-	idx = IOdemodFSK(bits, bitlen); 
+  uint32_t code = bytebits_to_byte(BitStream+idx,32);
+  uint32_t code2 = bytebits_to_byte(BitStream+idx+32,32); 
+  uint8_t version = bytebits_to_byte(BitStream+idx+27,8); //14,4
+  uint8_t facilitycode = bytebits_to_byte(BitStream+idx+18,8) ;
+  uint16_t number = (bytebits_to_byte(BitStream+idx+36,8)<<8)|(bytebits_to_byte(BitStream+idx+45,8)); //36,9
   
-	if (idx == 0) {
-		return 0;
-	}
-	if (idx == -1) {
-		PrintAndLog("data samples size is too small");
-		return 0;
-	}
-	if (idx == -2) {
-		PrintAndLog("Data samples has too much noice");
-		return 0;
-	}
-	if (idx == -3){
-		PrintAndLog("No good demod");
-		return 0;
-	}
-  
-	if (idx+64 > bitlen) return 0;
-  
-	//Index map
-	//0           10          20          30          40          50          60
-	//|           |           |           |           |           |           |
-	//01234567 8 90123456 7 89012345 6 78901234 5 67890123 4 56789012 3 45678901 23
-	//-----------------------------------------------------------------------------
-	//00000000 0 11110000 1 facility 1 version* 1 code*one 1 code*two 1 ???????? 11
-	//
-	//XSF(version)facility:codeone+codetwo (raw)
-	//Handle the data
-
-	PrintAndLog("%d%d%d%d%d%d%d%d %d",			bits[idx]   , bits[idx+1],  bits[idx+2], bits[idx+3], bits[idx+4], bits[idx+5], bits[idx+6], bits[idx+7], bits[idx+8]);
-	PrintAndLog("%d%d%d%d%d%d%d%d %d",			bits[idx+9] , bits[idx+10], bits[idx+11], bits[idx+12], bits[idx+13], bits[idx+14], bits[idx+15], bits[idx+16], bits[idx+17]);       
-	PrintAndLog("%d%d%d%d%d%d%d%d %d facility", bits[idx+18], bits[idx+19], bits[idx+20], bits[idx+21], bits[idx+22], bits[idx+23], bits[idx+24], bits[idx+25], bits[idx+26]);
-	PrintAndLog("%d%d%d%d%d%d%d%d %d version",	bits[idx+27], bits[idx+28], bits[idx+29], bits[idx+30], bits[idx+31], bits[idx+32], bits[idx+33], bits[idx+34], bits[idx+35]);
-	PrintAndLog("%d%d%d%d%d%d%d%d %d code1",	bits[idx+36], bits[idx+37], bits[idx+38], bits[idx+39], bits[idx+40], bits[idx+41], bits[idx+42], bits[idx+43], bits[idx+44]);
-	PrintAndLog("%d%d%d%d%d%d%d%d %d code2",	bits[idx+45], bits[idx+46], bits[idx+47], bits[idx+48], bits[idx+49], bits[idx+50], bits[idx+51], bits[idx+52], bits[idx+53]);
-	PrintAndLog("%d%d%d%d%d%d%d%d %d%d checksum", bits[idx+54], bits[idx+55], bits[idx+56], bits[idx+57], bits[idx+58], bits[idx+59], bits[idx+60], bits[idx+61], bits[idx+62], bits[idx+63]);
-
-	uint32_t code = bytebits_to_byte(bits+idx,32);
-	uint32_t code2 = bytebits_to_byte(bits+idx+32,32); 
-	uint8_t version = bytebits_to_byte(bits+idx+27,8); //14,4
-	uint8_t facilitycode = bytebits_to_byte(bits+idx+18,8) ;
-	uint16_t number = (bytebits_to_byte(bits+idx+36,8)<<8)|(bytebits_to_byte(bits+idx+45,8)); //36,9
-		  
-	PrintAndLog("XSF(%02d)%02x:%05d (%08x%08x)", version, facilitycode, number, code, code2);    
-	SetGraphBuf(bits, bitlen);
-	return 1;
+  PrintAndLog("XSF(%02d)%02x:%05d (%08x%08x)",version,facilitycode,number,code,code2);    
+  setGraphBuf(BitStream,BitLen);
+  return 1;
 }
-
 int CmdFSKdemod(const char *Cmd) //old CmdFSKdemod needs updating
 {
   static const int LowTone[]  = {
@@ -733,12 +696,12 @@ int CmdFSKdemod(const char *Cmd) //old CmdFSKdemod needs updating
 
   int lowLen = sizeof (LowTone) / sizeof (int);
   int highLen = sizeof (HighTone) / sizeof (int);
-  int convLen = (highLen > lowLen) ? highLen : lowLen;
+  int convLen = (highLen > lowLen) ? highLen : lowLen; //if highlen > lowLen then highlen else lowlen
   uint32_t hi = 0, lo = 0;
 
   int i, j;
   int minMark = 0, maxMark = 0;
-
+  
   for (i = 0; i < GraphTraceLen - convLen; ++i) {
     int lowSum = 0, highSum = 0;
 
@@ -916,81 +879,43 @@ int CmdSamples(const char *Cmd)
 		n = sizeof(got);
   
 	PrintAndLog("Reading %d samples from device memory\n", n);
-	GetFromBigBuf(got,n,0);
-	WaitForResponse(CMD_ACK,NULL);
+  GetFromBigBuf(got,n,0);
+  WaitForResponse(CMD_ACK,NULL);
 	for (int j = 0; j < n; ++j) {
 		GraphBuffer[j] = ((int)got[j]) - 128;
-	}
-	GraphTraceLen = n;
-	RepaintGraphWindow();
-	return 0;
+  }
+  GraphTraceLen = n;
+  RepaintGraphWindow();
+  return 0;
 }
 
 int CmdTuneSamples(const char *Cmd)
 {
-	int timeout = 0;
-	printf("\nMeasuring antenna characteristics, please wait...");
+  int cnt = 0;
+  int n = 255;
+  uint8_t got[255];
 
-	UsbCommand c = {CMD_MEASURE_ANTENNA_TUNING};
-	SendCommand(&c);
-
-	UsbCommand resp;
-	while(!WaitForResponseTimeout(CMD_MEASURED_ANTENNA_TUNING,&resp,1000)) {
-		timeout++;
-		printf(".");
-		if (timeout > 7) {
-			PrintAndLog("\nNo response from Proxmark. Aborting...");
-			return 1;
-		}
-	}
-
-	int peakv, peakf;
-	int vLf125, vLf134, vHf;
-	vLf125 = resp.arg[0] & 0xffff;
-	vLf134 = resp.arg[0] >> 16;
-	vHf = resp.arg[1] & 0xffff;;
-	peakf = resp.arg[2] & 0xffff;
-	peakv = resp.arg[2] >> 16;
-	PrintAndLog("");
-	PrintAndLog("# LF antenna: %5.2f V @   125.00 kHz", vLf125/1000.0);
-	PrintAndLog("# LF antenna: %5.2f V @   134.00 kHz", vLf134/1000.0);
-	PrintAndLog("# LF optimal: %5.2f V @%9.2f kHz", peakv/1000.0, 12000.0/(peakf+1));
-	PrintAndLog("# HF antenna: %5.2f V @    13.56 MHz", vHf/1000.0);
-	if (peakv<2000)
-		PrintAndLog("# Your LF antenna is unusable.");
-	else if (peakv<10000)
-		PrintAndLog("# Your LF antenna is marginal.");
-	if (vHf<2000)
-		PrintAndLog("# Your HF antenna is unusable.");
-	else if (vHf<5000)
-		PrintAndLog("# Your HF antenna is marginal.");
-
-	for (int i = 0; i < 256; i++) {
-		GraphBuffer[i] = resp.d.asBytes[i] - 128;
-	}
+  PrintAndLog("Reading %d samples\n", n);
+  GetFromBigBuf(got,n,7256); // armsrc/apps.h: #define FREE_BUFFER_OFFSET 7256
+  WaitForResponse(CMD_ACK,NULL);
+  for (int j = 0; j < n; j++) {
+    GraphBuffer[cnt++] = ((int)got[j]) - 128;
+  }
   
-	PrintAndLog("Done! Divisor 89 is 134khz, 95 is 125khz.\n");
-	PrintAndLog("\n");
-	GraphTraceLen = 256;
-	ShowGraphWindow();
-
+  PrintAndLog("Done! Divisor 89 is 134khz, 95 is 125khz.\n");
+  PrintAndLog("\n");
+  GraphTraceLen = n;
+  RepaintGraphWindow();
   return 0;
 }
 
 int CmdLoad(const char *Cmd)
 {
-   char filename[FILE_PATH_SIZE] = {0x00};
-   int len = 0;
-
-   len = strlen(Cmd);
-   if (len > FILE_PATH_SIZE) len = FILE_PATH_SIZE;
-   memcpy(filename, Cmd, len);
-	
-   FILE *f = fopen(filename, "r");
-   if (!f) {
-     PrintAndLog("couldn't open '%s'", filename);
-     return 0;
-   }
+  FILE *f = fopen(Cmd, "r");
+  if (!f) {
+    PrintAndLog("couldn't open '%s'", Cmd);
+    return 0;
+  }
 
   GraphTraceLen = 0;
   char line[80];
@@ -1070,13 +995,20 @@ int CmdManchesterDemod(const char *Cmd)
 
   /* But it does not work if compiling on WIndows: therefore we just allocate a */
   /* large array */
-  uint8_t BitStream[MAX_GRAPH_TRACE_LEN] = {0x00};
+  uint8_t BitStream[MAX_GRAPH_TRACE_LEN] = {0};
 
   /* Detect high and lows */
-  DetectHighLowInGraph( &high, &low, TRUE);
-  
+  for (i = 0; i < GraphTraceLen; i++)
+  {
+    if (GraphBuffer[i] > high)
+      high = GraphBuffer[i];
+    else if (GraphBuffer[i] < low)
+      low = GraphBuffer[i];
+  }
+
   /* Get our clock */
-  clock = GetClock(Cmd, 0); 
+  clock = GetClock(Cmd, high, 1);
+
   int tolerance = clock/4;
 
   /* Detect first transition */
@@ -1094,14 +1026,14 @@ int CmdManchesterDemod(const char *Cmd)
       break;
     }
   }
-  
+
   /* If we're not working with 1/0s, demod based off clock */
   if (high != 1)
   {
     bit = 0; /* We assume the 1st bit is zero, it may not be
               * the case: this routine (I think) has an init problem.
               * Ed.
-			  */
+              */
     for (; i < (int)(GraphTraceLen / clock); i++)
     {
       hithigh = 0;
@@ -1144,30 +1076,30 @@ int CmdManchesterDemod(const char *Cmd)
     {
       if (GraphBuffer[i-1] != GraphBuffer[i])
       {
-      lc = i-lastval;
-      lastval = i;
+        lc = i-lastval;
+        lastval = i;
 
-      // Error check: if bitidx becomes too large, we do not
-      // have a Manchester encoded bitstream or the clock is really
-      // wrong!
-      if (bitidx > (GraphTraceLen*2/clock+8) ) {
-        PrintAndLog("Error: the clock you gave is probably wrong, aborting.");
-        return 0;
-      }
-      // Then switch depending on lc length:
-      // Tolerance is 1/4 of clock rate (arbitrary)
-      if (abs(lc-clock/2) < tolerance) {
-        // Short pulse : either "1" or "0"
-        BitStream[bitidx++]=GraphBuffer[i-1];
-      } else if (abs(lc-clock) < tolerance) {
-        // Long pulse: either "11" or "00"
-        BitStream[bitidx++]=GraphBuffer[i-1];
-        BitStream[bitidx++]=GraphBuffer[i-1];
-      } else {
+        // Error check: if bitidx becomes too large, we do not
+        // have a Manchester encoded bitstream or the clock is really
+        // wrong!
+        if (bitidx > (GraphTraceLen*2/clock+8) ) {
+          PrintAndLog("Error: the clock you gave is probably wrong, aborting.");
+          return 0;
+        }
+        // Then switch depending on lc length:
+        // Tolerance is 1/4 of clock rate (arbitrary)
+        if (abs(lc-clock/2) < tolerance) {
+          // Short pulse : either "1" or "0"
+          BitStream[bitidx++]=GraphBuffer[i-1];
+        } else if (abs(lc-clock) < tolerance) {
+          // Long pulse: either "11" or "00"
+          BitStream[bitidx++]=GraphBuffer[i-1];
+          BitStream[bitidx++]=GraphBuffer[i-1];
+        } else {
         // Error
           warnings++;
-        PrintAndLog("Warning: Manchester decode error for pulse width detection.");
-        PrintAndLog("(too many of those messages mean either the stream is not Manchester encoded, or clock is wrong)");
+          PrintAndLog("Warning: Manchester decode error for pulse width detection.");
+          PrintAndLog("(too many of those messages mean either the stream is not Manchester encoded, or clock is wrong)");
 
           if (warnings > 10)
           {
@@ -1181,20 +1113,18 @@ int CmdManchesterDemod(const char *Cmd)
     // At this stage, we now have a bitstream of "01" ("1") or "10" ("0"), parse it into final decoded bitstream
     // Actually, we overwrite BitStream with the new decoded bitstream, we just need to be careful
     // to stop output at the final bitidx2 value, not bitidx
-	
-	//http://www.proxmark.org/forum/viewtopic.php?id=403
-    for (i = 1; i < bitidx; i += 2) {
+    for (i = 0; i < bitidx; i += 2) {
       if ((BitStream[i] == 0) && (BitStream[i+1] == 1)) {
         BitStream[bit2idx++] = 1 ^ invert;
-    } else if ((BitStream[i] == 1) && (BitStream[i+1] == 0)) {
-      BitStream[bit2idx++] = 0 ^ invert;
-    } else {
-      // We cannot end up in this state, this means we are unsynchronized,
-      // move up 1 bit:
-      i++;
-      warnings++;
-      PrintAndLog("Unsynchronized, resync...");
-      PrintAndLog("(too many of those messages mean the stream is not Manchester encoded)");
+      } else if ((BitStream[i] == 1) && (BitStream[i+1] == 0)) {
+        BitStream[bit2idx++] = 0 ^ invert;
+      } else {
+        // We cannot end up in this state, this means we are unsynchronized,
+        // move up 1 bit:
+        i++;
+        warnings++;
+        PrintAndLog("Unsynchronized, resync...");
+        PrintAndLog("(too many of those messages mean the stream is not Manchester encoded)");
 
         if (warnings > 10)
         {
@@ -1226,27 +1156,28 @@ int CmdManchesterDemod(const char *Cmd)
       BitStream[i+14],
       BitStream[i+15]);
   }
-  return bit2idx;
+  return 0;
 }
 
 /* Modulate our data into manchester */
 int CmdManchesterMod(const char *Cmd)
 {
   int i, j;
+  int clock;
   int bit, lastbit, wave;
-  int clock = GetClock(Cmd, 0);
- 
-  int half = (int)(clock/2);
-  
+
+  /* Get our clock */
+  clock = GetClock(Cmd, 0, 1);
+
   wave = 0;
   lastbit = 1;
   for (i = 0; i < (int)(GraphTraceLen / clock); i++)
   {
     bit = GraphBuffer[i * clock] ^ 1;
 
-    for (j = 0; j < half; ++j)
+    for (j = 0; j < (int)(clock/2); j++)
       GraphBuffer[(i * clock) + j] = bit ^ lastbit ^ wave;
-    for (j = half; j < clock; ++j)
+    for (j = (int)(clock/2); j < clock; j++)
       GraphBuffer[(i * clock) + j] = bit ^ lastbit ^ wave ^ 1;
 
     /* Keep track of how we start our wave and if we changed or not this time */
@@ -1288,17 +1219,9 @@ int CmdPlot(const char *Cmd)
 
 int CmdSave(const char *Cmd)
 {
-   char filename[FILE_PATH_SIZE] = {0x00};
-   int len = 0;
-
-   len = strlen(Cmd);
-   if (len > FILE_PATH_SIZE) len = FILE_PATH_SIZE;
-   memcpy(filename, Cmd, len);
-   
-
-  FILE *f = fopen(filename, "w");
+  FILE *f = fopen(Cmd, "w");
   if(!f) {
-    PrintAndLog("couldn't open '%s'", filename);
+    PrintAndLog("couldn't open '%s'", Cmd);
     return 0;
   }
   int i;
@@ -1413,8 +1336,6 @@ static command_t CommandTable[] =
   {"buffclear",     CmdBuffClear,       1, "Clear sample buffer and graph window"},
   {"dec",           CmdDec,             1, "Decimate samples"},
   {"detectaskclock",CmdDetectClockRate, 1, "Detect ASK clock rate"},
-  {"dirthreshold",  CmdDirectionalThreshold,   1, "<thres up> <thres down> -- Max rising higher up-thres/ Min falling lower down-thres, keep rest as prev."},
-  {"em4xdecode",    CmdEm410xDecode,    1, "decode em4x from graph buffer"},
   {"fskdemod",      CmdFSKdemod,        1, "Demodulate graph window as a HID FSK"},
   {"fskhiddemod",   CmdFSKdemodHID,     1, "Demodulate graph window as a HID FSK using raw"},
   {"fskiodemod",    CmdFSKdemodIO,      1, "Demodulate graph window as an IO Prox FSK using raw"},
@@ -1432,11 +1353,12 @@ static command_t CommandTable[] =
   {"norm",          CmdNorm,            1, "Normalize max/min to +/-500"},
   {"plot",          CmdPlot,            1, "Show graph window (hit 'h' in window for keystroke help)"},
   {"samples",       CmdSamples,         0, "[512 - 40000] -- Get raw samples for graph window"},
+  {"tune",          CmdTuneSamples,     0, "Get hw tune samples for graph window"},
   {"save",          CmdSave,            1, "<filename> -- Save trace (from graph window)"},
   {"scale",         CmdScale,           1, "<int> -- Set cursor display scale"},
   {"threshold",     CmdThreshold,       1, "<threshold> -- Maximize/minimize every value in the graph window depending on threshold"},
-  {"tune",          CmdTuneSamples,     0, "Get hw tune samples for graph window"},
   {"zerocrossings", CmdZerocrossings,   1, "Count time between zero-crossings"},
+  {"dirthreshold",  CmdDirectionalThreshold,   1, "<thres up> <thres down> -- Max rising higher up-thres/ Min falling lower down-thres, keep rest as prev."},
   {NULL, NULL, 0, NULL}
 };
 

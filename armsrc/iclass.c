@@ -36,7 +36,7 @@
 //
 //-----------------------------------------------------------------------------
 
-#include "../include/proxmark3.h"
+#include "proxmark3.h"
 #include "apps.h"
 #include "util.h"
 #include "string.h"
@@ -45,10 +45,8 @@
 // Needed for CRC in emulation mode;
 // same construction as in ISO 14443;
 // different initial value (CRC_ICLASS)
-#include "../common/iso14443crc.h"
-#include "../common/iso15693tools.h"
+#include "iso14443crc.h"
 #include "iso15693tools.h"
-
 
 static int timeout = 4096;
 
@@ -353,7 +351,7 @@ static struct {
 		SUB_SECOND_HALF,
 		SUB_BOTH
 	}		sub;
-    uint8_t   *output;
+    uint8_t *output;
 } Demod;
 
 static RAMFUNC int ManchesterDecoding(int v)
@@ -435,7 +433,7 @@ static RAMFUNC int ManchesterDecoding(int v)
 	else {
 		modulation = bit & Demod.syncBit;
 		modulation |= ((bit << 1) ^ ((Demod.buffer & 0x08) >> 3)) & Demod.syncBit;
-	
+
 		Demod.samples += 4;
 
 		if(Demod.posCount==0) {
@@ -645,7 +643,7 @@ void RAMFUNC SnoopIClass(void)
 	uint8_t *readerToTagCmd = (((uint8_t *)BigBuf) + RECV_CMD_OFFSET);
     // The response (tag -> reader) that we're receiving.
 	uint8_t *tagToReaderResponse = (((uint8_t *)BigBuf) + RECV_RESP_OFFSET);
-
+	
     FpgaDownloadAndGo(FPGA_BITSTREAM_HF);
  
     // reset traceLen to 0
@@ -744,7 +742,7 @@ void RAMFUNC SnoopIClass(void)
 
 			//if(!LogTrace(Uart.output,Uart.byteCnt, rsamples, Uart.parityBits,TRUE)) break;
 			//if(!LogTrace(NULL, 0, Uart.endTime*16 - DELAY_READER_AIR2ARM_AS_SNIFFER, 0, TRUE)) break;
-			if(tracing) {
+			if(tracing)	{
 				uint8_t parity[MAX_PARITY_SIZE];
 				GetParity(Uart.output, Uart.byteCnt, parity);
 				LogTrace(Uart.output,Uart.byteCnt, (GetCountSspClk()-time_0) << 4, (GetCountSspClk()-time_0) << 4, parity, TRUE);
@@ -768,7 +766,7 @@ void RAMFUNC SnoopIClass(void)
 		    rsamples = samples - Demod.samples;
 		    LED_B_ON();
 
-			if(tracing) {
+			if(tracing)	{
 				uint8_t parity[MAX_PARITY_SIZE];
 				GetParity(Demod.output, Demod.len, parity);
 				LogTrace(Demod.output, Demod.len, (GetCountSspClk()-time_0) << 4, (GetCountSspClk()-time_0) << 4, parity, FALSE);
@@ -1267,18 +1265,18 @@ static void TransmitIClassCommand(const uint8_t *cmd, int len, int *samples, int
    if (wait)
    {
      if(*wait < 10) *wait = 10;
-
-  for(c = 0; c < *wait;) {
-    if(AT91C_BASE_SSC->SSC_SR & (AT91C_SSC_TXRDY)) {
-      AT91C_BASE_SSC->SSC_THR = 0x00;		// For exact timing!
-      c++;
-    }
-    if(AT91C_BASE_SSC->SSC_SR & (AT91C_SSC_RXRDY)) {
-      volatile uint32_t r = AT91C_BASE_SSC->SSC_RHR;
-      (void)r;
-    }
-    WDT_HIT();
-  }
+     
+     for(c = 0; c < *wait;) {
+       if(AT91C_BASE_SSC->SSC_SR & (AT91C_SSC_TXRDY)) {
+         AT91C_BASE_SSC->SSC_THR = 0x00;		// For exact timing!
+         c++;
+       }
+       if(AT91C_BASE_SSC->SSC_SR & (AT91C_SSC_RXRDY)) {
+         volatile uint32_t r = AT91C_BASE_SSC->SSC_RHR;
+         (void)r;
+       }
+       WDT_HIT();
+     }
 
    }
 
@@ -1361,19 +1359,19 @@ void CodeIClassCommand(const uint8_t * cmd, int len)
 
 void ReaderTransmitIClass(uint8_t* frame, int len)
 {
-  int wait = 0;
-  int samples = 0;
+	int wait = 0;
+	int samples = 0;
 
-  // This is tied to other size changes
-  CodeIClassCommand(frame,len);
+	// This is tied to other size changes
+	CodeIClassCommand(frame,len);
 
-  // Select the card
-  TransmitIClassCommand(ToSend, ToSendMax, &samples, &wait);
-  if(trigger)
-  	LED_A_ON();
+	// Select the card
+	TransmitIClassCommand(ToSend, ToSendMax, &samples, &wait);
+	if(trigger)
+		LED_A_ON();
 
-  // Store reader command in buffer
-  if (tracing) {
+	// Store reader command in buffer
+	if (tracing) {
 		uint8_t par[MAX_PARITY_SIZE];
 		GetParity(frame, len, par);
 		LogTrace(frame, len, rsamples, rsamples, par, TRUE);
@@ -1408,7 +1406,7 @@ static int GetIClassAnswer(uint8_t *receivedResponse, int maxLen, int *samples, 
 	for(;;) {
 		WDT_HIT();
 
-	    if(BUTTON_PRESS()) return FALSE;
+	        if(BUTTON_PRESS()) return FALSE;
 
 		if(AT91C_BASE_SSC->SSC_SR & (AT91C_SSC_TXRDY)) {
 			AT91C_BASE_SSC->SSC_THR = 0x00;  // To make use of exact timing of next command from reader!!
@@ -1433,10 +1431,10 @@ int ReaderReceiveIClass(uint8_t* receivedAnswer)
   int samples = 0;
   if (!GetIClassAnswer(receivedAnswer,160,&samples,0)) return FALSE;
   rsamples += samples;
-  if (tracing){
-		uint8_t parity[MAX_PARITY_SIZE];
-		GetParity(receivedAnswer, Demod.len, parity);
-		LogTrace(receivedAnswer,Demod.len,rsamples,rsamples,parity,FALSE);
+  if (tracing) {
+	uint8_t parity[MAX_PARITY_SIZE];
+	GetParity(receivedAnswer, Demod.len, parity);
+	LogTrace(receivedAnswer,Demod.len,rsamples,rsamples,parity,FALSE);
   }
   if(samples == 0) return FALSE;
   return Demod.len;
@@ -1539,7 +1537,7 @@ void ReaderIClass(uint8_t arg0) {
 
     uint8_t card_data[24]={0};
     uint8_t last_csn[8]={0};
-
+	
     int read_status= 0;
     bool abort_after_read = arg0 & FLAG_ICLASS_READER_ONLY_ONCE;
 	bool get_cc = arg0 & FLAG_ICLASS_READER_GET_CC;
@@ -1554,7 +1552,7 @@ void ReaderIClass(uint8_t arg0) {
 			DbpString("Trace full");
 			break;
 		}
-        WDT_HIT();
+		WDT_HIT();
 
 		read_status = handshakeIclassTag(card_data);
 
@@ -1562,24 +1560,24 @@ void ReaderIClass(uint8_t arg0) {
 		if(read_status == 1) datasize = 8;
 		if(read_status == 2) datasize = 16;
 
-                    LED_B_ON();
-                    //Send back to client, but don't bother if we already sent this
-                    if(memcmp(last_csn, card_data, 8) != 0)
+		LED_B_ON();
+		//Send back to client, but don't bother if we already sent this
+		if(memcmp(last_csn, card_data, 8) != 0)
 		{
 
 			if(!get_cc || (get_cc && read_status == 2))
 			{
-                        cmd_send(CMD_ACK,read_status,0,0,card_data,datasize);
+				cmd_send(CMD_ACK,read_status,0,0,card_data,datasize);
 				if(abort_after_read) {
 					LED_A_OFF();
 					return;
 				}
-                    //Save that we already sent this....
-                        memcpy(last_csn, card_data, 8);
+				//Save that we already sent this....
+				memcpy(last_csn, card_data, 8);
 			}
 			//If 'get_cc' was specified and we didn't get a CC, we'll just keep trying...
 		}
-                    LED_B_OFF();
+		LED_B_OFF();
     }
     cmd_send(CMD_ACK,0,0,0,card_data, 0);
     LED_A_OFF();
@@ -1614,14 +1612,14 @@ void ReaderIClass_Replay(uint8_t arg0, uint8_t *MAC) {
 	} memory;
 	
 	uint8_t* resp = (((uint8_t *)BigBuf) + RECV_RESP_OFFSET);
-
+	
     setupIclassReader();
 
 
 	while(!BUTTON_PRESS()) {
 	
 		WDT_HIT();
-	
+
 		if(traceLen > TRACE_SIZE) {
 			DbpString("Trace full");
 			break;
@@ -1630,20 +1628,20 @@ void ReaderIClass_Replay(uint8_t arg0, uint8_t *MAC) {
 		uint8_t read_status = handshakeIclassTag(card_data);
 		if(read_status < 2) continue;
 
-				//for now replay captured auth (as cc not updated)
-				memcpy(check+5,MAC,4);
+		//for now replay captured auth (as cc not updated)
+		memcpy(check+5,MAC,4);
 
 		if(sendCmdGetResponseWithRetries(check, sizeof(check),resp, 4, 5))
 		{
-				  Dbprintf("Error: Authentication Fail!");
+			Dbprintf("Error: Authentication Fail!");
 			continue;
-				}
+		}
 
 		//first get configuration block (block 1)
 		crc = block_crc_LUT[1];
-				read[1]=1;
-				read[2] = crc >> 8;
-				read[3] = crc & 0xff;
+		read[1]=1;
+		read[2] = crc >> 8;
+		read[3] = crc & 0xff;
 
 		if(sendCmdGetResponseWithRetries(read, sizeof(read),resp, 10, 10))
 		{
@@ -1651,30 +1649,30 @@ void ReaderIClass_Replay(uint8_t arg0, uint8_t *MAC) {
 			continue;
 		}
 
-					 mem=resp[5];
-					 memory.k16= (mem & 0x80);
-					 memory.book= (mem & 0x20);
-					 memory.k2= (mem & 0x8);
-					 memory.lockauth= (mem & 0x2);
-					 memory.keyaccess= (mem & 0x1);
+		mem=resp[5];
+		memory.k16= (mem & 0x80);
+		memory.book= (mem & 0x20);
+		memory.k2= (mem & 0x8);
+		memory.lockauth= (mem & 0x2);
+		memory.keyaccess= (mem & 0x1);
 
 		cardsize = memory.k16 ? 255 : 32;
 		WDT_HIT();
 
-				//then loop around remaining blocks
+		//then loop around remaining blocks
 		for(int block=0; block < cardsize; block++){
 
 			read[1]= block;
 			crc = block_crc_LUT[block];
-				    read[2] = crc >> 8;
-				    read[3] = crc & 0xff;
+			read[2] = crc >> 8;
+			read[3] = crc & 0xff;
 
 			if(!sendCmdGetResponseWithRetries(read, sizeof(read), resp, 10, 10))
 			{
-				         Dbprintf("     %02x: %02x %02x %02x %02x %02x %02x %02x %02x",
+				Dbprintf("     %02x: %02x %02x %02x %02x %02x %02x %02x %02x",
 						 block, resp[0], resp[1], resp[2],
-					  resp[3], resp[4], resp[5],
-					  resp[6], resp[7]);
+						resp[3], resp[4], resp[5],
+						resp[6], resp[7]);
 
 			}else{
 				Dbprintf("Failed to dump block %d", block);
@@ -1702,10 +1700,10 @@ void IClass_iso14443A_write(uint8_t arg0, uint8_t blockNo, uint8_t *data, uint8_
 	
     uint16_t crc = 0;
 	
-	uint8_t* resp = (((uint8_t *)BigBuf) + RECV_RESP_OFFSET);
+	uint8_t* resp = (((uint8_t *)BigBuf) + 3560);
 
 	// Reset trace buffer
-	memset(trace, 0x44, RECV_CMD_OFFSET);
+    memset(trace, 0x44, RECV_CMD_OFFSET);
 	traceLen = 0;
 
 	// Setup SSC

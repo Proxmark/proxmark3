@@ -13,14 +13,16 @@
 #include <stdbool.h>
 #include <string.h>
 #include <stdint.h>
-#include "../common/iso14443crc.h"
+#include "iso14443crc.h"
 #include "proxmark3.h"
 #include "data.h"
 #include "graph.h"
+#include "util.h"
 #include "ui.h"
 #include "cmdparser.h"
 #include "cmdhf14b.h"
 #include "cmdmain.h"
+
 
 static int CmdHelp(const char *Cmd);
 
@@ -144,7 +146,7 @@ demodError:
 
 int CmdHF14BList(const char *Cmd)
 {
-  uint8_t got[TRACE_BUFFER_SIZE];
+  uint8_t got[960];
   GetFromBigBuf(got,sizeof(got),0);
   WaitForResponse(CMD_ACK,NULL);
 
@@ -156,8 +158,9 @@ int CmdHF14BList(const char *Cmd)
   int prev = -1;
 
   for(;;) {
-    
-	if(i >= TRACE_BUFFER_SIZE) { break; }
+    if(i >= 900) {
+      break;
+    }
 
     bool isResponse;
     int timestamp = *((uint32_t *)(got+i));
@@ -174,7 +177,7 @@ int CmdHF14BList(const char *Cmd)
     if(len > 100) {
       break;
     }
-    if(i + len >= TRACE_BUFFER_SIZE) {
+    if(i + len >= 900) {
       break;
     }
 
@@ -356,7 +359,7 @@ int CmdHF14BCmdRaw (const char *cmd) {
     SendCommand(&c);
     
     if (reply) {
-        if (WaitForResponseTimeout(CMD_ACK,&resp,10000)) {
+        if (WaitForResponseTimeout(CMD_ACK,&resp,1000)) {
             recv = resp.d.asBytes;
             PrintAndLog("received %i octets",resp.arg[0]);
             if(!resp.arg[0])

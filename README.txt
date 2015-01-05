@@ -1,68 +1,87 @@
-The iceman fork.
-
 NOTICE:
+(2014-03-26)
+This is now the official Proxmark repository!
 
-The official Proxmark repository is found here: https://github.com/Proxmark/proxmark3
+INTRODUCTION:
 
+The proxmark3 is a powerful general purpose RFID tool, the size of a deck
+of cards, designed to snoop, listen and emulate everything from
+Low Frequency (125kHz) to High Frequency (13.56MHz) tags.
 
-NEWS:      
+This repository contains enough software, logic (for the FPGA), and design
+documentation for the hardware that you could, at least in theory,
+do something useful with a proxmark3.
 
-Whats in this fork?  I have scraped the web for different enhancements to the PM3 source code and not all of them ever found their way to the master branch. 
-Among the stuff is
+RESOURCES:
 
-	* Jonor's hf 14a raw timing patch
-	* Piwi's updates. (usually gets into the master)
-	* Holiman's iclass, (usually gets into the master)
-	* Marshmellow's LF fixes
-	* Midnitesnake's Ultralight,  Ultralight-c enhancements
-	* Izsh's lf peak modification / iir-filtering
-	* Aspers's tips and tricks from inside the PM3-gui-tool, settings.xml and other stuff.
-	* My own desfire, Ultralight extras, LF T55xx enhancements, bugs fixes (filelength, hf mf commands ), TNP3xxx lua scripts,  Awid26,  skidata scripts (will come)
-	* other obscure patches like for the sammy-mode,  (offline you know), tagidentifications, defaultkeys. 
-	
-Give me a hint, and I'll see if I can't merge in the stuff you have. 
-
-I don't actually know how to make small pull-request to github :( and that is the number one reason for me not pushing a lot of things back to the PM3 master.
-	
-PM3 GUI:
-
-I do tend to rename and move stuff around, the official PM3-GUI from Gaucho will not work so well. *sorry*	
-
-	  
+   * This repository!
+      https://github.com/Proxmark/proxmark3
+      
+   * The Wiki
+      https://github.com/Proxmark/proxmark3/wiki
+      
+   * The GitHub page
+      http://proxmark.github.io/proxmark3/
+      
+   * The Forum
+      http://www.proxmark.org/forum
+      
+   * The IRC chanel
+       irc.freenode.org #proxmark3
+       -or-
+       http://webchat.freenode.net/?channels=#proxmark3
+   
 DEVELOPMENT:
 
-This fork is adjusted to compile on windows/mingw environment with Qt5.3.1 & GCC 4.8
-For people with linux you will need to patch some source code and some small change to one makefile.  If you are lazy, you google the forum and find asper's or holimans makefile or you find your solution below.
+The tools required to build  or run the project will vary depending on
+your operating system. Please refer to the Wiki for details.
 
-Common errors linux/macOS finds
-Error:
-	* loclass/fileutils.c:15:2: warning: implicit declaration of function ‘_stat’ [-Wimplicit-function-declaration]
-Solution:
-	* Remove the "unscore" sign.   In linux you use without underscore, in windows you need a underscore. 
-	
-Error:  
-	* \client\makefile  the parameter -lgdi32 
-Solution:
-	* Remove parameter.
-	
-Error:  
-	* Using older Qt4.6 gives compilation errors.  
-Solution
-	* Upgrade to Qt5.3.1 
-	OR 
-	* Change these two line in  \client\makefile
-		CXXFLAGS = -I$(QTDIR)/include -I$(QTDIR)/include/QtCore -I$(QTDIR)/include/QtGui -I$(QTDIR)/include/QtWidgets  -I/mingw/include
-		QTLDLIBS = -L$(QTDIR)/lib  -lQt5Core -lQt5Gui -lQt5Widgets 
-		
-		TO
-		
-		CXXFLAGS = -I$(QTDIR)/include -I$(QTDIR)/include/QtCore -I$(QTDIR)/include/QtGui
-		QTLDLIBS = -L$(QTDIR)/lib -lQtCore4 -lQtGui4
-	
+   * https://github.com/Proxmark/proxmark3/wiki
 
-An old Qt4 version makefile is found here: http://www.icesql.se/proxmark3/code/linuxmakefile.txt  but this one doesn't have all new files in it. So I don't recommend it.
+OBTAINING HARDWARE:
 
+The Proxmark 3 is available for purcahse (assembled and tested) from the
+following locations:
+
+   * http://proxmark3.com/
+   * http://www.xfpga.com/
+
+Most of the ultra-low-volume contract assemblers could put
+something like this together with a reasonable yield. A run of around
+a dozen units is probably cost-effective. The BOM includes (possibly-
+outdated) component pricing, and everything is available from Digikey
+and the usual distributors.
+
+If you've never assembled a modern circuit board by hand, then this is
+not a good place to start. Some of the components (e.g. the crystals)
+must not be assembled with a soldering iron, and require hot air.
+
+The schematics are included; the component values given are not
+necessarily correct for all situations, but it should be possible to do
+nearly anything you would want with appropriate population options.
+
+The printed circuit board artwork is also available, as Gerbers and an
+Excellon drill file.
 
 
-January 2015, Sweden
-iceman at host iuse.se
+LICENSING:
+
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; either version 2 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
+
+
+Jonathan Westhues
+user jwesthues, at host cq.cx
+
+May 2007, Cambridge MA

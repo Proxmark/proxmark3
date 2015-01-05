@@ -10,16 +10,17 @@
 
 #ifndef GRAPH_H__
 #define GRAPH_H__
+#include <stdint.h>
 
 void AppendGraph(int redraw, int clock, int bit);
 int ClearGraph(int redraw);
-int GetFromGraphBuf(uint8_t *buff);
-int GetClock(const char *str, int verbose);
-void SetGraphBuf(uint8_t *buff,int size);
-bool HasGraphData();
-void DetectHighLowInGraph(int *high, int *low, bool addFuzz); 
+//int DetectClock(int peak);
+int getFromGraphBuf(uint8_t *buff);
+int GetClock(const char *str, int peak, int verbose);
+void setGraphBuf(uint8_t *buff,int size);
 
 #define MAX_GRAPH_TRACE_LEN (1024*128)
 extern int GraphBuffer[MAX_GRAPH_TRACE_LEN];
 extern int GraphTraceLen;
+
 #endif

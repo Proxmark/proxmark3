@@ -1,41 +1,3 @@
-/*****************************************************************************
- * WARNING
- *
- * THIS CODE IS CREATED FOR EXPERIMENTATION AND EDUCATIONAL USE ONLY. 
- * 
- * USAGE OF THIS CODE IN OTHER WAYS MAY INFRINGE UPON THE INTELLECTUAL 
- * PROPERTY OF OTHER PARTIES, SUCH AS INSIDE SECURE AND HID GLOBAL, 
- * AND MAY EXPOSE YOU TO AN INFRINGEMENT ACTION FROM THOSE PARTIES. 
- * 
- * THIS CODE SHOULD NEVER BE USED TO INFRINGE PATENTS OR INTELLECTUAL PROPERTY RIGHTS. 
- *
- *****************************************************************************
- *
- * This file is part of loclass. It is a reconstructon of the cipher engine
- * used in iClass, and RFID techology.
- *
- * The implementation is based on the work performed by
- * Flavio D. Garcia, Gerhard de Koning Gans, Roel Verdult and
- * Milosch Meriac in the paper "Dismantling IClass".
- *
- * Copyright (C) 2014 Martin Holst Swende
- *
- * This is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as published
- * by the Free Software Foundation.
- *
- * This file is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with loclass.  If not, see <http://www.gnu.org/licenses/>.
- * 
- * 
- * 
- ****************************************************************************/
-
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -51,11 +13,11 @@
 int fileExists(const char *filename) {
 
 #ifdef _WIN32
-	struct _stat fileStat;
-	int result = _stat(filename, &fileStat);
+	struct _stat st;
+	int result = _stat(filename, &st);
 #else
-	struct stat fileStat;
-	int result = stat(filename, &fileStat);
+	struct stat st;
+	int result = stat(filename, &st);
 #endif
 	return result == 0;
 }
@@ -76,33 +38,21 @@ int saveFile(const char *preferredName, const char *suffix, const void* data, si
 	/* We should have a valid filename now, e.g. dumpdata-3.bin */
 
 	/*Opening file for writing in binary mode*/
-	FILE *fh=fopen(fileName,"wb");
-	if(!fh) {
+	FILE *fileHandle=fopen(fileName,"wb");
+	if(!fileHandle) {
 		PrintAndLog("Failed to write to file '%s'", fileName);
-		free(fh);
+		free(fileName);
 		return 1;
 	}
-	fwrite(data, 1,	datalen, fh);
-	fclose(fh);
-	PrintAndLog("Saved data to '%s'", fileName);
+	fwrite(data, 1,	datalen, fileHandle);
+	fclose(fileHandle);
+	PrintAndLog(">Saved data to '%s'", fileName);
+
 	free(fileName);
 
 	return 0;
 }
 
-int loadFile(const char *fileName, void* data, size_t datalen)
-{
-	FILE *filehandle = fopen(fileName, "rb");
-	if(!filehandle) {
-		PrintAndLog("Failed to read from file '%s'", fileName);
-		free(filehandle);
-		return 1;
-	}
-	fread(data,datalen,1,filehandle);
-	fclose(filehandle);
-	free(filehandle);
-	return 0;
-}
 /**
  * Utility function to print to console. This is used consistently within the library instead
  * of printf, but it actually only calls printf (and adds a linebreak).
@@ -113,11 +63,11 @@ int loadFile(const char *fileName, void* data, size_t datalen)
  */
 void prnlog(char *fmt, ...)
 {
-
+	char buffer[2048] = {0};
 	va_list args;
 	va_start(args,fmt);
-    PrintAndLog(fmt, args);
-    //vprintf(fmt,args);
+	vsprintf (buffer,fmt, args);
 	va_end(args);
-    //printf("\n");
+	PrintAndLog(buffer);
+
 }

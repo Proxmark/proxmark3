@@ -47,7 +47,7 @@ void SendCommand(UsbCommand *c) {
       PrintAndLog("Sending bytes to proxmark failed - offline");
       return;
     }
-	/**
+  /**
 	The while-loop below causes hangups at times, when the pm3 unit is unresponsive
 	or disconnected. The main console thread is alive, but comm thread just spins here.
 	Not good.../holiman

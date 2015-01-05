@@ -20,7 +20,7 @@
 #include "ui.h"
 #include "cmdparser.h"
 #include "cmdhficlass.h"
-#include "../include/common.h"
+#include "common.h"
 #include "util.h"
 #include "cmdmain.h"
 #include "loclass/des.h"
@@ -34,53 +34,17 @@ static int CmdHelp(const char *Cmd);
 
 int xorbits_8(uint8_t val)
 {
-	uint8_t res = val ^ (val >> 1); //1st pass
-	res = res ^ (res >> 1); 		// 2nd pass
-	res = res ^ (res >> 2); 		// 3rd pass
-	res = res ^ (res >> 4); 			// 4th pass
-	return res & 1;
-}
-
-#define ICLASS_CMD_ACTALL 0x0A
-#define ICLASS_CMD_IDENTIFY 0x0C
-#define ICLASS_CMD_READ 0x0C
-
-#define ICLASS_CMD_SELECT 0x81
-#define ICLASS_CMD_PAGESEL 0x84
-#define ICLASS_CMD_READCHECK 0x88
-#define ICLASS_CMD_CHECK 0x05
-#define ICLASS_CMD_SOF 0x0F
-#define ICLASS_CMD_HALT 0x00
-
-
-void explain(char *exp, size_t size, uint8_t* cmd, uint8_t cmdsize)
-{
-
-	if(cmdsize > 1 && cmd[0] == ICLASS_CMD_READ)
-	{
-		  snprintf(exp,size,"READ(%d)",cmd[1]);
-		  return;
-	}
-
-    switch(cmd[0])
-    {
-	case ICLASS_CMD_ACTALL:            snprintf(exp,size,"ACTALL"); break;
-	case ICLASS_CMD_IDENTIFY:    snprintf(exp,size,"IDENTIFY"); break;
-	case ICLASS_CMD_SELECT:         snprintf(exp,size,"SELECT"); break;
-	case ICLASS_CMD_PAGESEL:         snprintf(exp,size,"PAGESEL"); break;
-	case ICLASS_CMD_READCHECK:         snprintf(exp,size,"READCHECK"); break;
-	case ICLASS_CMD_CHECK:         snprintf(exp,size,"CHECK"); break;
-	case ICLASS_CMD_SOF:            snprintf(exp,size,"SOF"); break;
-	case ICLASS_CMD_HALT:            snprintf(exp,size,"HALT"); break;
-	default:                        snprintf(exp,size,"?"); break;
-    }
-    return;
+    uint8_t res = val ^ (val >> 1); //1st pass
+    res = res ^ (res >> 1); 		// 2nd pass
+    res = res ^ (res >> 2); 		// 3rd pass
+    res = res ^ (res >> 4); 			// 4th pass
+    return res & 1;
 }
 
 int CmdHFiClassList(const char *Cmd)
 {
 	PrintAndLog("Deprecated command, use 'hf list iclass' instead");
-  return 0;
+	return 0;
 }
 
 int CmdHFiClassSnoop(const char *Cmd)
@@ -140,24 +104,24 @@ int CmdHFiClassSim(const char *Cmd)
 			 0x0c,0x90,0x32,0xf3,0x5d,0xff,0x12,0xe0 };
 */
       
-	uint8_t csns[8*NUM_CSNS] = {
-	 0x00, 0x0B, 0x0F, 0xFF, 0xF7, 0xFF, 0x12, 0xE0,
-	 0x00, 0x04, 0x0E, 0x08, 0xF7, 0xFF, 0x12, 0xE0,
-	 0x00, 0x09, 0x0D, 0x05, 0xF7, 0xFF, 0x12, 0xE0,
-	 0x00, 0x0A, 0x0C, 0x06, 0xF7, 0xFF, 0x12, 0xE0,
-	 0x00, 0x0F, 0x0B, 0x03, 0xF7, 0xFF, 0x12, 0xE0,
-	 0x00, 0x08, 0x0A, 0x0C, 0xF7, 0xFF, 0x12, 0xE0,
-	 0x00, 0x0D, 0x09, 0x09, 0xF7, 0xFF, 0x12, 0xE0,
-	 0x00, 0x0E, 0x08, 0x0A, 0xF7, 0xFF, 0x12, 0xE0,
-	 0x00, 0x03, 0x07, 0x17, 0xF7, 0xFF, 0x12, 0xE0,
-	 0x00, 0x3C, 0x06, 0xE0, 0xF7, 0xFF, 0x12, 0xE0,
-	 0x00, 0x01, 0x05, 0x1D, 0xF7, 0xFF, 0x12, 0xE0,
-	 0x00, 0x02, 0x04, 0x1E, 0xF7, 0xFF, 0x12, 0xE0,
-	 0x00, 0x07, 0x03, 0x1B, 0xF7, 0xFF, 0x12, 0xE0,
-	 0x00, 0x00, 0x02, 0x24, 0xF7, 0xFF, 0x12, 0xE0,
-	 0x00, 0x05, 0x01, 0x21, 0xF7, 0xFF, 0x12, 0xE0 };
-	
-	 memcpy(c.d.asBytes, csns, 8*NUM_CSNS);
+       uint8_t csns[8*NUM_CSNS] = {
+        0x00, 0x0B, 0x0F, 0xFF, 0xF7, 0xFF, 0x12, 0xE0,
+        0x00, 0x04, 0x0E, 0x08, 0xF7, 0xFF, 0x12, 0xE0,
+        0x00, 0x09, 0x0D, 0x05, 0xF7, 0xFF, 0x12, 0xE0,
+        0x00, 0x0A, 0x0C, 0x06, 0xF7, 0xFF, 0x12, 0xE0,
+        0x00, 0x0F, 0x0B, 0x03, 0xF7, 0xFF, 0x12, 0xE0,
+        0x00, 0x08, 0x0A, 0x0C, 0xF7, 0xFF, 0x12, 0xE0,
+        0x00, 0x0D, 0x09, 0x09, 0xF7, 0xFF, 0x12, 0xE0,
+        0x00, 0x0E, 0x08, 0x0A, 0xF7, 0xFF, 0x12, 0xE0,
+        0x00, 0x03, 0x07, 0x17, 0xF7, 0xFF, 0x12, 0xE0,
+        0x00, 0x3C, 0x06, 0xE0, 0xF7, 0xFF, 0x12, 0xE0,
+        0x00, 0x01, 0x05, 0x1D, 0xF7, 0xFF, 0x12, 0xE0,
+        0x00, 0x02, 0x04, 0x1E, 0xF7, 0xFF, 0x12, 0xE0,
+        0x00, 0x07, 0x03, 0x1B, 0xF7, 0xFF, 0x12, 0xE0,
+        0x00, 0x00, 0x02, 0x24, 0xF7, 0xFF, 0x12, 0xE0,
+        0x00, 0x05, 0x01, 0x21, 0xF7, 0xFF, 0x12, 0xE0 };
+
+		memcpy(c.d.asBytes, csns, 8*NUM_CSNS);
 
 		SendCommand(&c);
 		if (!WaitForResponseTimeout(CMD_ACK, &resp, -1)) {
@@ -166,7 +130,7 @@ int CmdHFiClassSim(const char *Cmd)
 		}
 
 		uint8_t num_mac_responses  = resp.arg[1];
-		PrintAndLog("Mac responses: %d MACs obtained (should be %d)", num_mac_responses, NUM_CSNS);
+		PrintAndLog("Mac responses: %d MACs obtained (should be %d)", num_mac_responses,NUM_CSNS);
 
 		size_t datalen = NUM_CSNS*24;
 		/*
@@ -245,7 +209,7 @@ int CmdHFiClassReader_Replay(const char *Cmd)
   if (strlen(Cmd)<1) {
     PrintAndLog("Usage:  hf iclass replay <MAC>");
     PrintAndLog("        sample: hf iclass replay 00112233");
-	return 0;
+    return 0;
   }
 
   if (param_gethex(Cmd, 0, MAC, 8)) {
@@ -323,7 +287,7 @@ int CmdHFiClassReader_Dump(const char *Cmd)
   UsbCommand c = {CMD_READER_ICLASS, {0}};
   c.arg[0] = FLAG_ICLASS_READER_ONLY_ONCE| FLAG_ICLASS_READER_GET_CC;
   if(!fake_dummy_test)   
-  SendCommand(&c);
+    SendCommand(&c);
   
 
 
@@ -469,19 +433,64 @@ int CmdHFiClass_iso14443A_write(const char *Cmd)
   }
   return 0;
 }
+int CmdHFiClass_loclass(const char *Cmd)
+{
+	char opt = param_getchar(Cmd, 0);
 
+	if (strlen(Cmd)<1 || opt == 'h') {
+		PrintAndLog("Usage: hf iclass loclass [options]");
+		PrintAndLog("Options:");
+		PrintAndLog("h             Show this help");
+		PrintAndLog("t             Perform self-test");
+		PrintAndLog("f <filename>  Bruteforce iclass dumpfile");
+		PrintAndLog("                   An iclass dumpfile is assumed to consist of an arbitrary number of");
+		PrintAndLog("                   malicious CSNs, and their protocol responses");
+		PrintAndLog("                   The the binary format of the file is expected to be as follows: ");
+		PrintAndLog("                   <8 byte CSN><8 byte CC><4 byte NR><4 byte MAC>");
+		PrintAndLog("                   <8 byte CSN><8 byte CC><4 byte NR><4 byte MAC>");
+		PrintAndLog("                   <8 byte CSN><8 byte CC><4 byte NR><4 byte MAC>");
+		PrintAndLog("                  ... totalling N*24 bytes");
+		return 0;
+	}
+	char fileName[255] = {0};
+	if(opt == 'f')
+	{
+			if(param_getstr(Cmd, 1, fileName) > 0)
+			{
+				return bruteforceFileNoKeys(fileName);
+			}else
+			{
+				PrintAndLog("You must specify a filename");
+			}
+	}
+	else if(opt == 't')
+	{
+		int errors = testCipherUtils();
+		errors += testMAC();
+		errors += doKeyTests(0);
+		errors += testElite();
+		if(errors)
+		{
+			prnlog("OBS! There were errors!!!");
+		}
+		return errors;
+	}
+
+	return 0;
+}
 
 static command_t CommandTable[] = 
 {
-  {"help",    CmdHelp,        1, "This help"},
-  {"list",	CmdHFiClassList,	0,	"[Deprecated] List iClass history"},
-  {"snoop",   CmdHFiClassSnoop,  0, "Eavesdrop iClass communication"},
-  {"sim",     CmdHFiClassSim,    0, "Simulate iClass tag"},
-  {"reader",CmdHFiClassReader,	0,	"Read an iClass tag"},
-  {"replay",  CmdHFiClassReader_Replay, 0, "Read an iClass tag via Reply Attack"},
-  {"dump",	  CmdHFiClassReader_Dump, 0, "Authenticate and Dump iClass tag"},
-  {"write",	CmdHFiClass_iso14443A_write,	0,	"Authenticate and Write iClass block"},
-  {NULL, NULL, 0, NULL}
+	{"help",	CmdHelp,			1,	"This help"},
+	{"list",	CmdHFiClassList,	0,	"[Deprecated] List iClass history"},
+	{"snoop",	CmdHFiClassSnoop,	0,	"Eavesdrop iClass communication"},
+	{"sim",	CmdHFiClassSim,		0,	"Simulate iClass tag"},
+	{"reader",CmdHFiClassReader,	0,	"Read an iClass tag"},
+	{"replay",CmdHFiClassReader_Replay,	0,	"Read an iClass tag via Reply Attack"},
+	{"dump",	CmdHFiClassReader_Dump,	0,		"Authenticate and Dump iClass tag"},
+	{"write",	CmdHFiClass_iso14443A_write,	0,	"Authenticate and Write iClass block"},
+	{"loclass",	CmdHFiClass_loclass,	1,	"Use loclass to perform bruteforce of reader attack dump"},
+	{NULL, NULL, 0, NULL}
 };
 
 int CmdHFiClass(const char *Cmd)
@@ -493,5 +502,5 @@ int CmdHFiClass(const char *Cmd)
 int CmdHelp(const char *Cmd)
 {
   CmdsHelp(CommandTable);
-	return 0;
+  return 0;
 }

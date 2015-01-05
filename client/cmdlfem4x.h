@@ -22,6 +22,5 @@ int CmdReadWord(const char *Cmd);
 int CmdReadWordPWD(const char *Cmd);
 int CmdWriteWord(const char *Cmd);
 int CmdWriteWordPWD(const char *Cmd);
-int MWRem4xReplay(const char* Cmd);
 
 #endif

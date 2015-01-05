@@ -15,9 +15,9 @@
 #include "proxmark3.h"
 #include "ui.h"
 #include "cmdparser.h"
-#include "../include/common.h"
+#include "common.h"
 #include "util.h"
-#include "../include/hitag2.h"
+#include "hitag2.h"
 #include "sleep.h"
 #include "cmdmain.h"
 
@@ -29,7 +29,7 @@ size_t nbytes(size_t nbits) {
 
 int CmdLFHitagList(const char *Cmd)
 {
-  uint8_t got[TRACE_BUFFER_SIZE];
+  uint8_t got[3000];
   GetFromBigBuf(got,sizeof(got),0);
   WaitForResponse(CMD_ACK,NULL);
 
@@ -39,25 +39,11 @@ int CmdLFHitagList(const char *Cmd)
 
   int i = 0;
   int prev = -1;
-  int len = strlen(Cmd);
 
-  char filename[FILE_PATH_SIZE]  = { 0x00 };
-  FILE* pf = NULL;
-  	
-  if (len > FILE_PATH_SIZE) 
-     len = FILE_PATH_SIZE;
-  memcpy(filename, Cmd, len);
-   
-  if (strlen(filename) > 0) {
-	if ((pf = fopen(filename,"wb")) == NULL) {
-		PrintAndLog("Error: Could not open file [%s]",filename);
-		return 1;
-	}
-  }
-  
   for (;;) {
-  
-    if(i >= TRACE_BUFFER_SIZE) { break; }
+    if(i >= 1900) {
+      break;
+    }
 
     bool isResponse;
     int timestamp = *((uint32_t *)(got+i));
@@ -82,7 +68,9 @@ int CmdLFHitagList(const char *Cmd)
     if (len > 100) {
       break;
     }
-    if (i + len >= TRACE_BUFFER_SIZE) { break;}
+    if (i + len >= 1900) {
+      break;
+    }
 
     uint8_t *frame = (got+i+9);
 
@@ -115,23 +103,19 @@ int CmdLFHitagList(const char *Cmd)
       line);
 
 
-   if (pf) {
-      fprintf(pf," +%7d:  %3d: %s %s\n",
-					(prev < 0 ? 0 : (timestamp - prev)),
-					bits,
-					(isResponse ? "TAG" : "   "),
-					line);
-    }
+//   if (pf) {
+//      fprintf(pf," +%7d:  %3d: %s %s\n",
+//					(prev < 0 ? 0 : (timestamp - prev)),
+//					bits,
+//					(isResponse ? "TAG" : "   "),
+//					line);
+//    }
 	
     prev = timestamp;
     i += (len + 9);
   }
   
-  if (pf) {
-    fclose(pf);
-	PrintAndLog("Recorded activity succesfully written to file: %s", filename);
-  }
-	
+
   return 0;
 }
 
@@ -142,15 +126,13 @@ int CmdLFHitagSnoop(const char *Cmd) {
 }
 
 int CmdLFHitagSim(const char *Cmd) {
-    
-	UsbCommand c = {CMD_SIMULATE_HITAG};
-	char filename[FILE_PATH_SIZE] = { 0x00 };
+  UsbCommand c = {CMD_SIMULATE_HITAG};
+	char filename[256] = { 0x00 };
 	FILE* pf;
 	bool tag_mem_supplied;
-	int len = strlen(Cmd);
-	if (len > FILE_PATH_SIZE) len = FILE_PATH_SIZE;
-	memcpy(filename, Cmd, len);
-   
+
+	param_getstr(Cmd,0,filename);
+	
 	if (strlen(filename) > 0) {
 		if ((pf = fopen(filename,"rb+")) == NULL) {
 			PrintAndLog("Error: Could not open file [%s]",filename);
@@ -158,10 +140,10 @@ int CmdLFHitagSim(const char *Cmd) {
 		}
 		tag_mem_supplied = true;
 		if (fread(c.d.asBytes,48,1,pf) == 0) {
-            PrintAndLog("Error: File reading error");
+      PrintAndLog("Error: File reading error");
       fclose(pf);
 			return 1;
-         }
+    }
 		fclose(pf);
 	} else {
 		tag_mem_supplied = false;
@@ -245,11 +227,11 @@ int CmdLFHitagReader(const char *Cmd) {
 static command_t CommandTable[] = 
 {
   {"help",    CmdHelp,           1, "This help"},
-  {"list",    CmdLFHitagList,    1, "<outfile> List Hitag trace history"},
+  {"list",    CmdLFHitagList,    1, "List Hitag trace history"},
   {"reader",  CmdLFHitagReader,  1, "Act like a Hitag Reader"},
-  {"sim",     CmdLFHitagSim,     1, "<infile> Simulate Hitag transponder"},
+  {"sim",     CmdLFHitagSim,     1, "Simulate Hitag transponder"},
   {"snoop",   CmdLFHitagSnoop,   1, "Eavesdrop Hitag communication"},
-  {NULL, NULL, 0, NULL}
+		{NULL, NULL, 0, NULL}
 };
 
 int CmdLFHitag(const char *Cmd)

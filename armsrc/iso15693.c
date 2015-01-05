@@ -58,14 +58,12 @@
 // *) document all the functions
 
 
-#include "../include/proxmark3.h"
+#include "proxmark3.h"
 #include "util.h"
 #include "apps.h"
 #include "string.h"
-#include "../common/iso15693tools.h"
-#include "../common/cmd.h"
-#include "crapto1.h"
-#include "mifareutil.h"
+#include "iso15693tools.h"
+#include "cmd.h"
 
 #define arraylen(x) (sizeof(x)/sizeof((x)[0]))
 
@@ -453,7 +451,7 @@ static int GetIso15693AnswerFromSniff(uint8_t *receivedResponse, int maxLen, int
 
 	int8_t prev = 0;
 
-    // NOW READ RESPONSE
+// NOW READ RESPONSE
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_HF_READER_RX_XCORR);
 	//spindelay(60);	// greg - experiment to get rid of some of the 0 byte/failed reads
 	c = 0;
@@ -469,9 +467,21 @@ static int GetIso15693AnswerFromSniff(uint8_t *receivedResponse, int maxLen, int
 			// tone that the tag AM-modulates, so every other sample is I,
 			// every other is Q. We just want power, so abs(I) + abs(Q) is
 			// close to what we want.
-			if (getNext) {
+			if(getNext) {
+				int8_t r;
 
-				dest[c++] = abs(b) + abs(prev);
+				if(b < 0) {
+					r = -b;
+				} else {
+					r = b;
+				}
+				if(prev < 0) {
+					r -= prev;
+				} else {
+					r += prev;
+				}
+
+				dest[c++] = (uint8_t)r;
 
 				if(c >= 20000) {
 					break;
@@ -679,8 +689,8 @@ void RecordRawAdcSamplesIso15693(void)
 	FpgaSetupSsc();
 
 	// Start from off (no field generated)
-   	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
-   	SpinDelay(200);
+    	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
+    	SpinDelay(200);
 
 	SetAdcMuxFor(GPIO_MUXSEL_HIPKD);
 
@@ -982,7 +992,7 @@ void SetDebugIso15693(uint32_t debug) {
 // Simulate an ISO15693 reader, perform anti-collision and then attempt to read a sector
 // all demodulation performed in arm rather than host. - greg
 //-----------------------------------------------------------------------------
-void ReaderIso15693(uint32_t parameter )
+void ReaderIso15693(uint32_t parameter)
 {
 	LED_A_ON();
 	LED_B_ON();
@@ -1003,7 +1013,7 @@ void ReaderIso15693(uint32_t parameter )
 	int elapsed = 0;
 	uint8_t TagUID[8] = {0x00};
 
-	 
+
 	// Blank arrays
 	memset(BigBuf + 3660, 0x00, 300);
 
@@ -1014,9 +1024,9 @@ void ReaderIso15693(uint32_t parameter )
 	FpgaSetupSsc();
 
 	// Start from off (no field generated)
-   	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
-   	SpinDelay(200);
-	
+    	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
+    	SpinDelay(200);
+
 	// Give the tags time to energize
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_HF_READER_RX_XCORR);
 	SpinDelay(200);
@@ -1055,7 +1065,7 @@ void ReaderIso15693(uint32_t parameter )
 	Dbhexdump(answerLen1,answer1,true);
 
 	// UID is reverse
-	if (answerLen1 >= 12) 
+	if (answerLen1>=12) 
 		Dbprintf("UID = %02hX%02hX%02hX%02hX%02hX%02hX%02hX%02hX",
 			TagUID[7],TagUID[6],TagUID[5],TagUID[4],
 			TagUID[3],TagUID[2],TagUID[1],TagUID[0]);
@@ -1069,14 +1079,14 @@ void ReaderIso15693(uint32_t parameter )
 	DbdecodeIso15693Answer(answerLen3,answer3);
 	Dbhexdump(answerLen3,answer3,true);
 
- 	// read all pages
-	if (answerLen1 >= 12 && DEBUG) {
+	// read all pages
+	if (answerLen1>=12 && DEBUG) {
 		i=0;			
-		while (i < 32) {  // sanity check, assume max 32 pages
+		while (i<32) {  // sanity check, assume max 32 pages
 			BuildReadBlockRequest(TagUID,i);
-			TransmitTo15693Tag(ToSend,ToSendMax,&tsamples, &wait);  
-			answerLen2 = GetIso15693AnswerFromTag(answer2, 100, &samples, &elapsed);
-			if (answerLen2 > 0) {
+	      TransmitTo15693Tag(ToSend,ToSendMax,&tsamples, &wait);  
+         answerLen2 = GetIso15693AnswerFromTag(answer2, 100, &samples, &elapsed);
+			if (answerLen2>0) {
 				Dbprintf("READ SINGLE BLOCK %d returned %d octets:",i,answerLen2);
 				DbdecodeIso15693Answer(answerLen2,answer2);
 				Dbhexdump(answerLen2,answer2,true);
@@ -1108,9 +1118,9 @@ void SimTagIso15693(uint32_t parameter, uint8_t *uid)
 	int tsamples = 0;
 	int wait = 0;
 	int elapsed = 0;
-	
+
 	memset(buf, 0x00, 100);
-	
+
 	FpgaDownloadAndGo(FPGA_BITSTREAM_HF);
 
 	SetAdcMuxFor(GPIO_MUXSEL_HIPKD);
@@ -1118,8 +1128,8 @@ void SimTagIso15693(uint32_t parameter, uint8_t *uid)
 	FpgaSetupSsc();
 
 	// Start from off (no field generated)
-    FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
-    SpinDelay(200);
+    	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
+	SpinDelay(200);
 
 	LED_A_OFF();
 	LED_B_OFF();
@@ -1136,7 +1146,7 @@ void SimTagIso15693(uint32_t parameter, uint8_t *uid)
 		
 		BuildInventoryResponse(uid);
 	
-		TransmitTo15693Reader(ToSend, ToSendMax, &tsamples, &wait);
+		TransmitTo15693Reader(ToSend,ToSendMax, &tsamples, &wait);
 	}
 
 	Dbprintf("%d octets read from reader command: %x %x %x %x %x %x %x %x %x", answerLen1,

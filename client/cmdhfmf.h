@@ -16,11 +16,11 @@
 #include <string.h>
 #include <ctype.h>
 #include "proxmark3.h"
-#include "../common/iso14443crc.h"
+#include "iso14443crc.h"
 #include "data.h"
 #include "ui.h"
 #include "cmdparser.h"
-#include "../include/common.h"
+#include "common.h"
 #include "util.h"
 #include "mifarehost.h"
 
@@ -53,5 +53,5 @@ int CmdHF14AMfCGetBlk(const char* cmd);
 int CmdHF14AMfCGetSc(const char* cmd);
 int CmdHF14AMfCLoad(const char* cmd);
 int CmdHF14AMfCSave(const char* cmd);
-int GetCardSize();
+
 #endif

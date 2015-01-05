@@ -32,7 +32,9 @@
 
 #include "cmd.h"
 #include "string.h"
-#include "../include/proxmark3.h"
+#include "proxmark3.h"
+
+//static UsbCommand txcmd;
 
 bool cmd_receive(UsbCommand* cmd) {
  

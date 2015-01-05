@@ -9,8 +9,7 @@
 // Routines to load the FPGA image, and then to configure the FPGA's major
 // mode once it is configured.
 //-----------------------------------------------------------------------------
-
-#include "../include/proxmark3.h"
+#include "proxmark3.h"
 #include "apps.h"
 #include "util.h"
 #include "string.h"

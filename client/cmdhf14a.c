@@ -14,150 +14,22 @@
 #include <string.h>
 #include <unistd.h>
 #include "util.h"
-#include "../common/iso14443crc.h"
+#include "iso14443crc.h"
 #include "data.h"
 #include "proxmark3.h"
 #include "ui.h"
 #include "cmdparser.h"
 #include "cmdhf14a.h"
-#include "../include/common.h"
+#include "common.h"
 #include "cmdmain.h"
-#include "../include/mifare.h"
+#include "mifare.h"
 
 static int CmdHelp(const char *Cmd);
 static void waitCmd(uint8_t iLen);
 
 int CmdHF14AList(const char *Cmd)
 {
-	bool ShowWaitCycles = false;
-	char param = param_getchar(Cmd, 0);
-	
-	if (param == 'h' || (param != 0 && param != 'f')) {
-		PrintAndLog("List data in trace buffer.");
-		PrintAndLog("Usage:  hf 14a list [f]");
-		PrintAndLog("f - show frame delay times as well");
-		PrintAndLog("sample: hf 14a list f");
-		return 0;
-	}	
-
-	ShowWaitCycles = (param == 'f');
-		
-// for the time being. Need better Bigbuf handling.	
-#define TRACE_SIZE 3000	
-
-	uint8_t trace[TRACE_SIZE];
-	GetFromBigBuf(trace, TRACE_SIZE, 0);
-	WaitForResponse(CMD_ACK,NULL);
-
-	PrintAndLog("Recorded Activity");
-	PrintAndLog("");
-	PrintAndLog("Start = Start of Start Bit, End = End of last modulation. Src = Source of Transfer");
-	PrintAndLog("All times are in carrier periods (1/13.56Mhz)");
-	PrintAndLog("");
-	PrintAndLog("     Start |       End | Src | Data (! denotes parity error)                                   | CRC ");
-	PrintAndLog("-----------|-----------|-----|-----------------------------------------------------------------------");
-
-	uint16_t tracepos = 0;
-	uint16_t duration;
-	uint16_t data_len;
-	uint16_t parity_len;
-	bool isResponse;
-	uint32_t timestamp;
-	uint32_t first_timestamp;
-	uint32_t EndOfTransmissionTimestamp;
-	
-	for (;;) {
-	
-		if(tracepos >= TRACE_SIZE) break;
-	
-		timestamp = *((uint32_t *)(trace + tracepos));
-		
-		// Break and stick with current result if buffer was not completely full
-		if (timestamp == 0x44444444) break; 
-
-		if(tracepos == 0) {
-			first_timestamp = timestamp;
-		}
-		
-		tracepos += 4;
-		duration = *((uint16_t *)(trace + tracepos));
-		tracepos += 2;
-		data_len = *((uint16_t *)(trace + tracepos));
-		tracepos += 2;
-
-		isResponse = false;
-		if (data_len & 0x8000) {
-			data_len &= 0x7fff;
-			isResponse = true;
-		}
-		
-		parity_len = (data_len-1)/8 + 1;
-		
-		if (tracepos + data_len + parity_len >= TRACE_SIZE) break;
-
-		uint8_t *frame = trace + tracepos;
-		tracepos += data_len;
-		uint8_t *parityBytes = trace + tracepos;
-		tracepos += parity_len;
-		
-		char line[16][110];
-		for (int j = 0; j < data_len; j++) {
-			int oddparity = 0x01;
-			int k;
-
-			for (k=0;k<8;k++) {
-				oddparity ^= (((frame[j] & 0xFF) >> k) & 0x01);
-			}
-
-			uint8_t parityBits = parityBytes[j>>3];
-			if (isResponse && (oddparity != ((parityBits >> (7-(j&0x0007))) & 0x01))) {
-				sprintf(line[j/16]+((j%16)*4), "%02x! ", frame[j]);
-			} else {
-				sprintf(line[j/16]+((j%16)*4), "%02x  ", frame[j]);	
-			}
-		}
-		
-		char crc[5] = {0x00}; 
-		if (data_len > 2) {
-			uint8_t b1, b2;
-			ComputeCrc14443(CRC_14443_A, frame, data_len-2, &b1, &b2);
-			if (b1 != frame[data_len-2] || b2 != frame[data_len-1]) {
-				sprintf(crc, (isResponse & (data_len < 6)) ? "" : "!crc");
-			} 
-		}
-		
-		EndOfTransmissionTimestamp = timestamp + duration;
-		int num_lines = (data_len - 1)/16 + 1;
-				
-		for (int j = 0; j < num_lines; j++) {
-			if (j == 0) {
-				PrintAndLog(" %9d | %9d | %s | %-64s| %s",
-					(timestamp - first_timestamp),
-					(EndOfTransmissionTimestamp - first_timestamp),
-					(isResponse ? "Tag" : "Rdr"),
-					line[j], 
-					(j == num_lines-1)?crc:""
-					);
-			} else {
-				PrintAndLog("           |           |     | %-64s| %s",
-					line[j], 
-					(j == num_lines-1)?crc:"");
-			}
-		}				
-	
-		bool next_isResponse = *((uint16_t *)(trace + tracepos + 6)) & 0x8000;
-		
-		if (ShowWaitCycles && !isResponse && next_isResponse) {
-			uint32_t next_timestamp = *((uint32_t *)(trace + tracepos));
-			if (next_timestamp != 0x44444444) {
-				PrintAndLog(" %9d | %9d | %s | fdt (Frame Delay Time): %d",
-					(EndOfTransmissionTimestamp - first_timestamp),
-					(next_timestamp - first_timestamp),
-					" ",
-					(next_timestamp - EndOfTransmissionTimestamp));				
-			}
-		}	
-	}
+	PrintAndLog("Deprecated command, use 'hf list 14a' instead");
 	return 0;
 }
 
@@ -225,6 +97,13 @@ int CmdHF14AReader(const char *Cmd)
 	    memcpy(&card.ats, resp.d.asBytes, resp.arg[0]);
 		card.ats_len = resp.arg[0];				// note: ats_len includes CRC Bytes
 	} 
+
+	// disconnect
+	c.arg[0] = 0;
+	c.arg[1] = 0;
+	c.arg[2] = 0;
+	SendCommand(&c);
+
 	
 	if(card.ats_len >= 3) {			// a valid ATS consists of at least the length byte (TL) and 2 CRC bytes
 		bool ta1 = 0, tb1 = 0, tc1 = 0;
@@ -364,24 +243,6 @@ int CmdHF14AReader(const char *Cmd)
 		PrintAndLog("proprietary non iso14443-4 card found, RATS not supported");
 	}
 
-	
-	// try to see if card responses to "chinese magic backdoor" commands.
-	c.cmd = CMD_MIFARE_CIDENT;
-	c.arg[0] = 0;
-	c.arg[1] = 0;
-	c.arg[2] = 0;	
-	SendCommand(&c);
-	WaitForResponse(CMD_ACK,&resp);
-	uint8_t isOK  = resp.arg[0] & 0xff;
-	PrintAndLog(" Answers to chinese magic backdoor commands: %s", (isOK ? "YES" : "NO") );
-	
-	// disconnect
-	c.cmd = CMD_READER_ISO_14443a;
-	c.arg[0] = 0;
-	c.arg[1] = 0;
-	c.arg[2] = 0;
-	SendCommand(&c);
-	
 	return select_status;
 }
 
@@ -536,22 +397,19 @@ int CmdHF14ACmdRaw(const char *cmd) {
     uint8_t active=0;
     uint8_t active_select=0;
     uint16_t numbits=0;
-	uint16_t timeout=0;
-	uint8_t bTimeout=0;
     char buf[5]="";
     int i=0;
-    uint8_t data[USB_CMD_DATA_SIZE];
+    uint8_t data[100];
     unsigned int datalen=0, temp;
 
     if (strlen(cmd)<2) {
-        PrintAndLog("Usage: hf 14a raw [-r] [-c] [-p] [-f] [-b] [-t] <number of bits> <0A 0B 0C ... hex>");
+        PrintAndLog("Usage: hf 14a raw [-r] [-c] [-p] [-f] [-b] <number of bits> <0A 0B 0C ... hex>");
         PrintAndLog("       -r    do not read response");
         PrintAndLog("       -c    calculate and append CRC");
         PrintAndLog("       -p    leave the signal field ON after receive");
         PrintAndLog("       -a    active signal field ON without select");
         PrintAndLog("       -s    active signal field ON with select");
         PrintAndLog("       -b    number of bits to send. Useful for send partial byte");
-		PrintAndLog("       -t    timeout");
         return 0;
     }
 
@@ -584,14 +442,6 @@ int CmdHF14ACmdRaw(const char *cmd) {
                     while(cmd[i]!=' ' && cmd[i]!='\0') { i++; }
                     i-=2;
                     break;
-				case 't':
-					bTimeout=1;
-					sscanf(cmd+i+2,"%d",&temp);
-					timeout = temp & 0xFFFF;
-					i+=3;
-					while(cmd[i]!=' ' && cmd[i]!='\0') { i++; }
-					i+=2;
-					break;
                 default:
                     PrintAndLog("Invalid option");
                     return 0;
@@ -609,19 +459,15 @@ int CmdHF14ACmdRaw(const char *cmd) {
             if (strlen(buf)>=2) {
                 sscanf(buf,"%x",&temp);
                 data[datalen]=(uint8_t)(temp & 0xff);
+                datalen++;
                 *buf=0;
-				if (++datalen>sizeof(data)){
-					if (crc)
-						PrintAndLog("Buffer is full, we can't add CRC to your data");
-					break;
-				}
             }
             continue;
         }
         PrintAndLog("Invalid char on input");
         return 0;
     }
-    if(crc && datalen>0 && datalen<sizeof(data)-2)
+    if(crc && datalen>0)
     {
         uint8_t first, second;
         ComputeCrc14443(CRC_14443_A, data, datalen, &first, &second);
@@ -635,22 +481,13 @@ int CmdHF14ACmdRaw(const char *cmd) {
         if(active)
             c.arg[0] |= ISO14A_NO_SELECT;
     }
-	if(bTimeout){
-	    #define MAX_TIMEOUT 624*105 // max timeout is 624 ms
-        c.arg[0] |= ISO14A_SET_TIMEOUT;
-        c.arg[2] = timeout * 105; // each bit is about 9.4 us
-        if(c.arg[2]>MAX_TIMEOUT) {
-            c.arg[2] = MAX_TIMEOUT;
-            PrintAndLog("Set timeout to 624 ms. The max we can wait for response");
-        }
-	}
     if(power)
         c.arg[0] |= ISO14A_NO_DISCONNECT;
     if(datalen>0)
         c.arg[0] |= ISO14A_RAW;
 
-	// Max buffer is USB_CMD_DATA_SIZE
-    c.arg[1] = (datalen & 0xFFFF) | (numbits << 16);
+    c.arg[1] = datalen;
+    c.arg[2] = numbits;
     memcpy(c.d.asBytes,data,datalen);
 
     SendCommand(&c);
@@ -670,7 +507,7 @@ static void waitCmd(uint8_t iSelect)
     UsbCommand resp;
     char *hexout;
 
-    if (WaitForResponseTimeout(CMD_ACK,&resp,10000)) {
+    if (WaitForResponseTimeout(CMD_ACK,&resp,1000)) {
         recv = resp.d.asBytes;
         uint8_t iLen = iSelect ? resp.arg[1] : resp.arg[0];
         PrintAndLog("received %i octets",iLen);

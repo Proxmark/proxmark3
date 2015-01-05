@@ -72,7 +72,7 @@ int mfnested(uint8_t blockNo, uint8_t keyType, uint8_t * key, uint8_t trgBlockNo
 	uint16_t i, len;
 	uint32_t uid;
 	UsbCommand resp;
-	
+
 	StateList_t statelists[2];
 	struct Crypto1State *p1, *p2, *p3, *p4;
 	
@@ -216,7 +216,7 @@ int mfEmlGetMem(uint8_t *data, int blockNum, int blocksCount) {
 	UsbCommand c = {CMD_MIFARE_EML_MEMGET, {blockNum, blocksCount, 0}};
  	SendCommand(&c);
 
-	UsbCommand resp;
+  UsbCommand resp;
 	if (!WaitForResponseTimeout(CMD_ACK,&resp,1500)) return 1;
 	memcpy(data, resp.d.asBytes, blocksCount * 16);
 	return 0;
@@ -250,7 +250,7 @@ int mfCSetBlock(uint8_t blockNo, uint8_t *data, uint8_t *uid, bool wantWipe, uin
 	memcpy(c.d.asBytes, data, 16); 
 	SendCommand(&c);
 
-	UsbCommand resp;
+  UsbCommand resp;
 	if (WaitForResponseTimeout(CMD_ACK,&resp,1500)) {
 		isOK  = resp.arg[0] & 0xff;
 		if (uid != NULL) memcpy(uid, resp.d.asBytes, 4);
@@ -339,10 +339,10 @@ int loadTraceCard(uint8_t *tuid) {
 	while(!feof(f)){
 		memset(buf, 0, sizeof(buf));
 		if (fgets(buf, sizeof(buf), f) == NULL) {
-      PrintAndLog("File reading error.");
+			PrintAndLog("File reading error.");
 			fclose(f);
 			return 2;
-    }
+    	}
 
 		if (strlen(buf) < 32){
 			if (feof(f)) break;
@@ -440,7 +440,7 @@ int mfTraceDecode(uint8_t *data_src, int len, bool wantSaveToEmlFile) {
 		}
 		
 		// AUTHENTICATION
-		if ((len == 4) && ((data[0] == 0x60) || (data[0] == 0x61))) {
+		if ((len ==4) && ((data[0] == 0x60) || (data[0] == 0x61))) {
 			traceState = TRACE_AUTH1;
 			traceCurBlock = data[1];
 			traceCurKey = data[0] == 60 ? 1:0;

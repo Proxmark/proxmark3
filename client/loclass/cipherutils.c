@@ -1,17 +1,5 @@
 /*****************************************************************************
- * WARNING
- *
- * THIS CODE IS CREATED FOR EXPERIMENTATION AND EDUCATIONAL USE ONLY. 
- * 
- * USAGE OF THIS CODE IN OTHER WAYS MAY INFRINGE UPON THE INTELLECTUAL 
- * PROPERTY OF OTHER PARTIES, SUCH AS INSIDE SECURE AND HID GLOBAL, 
- * AND MAY EXPOSE YOU TO AN INFRINGEMENT ACTION FROM THOSE PARTIES. 
- * 
- * THIS CODE SHOULD NEVER BE USED TO INFRINGE PATENTS OR INTELLECTUAL PROPERTY RIGHTS. 
- *
- *****************************************************************************
- *
- * This file is part of loclass. It is a reconstructon of the cipher engine
+ * This file is part of iClassCipher. It is a reconstructon of the cipher engine
  * used in iClass, and RFID techology.
  *
  * The implementation is based on the work performed by

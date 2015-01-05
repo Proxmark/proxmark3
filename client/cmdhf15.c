@@ -31,9 +31,10 @@
 #include "data.h"
 #include "graph.h"
 #include "ui.h"
+#include "util.h"
 #include "cmdparser.h"
 #include "cmdhf15.h"
-#include "../common/iso15693tools.h"
+#include "iso15693tools.h"
 #include "cmdmain.h"
 
 #define FrameSOF              Iso15693FrameSOF
@@ -44,7 +45,6 @@
 #define Crc(data,datalen)     Iso15693Crc(data,datalen)
 #define AddCrc(data,datalen)  Iso15693AddCrc(data,datalen)
 #define sprintUID(target,uid)	Iso15693sprintUID(target,uid)
-#define TRACE_BUFF_SIZE 12000
 
 // structure and database for uid -> tagtype lookups 
 typedef struct { 
@@ -255,17 +255,6 @@ int CmdHF15Read(const char *Cmd)
 {
 	UsbCommand c = {CMD_ACQUIRE_RAW_ADC_SAMPLES_ISO_15693};
 	SendCommand(&c);
-
-	uint8_t data[TRACE_BUFF_SIZE] = {0x00};
-	
-	GetFromBigBuf(data,TRACE_BUFF_SIZE,3560);  //3560 -- should be offset..
-	WaitForResponseTimeout(CMD_ACK,NULL, 1500);
-
-	for (int j = 0; j < TRACE_BUFF_SIZE; j++) {
-		GraphBuffer[j] = ((int)data[j]) ;
-	}
-	GraphTraceLen = TRACE_BUFF_SIZE;
-	RepaintGraphWindow();
 	return 0;
 }
 
@@ -274,17 +263,6 @@ int CmdHF15Record(const char *Cmd)
 {
 	UsbCommand c = {CMD_RECORD_RAW_ADC_SAMPLES_ISO_15693};
 	SendCommand(&c);
-
-	uint8_t data[TRACE_BUFF_SIZE] = {0x00};
-	
-	GetFromBigBuf(data,TRACE_BUFF_SIZE,3560);  //3560 -- should be offset..
-	WaitForResponseTimeout(CMD_ACK,NULL, 1500);
-
-	for (int j = 0; j < TRACE_BUFF_SIZE; j++) {
-		GraphBuffer[j] = ((int)data[j]) ;
-	}
-	GraphTraceLen = TRACE_BUFF_SIZE;
-	RepaintGraphWindow();
 	return 0;
 }
 
@@ -582,9 +560,9 @@ int CmdHF15CmdRaw (const char *cmd) {
  */
 int prepareHF15Cmd(char **cmd, UsbCommand *c, uint8_t iso15cmd[], int iso15cmdlen) {
 	int temp;
-	uint8_t *req = c->d.asBytes;
+	uint8_t *req=c->d.asBytes;
 	uint8_t uid[8] = {0x00};
-	uint32_t reqlen = 0;
+	uint32_t reqlen=0;
 
 	// strip
 	while (**cmd==' ' || **cmd=='\t') (*cmd)++;

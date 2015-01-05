@@ -10,20 +10,19 @@
 // executes.
 //-----------------------------------------------------------------------------
 
-#include "../common/usb_cdc.h"
-#include "../common/cmd.h"
+#include "usb_cdc.h"
+#include "cmd.h"
 
-#include "../include/proxmark3.h"
+#include "proxmark3.h"
 #include "apps.h"
 #include "util.h"
 #include "printf.h"
 #include "string.h"
+
 #include <stdarg.h>
 
-
 #include "legicrf.h"
-#include "../include/hitag2.h"
-
+#include <hitag2.h>
 
 #ifdef WITH_LCD
  #include "LCD.h"
@@ -37,7 +36,7 @@
 // is the order in which they go out on the wire.
 //=============================================================================
 
-#define TOSEND_BUFFER_SIZE (9*MAX_FRAME_SIZE + 1 + 1 + 2) // 8 data bits and 1 parity bit per payload byte, 1 correction bit, 1 SOC bit, 2 EOC bits
+#define TOSEND_BUFFER_SIZE (9*MAX_FRAME_SIZE + 1 + 1 + 2)  // 8 data bits and 1 parity bit per payload byte, 1 correction bit, 1 SOC bit, 2 EOC bits 
 uint8_t ToSend[TOSEND_BUFFER_SIZE];
 int ToSendMax;
 static int ToSendBit;
@@ -69,7 +68,7 @@ void ToSendStuffBit(int b)
 
 	ToSendBit++;
 
-	if(ToSendMax  >= sizeof(ToSend)) {
+	if(ToSendMax >= sizeof(ToSend)) {
 		ToSendBit = 0;
 		DbpString("ToSendStuffBit overflowed!");
 	}
@@ -173,7 +172,7 @@ void MeasureAntennaTuning(void)
 	int i, adcval = 0, peak = 0, peakv = 0, peakf = 0; //ptr = 0 
 	int vLf125 = 0, vLf134 = 0, vHf = 0;	// in mV
 
-  LED_B_ON();
+	LED_B_ON();
 
 /*
  * Sweeps the useful LF range of the proxmark from
@@ -207,7 +206,7 @@ void MeasureAntennaTuning(void)
 
 	for (i=18; i >= 0; i--) LF_Results[i] = 0;
 	
-  LED_A_ON();
+	LED_A_ON();
 	// Let the FPGA drive the high-frequency antenna around 13.56 MHz.
   	FpgaDownloadAndGo(FPGA_BITSTREAM_HF);
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_HF_READER_RX_XCORR);
@@ -218,9 +217,9 @@ void MeasureAntennaTuning(void)
 
 	cmd_send(CMD_MEASURED_ANTENNA_TUNING,vLf125|(vLf134<<16),vHf,peakf|(peakv<<16),LF_Results,256);
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
-  LED_A_OFF();
-  LED_B_OFF();
-  return;
+	LED_A_OFF();
+	LED_B_OFF();
+	return;
 }
 
 void MeasureAntennaTuningHf(void)
@@ -362,7 +361,7 @@ void SamyRun()
 	for (;;)
 	{
 		usb_poll();
-		WDT_HIT();
+    WDT_HIT();
 
 		// Was our button held down or pressed?
 		int button_pressed = BUTTON_HELD(1000);
@@ -626,7 +625,7 @@ void UsbPacketReceived(uint8_t *packet, int len)
 {
 	UsbCommand *c = (UsbCommand *)packet;
 
-  //Dbprintf("received %d bytes, with command: 0x%04x and args: %d %d %d",len,c->cmd,c->arg[0],c->arg[1],c->arg[2]);
+//  Dbprintf("received %d bytes, with command: 0x%04x and args: %d %d %d",len,c->cmd,c->arg[0],c->arg[1],c->arg[2]);
   
 	switch(c->cmd) {
 #ifdef WITH_LF
@@ -669,8 +668,9 @@ void UsbPacketReceived(uint8_t *packet, int len)
 			WriteTItag(c->arg[0],c->arg[1],c->arg[2]);
 			break;
 		case CMD_SIMULATE_TAG_125K:
-			SimulateTagLowFrequency(c->arg[0], c->arg[1], 0);
-			//SimulateTagLowFrequencyA(c->arg[0], c->arg[1]);
+			LED_A_ON();
+			SimulateTagLowFrequency(c->arg[0], c->arg[1], 1);
+			LED_A_OFF();
 			break;
 		case CMD_LF_SIMULATE_BIDIR:
 			SimulateTagLowFrequencyBidir(c->arg[0], c->arg[1]);
@@ -792,10 +792,6 @@ void UsbPacketReceived(uint8_t *packet, int len)
 			EPA_PACE_Collect_Nonce(c);
 			break;
 			
-		// case CMD_EPA_:
-		//	EpaFoo(c);
-		// break;
-			
 		case CMD_READER_MIFARE:
             ReaderMifare(c->arg[0]);
 			break;
@@ -805,17 +801,8 @@ void UsbPacketReceived(uint8_t *packet, int len)
 		case CMD_MIFAREU_READBL:
 			MifareUReadBlock(c->arg[0],c->d.asBytes);
 			break;
-		case CMD_MIFAREUC_AUTH1:
-			MifareUC_Auth1(c->arg[0],c->d.asBytes);
-			break;
-		case CMD_MIFAREUC_AUTH2:
-			MifareUC_Auth2(c->arg[0],c->d.asBytes);
-			break;
 		case CMD_MIFAREU_READCARD:
-			MifareUReadCard(c->arg[0],c->arg[1],c->d.asBytes);
-                        break;
-		case CMD_MIFAREUC_READCARD:
-			MifareUReadCard(c->arg[0],c->arg[1],c->d.asBytes);
+			MifareUReadCard(c->arg[0],c->d.asBytes);
                         break;
 		case CMD_MIFARE_READSC:
 			MifareReadSector(c->arg[0], c->arg[1], c->arg[2], c->d.asBytes);
@@ -871,28 +858,6 @@ void UsbPacketReceived(uint8_t *packet, int len)
 		case CMD_MIFARE_SNIFFER:
 			SniffMifare(c->arg[0]);
 			break;
-			
-		// mifare desfire
-		case CMD_MIFARE_DESFIRE_READBL:
-			break;
-		case CMD_MIFARE_DESFIRE_WRITEBL:
-			break;
-		case CMD_MIFARE_DESFIRE_AUTH1:
-			MifareDES_Auth1(c->arg[0], c->arg[1], c->arg[2], c->d.asBytes);
-			break;
-		case CMD_MIFARE_DESFIRE_AUTH2:
-			//MifareDES_Auth2(c->arg[0],c->d.asBytes);
-			break;
-		// case CMD_MIFARE_DES_READER:
-			// ReaderMifareDES(c->arg[0], c->arg[1], c->d.asBytes);
-			//break;
-		case CMD_MIFARE_DESFIRE_INFO:
-			MifareDesfireGetInformation();
-			break;
-		case CMD_MIFARE_DESFIRE:
-			MifareSendCommand(c->arg[0], c->arg[1], c->d.asBytes);
-			break;
-
 #endif
 
 #ifdef WITH_ICLASS
@@ -907,7 +872,7 @@ void UsbPacketReceived(uint8_t *packet, int len)
 			ReaderIClass(c->arg[0]);
 			break;
 		case CMD_READER_ICLASS_REPLAY:
-		        ReaderIClass_Replay(c->arg[0], c->d.asBytes);
+		    ReaderIClass_Replay(c->arg[0], c->d.asBytes);
 			break;
 #endif
 
@@ -1036,7 +1001,7 @@ void  __attribute__((noreturn)) AppMain(void)
 	LED_A_OFF();
 
 	// Init USB device
-	usb_enable();
+  usb_enable();
 
 	// The FPGA gets its clock from us from PCK0 output, so set that up.
 	AT91C_BASE_PIOA->PIO_BSR = GPIO_PCK0;
@@ -1066,12 +1031,12 @@ void  __attribute__((noreturn)) AppMain(void)
 	size_t rx_len;
   
 	for(;;) {
-		if (usb_poll()) {
-			rx_len = usb_read(rx,sizeof(UsbCommand));
-			if (rx_len) {
-				UsbPacketReceived(rx,rx_len);
-			}
-		}
+    if (usb_poll()) {
+      rx_len = usb_read(rx,sizeof(UsbCommand));
+      if (rx_len) {
+        UsbPacketReceived(rx,rx_len);
+      }
+    }
 		WDT_HIT();
 
 #ifdef WITH_LF

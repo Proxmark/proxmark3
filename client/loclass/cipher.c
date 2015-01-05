@@ -1,17 +1,5 @@
 /*****************************************************************************
- * WARNING
- *
- * THIS CODE IS CREATED FOR EXPERIMENTATION AND EDUCATIONAL USE ONLY. 
- * 
- * USAGE OF THIS CODE IN OTHER WAYS MAY INFRINGE UPON THE INTELLECTUAL 
- * PROPERTY OF OTHER PARTIES, SUCH AS INSIDE SECURE AND HID GLOBAL, 
- * AND MAY EXPOSE YOU TO AN INFRINGEMENT ACTION FROM THOSE PARTIES. 
- * 
- * THIS CODE SHOULD NEVER BE USED TO INFRINGE PATENTS OR INTELLECTUAL PROPERTY RIGHTS. 
- *
- *****************************************************************************
- *
- * This file is part of loclass. It is a reconstructon of the cipher engine
+ * This file is part of iClassCipher. It is a reconstructon of the cipher engine
  * used in iClass, and RFID techology.
  *
  * The implementation is based on the work performed by
@@ -215,7 +203,7 @@ void MAC(uint8_t* k, BitstreamIn input, BitstreamOut out)
 	BitstreamIn input_32_zeroes = {zeroes_32,sizeof(zeroes_32)*8,0};
 	State initState = suc(k,init(k),&input);
 	output(k,initState,&input_32_zeroes,&out);
-}	 
+}
 
 void doMAC(uint8_t *cc_nr_p, int length, uint8_t *div_key_p, uint8_t mac[4])
 {
@@ -224,17 +212,17 @@ void doMAC(uint8_t *cc_nr_p, int length, uint8_t *div_key_p, uint8_t mac[4])
     cc_nr=(uint8_t*)malloc(length+1);
     memcpy(cc_nr,cc_nr_p,length);
     memcpy(div_key,div_key_p,8);
-    
-	reverse_arraybytes(cc_nr,length);
-	BitstreamIn bitstream = {cc_nr,length * 8,0};
-	uint8_t dest []= {0,0,0,0,0,0,0,0};
-	BitstreamOut out = { dest, sizeof(dest)*8, 0 };
-	MAC(div_key,bitstream, out);
-	//The output MAC must also be reversed
-	reverse_arraybytes(dest, sizeof(dest));
-	memcpy(mac,dest,4);
+
+    reverse_arraybytes(cc_nr,length);
+    BitstreamIn bitstream = {cc_nr,length * 8,0};
+    uint8_t dest []= {0,0,0,0,0,0,0,0};
+    BitstreamOut out = { dest, sizeof(dest)*8, 0 };
+    MAC(div_key,bitstream, out);
+    //The output MAC must also be reversed
+    reverse_arraybytes(dest, sizeof(dest));
+    memcpy(mac, dest, 4);
     //printf("Calculated_MAC\t%02x%02x%02x%02x\n", dest[0],dest[1],dest[2],dest[3]);
-	free(cc_nr);
+    free(cc_nr);
     return;
 }
 
@@ -260,8 +248,8 @@ int testMAC()
 		prnlog("[+] FAILED: MAC calculation failed:");
 		printarr("    Calculated_MAC", calculated_mac, 4);
 		printarr("    Correct_MAC   ", correct_MAC, 4);
-	return 1;
-}
+		return 1;
+	}
 
 	return 0;
 }

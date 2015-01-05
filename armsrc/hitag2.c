@@ -16,10 +16,10 @@
 // (c) 2012 Roel Verdult
 //-----------------------------------------------------------------------------
 
-#include "../include/proxmark3.h"
+#include "proxmark3.h"
 #include "apps.h"
 #include "util.h"
-#include "../include/hitag2.h"
+#include "hitag2.h"
 #include "string.h"
 
 static bool bQuiet;
@@ -744,7 +744,7 @@ void SnoopHitag(uint32_t type) {
 	// Set up eavesdropping mode, frequency divisor which will drive the FPGA
 	// and analog mux selection.
 	FpgaDownloadAndGo(FPGA_BITSTREAM_LF);
-	FpgaWriteConfWord(FPGA_MAJOR_MODE_LF_EDGE_DETECT  | FPGA_LF_EDGE_DETECT_TOGGLE_MODE);
+	FpgaWriteConfWord(FPGA_MAJOR_MODE_LF_EDGE_DETECT);
 	FpgaSendCommand(FPGA_CMD_SET_DIVISOR, 95); //125Khz
 	SetAdcMuxFor(GPIO_MUXSEL_LOPKD);
 	RELAY_OFF();
@@ -968,7 +968,7 @@ void SimulateHitagTag(bool tag_mem_supplied, byte_t* data) {
 	// Set up simulator mode, frequency divisor which will drive the FPGA
 	// and analog mux selection.
 	FpgaDownloadAndGo(FPGA_BITSTREAM_LF);
-	FpgaWriteConfWord(FPGA_MAJOR_MODE_LF_EDGE_DETECT | FPGA_LF_EDGE_DETECT_READER_FIELD);
+	FpgaWriteConfWord(FPGA_MAJOR_MODE_LF_EDGE_DETECT);
 	FpgaSendCommand(FPGA_CMD_SET_DIVISOR, 95); //125Khz
 	SetAdcMuxFor(GPIO_MUXSEL_LOPKD);
 	RELAY_OFF();
@@ -987,7 +987,7 @@ void SimulateHitagTag(bool tag_mem_supplied, byte_t* data) {
 	AT91C_BASE_PMC->PMC_PCER = (1 << AT91C_ID_TC1);
 	AT91C_BASE_PIOA->PIO_BSR = GPIO_SSC_FRAME;
 	
-    // Disable timer during configuration	
+  // Disable timer during configuration	
 	AT91C_BASE_TC1->TC_CCR = AT91C_TC_CLKDIS;
 
 	// Capture mode, default timer source = MCK/2 (TIMER_CLOCK1), TIOA is external trigger,
@@ -1140,7 +1140,7 @@ void ReaderHitag(hitag_function htf, hitag_data* htd) {
 		case RHT2F_PASSWORD: {
       Dbprintf("List identifier in password mode");
 			memcpy(password,htd->pwd.password,4);
-      blocknr = 0;
+      		blocknr = 0;
 			bQuitTraceFull = false;
 			bQuiet = false;
 			bPwd = false;
@@ -1158,7 +1158,7 @@ void ReaderHitag(hitag_function htf, hitag_data* htd) {
       
 		case RHT2F_CRYPTO: {
 			DbpString("Authenticating using key:");
-			memcpy(key,htd->crypto.key,6);	// 4 or 6 ??
+			memcpy(key,htd->crypto.key,4);	  //HACK; 4 or 6??  I read both in the code.
 			Dbhexdump(6,key,false);
       blocknr = 0;
 			bQuiet = false;
