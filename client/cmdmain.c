@@ -131,13 +131,12 @@ int getCommand(UsbCommand* response)
  */
 bool WaitForResponseTimeout(uint32_t cmd, UsbCommand* response, size_t ms_timeout) {
   
-
+	UsbCommand resp;
 	if (response == NULL)
-    response = &resp;
+		response = &resp;
 
-
-  // Wait until the command is received
-  for(size_t dm_seconds=0; dm_seconds < ms_timeout/10; dm_seconds++) {
+	  // Wait until the command is received
+	  for(size_t dm_seconds=0; dm_seconds < ms_timeout/10; dm_seconds++) {
 
 		while(getCommand(response)) {
           if(response->cmd == cmd){
