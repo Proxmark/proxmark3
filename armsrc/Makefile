@@ -10,7 +10,7 @@ APP_INCLUDES = apps.h
 
 #remove one of the following defines and comment out the relevant line
 #in the next section to remove that particular feature from compilation  
-APP_CFLAGS	= -DWITH_LF -DWITH_ISO15693 -DWITH_ISO14443a -DWITH_ISO14443b -DWITH_ICLASS -DWITH_LEGICRF -DWITH_HITAG
+APP_CFLAGS	= -DWITH_LF -DWITH_ISO15693 -DWITH_ISO14443a -DWITH_ISO14443b -DWITH_ICLASS -DWITH_LEGICRF -DWITH_HITAG	   -fno-strict-aliasing
 #-DWITH_LCD 
 
 #SRC_LCD = fonts.c LCD.c
@@ -24,7 +24,8 @@ THUMBSRC = start.c \
 	$(SRC_LCD) \
 	$(SRC_ISO15693) \
 	$(SRC_LF) \
-	appmain.c printf.c \
+	appmain.c \
+	printf.c \
 	util.c \
 	string.c \
 	usb_cdc.c \
