@@ -1100,7 +1100,6 @@ int doIClassSimulation(uint8_t csn[], int breakAfterMacReceived, uint8_t *reader
 		//Signal tracer
 		// Can be used to get a trigger for an oscilloscope..
 		LED_C_OFF();
-
 		if(!GetIClassCommandFromReader(receivedCmd, &len, 100)) {
 			buttonPressed = true;
 			break;

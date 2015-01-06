@@ -551,6 +551,8 @@ lfsr_common_prefix(uint32_t pfx, uint32_t rr, uint8_t ks[8], uint8_t par[8][8], 
                 return 0;
 	}
 
+	}
+
 	s = statelist;
 	for(o = odd; *o != -1; ++o)
 		for(e = even; *e != -1; ++e)

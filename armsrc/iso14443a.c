@@ -399,7 +399,7 @@ static RAMFUNC bool MillerDecoding(uint8_t bit, uint32_t non_real_time)
 					if (Uart.len) {
 						return TRUE;											// we are finished with decoding the raw data sequence
 					} else {
-						UartReset();					// Nothing receiver - start over
+						UartReset();											// Nothing received - try again
 					}
 				}
 				if (Uart.state == STATE_START_OF_COMMUNICATION) {				// error - must not follow directly after SOC
@@ -472,6 +472,7 @@ void DemodReset()
 	Demod.startTime = 0;
 	Demod.endTime = 0;
 }
+
 
 void DemodInit(uint8_t *data, uint8_t *parity)
 {
@@ -762,6 +763,7 @@ static void CodeIso14443aAsTagPar(const uint8_t *cmd, uint16_t len, uint8_t *par
 	
 	// Send startbit
 	ToSend[++ToSendMax] = SEC_D;
+	
 	LastProxToAirDuration = 8 * ToSendMax - 4;
 
 	for(uint16_t i = 0; i < len; i++) {
@@ -1232,7 +1234,6 @@ void SimulateIso14443aTag(int tagType, int uid_1st, int uid_2nd, byte_t* data)
 			// do the tracing for the previous reader request and this tag answer:
 			uint8_t par[MAX_PARITY_SIZE];
 			GetParity(p_response->response, p_response->response_n, par);
-	
 			EmLogTrace(Uart.output, 
 						Uart.len, 
 						Uart.startTime*16 - DELAY_AIR2ARM_AS_TAG, 

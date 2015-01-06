@@ -717,6 +717,7 @@ void CmdHIDdemodFSK(int findone, int *high, int *low, int ledcontrol)
             hi2 = hi = lo = 0;
         }
         WDT_HIT();
+        //SpinDelay(50);
     }
     DbpString("Stopped");
     if (ledcontrol) LED_A_OFF();
