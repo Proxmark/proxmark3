@@ -140,7 +140,7 @@ int CmdHF14AReader(const char *Cmd)
 	iso14a_card_select_t card;
 	memcpy(&card, (iso14a_card_select_t *)resp.d.asBytes, sizeof(iso14a_card_select_t));
 
-	uint64_t select_status = resp.arg[0];		// 0: couldn't read, 1: OK, with ATS, 2: OK, no ATS
+	uint64_t select_status = resp.arg[0];		// 0: couldn't read, 1: OK, with ATS, 2: OK, no ATS, 3: proprietary Anticollision
 	
 	if(select_status == 0) {
 		PrintAndLog("iso14443a card select failed");
@@ -151,6 +151,18 @@ int CmdHF14AReader(const char *Cmd)
 		SendCommand(&c);
 		return 0;
 	}
+
+	if(select_status == 3) {
+		PrintAndLog("Card doesn't support standard iso14443-3 anticollision");
+		PrintAndLog("ATQA : %02x %02x", card.atqa[1], card.atqa[0]);
+		// disconnect
+		c.arg[0] = 0;
+		c.arg[1] = 0;
+		c.arg[2] = 0;
+		SendCommand(&c);
+		return 0;
+	}
+
 
 	PrintAndLog("ATQA : %02x %02x", card.atqa[1], card.atqa[0]);
 	PrintAndLog(" UID : %s", sprint_hex(card.uid, card.uidlen));

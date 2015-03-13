@@ -56,7 +56,7 @@ typedef struct {
 		// DROP_FIRST_HALF,
 		} state;
 	uint16_t shiftReg;
-	uint16_t bitCount;
+	int16_t	 bitCount;
 	uint16_t len;
 	uint16_t byteCntMax;
 	uint16_t posCnt;

@@ -141,6 +141,23 @@ void annotateIso15693(char *exp, size_t size, uint8_t* cmd, uint8_t cmdsize)
 	}
 }
 
+
+void annotateTopaz(char *exp, size_t size, uint8_t* cmd, uint8_t cmdsize)
+{
+
+	switch(cmd[0]) {
+		case TOPAZ_REQA						:snprintf(exp, size, "REQA");break;
+		case TOPAZ_WUPA						:snprintf(exp, size, "WUPA");break;
+		case TOPAZ_RID						:snprintf(exp, size, "RID");break;
+		case TOPAZ_RALL						:snprintf(exp, size, "RALL");break;
+		case TOPAZ_READ						:snprintf(exp, size, "READ");break;
+		case TOPAZ_WRITE_E					:snprintf(exp, size, "WRITE-E");break;
+		case TOPAZ_WRITE_NE					:snprintf(exp, size, "WRITE-NE");break;
+		default:                            snprintf(exp,size,"?"); break;
+	}
+}
+
+
 /**
 06 00 = INITIATE
 0E xx = SELECT ID (xx = Chip-ID)
@@ -255,11 +272,18 @@ uint8_t iclass_CRC_check(bool isResponse, uint8_t* data, uint8_t len)
 	}
 }
 
+
+uint16_t merge_topaz_reader_frames(uint16_t tracepos, uint16_t traceLen, uint8_t *trace, uint8_t *topaz_reader_command, uint16_t *data_len)
+{
+	return tracepos;
+}
+
+
 uint16_t printTraceLine(uint16_t tracepos, uint16_t traceLen, uint8_t *trace, uint8_t protocol, bool showWaitCycles)
 {
 	bool isResponse;
 	uint16_t duration, data_len, parity_len;
-
+	uint8_t topaz_reader_command[9];
 	uint32_t timestamp, first_timestamp, EndOfTransmissionTimestamp;
 	char explanation[30] = {0};
 
@@ -290,29 +314,35 @@ uint16_t printTraceLine(uint16_t tracepos, uint16_t traceLen, uint8_t *trace, ui
 	uint8_t *parityBytes = trace + tracepos;
 	tracepos += parity_len;
 
+	if (protocol == TOPAZ && !isResponse) {
+		// topaz reader commands come in 1 or 9 separate frames with 8 Bits each.
+		// merge them:
+		tracepos = merge_topaz_reader_frames(tracepos, traceLen, trace, topaz_reader_command, &data_len);
+	}
+	
 	//Check the CRC status
 	uint8_t crcStatus = 2;
 
 	if (data_len > 2) {
 		uint8_t b1, b2;
-		if(protocol == ICLASS)
-		{
-			crcStatus = iclass_CRC_check(isResponse, frame, data_len);
-
-		}else if (protocol == ISO_14443B)
-		{
-			crcStatus = iso14443B_CRC_check(isResponse, frame, data_len);
-		}
-		else if (protocol == ISO_14443A){//Iso 14443a
-
-			ComputeCrc14443(CRC_14443_A, frame, data_len-2, &b1, &b2);
-
-			if (b1 != frame[data_len-2] || b2 != frame[data_len-1]) {
-				if(!(isResponse & (data_len < 6)))
-				{
+		switch (protocol) {
+			case ICLASS:
+				crcStatus = iclass_CRC_check(isResponse, frame, data_len);
+				break;
+			case ISO_14443B:
+			case TOPAZ:			
+				crcStatus = iso14443B_CRC_check(isResponse, topaz_reader_command, data_len); 
+				break;
+			case ISO_14443A:
+				ComputeCrc14443(CRC_14443_A, frame, data_len-2, &b1, &b2);
+				if (b1 != frame[data_len-2] || b2 != frame[data_len-1]) {
+					if(!(isResponse & (data_len < 6))) {
 						crcStatus = 0;
+					}
 				}
-			}
+				break;
+			default: 
+				break;
 		}
 	}
 	//0 CRC-command, CRC not ok
@@ -361,12 +391,13 @@ uint16_t printTraceLine(uint16_t tracepos, uint16_t traceLen, uint8_t *trace, ui
 
 	if(!isResponse)
 	{
-		if(protocol == ICLASS)
-			annotateIclass(explanation,sizeof(explanation),frame,data_len);
-		else if (protocol == ISO_14443A)
-			annotateIso14443a(explanation,sizeof(explanation),frame,data_len);
-		else if(protocol == ISO_14443B)
-			annotateIso14443b(explanation,sizeof(explanation),frame,data_len);
+		switch(protocol) {
+			case ICLASS:		annotateIclass(explanation,sizeof(explanation),frame,data_len); break;
+			case ISO_14443A:	annotateIso14443a(explanation,sizeof(explanation),frame,data_len); break;
+			case ISO_14443B:	annotateIso14443b(explanation,sizeof(explanation),frame,data_len); break;
+			case TOPAZ:			annotateTopaz(explanation,sizeof(explanation),frame,data_len); break;
+			default:			break;
+		}
 	}
 
 	int num_lines = MIN((data_len - 1)/16 + 1, 16);
@@ -382,7 +413,7 @@ uint16_t printTraceLine(uint16_t tracepos, uint16_t traceLen, uint8_t *trace, ui
 		} else {
 			PrintAndLog("           |           |     | %-64s| %s| %s",
 				line[j],
-				(j == num_lines-1)?crc:"    ",
+				(j == num_lines-1) ? crc : "    ",
 				(j == num_lines-1) ? explanation : "");
 		}
 	}
@@ -425,20 +456,17 @@ int CmdHFList(const char *Cmd)
 	}
 	if(!errors)
 	{
-		if(strcmp(type, "iclass") == 0)
-		{
+		if(strcmp(type, "iclass") == 0)	{
 			protocol = ICLASS;
-		}else if(strcmp(type, "14a") == 0)
-		{
+		} else if(strcmp(type, "14a") == 0) {
 			protocol = ISO_14443A;
-		}
-		else if(strcmp(type, "14b") == 0)
-		{
+		} else if(strcmp(type, "14b") == 0)	{
 			protocol = ISO_14443B;
-		}else if(strcmp(type,"raw")== 0)
-		{
+		} else if(strcmp(type,"topaz")== 0) {
+			protocol = TOPAZ;
+		} else if(strcmp(type,"raw")== 0) {
 			protocol = -1;//No crc, no annotations
-		}else{
+		} else {
 			errors = true;
 		}
 	}
@@ -452,6 +480,7 @@ int CmdHFList(const char *Cmd)
 		PrintAndLog("    14a    - interpret data as iso14443a communications");
 		PrintAndLog("    14b    - interpret data as iso14443b communications");
 		PrintAndLog("    iclass - interpret data as iclass communications");
+		PrintAndLog("    topaz  - interpret data as topaz communications");
 		PrintAndLog("");
 		PrintAndLog("example: hf list 14a f");
 		PrintAndLog("example: hf list iclass");

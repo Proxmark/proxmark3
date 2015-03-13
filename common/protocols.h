@@ -168,9 +168,20 @@ NXP/Philips CUSTOM COMMANDS
 #define ISO15693_READ_MULTI_SECSTATUS 0x2C
 
 
-#define ISO_14443A 0
-#define ICLASS     1
-#define ISO_14443B 2
+// Topaz command set:
+#define	TOPAZ_REQA						0x26	// Request
+#define	TOPAZ_WUPA						0x52	// WakeUp
+#define	TOPAZ_RID						0x78	// Read ID
+#define	TOPAZ_RALL						0x00	// Read All (all bytes)
+#define	TOPAZ_READ						0x01	// Read (a single byte)
+#define	TOPAZ_WRITE_E					0x53	// Write-with-erase (a single byte)
+#define	TOPAZ_WRITE_NE					0x1a	// Write-no-erase (a single byte)
+
+
+#define ISO_14443A	0
+#define ICLASS		1
+#define ISO_14443B	2
+#define TOPAZ		3
 
 //-- Picopass fuses
 #define FUSE_FPERS   0x80
