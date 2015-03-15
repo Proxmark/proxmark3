@@ -273,16 +273,55 @@ uint8_t iclass_CRC_check(bool isResponse, uint8_t* data, uint8_t len)
 }
 
 
-uint16_t merge_topaz_reader_frames(uint16_t tracepos, uint16_t traceLen, uint8_t *trace, uint8_t *topaz_reader_command, uint16_t *data_len)
+bool is_last_record(uint16_t tracepos, uint8_t *trace, uint16_t traceLen)
 {
-	return tracepos;
+	return(tracepos + sizeof(uint32_t) + sizeof(uint16_t) + sizeof(uint16_t) >= traceLen);
+}
+
+
+bool next_record_is_response(uint16_t tracepos, uint8_t *trace)
+{
+	uint16_t next_records_datalen = *((uint16_t *)(trace + tracepos + sizeof(uint32_t) + sizeof(uint16_t)));
+	
+	return(next_records_datalen & 0x8000);
+}
+
+
+void merge_topaz_reader_frames(uint32_t timestamp, uint32_t *duration, uint16_t *tracepos, uint16_t traceLen, uint8_t *trace, uint8_t *frame, uint8_t *topaz_reader_command, uint16_t *data_len)
+{
+
+#define MAX_TOPAZ_READER_CMD_LEN	9
+
+	uint32_t last_timestamp = timestamp + *duration;
+
+	memcpy(topaz_reader_command, frame, MIN(*data_len, MAX_TOPAZ_READER_CMD_LEN));
+
+	while (!is_last_record(*tracepos, trace, traceLen) && !next_record_is_response(*tracepos, trace)) {
+		uint32_t next_timestamp = *((uint32_t *)(trace + *tracepos));
+		*tracepos += sizeof(uint32_t);
+		last_timestamp = next_timestamp + *((uint16_t *)(trace + *tracepos));
+		*tracepos += sizeof(uint16_t);
+		uint16_t next_data_len = *((uint16_t *)(trace + *tracepos)) & 0x7FFF;
+		*tracepos += sizeof(uint16_t);
+		uint8_t *next_frame = (trace + *tracepos);
+		*tracepos += next_data_len;
+		if (*data_len + next_data_len <= MAX_TOPAZ_READER_CMD_LEN) {
+			memcpy(topaz_reader_command + *data_len, next_frame, next_data_len);
+			*data_len += next_data_len;
+			}
+		uint16_t next_parity_len = (next_data_len-1)/8 + 1;
+		*tracepos += next_parity_len;
+	}
+
+	*duration = last_timestamp - timestamp;
 }
 
 
 uint16_t printTraceLine(uint16_t tracepos, uint16_t traceLen, uint8_t *trace, uint8_t protocol, bool showWaitCycles)
 {
 	bool isResponse;
-	uint16_t duration, data_len, parity_len;
+	uint16_t data_len, parity_len;
+	uint32_t duration;
 	uint8_t topaz_reader_command[9];
 	uint32_t timestamp, first_timestamp, EndOfTransmissionTimestamp;
 	char explanation[30] = {0};
@@ -317,7 +356,8 @@ uint16_t printTraceLine(uint16_t tracepos, uint16_t traceLen, uint8_t *trace, ui
 	if (protocol == TOPAZ && !isResponse) {
 		// topaz reader commands come in 1 or 9 separate frames with 8 Bits each.
 		// merge them:
-		tracepos = merge_topaz_reader_frames(tracepos, traceLen, trace, topaz_reader_command, &data_len);
+		merge_topaz_reader_frames(timestamp, &duration, &tracepos, traceLen, trace, frame, topaz_reader_command, &data_len);
+		frame = topaz_reader_command;
 	}
 	
 	//Check the CRC status
@@ -331,7 +371,7 @@ uint16_t printTraceLine(uint16_t tracepos, uint16_t traceLen, uint8_t *trace, ui
 				break;
 			case ISO_14443B:
 			case TOPAZ:			
-				crcStatus = iso14443B_CRC_check(isResponse, topaz_reader_command, data_len); 
+				crcStatus = iso14443B_CRC_check(isResponse, frame, data_len); 
 				break;
 			case ISO_14443A:
 				ComputeCrc14443(CRC_14443_A, frame, data_len-2, &b1, &b2);
@@ -370,7 +410,7 @@ uint16_t printTraceLine(uint16_t tracepos, uint16_t traceLen, uint8_t *trace, ui
 		}
 
 	}
-	if(crcStatus == 1)
+	if(crcStatus == 1 || crcStatus == 2)
 	{//CRC-command
 		char *pos1 = line[(data_len-2)/16]+(((data_len-2) % 16) * 4)-1;
 		(*pos1) = '[';
@@ -418,19 +458,15 @@ uint16_t printTraceLine(uint16_t tracepos, uint16_t traceLen, uint8_t *trace, ui
 		}
 	}
 
-	if (tracepos + sizeof(uint32_t) + sizeof(uint16_t) + sizeof(uint16_t) > traceLen) return traceLen;
+	if (is_last_record(tracepos, trace, traceLen)) return traceLen;
 	
-	bool next_isResponse = *((uint16_t *)(trace + tracepos + 6)) & 0x8000;
-
-	if (showWaitCycles && !isResponse && next_isResponse) {
+	if (showWaitCycles && !isResponse && next_record_is_response(tracepos, trace)) {
 		uint32_t next_timestamp = *((uint32_t *)(trace + tracepos));
-		if (next_timestamp != 0x44444444) {
-			PrintAndLog(" %9d | %9d | %s | fdt (Frame Delay Time): %d",
-				(EndOfTransmissionTimestamp - first_timestamp),
-				(next_timestamp - first_timestamp),
-				"   ",
-				(next_timestamp - EndOfTransmissionTimestamp));
-		}
+		PrintAndLog(" %9d | %9d | %s | fdt (Frame Delay Time): %d",
+			(EndOfTransmissionTimestamp - first_timestamp),
+			(next_timestamp - first_timestamp),
+			"   ",
+			(next_timestamp - EndOfTransmissionTimestamp));
 	}
 
 	return tracepos;
@@ -462,7 +498,7 @@ int CmdHFList(const char *Cmd)
 			protocol = ISO_14443A;
 		} else if(strcmp(type, "14b") == 0)	{
 			protocol = ISO_14443B;
-		} else if(strcmp(type,"topaz")== 0) {
+		} else if(strcmp(type,"nfc")== 0) {
 			protocol = TOPAZ;
 		} else if(strcmp(type,"raw")== 0) {
 			protocol = -1;//No crc, no annotations

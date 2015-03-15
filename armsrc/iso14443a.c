@@ -269,7 +269,7 @@ static RAMFUNC bool MillerDecoding(uint8_t bit, uint32_t non_real_time)
 	
 	if (Uart.state == STATE_UNSYNCD) {											// not yet synced
 	
-		if (Uart.highCnt < 2) {													// wait for a stable unmodulated signal
+		if (Uart.highCnt < 1) {													// wait for a stable unmodulated signal
 			if (Uart.twoBits == 0xffff) {
 				Uart.highCnt++;
 			} else {
