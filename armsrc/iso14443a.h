@@ -63,8 +63,7 @@ typedef struct {
 	uint16_t syncBit;
 	uint8_t  parityBits;
 	uint8_t  parityLen;
-	uint16_t highCnt;
-	uint16_t twoBits;
+	uint32_t fourBits;
 	uint32_t startTime, endTime;
     uint8_t *output;
 	uint8_t *parity;

@@ -189,7 +189,34 @@ void annotateIso14443b(char *exp, size_t size, uint8_t* cmd, uint8_t cmdsize)
 }
 
 /**
- * @brief iso14443B_CRC_Ok Checks CRC in command or response
+ * @brief iso14443A_CRC_check Checks CRC in command or response
+ * @param isResponse
+ * @param data
+ * @param len
+ * @return  0 : CRC-command, CRC not ok
+ *          1 : CRC-command, CRC ok
+ *          2 : Not crc-command
+ */
+
+uint8_t iso14443A_CRC_check(bool isResponse, uint8_t* data, uint8_t len)
+{
+	uint8_t b1,b2;
+
+	if(len <= 2) return 2;
+
+	if(isResponse & (len < 6)) return 2;
+	
+	ComputeCrc14443(CRC_14443_A, data, len-2, &b1, &b2);
+	if (b1 != data[len-2] || b2 != data[len-1]) {
+		return 0;
+	} else {
+		return 1;
+	}
+}
+
+
+/**
+ * @brief iso14443B_CRC_check Checks CRC in command or response
  * @param isResponse
  * @param data
  * @param len
@@ -206,9 +233,10 @@ uint8_t iso14443B_CRC_check(bool isResponse, uint8_t* data, uint8_t len)
 
 	ComputeCrc14443(CRC_14443_B, data, len-2, &b1, &b2);
 	if(b1 != data[len-2] || b2 != data[len-1]) {
-	  return 0;
+		return 0;
+	} else {
+		return 1;
 	}
-	return 1;
 }
 
 /**
@@ -287,33 +315,42 @@ bool next_record_is_response(uint16_t tracepos, uint8_t *trace)
 }
 
 
-void merge_topaz_reader_frames(uint32_t timestamp, uint32_t *duration, uint16_t *tracepos, uint16_t traceLen, uint8_t *trace, uint8_t *frame, uint8_t *topaz_reader_command, uint16_t *data_len)
+bool merge_topaz_reader_frames(uint32_t timestamp, uint32_t *duration, uint16_t *tracepos, uint16_t traceLen, uint8_t *trace, uint8_t *frame, uint8_t *topaz_reader_command, uint16_t *data_len)
 {
 
 #define MAX_TOPAZ_READER_CMD_LEN	9
 
 	uint32_t last_timestamp = timestamp + *duration;
 
-	memcpy(topaz_reader_command, frame, MIN(*data_len, MAX_TOPAZ_READER_CMD_LEN));
+	if ((*data_len != 1) || (frame[0] == TOPAZ_WUPA) || (frame[0] == TOPAZ_REQA)) return false;
+
+	memcpy(topaz_reader_command, frame, *data_len);
 
 	while (!is_last_record(*tracepos, trace, traceLen) && !next_record_is_response(*tracepos, trace)) {
 		uint32_t next_timestamp = *((uint32_t *)(trace + *tracepos));
 		*tracepos += sizeof(uint32_t);
-		last_timestamp = next_timestamp + *((uint16_t *)(trace + *tracepos));
+		uint16_t next_duration = *((uint16_t *)(trace + *tracepos));
 		*tracepos += sizeof(uint16_t);
 		uint16_t next_data_len = *((uint16_t *)(trace + *tracepos)) & 0x7FFF;
 		*tracepos += sizeof(uint16_t);
 		uint8_t *next_frame = (trace + *tracepos);
 		*tracepos += next_data_len;
-		if (*data_len + next_data_len <= MAX_TOPAZ_READER_CMD_LEN) {
+		if ((next_data_len == 1) && (*data_len + next_data_len <= MAX_TOPAZ_READER_CMD_LEN)) {
 			memcpy(topaz_reader_command + *data_len, next_frame, next_data_len);
 			*data_len += next_data_len;
-			}
+			last_timestamp = next_timestamp + next_duration;
+		} else {
+			// rewind and exit
+			*tracepos = *tracepos - next_data_len - sizeof(uint16_t) - sizeof(uint16_t) - sizeof(uint32_t);
+			break;
+		}
 		uint16_t next_parity_len = (next_data_len-1)/8 + 1;
 		*tracepos += next_parity_len;
 	}
 
 	*duration = last_timestamp - timestamp;
+	
+	return true;
 }
 
 
@@ -354,32 +391,27 @@ uint16_t printTraceLine(uint16_t tracepos, uint16_t traceLen, uint8_t *trace, ui
 	tracepos += parity_len;
 
 	if (protocol == TOPAZ && !isResponse) {
-		// topaz reader commands come in 1 or 9 separate frames with 8 Bits each.
+		// topaz reader commands come in 1 or 9 separate frames with 7 or 8 Bits each.
 		// merge them:
-		merge_topaz_reader_frames(timestamp, &duration, &tracepos, traceLen, trace, frame, topaz_reader_command, &data_len);
-		frame = topaz_reader_command;
+		if (merge_topaz_reader_frames(timestamp, &duration, &tracepos, traceLen, trace, frame, topaz_reader_command, &data_len)) {
+			frame = topaz_reader_command;
+		}
 	}
 	
 	//Check the CRC status
 	uint8_t crcStatus = 2;
 
 	if (data_len > 2) {
-		uint8_t b1, b2;
 		switch (protocol) {
 			case ICLASS:
 				crcStatus = iclass_CRC_check(isResponse, frame, data_len);
 				break;
 			case ISO_14443B:
-			case TOPAZ:			
+			case TOPAZ:
 				crcStatus = iso14443B_CRC_check(isResponse, frame, data_len); 
 				break;
 			case ISO_14443A:
-				ComputeCrc14443(CRC_14443_A, frame, data_len-2, &b1, &b2);
-				if (b1 != frame[data_len-2] || b2 != frame[data_len-1]) {
-					if(!(isResponse & (data_len < 6))) {
-						crcStatus = 0;
-					}
-				}
+				crcStatus = iso14443A_CRC_check(isResponse, frame, data_len);
 				break;
 			default: 
 				break;
@@ -403,19 +435,18 @@ uint16_t printTraceLine(uint16_t tracepos, uint16_t traceLen, uint8_t *trace, ui
 		}
 		uint8_t parityBits = parityBytes[j>>3];
 		if (isResponse && (oddparity != ((parityBits >> (7-(j&0x0007))) & 0x01))) {
-			snprintf(line[j/16]+(( j % 16) * 4),110, "%02x! ", frame[j]);
-
+			snprintf(line[j/16]+(( j % 16) * 4), 110, " %02x!", frame[j]);
 		} else {
-			snprintf(line[j/16]+(( j % 16) * 4),110, "%02x  ", frame[j]);
+			snprintf(line[j/16]+(( j % 16) * 4), 110, " %02x ", frame[j]);
 		}
 
 	}
-	if(crcStatus == 1 || crcStatus == 2)
+	if(crcStatus == 0 || crcStatus == 1)
 	{//CRC-command
-		char *pos1 = line[(data_len-2)/16]+(((data_len-2) % 16) * 4)-1;
+		char *pos1 = line[(data_len-2)/16]+(((data_len-2) % 16) * 4);
 		(*pos1) = '[';
-		char *pos2 = line[(data_len)/16]+(((data_len) % 16) * 4)-2;
-		(*pos2) = ']';
+		char *pos2 = line[(data_len)/16]+(((data_len) % 16) * 4);
+		sprintf(pos2, "%c", ']');
 	}
 	if(data_len == 0)
 	{
@@ -443,7 +474,7 @@ uint16_t printTraceLine(uint16_t tracepos, uint16_t traceLen, uint8_t *trace, ui
 	int num_lines = MIN((data_len - 1)/16 + 1, 16);
 	for (int j = 0; j < num_lines ; j++) {
 		if (j == 0) {
-			PrintAndLog(" %9d | %9d | %s | %-64s| %s| %s",
+			PrintAndLog(" %9d | %9d | %s |%-64s | %s| %s",
 				(timestamp - first_timestamp),
 				(EndOfTransmissionTimestamp - first_timestamp),
 				(isResponse ? "Tag" : "Rdr"),
@@ -451,7 +482,7 @@ uint16_t printTraceLine(uint16_t tracepos, uint16_t traceLen, uint8_t *trace, ui
 				(j == num_lines-1) ? crc : "    ",
 				(j == num_lines-1) ? explanation : "");
 		} else {
-			PrintAndLog("           |           |     | %-64s| %s| %s",
+			PrintAndLog("           |           |     |%-64s | %s| %s",
 				line[j],
 				(j == num_lines-1) ? crc : "    ",
 				(j == num_lines-1) ? explanation : "");
@@ -498,7 +529,7 @@ int CmdHFList(const char *Cmd)
 			protocol = ISO_14443A;
 		} else if(strcmp(type, "14b") == 0)	{
 			protocol = ISO_14443B;
-		} else if(strcmp(type,"nfc")== 0) {
+		} else if(strcmp(type,"topaz")== 0) {
 			protocol = TOPAZ;
 		} else if(strcmp(type,"raw")== 0) {
 			protocol = -1;//No crc, no annotations

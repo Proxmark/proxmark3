@@ -248,8 +248,7 @@ void UartReset()
 	Uart.parityLen = 0;					// number of decoded parity bytes
 	Uart.shiftReg = 0;					// shiftreg to hold decoded data bits
 	Uart.parityBits = 0;				// holds 8 parity bits
-	Uart.twoBits = 0x0000;	 			// buffer for 2 Bits
-	Uart.highCnt = 0;
+	Uart.fourBits = 0x00000000;			// buffer for 4 Bits
 	Uart.startTime = 0;
 	Uart.endTime = 0;
 }
@@ -265,40 +264,34 @@ void UartInit(uint8_t *data, uint8_t *parity)
 static RAMFUNC bool MillerDecoding(uint8_t bit, uint32_t non_real_time)
 {
 
-	Uart.twoBits = (Uart.twoBits << 8) | bit;
+	Uart.fourBits = (Uart.fourBits << 8) | bit;
 	
 	if (Uart.state == STATE_UNSYNCD) {											// not yet synced
 	
-		if (Uart.highCnt < 1) {													// wait for a stable unmodulated signal
-			if (Uart.twoBits == 0xffff) {
-				Uart.highCnt++;
-			} else {
-				Uart.highCnt = 0;
-			}
-		} else {	
-			Uart.syncBit = 0xFFFF; 												// not set
-																				// we look for a ...1111111100x11111xxxxxx pattern (the start bit)
-			if 		((Uart.twoBits & 0xDF00) == 0x1F00) Uart.syncBit = 8;   	// mask is   11x11111 xxxxxxxx, 
-																				// check for 00x11111 xxxxxxxx
-			else if	((Uart.twoBits & 0xEF80) == 0x8F80) Uart.syncBit = 7;		// both masks shifted right one bit, left padded with '1'
-			else if ((Uart.twoBits & 0xF7C0) == 0xC7C0) Uart.syncBit = 6;		// ...
-			else if ((Uart.twoBits & 0xFBE0) == 0xE3E0) Uart.syncBit = 5;
-			else if ((Uart.twoBits & 0xFDF0) == 0xF1F0) Uart.syncBit = 4;
-			else if ((Uart.twoBits & 0xFEF8) == 0xF8F8) Uart.syncBit = 3;
-			else if ((Uart.twoBits & 0xFF7C) == 0xFC7C) Uart.syncBit = 2;
-			else if ((Uart.twoBits & 0xFFBE) == 0xFE3E) Uart.syncBit = 1;
-			if (Uart.syncBit != 0xFFFF) {										// found a sync bit
-				Uart.startTime = non_real_time?non_real_time:(GetCountSspClk() & 0xfffffff8);
-				Uart.startTime -= Uart.syncBit;
-				Uart.endTime = Uart.startTime;
-				Uart.state = STATE_START_OF_COMMUNICATION;
-			}
+		Uart.syncBit = 9999; 													// not set
+		// we look for a ...xxxx1111111100x11111xxxxxx pattern 
+		// (unmodulated, followed by the start bit = 8 '1's followed by 2 '0's, eventually followed by another '0', followed by 5 '1's)
+#define ISO14443A_STARTBIT_MASK		0x007FEF80									// mask is    00000000 01111111 11101111 10000000
+#define ISO14443A_STARTBIT_PATTERN	0x007F8F80									// pattern is 00000000 01111111 10001111 10000000
+		if		((Uart.fourBits & ISO14443A_STARTBIT_MASK) >> 0 == ISO14443A_STARTBIT_PATTERN >> 0) Uart.syncBit = 7;
+		else if ((Uart.fourBits & ISO14443A_STARTBIT_MASK) >> 1 == ISO14443A_STARTBIT_PATTERN >> 1) Uart.syncBit = 6;
+		else if ((Uart.fourBits & ISO14443A_STARTBIT_MASK) >> 2 == ISO14443A_STARTBIT_PATTERN >> 2) Uart.syncBit = 5;
+		else if ((Uart.fourBits & ISO14443A_STARTBIT_MASK) >> 3 == ISO14443A_STARTBIT_PATTERN >> 3) Uart.syncBit = 4;
+		else if ((Uart.fourBits & ISO14443A_STARTBIT_MASK) >> 4 == ISO14443A_STARTBIT_PATTERN >> 4) Uart.syncBit = 3;
+		else if ((Uart.fourBits & ISO14443A_STARTBIT_MASK) >> 5 == ISO14443A_STARTBIT_PATTERN >> 5) Uart.syncBit = 2;
+		else if ((Uart.fourBits & ISO14443A_STARTBIT_MASK) >> 6 == ISO14443A_STARTBIT_PATTERN >> 6) Uart.syncBit = 1;
+		else if ((Uart.fourBits & ISO14443A_STARTBIT_MASK) >> 7 == ISO14443A_STARTBIT_PATTERN >> 7) Uart.syncBit = 0;
+		if (Uart.syncBit != 9999) {												// found a sync bit
+			Uart.startTime = non_real_time?non_real_time:(GetCountSspClk() & 0xfffffff8);
+			Uart.startTime -= Uart.syncBit;
+			Uart.endTime = Uart.startTime;
+			Uart.state = STATE_START_OF_COMMUNICATION;
 		}
 
 	} else {
 
-		if (IsMillerModulationNibble1(Uart.twoBits >> Uart.syncBit)) {			
-			if (IsMillerModulationNibble2(Uart.twoBits >> Uart.syncBit)) {		// Modulation in both halves - error
+		if (IsMillerModulationNibble1(Uart.fourBits >> Uart.syncBit)) {			
+			if (IsMillerModulationNibble2(Uart.fourBits >> Uart.syncBit)) {		// Modulation in both halves - error
 				UartReset();
 			} else {															// Modulation in first half = Sequence Z = logic "0"
 				if (Uart.state == STATE_MILLER_X) {								// error - must not follow after X
@@ -322,7 +315,7 @@ static RAMFUNC bool MillerDecoding(uint8_t bit, uint32_t non_real_time)
 				}
 			}
 		} else {
-			if (IsMillerModulationNibble2(Uart.twoBits >> Uart.syncBit)) {		// Modulation second half = Sequence X = logic "1"
+			if (IsMillerModulationNibble2(Uart.fourBits >> Uart.syncBit)) {		// Modulation second half = Sequence X = logic "1"
 				Uart.bitCount++;
 				Uart.shiftReg = (Uart.shiftReg >> 1) | 0x100;					// add a 1 to the shiftreg
 				Uart.state = STATE_MILLER_X;
@@ -358,12 +351,10 @@ static RAMFUNC bool MillerDecoding(uint8_t bit, uint32_t non_real_time)
 						return TRUE;											// we are finished with decoding the raw data sequence
 					} else {
 						UartReset();											// Nothing received - start over
-						Uart.highCnt = 1;
 					}
 				}
 				if (Uart.state == STATE_START_OF_COMMUNICATION) {				// error - must not follow directly after SOC
 					UartReset();
-					Uart.highCnt = 1;
 				} else {														// a logic "0"
 					Uart.bitCount++;
 					Uart.shiftReg = (Uart.shiftReg >> 1);						// add a 0 to the shiftreg
