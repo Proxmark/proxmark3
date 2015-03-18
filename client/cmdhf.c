@@ -23,6 +23,7 @@
 #include "cmdhficlass.h"
 #include "cmdhfmf.h"
 #include "cmdhfmfu.h"
+#include "cmdhftopaz.h"
 #include "protocols.h"
 
 static int CmdHelp(const char *Cmd);
@@ -354,7 +355,7 @@ bool merge_topaz_reader_frames(uint32_t timestamp, uint32_t *duration, uint16_t 
 }
 
 
-uint16_t printTraceLine(uint16_t tracepos, uint16_t traceLen, uint8_t *trace, uint8_t protocol, bool showWaitCycles)
+uint16_t printTraceLine(uint16_t tracepos, uint16_t traceLen, uint8_t *trace, uint8_t protocol, bool showWaitCycles, bool markCRCBytes)
 {
 	bool isResponse;
 	uint16_t data_len, parity_len;
@@ -441,13 +442,17 @@ uint16_t printTraceLine(uint16_t tracepos, uint16_t traceLen, uint8_t *trace, ui
 		}
 
 	}
-	if(crcStatus == 0 || crcStatus == 1)
-	{//CRC-command
-		char *pos1 = line[(data_len-2)/16]+(((data_len-2) % 16) * 4);
-		(*pos1) = '[';
-		char *pos2 = line[(data_len)/16]+(((data_len) % 16) * 4);
-		sprintf(pos2, "%c", ']');
+
+	if (markCRCBytes) {
+		if(crcStatus == 0 || crcStatus == 1)
+		{//CRC-command
+			char *pos1 = line[(data_len-2)/16]+(((data_len-2) % 16) * 4);
+			(*pos1) = '[';
+			char *pos2 = line[(data_len)/16]+(((data_len) % 16) * 4);
+			sprintf(pos2, "%c", ']');
+		}
 	}
+
 	if(data_len == 0)
 	{
 		if(data_len == 0){
@@ -507,22 +512,26 @@ uint16_t printTraceLine(uint16_t tracepos, uint16_t traceLen, uint8_t *trace, ui
 int CmdHFList(const char *Cmd)
 {
 	bool showWaitCycles = false;
+	bool markCRCBytes = false;
 	char type[40] = {0};
 	int tlen = param_getstr(Cmd,0,type);
-	char param = param_getchar(Cmd, 1);
+	char param1 = param_getchar(Cmd, 1);
+	char param2 = param_getchar(Cmd, 2);
 	bool errors = false;
 	uint8_t protocol = 0;
 	//Validate params
-	if(tlen == 0)
-	{
+
+	if(tlen == 0) {
 		errors = true;
 	}
-	if(param == 'h' || (param !=0 && param != 'f'))
-	{
+
+	if(param1 == 'h'
+			|| (param1 != 0 && param1 != 'f' && param1 != 'c')
+			|| (param2 != 0 && param2 != 'f' && param2 != 'c')) {
 		errors = true;
 	}
-	if(!errors)
-	{
+
+	if(!errors) {
 		if(strcmp(type, "iclass") == 0)	{
 			protocol = ICLASS;
 		} else if(strcmp(type, "14a") == 0) {
@@ -540,8 +549,9 @@ int CmdHFList(const char *Cmd)
 
 	if (errors) {
 		PrintAndLog("List protocol data in trace buffer.");
-		PrintAndLog("Usage:  hf list <protocol> [f]");
+		PrintAndLog("Usage:  hf list <protocol> [f][c]");
 		PrintAndLog("    f      - show frame delay times as well");
+		PrintAndLog("    c      - mark CRC bytes");
 		PrintAndLog("Supported <protocol> values:");
 		PrintAndLog("    raw    - just show raw data without annotations");
 		PrintAndLog("    14a    - interpret data as iso14443a communications");
@@ -555,10 +565,13 @@ int CmdHFList(const char *Cmd)
 	}
 
 
-	if (param == 'f') {
+	if (param1 == 'f' || param2 == 'f') {
 		showWaitCycles = true;
 	}
 
+	if (param1 == 'c' || param2 == 'c') {
+		markCRCBytes = true;
+	}
 
 	uint8_t *trace;
 	uint16_t tracepos = 0;
@@ -592,7 +605,7 @@ int CmdHFList(const char *Cmd)
 
 	while(tracepos < traceLen)
 	{
-		tracepos = printTraceLine(tracepos, traceLen, trace, protocol, showWaitCycles);
+		tracepos = printTraceLine(tracepos, traceLen, trace, protocol, showWaitCycles, markCRCBytes);
 	}
 
 	free(trace);
@@ -602,18 +615,19 @@ int CmdHFList(const char *Cmd)
 
 static command_t CommandTable[] = 
 {
-  {"help",        CmdHelp,          1, "This help"},
-  {"14a",         CmdHF14A,         1, "{ ISO14443A RFIDs... }"},
-  {"14b",         CmdHF14B,         1, "{ ISO14443B RFIDs... }"},
-  {"15",          CmdHF15,          1, "{ ISO15693 RFIDs... }"},
-  {"epa",         CmdHFEPA,         1, "{ German Identification Card... }"},
-  {"legic",       CmdHFLegic,       0, "{ LEGIC RFIDs... }"},
-  {"iclass",      CmdHFiClass,      1, "{ ICLASS RFIDs... }"},
-  {"mf",      		CmdHFMF,		1, "{ MIFARE RFIDs... }"},
-  {"mfu",			CmdHFMFUltra,		1, "{ MIFARE Ultralight RFIDs... }"},
-  {"tune",        CmdHFTune,        0, "Continuously measure HF antenna tuning"},
-  {"list",       CmdHFList,         1, "List protocol data in trace buffer"},
-	{NULL, NULL, 0, NULL}
+	{"help",	CmdHelp,		1, "This help"},
+	{"14a",		CmdHF14A,		1, "{ ISO14443A RFIDs... }"},
+	{"14b",		CmdHF14B,		1, "{ ISO14443B RFIDs... }"},
+	{"15",		CmdHF15,		1, "{ ISO15693 RFIDs... }"},
+	{"epa",		CmdHFEPA,		1, "{ German Identification Card... }"},
+	{"legic",	CmdHFLegic,		0, "{ LEGIC RFIDs... }"},
+	{"iclass",	CmdHFiClass,	1, "{ ICLASS RFIDs... }"},
+	{"mf",		CmdHFMF,		1, "{ MIFARE RFIDs... }"},
+	{"mfu",		CmdHFMFUltra,	1, "{ MIFARE Ultralight RFIDs... }"},
+	{"topaz",	CmdHFTopaz,		1, "{ TOPAZ (NFC Type 1) RFIDs... }"},
+	{"tune",	CmdHFTune,		0, "Continuously measure HF antenna tuning"},
+	{"list",	CmdHFList,		1, "List protocol data in trace buffer"},
+	{NULL,		NULL,			0, NULL}
 };
 
 int CmdHF(const char *Cmd)

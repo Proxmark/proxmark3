@@ -232,13 +232,19 @@ void AppendCrc14443a(uint8_t* data, int len)
 static tUart Uart;
 
 // Lookup-Table to decide if 4 raw bits are a modulation.
-// We accept two or three consecutive "0" in any position with the rest "1"
+// We accept the following:
+// 0001  -   a 3 tick wide pause
+// 0011  -   a 2 tick wide pause, or a three tick wide pause shifted left
+// 0111  -   a 2 tick wide pause shifted left
+// 1001  -   a 2 tick wide pause shifted right
 const bool Mod_Miller_LUT[] = {
-	TRUE,  TRUE,  FALSE, TRUE,  FALSE, FALSE, FALSE, FALSE,
-	TRUE,  TRUE,  FALSE, FALSE, TRUE,  FALSE, FALSE, FALSE
+//    TRUE,  TRUE,  FALSE, TRUE,  FALSE, FALSE, FALSE, FALSE,
+//    TRUE,  TRUE,  FALSE, FALSE, TRUE,  FALSE, FALSE, FALSE
+	FALSE,  TRUE, FALSE, TRUE,  FALSE, FALSE, FALSE, TRUE,
+	FALSE,  TRUE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE
 };
-#define IsMillerModulationNibble1(b) (Mod_Miller_LUT[(b & 0x00F0) >> 4])
-#define IsMillerModulationNibble2(b) (Mod_Miller_LUT[(b & 0x000F)])
+#define IsMillerModulationNibble1(b) (Mod_Miller_LUT[(b & 0x000000F0) >> 4])
+#define IsMillerModulationNibble2(b) (Mod_Miller_LUT[(b & 0x0000000F)])
 
 void UartReset()
 {
@@ -248,7 +254,6 @@ void UartReset()
 	Uart.parityLen = 0;					// number of decoded parity bytes
 	Uart.shiftReg = 0;					// shiftreg to hold decoded data bits
 	Uart.parityBits = 0;				// holds 8 parity bits
-	Uart.fourBits = 0x00000000;			// buffer for 4 Bits
 	Uart.startTime = 0;
 	Uart.endTime = 0;
 }
@@ -257,6 +262,7 @@ void UartInit(uint8_t *data, uint8_t *parity)
 {
 	Uart.output = data;
 	Uart.parity = parity;
+	Uart.fourBits = 0x00000000;			// clear the buffer for 4 Bits
 	UartReset();
 }
 
@@ -269,18 +275,21 @@ static RAMFUNC bool MillerDecoding(uint8_t bit, uint32_t non_real_time)
 	if (Uart.state == STATE_UNSYNCD) {											// not yet synced
 	
 		Uart.syncBit = 9999; 													// not set
-		// we look for a ...xxxx1111111100x11111xxxxxx pattern 
-		// (unmodulated, followed by the start bit = 8 '1's followed by 2 '0's, eventually followed by another '0', followed by 5 '1's)
-#define ISO14443A_STARTBIT_MASK		0x007FEF80									// mask is    00000000 01111111 11101111 10000000
-#define ISO14443A_STARTBIT_PATTERN	0x007F8F80									// pattern is 00000000 01111111 10001111 10000000
-		if		((Uart.fourBits & ISO14443A_STARTBIT_MASK) >> 0 == ISO14443A_STARTBIT_PATTERN >> 0) Uart.syncBit = 7;
-		else if ((Uart.fourBits & ISO14443A_STARTBIT_MASK) >> 1 == ISO14443A_STARTBIT_PATTERN >> 1) Uart.syncBit = 6;
-		else if ((Uart.fourBits & ISO14443A_STARTBIT_MASK) >> 2 == ISO14443A_STARTBIT_PATTERN >> 2) Uart.syncBit = 5;
-		else if ((Uart.fourBits & ISO14443A_STARTBIT_MASK) >> 3 == ISO14443A_STARTBIT_PATTERN >> 3) Uart.syncBit = 4;
-		else if ((Uart.fourBits & ISO14443A_STARTBIT_MASK) >> 4 == ISO14443A_STARTBIT_PATTERN >> 4) Uart.syncBit = 3;
-		else if ((Uart.fourBits & ISO14443A_STARTBIT_MASK) >> 5 == ISO14443A_STARTBIT_PATTERN >> 5) Uart.syncBit = 2;
-		else if ((Uart.fourBits & ISO14443A_STARTBIT_MASK) >> 6 == ISO14443A_STARTBIT_PATTERN >> 6) Uart.syncBit = 1;
-		else if ((Uart.fourBits & ISO14443A_STARTBIT_MASK) >> 7 == ISO14443A_STARTBIT_PATTERN >> 7) Uart.syncBit = 0;
+		// The start bit is one ore more Sequence Y followed by a Sequence Z (... 11111111 00x11111). We need to distinguish from
+		// Sequence X followed by Sequence Y followed by Sequence Z (111100x1 11111111 00x11111)
+		// we therefore look for a ...xx11111111111100x11111xxxxxx... pattern 
+		// (12 '1's followed by 2 '0's, eventually followed by another '0', followed by 5 '1's)
+#define ISO14443A_STARTBIT_MASK		0x07FFEF80									// mask is    00000111 11111111 11101111 10000000
+#define ISO14443A_STARTBIT_PATTERN	0x07FF8F80									// pattern is 00000111 11111111 10001111 10000000
+		if		((Uart.fourBits & (ISO14443A_STARTBIT_MASK >> 0)) == ISO14443A_STARTBIT_PATTERN >> 0) Uart.syncBit = 7;
+		else if ((Uart.fourBits & (ISO14443A_STARTBIT_MASK >> 1)) == ISO14443A_STARTBIT_PATTERN >> 1) Uart.syncBit = 6;
+		else if ((Uart.fourBits & (ISO14443A_STARTBIT_MASK >> 2)) == ISO14443A_STARTBIT_PATTERN >> 2) Uart.syncBit = 5;
+		else if ((Uart.fourBits & (ISO14443A_STARTBIT_MASK >> 3)) == ISO14443A_STARTBIT_PATTERN >> 3) Uart.syncBit = 4;
+		else if ((Uart.fourBits & (ISO14443A_STARTBIT_MASK >> 4)) == ISO14443A_STARTBIT_PATTERN >> 4) Uart.syncBit = 3;
+		else if ((Uart.fourBits & (ISO14443A_STARTBIT_MASK >> 5)) == ISO14443A_STARTBIT_PATTERN >> 5) Uart.syncBit = 2;
+		else if ((Uart.fourBits & (ISO14443A_STARTBIT_MASK >> 6)) == ISO14443A_STARTBIT_PATTERN >> 6) Uart.syncBit = 1;
+		else if ((Uart.fourBits & (ISO14443A_STARTBIT_MASK >> 7)) == ISO14443A_STARTBIT_PATTERN >> 7) Uart.syncBit = 0;
+
 		if (Uart.syncBit != 9999) {												// found a sync bit
 			Uart.startTime = non_real_time?non_real_time:(GetCountSspClk() & 0xfffffff8);
 			Uart.startTime -= Uart.syncBit;
@@ -646,7 +655,7 @@ void RAMFUNC SnoopIso14443a(uint8_t param) {
 										TRUE)) break;
 					}
 					/* And ready to receive another command. */
-					UartReset();
+					UartInit(receivedCmd, receivedCmdPar);
 					/* And also reset the demod code, which might have been */
 					/* false-triggered by the commands from the reader. */
 					DemodReset();
@@ -2798,7 +2807,7 @@ void RAMFUNC SniffMifare(uint8_t param) {
 					if (MfSniffLogic(receivedCmd, Uart.len, Uart.parity, Uart.bitCount, TRUE)) break;
 
 					/* And ready to receive another command. */
-					UartReset();
+					UartInit(receivedCmd, receivedCmdPar);
 					
 					/* And also reset the demod code */
 					DemodReset();

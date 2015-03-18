@@ -65,41 +65,42 @@ CMDSRCS = 	nonce2key/crapto1.c\
 		loclass/ikeys.c \
 		loclass/elite_crack.c\
 		loclass/fileutils.c\
-			mifarehost.c\
-			crc16.c \
-			iso14443crc.c \
-			iso15693tools.c \
-			data.c \
-			graph.c \
-			ui.c \
-			cmddata.c \
-			lfdemod.c \
-			cmdhf.c \
-			cmdhf14a.c \
-			cmdhf14b.c \
-			cmdhf15.c \
-			cmdhfepa.c \
-			cmdhflegic.c \
-			cmdhficlass.c \
-			cmdhfmf.c \
-            cmdhfmfu.c \
-			cmdhw.c \
-			cmdlf.c \
-			cmdlfio.c \
-			cmdlfhid.c \
-			cmdlfem4x.c \
-			cmdlfhitag.c \
-			cmdlfti.c \
-			cmdparser.c \
-			cmdmain.c \
-			cmdlft55xx.c \
-			cmdlfpcf7931.c\
-			pm3_binlib.c\
-			scripting.c\
-			cmdscript.c\
-			pm3_bitlib.c\
-			aes.c\
-			protocols.c\
+		mifarehost.c\
+		crc16.c \
+		iso14443crc.c \
+		iso15693tools.c \
+		data.c \
+		graph.c \
+		ui.c \
+		cmddata.c \
+		lfdemod.c \
+		cmdhf.c \
+		cmdhf14a.c \
+		cmdhf14b.c \
+		cmdhf15.c \
+		cmdhfepa.c \
+		cmdhflegic.c \
+		cmdhficlass.c \
+		cmdhfmf.c \
+        cmdhfmfu.c \
+		cmdhftopaz.c \
+		cmdhw.c \
+		cmdlf.c \
+		cmdlfio.c \
+		cmdlfhid.c \
+		cmdlfem4x.c \
+		cmdlfhitag.c \
+		cmdlfti.c \
+		cmdparser.c \
+		cmdmain.c \
+		cmdlft55xx.c \
+		cmdlfpcf7931.c\
+		pm3_binlib.c\
+		scripting.c\
+		cmdscript.c\
+		pm3_bitlib.c\
+		aes.c\
+		protocols.c\
 
 
 COREOBJS = $(CORESRCS:%.c=$(OBJDIR)/%.o)
