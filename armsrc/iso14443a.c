@@ -213,6 +213,12 @@ void AppendCrc14443a(uint8_t* data, int len)
 	ComputeCrc14443(CRC_14443_A,data,len,data+len,data+len+1);
 }
 
+void AppendCrc14443b(uint8_t* data, int len)
+{
+	ComputeCrc14443(CRC_14443_B,data,len,data+len,data+len+1);
+}
+
+
 //=============================================================================
 // ISO 14443 Type A - Miller decoder
 //=============================================================================
@@ -238,8 +244,6 @@ static tUart Uart;
 // 0111  -   a 2 tick wide pause shifted left
 // 1001  -   a 2 tick wide pause shifted right
 const bool Mod_Miller_LUT[] = {
-//    TRUE,  TRUE,  FALSE, TRUE,  FALSE, FALSE, FALSE, FALSE,
-//    TRUE,  TRUE,  FALSE, FALSE, TRUE,  FALSE, FALSE, FALSE
 	FALSE,  TRUE, FALSE, TRUE,  FALSE, FALSE, FALSE, TRUE,
 	FALSE,  TRUE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE
 };
@@ -279,8 +283,8 @@ static RAMFUNC bool MillerDecoding(uint8_t bit, uint32_t non_real_time)
 		// Sequence X followed by Sequence Y followed by Sequence Z (111100x1 11111111 00x11111)
 		// we therefore look for a ...xx11111111111100x11111xxxxxx... pattern 
 		// (12 '1's followed by 2 '0's, eventually followed by another '0', followed by 5 '1's)
-#define ISO14443A_STARTBIT_MASK		0x07FFEF80									// mask is    00000111 11111111 11101111 10000000
-#define ISO14443A_STARTBIT_PATTERN	0x07FF8F80									// pattern is 00000111 11111111 10001111 10000000
+		#define ISO14443A_STARTBIT_MASK		0x07FFEF80							// mask is    00000111 11111111 11101111 10000000
+		#define ISO14443A_STARTBIT_PATTERN	0x07FF8F80							// pattern is 00000111 11111111 10001111 10000000
 		if		((Uart.fourBits & (ISO14443A_STARTBIT_MASK >> 0)) == ISO14443A_STARTBIT_PATTERN >> 0) Uart.syncBit = 7;
 		else if ((Uart.fourBits & (ISO14443A_STARTBIT_MASK >> 1)) == ISO14443A_STARTBIT_PATTERN >> 1) Uart.syncBit = 6;
 		else if ((Uart.fourBits & (ISO14443A_STARTBIT_MASK >> 2)) == ISO14443A_STARTBIT_PATTERN >> 2) Uart.syncBit = 5;
@@ -655,7 +659,7 @@ void RAMFUNC SnoopIso14443a(uint8_t param) {
 										TRUE)) break;
 					}
 					/* And ready to receive another command. */
-					UartInit(receivedCmd, receivedCmdPar);
+					UartReset();
 					/* And also reset the demod code, which might have been */
 					/* false-triggered by the commands from the reader. */
 					DemodReset();
@@ -680,6 +684,9 @@ void RAMFUNC SnoopIso14443a(uint8_t param) {
 
 					// And ready to receive another response.
 					DemodReset();
+					// And reset the Miller decoder including itS (now outdated) input buffer
+					UartInit(receivedCmd, receivedCmdPar);
+
 					LED_C_OFF();
 				} 
 				TagIsActive = (Demod.state != DEMOD_UNSYNCD);
@@ -1337,7 +1344,7 @@ void CodeIso14443aBitsAsReaderPar(const uint8_t *cmd, uint16_t bits, const uint8
 		}
 
 		// Only transmit parity bit if we transmitted a complete byte
-		if (j == 8) {
+		if (j == 8 && parity != NULL) {
 			// Get the parity bit
 			if (parity[i>>3] & (0x80 >> (i&0x0007))) {
 				// Sequence X
@@ -1631,6 +1638,7 @@ static int GetIso14443aAnswerFromTag(uint8_t *receivedResponse, uint8_t *receive
 	}
 }
 
+
 void ReaderTransmitBitsPar(uint8_t* frame, uint16_t bits, uint8_t *par, uint32_t *timing)
 {
 	CodeIso14443aBitsAsReaderPar(frame, bits, par);
@@ -1646,10 +1654,12 @@ void ReaderTransmitBitsPar(uint8_t* frame, uint16_t bits, uint8_t *par, uint32_t
 	}
 }
 
+
 void ReaderTransmitPar(uint8_t* frame, uint16_t len, uint8_t *par, uint32_t *timing)
 {
   ReaderTransmitBitsPar(frame, len*8, par, timing);
 }
+
 
 void ReaderTransmitBits(uint8_t* frame, uint16_t len, uint32_t *timing)
 {
@@ -1658,6 +1668,7 @@ void ReaderTransmitBits(uint8_t* frame, uint16_t len, uint32_t *timing)
   GetParity(frame, len/8, par);
   ReaderTransmitBitsPar(frame, len, par, timing);
 }
+
 
 void ReaderTransmit(uint8_t* frame, uint16_t len, uint32_t *timing)
 {
@@ -1932,15 +1943,38 @@ void ReaderIso14443a(UsbCommand *c)
 
 	if(param & ISO14A_RAW) {
 		if(param & ISO14A_APPEND_CRC) {
-			AppendCrc14443a(cmd,len);
+			if(param & ISO14A_TOPAZMODE) {
+				AppendCrc14443b(cmd,len);
+			} else {
+				AppendCrc14443a(cmd,len);
+			}
 			len += 2;
 			if (lenbits) lenbits += 16;
 		}
-		if(lenbits>0) {
-			GetParity(cmd, lenbits/8, par);
-			ReaderTransmitBitsPar(cmd, lenbits, par, NULL);
-		} else {
-			ReaderTransmit(cmd,len, NULL);
+		if(lenbits>0) {				// want to send a specific number of bits (e.g. short commands)
+			if(param & ISO14A_TOPAZMODE) {
+				int bits_to_send = lenbits;
+				uint16_t i = 0;
+				ReaderTransmitBitsPar(&cmd[i++], MIN(bits_to_send, 7), NULL, NULL);		// first byte is always short (7bits) and no parity
+				bits_to_send -= 7;
+				while (bits_to_send > 0) {
+					ReaderTransmitBitsPar(&cmd[i++], MIN(bits_to_send, 8), NULL, NULL);	// following bytes are 8 bit and no parity
+					bits_to_send -= 8;
+				}
+			} else {
+				GetParity(cmd, lenbits/8, par);
+				ReaderTransmitBitsPar(cmd, lenbits, par, NULL);							// bytes are 8 bit with odd parity
+			}
+		} else {					// want to send complete bytes only
+			if(param & ISO14A_TOPAZMODE) {
+				uint16_t i = 0;
+				ReaderTransmitBitsPar(&cmd[i++], 7, NULL, NULL);						// first byte: 7 bits, no paritiy
+				while (i < len) {
+					ReaderTransmitBitsPar(&cmd[i++], 8, NULL, NULL);					// following bytes: 8 bits, no paritiy
+				}
+			} else {
+				ReaderTransmit(cmd,len, NULL);											// 8 bits, odd parity
+			}
 		}
 		arg0 = ReaderReceive(buf, par);
 		cmd_send(CMD_ACK,arg0,0,0,buf,sizeof(buf));
@@ -2824,6 +2858,8 @@ void RAMFUNC SniffMifare(uint8_t param) {
 
 					// And ready to receive another response.
 					DemodReset();
+					// And reset the Miller decoder including its (now outdated) input buffer
+					UartInit(receivedCmd, receivedCmdPar);
 				}
 				TagIsActive = (Demod.state != DEMOD_UNSYNCD);
 			}

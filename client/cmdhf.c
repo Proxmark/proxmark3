@@ -145,7 +145,6 @@ void annotateIso15693(char *exp, size_t size, uint8_t* cmd, uint8_t cmdsize)
 
 void annotateTopaz(char *exp, size_t size, uint8_t* cmd, uint8_t cmdsize)
 {
-
 	switch(cmd[0]) {
 		case TOPAZ_REQA						:snprintf(exp, size, "REQA");break;
 		case TOPAZ_WUPA						:snprintf(exp, size, "WUPA");break;
@@ -154,6 +153,10 @@ void annotateTopaz(char *exp, size_t size, uint8_t* cmd, uint8_t cmdsize)
 		case TOPAZ_READ						:snprintf(exp, size, "READ");break;
 		case TOPAZ_WRITE_E					:snprintf(exp, size, "WRITE-E");break;
 		case TOPAZ_WRITE_NE					:snprintf(exp, size, "WRITE-NE");break;
+		case TOPAZ_RSEG						:snprintf(exp, size, "RSEG");break;
+		case TOPAZ_READ8					:snprintf(exp, size, "READ8");break;
+		case TOPAZ_WRITE_E8					:snprintf(exp, size, "WRITE-E8");break;
+		case TOPAZ_WRITE_NE8				:snprintf(exp, size, "WRITE-NE8");break;
 		default:                            snprintf(exp,size,"?"); break;
 	}
 }
@@ -319,7 +322,7 @@ bool next_record_is_response(uint16_t tracepos, uint8_t *trace)
 bool merge_topaz_reader_frames(uint32_t timestamp, uint32_t *duration, uint16_t *tracepos, uint16_t traceLen, uint8_t *trace, uint8_t *frame, uint8_t *topaz_reader_command, uint16_t *data_len)
 {
 
-#define MAX_TOPAZ_READER_CMD_LEN	9
+#define MAX_TOPAZ_READER_CMD_LEN	16
 
 	uint32_t last_timestamp = timestamp + *duration;
 
@@ -479,7 +482,7 @@ uint16_t printTraceLine(uint16_t tracepos, uint16_t traceLen, uint8_t *trace, ui
 	int num_lines = MIN((data_len - 1)/16 + 1, 16);
 	for (int j = 0; j < num_lines ; j++) {
 		if (j == 0) {
-			PrintAndLog(" %9d | %9d | %s |%-64s | %s| %s",
+			PrintAndLog(" %10d | %10d | %s |%-64s | %s| %s",
 				(timestamp - first_timestamp),
 				(EndOfTransmissionTimestamp - first_timestamp),
 				(isResponse ? "Tag" : "Rdr"),
@@ -487,7 +490,7 @@ uint16_t printTraceLine(uint16_t tracepos, uint16_t traceLen, uint8_t *trace, ui
 				(j == num_lines-1) ? crc : "    ",
 				(j == num_lines-1) ? explanation : "");
 		} else {
-			PrintAndLog("           |           |     |%-64s | %s| %s",
+			PrintAndLog("            |            |     |%-64s | %s| %s",
 				line[j],
 				(j == num_lines-1) ? crc : "    ",
 				(j == num_lines-1) ? explanation : "");
