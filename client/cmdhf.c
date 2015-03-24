@@ -603,8 +603,8 @@ int CmdHFList(const char *Cmd)
 	PrintAndLog("iso14443a - All times are in carrier periods (1/13.56Mhz)");
 	PrintAndLog("iClass    - Timings are not as accurate");
 	PrintAndLog("");
-	PrintAndLog("     Start |       End | Src | Data (! denotes parity error)                                   | CRC | Annotation         |");
-	PrintAndLog("-----------|-----------|-----|-----------------------------------------------------------------|-----|--------------------|");
+	PrintAndLog("      Start |        End | Src | Data (! denotes parity error)                                   | CRC | Annotation         |");
+	PrintAndLog("------------|------------|-----|-----------------------------------------------------------------|-----|--------------------|");
 
 	while(tracepos < traceLen)
 	{
