@@ -22,7 +22,16 @@
 #include "iso14443crc.h"
 #include "protocols.h"
 
+#define TOPAZ_MAX_MEMORY	2048
 
+static struct {
+	uint8_t HR01[2];
+	uint8_t uid[7];
+	uint8_t size;
+	uint8_t data_blocks[TOPAZ_MAX_MEMORY/8][8];
+	uint8_t *dynamic_lock_areas;
+	uint8_t *dynamic_reserved_areas;
+} topaz_tag;
 
 
 static void topaz_switch_on_field(void)
@@ -92,12 +101,12 @@ static int topaz_select(uint8_t *atqa, uint8_t *rid_response)
 }
 
 
-static int topaz_rall(uint8_t *uid, uint8_t *rall_response)
+static int topaz_rall(uint8_t *uid, uint8_t *response)
 {
 	uint8_t rall_cmd[] = {TOPAZ_RALL, 0, 0, 0, 0, 0, 0, 0, 0};
 
 	memcpy(&rall_cmd[3], uid, 4);
-	if (!topaz_send_cmd(rall_cmd, sizeof(rall_cmd), rall_response)) {
+	if (!topaz_send_cmd(rall_cmd, sizeof(rall_cmd), response)) {
 		topaz_switch_off_field();
 		return -1;		// RALL failed
 	}
@@ -249,15 +258,7 @@ int CmdHFTopazReader(const char *Cmd)
 	uint8_t atqa[2];
 	uint8_t rid_response[8];
 	uint8_t *uid_echo = &rid_response[2];
-	union {
-		uint8_t raw_content[124];
-		struct {
-			uint8_t HR[2];
-			uint8_t data_block[15][8];
-			uint8_t CRC[2];
-		} static_memory;
-	} rall_response;
-	uint8_t *static_lock_bytes = rall_response.static_memory.data_block[0x0e];
+	uint8_t rall_response[124];
 	
 	status = topaz_select(atqa, rid_response);
 	
@@ -279,6 +280,9 @@ int CmdHFTopazReader(const char *Cmd)
 		return -1;
 	}
 
+	topaz_tag.HR01[0] = rid_response[0];
+	topaz_tag.HR01[1] = rid_response[1];
+	
 	// ToDo: CRC check
 	PrintAndLog("HR0  : %02x (%sa Topaz tag (%scapable of carrying a NDEF message), %s memory map)", rid_response[0], 
 						(rid_response[0] & 0xF0) == 0x10 ? "" : "not ",
@@ -286,7 +290,7 @@ int CmdHFTopazReader(const char *Cmd)
 						(rid_response[0] & 0x0F) == 0x10 ? "static" : "dynamic");
 	PrintAndLog("HR1  : %02x", rid_response[1]);
 	
-	status = topaz_rall(uid_echo, rall_response.raw_content);
+	status = topaz_rall(uid_echo, rall_response);
 
 	if(status == -1) {
 		PrintAndLog("Error: tag didn't answer to RALL");
@@ -294,46 +298,48 @@ int CmdHFTopazReader(const char *Cmd)
 		return -1;
 	}
 
+	memcpy(topaz_tag.uid, rall_response+2, 7);
 	PrintAndLog("UID  : %02x %02x %02x %02x %02x %02x %02x", 
-			rall_response.static_memory.data_block[0][6], 
-			rall_response.static_memory.data_block[0][5], 
-			rall_response.static_memory.data_block[0][4], 
-			rall_response.static_memory.data_block[0][3], 
-			rall_response.static_memory.data_block[0][2], 
-			rall_response.static_memory.data_block[0][1], 
-			rall_response.static_memory.data_block[0][0]);
+			topaz_tag.uid[6], 
+			topaz_tag.uid[5], 
+			topaz_tag.uid[4], 
+			topaz_tag.uid[3], 
+			topaz_tag.uid[2], 
+			topaz_tag.uid[1], 
+			topaz_tag.uid[0]);
 	PrintAndLog("       UID[6] (Manufacturer Byte) = %02x, Manufacturer: %s", 
-			rall_response.static_memory.data_block[0][6], 
-			getTagInfo(rall_response.static_memory.data_block[0][6]));
-	
+			topaz_tag.uid[6], 
+			getTagInfo(topaz_tag.uid[6]));
+
+	memcpy(topaz_tag.data_blocks, rall_response+2, 0x10*8);
 	PrintAndLog("");
 	PrintAndLog("Static Data blocks 00 to 0c:");
 	PrintAndLog("block# | offset | Data                    | Locked?");
 	char line[80];
 	for (uint16_t i = 0; i <= 0x0c; i++) {
 		for (uint16_t j = 0; j < 8; j++) {
-			sprintf(&line[3*j], "%02x ", rall_response.static_memory.data_block[i][j] /*rall_response[2 + 8*i + j]*/);
+			sprintf(&line[3*j], "%02x ", topaz_tag.data_blocks[i][j] /*rall_response[2 + 8*i + j]*/);
 		}
-		PrintAndLog("  0x%02x |  0x%02x  | %s|   %-3s", i, i*8, line, topaz_block_is_locked(i, static_lock_bytes) ? "yes" : "no");
+		PrintAndLog("  0x%02x |  0x%02x  | %s|   %-3s", i, i*8, line, topaz_block_is_locked(i, &topaz_tag.data_blocks[0x0d][0]) ? "yes" : "no");
 	}
 	
 	PrintAndLog("");
 	PrintAndLog("Static Reserved block 0d:");
 	for (uint16_t j = 0; j < 8; j++) {
-		sprintf(&line[3*j], "%02x ", rall_response.static_memory.data_block[0x0d][j]);
+		sprintf(&line[3*j], "%02x ", topaz_tag.data_blocks[0x0d][j]);
 	}
 	PrintAndLog("  0x%02x |  0x%02x  | %s|   %-3s", 0x0d, 0x0d*8, line, "n/a");
 	
 	PrintAndLog("");
-	PrintAndLog("Static Lockbits / OTP block 0e:");
+	PrintAndLog("Static Lockbits and OTP Bytes:");
 	for (uint16_t j = 0; j < 8; j++) {
-		sprintf(&line[3*j], "%02x ", static_lock_bytes[j]);
+		sprintf(&line[3*j], "%02x ", topaz_tag.data_blocks[0x0e][j]);
 	}
 	PrintAndLog("  0x%02x |  0x%02x  | %s|   %-3s", 0x0e, 0x0e*8, line, "n/a");
 
 	PrintAndLog("");
 
-	status = topaz_print_CC(&rall_response.static_memory.data_block[1][0]);
+	status = topaz_print_CC(&topaz_tag.data_blocks[1][0]);
 	
 	if (status == -1) {
 		PrintAndLog("No NDEF message present");
@@ -342,14 +348,14 @@ int CmdHFTopazReader(const char *Cmd)
 	}
 
 	PrintAndLog("");
-	bool lock_TLV_present = topaz_print_lock_control_TLVs(&rall_response.static_memory.data_block[1][4]);
+	bool lock_TLV_present = topaz_print_lock_control_TLVs(&topaz_tag.data_blocks[1][4]);
 
 	PrintAndLog("");
-	bool reserved_mem_present = topaz_print_reserved_memory_control_TLVs(&rall_response.static_memory.data_block[1][4]);
+	bool reserved_mem_present = topaz_print_reserved_memory_control_TLVs(&topaz_tag.data_blocks[1][4]);
 
-	topaz_print_lifecycle_state(&rall_response.static_memory.data_block[1][0]);
+	topaz_print_lifecycle_state(&topaz_tag.data_blocks[1][0]);
 
-	topaz_print_NDEF(&rall_response.static_memory.data_block[1][0]);
+	topaz_print_NDEF(&topaz_tag.data_blocks[1][0]);
 	
 	topaz_switch_off_field();
 	return 0;
