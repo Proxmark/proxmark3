@@ -51,6 +51,7 @@ SECTIONS
 	__data_src_start__ = LOADADDR(.data);
 	__data_start__ = ADDR(.data);
 	__data_end__ = __data_start__ + SIZEOF(.data);
+	__os_size__ = SIZEOF(.text) + SIZEOF(.data) + SIZEOF(.rodata);
 	
 	.bss : {
 		__bss_start__ = .; 

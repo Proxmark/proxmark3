@@ -30,7 +30,8 @@ THUMBSRC = start.c \
 	util.c \
 	string.c \
 	usb_cdc.c \
-	cmd.c
+	cmd.c \
+	inflate.c
 
 # These are to be compiled in ARM mode
 ARMSRC = fpgaloader.c \

@@ -12,7 +12,8 @@ CXX=g++
 VPATH = ../common
 OBJDIR = obj
 
-LDLIBS = -L/opt/local/lib -L/usr/local/lib ../liblua/liblua.a -lreadline -lpthread -lm
+LDLIBS = -L/opt/local/lib -L/usr/local/lib -lreadline -lpthread -lm
+LUALIB = ../liblua/liblua.a
 LDFLAGS = $(COMMON_FLAGS)
 CFLAGS = -std=c99 -I. -I../include -I../common -I/opt/local/include -I../liblua -Wall $(COMMON_FLAGS) -g -O4
 LUAPLATFORM = generic
@@ -108,15 +109,15 @@ COREOBJS = $(CORESRCS:%.c=$(OBJDIR)/%.o)
 CMDOBJS = $(CMDSRCS:%.c=$(OBJDIR)/%.o)
 
 RM = rm -f
-BINS = proxmark3 flasher #snooper cli
+BINS = proxmark3 flasher fpga_compress #snooper cli
 CLEAN = cli cli.exe flasher flasher.exe proxmark3 proxmark3.exe snooper snooper.exe $(CMDOBJS) $(OBJDIR)/*.o *.o *.moc.cpp
 
 all: lua_build $(BINS) 
 
 all-static: LDLIBS:=-static $(LDLIBS)
-all-static: snooper cli flasher
+all-static: snooper cli flasher fpga_compress
 	
-proxmark3: LDLIBS+=$(QTLDLIBS)
+proxmark3: LDLIBS+=$(QTLDLIBS) $(LUALIB)
 proxmark3: $(OBJDIR)/proxmark3.o $(COREOBJS) $(CMDOBJS) $(QTGUI)
 	$(CXX) $(CXXFLAGS) $^ $(LDLIBS) -o $@
 
@@ -127,6 +128,9 @@ cli: $(OBJDIR)/cli.o $(COREOBJS) $(CMDOBJS) $(OBJDIR)/guidummy.o
 	$(CXX) $(CXXFLAGS) $^ $(LDLIBS) -o $@
 
 flasher: $(OBJDIR)/flash.o $(OBJDIR)/flasher.o $(COREOBJS)
+	$(CXX) $(CXXFLAGS) $^ $(LDLIBS) -o $@
+
+fpga_compress: $(OBJDIR)/fpga_compress.o
 	$(CXX) $(CXXFLAGS) $^ $(LDLIBS) -o $@
 
 $(OBJDIR)/%.o: %.c

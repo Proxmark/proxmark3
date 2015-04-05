@@ -310,7 +310,7 @@ void ReadMem(int addr)
 /* osimage version information is linked in */
 extern struct version_information version_information;
 /* bootrom version information is pointed to from _bootphase1_version_pointer */
-extern char *_bootphase1_version_pointer, _flash_start, _flash_end;
+extern char *_bootphase1_version_pointer, _flash_start, _flash_end, _bootrom_start, _bootrom_end, __os_size__;
 void SendVersion(void)
 {
 	char temp[512]; /* Limited data payload in USB packets */
@@ -331,10 +331,13 @@ void SendVersion(void)
 	FormatVersionInformation(temp, sizeof(temp), "os: ", &version_information);
 	DbpString(temp);
 
-	FpgaGatherVersion(temp, sizeof(temp));
+	FpgaGatherVersion(FPGA_BITSTREAM_LF, temp, sizeof(temp));
 	DbpString(temp);
-	// Send Chip ID
-	cmd_send(CMD_ACK,*(AT91C_DBGU_CIDR),0,0,NULL,0);
+	FpgaGatherVersion(FPGA_BITSTREAM_HF, temp, sizeof(temp));
+	DbpString(temp);
+	
+	// Send Chip ID and used flash memory
+	cmd_send(CMD_ACK, *(AT91C_DBGU_CIDR), (uint32_t)&_bootrom_end - (uint32_t)&_bootrom_start + (uint32_t)&__os_size__, 0, NULL, 0);
 }
 
 #ifdef WITH_LF

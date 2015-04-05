@@ -14,6 +14,19 @@
 #include "util.h"
 #include "string.h"
 
+// remember which version of the bitstream we have already downloaded to the FPGA
+static int downloaded_bitstream = FPGA_BITSTREAM_ERR;
+
+// this is where the bitstreams are located in memory:
+extern uint8_t _binary_fpga_lf_bit_start, _binary_fpga_lf_bit_end;
+extern uint8_t _binary_fpga_hf_bit_start, _binary_fpga_hf_bit_end;
+static uint8_t *fpga_image_ptr = NULL;
+
+static const uint8_t _bitparse_fixed_header[] = {0x00, 0x09, 0x0f, 0xf0, 0x0f, 0xf0, 0x0f, 0xf0, 0x0f, 0xf0, 0x00, 0x00, 0x01};
+static const uint8_t _gzip_header[] = {0x1f, 0x8b, 0x08};  // including compression method 0x08 (deflate)
+#define GZIP_HEADER_SIZE		sizeof(_gzip_header)
+#define FPGA_BITSTREAM_FIXED_HEADER_SIZE	sizeof(_bitparse_fixed_header)
+
 //-----------------------------------------------------------------------------
 // Set up the Serial Peripheral Interface as master
 // Used to write the FPGA config word
@@ -150,6 +163,19 @@ bool FpgaSetupSscDma(uint8_t *buf, int len)
     return true;
 }
 
+
+void reset_fpga_stream(uint8_t *image_start)
+{
+	fpga_image_ptr = image_start;
+}
+
+
+uint8_t get_from_fpga_stream(void)
+{
+	return *fpga_image_ptr++;
+}
+
+
 static void DownloadFPGA_byte(unsigned char w)
 {
 #define SEND_BIT(x) { if(w & (1<<x) ) HIGH(GPIO_FPGA_DIN); else LOW(GPIO_FPGA_DIN); HIGH(GPIO_FPGA_CCLK); LOW(GPIO_FPGA_CCLK); }
@@ -163,9 +189,8 @@ static void DownloadFPGA_byte(unsigned char w)
 	SEND_BIT(0);
 }
 
-// Download the fpga image starting at FpgaImage and with length FpgaImageLen bytes
-// If bytereversal is set: reverse the byte order in each 4-byte word
-static void DownloadFPGA(const char *FpgaImage, int FpgaImageLen, int bytereversal)
+// Download the fpga image starting at current stream position with length FpgaImageLen bytes
+static void DownloadFPGA(int FpgaImageLen)
 {
 	int i=0;
 
@@ -218,21 +243,8 @@ static void DownloadFPGA(const char *FpgaImage, int FpgaImageLen, int byterevers
 		return;
 	}
 
-	if(bytereversal) {
-		/* This is only supported for uint32_t aligned images */
-		if( ((int)FpgaImage % sizeof(uint32_t)) == 0 ) {
-			i=0;
-			while(FpgaImageLen-->0)
-				DownloadFPGA_byte(FpgaImage[(i++)^0x3]);
-			/* Explanation of the magic in the above line:
-			 * i^0x3 inverts the lower two bits of the integer i, counting backwards
-			 * for each 4 byte increment. The generated sequence of (i++)^3 is
-			 * 3 2 1 0 7 6 5 4 11 10 9 8 15 14 13 12 etc. pp.
-			 */
-		}
-	} else {
-		while(FpgaImageLen-->0)
-			DownloadFPGA_byte(*FpgaImage++);
+	while(FpgaImageLen-->0) {
+		DownloadFPGA_byte(get_from_fpga_stream());
 	}
 
 	// continue to clock FPGA until ready signal goes high
@@ -250,39 +262,21 @@ static void DownloadFPGA(const char *FpgaImage, int FpgaImageLen, int byterevers
 	LED_D_OFF();
 }
 
-static char *bitparse_headers_start;
-static char *bitparse_bitstream_end;
-static int bitparse_initialized = 0;
+
 /* Simple Xilinx .bit parser. The file starts with the fixed opaque byte sequence
  * 00 09 0f f0 0f f0 0f f0 0f f0 00 00 01
  * After that the format is 1 byte section type (ASCII character), 2 byte length
  * (big endian), <length> bytes content. Except for section 'e' which has 4 bytes
  * length.
  */
-static const char _bitparse_fixed_header[] = {0x00, 0x09, 0x0f, 0xf0, 0x0f, 0xf0, 0x0f, 0xf0, 0x0f, 0xf0, 0x00, 0x00, 0x01};
-static int bitparse_init(void * start_address, void *end_address)
+int bitparse_find_section(char section_name, unsigned int *section_length)
 {
-	bitparse_initialized = 0;
-
-	if(memcmp(_bitparse_fixed_header, start_address, sizeof(_bitparse_fixed_header)) != 0) {
-		return 0; /* Not matched */
-	} else {
-		bitparse_headers_start= ((char*)start_address) + sizeof(_bitparse_fixed_header);
-		bitparse_bitstream_end= (char*)end_address;
-		bitparse_initialized = 1;
-		return 1;
-	}
-}
-
-int bitparse_find_section(char section_name, char **section_start, unsigned int *section_length)
-{
-	char *pos = bitparse_headers_start;
 	int result = 0;
-
-	if(!bitparse_initialized) return 0;
-
-	while(pos < bitparse_bitstream_end) {
-		char current_name = *pos++;
+	#define MAX_FPGA_BIT_STREAM_HEADER_SEARCH 100  // maximum number of bytes to search for the requested section
+	uint16_t numbytes = 0;
+	while(numbytes < MAX_FPGA_BIT_STREAM_HEADER_SEARCH) {
+		char current_name = get_from_fpga_stream();
+		numbytes++;
 		unsigned int current_length = 0;
 		if(current_name < 'a' || current_name > 'e') {
 			/* Strange section name, abort */
@@ -292,11 +286,13 @@ int bitparse_find_section(char section_name, char **section_start, unsigned int 
 		switch(current_name) {
 		case 'e':
 			/* Four byte length field */
-			current_length += (*pos++) << 24;
-			current_length += (*pos++) << 16;
+			current_length += get_from_fpga_stream() << 24;
+			current_length += get_from_fpga_stream() << 16;
+			numbytes += 2;
 		default: /* Fall through, two byte length field */
-			current_length += (*pos++) << 8;
-			current_length += (*pos++) << 0;
+			current_length += get_from_fpga_stream() << 8;
+			current_length += get_from_fpga_stream() << 0;
+			numbytes += 2;
 		}
 
 		if(current_name != 'e' && current_length > 255) {
@@ -306,108 +302,136 @@ int bitparse_find_section(char section_name, char **section_start, unsigned int 
 
 		if(current_name == section_name) {
 			/* Found it */
-			*section_start = pos;
 			*section_length = current_length;
 			result = 1;
 			break;
 		}
 
-		pos += current_length; /* Skip section */
+		for (uint16_t i = 0; i < current_length && numbytes < MAX_FPGA_BIT_STREAM_HEADER_SEARCH; i++) {
+			get_from_fpga_stream();
+			numbytes++;
+		}
 	}
 
 	return result;
 }
 
+void init_fpga_inflate(void)
+{
+	// initialize zlib for inflate
+}
+
+
 //-----------------------------------------------------------------------------
 // Find out which FPGA image format is stored in flash, then call DownloadFPGA
 // with the right parameters to download the image
 //-----------------------------------------------------------------------------
-extern char _binary_fpga_lf_bit_start, _binary_fpga_lf_bit_end;
-extern char _binary_fpga_hf_bit_start, _binary_fpga_hf_bit_end;
 void FpgaDownloadAndGo(int bitstream_version)
 {
-	void *bit_start;
-	void *bit_end;
-
+	uint8_t header[FPGA_BITSTREAM_FIXED_HEADER_SIZE];
+	
 	// check whether or not the bitstream is already loaded
-	if (FpgaGatherBitstreamVersion() == bitstream_version)
+	if (downloaded_bitstream == bitstream_version)
 		return;
 
 	if (bitstream_version == FPGA_BITSTREAM_LF) {
-		bit_start = &_binary_fpga_lf_bit_start;
-		bit_end = &_binary_fpga_lf_bit_end;
+		reset_fpga_stream(&_binary_fpga_lf_bit_start);
 	} else if (bitstream_version == FPGA_BITSTREAM_HF) {
-		bit_start = &_binary_fpga_hf_bit_start;
-		bit_end = &_binary_fpga_hf_bit_end;
+		reset_fpga_stream(&_binary_fpga_hf_bit_start);
 	} else
 		return;
-	/* Check for the new flash image format: Should have the .bit file at &_binary_fpga_bit_start
-	 */
-	if(bitparse_init(bit_start, bit_end)) {
-		/* Successfully initialized the .bit parser. Find the 'e' section and
-		 * send its contents to the FPGA.
-		 */
-		char *bitstream_start;
-		unsigned int bitstream_length;
-		if(bitparse_find_section('e', &bitstream_start, &bitstream_length)) {
-			DownloadFPGA(bitstream_start, bitstream_length, 0);
 
+	uint16_t i = 0;	
+	for (; i < GZIP_HEADER_SIZE; i++) {
+		header[i] = get_from_fpga_stream();
+	}
+	
+	// Check for compressed new flash image format (starts with gzip header)
+	if(memcmp(_gzip_header, header, GZIP_HEADER_SIZE) == 0) {
+		init_fpga_inflate();
+	}
+
+	for (; i < FPGA_BITSTREAM_FIXED_HEADER_SIZE; i++) {
+		header[i] = get_from_fpga_stream();
+	}
+
+	// Check for the new flash image format: Should have the .bit file at &_binary_fpga_bit_start
+	if(memcmp(_bitparse_fixed_header, header, FPGA_BITSTREAM_FIXED_HEADER_SIZE) == 0) {
+		unsigned int bitstream_length;
+		if(bitparse_find_section('e', &bitstream_length)) {
+			DownloadFPGA(bitstream_length);
+			downloaded_bitstream = bitstream_version;
 			return; /* All done */
 		}
 	}
-
-	/* Fallback for the old flash image format: Check for the magic marker 0xFFFFFFFF
-	 * 0xAA995566 at address 0x102000. This is raw bitstream with a size of 336,768 bits
-	 * = 10,524 uint32_t, stored as uint32_t e.g. little-endian in memory, but each DWORD
-	 * is still to be transmitted in MSBit first order. Set the invert flag to indicate
-	 * that the DownloadFPGA function should invert every 4 byte sequence when doing
-	 * the bytewise download.
-	 */
-	if( *(uint32_t*)0x102000 == 0xFFFFFFFF && *(uint32_t*)0x102004 == 0xAA995566 )
-		DownloadFPGA((char*)0x102000, 10524*4, 1);
-}
+}	
 
 int FpgaGatherBitstreamVersion()
 {
-	char temp[256];
-	FpgaGatherVersion(temp, sizeof (temp));
-	if (!memcmp("LF", temp, 2))
-		return FPGA_BITSTREAM_LF;
-	else if (!memcmp("HF", temp, 2))
-		return FPGA_BITSTREAM_HF;
-	return FPGA_BITSTREAM_ERR;
+	return downloaded_bitstream;
 }
 
-void FpgaGatherVersion(char *dst, int len)
+void FpgaGatherVersion(int bitstream_version, char *dst, int len)
 {
-	char *fpga_info;
 	unsigned int fpga_info_len;
-	dst[0] = 0;
-	if(!bitparse_find_section('e', &fpga_info, &fpga_info_len)) {
-		strncat(dst, "FPGA image: legacy image without version information", len-1);
-	} else {
-		/* USB packets only have 48 bytes data payload, so be terse */
-		if(bitparse_find_section('a', &fpga_info, &fpga_info_len) && fpga_info[fpga_info_len-1] == 0 ) {
-			if (!memcmp("fpga_lf", fpga_info, 7))
-				strncat(dst, "LF ", len-1);
-			else if (!memcmp("fpga_hf", fpga_info, 7))
-				strncat(dst, "HF ", len-1);
+	char tempstr[40];
+	
+	dst[0] = '\0';
+	
+	if (bitstream_version == FPGA_BITSTREAM_LF) {
+		reset_fpga_stream(&_binary_fpga_lf_bit_start);
+	} else if (bitstream_version == FPGA_BITSTREAM_HF) {
+		reset_fpga_stream(&_binary_fpga_hf_bit_start);
+	} else
+		return;
+
+		
+	for (uint16_t i = 0; i < FPGA_BITSTREAM_FIXED_HEADER_SIZE; i++) {
+		get_from_fpga_stream();
+	}
+
+	if(bitparse_find_section('a', &fpga_info_len)) {
+		for (uint16_t i = 0; i < fpga_info_len; i++) {
+			char c = (char)get_from_fpga_stream();
+			if (i < sizeof(tempstr)) {
+				tempstr[i] = c;
+			}
 		}
-		strncat(dst, "FPGA image built", len-1);
-#if 0
-		if(bitparse_find_section('b', &fpga_info, &fpga_info_len) && fpga_info[fpga_info_len-1] == 0 ) {
-			strncat(dst, " for ", len-1);
-			strncat(dst, fpga_info, len-1);
+		if (!memcmp("fpga_lf", tempstr, 7))
+			strncat(dst, "LF ", len-1);
+		else if (!memcmp("fpga_hf", tempstr, 7))
+			strncat(dst, "HF ", len-1);
+	}
+	strncat(dst, "FPGA image built", len-1);
+	if(bitparse_find_section('b', &fpga_info_len)) {
+		strncat(dst, " for ", len-1);
+		for (uint16_t i = 0; i < fpga_info_len; i++) {
+			char c = (char)get_from_fpga_stream();
+			if (i < sizeof(tempstr)) {
+				tempstr[i] = c;
+			}
 		}
-#endif
-		if(bitparse_find_section('c', &fpga_info, &fpga_info_len) && fpga_info[fpga_info_len-1] == 0 ) {
-			strncat(dst, " on ", len-1);
-			strncat(dst, fpga_info, len-1);
+		strncat(dst, tempstr, len-1);
+	}
+	if(bitparse_find_section('c', &fpga_info_len)) {
+		strncat(dst, " on ", len-1);
+		for (uint16_t i = 0; i < fpga_info_len; i++) {
+			char c = (char)get_from_fpga_stream();
+			if (i < sizeof(tempstr)) {
+				tempstr[i] = c;
+			}
 		}
-		if(bitparse_find_section('d', &fpga_info, &fpga_info_len) && fpga_info[fpga_info_len-1] == 0 ) {
-			strncat(dst, " at ", len-1);
-			strncat(dst, fpga_info, len-1);
+		strncat(dst, tempstr, len-1);
+	}
+	if(bitparse_find_section('d', &fpga_info_len)) {
+		strncat(dst, " at ", len-1);
+		for (uint16_t i = 0; i < fpga_info_len; i++) {
+			char c = (char)get_from_fpga_stream();
+			if (i < sizeof(tempstr)) {
+				tempstr[i] = c;
+			}
 		}
+		strncat(dst, tempstr, len-1);
 	}
 }
 
