@@ -320,7 +320,7 @@ int CmdHFTopazReader(const char *Cmd)
 		for (uint16_t j = 0; j < 8; j++) {
 			sprintf(&line[3*j], "%02x ", topaz_tag.data_blocks[i][j] /*rall_response[2 + 8*i + j]*/);
 		}
-		PrintAndLog("  0x%02x |  0x%02x  | %s|   %-3s", i, i*8, line, topaz_block_is_locked(i, &topaz_tag.data_blocks[0x0d][0]) ? "yes" : "no");
+		PrintAndLog("  0x%02x |  0x%02x  | %s|   %-3s", i, i*8, line, topaz_block_is_locked(i, &topaz_tag.data_blocks[0x0e][0]) ? "yes" : "no");
 	}
 	
 	PrintAndLog("");
