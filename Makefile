@@ -1,6 +1,5 @@
 include common/Makefile.common
 
-GZIP=gzip
 FLASH_PORT=/dev/ttyACM0
 
 all clean: %: bootrom/% armsrc/% client/% recovery/%

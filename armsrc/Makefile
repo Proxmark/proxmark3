@@ -10,7 +10,7 @@ APP_INCLUDES = apps.h
 
 #remove one of the following defines and comment out the relevant line
 #in the next section to remove that particular feature from compilation  
-APP_CFLAGS	= -DWITH_LF -DWITH_ISO15693 -DWITH_ISO14443a -DWITH_ISO14443b -DWITH_ICLASS -DWITH_LEGICRF -DWITH_HITAG  -DWITH_CRC -DON_DEVICE -fno-strict-aliasing -ffunction-sections -fdata-sections
+APP_CFLAGS	= -DWITH_LF -DWITH_ISO15693 -DWITH_ISO14443a -DWITH_ISO14443b -DWITH_ICLASS -DWITH_LEGICRF -DWITH_HITAG  -DWITH_CRC -DON_DEVICE -DZ_SOLO -fno-strict-aliasing -ffunction-sections -fdata-sections
 #-DWITH_LCD 
 
 #SRC_LCD = fonts.c LCD.c
@@ -31,7 +31,11 @@ THUMBSRC = start.c \
 	string.c \
 	usb_cdc.c \
 	cmd.c \
-	inflate.c
+	inflate.c \
+	zutil.c \
+	adler32.c \
+	inftrees.c \
+	inffast.c
 
 # These are to be compiled in ARM mode
 ARMSRC = fpgaloader.c \
@@ -57,11 +61,14 @@ OBJS = $(OBJDIR)/osimage.s19
 
 all: $(OBJS)
 
-$(OBJDIR)/fpga_lf.o: fpga_lf.bit
-	$(OBJCOPY) -O elf32-littlearm -I binary -B arm --redefine-sym _binary____fpga_fpga_lf_bit_start=_binary_fpga_lf_bit_start --redefine-sym _binary____fpga_fpga_lf_bit_end=_binary_fpga_lf_bit_end --prefix-sections=fpga_lf_bit  $^ $@
+$(OBJDIR)/fpga_lf.o: $(OBJDIR)/fpga_lf.bit.gz
+	$(OBJCOPY) -O elf32-littlearm -I binary -B arm --redefine-sym _binary_obj_fpga_lf_bit_gz_start=_binary_fpga_lf_bit_start --redefine-sym _binary_obj_fpga_lf_bit_gz_end=_binary_fpga_lf_bit_end --prefix-sections=fpga_lf_bit  $^ $@
 
-$(OBJDIR)/fpga_hf.o: fpga_hf.bit
-	$(OBJCOPY) -O elf32-littlearm -I binary -B arm --redefine-sym _binary____fpga_fpga_hf_bit_start=_binary_fpga_hf_bit_start --redefine-sym _binary____fpga_fpga_hf_bit_end=_binary_fpga_hf_bit_end --prefix-sections=fpga_hf_bit  $^ $@
+$(OBJDIR)/fpga_hf.o: $(OBJDIR)/fpga_hf.bit.gz
+	$(OBJCOPY) -O elf32-littlearm -I binary -B arm --redefine-sym _binary_obj_fpga_hf_bit_gz_start=_binary_fpga_hf_bit_start --redefine-sym _binary_obj_fpga_hf_bit_gz_end=_binary_fpga_hf_bit_end --prefix-sections=fpga_hf_bit  $^ $@
+
+$(OBJDIR)/%.bit.gz: %.bit
+	$(GZIP) --best -c $^ >$@  
 
 $(OBJDIR)/fullimage.elf: $(VERSIONOBJ) $(OBJDIR)/fpga_lf.o $(OBJDIR)/fpga_hf.o $(THUMBOBJ) $(ARMOBJ)
 	$(CC) $(LDFLAGS) -Wl,-T,ldscript,-Map,$(patsubst %.elf,%.map,$@) -o $@ $^ $(LIBS)
@@ -82,6 +89,7 @@ clean:
 	$(DELETE) $(OBJDIR)$(PATHSEP)*.s19
 	$(DELETE) $(OBJDIR)$(PATHSEP)*.map
 	$(DELETE) $(OBJDIR)$(PATHSEP)*.d
+	$(DELETE) $(OBJDIR)$(PATHSEP)*.gz
 	$(DELETE) version.c
 
 .PHONY: all clean help

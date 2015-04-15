@@ -25,6 +25,7 @@ CC	= $(CROSS)gcc
 AS	= $(CROSS)as
 LD	= $(CROSS)ld
 OBJCOPY = $(CROSS)objcopy
+GZIP=gzip
 
 OBJDIR	= obj
 
