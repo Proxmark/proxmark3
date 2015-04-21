@@ -171,19 +171,21 @@ bool FpgaSetupSscDma(uint8_t *buf, int len)
 }
 
 
-uint8_t get_from_fpga_stream(z_streamp compressed_fpga_stream, uint8_t *output_buffer)
+static int get_from_fpga_stream(z_streamp compressed_fpga_stream, uint8_t *output_buffer)
 {
 	if (fpga_image_ptr == compressed_fpga_stream->next_out) {	// need more data
 		compressed_fpga_stream->next_out = output_buffer;
 		compressed_fpga_stream->avail_out = OUTPUT_BUFFER_LEN;
 		fpga_image_ptr = output_buffer;
 		int res = inflate(compressed_fpga_stream, Z_SYNC_FLUSH);
-		// if (res != Z_OK && res != Z_STREAM_END) {
+		if (res != Z_OK) {
 			Dbprintf("inflate returned: %d, %s", res, compressed_fpga_stream->msg);
-		// }
+		}
+		if (res < 0) {
+			return res;
+		}
 	}
 
-	Dbprintf("get_from_fpga_stream() returns %02x", *fpga_image_ptr);
 	return *fpga_image_ptr++;
 }
 
@@ -197,33 +199,12 @@ static voidpf fpga_inflate_malloc(voidpf opaque, uInt items, uInt size)
 
 static void fpga_inflate_free(voidpf opaque, voidpf address)
 {
-	Dbprintf("zlib wants to free memory");
+	Dbprintf("zlib frees memory");
 	BigBuf_free_keep_EM();
 }
 
 
-void init_fpga_inflate(z_streamp compressed_fpga_stream, uint8_t *fpga_image_start, uint32_t fpga_image_size, uint8_t *output_buffer)
-{
-	// initialize z_stream structure for inflate:
-	compressed_fpga_stream->next_in = fpga_image_start;
-	compressed_fpga_stream->avail_in = fpga_image_size;
-	compressed_fpga_stream->next_out = output_buffer;
-	compressed_fpga_stream->avail_out = OUTPUT_BUFFER_LEN;
-	compressed_fpga_stream->zalloc = &fpga_inflate_malloc;
-	compressed_fpga_stream->zfree = &fpga_inflate_free;
-
-	// initialize inflate to automatically detect header:
-	int res = inflateInit2(compressed_fpga_stream, 15+32);
-
-	fpga_image_ptr = output_buffer;
-	
-	Dbprintf("InflateInit returned %d", res);
-	Dbprintf("fpga_image_ptr pointing at %02x %02x %02x %02x", fpga_image_ptr[0], fpga_image_ptr[1], fpga_image_ptr[2], fpga_image_ptr[3]);
-	Dbprintf("zstream->next_in pointing at %02x %02x %02x %02x", compressed_fpga_stream->next_in[0], compressed_fpga_stream->next_in[1], compressed_fpga_stream->next_in[2], compressed_fpga_stream->next_in[3]);
-}
-
-
-bool reset_fpga_stream(int bitstream_version, z_streamp compressed_fpga_stream, uint8_t *output_buffer)
+static bool reset_fpga_stream(int bitstream_version, z_streamp compressed_fpga_stream, uint8_t *output_buffer)
 {
 	uint8_t header[FPGA_BITSTREAM_FIXED_HEADER_SIZE];
 	uint8_t *fpga_image_start;
@@ -239,7 +220,18 @@ bool reset_fpga_stream(int bitstream_version, z_streamp compressed_fpga_stream, 
 		return false;
 	}	
 
-	init_fpga_inflate(compressed_fpga_stream, fpga_image_start, fpga_image_size, output_buffer);
+	// initialize z_stream structure for inflate:
+	compressed_fpga_stream->next_in = fpga_image_start;
+	compressed_fpga_stream->avail_in = fpga_image_size;
+	compressed_fpga_stream->next_out = output_buffer;
+	compressed_fpga_stream->avail_out = OUTPUT_BUFFER_LEN;
+	compressed_fpga_stream->zalloc = &fpga_inflate_malloc;
+	compressed_fpga_stream->zfree = &fpga_inflate_free;
+
+	// initialize inflate with WindowBits=15 and to automatically detect header:
+	inflateInit2(compressed_fpga_stream, 15+32);
+
+	fpga_image_ptr = output_buffer;
 
 	for (uint16_t i = 0; i < FPGA_BITSTREAM_FIXED_HEADER_SIZE; i++) {
 		header[i] = get_from_fpga_stream(compressed_fpga_stream, output_buffer);
@@ -270,9 +262,9 @@ static void DownloadFPGA_byte(unsigned char w)
 // Download the fpga image starting at current stream position with length FpgaImageLen bytes
 static void DownloadFPGA(int FpgaImageLen, z_streamp compressed_fpga_stream, uint8_t *output_buffer)
 {
-	Dbprintf("Would have loaded FPGA");
-	return;
 
+	Dbprintf("DownloadFPGA(len: %d)", FpgaImageLen);
+	
 	int i=0;
 
 	AT91C_BASE_PIOA->PIO_OER = GPIO_FPGA_ON;
@@ -324,10 +316,17 @@ static void DownloadFPGA(int FpgaImageLen, z_streamp compressed_fpga_stream, uin
 		return;
 	}
 
-	while(FpgaImageLen-->0) {
-		DownloadFPGA_byte(get_from_fpga_stream(compressed_fpga_stream, output_buffer));
+	for(i = 0; i < FpgaImageLen; i++) {
+		int b = get_from_fpga_stream(compressed_fpga_stream, output_buffer);
+		if (b < 0) {
+			Dbprintf("Error %d during FpgaDownload", b);
+			break;
+		}
+		DownloadFPGA_byte(b);
 	}
-
+	
+	Dbprintf("%d bytes loaded into FPGA", i);
+	
 	// continue to clock FPGA until ready signal goes high
 	i=100000;
 	while ( (i--) && ( !(AT91C_BASE_PIOA->PIO_PDSR & GPIO_FPGA_DONE ) ) ) {
@@ -350,7 +349,7 @@ static void DownloadFPGA(int FpgaImageLen, z_streamp compressed_fpga_stream, uin
  * (big endian), <length> bytes content. Except for section 'e' which has 4 bytes
  * length.
  */
-int bitparse_find_section(char section_name, unsigned int *section_length, z_streamp compressed_fpga_stream, uint8_t *output_buffer)
+static int bitparse_find_section(char section_name, unsigned int *section_length, z_streamp compressed_fpga_stream, uint8_t *output_buffer)
 {
 	int result = 0;
 	#define MAX_FPGA_BIT_STREAM_HEADER_SEARCH 100  // maximum number of bytes to search for the requested section
@@ -414,13 +413,15 @@ void FpgaDownloadAndGo(int bitstream_version)
 	if (!reset_fpga_stream(bitstream_version, &compressed_fpga_stream, output_buffer)) {
 		return;
 	}
-	
+
 	unsigned int bitstream_length;
 	if(bitparse_find_section('e', &bitstream_length, &compressed_fpga_stream, output_buffer)) {
 		DownloadFPGA(bitstream_length, &compressed_fpga_stream, output_buffer);
 		downloaded_bitstream = bitstream_version;
-		return; /* All done */
 	}
+
+	inflateEnd(&compressed_fpga_stream);
+		
 }	
 
 
@@ -432,7 +433,7 @@ void FpgaGatherVersion(int bitstream_version, char *dst, int len)
 	uint8_t output_buffer[OUTPUT_BUFFER_LEN];
 	
 	dst[0] = '\0';
-	
+
 	if (!reset_fpga_stream(bitstream_version, &compressed_fpga_stream, output_buffer)) {
 		return;
 	}
@@ -480,6 +481,9 @@ void FpgaGatherVersion(int bitstream_version, char *dst, int len)
 		}
 		strncat(dst, tempstr, len-1);
 	}
+	
+	inflateEnd(&compressed_fpga_stream);
+
 }
 
 

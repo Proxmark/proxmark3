@@ -10,7 +10,8 @@ APP_INCLUDES = apps.h
 
 #remove one of the following defines and comment out the relevant line
 #in the next section to remove that particular feature from compilation  
-APP_CFLAGS	= -DWITH_LF -DWITH_ISO15693 -DWITH_ISO14443a -DWITH_ISO14443b -DWITH_ICLASS -DWITH_LEGICRF -DWITH_HITAG  -DWITH_CRC -DON_DEVICE -DZ_SOLO -fno-strict-aliasing -ffunction-sections -fdata-sections
+APP_CFLAGS	= -DWITH_LF -DWITH_ISO15693 -DWITH_ISO14443a -DWITH_ISO14443b -DWITH_ICLASS -DWITH_LEGICRF -DWITH_HITAG  -DWITH_CRC -DON_DEVICE -DZ_SOLO -DZ_PREFIX \
+				-fno-strict-aliasing -ffunction-sections -fdata-sections
 #-DWITH_LCD 
 
 #SRC_LCD = fonts.c LCD.c
@@ -19,23 +20,21 @@ SRC_ISO15693 = iso15693.c iso15693tools.c
 SRC_ISO14443a = epa.c iso14443a.c mifareutil.c mifarecmd.c mifaresniff.c
 SRC_ISO14443b = iso14443.c
 SRC_CRAPTO1 = crapto1.c crypto1.c des.c aes.c 
-SRC_CRC = iso14443crc.c crc.c crc16.c crc32.c 
+SRC_CRC = iso14443crc.c crc.c crc16.c crc32.c
+SRC_ZLIB = inflate.c inffast.c inftrees.c z_crc32.c adler32.c zutil.c
 
+# Compile these in thumb mode (small size)
 THUMBSRC = start.c \
 	$(SRC_LCD) \
 	$(SRC_ISO15693) \
 	$(SRC_LF) \
+	$(SRC_ZLIB) \
 	appmain.c \
 	printf.c \
 	util.c \
 	string.c \
 	usb_cdc.c \
-	cmd.c \
-	inflate.c \
-	zutil.c \
-	adler32.c \
-	inftrees.c \
-	inffast.c
+	cmd.c
 
 # These are to be compiled in ARM mode
 ARMSRC = fpgaloader.c \
@@ -52,6 +51,9 @@ ARMSRC = fpgaloader.c \
 
 # stdint.h provided locally until GCC 4.5 becomes C99 compliant
 APP_CFLAGS += -I.
+
+# zlib includes:
+APP_CFLAGS += -I../zlib
 
 # Do not move this inclusion before the definition of {THUMB,ASM,ARM}SRC
 include ../common/Makefile.common
