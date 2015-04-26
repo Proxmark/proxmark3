@@ -9,13 +9,13 @@ include ../common/Makefile.common
 CC=gcc
 CXX=g++
 #COMMON_FLAGS = -m32
-VPATH = ../common
+VPATH = ../common ../zlib
 OBJDIR = obj
 
 LDLIBS = -L/opt/local/lib -L/usr/local/lib -lreadline -lpthread -lm
 LUALIB = ../liblua/liblua.a
 LDFLAGS = $(COMMON_FLAGS)
-CFLAGS = -std=c99 -I. -I../include -I../common -I/opt/local/include -I../liblua -Wall $(COMMON_FLAGS) -g -O4
+CFLAGS = -std=c99 -I. -I../include -I../common -I../zlib -I/opt/local/include -I../liblua -Wall $(COMMON_FLAGS) -DZ_SOLO -DZ_PREFIX -DNO_GZIP -g -O4
 LUAPLATFORM = generic
 
 ifneq (,$(findstring MINGW,$(platform)))
@@ -104,9 +104,11 @@ CMDSRCS = 	nonce2key/crapto1.c\
 			aes.c\
 			protocols.c\
 
+ZLIBSRCS = deflate.c adler32.c trees.c zutil.c
 
 COREOBJS = $(CORESRCS:%.c=$(OBJDIR)/%.o)
 CMDOBJS = $(CMDSRCS:%.c=$(OBJDIR)/%.o)
+ZLIBOBJS = $(ZLIBSRCS:%.c=$(OBJDIR)/%.o)
 
 RM = rm -f
 BINS = proxmark3 flasher fpga_compress #snooper cli
@@ -116,7 +118,7 @@ all: lua_build $(BINS)
 
 all-static: LDLIBS:=-static $(LDLIBS)
 all-static: snooper cli flasher fpga_compress
-	
+
 proxmark3: LDLIBS+=$(QTLDLIBS) $(LUALIB)
 proxmark3: $(OBJDIR)/proxmark3.o $(COREOBJS) $(CMDOBJS) $(QTGUI)
 	$(CXX) $(CXXFLAGS) $^ $(LDLIBS) -o $@
@@ -130,7 +132,7 @@ cli: $(OBJDIR)/cli.o $(COREOBJS) $(CMDOBJS) $(OBJDIR)/guidummy.o
 flasher: $(OBJDIR)/flash.o $(OBJDIR)/flasher.o $(COREOBJS)
 	$(CXX) $(CXXFLAGS) $^ $(LDLIBS) -o $@
 
-fpga_compress: $(OBJDIR)/fpga_compress.o
+fpga_compress: $(OBJDIR)/fpga_compress.o $(ZLIBOBJS)
 	$(CXX) $(CXXFLAGS) $^ $(LDLIBS) -o $@
 
 $(OBJDIR)/%.o: %.c

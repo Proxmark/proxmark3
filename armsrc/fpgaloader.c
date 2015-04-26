@@ -228,8 +228,7 @@ static bool reset_fpga_stream(int bitstream_version, z_streamp compressed_fpga_s
 	compressed_fpga_stream->zalloc = &fpga_inflate_malloc;
 	compressed_fpga_stream->zfree = &fpga_inflate_free;
 
-	// initialize inflate with WindowBits=15 and to automatically detect header:
-	inflateInit2(compressed_fpga_stream, 15+32);
+	inflateInit2(compressed_fpga_stream, 15);
 
 	fpga_image_ptr = output_buffer;
 
