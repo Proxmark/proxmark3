@@ -21,6 +21,13 @@ bool FpgaSetupSscDma(uint8_t *buf, int len);
 #define FpgaEnableSscDma(void) AT91C_BASE_PDC_SSC->PDC_PTCR = AT91C_PDC_RXTEN;
 void SetAdcMuxFor(uint32_t whichGpio);
 
+// definitions for multiple FPGA config files support
+#define FPGA_BITSTREAM_MAX 2	// the total number of FPGA bitstreams (configs)
+#define FPGA_BITSTREAM_ERR 0
+#define FPGA_BITSTREAM_LF 1
+#define FPGA_BITSTREAM_HF 2
+
+
 // Definitions for the FPGA commands.
 #define FPGA_CMD_SET_CONFREG						(1<<12)
 #define FPGA_CMD_SET_DIVISOR						(2<<12)

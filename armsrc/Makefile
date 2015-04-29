@@ -22,6 +22,9 @@ SRC_ISO14443b = iso14443.c
 SRC_CRAPTO1 = crapto1.c crypto1.c des.c aes.c 
 SRC_CRC = iso14443crc.c crc.c crc16.c crc32.c
 
+#the FPGA bitstream files. Note: order matters!
+FPGA_BITSTREAMS = fpga_lf.bit fpga_hf.bit
+
 #the zlib source files required for decompressing the fpga config at run time
 SRC_ZLIB = inflate.c inffast.c inftrees.c adler32.c zutil.c
 #additional defines required to compile zlib
@@ -67,16 +70,13 @@ FPGA_COMPRESSOR = ../client/fpga_compress
 
 all: $(OBJS)
 
-$(OBJDIR)/fpga_lf.o: $(OBJDIR)/fpga_lf.bit.z
-	$(OBJCOPY) -O elf32-littlearm -I binary -B arm --redefine-sym _binary_obj_fpga_lf_bit_z_start=_binary_fpga_lf_bit_start --redefine-sym _binary_obj_fpga_lf_bit_z_end=_binary_fpga_lf_bit_end --prefix-sections=fpga_lf_bit  $^ $@
+$(OBJDIR)/fpga_all.o: $(OBJDIR)/fpga_all.bit.z
+	$(OBJCOPY) -O elf32-littlearm -I binary -B arm --prefix-sections=fpga_all_bit $^ $@
 
-$(OBJDIR)/fpga_hf.o: $(OBJDIR)/fpga_hf.bit.z
-	$(OBJCOPY) -O elf32-littlearm -I binary -B arm --redefine-sym _binary_obj_fpga_hf_bit_z_start=_binary_fpga_hf_bit_start --redefine-sym _binary_obj_fpga_hf_bit_z_end=_binary_fpga_hf_bit_end --prefix-sections=fpga_hf_bit  $^ $@
-
-$(OBJDIR)/%.bit.z: %.bit $(FPGA_COMPRESSOR)
+$(OBJDIR)/fpga_all.bit.z: $(FPGA_BITSTREAMS) $(FPGA_COMPRESSOR)
 	$(FPGA_COMPRESSOR) $(filter %.bit,$^) $@  
 
-$(OBJDIR)/osimage.elf: $(VERSIONOBJ) $(OBJDIR)/fpga_lf.o $(OBJDIR)/fpga_hf.o $(THUMBOBJ) $(ARMOBJ)
+$(OBJDIR)/fullimage.elf: $(VERSIONOBJ) $(OBJDIR)/fpga_all.o $(THUMBOBJ) $(ARMOBJ)
 	$(CC) $(LDFLAGS) -Wl,-T,ldscript,-Map,$(patsubst %.elf,%.map,$@) -o $@ $^ $(LIBS)
 
 tarbin: $(OBJS)
@@ -95,6 +95,6 @@ clean:
 help:
 	@echo Multi-OS Makefile, you are running on $(DETECTED_OS)
 	@echo Possible targets:
-	@echo +	all    - Build the OS image $(OBJDIR)/osimage.s19
+	@echo +	all    - Build the full image $(OBJDIR)/fullimage.s19
 	@echo +	clean  - Clean $(OBJDIR)
 

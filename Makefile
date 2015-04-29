@@ -31,10 +31,10 @@ client: client/all
 flash-bootrom: bootrom/obj/bootrom.elf $(FLASH_TOOL)
 	$(FLASH_TOOL) $(FLASH_PORT) -b $(subst /,$(PATHSEP),$<)
 
-flash-os: armsrc/obj/osimage.elf $(FLASH_TOOL)
+flash-os: armsrc/obj/fullimage.elf $(FLASH_TOOL)
 	$(FLASH_TOOL) $(FLASH_PORT) $(subst /,$(PATHSEP),$<)
 
-flash-all: bootrom/obj/bootrom.elf armsrc/obj/osimage.elf $(FLASH_TOOL)
+flash-all: bootrom/obj/bootrom.elf armsrc/obj/fullimage.elf $(FLASH_TOOL)
 	$(FLASH_TOOL) $(FLASH_PORT) -b $(subst /,$(PATHSEP),$(filter-out $(FLASH_TOOL),$^))
 
 newtarbin:
