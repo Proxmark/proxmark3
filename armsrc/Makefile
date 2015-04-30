@@ -28,7 +28,7 @@ FPGA_BITSTREAMS = fpga_lf.bit fpga_hf.bit
 #the zlib source files required for decompressing the fpga config at run time
 SRC_ZLIB = inflate.c inffast.c inftrees.c adler32.c zutil.c
 #additional defines required to compile zlib
-ZLIB_CFLAGS = -DZ_SOLO -DZ_PREFIX -DNO_GZIP
+ZLIB_CFLAGS = -DZ_SOLO -DZ_PREFIX -DNO_GZIP -DZLIB_PM3_TUNED
 APP_CFLAGS += $(ZLIB_CFLAGS)
 # zlib includes:
 APP_CFLAGS += -I../zlib

@@ -92,7 +92,11 @@
 #endif
 
 /* function prototypes */
+#ifdef ZLIB_PM3_TUNED
+extern void Dbprintf(const char *fmt, ...);
+#else
 local void fixedtables OF((struct inflate_state FAR *state));
+#endif
 local int updatewindow OF((z_streamp strm, const unsigned char FAR *end,
                            unsigned copy));
 #ifdef BUILDFIXED
@@ -258,6 +262,7 @@ int value;
    used for threaded applications, since the rewriting of the tables and virgin
    may not be thread-safe.
  */
+#ifndef ZLIB_PM3_TUNED
 local void fixedtables(state)
 struct inflate_state FAR *state;
 {
@@ -361,7 +366,7 @@ void makefixed()
     puts("\n    };");
 }
 #endif /* MAKEFIXED */
-
+#endif /* ZLIB_PM3_TUNED */
 /*
    Update the window with the last wsize (normally 32K) bytes written before
    returning.  If window does not exist yet, create it.  This is only called
@@ -841,6 +846,10 @@ int flush;
                 state->mode = STORED;
                 break;
             case 1:                             /* fixed block */
+#ifdef ZLIB_PM3_TUNED
+				Dbprintf("FATAL error. Compressed FPGA files with fixed code blocks are not supported!");
+				for(;;);
+#else				
                 fixedtables(state);
                 Tracev((stderr, "inflate:     fixed codes block%s\n",
                         state->last ? " (last)" : ""));
@@ -849,6 +858,7 @@ int flush;
                     DROPBITS(2);
                     goto inf_leave;
                 }
+#endif
                 break;
             case 2:                             /* dynamic block */
                 Tracev((stderr, "inflate:     dynamic codes block%s\n",
