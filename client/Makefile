@@ -15,7 +15,7 @@ OBJDIR = obj
 LDLIBS = -L/opt/local/lib -L/usr/local/lib -lreadline -lpthread -lm
 LUALIB = ../liblua/liblua.a
 LDFLAGS = $(COMMON_FLAGS)
-CFLAGS = -std=c99 -I. -I../include -I../common -I../zlib -I/opt/local/include -I../liblua -Wall $(COMMON_FLAGS) -DZ_SOLO -DZ_PREFIX -DNO_GZIP -g -O4
+CFLAGS = -std=c99 -I. -I../include -I../common -I../zlib -I/opt/local/include -I../liblua -Wall $(COMMON_FLAGS) -g -O4
 LUAPLATFORM = generic
 
 ifneq (,$(findstring MINGW,$(platform)))
@@ -42,7 +42,6 @@ else
     #MOC = /usr/lib/x86_64-linux-gnu/qt4/bin/moc
     LUAPLATFORM = linux
 endif
-
 
 ifneq ($(QTLDLIBS),)
     QTGUI = $(OBJDIR)/proxgui.o $(OBJDIR)/proxguiqt.o $(OBJDIR)/proxguiqt.moc.o
@@ -105,6 +104,8 @@ CMDSRCS = 	nonce2key/crapto1.c\
 			protocols.c\
 
 ZLIBSRCS = deflate.c adler32.c trees.c zutil.c
+ZLIB_FLAGS = -DZ_SOLO -DZ_PREFIX -DNO_GZIP -DZLIB_PM3_TUNED
+
 
 COREOBJS = $(CORESRCS:%.c=$(OBJDIR)/%.o)
 CMDOBJS = $(CMDSRCS:%.c=$(OBJDIR)/%.o)
@@ -133,10 +134,10 @@ flasher: $(OBJDIR)/flash.o $(OBJDIR)/flasher.o $(COREOBJS)
 	$(CXX) $(CXXFLAGS) $^ $(LDLIBS) -o $@
 
 fpga_compress: $(OBJDIR)/fpga_compress.o $(ZLIBOBJS)
-	$(CXX) $(CXXFLAGS) $^ $(LDLIBS) -o $@
+	$(CXX) $(CXXFLAGS) $(ZLIB_FLAGS) $^ $(LDLIBS) -o $@
 
 $(OBJDIR)/%.o: %.c
-	$(CC) $(CFLAGS) -c -o $@ $<
+	$(CC) $(CFLAGS) $(ZLIB_FLAGS) -c -o $@ $<
 
 $(OBJDIR)/%.o: %.cpp
 	$(CXX) $(CXXFLAGS) -c -o $@ $<

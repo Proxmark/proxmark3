@@ -65,7 +65,7 @@ ARMSRC = fpgaloader.c \
 # Do not move this inclusion before the definition of {THUMB,ASM,ARM}SRC
 include ../common/Makefile.common
 
-OBJS = $(OBJDIR)/osimage.s19 
+OBJS = $(OBJDIR)/fullimage.s19 
 FPGA_COMPRESSOR = ../client/fpga_compress
 
 all: $(OBJS)
@@ -75,10 +75,28 @@ $(OBJDIR)/fpga_all.o: $(OBJDIR)/fpga_all.bit.z
 
 $(OBJDIR)/fpga_all.bit.z: $(FPGA_BITSTREAMS) $(FPGA_COMPRESSOR)
 	$(FPGA_COMPRESSOR) $(filter %.bit,$^) $@  
-
-$(OBJDIR)/fullimage.elf: $(VERSIONOBJ) $(OBJDIR)/fpga_all.o $(THUMBOBJ) $(ARMOBJ)
+	
+$(OBJDIR)/fullimage.stage1.elf: $(VERSIONOBJ) $(OBJDIR)/fpga_all.o $(THUMBOBJ) $(ARMOBJ)
 	$(CC) $(LDFLAGS) -Wl,-T,ldscript,-Map,$(patsubst %.elf,%.map,$@) -o $@ $^ $(LIBS)
 
+$(OBJDIR)/fullimage.nodata.bin: $(OBJDIR)/fullimage.stage1.elf
+	$(OBJCOPY) -O binary -I elf32-littlearm --remove-section .data $^ $@
+	
+$(OBJDIR)/fullimage.nodata.o: $(OBJDIR)/fullimage.nodata.bin
+	$(OBJCOPY) -O elf32-littlearm -I binary -B arm --rename-section .data=stage1_image $^ $@
+
+$(OBJDIR)/fullimage.data.bin: $(OBJDIR)/fullimage.stage1.elf
+	$(OBJCOPY) -O binary -I elf32-littlearm --only-section .data $^ $@
+
+$(OBJDIR)/fullimage.data.bin.z: $(OBJDIR)/fullimage.data.bin $(FPGA_COMPRESSOR)
+	$(FPGA_COMPRESSOR) $(filter %.bin,$^) $@  
+	
+$(OBJDIR)/fullimage.data.o: $(OBJDIR)/fullimage.data.bin.z
+	$(OBJCOPY) -O elf32-littlearm -I binary -B arm --rename-section .data=compressed_data $^ $@
+
+$(OBJDIR)/fullimage.elf: $(OBJDIR)/fullimage.nodata.o $(OBJDIR)/fullimage.data.o
+	$(CC) $(LDFLAGS) -Wl,-T,ldscript,-Map,$(patsubst %.elf,%.map,$@) -o $@ $^
+	
 tarbin: $(OBJS)
 	$(TAR) $(TARFLAGS) ../proxmark3-$(platform)-bin.tar $(OBJS:%=armsrc/%) $(OBJS:%.s19=armsrc/%.elf)
 

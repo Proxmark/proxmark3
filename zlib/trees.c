@@ -913,9 +913,10 @@ void ZLIB_INTERNAL _tr_flush_block(s, buf, stored_len, last)
     ulg opt_lenb, static_lenb; /* opt_len and static_len in bytes */
     int max_blindex = 0;  /* index of last bit length code of non zero freq */
 
+#ifndef ZLIB_PM3_TUNED
     /* Build the Huffman trees unless a stored block is forced */
     if (s->level > 0) {
-
+#endif
         /* Check if the file is binary or text */
         if (s->strm->data_type == Z_UNKNOWN)
             s->strm->data_type = detect_data_type(s);
@@ -945,6 +946,7 @@ void ZLIB_INTERNAL _tr_flush_block(s, buf, stored_len, last)
                 opt_lenb, s->opt_len, static_lenb, s->static_len, stored_len,
                 s->last_lit));
 
+#ifndef ZLIB_PM3_TUNED
         if (static_lenb <= opt_lenb) opt_lenb = static_lenb;
 
     } else {
@@ -978,7 +980,8 @@ void ZLIB_INTERNAL _tr_flush_block(s, buf, stored_len, last)
         s->compressed_len += 3 + s->static_len;
 #endif
     } else {
-        send_bits(s, (DYN_TREES<<1)+last, 3);
+#endif /* ZLIB_PM3_TUNED */
+		send_bits(s, (DYN_TREES<<1)+last, 3);
         send_all_trees(s, s->l_desc.max_code+1, s->d_desc.max_code+1,
                        max_blindex+1);
         compress_block(s, (const ct_data *)s->dyn_ltree,
