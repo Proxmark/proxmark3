@@ -45,14 +45,12 @@ static void usage(char *argv0)
 
 static voidpf fpga_deflate_malloc(voidpf opaque, uInt items, uInt size)
 {
-	fprintf(stderr, "zlib requested %d bytes\n", items*size);
 	return malloc(items*size);
 }
 
 
 static void fpga_deflate_free(voidpf opaque, voidpf address)
 {
-	fprintf(stderr, "zlib frees memory\n");
 	return free(address);
 }
 
@@ -119,7 +117,6 @@ int zlib_compress(FILE *infile[], uint8_t num_infiles, FILE *outfile)
 
 	// estimate the size of the compressed output
 	unsigned int outsize_max = deflateBound(&compressed_fpga_stream, compressed_fpga_stream.avail_in);
-	fprintf(stderr, "Allocating %ld bytes for output file (estimated upper bound)\n", outsize_max);
 	uint8_t *outbuf = malloc(outsize_max);
 	compressed_fpga_stream.next_out = outbuf;
 	compressed_fpga_stream.avail_out = outsize_max;
@@ -137,7 +134,7 @@ int zlib_compress(FILE *infile[], uint8_t num_infiles, FILE *outfile)
 		ret = deflate(&compressed_fpga_stream, Z_FINISH);
 	}
 	
-	fprintf(stderr, "produced %d bytes of output\n", compressed_fpga_stream.total_out);
+	fprintf(stderr, "\ncompressed %d input bytes to %d output bytes\n", i, compressed_fpga_stream.total_out);
 
 	if (ret != Z_STREAM_END) {
 		fprintf(stderr, "Error in deflate(): %d %s\n", ret, compressed_fpga_stream.msg);
@@ -170,6 +167,72 @@ int zlib_compress(FILE *infile[], uint8_t num_infiles, FILE *outfile)
 }
 
 
+int zlib_decompress(FILE *infile, FILE *outfile)
+{
+	#define DECOMPRESS_BUF_SIZE 1024
+	uint8_t outbuf[DECOMPRESS_BUF_SIZE];
+	uint8_t inbuf[DECOMPRESS_BUF_SIZE];
+	int ret;
+	
+	z_stream compressed_fpga_stream;
+	// initialize zlib structures
+	compressed_fpga_stream.next_in = inbuf;
+	compressed_fpga_stream.avail_in = 0;
+	compressed_fpga_stream.next_out = outbuf;
+	compressed_fpga_stream.avail_out = DECOMPRESS_BUF_SIZE;
+	compressed_fpga_stream.zalloc = fpga_deflate_malloc;
+	compressed_fpga_stream.zfree = fpga_deflate_free;
+	
+	ret = inflateInit2(&compressed_fpga_stream, 0);
+	
+	do {
+		if (compressed_fpga_stream.avail_in == 0) {
+			compressed_fpga_stream.next_in = inbuf;
+			uint16_t i = 0;
+			do {
+				uint8_t c = fgetc(infile);
+				if (!feof(infile)) {
+					inbuf[i++] = c;
+					compressed_fpga_stream.avail_in++;
+				} else {
+					break;
+				}
+			} while (i < DECOMPRESS_BUF_SIZE);
+		}
+
+		ret = inflate(&compressed_fpga_stream, Z_SYNC_FLUSH);
+
+		if (ret != Z_OK && ret != Z_STREAM_END) {
+			break;
+		}
+
+		if (compressed_fpga_stream.avail_out == 0) {
+			for (uint16_t i = 0; i < DECOMPRESS_BUF_SIZE; i++) {
+				fputc(outbuf[i], outfile);
+			}
+			compressed_fpga_stream.avail_out = DECOMPRESS_BUF_SIZE;
+			compressed_fpga_stream.next_out = outbuf;
+		}
+	} while (ret == Z_OK);
+
+	if (ret == Z_STREAM_END) {  // reached end of input
+		uint16_t i = 0;
+		while (compressed_fpga_stream.avail_out < DECOMPRESS_BUF_SIZE) {
+			fputc(outbuf[i++], outfile);
+			compressed_fpga_stream.avail_out++;
+		}
+		fclose(outfile);
+		fclose(infile);
+		return 0;
+	} else {
+		fprintf(stderr, "Error. Inflate() returned error %d, %s", ret, compressed_fpga_stream.msg);
+		fclose(outfile);
+		fclose(infile);
+		return -1;
+	}
+	
+}
+
 
 int main(int argc, char **argv)
 {
@@ -181,6 +244,26 @@ int main(int argc, char **argv)
 		return -1;
 	}
 	
+	if (!strcmp(argv[1], "-d")) {
+		infiles = calloc(1, sizeof(FILE*));
+		if (argc != 4) {
+			usage(argv[0]);
+			return -1;
+		} 
+		infiles[0] = fopen(argv[2], "rb");
+		if (infiles[0] == NULL) {
+			fprintf(stderr, "Error. Cannot open input file %s", argv[2]);
+			return -1;
+		}
+		outfile = fopen(argv[3], "wb");
+		if (outfile == NULL) {
+			fprintf(stderr, "Error. Cannot open output file %s", argv[3]);
+			return -1;
+		}
+		return zlib_decompress(infiles[0], outfile);
+	}
+	
+
 	infiles = calloc(argc-2, sizeof(FILE*));
 	
 	for (uint16_t i = 0; i < argc-2; i++) { 
@@ -195,7 +278,7 @@ int main(int argc, char **argv)
 	if (outfile == NULL) {
 		fprintf(stderr, "Error. Cannot open output file %s", argv[argc-1]);
 		return -1;
-		}
+	}
 		
 	return zlib_compress(infiles, argc-2, outfile);
 }

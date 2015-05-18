@@ -847,8 +847,8 @@ int flush;
                 break;
             case 1:                             /* fixed block */
 #ifdef ZLIB_PM3_TUNED
-				Dbprintf("FATAL error. Compressed FPGA files with fixed code blocks are not supported!");
-				for(;;);
+                strm->msg = (char *)"fixed block coding not supported";
+				state->mode = BAD;
 #else				
                 fixedtables(state);
                 Tracev((stderr, "inflate:     fixed codes block%s\n",
