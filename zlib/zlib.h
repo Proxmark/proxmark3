@@ -28,6 +28,13 @@
   (zlib format), rfc1951 (deflate format) and rfc1952 (gzip format).
 */
 
+//-----------------------------------------------------------------------------
+// This version of zlib is modified for use within the Proxmark3 project. 
+// Files from the original distribution which are not required for this
+// purpose are not included. All modifications can easily be found
+// by searching for #ifdef ZLIB_PM3_TUNED and #ifndef ZLIB_PM3_TUNED.
+//-----------------------------------------------------------------------------
+
 #ifndef ZLIB_H
 #define ZLIB_H
 
@@ -37,12 +44,23 @@
 extern "C" {
 #endif
 
+#ifndef ZLIB_PM3_TUNED
 #define ZLIB_VERSION "1.2.8"
 #define ZLIB_VERNUM 0x1280
 #define ZLIB_VER_MAJOR 1
 #define ZLIB_VER_MINOR 2
 #define ZLIB_VER_REVISION 8
 #define ZLIB_VER_SUBREVISION 0
+#else
+#define ZLIB_VERSION "1.2.8.f-Proxmark3"
+#define ZLIB_VERNUM 0x128f
+#define ZLIB_VER_MAJOR 1
+#define ZLIB_VER_MINOR 2
+#define ZLIB_VER_REVISION 8
+#define ZLIB_VER_SUBREVISION f
+#endif
+
+
 
 /*
     The 'zlib' compression library provides in-memory compression and

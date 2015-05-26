@@ -3,7 +3,10 @@
 // at your option, any later version. See the LICENSE.txt file for the text of
 // the license.
 //-----------------------------------------------------------------------------
-// Flasher frontend tool
+// Compression tool for FPGA config files. Compress several *.bit files at
+// compile time. Decompression is done at run time (see fpgaloader.c).
+// This uses the zlib library tuned to this specific case. The small file sizes
+// allow to use "insane" parameters for optimum compression ratio.
 //-----------------------------------------------------------------------------
 
 #include <stdio.h>
@@ -17,8 +20,8 @@
 
 // zlib configuration
 #define COMPRESS_LEVEL			9		// use best possible compression
-#define COMPRESS_WINDOW_BITS	15		// default = 15 for a window of 2^15 = 32KBytes
-#define COMPRESS_MEM_LEVEL		9		// determines the amount of memory allocated during compression. Default = 8. Must be < 9
+#define COMPRESS_WINDOW_BITS	15		// default = max = 15 for a window of 2^15 = 32KBytes
+#define COMPRESS_MEM_LEVEL		9		// determines the amount of memory allocated during compression. Default = 8.
 /* COMPRESS_STRATEGY can be 
 	Z_DEFAULT_STRATEGY (the default), 
 	Z_FILTERED (more huffmann, less string matching),
@@ -36,10 +39,12 @@
 #define FPGA_INTERLEAVE_SIZE	288 	// (the FPGA's internal config frame size is 288 bits. Interleaving with 288 bytes should give best compression)
 #define FPGA_CONFIG_SIZE		42336	// our current fpga_[lh]f.bit files are 42175 bytes. Rounded up to next multiple of FPGA_INTERLEAVE_SIZE
 
-static void usage(char *argv0)
+static void usage(void)
 {
-	fprintf(stderr, "Usage:   %s <infile1> <infile2> ... <infile_n> <outfile>\n\n", argv0);
-	fprintf(stderr, "Combines n FPGA bitstream files and compresses them into one.\n\n");
+	fprintf(stderr, "Usage: fpga_compress <infile1> <infile2> ... <infile_n> <outfile>\n");
+	fprintf(stderr, "          Combine n FPGA bitstream files and compress them into one.\n\n");
+	fprintf(stderr, "       fpga_compress -d <infile> <outfile>");
+	fprintf(stderr, "          Decompress <infile>. Write result to <outfile>");
 }
 
 
@@ -77,7 +82,7 @@ int zlib_compress(FILE *infile[], uint8_t num_infiles, FILE *outfile)
 
 	fpga_config = malloc(num_infiles * FPGA_CONFIG_SIZE);
 	
-	// read the input files interleaving into fpga_config[]
+	// read the input files. Interleave them into fpga_config[]
 	i = 0;
 	do {
 		for(uint16_t j = 0; j < num_infiles; j++) {
@@ -100,8 +105,6 @@ int zlib_compress(FILE *infile[], uint8_t num_infiles, FILE *outfile)
 		}
 	} while (!all_feof(infile, num_infiles));
 
-	fprintf(stderr, "Read a total of %ld bytes from %d files\n", i, num_infiles);
-	
 	// initialize zlib structures
 	compressed_fpga_stream.next_in = fpga_config;
 	compressed_fpga_stream.avail_in = i;
@@ -120,7 +123,6 @@ int zlib_compress(FILE *infile[], uint8_t num_infiles, FILE *outfile)
 	uint8_t *outbuf = malloc(outsize_max);
 	compressed_fpga_stream.next_out = outbuf;
 	compressed_fpga_stream.avail_out = outsize_max;
-	
 					
 	if (ret == Z_OK) {
 		ret = deflateTune(&compressed_fpga_stream,
@@ -134,7 +136,7 @@ int zlib_compress(FILE *infile[], uint8_t num_infiles, FILE *outfile)
 		ret = deflate(&compressed_fpga_stream, Z_FINISH);
 	}
 	
-	fprintf(stderr, "\ncompressed %d input bytes to %d output bytes\n", i, compressed_fpga_stream.total_out);
+	fprintf(stderr, "compressed %d input bytes to %d output bytes\n", i, compressed_fpga_stream.total_out);
 
 	if (ret != Z_STREAM_END) {
 		fprintf(stderr, "Error in deflate(): %d %s\n", ret, compressed_fpga_stream.msg);
@@ -175,6 +177,7 @@ int zlib_decompress(FILE *infile, FILE *outfile)
 	int ret;
 	
 	z_stream compressed_fpga_stream;
+
 	// initialize zlib structures
 	compressed_fpga_stream.next_in = inbuf;
 	compressed_fpga_stream.avail_in = 0;
@@ -240,14 +243,14 @@ int main(int argc, char **argv)
 	FILE *outfile;
 	
 	if (argc == 1 || argc == 2) {
-		usage(argv[0]);
+		usage();
 		return -1;
 	}
 	
-	if (!strcmp(argv[1], "-d")) {
+	if (!strcmp(argv[1], "-d")) {			// Decompress
 		infiles = calloc(1, sizeof(FILE*));
 		if (argc != 4) {
-			usage(argv[0]);
+			usage();
 			return -1;
 		} 
 		infiles[0] = fopen(argv[2], "rb");
@@ -261,24 +264,22 @@ int main(int argc, char **argv)
 			return -1;
 		}
 		return zlib_decompress(infiles[0], outfile);
-	}
-	
 
-	infiles = calloc(argc-2, sizeof(FILE*));
-	
-	for (uint16_t i = 0; i < argc-2; i++) { 
-		infiles[i] = fopen(argv[i+1], "rb");
-		if (infiles[i] == NULL) {
-			fprintf(stderr, "Error. Cannot open input file %s", argv[i+1]);
+	} else {								// Compress
+
+		infiles = calloc(argc-2, sizeof(FILE*));
+		for (uint16_t i = 0; i < argc-2; i++) { 
+			infiles[i] = fopen(argv[i+1], "rb");
+			if (infiles[i] == NULL) {
+				fprintf(stderr, "Error. Cannot open input file %s", argv[i+1]);
+				return -1;
+			}
+		}
+		outfile = fopen(argv[argc-1], "wb");
+		if (outfile == NULL) {
+			fprintf(stderr, "Error. Cannot open output file %s", argv[argc-1]);
 			return -1;
 		}
+		return zlib_compress(infiles, argc-2, outfile);
 	}
-
-	outfile = fopen(argv[argc-1], "wb");
-	if (outfile == NULL) {
-		fprintf(stderr, "Error. Cannot open output file %s", argv[argc-1]);
-		return -1;
-	}
-		
-	return zlib_compress(infiles, argc-2, outfile);
 }

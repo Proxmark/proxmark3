@@ -104,7 +104,8 @@ CMDSRCS = 	nonce2key/crapto1.c\
 			protocols.c\
 
 ZLIBSRCS = deflate.c adler32.c trees.c zutil.c inflate.c inffast.c inftrees.c
-ZLIB_FLAGS = -DZ_SOLO -DZ_PREFIX -DNO_GZIP -DZLIB_PM3_TUNED -DDEBUG -Dverbose=1
+ZLIB_FLAGS = -DZ_SOLO -DZ_PREFIX -DNO_GZIP -DZLIB_PM3_TUNED 
+#-DDEBUG -Dverbose=1
 
 
 COREOBJS = $(CORESRCS:%.c=$(OBJDIR)/%.o)
@@ -113,7 +114,7 @@ ZLIBOBJS = $(ZLIBSRCS:%.c=$(OBJDIR)/%.o)
 
 RM = rm -f
 BINS = proxmark3 flasher fpga_compress #snooper cli
-CLEAN = cli cli.exe flasher flasher.exe proxmark3 proxmark3.exe snooper snooper.exe $(CMDOBJS) $(OBJDIR)/*.o *.o *.moc.cpp
+CLEAN = cli cli.exe flasher flasher.exe proxmark3 proxmark3.exe fpga_compress fpga_compress.exe snooper snooper.exe $(CMDOBJS) $(OBJDIR)/*.o *.o *.moc.cpp
 
 all: lua_build $(BINS) 
 

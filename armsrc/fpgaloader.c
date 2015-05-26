@@ -173,6 +173,10 @@ bool FpgaSetupSscDma(uint8_t *buf, int len)
 }
 
 
+//----------------------------------------------------------------------------
+// Uncompress (inflate) the FPGA data. Returns one decompressed byte with
+// each call. 
+//----------------------------------------------------------------------------
 static int get_from_fpga_combined_stream(z_streamp compressed_fpga_stream, uint8_t *output_buffer)
 {
 	if (fpga_image_ptr == compressed_fpga_stream->next_out) {	// need more data
@@ -193,7 +197,11 @@ static int get_from_fpga_combined_stream(z_streamp compressed_fpga_stream, uint8
 	return *fpga_image_ptr++;
 }
 
-
+//----------------------------------------------------------------------------
+// Undo the interleaving of several FPGA config files. FPGA config files
+// are combined into one big file:
+// 288 bytes from FPGA file 1, followed by 288 bytes from FGPA file 2, etc.
+//----------------------------------------------------------------------------
 static int get_from_fpga_stream(int bitstream_version, z_streamp compressed_fpga_stream, uint8_t *output_buffer)
 {
 	while((uncompressed_bytes_cnt / FPGA_INTERLEAVE_SIZE) % FPGA_BITSTREAM_MAX != (bitstream_version - 1)) {
@@ -208,18 +216,19 @@ static int get_from_fpga_stream(int bitstream_version, z_streamp compressed_fpga
 
 static voidpf fpga_inflate_malloc(voidpf opaque, uInt items, uInt size)
 {
-	Dbprintf("zlib requested %d bytes", items*size);
 	return BigBuf_malloc(items*size);
 }
 
 
 static void fpga_inflate_free(voidpf opaque, voidpf address)
 {
-	Dbprintf("zlib frees memory");
-	BigBuf_free_keep_EM();
+	BigBuf_free();
 }
 
 
+//----------------------------------------------------------------------------
+// Initialize decompression of the respective (HF or LF) FPGA stream 
+//----------------------------------------------------------------------------
 static bool reset_fpga_stream(int bitstream_version, z_streamp compressed_fpga_stream, uint8_t *output_buffer)
 {
 	uint8_t header[FPGA_BITSTREAM_FIXED_HEADER_SIZE];
@@ -234,7 +243,7 @@ static bool reset_fpga_stream(int bitstream_version, z_streamp compressed_fpga_s
 	compressed_fpga_stream->zalloc = &fpga_inflate_malloc;
 	compressed_fpga_stream->zfree = &fpga_inflate_free;
 
-	inflateInit2(compressed_fpga_stream, 15);
+	inflateInit2(compressed_fpga_stream, 0);
 
 	fpga_image_ptr = output_buffer;
 
@@ -330,8 +339,6 @@ static void DownloadFPGA(int bitstream_version, int FpgaImageLen, z_streamp comp
 		DownloadFPGA_byte(b);
 	}
 	
-	Dbprintf("%d bytes loaded into FPGA", i);
-	
 	// continue to clock FPGA until ready signal goes high
 	i=100000;
 	while ( (i--) && ( !(AT91C_BASE_PIOA->PIO_PDSR & GPIO_FPGA_DONE ) ) ) {
@@ -402,10 +409,10 @@ static int bitparse_find_section(int bitstream_version, char section_name, unsig
 }
 
 
-//-----------------------------------------------------------------------------
-// Find out which FPGA image format is stored in flash, then call DownloadFPGA
-// with the right parameters to download the image
-//-----------------------------------------------------------------------------
+//----------------------------------------------------------------------------
+// Check which FPGA image is currently loaded (if any). If necessary 
+// decompress and load the correct (HF or LF) image to the FPGA
+//----------------------------------------------------------------------------
 void FpgaDownloadAndGo(int bitstream_version)
 {
 	z_stream compressed_fpga_stream;
@@ -415,6 +422,9 @@ void FpgaDownloadAndGo(int bitstream_version)
 	if (downloaded_bitstream == bitstream_version)
 		return;
 
+	// make sure that we have enough memory to decompress
+	BigBuf_free();
+	
 	if (!reset_fpga_stream(bitstream_version, &compressed_fpga_stream, output_buffer)) {
 		return;
 	}
@@ -426,10 +436,15 @@ void FpgaDownloadAndGo(int bitstream_version)
 	}
 
 	inflateEnd(&compressed_fpga_stream);
-		
 }	
 
 
+//-----------------------------------------------------------------------------
+// Gather version information from FPGA image. Needs to decompress the begin 
+// of the respective (HF or LF) image.
+// Note: decompression makes use of (i.e. overwrites) BigBuf[]. It is therefore
+// advisable to call this only once and store the results for later use.
+//-----------------------------------------------------------------------------
 void FpgaGatherVersion(int bitstream_version, char *dst, int len)
 {
 	unsigned int fpga_info_len;
@@ -438,6 +453,9 @@ void FpgaGatherVersion(int bitstream_version, char *dst, int len)
 	uint8_t output_buffer[OUTPUT_BUFFER_LEN];
 	
 	dst[0] = '\0';
+
+	// ensure that we can allocate enough memory for decompression:
+	BigBuf_free();
 
 	if (!reset_fpga_stream(bitstream_version, &compressed_fpga_stream, output_buffer)) {
 		return;
@@ -487,8 +505,9 @@ void FpgaGatherVersion(int bitstream_version, char *dst, int len)
 		strncat(dst, tempstr, len-1);
 	}
 	
-	inflateEnd(&compressed_fpga_stream);
+	strncat(dst, "\n", len-1);
 
+	inflateEnd(&compressed_fpga_stream);
 }
 
 

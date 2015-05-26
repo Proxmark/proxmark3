@@ -75,7 +75,10 @@ $(OBJDIR)/fpga_all.o: $(OBJDIR)/fpga_all.bit.z
 
 $(OBJDIR)/fpga_all.bit.z: $(FPGA_BITSTREAMS) $(FPGA_COMPRESSOR)
 	$(FPGA_COMPRESSOR) $(filter %.bit,$^) $@  
-	
+
+$(FPGA_COMPRESSOR):
+		make -C ../client $(notdir $(FPGA_COMPRESSOR))
+		
 $(OBJDIR)/fullimage.stage1.elf: $(VERSIONOBJ) $(OBJDIR)/fpga_all.o $(THUMBOBJ) $(ARMOBJ)
 	$(CC) $(LDFLAGS) -Wl,-T,ldscript,-Map,$(patsubst %.elf,%.map,$@) -o $@ $^ $(LIBS)
 
@@ -107,6 +110,7 @@ clean:
 	$(DELETE) $(OBJDIR)$(PATHSEP)*.map
 	$(DELETE) $(OBJDIR)$(PATHSEP)*.d
 	$(DELETE) $(OBJDIR)$(PATHSEP)*.z
+	$(DELETE) $(OBJDIR)$(PATHSEP)*.bin
 	$(DELETE) version.c
 
 .PHONY: all clean help

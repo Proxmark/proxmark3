@@ -32,7 +32,15 @@
 
 /* @(#) $Id$ */
 
+//-----------------------------------------------------------------------------
+// This version of zlib is modified for use within the Proxmark3 project. 
+// Files from the original distribution which are not required for this
+// purpose are not included. All modifications can easily be found
+// by searching for #ifdef ZLIB_PM3_TUNED and #ifndef ZLIB_PM3_TUNED.
+//-----------------------------------------------------------------------------
+
 /* #define GEN_TREES_H */
+
 
 #include "deflate.h"
 
@@ -910,10 +918,10 @@ void ZLIB_INTERNAL _tr_flush_block(s, buf, stored_len, last)
     ulg stored_len;   /* length of input block */
     int last;         /* one if this is the last block for a file */
 {
-    ulg opt_lenb, static_lenb; /* opt_len and static_len in bytes */
     int max_blindex = 0;  /* index of last bit length code of non zero freq */
-
 #ifndef ZLIB_PM3_TUNED
+    ulg opt_lenb, static_lenb; /* opt_len and static_len in bytes */
+
     /* Build the Huffman trees unless a stored block is forced */
     if (s->level > 0) {
 #endif
@@ -938,6 +946,7 @@ void ZLIB_INTERNAL _tr_flush_block(s, buf, stored_len, last)
          */
         max_blindex = build_bl_tree(s);
 
+#ifndef ZLIB_PM3_TUNED
         /* Determine the best encoding. Compute the block lengths in bytes. */
         opt_lenb = (s->opt_len+3+7)>>3;
         static_lenb = (s->static_len+3+7)>>3;
@@ -946,7 +955,6 @@ void ZLIB_INTERNAL _tr_flush_block(s, buf, stored_len, last)
                 opt_lenb, s->opt_len, static_lenb, s->static_len, stored_len,
                 s->last_lit));
 
-#ifndef ZLIB_PM3_TUNED
         if (static_lenb <= opt_lenb) opt_lenb = static_lenb;
 
     } else {
@@ -980,7 +988,7 @@ void ZLIB_INTERNAL _tr_flush_block(s, buf, stored_len, last)
         s->compressed_len += 3 + s->static_len;
 #endif
     } else {
-#endif /* ZLIB_PM3_TUNED */
+#endif /* !ZLIB_PM3_TUNED */
 		send_bits(s, (DYN_TREES<<1)+last, 3);
         send_all_trees(s, s->l_desc.max_code+1, s->d_desc.max_code+1,
                        max_blindex+1);

@@ -404,13 +404,24 @@ int CmdTune(const char *Cmd)
 
 int CmdVersion(const char *Cmd)
 {
-  UsbCommand c = {CMD_VERSION};
-  UsbCommand resp;
-  SendCommand(&c);
-  if (WaitForResponseTimeout(CMD_ACK,&resp,1000)) {
-      lookupChipID(resp.arg[0], resp.arg[1]);
-  }
-  return 0;
+
+	UsbCommand c = {CMD_VERSION};
+	static UsbCommand resp = {0, {0, 0, 0}};
+	
+	if (resp.arg[0] == 0 && resp.arg[1] == 0) { // no cached information available
+		SendCommand(&c);
+		if (WaitForResponseTimeout(CMD_ACK,&resp,1000) && Cmd != NULL) {
+			PrintAndLog("Prox/RFID mark3 RFID instrument");
+			PrintAndLog((char*)resp.d.asBytes);
+			lookupChipID(resp.arg[0], resp.arg[1]);
+		}
+	} else if (Cmd != NULL) {
+		PrintAndLog("Prox/RFID mark3 RFID instrument");
+		PrintAndLog((char*)resp.d.asBytes);
+		lookupChipID(resp.arg[0], resp.arg[1]);
+	}
+	
+	return 0;
 }
 
 static command_t CommandTable[] = 

@@ -52,7 +52,7 @@
 #include "deflate.h"
 
 const char deflate_copyright[] =
-   " deflate 1.2.8 Copyright 1995-2013 Jean-loup Gailly and Mark Adler ";
+   " deflate 1.2.8.f-Proxmark3 Copyright 1995-2013 Jean-loup Gailly and Mark Adler ";
 /*
   If you use the zlib library in a product, an acknowledgment is welcome
   in the documentation of your product. If for some reason you cannot
@@ -60,6 +60,15 @@ const char deflate_copyright[] =
   copyright string in the executable of your product.
  */
 
+//-----------------------------------------------------------------------------
+// This version of zlib is modified for use within the Proxmark3 project. 
+// Files from the original distribution which are not required for this
+// purpose are not included. All modifications can easily be found
+// by searching for #ifdef ZLIB_PM3_TUNED and #ifndef ZLIB_PM3_TUNED.
+//-----------------------------------------------------------------------------
+
+
+ 
 /* ===========================================================================
  *  Function prototypes.
  */
@@ -1727,12 +1736,11 @@ local block_state deflate_fast(s, flush)
 
 
 #ifdef ZLIB_PM3_TUNED
-local uInt try_harder(s, strstart, lookahead, hash_head, level)
+local uInt try_harder(s, strstart, lookahead, hash_head)
 	deflate_state *s;
 	uInt strstart;
 	uInt lookahead;
 	IPos hash_head;
-	uInt level;
 {
 	uInt strstart_save = s->strstart;
 	s->strstart = strstart;
@@ -1768,22 +1776,11 @@ local uInt try_harder(s, strstart, lookahead, hash_head, level)
 		} else {
 			combined_gain = s->strstart - strstart + 1 - MIN_MATCH;  // (possibly truncated) previous_length - 3 literals
 		}
-		if (level > 1 && s->strstart+1 <= s->window_size - MIN_LOOKAHEAD) {	// test one level more
-			s->prev_length = match_length;
-			uInt save_ins_h = s->ins_h;
-			UPDATE_HASH(s, s->ins_h, s->window[(s->strstart+1) + (MIN_MATCH-1)]);
-			combined_gain += try_harder(s, s->strstart+1, s->lookahead-1, s->head[s->ins_h], level-1);
-			s->ins_h = save_ins_h;
+		if (match_length < MIN_MATCH) { 
+			combined_gain += 0;							// no gain
 		} else {
-			if (match_length < MIN_MATCH) { 
-				combined_gain += 0;							// no gain
-			} else {
-				combined_gain += match_length - MIN_MATCH; 	// match_length bytes coded as approx three literals
-			}
+			combined_gain += match_length - MIN_MATCH; 	// match_length bytes are coded as three literals
 		}
-		// if (combined_length > s->lookahead - 1) {
-			// combined_length = s->lookahead;
-		// }
 		if (combined_gain >= best_combined_gain) {			// in case of a tie we prefer the longer prev_length
 			best_combined_gain = combined_gain;
 			best_prev_length = s->strstart - strstart + 1;
@@ -1792,12 +1789,6 @@ local uInt try_harder(s, strstart, lookahead, hash_head, level)
 		s->lookahead--;
 		UPDATE_HASH(s, s->ins_h, s->window[(s->strstart) + (MIN_MATCH-1)]);
 		hash_head = s->head[s->ins_h];
-		// if (s->strstart - strstart + 1 == MIN_MATCH-1) {		// a match with length == 2 is not possible
-			// s->strstart++;
-			// s->lookahead--;
-			// UPDATE_HASH(s, s->ins_h, s->window[(s->strstart) + (MIN_MATCH-1)]);
-			// hash_head = s->head[s->ins_h];
-		// }
 	} while (s->strstart <= strstart-1 + prev_length 			// try to truncate the previous match to 1, 3, ... prev_length
 			&& s->strstart <= s->window_size - MIN_LOOKAHEAD);	// watch out for the end of the input
 	
@@ -1806,11 +1797,6 @@ local uInt try_harder(s, strstart, lookahead, hash_head, level)
 	s->ins_h = ins_h_save;
 	s->match_length = current_match_length;
 	s->match_start = current_match_start;
-	if (prev_length >= MIN_MATCH) {
-		if (best_prev_length != prev_length && best_prev_length >= MIN_MATCH) {
-			printf("at %d, level %d: Reducing prev_length from %d to %d\n", s->strstart, level, prev_length, best_prev_length);
-		}
-	}
 	if (best_prev_length >= MIN_MATCH) {
 		s->prev_length = best_prev_length;
 		s->match_length = MIN_MATCH - 1;
@@ -1865,7 +1851,7 @@ local block_state deflate_slow(s, flush)
 
 #ifdef ZLIB_PM3_TUNED
 		if (s->prev_length < s->max_lazy_match) {
-			try_harder(s, s->strstart, s->lookahead, hash_head, 1);
+			try_harder(s, s->strstart, s->lookahead, hash_head);
 		}
 
 #else
