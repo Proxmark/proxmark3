@@ -19,4 +19,8 @@ bool WaitForResponseTimeout(uint32_t cmd, UsbCommand* response, size_t ms_timeou
 bool WaitForResponse(uint32_t cmd, UsbCommand* response);
 void clearCommandBuffer();
 command_t* getTopLevelCommandTable();
+
+//For storing command that are received from the device
+#define CMD_BUFFER_SIZE 50
+
 #endif

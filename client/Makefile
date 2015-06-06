@@ -84,7 +84,7 @@ CMDSRCS = 	nonce2key/crapto1.c\
 			cmdhflegic.c \
 			cmdhficlass.c \
 			cmdhfmf.c \
-            cmdhfmfu.c \
+			cmdhfmfu.c \
 			cmdhw.c \
 			cmdlf.c \
 			cmdlfio.c \
@@ -103,7 +103,13 @@ CMDSRCS = 	nonce2key/crapto1.c\
 			aes.c\
 			protocols.c\
 			sha1.c\
-
+			cmdcrc.c\
+			reveng/reveng.c\
+			reveng/cli.c\
+			reveng/bmpbit.c\
+			reveng/model.c\
+			reveng/poly.c\
+			reveng/getopt.c\
 
 COREOBJS = $(CORESRCS:%.c=$(OBJDIR)/%.o)
 CMDOBJS = $(CMDSRCS:%.c=$(OBJDIR)/%.o)
