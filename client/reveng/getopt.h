@@ -21,5 +21,5 @@
 */
 
 extern char *optarg;
-extern int optind, opterr, optopt;
+extern int optind, opterr, optopt, pos;
 int getopt(int argc, char *argv[], const char *optstring);

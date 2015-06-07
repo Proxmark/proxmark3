@@ -61,7 +61,10 @@
  * specific.
  */
 
-/* #define PRESETS  1 */
+#ifdef _WIN32
+ #define PRESETS  1 //
+#endif
+
 
 /* Macros defining the size of a bmp_t.
  * Their values only matter if PRESETS and/or BMPMACRO are defined, in

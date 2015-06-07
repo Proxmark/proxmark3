@@ -89,7 +89,7 @@ int reveng_main(int argc, char *argv[]) {
 	model_t pset = model, *candmods, *mptr;
 	char *string;
 
-	//myname = argv[0];
+	myname = argv[0];
 
 	/* stdin must be binary */
 #ifdef _WIN32
@@ -97,7 +97,9 @@ int reveng_main(int argc, char *argv[]) {
 #endif /* _WIN32 */
 
 	SETBMP();
-
+	
+	pos=0;
+	optind=1;
 	do {
 		c=getopt(argc, argv, "?A:BDFLMP:SVXa:bcdefhi:k:lm:p:q:rstuvw:x:yz");
 		switch(c) {
@@ -487,7 +489,8 @@ void
 uerror(const char *msg) {
 	/* Callback function to report fatal errors */
 	fprintf(stderr, "%s: %s\n", myname, msg);
-	exit(EXIT_FAILURE);
+	return;
+	//exit(EXIT_FAILURE);
 }
 
 void
@@ -545,7 +548,8 @@ oread(const char *name) {
 		return(stdin);
 	if(!(handle = fopen(name, "rb"))) {
 		fprintf(stderr, "%s: cannot open '%s' for reading\n", myname, name);
-		exit(EXIT_FAILURE);
+		return 0;
+		//exit(EXIT_FAILURE);
 	}
 	return(handle);
 }
