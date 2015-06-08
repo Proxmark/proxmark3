@@ -12,4 +12,6 @@
 #define CMDCRC_H__
 
 int CmdCrc(const char *Cmd);
+int CmdrevengTest(const char *Cmd);
+int GetModels(char *Models[], int *count, uint32_t *width);
 #endif
