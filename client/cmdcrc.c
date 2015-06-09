@@ -295,7 +295,13 @@ int CmdrevengTest(const char *Cmd){
 }
 
 //-c || -v
-int RunModel(char *inModel, char *inHexStr, bool reverse, char *result){
+//inModel = valid model name string - CRC-8
+//inHexStr = input hex string to calculate crc on
+//reverse = reverse calc option if true
+//endian = {0 = calc default endian input and output, b = big endian input and output, B = big endian output, r = right justified
+//          l = little endian input and output, L = little endian output only, t = left justified}
+//result = calculated crc hex string
+int RunModel(char *inModel, char *inHexStr, bool reverse, char endian, char *result){
 	/* default values */
 	static model_t model = {
 		PZERO,		// no CRC polynomial, user must specify
@@ -331,6 +337,34 @@ int RunModel(char *inModel, char *inHexStr, bool reverse, char *result){
 	width = plen(model.spoly);
 	rflags |= R_HAVEP | R_HAVEI | R_HAVERI | R_HAVERO | R_HAVEX;
 	
+	//set flags
+	switch (endian) {
+		case 'b': /* b  big-endian (RefIn = false, RefOut = false ) */
+			model.flags &= ~P_REFIN;
+			rflags |= R_HAVERI;
+			/* fall through: */
+		case 'B': /* B  big-endian output (RefOut = false) */
+			model.flags &= ~P_REFOUT;
+			rflags |= R_HAVERO;
+			mnovel(&model);
+			/* fall through: */
+		case 'r': /* r  right-justified */
+			model.flags |= P_RTJUST;
+			break;
+		case 'l': /* l  little-endian input and output */
+			model.flags |= P_REFIN;
+			rflags |= R_HAVERI;
+			/* fall through: */
+		case 'L': /* L  little-endian output */
+			model.flags |= P_REFOUT;
+			rflags |= R_HAVERO;
+			mnovel(&model);
+			/* fall through: */
+		case 't': /* t  left-justified */
+			model.flags &= ~P_RTJUST;
+			break;
+	}
+
 	mcanon(&model);
 
 	if (reverse) {
@@ -402,15 +436,16 @@ int CmdrevengTestC(const char *Cmd){
 	char inHexStr[30] = {0x00};
 	char result[30];
 	int dataLen;
-
+	char endian = 0;
 	dataLen = param_getstr(Cmd, cmdp++, inModel);
 	if (dataLen < 4) return 0;
 	dataLen = param_getstr(Cmd, cmdp++, inHexStr);
 	if (dataLen < 4) return 0;
-	bool reverse = (param_get8(Cmd, cmdp)) ? true : false;
+	bool reverse = (param_get8(Cmd, cmdp++)) ? true : false;
+	endian = param_getchar(Cmd, cmdp++); 
 
 	//PrintAndLog("mod: %s, hex: %s, rev %d", inModel, inHexStr, reverse);
-	int ans = RunModel(inModel, inHexStr, reverse, result);
+	int ans = RunModel(inModel, inHexStr, reverse, endian, result);
 	if (!ans) return 0;
 	
 	PrintAndLog("Result: %s",result);
