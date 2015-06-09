@@ -293,3 +293,126 @@ int CmdrevengTest(const char *Cmd){
 	}
 	return 1;
 }
+
+//-c || -v
+int RunModel(char *inModel, char *inHexStr, bool reverse, char *result){
+	/* default values */
+	static model_t model = {
+		PZERO,		// no CRC polynomial, user must specify
+		PZERO,		// Init = 0
+		P_BE,		  // RefIn = false, RefOut = false, plus P_RTJUST setting in reveng.h
+		PZERO,		// XorOut = 0
+		PZERO,		// check value unused 
+		NULL		  // no model name 
+	};
+	int ibperhx = 8, obperhx = 8;
+	int rflags = 0; // search flags 
+	int c;
+	unsigned long width = 0UL;
+	poly_t apoly, crc;
+
+	char *string;
+
+	// stdin must be binary
+	#ifdef _WIN32
+		_setmode(STDIN_FILENO, _O_BINARY);
+	#endif /* _WIN32 */
+
+	SETBMP();
+	//set model
+	if(!(c = mbynam(&model, inModel))) {
+		fprintf(stderr,"error: preset model '%s' not found.  Use reveng -D to list presets.\n", inModel);
+		return 0;
+	}
+	if(c < 0)
+		return uerr("no preset models available");
+
+	// must set width so that parameter to -ipx is not zeroed 
+	width = plen(model.spoly);
+	rflags |= R_HAVEP | R_HAVEI | R_HAVERI | R_HAVERO | R_HAVEX;
+	
+	mcanon(&model);
+
+	if (reverse) {
+		// v  calculate reversed CRC
+		/* Distinct from the -V switch as this causes
+		 * the arguments and output to be reversed as well.
+		 */
+		// reciprocate Poly
+		prcp(&model.spoly);
+
+		/* mrev() does:
+		 *   if(refout) prev(init); else prev(xorout);
+		 * but here the entire argument polynomial is
+		 * reflected, not just the characters, so RefIn
+		 * and RefOut are not inverted as with -V.
+		 * Consequently Init is the mirror image of the
+		 * one resulting from -V, and so we have:
+		 */
+		if(~model.flags & P_REFOUT) {
+			prev(&model.init);
+			prev(&model.xorout);
+		}
+
+		// swap init and xorout
+		apoly = model.init;
+		model.init = model.xorout;
+		model.xorout = apoly;
+	}
+	// c  calculate CRC
+
+	// validate inputs
+	/* if(plen(model.spoly) == 0) {
+	 *	fprintf(stderr,"%s: no polynomial specified for -%c (add -w WIDTH -p POLY)\n", myname, mode);
+	 *	exit(EXIT_FAILURE);
+	 * }
+	 */
+
+	/* in the Williams model, xorout is applied after the refout stage.
+	 * as refout is part of ptostr(), we reverse xorout here.
+	 */
+	if(model.flags & P_REFOUT)
+		prev(&model.xorout);
+
+	apoly = strtop(inHexStr, model.flags, ibperhx);
+
+	if(reverse)
+		prev(&apoly);
+
+	crc = pcrc(apoly, model.spoly, model.init, model.xorout, model.flags);
+
+	if(reverse)
+		prev(&crc);
+
+	string = ptostr(crc, model.flags, obperhx);
+	for (int i = 0; i < 50; i++){
+		result[i] = string[i];
+		if (result[i]==0) break;
+	}
+	free(string);
+	pfree(&crc);
+	pfree(&apoly);
+	return 1;
+}
+
+//test call to RunModel
+int CmdrevengTestC(const char *Cmd){
+	int cmdp = 0;
+	char inModel[30] = {0x00};
+	char inHexStr[30] = {0x00};
+	char result[30];
+	int dataLen;
+
+	dataLen = param_getstr(Cmd, cmdp++, inModel);
+	if (dataLen < 4) return 0;
+	dataLen = param_getstr(Cmd, cmdp++, inHexStr);
+	if (dataLen < 4) return 0;
+	bool reverse = (param_get8(Cmd, cmdp)) ? true : false;
+
+	//PrintAndLog("mod: %s, hex: %s, rev %d", inModel, inHexStr, reverse);
+	int ans = RunModel(inModel, inHexStr, reverse, result);
+	if (!ans) return 0;
+	
+	PrintAndLog("Result: %s",result);
+	return 1;
+}

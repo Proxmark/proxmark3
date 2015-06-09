@@ -33,7 +33,10 @@ unsigned int current_command = CMD_UNKNOWN;
 static int CmdHelp(const char *Cmd);
 static int CmdQuit(const char *Cmd);
 static int CmdRev(const char *Cmd);
+/* // for testing reveng api - cmdcrc.c
 static int CmdrevengT(const char *Cmd);
+static int CmdrevengC(const char *Cmd);
+*/
 
 //For storing command that are received from the device
 static UsbCommand cmdBuffer[CMD_BUFFER_SIZE];
@@ -50,7 +53,10 @@ static command_t CommandTable[] =
   {"hw",    CmdHW,    1, "{ Hardware commands... }"},
   {"lf",    CmdLF,    1, "{ Low Frequency commands... }"},
   {"reveng",CmdRev,   1, "Crc calculations from the software reveng1-30"},
+  /* // for testing reveng api - cmdcrc.c
   {"revengt",CmdrevengT,1, "TEST Crc calculations from the software reveng1-30"},
+  {"revengc",CmdrevengC,1, "TEST Crc calculations from the software reveng1-30"},
+  */
   {"script",CmdScript,1, "{ Scripting commands }"},
   {"quit",  CmdQuit,  1, "Exit program"},
   {"exit",  CmdQuit,  1, "Exit program"},
@@ -78,11 +84,16 @@ int CmdRev(const char *Cmd)
   CmdCrc(Cmd);
   return 0;
 }
-
+/* // for testing reveng api - cmdcrc.c
 int CmdrevengT(const char *Cmd)
 {
   return CmdrevengTest(Cmd);
 }
+int CmdrevengC(const char *Cmd)
+{
+  return CmdrevengTestC(Cmd);
+}
+*/
 /**
  * @brief This method should be called when sending a new command to the pm3. In case any old
  *  responses from previous commands are stored in the buffer, a call to this method should clear them.

@@ -13,5 +13,7 @@
 
 int CmdCrc(const char *Cmd);
 int CmdrevengTest(const char *Cmd);
+int CmdrevengTestC(const char *Cmd);
 int GetModels(char *Models[], int *count, uint32_t *width);
+int RunModel(char *inModel, char *inHexStr, bool reverse, char *result);
 #endif
