@@ -90,16 +90,11 @@ int GetModels(char *Models[], int *count, uint32_t *width){
 		PZERO,		/* check value unused */
 		NULL		/* no model name */
 	};
+
 	int ibperhx = 8;//, obperhx = 8;
 	int rflags = 0, uflags = 0; /* search and UI flags */
-
-	//unsigned long width = 0UL;
-	//int c, mode = 0, args, psets, pass;
 	poly_t apoly, crc, qpoly = PZERO, *apolys = NULL, *pptr = NULL, *qptr = NULL;
 	model_t pset = model, *candmods, *mptr;
-	//char *string;
-
-	//myname = argv[0];
 
 	/* stdin must be binary */
 	#ifdef _WIN32
@@ -108,14 +103,10 @@ int GetModels(char *Models[], int *count, uint32_t *width){
 
 	SETBMP();
 	
-	//pos=0;
-	//optind=1;
-
 	int args = 0, psets, pass;
 	int Cnt = 0;
 	if (*width == 0) { //reveng -D
 		*count = mcount();
-		//PrintAndLog("Count: %d",*count);
 		if(!*count)
 			return uerr("no preset models available");
 
@@ -123,153 +114,149 @@ int GetModels(char *Models[], int *count, uint32_t *width){
 			mbynum(&model, mode);
 			mcanon(&model);
 			size_t size = (model.name && *model.name) ? strlen(model.name) : 6;
-			//PrintAndLog("Size: %d, %s",size,model.name);
 			char *tmp = calloc(size+1, sizeof(char));
 			if (tmp==NULL)
 				return uerr("out of memory?");
 
 			memcpy(tmp, model.name, size);
 			Models[mode] = tmp;
-			//ufound(&model);
 		}
+		mfree(&model);
 	} else { //reveng -s
 
-			if(~model.flags & P_MULXN)
-				return uerr("cannot search for non-Williams compliant models");
+		if(~model.flags & P_MULXN)
+			return uerr("cannot search for non-Williams compliant models");
 
-			praloc(&model.spoly, *width);
-			praloc(&model.init, *width);
-			praloc(&model.xorout, *width);
-			if(!plen(model.spoly))
-				palloc(&model.spoly, *width);
+		praloc(&model.spoly, *width);
+		praloc(&model.init, *width);
+		praloc(&model.xorout, *width);
+		if(!plen(model.spoly))
+			palloc(&model.spoly, *width);
+		else
+			*width = plen(model.spoly);
+
+		/* special case if qpoly is zero, search to end of range */
+		if(!ptst(qpoly))
+			rflags &= ~R_HAVEQ;
+
+
+		/* not going to be sending additional args at this time (maybe future?)
+
+		// allocate argument array 
+		args = argc - optind;
+		if(!(apolys = malloc(args * sizeof(poly_t))))
+			return uerr("cannot allocate memory for argument list");
+
+		for(pptr = apolys; optind < argc; ++optind) {
+			if(uflags & C_INFILE)
+				*pptr++ = rdpoly(argv[optind], model.flags, ibperhx);
 			else
-				*width = plen(model.spoly);
+				*pptr++ = strtop(argv[optind], model.flags, ibperhx);
+		}
+		// exit value of pptr is used hereafter! 
+	
+		*/
 
-			/* special case if qpoly is zero, search to end of range */
-			if(!ptst(qpoly))
-				rflags &= ~R_HAVEQ;
-
-
-			/* not going to be sending additional args
-
-			// allocate argument array 
-			args = argc - optind;
-			if(!(apolys = malloc(args * sizeof(poly_t))))
-				return uerr("cannot allocate memory for argument list");
-
-			for(pptr = apolys; optind < argc; ++optind) {
-				if(uflags & C_INFILE)
-					*pptr++ = rdpoly(argv[optind], model.flags, ibperhx);
-				else
-					*pptr++ = strtop(argv[optind], model.flags, ibperhx);
-			}
-			// exit value of pptr is used hereafter! 
-		
-			*/
-
-			/* if endianness not specified, try
-			 * little-endian then big-endian.
-			 * NB: crossed-endian algorithms will not be
-			 * searched.
-			 */
-			/* scan against preset models */
-			if(~uflags & C_FORCE) {
-				pass = 0;
-				Cnt = 0;
-				do {
-					psets = mcount();
-					//PrintAndLog("psets: %d",psets);
-					while(psets) {
-						mbynum(&pset, --psets);
-						
-						/* skip if different width, or refin or refout don't match */
-						if(plen(pset.spoly) != *width || (model.flags ^ pset.flags) & (P_REFIN | P_REFOUT))
-							continue;
-						/* skip if the preset doesn't match specified parameters */
-						if(rflags & R_HAVEP && pcmp(&model.spoly, &pset.spoly))
-							continue;
-						if(rflags & R_HAVEI && psncmp(&model.init, &pset.init))
-							continue;
-						if(rflags & R_HAVEX && psncmp(&model.xorout, &pset.xorout))
-							continue;
-				
-						apoly = pclone(pset.xorout);
-						if(pset.flags & P_REFOUT)
-							prev(&apoly);
-						for(qptr = apolys; qptr < pptr; ++qptr) {
-							crc = pcrc(*qptr, pset.spoly, pset.init, apoly, 0);
-							if(ptst(crc)) {
-								pfree(&crc);
-								break;
-							} else
-								pfree(&crc);
-						}
-						pfree(&apoly);
-						if(qptr == pptr) {
-							/* the selected model solved all arguments */
-							mcanon(&pset);
-							
-							size_t size = (pset.name && *pset.name) ? strlen(pset.name) : 6;
-							//PrintAndLog("Size: %d, %s, count: %d",size,pset.name, Cnt);
-							char *tmp = calloc(size+1, sizeof(char));
-							if (tmp==NULL){
-								PrintAndLog("out of memory?");
-								return 0;
-							}
-							memcpy(tmp, pset.name, size);
-							Models[Cnt++] = tmp;
-							*count = Cnt;
-							//ufound(&pset);
-							uflags |= C_RESULT;
-						}
-					}
-					mfree(&pset);
-
-					/* toggle refIn/refOut and reflect arguments */
-					if(~rflags & R_HAVERI) {
-						model.flags ^= P_REFIN | P_REFOUT;
-						for(qptr = apolys; qptr < pptr; ++qptr)
-							prevch(qptr, ibperhx);
-					}
-				} while(~rflags & R_HAVERI && ++pass < 2);
-			}
-			if(uflags & C_RESULT) {
-				for(qptr = apolys; qptr < pptr; ++qptr)
-					pfree(qptr);
-				return 1;
-				//exit(EXIT_SUCCESS);
-			}
-			if(!(model.flags & P_REFIN) != !(model.flags & P_REFOUT))
-				return uerr("cannot search for crossed-endian models");
+		/* if endianness not specified, try
+		 * little-endian then big-endian.
+		 * NB: crossed-endian algorithms will not be
+		 * searched.
+		 */
+		/* scan against preset models */
+		if(~uflags & C_FORCE) {
 			pass = 0;
+			Cnt = 0;
 			do {
-				mptr = candmods = reveng(&model, qpoly, rflags, args, apolys);
-				if(mptr && plen(mptr->spoly))
-					uflags |= C_RESULT;
-				while(mptr && plen(mptr->spoly)) {
-					/* results were printed by the callback
-					 * string = mtostr(mptr);
-					 * puts(string);
-					 * free(string);
-					 */
-					mfree(mptr++);
+				psets = mcount();
+				//PrintAndLog("psets: %d",psets);
+				while(psets) {
+					mbynum(&pset, --psets);
+					
+					/* skip if different width, or refin or refout don't match */
+					if(plen(pset.spoly) != *width || (model.flags ^ pset.flags) & (P_REFIN | P_REFOUT))
+						continue;
+					/* skip if the preset doesn't match specified parameters */
+					if(rflags & R_HAVEP && pcmp(&model.spoly, &pset.spoly))
+						continue;
+					if(rflags & R_HAVEI && psncmp(&model.init, &pset.init))
+						continue;
+					if(rflags & R_HAVEX && psncmp(&model.xorout, &pset.xorout))
+						continue;
+			
+					//for additional args (not used yet, maybe future?)
+					apoly = pclone(pset.xorout);
+					if(pset.flags & P_REFOUT)
+						prev(&apoly);
+					
+					for(qptr = apolys; qptr < pptr; ++qptr) {
+						crc = pcrc(*qptr, pset.spoly, pset.init, apoly, 0);
+						if(ptst(crc)) {
+							pfree(&crc);
+							break;
+						} else
+							pfree(&crc);
+					}
+					pfree(&apoly);
+					if(qptr == pptr) {
+
+						/* the selected model solved all arguments */
+
+						mcanon(&pset);
+						
+						size_t size = (pset.name && *pset.name) ? strlen(pset.name) : 6;
+						//PrintAndLog("Size: %d, %s, count: %d",size,pset.name, Cnt);
+						char *tmp = calloc(size+1, sizeof(char));
+						if (tmp==NULL){
+							PrintAndLog("out of memory?");
+							return 0;
+						}
+						memcpy(tmp, pset.name, size);
+						Models[Cnt++] = tmp;
+						*count = Cnt;
+						uflags |= C_RESULT;
+					}
 				}
-				free(candmods);
+				mfree(&pset);
+
+				/* toggle refIn/refOut and reflect arguments */
 				if(~rflags & R_HAVERI) {
 					model.flags ^= P_REFIN | P_REFOUT;
 					for(qptr = apolys; qptr < pptr; ++qptr)
 						prevch(qptr, ibperhx);
 				}
 			} while(~rflags & R_HAVERI && ++pass < 2);
+		}
+		//got everything now free the memory...
+
+		if(uflags & C_RESULT) {
 			for(qptr = apolys; qptr < pptr; ++qptr)
 				pfree(qptr);
-			free(apolys);
-			if(~uflags & C_RESULT)
-				return uerr("no models found");
+		}
+		if(!(model.flags & P_REFIN) != !(model.flags & P_REFOUT))
+			return uerr("cannot search for crossed-endian models");
 
-
+		pass = 0;
+		do {
+			mptr = candmods = reveng(&model, qpoly, rflags, args, apolys);
+			if(mptr && plen(mptr->spoly))
+				uflags |= C_RESULT;
+			while(mptr && plen(mptr->spoly)) {
+				mfree(mptr++);
+			}
+			free(candmods);
+			if(~rflags & R_HAVERI) {
+				model.flags ^= P_REFIN | P_REFOUT;
+				for(qptr = apolys; qptr < pptr; ++qptr)
+					prevch(qptr, ibperhx);
+			}
+		} while(~rflags & R_HAVERI && ++pass < 2);
+		for(qptr = apolys; qptr < pptr; ++qptr)
+			pfree(qptr);
+		free(apolys);
+		if(~uflags & C_RESULT)
+			return uerr("no models found");
+		mfree(&model);
 	}
-	//PrintAndLog("DONE");
 	return 1;
 }
 
