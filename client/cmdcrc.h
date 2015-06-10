@@ -14,6 +14,7 @@
 int CmdCrc(const char *Cmd);
 int CmdrevengTest(const char *Cmd);
 int CmdrevengTestC(const char *Cmd);
-int GetModels(char *Models[], int *count, uint32_t *width);
+int CmdrevengSearch(const char *Cmd);
+int GetModels(char *Models[], int *count, uint8_t *width);
 int RunModel(char *inModel, char *inHexStr, bool reverse, char endian, char *result);
 #endif

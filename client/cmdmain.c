@@ -37,8 +37,8 @@ static int CmdRev(const char *Cmd);
 /*
 static int CmdrevengT(const char *Cmd);
 static int CmdrevengC(const char *Cmd);
+static int CmdrevengA(const char *Cmd);
 */
-
 //For storing command that are received from the device
 static UsbCommand cmdBuffer[CMD_BUFFER_SIZE];
 //Points to the next empty position to write to
@@ -54,10 +54,11 @@ static command_t CommandTable[] =
   {"hw",    CmdHW,    1, "{ Hardware commands... }"},
   {"lf",    CmdLF,    1, "{ Low Frequency commands... }"},
   {"reveng",CmdRev,   1, "Crc calculations from the software reveng1-30"},
-   // for testing reveng api - cmdcrc.c
-  //{"revengt",CmdrevengT,1, "TEST Crc calculations from the software reveng1-30"},
-  //{"revengc",CmdrevengC,1, "TEST Crc calculations from the software reveng1-30"},
-  
+  /* // for testing reveng api - cmdcrc.c
+  {"revenga",CmdrevengA,1, "TEST Crc calculations from the software reveng1-30"},
+  {"revengt",CmdrevengT,1, "TEST Crc calculations from the software reveng1-30"},
+  {"revengc",CmdrevengC,1, "TEST Crc calculations from the software reveng1-30"},
+  */
   {"script",CmdScript,1, "{ Scripting commands }"},
   {"quit",  CmdQuit,  1, "Exit program"},
   {"exit",  CmdQuit,  1, "Exit program"},
@@ -85,8 +86,12 @@ int CmdRev(const char *Cmd)
   CmdCrc(Cmd);
   return 0;
 }
-/*
- // for testing reveng api - cmdcrc.c
+
+/* // for testing reveng api - cmdcrc.c
+int CmdrevengA(const char *Cmd)
+{
+  return CmdrevengSearch(Cmd);
+}
 int CmdrevengT(const char *Cmd)
 {
   return CmdrevengTest(Cmd);
