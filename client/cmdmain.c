@@ -34,9 +34,10 @@ static int CmdHelp(const char *Cmd);
 static int CmdQuit(const char *Cmd);
 static int CmdRev(const char *Cmd);
  // for testing reveng api - cmdcrc.c
+/*
 static int CmdrevengT(const char *Cmd);
 static int CmdrevengC(const char *Cmd);
-
+*/
 
 //For storing command that are received from the device
 static UsbCommand cmdBuffer[CMD_BUFFER_SIZE];
@@ -84,6 +85,7 @@ int CmdRev(const char *Cmd)
   CmdCrc(Cmd);
   return 0;
 }
+/*
  // for testing reveng api - cmdcrc.c
 int CmdrevengT(const char *Cmd)
 {
@@ -92,7 +94,7 @@ int CmdrevengT(const char *Cmd)
 int CmdrevengC(const char *Cmd)
 {
   return CmdrevengTestC(Cmd);
-}
+}*/
 
 /**
  * @brief This method should be called when sending a new command to the pm3. In case any old
