@@ -61,9 +61,13 @@
  * specific.
  */
 
-#ifdef _WIN32
- #define PRESETS  1 //
-#endif
+
+// PM3 NOTES:
+// only PRESETS tested on windows
+// PRESETS was commented out of original code
+// but to enable preset models it must be enabled 
+// (marshmellow)
+#define PRESETS  1 
 
 
 /* Macros defining the size of a bmp_t.
