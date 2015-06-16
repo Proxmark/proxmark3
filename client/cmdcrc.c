@@ -311,7 +311,7 @@ int RunModel(char *inModel, char *inHexStr, bool reverse, char endian, char *res
 	int ibperhx = 8, obperhx = 8;
 	int rflags = 0; // search flags 
 	int c;
-	unsigned long width;
+	//unsigned long width;
 	poly_t apoly, crc;
 
 	char *string;
@@ -331,7 +331,7 @@ int RunModel(char *inModel, char *inHexStr, bool reverse, char endian, char *res
 		return uerr("no preset models available");
 
 	// must set width so that parameter to -ipx is not zeroed 
-	width = plen(model.spoly);
+	//width = plen(model.spoly);
 	rflags |= R_HAVEP | R_HAVEI | R_HAVERI | R_HAVERO | R_HAVEX;
 	
 	//set flags
