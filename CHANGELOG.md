@@ -5,6 +5,8 @@ This project uses the changelog in accordance with [keepchangelog](http://keepac
 ## [Unreleased][unreleased]
 
 ### Added
+- Add `hf 14b info` to `hf search` (marshmellow)
+- Add `hf 14b info` to find and print info about std 14b tags and sri tags (using 14b raw commands in the client)  (marshmellow)
 - Add PACE replay functionality (frederikmoellers)
 
 ### Fixed 
