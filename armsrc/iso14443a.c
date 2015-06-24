@@ -1971,7 +1971,7 @@ int32_t dist_nt(uint32_t nt1, uint32_t nt2) {
 		nttmp1 = prng_successor(nttmp1, 1);
 		if (nttmp1 == nt2) return i;
 		nttmp2 = prng_successor(nttmp2, 1);
-			if (nttmp2 == nt1) return -i;
+		if (nttmp2 == nt1) return -i;
 		}
 	
 	return(-99999); // either nt1 or nt2 are invalid nonces
@@ -2040,18 +2040,21 @@ void ReaderMifare(bool first_try)
 	LED_B_OFF();
 	LED_C_OFF();
 	
-  
+
+	#define DARKSIDE_MAX_TRIES	32		// number of tries to sync on PRNG cycle. Then give up.
+	uint16_t unsuccessfull_tries = 0;
+	
 	for(uint16_t i = 0; TRUE; i++) {
 		
+		LED_C_ON();
 		WDT_HIT();
 
 		// Test if the action was cancelled
 		if(BUTTON_PRESS()) {
+			isOK = -1;
 			break;
 		}
 		
-		LED_C_ON();
-
 		if(!iso14443a_select_card(uid, NULL, &cuid)) {
 			if (MF_DBGLEVEL >= 1)	Dbprintf("Mifare: Can't select card");
 			continue;
@@ -2086,8 +2089,14 @@ void ReaderMifare(bool first_try)
 				nt_attacked = nt;
 			}
 			else {
-				if (nt_distance == -99999) { // invalid nonce received, try again
-					continue;
+				if (nt_distance == -99999) { // invalid nonce received
+					unsuccessfull_tries++;
+					if (!nt_attacked && unsuccessfull_tries > DARKSIDE_MAX_TRIES) {
+						isOK = -3;		// Card has an unpredictable PRNG. Give up	
+						break;
+					} else {
+						continue;		// continue trying...
+					}
 				}
 				sync_cycles = (sync_cycles - nt_distance);
 				if (MF_DBGLEVEL >= 3) Dbprintf("calibrating in cycle %d. nt_distance=%d, Sync_cycles: %d\n", i, nt_distance, sync_cycles);
@@ -2149,6 +2158,10 @@ void ReaderMifare(bool first_try)
 			if (nt_diff == 0 && first_try)
 			{
 				par[0]++;
+				if (par[0] == 0x00) {		// tried all 256 possible parities without success. Card doesn't send NACK.
+					isOK = -2;
+					break;
+				}
 			} else {
 				par[0] = ((par[0] & 0x1F) + 1) | par_low;
 			}
@@ -2165,7 +2178,7 @@ void ReaderMifare(bool first_try)
 	memcpy(buf + 16, ks_list, 8);
 	memcpy(buf + 24, mf_nr_ar, 4);
 		
-	cmd_send(CMD_ACK,isOK,0,0,buf,28);
+	cmd_send(CMD_ACK, isOK, 0, 0, buf, 28);
 
 	// Thats it...
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
