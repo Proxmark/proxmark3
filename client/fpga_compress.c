@@ -85,6 +85,15 @@ int zlib_compress(FILE *infile[], uint8_t num_infiles, FILE *outfile)
 	// read the input files. Interleave them into fpga_config[]
 	i = 0;
 	do {
+
+		if (i >= num_infiles * FPGA_CONFIG_SIZE) {
+			fprintf(stderr, "Input files too big (total > %lu bytes). These are probably not PM3 FPGA config files.\n", num_infiles*FPGA_CONFIG_SIZE);
+			for(uint16_t j = 0; j < num_infiles; j++) {
+				fclose(infile[j]);
+			}
+			return(EXIT_FAILURE);
+		}
+
 		for(uint16_t j = 0; j < num_infiles; j++) {
 			for(uint16_t k = 0; k < FPGA_INTERLEAVE_SIZE; k++) {
 				c = fgetc(infile[j]);
@@ -96,13 +105,6 @@ int zlib_compress(FILE *infile[], uint8_t num_infiles, FILE *outfile)
 			}
 		}
 
-		if (i > num_infiles * FPGA_CONFIG_SIZE) {
-			fprintf(stderr, "Input files too big (total > %lu bytes). These are probably not PM3 FPGA config files.", num_infiles*FPGA_CONFIG_SIZE);
-			for(uint16_t j = 0; j < num_infiles; j++) {
-				fclose(infile[j]);
-			}
-			return -1;
-		}
 	} while (!all_feof(infile, num_infiles));
 
 	// initialize zlib structures
@@ -148,7 +150,7 @@ int zlib_compress(FILE *infile[], uint8_t num_infiles, FILE *outfile)
 		fclose(outfile);
 		free(infile);
 		free(fpga_config);
-		return -1;
+		return(EXIT_FAILURE);
 		}
 		
 	for (i = 0; i < compressed_fpga_stream.total_out; i++) {
@@ -164,7 +166,7 @@ int zlib_compress(FILE *infile[], uint8_t num_infiles, FILE *outfile)
 	free(infile);
 	free(fpga_config);
 	
-	return 0;
+	return(EXIT_SUCCESS);
 	
 }
 
@@ -226,12 +228,12 @@ int zlib_decompress(FILE *infile, FILE *outfile)
 		}
 		fclose(outfile);
 		fclose(infile);
-		return 0;
+		return(EXIT_SUCCESS);
 	} else {
 		fprintf(stderr, "Error. Inflate() returned error %d, %s", ret, compressed_fpga_stream.msg);
 		fclose(outfile);
 		fclose(infile);
-		return -1;
+		return(EXIT_FAILURE);
 	}
 	
 }
@@ -244,24 +246,24 @@ int main(int argc, char **argv)
 	
 	if (argc == 1 || argc == 2) {
 		usage();
-		return -1;
+		return(EXIT_FAILURE);
 	}
 	
 	if (!strcmp(argv[1], "-d")) {			// Decompress
 		infiles = calloc(1, sizeof(FILE*));
 		if (argc != 4) {
 			usage();
-			return -1;
+			return(EXIT_FAILURE);
 		} 
 		infiles[0] = fopen(argv[2], "rb");
 		if (infiles[0] == NULL) {
 			fprintf(stderr, "Error. Cannot open input file %s", argv[2]);
-			return -1;
+			return(EXIT_FAILURE);
 		}
 		outfile = fopen(argv[3], "wb");
 		if (outfile == NULL) {
 			fprintf(stderr, "Error. Cannot open output file %s", argv[3]);
-			return -1;
+			return(EXIT_FAILURE);
 		}
 		return zlib_decompress(infiles[0], outfile);
 
@@ -272,13 +274,13 @@ int main(int argc, char **argv)
 			infiles[i] = fopen(argv[i+1], "rb");
 			if (infiles[i] == NULL) {
 				fprintf(stderr, "Error. Cannot open input file %s", argv[i+1]);
-				return -1;
+				return(EXIT_FAILURE);
 			}
 		}
 		outfile = fopen(argv[argc-1], "wb");
 		if (outfile == NULL) {
 			fprintf(stderr, "Error. Cannot open output file %s", argv[argc-1]);
-			return -1;
+			return(EXIT_FAILURE);
 		}
 		return zlib_compress(infiles, argc-2, outfile);
 	}
