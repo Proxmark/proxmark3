@@ -556,7 +556,12 @@ int CmdHFSearch(const char *Cmd){
 	if (ans > 0) {
 		PrintAndLog("\nValid ISO14443A Tag Found - Quiting Search\n");
 		return ans;
-	} 
+	}
+	ans = HF14BInfo(false);
+	if (ans) {
+		PrintAndLog("\nValid ISO14443B Tag Found - Quiting Search\n");
+		return ans;
+	}
 	ans = HFiClassReader("", false, false);
 	if (ans) {
 		PrintAndLog("\nValid iClass Tag (or PicoPass Tag) Found - Quiting Search\n");
@@ -567,12 +572,7 @@ int CmdHFSearch(const char *Cmd){
 		PrintAndLog("\nValid ISO15693 Tag Found - Quiting Search\n");
 		return ans;
 	}
-
-
-	//14b has issues currently...
-	//ans = CmdHF14BRead(Cmd);
-	//if (ans > 0) return ans;
-
+	PrintAndLog("\nno known/supported 13.56 MHz tags found\n");
 	return 0;
 }
 
