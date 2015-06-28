@@ -70,11 +70,13 @@ FPGA_COMPRESSOR = ../client/fpga_compress
 
 all: $(OBJS)
 
+.DELETE_ON_ERROR:
+
 $(OBJDIR)/fpga_all.o: $(OBJDIR)/fpga_all.bit.z
 	$(OBJCOPY) -O elf32-littlearm -I binary -B arm --prefix-sections=fpga_all_bit $^ $@
 
 $(OBJDIR)/fpga_all.bit.z: $(FPGA_BITSTREAMS) $(FPGA_COMPRESSOR)
-	$(FPGA_COMPRESSOR) $(filter %.bit,$^) $@  
+	$(FPGA_COMPRESSOR) $(filter %.bit,$^) $@
 
 $(FPGA_COMPRESSOR):
 		make -C ../client $(notdir $(FPGA_COMPRESSOR))
