@@ -388,7 +388,7 @@ int usage_lf_config()
 	PrintAndLog("       b <bps>       Sets resolution of bits per sample. Default (max): 8");
 	PrintAndLog("       d <decim>     Sets decimation. A value of N saves only 1 in N samples. Default: 1");
 	PrintAndLog("       a [0|1]       Averaging - if set, will average the stored sample value when decimating. Default: 1");
-	PrintAndLog("       t <threshold> Sets trigger threshold. 0 means no threshold");
+	PrintAndLog("       t <threshold> Sets trigger threshold. 0 means no threshold (range: 0-128)");
 	PrintAndLog("Examples:");
 	PrintAndLog("      lf config b 8 L");
 	PrintAndLog("                    Samples at 125KHz, 8bps.");
