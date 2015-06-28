@@ -274,16 +274,6 @@ static void print_st_general_info(uint8_t *data){
 	return;
 }
 
-// 14b get and print Full Info (as much as we know)
-int HF14BStdInfo(uint8_t *data, uint8_t *datalen){
-	if (!HF14BStdReader(data,datalen)) return 0;
-
-	//add more info here
-	print_atqb_resp(data);
-
-	return 1;
-}
-
 // 14b get and print UID only (general info)
 int HF14BStdReader(uint8_t *data, uint8_t *datalen){
 	//05 00 00 = find one tag in field
@@ -319,12 +309,12 @@ int HF14BStdReader(uint8_t *data, uint8_t *datalen){
 	return 1;
 }
 
-// SRx get and print full info (needs more info...)
-int HF14B_ST_Info(uint8_t *data, uint8_t *datalen){
-	if (!HF14B_ST_Reader(data, datalen)) return 0;
-	
-	//add locking bit information here.
+// 14b get and print Full Info (as much as we know)
+int HF14BStdInfo(uint8_t *data, uint8_t *datalen){
+	if (!HF14BStdReader(data,datalen)) return 0;
 
+	//add more info here
+	print_atqb_resp(data);
 
 	return 1;
 }
@@ -367,6 +357,16 @@ int HF14B_ST_Reader(uint8_t *data, uint8_t *datalen){
 
 	PrintAndLog("\n14443-3b ST tag found:");
 	print_st_general_info(data);
+	return 1;
+}
+
+// SRx get and print full info (needs more info...)
+int HF14B_ST_Info(uint8_t *data, uint8_t *datalen){
+	if (!HF14B_ST_Reader(data, datalen)) return 0;
+	
+	//add locking bit information here.
+
+
 	return 1;
 }
 
