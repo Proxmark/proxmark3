@@ -61,12 +61,10 @@
 **/
 
 #include "optimized_cipher.h"
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdbool.h>
 #include <stdint.h>
-#include <time.h>
 
 
 #define opt_T(s) (0x1 & ((s->t >> 15) ^ (s->t >> 14)^ (s->t >> 10)^ (s->t >> 8)^ (s->t >> 5)^ (s->t >> 4)^ (s->t >> 1)^ s->t))
