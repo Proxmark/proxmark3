@@ -1125,7 +1125,6 @@ int doIClassSimulation( int simulationMode, uint8_t *reader_mac_buf)
 	int resp_cc_len;
 
 	uint8_t *receivedCmd = BigBuf_malloc(MAX_FRAME_SIZE);
-	memset(receivedCmd, 0x44, MAX_FRAME_SIZE);
 	int len;
 
 	// Prepare card messages
@@ -1336,7 +1335,6 @@ int doIClassSimulation( int simulationMode, uint8_t *reader_mac_buf)
 			}
 
 		}
-		memset(receivedCmd, 0x44, MAX_FRAME_SIZE);
 	}
 
 	//Dbprintf("%x", cmdsRecvd);
