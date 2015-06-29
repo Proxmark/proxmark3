@@ -295,7 +295,7 @@ int print_ST_Lock_info(uint8_t model){
 		case 0x7: //             (SRI4K)
 			//only need data[3]
 			blk1 = 9;
-			PrintAndLog("   raw: %s",printBits(8,data+3));
+			PrintAndLog("   raw: %s",printBits(1,data+3));
 			PrintAndLog(" 07/08: %slocked", blk1, (data[3] & 1) ? "not " : "" );
 			for (uint8_t i = 1; i<8; i++){
 				PrintAndLog("    %02u: %slocked", blk1, (data[3] & (1 << i)) ? "not " : "" );
@@ -307,7 +307,7 @@ int print_ST_Lock_info(uint8_t model){
 		case 0xC: //             (SRT512)
 			//need data[2] and data[3]
 			blk1 = 0;
-			PrintAndLog("   raw: %s",printBits(16,data+2));
+			PrintAndLog("   raw: %s",printBits(2,data+2));
 			for (uint8_t b=2; b<4; b++){
 				for (uint8_t i=0; i<8; i++){
 					PrintAndLog("    %02u: %slocked", blk1, (data[b] & (1 << i)) ? "not " : "" );
@@ -318,7 +318,7 @@ int print_ST_Lock_info(uint8_t model){
 		case 0x2: //             (SR176)
 			//need data[2]
 			blk1 = 0;
-			PrintAndLog("   raw: %s",printBits(8,data+2));
+			PrintAndLog("   raw: %s",printBits(1,data+2));
 			for (uint8_t i = 0; i<8; i++){
 				PrintAndLog(" %02u/%02u: %slocked", blk1, blk1+1, (data[2] & (1 << i)) ? "" : "not " );
 				blk1+=2;
