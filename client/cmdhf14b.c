@@ -267,7 +267,7 @@ char *get_ST_Chip_Model(uint8_t data){
 
 int print_ST_Lock_info(uint8_t model){
 	//assume connection open and tag selected...
-	uint8_t data[8] = {0x00};
+	uint8_t data[16] = {0x00};
 	uint8_t datalen = 2;
 	bool crc = true;
 	uint8_t resplen;
@@ -296,9 +296,9 @@ int print_ST_Lock_info(uint8_t model){
 			//only need data[3]
 			blk1 = 9;
 			PrintAndLog("   raw: %s",printBits(1,data+3));
-			PrintAndLog(" 07/08: %slocked", blk1, (data[3] & 1) ? "not " : "" );
+			PrintAndLog(" 07/08:%slocked", (data[3] & 1) ? " not " : " " );
 			for (uint8_t i = 1; i<8; i++){
-				PrintAndLog("    %02u: %slocked", blk1, (data[3] & (1 << i)) ? "not " : "" );
+				PrintAndLog("    %02u:%slocked", blk1, (data[3] & (1 << i)) ? " not " : " " );
 				blk1++;
 			}
 			break;
@@ -310,7 +310,7 @@ int print_ST_Lock_info(uint8_t model){
 			PrintAndLog("   raw: %s",printBits(2,data+2));
 			for (uint8_t b=2; b<4; b++){
 				for (uint8_t i=0; i<8; i++){
-					PrintAndLog("    %02u: %slocked", blk1, (data[b] & (1 << i)) ? "not " : "" );
+					PrintAndLog("    %02u:%slocked", blk1, (data[b] & (1 << i)) ? " not " : " " );
 					blk1++;
 				}
 			}
@@ -320,7 +320,7 @@ int print_ST_Lock_info(uint8_t model){
 			blk1 = 0;
 			PrintAndLog("   raw: %s",printBits(1,data+2));
 			for (uint8_t i = 0; i<8; i++){
-				PrintAndLog(" %02u/%02u: %slocked", blk1, blk1+1, (data[2] & (1 << i)) ? "" : "not " );
+				PrintAndLog(" %02u/%02u:%slocked", blk1, blk1+1, (data[2] & (1 << i)) ? " " : " not " );
 				blk1+=2;
 			}
 			break;
@@ -415,10 +415,11 @@ int HF14B_ST_Reader(uint8_t *data, uint8_t *datalen, bool closeCon){
 
 	//leave power on
 	if (HF14BCmdRaw(true, &crc, true, data, datalen, false)==0) return rawClose();
+
+	if (*datalen != 10 || !crc) return rawClose();
+
 	//power off ?
 	if (closeCon) rawClose();
-
-	if (*datalen != 10 || !crc) return 0;
 
 	PrintAndLog("\n14443-3b ST tag found:");
 	print_st_general_info(data);
