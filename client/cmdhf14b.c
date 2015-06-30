@@ -200,7 +200,7 @@ int CmdHF14BCmdRaw (const char *Cmd) {
 		return 0;
 	}
 
-	if (select){
+	if (select){ //auto select 14b tag
 		uint8_t	cmd2[16];
 		uint8_t cmdLen = 3;
 		bool crc2 = true;
@@ -208,17 +208,20 @@ int CmdHF14BCmdRaw (const char *Cmd) {
 		cmd2[1] = 0x00;
 		cmd2[2] = 0x08;
 
+		// REQB
 		if (HF14BCmdRaw(true, &crc2, true, cmd2, &cmdLen, false)==0) return rawClose();
 
 		if (cmd2[0] != 0x50 || cmdLen != 14 || !crc2) return rawClose();
 
-		data[0] = 0x1D;
+		data[0] = 0x1D; 
+		// UID from data[1 - 4]
 		data[5] = 0x00;
 		data[6] = 0x08;
 		data[7] = 0x01;
 		data[8] = 0x00;
-
 		cmdLen = 9;
+
+		// attrib
 		if (HF14BCmdRaw(true, &crc2, true, cmd2, &cmdLen, false)==0) return rawClose();
 
 		if (cmd2[0] != 0x10 || cmdLen != 3 || !crc2) return rawClose();
