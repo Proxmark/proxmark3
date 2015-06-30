@@ -334,8 +334,6 @@ void SimulateIso14443bTag(void)
 		0x00, 0x21, 0x85, 0x5e, 0xd7
 	};
 
-	FpgaDownloadAndGo(FPGA_BITSTREAM_HF);
-
 	clear_trace();
 	set_tracing(TRUE);
 
@@ -349,6 +347,8 @@ void SimulateIso14443bTag(void)
 
 	uint16_t len;
 	uint16_t cmdsRecvd = 0;
+
+	FpgaDownloadAndGo(FPGA_BITSTREAM_HF);
 
 	// prepare the (only one) tag answer:
 	CodeIso14443bAsTag(response1, sizeof(response1));
@@ -908,6 +908,9 @@ static void CodeAndTransmit14443bAsReader(const uint8_t *cmd, int len)
 //-----------------------------------------------------------------------------
 void ReadSTMemoryIso14443b(uint32_t dwLast)
 {
+	clear_trace();
+	set_tracing(TRUE);
+
 	uint8_t i = 0x00;
 
 	FpgaDownloadAndGo(FPGA_BITSTREAM_HF);
@@ -925,9 +928,6 @@ void ReadSTMemoryIso14443b(uint32_t dwLast)
 	LED_D_ON();
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_HF_READER_RX_XCORR | FPGA_HF_READER_RX_XCORR_848_KHZ);
 	SpinDelay(200);
-
-	clear_trace();
-	set_tracing(TRUE);
 
 	// First command: wake up the tag using the INITIATE command
 	uint8_t cmd1[] = {0x06, 0x00, 0x97, 0x5b};
@@ -1199,17 +1199,19 @@ void SendRawCommand14443B(uint32_t datalen, uint32_t recv, uint8_t powerfield, u
 	FpgaDownloadAndGo(FPGA_BITSTREAM_HF);
 	SetAdcMuxFor(GPIO_MUXSEL_HIPKD);
 	FpgaSetupSsc();
-
-	set_tracing(TRUE);
 	
-	CodeAndTransmit14443bAsReader(data, datalen);
+	if (datalen){
+		set_tracing(TRUE);
+		
+		CodeAndTransmit14443bAsReader(data, datalen);
 
-	if(recv) {
-		GetSamplesFor14443bDemod(RECEIVE_SAMPLES_TIMEOUT, TRUE);
-		uint16_t iLen = MIN(Demod.len, USB_CMD_DATA_SIZE);
-		cmd_send(CMD_ACK, iLen, 0, 0, Demod.output, iLen);
-	}
-	
+		if(recv) {
+			GetSamplesFor14443bDemod(RECEIVE_SAMPLES_TIMEOUT, TRUE);
+			uint16_t iLen = MIN(Demod.len, USB_CMD_DATA_SIZE);
+			cmd_send(CMD_ACK, iLen, 0, 0, Demod.output, iLen);
+		}
+	} 
+
 	if(!powerfield) {
 		FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
 		LED_D_OFF();

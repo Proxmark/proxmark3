@@ -213,12 +213,12 @@ int CmdHF14BCmdRaw (const char *Cmd) {
 
 		if (cmd2[0] != 0x50 || cmdLen != 14 || !crc2) return rawClose();
 
-		data[0] = 0x1D; 
+		cmd2[0] = 0x1D; 
 		// UID from data[1 - 4]
-		data[5] = 0x00;
-		data[6] = 0x08;
-		data[7] = 0x01;
-		data[8] = 0x00;
+		cmd2[5] = 0x00;
+		cmd2[6] = 0x08;
+		cmd2[7] = 0x01;
+		cmd2[8] = 0x00;
 		cmdLen = 9;
 
 		// attrib
