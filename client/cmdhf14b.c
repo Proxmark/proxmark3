@@ -132,6 +132,7 @@ int CmdHF14BCmdRaw (const char *Cmd) {
 	bool reply = true;
 	bool crc = false;
 	bool power = false;
+	bool select = false;
 	char buf[5] = "";
 	uint8_t data[100] = {0x00};
 	uint8_t datalen = 0;
@@ -142,7 +143,8 @@ int CmdHF14BCmdRaw (const char *Cmd) {
 			PrintAndLog("       -r    do not read response");
 			PrintAndLog("       -c    calculate and append CRC");
 			PrintAndLog("       -p    leave the field on after receive");
-			return 0;    
+			PrintAndLog("       -s    active signal field ON with select");
+			return 0;
 	}
 
 	// strip
@@ -163,6 +165,10 @@ int CmdHF14BCmdRaw (const char *Cmd) {
 				case 'p': 
 				case 'P': 
 					power = true;
+					break;
+				case 's':
+				case 'S':
+					select = true;
 					break;
 				default:
 					PrintAndLog("Invalid option");
@@ -192,6 +198,30 @@ int CmdHF14BCmdRaw (const char *Cmd) {
 	{
 		PrintAndLog("Missing data input");
 		return 0;
+	}
+
+	if (select){
+		uint8_t	cmd2[16];
+		uint8_t cmdLen = 3;
+		bool crc2 = true;
+		cmd2[0] = 0x05;
+		cmd2[1] = 0x00;
+		cmd2[2] = 0x08;
+
+		if (HF14BCmdRaw(true, &crc2, true, cmd2, &cmdLen, false)==0) return rawClose();
+
+		if (cmd2[0] != 0x50 || cmdLen != 14 || !crc2) return rawClose();
+
+		data[0] = 0x1D;
+		data[5] = 0x00;
+		data[6] = 0x08;
+		data[7] = 0x01;
+		data[8] = 0x00;
+
+		cmdLen = 9;
+		if (HF14BCmdRaw(true, &crc2, true, cmd2, &cmdLen, false)==0) return rawClose();
+
+		if (cmd2[0] != 0x10 || cmdLen != 3 || !crc2) return rawClose();
 	}
 
 	return HF14BCmdRaw(reply, &crc, power, data, &datalen, true);
@@ -342,9 +372,9 @@ static void print_st_general_info(uint8_t *data){
 // 14b get and print UID only (general info)
 int HF14BStdReader(uint8_t *data, uint8_t *datalen){
 	//05 00 00 = find one tag in field
-	//1d xx xx xx xx 20 00 08 01 00 = attrib xx=crc
-	//a3 = ?  (resp 03 e2 c2)
-	//02 = ?  (resp 02 6a d3)
+	//1d xx xx xx xx 00 08 01 00 = attrib xx=UID (resp 10 [f9 e0])
+	//a3 = ?  (resp 03 [e2 c2])
+	//02 = ?  (resp 02 [6a d3])
 	// 022b (resp 02 67 00 [29  5b])
 	// 0200a40400 (resp 02 67 00 [29 5b])
 	// 0200a4040c07a0000002480300 (resp 02 67 00 [29 5b])
@@ -366,7 +396,7 @@ int HF14BStdReader(uint8_t *data, uint8_t *datalen){
 
 	if (HF14BCmdRaw(true, &crc, false, data, datalen, false)==0) return 0;
 
-	if (data[0] != 0x50  || *datalen != 14 || !crc) return 0;
+	if (data[0] != 0x50 || *datalen != 14 || !crc) return 0;
 
 	PrintAndLog ("\n14443-3b tag found:");
 	PrintAndLog ("           UID: %s", sprint_hex(data+1,4));
