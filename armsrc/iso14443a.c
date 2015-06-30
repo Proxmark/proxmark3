@@ -551,12 +551,8 @@ void RAMFUNC SnoopIso14443a(uint8_t param) {
 	
 	LEDsoff();
 
-	// We won't start recording the frames that we acquire until we trigger;
-	// a good trigger condition to get started is probably when we see a
-	// response from the tag.
-	// triggered == FALSE -- to wait first for card
-	bool triggered = !(param & 0x03); 
-	
+	iso14443a_setup(FPGA_HF_ISO14443A_SNIFFER);
+
 	// Allocate memory from BigBuf for some buffers
 	// free all previous allocations first
 	BigBuf_free();
@@ -583,8 +579,6 @@ void RAMFUNC SnoopIso14443a(uint8_t param) {
 	bool TagIsActive = FALSE;
 	bool ReaderIsActive = FALSE;
 	
-	iso14443a_setup(FPGA_HF_ISO14443A_SNIFFER);
-
 	// Set up the demodulator for tag -> reader responses.
 	DemodInit(receivedResponse, receivedResponsePar);
 	
@@ -593,6 +587,12 @@ void RAMFUNC SnoopIso14443a(uint8_t param) {
 	
 	// Setup and start DMA.
 	FpgaSetupSscDma((uint8_t *)dmaBuf, DMA_BUFFER_SIZE);
+	
+	// We won't start recording the frames that we acquire until we trigger;
+	// a good trigger condition to get started is probably when we see a
+	// response from the tag.
+	// triggered == FALSE -- to wait first for card
+	bool triggered = !(param & 0x03); 
 	
 	// And now we loop, receiving samples.
 	for(uint32_t rsamples = 0; TRUE; ) {
@@ -1026,6 +1026,9 @@ void SimulateIso14443aTag(int tagType, int uid_1st, int uid_2nd, byte_t* data)
 		.modulation_n = 0
 	};
   
+	// We need to listen to the high-frequency, peak-detected path.
+	iso14443a_setup(FPGA_HF_ISO14443A_TAGSIM_LISTEN);
+
 	BigBuf_free_keep_EM();
 
 	// allocate buffers:
@@ -1053,9 +1056,6 @@ void SimulateIso14443aTag(int tagType, int uid_1st, int uid_2nd, byte_t* data)
 	int happened = 0;
 	int happened2 = 0;
 	int cmdsRecvd = 0;
-
-	// We need to listen to the high-frequency, peak-detected path.
-	iso14443a_setup(FPGA_HF_ISO14443A_TAGSIM_LISTEN);
 
 	cmdsRecvd = 0;
 	tag_response_info_t* p_response;
@@ -1971,7 +1971,7 @@ int32_t dist_nt(uint32_t nt1, uint32_t nt2) {
 		nttmp1 = prng_successor(nttmp1, 1);
 		if (nttmp1 == nt2) return i;
 		nttmp2 = prng_successor(nttmp2, 1);
-			if (nttmp2 == nt1) return -i;
+		if (nttmp2 == nt1) return -i;
 		}
 	
 	return(-99999); // either nt1 or nt2 are invalid nonces
@@ -1994,6 +1994,10 @@ void ReaderMifare(bool first_try)
 	uint8_t receivedAnswer[MAX_MIFARE_FRAME_SIZE];
 	uint8_t receivedAnswerPar[MAX_MIFARE_PARITY_SIZE];
 
+	if (first_try) { 
+		iso14443a_setup(FPGA_HF_ISO14443A_READER_MOD);
+	}
+	
 	// free eventually allocated BigBuf memory. We want all for tracing.
 	BigBuf_free();
 	
@@ -2022,7 +2026,6 @@ void ReaderMifare(bool first_try)
 
 	if (first_try) { 
 		mf_nr_ar3 = 0;
-		iso14443a_setup(FPGA_HF_ISO14443A_READER_MOD);
 		sync_time = GetCountSspClk() & 0xfffffff8;
 		sync_cycles = 65536;									// theory: Mifare Classic's random generator repeats every 2^16 cycles (and so do the nonces).
 		nt_attacked = 0;
@@ -2040,18 +2043,21 @@ void ReaderMifare(bool first_try)
 	LED_B_OFF();
 	LED_C_OFF();
 	
-  
+
+	#define DARKSIDE_MAX_TRIES	32		// number of tries to sync on PRNG cycle. Then give up.
+	uint16_t unsuccessfull_tries = 0;
+	
 	for(uint16_t i = 0; TRUE; i++) {
 		
+		LED_C_ON();
 		WDT_HIT();
 
 		// Test if the action was cancelled
 		if(BUTTON_PRESS()) {
+			isOK = -1;
 			break;
 		}
 		
-		LED_C_ON();
-
 		if(!iso14443a_select_card(uid, NULL, &cuid)) {
 			if (MF_DBGLEVEL >= 1)	Dbprintf("Mifare: Can't select card");
 			continue;
@@ -2086,8 +2092,14 @@ void ReaderMifare(bool first_try)
 				nt_attacked = nt;
 			}
 			else {
-				if (nt_distance == -99999) { // invalid nonce received, try again
-					continue;
+				if (nt_distance == -99999) { // invalid nonce received
+					unsuccessfull_tries++;
+					if (!nt_attacked && unsuccessfull_tries > DARKSIDE_MAX_TRIES) {
+						isOK = -3;		// Card has an unpredictable PRNG. Give up	
+						break;
+					} else {
+						continue;		// continue trying...
+					}
 				}
 				sync_cycles = (sync_cycles - nt_distance);
 				if (MF_DBGLEVEL >= 3) Dbprintf("calibrating in cycle %d. nt_distance=%d, Sync_cycles: %d\n", i, nt_distance, sync_cycles);
@@ -2149,6 +2161,10 @@ void ReaderMifare(bool first_try)
 			if (nt_diff == 0 && first_try)
 			{
 				par[0]++;
+				if (par[0] == 0x00) {		// tried all 256 possible parities without success. Card doesn't send NACK.
+					isOK = -2;
+					break;
+				}
 			} else {
 				par[0] = ((par[0] & 0x1F) + 1) | par_low;
 			}
@@ -2165,7 +2181,7 @@ void ReaderMifare(bool first_try)
 	memcpy(buf + 16, ks_list, 8);
 	memcpy(buf + 24, mf_nr_ar, 4);
 		
-	cmd_send(CMD_ACK,isOK,0,0,buf,28);
+	cmd_send(CMD_ACK, isOK, 0, 0, buf, 28);
 
 	// Thats it...
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
@@ -2226,13 +2242,6 @@ void Mifare1ksim(uint8_t flags, uint8_t exitAfterNReads, uint8_t arg2, uint8_t *
 	uint32_t ar_nr_responses[] = {0,0,0,0,0,0,0,0};
 	uint8_t ar_nr_collected = 0;
 
-	// free eventually allocated BigBuf memory but keep Emulator Memory
-	BigBuf_free_keep_EM();
-
-	// clear trace
-	clear_trace();
-	set_tracing(TRUE);
-
 	// Authenticate response - nonce
 	uint32_t nonce = bytes_to_num(rAUTH_NT, 4);
 	
@@ -2274,10 +2283,6 @@ void Mifare1ksim(uint8_t flags, uint8_t exitAfterNReads, uint8_t arg2, uint8_t *
 		rUIDBCC2[4] = rUIDBCC2[0] ^ rUIDBCC2[1] ^ rUIDBCC2[2] ^ rUIDBCC2[3];
 	}
 
-	// We need to listen to the high-frequency, peak-detected path.
-	iso14443a_setup(FPGA_HF_ISO14443A_TAGSIM_LISTEN);
-
-
 	if (MF_DBGLEVEL >= 1)	{
 		if (!_7BUID) {
 			Dbprintf("4B UID: %02x%02x%02x%02x", 
@@ -2288,6 +2293,17 @@ void Mifare1ksim(uint8_t flags, uint8_t exitAfterNReads, uint8_t arg2, uint8_t *
 				rUIDBCC2[0], rUIDBCC2[1] ,rUIDBCC2[2], rUIDBCC2[3]);
 		}
 	}
+
+	// We need to listen to the high-frequency, peak-detected path.
+	iso14443a_setup(FPGA_HF_ISO14443A_TAGSIM_LISTEN);
+
+	// free eventually allocated BigBuf memory but keep Emulator Memory
+	BigBuf_free_keep_EM();
+
+	// clear trace
+	clear_trace();
+	set_tracing(TRUE);
+
 
 	bool finished = FALSE;
 	while (!BUTTON_PRESS() && !finished) {
@@ -2707,10 +2723,8 @@ void RAMFUNC SniffMifare(uint8_t param) {
 	uint8_t receivedResponse[MAX_MIFARE_FRAME_SIZE];
 	uint8_t receivedResponsePar[MAX_MIFARE_PARITY_SIZE];
 
-	// As we receive stuff, we copy it from receivedCmd or receivedResponse
-	// into trace, along with its length and other annotations.
-	//uint8_t *trace = (uint8_t *)BigBuf;
-	
+	iso14443a_setup(FPGA_HF_ISO14443A_SNIFFER);
+
 	// free eventually allocated BigBuf memory
 	BigBuf_free();
 	// allocate the DMA buffer, used to stream samples from the FPGA
@@ -2721,8 +2735,6 @@ void RAMFUNC SniffMifare(uint8_t param) {
 	int dataLen = 0;
 	bool ReaderIsActive = FALSE;
 	bool TagIsActive = FALSE;
-
-	iso14443a_setup(FPGA_HF_ISO14443A_SNIFFER);
 
 	// Set up the demodulator for tag -> reader responses.
 	DemodInit(receivedResponse, receivedResponsePar);
