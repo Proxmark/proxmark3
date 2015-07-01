@@ -22,15 +22,25 @@
 #include "iso14443crc.h"
 #include "protocols.h"
 
-#define TOPAZ_MAX_MEMORY	2048
+#define TOPAZ_STATIC_MEMORY	(0x0f * 8)
+
+typedef struct dynamic_lock_area {
+	struct dynamic_lock_area *next;
+	uint16_t	byte_offset;
+	uint16_t	size_in_bits;
+	uint16_t	first_locked_byte;
+	uint16_t	bytes_locked_per_bit;
+} dynamic_lock_area_t;
+
 
 static struct {
 	uint8_t HR01[2];
 	uint8_t uid[7];
 	uint8_t size;
-	uint8_t data_blocks[TOPAZ_MAX_MEMORY/8][8];
-	uint8_t *dynamic_lock_areas;
+	uint8_t data_blocks[TOPAZ_STATIC_MEMORY/8][8];
+	dynamic_lock_area_t *dynamic_lock_areas;
 	uint8_t *dynamic_reserved_areas;
+	uint8_t *dynamic_memory;
 } topaz_tag;
 
 
@@ -115,8 +125,46 @@ static int topaz_rall(uint8_t *uid, uint8_t *response)
 }
 
 
-static bool topaz_block_is_locked(uint8_t blockno, uint8_t *lockbits)
+static dynamic_lock_area_t *get_dynamic_lock_area(uint16_t byteno)
 {
+	dynamic_lock_area_t *lock_area;
+	
+	lock_area = topaz_tag.dynamic_lock_areas;
+	
+	while (lock_area != NULL) {
+		if (byteno < lock_area->first_locked_byte) {
+			lock_area = lock_area->next;
+		} else {
+			return lock_area;
+		}
+	}
+
+	return NULL;
+}
+
+
+// check if a memory block (8 Bytes) is locked.
+// TODO: support other sizes of locked_bytes_per_bit (current assumption: each lock bit locks 8 Bytes) 
+static bool topaz_byte_is_locked(uint16_t byteno)
+{
+	uint8_t *lockbits;
+	uint16_t locked_bytes_per_bit;
+	dynamic_lock_area_t *lock_area;
+	
+	if (byteno < TOPAZ_STATIC_MEMORY) {
+		lockbits = &topaz_tag.data_blocks[0x0e][0];
+		locked_bytes_per_bit = 8;
+	} else {
+		lock_area = get_dynamic_lock_area(byteno);
+		if (lock_area == NULL) {
+			return false;
+		}
+		locked_bytes_per_bit = lock_area->bytes_locked_per_bit;
+		byteno = byteno - lock_area->first_locked_byte;
+		lockbits = &topaz_tag.dynamic_memory[lock_area->byte_offset - TOPAZ_STATIC_MEMORY];
+	}
+
+	uint16_t blockno = byteno / locked_bytes_per_bit;
 	if(lockbits[blockno/8] >> (blockno % 8) & 0x01) {
 		return true;
 	} else {
@@ -134,7 +182,9 @@ static int topaz_print_CC(uint8_t *data)
 	PrintAndLog("Capability Container: %02x %02x %02x %02x", data[0], data[1], data[2], data[3]);
 	PrintAndLog("  %02x: NDEF Magic Number", data[0]); 
 	PrintAndLog("  %02x: version %d.%d supported by tag", data[1], (data[1] & 0xF0) >> 4, data[1] & 0x0f);
-	PrintAndLog("  %02x: Physical Memory Size of this tag: %d bytes", data[2], (data[2] + 1) * 8);
+	uint16_t memsize = (data[2] + 1) * 8;
+	topaz_tag.dynamic_memory = malloc(memsize - TOPAZ_STATIC_MEMORY);
+	PrintAndLog("  %02x: Physical Memory Size of this tag: %d bytes", data[2], memsize);
 	PrintAndLog("  %02x: %s / %s", data[3], 
 				(data[3] & 0xF0) ? "(RFU)" : "Read access granted without any security", 
 				(data[3] & 0x0F)==0 ? "Write access granted without any security" : (data[3] & 0x0F)==0x0F ? "No write access granted at all" : "(RFU)");
@@ -181,6 +231,7 @@ static bool topaz_print_lock_control_TLVs(uint8_t *memory)
 	uint16_t length;
 	uint8_t *value;
 	bool lock_TLV_present = false;
+	uint16_t first_locked_byte = 0x0f * 8;
 	
 	while(*TLV_ptr != 0x03 && *TLV_ptr != 0xFD && *TLV_ptr != 0xFE) {	
 		// all Lock Control TLVs shall be present before the NDEF message TLV, the proprietary TLV (and the Terminator TLV)
@@ -188,14 +239,30 @@ static bool topaz_print_lock_control_TLVs(uint8_t *memory)
 		if (tag == 0x01) {			// the Lock Control TLV
 			uint8_t pages_addr = value[0] >> 4;
 			uint8_t byte_offset = value[0] & 0x0f;
-			uint8_t size_in_bits = value[1] ? value[1] : 256;
-			uint8_t bytes_per_page = 1 << (value[2] & 0x0f);
-			uint8_t bytes_locked_per_bit = 1 << (value[2] >> 4);
-			PrintAndLog("Lock Area of %d bits at byte offset 0x%02x. Each Lock Bit locks %d bytes.", 
+			uint16_t size_in_bits = value[1] ? value[1] : 256;
+			uint16_t bytes_per_page = 1 << (value[2] & 0x0f);
+			uint16_t bytes_locked_per_bit = 1 << (value[2] >> 4);
+			PrintAndLog("Lock Area of %d bits at byte offset 0x%04x. Each Lock Bit locks %d bytes.", 
 						size_in_bits,
 						pages_addr * bytes_per_page + byte_offset,
 						bytes_locked_per_bit);
 			lock_TLV_present = true;
+			dynamic_lock_area_t *old = topaz_tag.dynamic_lock_areas;
+			dynamic_lock_area_t *new = topaz_tag.dynamic_lock_areas;
+			if (old == NULL) {
+				new = topaz_tag.dynamic_lock_areas = (dynamic_lock_area_t *)malloc(sizeof(dynamic_lock_area_t));
+			} else {
+				while(old->next != NULL) {
+					old = old->next;
+				}
+				new = old->next = (dynamic_lock_area_t *)malloc(sizeof(dynamic_lock_area_t));
+			}
+			new->next = NULL;
+			new->first_locked_byte = first_locked_byte;
+			new->byte_offset = pages_addr * bytes_per_page + byte_offset;
+			new->size_in_bits = size_in_bits;
+			new->bytes_locked_per_bit = bytes_locked_per_bit;
+			first_locked_byte = first_locked_byte + size_in_bits*bytes_locked_per_bit;
 		}
 	}
 	
@@ -314,13 +381,13 @@ int CmdHFTopazReader(const char *Cmd)
 	memcpy(topaz_tag.data_blocks, rall_response+2, 0x10*8);
 	PrintAndLog("");
 	PrintAndLog("Static Data blocks 00 to 0c:");
-	PrintAndLog("block# | offset | Data                    | Locked?");
+	PrintAndLog("block# | offset | Data                    | Locked(y/n)");
 	char line[80];
 	for (uint16_t i = 0; i <= 0x0c; i++) {
 		for (uint16_t j = 0; j < 8; j++) {
 			sprintf(&line[3*j], "%02x ", topaz_tag.data_blocks[i][j] /*rall_response[2 + 8*i + j]*/);
 		}
-		PrintAndLog("  0x%02x |  0x%02x  | %s|   %-3s", i, i*8, line, topaz_block_is_locked(i, &topaz_tag.data_blocks[0x0e][0]) ? "yes" : "no");
+		PrintAndLog("  0x%02x | 0x%04x | %s|   %-3s", i, i*8, line, topaz_byte_is_locked(i*8) ? "yyyyyyyy" : "nnnnnnnn");
 	}
 	
 	PrintAndLog("");
@@ -328,14 +395,14 @@ int CmdHFTopazReader(const char *Cmd)
 	for (uint16_t j = 0; j < 8; j++) {
 		sprintf(&line[3*j], "%02x ", topaz_tag.data_blocks[0x0d][j]);
 	}
-	PrintAndLog("  0x%02x |  0x%02x  | %s|   %-3s", 0x0d, 0x0d*8, line, "n/a");
+	PrintAndLog("  0x%02x | 0x%04x | %s|   %-3s", 0x0d, 0x0d*8, line, "n/a");
 	
 	PrintAndLog("");
 	PrintAndLog("Static Lockbits and OTP Bytes:");
 	for (uint16_t j = 0; j < 8; j++) {
 		sprintf(&line[3*j], "%02x ", topaz_tag.data_blocks[0x0e][j]);
 	}
-	PrintAndLog("  0x%02x |  0x%02x  | %s|   %-3s", 0x0e, 0x0e*8, line, "n/a");
+	PrintAndLog("  0x%02x | 0x%04x | %s|   %-3s", 0x0e, 0x0e*8, line, "n/a");
 
 	PrintAndLog("");
 
