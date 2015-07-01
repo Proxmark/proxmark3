@@ -72,11 +72,57 @@ void annotateIso14443a(char *exp, size_t size, uint8_t* cmd, uint8_t cmdsize)
 	case MIFARE_CMD_DEC:			snprintf(exp,size,"DEC(%d)",cmd[1]); break;
 	case MIFARE_CMD_RESTORE:		snprintf(exp,size,"RESTORE(%d)",cmd[1]); break;
 	case MIFARE_CMD_TRANSFER:		snprintf(exp,size,"TRANSFER(%d)",cmd[1]); break;
-	case MIFARE_AUTH_KEYA:			snprintf(exp,size,"AUTH-A(%d)",cmd[1]); break;
+	case MIFARE_AUTH_KEYA:{
+		if ( cmdsize > 3)
+			snprintf(exp,size,"AUTH-A(%d)",cmd[1]); 
+		else
+			//	case MIFARE_ULEV1_VERSION :  both 0x60.
+			snprintf(exp,size,"EV1 VERSION");
+		break;
+	}
 	case MIFARE_AUTH_KEYB:			snprintf(exp,size,"AUTH-B(%d)",cmd[1]); break;
 	case MIFARE_MAGICWUPC1:			snprintf(exp,size,"MAGIC WUPC1"); break;
 	case MIFARE_MAGICWUPC2:			snprintf(exp,size,"MAGIC WUPC2"); break;
 	case MIFARE_MAGICWIPEC:			snprintf(exp,size,"MAGIC WIPEC"); break;
+	case MIFARE_ULC_AUTH_1:		snprintf(exp,size,"AUTH "); break;
+	case MIFARE_ULC_AUTH_2:		snprintf(exp,size,"AUTH_ANSW"); break;
+	case MIFARE_ULEV1_AUTH:
+		if ( cmdsize == 7 )
+			snprintf(exp,size,"PWD-AUTH KEY: 0x%02x%02x%02x%02x", cmd[1], cmd[2], cmd[3], cmd[4] );
+		else
+			snprintf(exp,size,"PWD-AUTH");
+		break;
+	case MIFARE_ULEV1_FASTREAD:{
+		if ( cmdsize >=3 && cmd[2] <= 0xE6)
+			snprintf(exp,size,"READ RANGE (%d-%d)",cmd[1],cmd[2]); 
+		else
+			snprintf(exp,size,"?");
+		break;
+	}
+	case MIFARE_ULC_WRITE:{
+		if ( cmd[1] < 0x21 )
+			snprintf(exp,size,"WRITEBLOCK(%d)",cmd[1]); 
+		else
+			snprintf(exp,size,"?");
+		break;
+	}
+	case MIFARE_ULEV1_READ_CNT:{
+		if ( cmd[1] < 5 )
+			snprintf(exp,size,"READ CNT(%d)",cmd[1]);
+		else
+			snprintf(exp,size,"?");
+		break;
+	}
+	case MIFARE_ULEV1_INCR_CNT:{
+		if ( cmd[1] < 5 )
+			snprintf(exp,size,"INCR(%d)",cmd[1]);
+		else
+			snprintf(exp,size,"?");
+		break;
+	}
+	case MIFARE_ULEV1_READSIG:		snprintf(exp,size,"READ_SIG"); break;
+	case MIFARE_ULEV1_CHECKTEAR:	snprintf(exp,size,"CHK_TEARING(%d)",cmd[1]); break;
+	case MIFARE_ULEV1_VCSL:		snprintf(exp,size,"VCSL"); break;
 	default:						snprintf(exp,size,"?"); break;
 	}
 	return;
@@ -438,8 +484,8 @@ uint16_t printTraceLine(uint16_t tracepos, uint16_t traceLen, uint8_t *trace, ui
 			oddparity ^= (((frame[j] & 0xFF) >> k) & 0x01);
 		}
 		uint8_t parityBits = parityBytes[j>>3];
-		if (isResponse && (oddparity != ((parityBits >> (7-(j&0x0007))) & 0x01))) {
-			snprintf(line[j/16]+(( j % 16) * 4), 110, " %02x!", frame[j]);
+		if (protocol != ISO_14443B && isResponse && (oddparity != ((parityBits >> (7-(j&0x0007))) & 0x01))) {
+			snprintf(line[j/16]+(( j % 16) * 4),110, "%02x! ", frame[j]);
 		} else {
 			snprintf(line[j/16]+(( j % 16) * 4), 110, " %02x ", frame[j]);
 		}
@@ -615,9 +661,36 @@ int CmdHFList(const char *Cmd)
 	return 0;
 }
 
+int CmdHFSearch(const char *Cmd){
+	int ans = 0;
+	PrintAndLog("");
+	ans = CmdHF14AReader("s");
+	if (ans > 0) {
+		PrintAndLog("\nValid ISO14443A Tag Found - Quiting Search\n");
+		return ans;
+	}
+	ans = HF14BInfo(false);
+	if (ans) {
+		PrintAndLog("\nValid ISO14443B Tag Found - Quiting Search\n");
+		return ans;
+	}
+	ans = HFiClassReader("", false, false);
+	if (ans) {
+		PrintAndLog("\nValid iClass Tag (or PicoPass Tag) Found - Quiting Search\n");
+		return ans;
+	}
+	ans = HF15Reader("", false);
+	if (ans) {
+		PrintAndLog("\nValid ISO15693 Tag Found - Quiting Search\n");
+		return ans;
+	}
+	PrintAndLog("\nno known/supported 13.56 MHz tags found\n");
+	return 0;
+}
 
 static command_t CommandTable[] = 
 {
+<<<<<<< HEAD
 	{"help",	CmdHelp,		1, "This help"},
 	{"14a",		CmdHF14A,		1, "{ ISO14443A RFIDs... }"},
 	{"14b",		CmdHF14B,		1, "{ ISO14443B RFIDs... }"},
@@ -631,6 +704,21 @@ static command_t CommandTable[] =
 	{"tune",	CmdHFTune,		0, "Continuously measure HF antenna tuning"},
 	{"list",	CmdHFList,		1, "List protocol data in trace buffer"},
 	{NULL,		NULL,			0, NULL}
+=======
+  {"help",        CmdHelp,          1, "This help"},
+  {"14a",         CmdHF14A,         1, "{ ISO14443A RFIDs... }"},
+  {"14b",         CmdHF14B,         1, "{ ISO14443B RFIDs... }"},
+  {"15",          CmdHF15,          1, "{ ISO15693 RFIDs... }"},
+  {"epa",         CmdHFEPA,         1, "{ German Identification Card... }"},
+  {"legic",       CmdHFLegic,       0, "{ LEGIC RFIDs... }"},
+  {"iclass",      CmdHFiClass,      1, "{ ICLASS RFIDs... }"},
+  {"mf",          CmdHFMF,          1, "{ MIFARE RFIDs... }"},
+  {"mfu",         CmdHFMFUltra,     1, "{ MIFARE Ultralight RFIDs... }"},
+  {"tune",        CmdHFTune,        0, "Continuously measure HF antenna tuning"},
+  {"list",        CmdHFList,        1, "List protocol data in trace buffer"},
+  {"search",      CmdHFSearch,      1, "Search for known HF tags [preliminary]"},
+	{NULL, NULL, 0, NULL}
+>>>>>>> master
 };
 
 int CmdHF(const char *Cmd)

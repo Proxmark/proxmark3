@@ -108,11 +108,12 @@ void print_hex(const uint8_t * data, const size_t len)
 	printf("\n");
 }
 
-char * sprint_hex(const uint8_t * data, const size_t len) {
+char *sprint_hex(const uint8_t *data, const size_t len) {
 	
 	int maxLen = ( len > 1024/3) ? 1024/3 : len;
 	static char buf[1024];
-	char * tmp = buf;
+	memset(buf, 0x00, 1024);
+	char *tmp = buf;
 	size_t i;
 
 	for (i=0; i < maxLen; ++i, tmp += 3)
@@ -121,19 +122,25 @@ char * sprint_hex(const uint8_t * data, const size_t len) {
 	return buf;
 }
 
-char * sprint_bin(const uint8_t * data, const size_t len) {
+char *sprint_bin_break(const uint8_t *data, const size_t len, const uint8_t breaks) {
 	
-	int maxLen = ( len > 1024) ? 1024 : len;
+	int maxLen = ( len > 1020) ? 1020 : len;
 	static char buf[1024];
-	char * tmp = buf;
-	size_t i;
+	memset(buf, 0x00, 1024);
+	char *tmp = buf;
 
-	for (i=0; i < maxLen; ++i, ++tmp)
-		sprintf(tmp, "%u", data[i]);
+	for (size_t i=0; i < maxLen; ++i){
+		sprintf(tmp++, "%u", data[i]);
+		if (breaks > 0 && !((i+1) % breaks))
+			sprintf(tmp++, "%s","\n");
+	}
 
 	return buf;
 }
 
+char *sprint_bin(const uint8_t *data, const size_t len) {
+	return sprint_bin_break(data, len, 0);
+}
 void num_to_bytes(uint64_t n, size_t len, uint8_t* dest)
 {
 	while (len--) {
@@ -151,6 +158,22 @@ uint64_t bytes_to_num(uint8_t* src, size_t len)
 		src++;
 	}
 	return num;
+}
+
+// aa,bb,cc,dd,ee,ff,gg,hh, ii,jj,kk,ll,mm,nn,oo,pp
+// to
+// hh,gg,ff,ee,dd,cc,bb,aa, pp,oo,nn,mm,ll,kk,jj,ii
+// up to 64 bytes or 512 bits
+uint8_t *SwapEndian64(const uint8_t *src, const size_t len, const uint8_t blockSize){
+	static uint8_t buf[64];
+	memset(buf, 0x00, 64);
+	uint8_t *tmp = buf;
+	for (uint8_t block=0; block < (uint8_t)(len/blockSize); block++){
+		for (size_t i = 0; i < blockSize; i++){
+			tmp[i+(blockSize*block)] = src[(blockSize-1-i)+(blockSize*block)];
+		}
+	}
+	return tmp;
 }
 
 //assumes little endian
@@ -371,7 +394,7 @@ int hextobinstring(char *target, char *source)
 
 // convert binary array of 0x00/0x01 values to hex (safe to do in place as target will always be shorter than source)
 // return number of bits converted
-int binarraytohex(char *target, char *source, int length)
+int binarraytohex(char *target,char *source, int length)
 {
     unsigned char i, x;
     int j = length;
@@ -420,4 +443,13 @@ void wiegand_add_parity(char *target, char *source, char length)
     memcpy(target, source, length);
     target += length;
     *(target)= GetParity(source + length / 2, ODD, length / 2);
+}
+
+void xor(unsigned char *dst, unsigned char *src, size_t len) {
+   for( ; len > 0; len--,dst++,src++)
+       *dst ^= *src;
+}
+
+int32_t le24toh (uint8_t data[3]) {
+    return (data[2] << 16) | (data[1] << 8) | data[0];
 }

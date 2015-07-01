@@ -96,9 +96,6 @@ uint16_t BigBuf_max_traceLen(void)
 }
 
 void clear_trace() {
-	uint8_t *trace = BigBuf_get_addr();
-	uint16_t max_traceLen = BigBuf_max_traceLen();
-	memset(trace, 0x44, max_traceLen);
 	traceLen = 0;
 }
 

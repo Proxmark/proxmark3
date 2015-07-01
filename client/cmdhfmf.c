@@ -17,7 +17,7 @@ int CmdHF14AMifare(const char *Cmd)
 	uint32_t uid = 0;
 	uint32_t nt = 0, nr = 0;
 	uint64_t par_list = 0, ks_list = 0, r_key = 0;
-	uint8_t isOK = 0;
+	int16_t isOK = 0;
 	uint8_t keyBlock[8] = {0};
 
 	UsbCommand c = {CMD_READER_MIFARE, {true, 0, 0}};
@@ -25,7 +25,7 @@ int CmdHF14AMifare(const char *Cmd)
 	// message
 	printf("-------------------------------------------------------------------------\n");
 	printf("Executing command. Expected execution time: 25sec on average  :-)\n");
-	printf("Press the key on the proxmark3 device to abort both proxmark3 and client.\n");
+	printf("Press button on the proxmark3 device to abort both proxmark3 and client.\n");
 	printf("-------------------------------------------------------------------------\n");
 
 	
@@ -47,15 +47,20 @@ start:
 		}
 		
 		UsbCommand resp;
-		if (WaitForResponseTimeout(CMD_ACK,&resp,1000)) {
-			isOK  = resp.arg[0] & 0xff;
+		if (WaitForResponseTimeout(CMD_ACK, &resp, 1000)) {
+			isOK  = resp.arg[0];
 			uid = (uint32_t)bytes_to_num(resp.d.asBytes +  0, 4);
 			nt =  (uint32_t)bytes_to_num(resp.d.asBytes +  4, 4);
 			par_list = bytes_to_num(resp.d.asBytes +  8, 8);
 			ks_list = bytes_to_num(resp.d.asBytes +  16, 8);
 			nr = bytes_to_num(resp.d.asBytes + 24, 4);
 			printf("\n\n");
-			if (!isOK) PrintAndLog("Proxmark can't get statistic info. Execution aborted.\n");
+			switch (isOK) {
+				case -1 : PrintAndLog("Button pressed. Aborted.\n"); break;
+				case -2 : PrintAndLog("Card is not vulnerable to Darkside attack (doesn't send NACK on authentication requests).\n"); break;
+				case -3 : PrintAndLog("Card is not vulnerable to Darkside attack (its random number generator is not predictable).\n"); break;
+				default: ;
+			}
 			break;
 		}
 	}	
@@ -434,7 +439,7 @@ int CmdHF14AMfRestore(const char *Cmd)
 {
 	uint8_t sectorNo,blockNo;
 	uint8_t keyType = 0;
-	uint8_t key[6] = {0xFF};
+	uint8_t key[6] = {0xFF,0xFF,0xFF,0xFF,0xFF,0xFF};
 	uint8_t bldata[16] = {0x00};
 	uint8_t keyA[40][6];
 	uint8_t keyB[40][6];
@@ -547,7 +552,7 @@ int CmdHF14AMfNested(const char *Cmd)
 	uint8_t trgKeyType = 0;
 	uint8_t SectorsCnt = 0;
 	uint8_t key[6] = {0, 0, 0, 0, 0, 0};
-	uint8_t keyBlock[13*6];
+	uint8_t keyBlock[14*6];
 	uint64_t key64 = 0;
 	bool transferToEml = false;
 	
@@ -622,8 +627,14 @@ int CmdHF14AMfNested(const char *Cmd)
 	
 	if (cmdp == 'o') {
 		PrintAndLog("--target block no:%3d, target key type:%c ", trgBlockNo, trgKeyType?'B':'A');
-		if (mfnested(blockNo, keyType, key, trgBlockNo, trgKeyType, keyBlock, true)) {
-			PrintAndLog("Nested error.");
+		int16_t isOK = mfnested(blockNo, keyType, key, trgBlockNo, trgKeyType, keyBlock, true);
+		if (isOK) {
+			switch (isOK) {
+				case -1 : PrintAndLog("Error: No response from Proxmark.\n"); break;
+				case -2 : PrintAndLog("Button pressed. Aborted.\n"); break;
+				case -3 : PrintAndLog("Tag isn't vulnerable to Nested Attack (random numbers are not predictable).\n"); break;
+				default : PrintAndLog("Unknown Error.\n");
+			}
 			return 2;
 		}
 		key64 = bytes_to_num(keyBlock, 6);
@@ -696,11 +707,17 @@ int CmdHF14AMfNested(const char *Cmd)
 				for (trgKeyType = 0; trgKeyType < 2; trgKeyType++) { 
 					if (e_sector[sectorNo].foundKey[trgKeyType]) continue;
 					PrintAndLog("-----------------------------------------------");
-					if(mfnested(blockNo, keyType, key, FirstBlockOfSector(sectorNo), trgKeyType, keyBlock, calibrate)) {
-						PrintAndLog("Nested error.\n");
+					int16_t isOK = mfnested(blockNo, keyType, key, FirstBlockOfSector(sectorNo), trgKeyType, keyBlock, calibrate);
+					if(isOK) {
+						switch (isOK) {
+							case -1 : PrintAndLog("Error: No response from Proxmark.\n"); break;
+							case -2 : PrintAndLog("Button pressed. Aborted.\n"); break;
+							case -3 : PrintAndLog("Tag isn't vulnerable to Nested Attack (random numbers are not predictable).\n"); break;
+							default : PrintAndLog("Unknown Error.\n");
+						}
 						free(e_sector);
-						return 2;					}
-					else {
+						return 2;
+					} else {
 						calibrate = false;
 					}
 					
@@ -1200,7 +1217,7 @@ int CmdHF14AMfELoad(const char *Cmd)
 
 	len = param_getstr(Cmd,nameParamNo,filename);
 	
-	if (len > FILE_PATH_SIZE) len = FILE_PATH_SIZE;
+	if (len > FILE_PATH_SIZE - 4) len = FILE_PATH_SIZE - 4;
 
 	fnameptr += len;
 
@@ -1299,17 +1316,20 @@ int CmdHF14AMfESave(const char *Cmd)
 
 	len = param_getstr(Cmd,nameParamNo,filename);
 	
-	if (len > FILE_PATH_SIZE) len = FILE_PATH_SIZE;
+	if (len > FILE_PATH_SIZE - 4) len = FILE_PATH_SIZE - 4;
 	
 	// user supplied filename?
 	if (len < 1) {
 		// get filename (UID from memory)
 		if (mfEmlGetMem(buf, 0, 1)) {
 			PrintAndLog("Can\'t get UID from block: %d", 0);
-			sprintf(filename, "dump.eml"); 
+			len = sprintf(fnameptr, "dump");
+			fnameptr += len;
 		}
-		for (j = 0; j < 7; j++, fnameptr += 2)
-			sprintf(fnameptr, "%02X", buf[j]); 
+		else {
+			for (j = 0; j < 7; j++, fnameptr += 2)
+				sprintf(fnameptr, "%02X", buf[j]);
+		}
 	} else {
 		fnameptr += len;
 	}
@@ -1499,16 +1519,16 @@ int CmdHF14AMfCSetUID(const char *Cmd)
 
 int CmdHF14AMfCSetBlk(const char *Cmd)
 {
-	uint8_t uid[8] = {0x00};
 	uint8_t memBlock[16] = {0x00};
 	uint8_t blockNo = 0;
+	bool wipeCard = FALSE;
 	int res;
 
 	if (strlen(Cmd) < 1 || param_getchar(Cmd, 0) == 'h') {
-		PrintAndLog("Usage:  hf mf csetblk <block number> <block data (32 hex symbols)>");
+		PrintAndLog("Usage:  hf mf csetblk <block number> <block data (32 hex symbols)> [w]");
 		PrintAndLog("sample:  hf mf csetblk 1 01020304050607080910111213141516");
-		PrintAndLog("Set block data for magic Chinese card (only works with!!!)");
-		PrintAndLog("If you want wipe card then add 'w' into command line. \n");
+		PrintAndLog("Set block data for magic Chinese card (only works with such cards)");
+		PrintAndLog("If you also want wipe the card then add 'w' at the end of the command line");
 		return 0;
 	}	
 
@@ -1519,14 +1539,15 @@ int CmdHF14AMfCSetBlk(const char *Cmd)
 		return 1;
 	}
 
+	char ctmp = param_getchar(Cmd, 2);
+	wipeCard = (ctmp == 'w' || ctmp == 'W');
 	PrintAndLog("--block number:%2d data:%s", blockNo, sprint_hex(memBlock, 16));
 
-	res = mfCSetBlock(blockNo, memBlock, uid, 0, CSETBLOCK_SINGLE_OPER);
+	res = mfCSetBlock(blockNo, memBlock, NULL, wipeCard, CSETBLOCK_SINGLE_OPER);
 	if (res) {
-			PrintAndLog("Can't write block. error=%d", res);
-			return 1;
-		}
-	
+		PrintAndLog("Can't write block. error=%d", res);
+		return 1;
+	}
 	return 0;
 }
 
@@ -1571,7 +1592,7 @@ int CmdHF14AMfCLoad(const char *Cmd)
 		return 0;
 	} else {
 		len = strlen(Cmd);
-		if (len > FILE_PATH_SIZE) len = FILE_PATH_SIZE;
+		if (len > FILE_PATH_SIZE - 4) len = FILE_PATH_SIZE - 4;
 
 		memcpy(filename, Cmd, len);
 		fnameptr += len;
@@ -1591,6 +1612,7 @@ int CmdHF14AMfCLoad(const char *Cmd)
 			memset(buf, 0, sizeof(buf));
 			
 			if (fgets(buf, sizeof(buf), f) == NULL) {
+				fclose(f);
 				PrintAndLog("File reading error.");
 				return 2;
 			}
@@ -1599,6 +1621,7 @@ int CmdHF14AMfCLoad(const char *Cmd)
 				if(strlen(buf) && feof(f))
 					break;
 				PrintAndLog("File content error. Block data must include 32 HEX symbols");
+				fclose(f);
 				return 2;
 			}
 			for (i = 0; i < 32; i += 2)
@@ -1637,7 +1660,7 @@ int CmdHF14AMfCGetBlk(const char *Cmd) {
 	if (strlen(Cmd) < 1 || param_getchar(Cmd, 0) == 'h') {
 		PrintAndLog("Usage:  hf mf cgetblk <block number>");
 		PrintAndLog("sample:  hf mf cgetblk 1");
-		PrintAndLog("Get block data from magic Chinese card (only works with!!!)\n");
+		PrintAndLog("Get block data from magic Chinese card (only works with such cards)\n");
 		return 0;
 	}	
 
@@ -1664,7 +1687,7 @@ int CmdHF14AMfCGetSc(const char *Cmd) {
 	if (strlen(Cmd) < 1 || param_getchar(Cmd, 0) == 'h') {
 		PrintAndLog("Usage:  hf mf cgetsc <sector number>");
 		PrintAndLog("sample:  hf mf cgetsc 0");
-		PrintAndLog("Get sector data from magic Chinese card (only works with!!!)\n");
+		PrintAndLog("Get sector data from magic Chinese card (only works with such cards)\n");
 		return 0;
 	}	
 
@@ -1738,16 +1761,19 @@ int CmdHF14AMfCSave(const char *Cmd) {
 		return 0;
 	} else {
 		len = strlen(Cmd);
-		if (len > FILE_PATH_SIZE) len = FILE_PATH_SIZE;
+		if (len > FILE_PATH_SIZE - 4) len = FILE_PATH_SIZE - 4;
 	
 		if (len < 1) {
 			// get filename
 			if (mfCGetBlock(0, buf, CSETBLOCK_SINGLE_OPER)) {
 				PrintAndLog("Cant get block: %d", 0);
-				return 1;
+				len = sprintf(fnameptr, "dump");
+				fnameptr += len;
 			}
-			for (j = 0; j < 7; j++, fnameptr += 2)
-				sprintf(fnameptr, "%02x", buf[j]); 
+			else {
+				for (j = 0; j < 7; j++, fnameptr += 2)
+					sprintf(fnameptr, "%02x", buf[j]); 
+			}
 		} else {
 			memcpy(filename, Cmd, len);
 			fnameptr += len;

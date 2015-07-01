@@ -23,6 +23,7 @@
 #include "common.h"
 #include "cmdmain.h"
 #include "mifare.h"
+#include "cmdhfmfu.h"
 
 static int CmdHelp(const char *Cmd);
 static void waitCmd(uint8_t iLen);
@@ -143,7 +144,7 @@ int CmdHF14AReader(const char *Cmd)
 	uint64_t select_status = resp.arg[0];		// 0: couldn't read, 1: OK, with ATS, 2: OK, no ATS, 3: proprietary Anticollision
 	
 	if(select_status == 0) {
-		PrintAndLog("iso14443a card select failed");
+		if (Cmd[0] != 's') PrintAndLog("iso14443a card select failed");
 		// disconnect
 		c.arg[0] = 0;
 		c.arg[1] = 0;
@@ -163,19 +164,68 @@ int CmdHF14AReader(const char *Cmd)
 		return 0;
 	}
 
-
-	PrintAndLog("ATQA : %02x %02x", card.atqa[1], card.atqa[0]);
 	PrintAndLog(" UID : %s", sprint_hex(card.uid, card.uidlen));
+	PrintAndLog("ATQA : %02x %02x", card.atqa[1], card.atqa[0]);
 	PrintAndLog(" SAK : %02x [%d]", card.sak, resp.arg[0]);
 
-	// Double & triple sized UID, can be mapped to a manufacturer.
-	// HACK: does this apply for Ultralight cards?
-	if ( card.uidlen > 4 ) {
-		PrintAndLog("MANUFACTURER : %s", getTagInfo(card.uid[0]));
-	}
-
 	switch (card.sak) {
-		case 0x00: PrintAndLog("TYPE : NXP MIFARE Ultralight | Ultralight C"); break;
+		case 0x00: 
+
+			//***************************************test****************
+			// disconnect
+			c.arg[0] = 0;
+			c.arg[1] = 0;
+			c.arg[2] = 0;
+			SendCommand(&c);
+			
+			uint32_t tagT = GetHF14AMfU_Type();
+			ul_print_type(tagT, 0);
+
+			//reconnect for further tests
+			c.arg[0] = ISO14A_CONNECT | ISO14A_NO_DISCONNECT;
+			c.arg[1] = 0;
+			c.arg[2] = 0;
+
+			SendCommand(&c);
+
+			UsbCommand resp;
+			WaitForResponse(CMD_ACK,&resp);
+			
+			memcpy(&card, (iso14a_card_select_t *)resp.d.asBytes, sizeof(iso14a_card_select_t));
+
+			select_status = resp.arg[0];		// 0: couldn't read, 1: OK, with ATS, 2: OK, no ATS
+			
+			if(select_status == 0) {
+				//PrintAndLog("iso14443a card select failed");
+				// disconnect
+				c.arg[0] = 0;
+				c.arg[1] = 0;
+				c.arg[2] = 0;
+				SendCommand(&c);
+				return 0;
+			}
+
+			/*  orig
+			// check if the tag answers to GETVERSION (0x60)
+			c.arg[0] = ISO14A_RAW | ISO14A_APPEND_CRC | ISO14A_NO_DISCONNECT;
+			c.arg[1] = 1;
+			c.arg[2] = 0;
+			c.d.asBytes[0] = 0x60;
+			SendCommand(&c);
+			WaitForResponse(CMD_ACK,&resp);
+
+			uint8_t version[10] = {0};
+			memcpy(version, resp.d.asBytes, resp.arg[0] < sizeof(version) ? resp.arg[0] : sizeof(version));
+			uint8_t len = resp.arg[0] & 0xff;
+			switch ( len ){
+				// todo, identify "Magic UL-C tags". // they usually have a static nonce response to 0x1A command.
+				// UL-EV1, size, check version[6] == 0x0b (smaller)  0x0b * 4 == 48
+				case 0x0A:PrintAndLog("TYPE : NXP MIFARE Ultralight EV1 %d bytes", (version[6] == 0xB) ? 48 : 128);break;
+				case 0x01:PrintAndLog("TYPE : NXP MIFARE Ultralight C");break;
+				case 0x00:PrintAndLog("TYPE : NXP MIFARE Ultralight");break;	
+			}
+			*/
+			break;
 		case 0x01: PrintAndLog("TYPE : NXP TNP3xxx Activision Game Appliance"); break;
 		case 0x04: PrintAndLog("TYPE : NXP MIFARE (various !DESFire !DESFire EV1)"); break;
 		case 0x08: PrintAndLog("TYPE : NXP MIFARE CLASSIC 1k | Plus 2k SL1"); break;
@@ -192,6 +242,12 @@ int CmdHF14AReader(const char *Cmd)
 		default: ;
 	}
 
+	// Double & triple sized UID, can be mapped to a manufacturer.
+	// HACK: does this apply for Ultralight cards?
+	if ( card.uidlen > 4 ) {
+		PrintAndLog("MANUFACTURER : %s", getTagInfo(card.uid[0]));
+	}
+
 	// try to request ATS even if tag claims not to support it
 	if (select_status == 2) {
 		uint8_t rats[] = { 0xE0, 0x80 }; // FSDI=8 (FSD=256), CID=0
@@ -202,7 +258,7 @@ int CmdHF14AReader(const char *Cmd)
 		SendCommand(&c);
 		WaitForResponse(CMD_ACK,&resp);
 		
-	    memcpy(&card.ats, resp.d.asBytes, resp.arg[0]);
+	    memcpy(card.ats, resp.d.asBytes, resp.arg[0]);
 		card.ats_len = resp.arg[0];				// note: ats_len includes CRC Bytes
 	} 
 
