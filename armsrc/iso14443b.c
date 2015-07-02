@@ -321,10 +321,16 @@ static int GetIso14443bCommandFromReader(uint8_t *received, uint16_t *len)
 //-----------------------------------------------------------------------------
 void SimulateIso14443bTag(void)
 {
-	// the only commands we understand is REQB, AFI=0, Select All, N=0:
-	static const uint8_t cmd1[] = { 0x05, 0x00, 0x08, 0x39, 0x73 };
+	// the only commands we understand is REQB, AFI=0, Select All, N=8:
+	static const uint8_t cmd1[] = { 0x05, 0x00, 0x08, 0x39, 0x73 }; // REQB
 	// ... and REQB, AFI=0, Normal Request, N=0:
-	static const uint8_t cmd2[] = { 0x05, 0x00, 0x00, 0x71, 0xFF };
+	static const uint8_t cmd2[] = { 0x05, 0x00, 0x00, 0x71, 0xFF }; // REQB
+	// ... and WUPB, AFI=0, N=8:
+	static const uint8_t cmd3[] = { 0x05, 0x08, 0x08, 0xF9, 0xBD }; // WUPB
+	// ... and HLTB
+	static const uint8_t cmd4[] = { 0x50, 0xff, 0xff, 0xff, 0xff }; // HLTB
+	// ... and ATTRIB
+	static const uint8_t cmd5[] = { 0x1D, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff}; // ATTRIB
 
 	// ... and we always respond with ATQB, PUPI = 820de174, Application Data = 0x20381922,
 	// supports only 106kBit/s in both directions, max frame size = 32Bytes,
@@ -333,6 +339,9 @@ void SimulateIso14443bTag(void)
 		0x50, 0x82, 0x0d, 0xe1, 0x74, 0x20, 0x38, 0x19, 0x22,
 		0x00, 0x21, 0x85, 0x5e, 0xd7
 	};
+	// response to HLTB and ATTRIB
+	static const uint8_t response2[] = {0x00, 0x78, 0xF0};
+
 
 	FpgaDownloadAndGo(FPGA_BITSTREAM_HF);
 
@@ -356,6 +365,12 @@ void SimulateIso14443bTag(void)
 	memcpy(resp1Code, ToSend, ToSendMax); 
 	uint16_t resp1CodeLen = ToSendMax;
 
+	// prepare the (other) tag answer:
+	CodeIso14443bAsTag(response2, sizeof(response2));
+	uint8_t *resp2Code = BigBuf_malloc(ToSendMax);
+	memcpy(resp2Code, ToSend, ToSendMax); 
+	uint16_t resp2CodeLen = ToSendMax;
+
 	// We need to listen to the high-frequency, peak-detected path.
 	SetAdcMuxFor(GPIO_MUXSEL_HIPKD);
 	FpgaSetupSsc();
@@ -376,23 +391,38 @@ void SimulateIso14443bTag(void)
 
 		// Good, look at the command now.
 		if ( (len == sizeof(cmd1) && memcmp(receivedCmd, cmd1, len) == 0)
-			|| (len == sizeof(cmd2) && memcmp(receivedCmd, cmd2, len) == 0) ) {
+			|| (len == sizeof(cmd2) && memcmp(receivedCmd, cmd2, len) == 0)
+			|| (len == sizeof(cmd3) && memcmp(receivedCmd, cmd3, len) == 0) ) {
 			resp = response1; 
 			respLen = sizeof(response1);
 			respCode = resp1Code; 
 			respCodeLen = resp1CodeLen;
+		} else if ( (len == sizeof(cmd4) && receivedCmd[0] == cmd4[0])
+			|| (len == sizeof(cmd5) && receivedCmd[0] == cmd5[0]) ) {
+			resp = response2; 
+			respLen = sizeof(response2);
+			respCode = resp2Code; 
+			respCodeLen = resp2CodeLen;
 		} else {
 			Dbprintf("new cmd from reader: len=%d, cmdsRecvd=%d", len, cmdsRecvd);
 			// And print whether the CRC fails, just for good measure
 			uint8_t b1, b2;
-			ComputeCrc14443(CRC_14443_B, receivedCmd, len-2, &b1, &b2);
-			if(b1 != receivedCmd[len-2] || b2 != receivedCmd[len-1]) {
-				// Not so good, try again.
-				DbpString("+++CRC fail");
-			} else {
-				DbpString("CRC passes");
+			if (len >= 3){ // if crc exists
+				ComputeCrc14443(CRC_14443_B, receivedCmd, len-2, &b1, &b2);
+				if(b1 != receivedCmd[len-2] || b2 != receivedCmd[len-1]) {
+					// Not so good, try again.
+					DbpString("+++CRC fail");
+				} else {
+					DbpString("CRC passes");
+				}
 			}
-			break;
+			//get rid of compiler warning
+			respCodeLen = 0;
+			resp = response1;
+			respLen	= 0;
+			respCode = resp1Code;
+			//don't crash at new command just wait and see if reader will send other new cmds.
+			//break;
 		}
 
 		cmdsRecvd++;

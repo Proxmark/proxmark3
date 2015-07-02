@@ -206,7 +206,7 @@ int CmdHF14BCmdRaw (const char *Cmd) {
 		bool crc2 = true;
 		cmd2[0] = 0x05;
 		cmd2[1] = 0x00;
-		cmd2[2] = 0x08;
+		cmd2[2] = 0x00;
 
 		// REQB
 		if (HF14BCmdRaw(true, &crc2, true, cmd2, &cmdLen, false)==0) return rawClose();
@@ -224,7 +224,7 @@ int CmdHF14BCmdRaw (const char *Cmd) {
 		// attrib
 		if (HF14BCmdRaw(true, &crc2, true, cmd2, &cmdLen, false)==0) return rawClose();
 
-		if (cmd2[0] != 0x10 || cmdLen != 3 || !crc2) return rawClose();
+		if (cmdLen != 3 || !crc2) return rawClose();
 	}
 
 	return HF14BCmdRaw(reply, &crc, power, data, &datalen, true);
@@ -232,7 +232,7 @@ int CmdHF14BCmdRaw (const char *Cmd) {
 
 // print full atqb info
 static void print_atqb_resp(uint8_t *data){
-	PrintAndLog ("           UID: %s", sprint_hex(data+1,4));
+	//PrintAndLog ("           UID: %s", sprint_hex(data+1,4));
 	PrintAndLog ("      App Data: %s", sprint_hex(data+5,4));
 	PrintAndLog ("      Protocol: %s", sprint_hex(data+9,3));
 	uint8_t BitRate = data[9];
@@ -267,14 +267,15 @@ static void print_atqb_resp(uint8_t *data){
 	else
 		maxFrame = 257;
 
-	PrintAndLog ("Max Frame Size: %d%s",maxFrame, (maxFrame == 257) ? "+ RFU" : "");
+	PrintAndLog ("Max Frame Size: %u%s",maxFrame, (maxFrame == 257) ? "+ RFU" : "");
 
 	uint8_t protocolT = data[10] & 0xF;
 	PrintAndLog (" Protocol Type: Protocol is %scompliant with ISO/IEC 14443-4",(protocolT) ? "" : "not " );
-	PrintAndLog ("Frame Wait Int: %d", data[11]>>4);
+	PrintAndLog ("Frame Wait Int: %u", data[11]>>4);
 	PrintAndLog (" App Data Code: Application is %s",(data[11]&4) ? "Standard" : "Proprietary");
 	PrintAndLog (" Frame Options: NAD is %ssupported",(data[11]&2) ? "" : "not ");
 	PrintAndLog (" Frame Options: CID is %ssupported",(data[11]&1) ? "" : "not ");
+	PrintAndLog ("Max Buf Length: %u (MBLI) %s",data[14]>>4, (data[14] & 0xF0) ? "" : "not supported");
 	
 	return;
 }
@@ -390,20 +391,44 @@ int HF14BStdReader(uint8_t *data, uint8_t *datalen){
 	//03 = ?  (resp 03 [e3 c2])
 	//c2 = ?  (resp c2 [66 15])
 	//b2 = ?  (resp a3 [e9 67])
+	//a2 = ?  (resp 02 [6a d3])
 	bool crc = true;
 	*datalen = 3;
 	//std read cmd
 	data[0] = 0x05;
 	data[1] = 0x00;
-	data[2] = 0x08;
+	data[2] = 0x00;
 
-	if (HF14BCmdRaw(true, &crc, false, data, datalen, false)==0) return 0;
+	if (HF14BCmdRaw(true, &crc, true, data, datalen, false)==0) return rawClose();
 
-	if (data[0] != 0x50 || *datalen != 14 || !crc) return 0;
+	if (data[0] != 0x50 || *datalen != 14 || !crc) return rawClose();
 
 	PrintAndLog ("\n14443-3b tag found:");
 	PrintAndLog ("           UID: %s", sprint_hex(data+1,4));
 
+	uint8_t	cmd2[16];
+	uint8_t cmdLen = 3;
+	bool crc2 = true;
+
+	cmd2[0] = 0x1D; 
+	// UID from data[1 - 4]
+	cmd2[1] = data[1];
+	cmd2[2] = data[2];
+	cmd2[3] = data[3];
+	cmd2[4] = data[4];
+	cmd2[5] = 0x00;
+	cmd2[6] = 0x08;
+	cmd2[7] = 0x01;
+	cmd2[8] = 0x00;
+	cmdLen = 9;
+
+	// attrib
+	if (HF14BCmdRaw(true, &crc2, true, cmd2, &cmdLen, false)==0) return rawClose();
+
+	if (cmdLen != 3 || !crc2) return rawClose();
+	// add attrib responce to data
+	data[14] = cmd2[0];
+	rawClose();
 	return 1;
 }
 
@@ -413,6 +438,7 @@ int HF14BStdInfo(uint8_t *data, uint8_t *datalen){
 
 	//add more info here
 	print_atqb_resp(data);
+
 
 	return 1;
 }
