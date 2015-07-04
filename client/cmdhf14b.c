@@ -206,7 +206,7 @@ int CmdHF14BCmdRaw (const char *Cmd) {
 		bool crc2 = true;
 		cmd2[0] = 0x05;
 		cmd2[1] = 0x00;
-		cmd2[2] = 0x00;
+		cmd2[2] = 0x08;
 
 		// REQB
 		if (HF14BCmdRaw(true, &crc2, true, cmd2, &cmdLen, false)==0) return rawClose();
@@ -397,7 +397,7 @@ int HF14BStdReader(uint8_t *data, uint8_t *datalen){
 	//std read cmd
 	data[0] = 0x05;
 	data[1] = 0x00;
-	data[2] = 0x00;
+	data[2] = 0x08;
 
 	if (HF14BCmdRaw(true, &crc, true, data, datalen, false)==0) return rawClose();
 

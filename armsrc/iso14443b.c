@@ -321,16 +321,14 @@ static int GetIso14443bCommandFromReader(uint8_t *received, uint16_t *len)
 //-----------------------------------------------------------------------------
 void SimulateIso14443bTag(void)
 {
-	// the only commands we understand is REQB, AFI=0, Select All, N=8:
-	static const uint8_t cmd1[] = { 0x05, 0x00, 0x08, 0x39, 0x73 }; // REQB
-	// ... and REQB, AFI=0, Normal Request, N=0:
+	// the only commands we understand is WUPB, AFI=0, Select All, N=1:
+	static const uint8_t cmd1[] = { 0x05, 0x00, 0x08, 0x39, 0x73 }; // WUPB
+	// ... and REQB, AFI=0, Normal Request, N=1:
 	static const uint8_t cmd2[] = { 0x05, 0x00, 0x00, 0x71, 0xFF }; // REQB
-	// ... and WUPB, AFI=0, N=8:
-	static const uint8_t cmd3[] = { 0x05, 0x08, 0x08, 0xF9, 0xBD }; // WUPB
 	// ... and HLTB
-	static const uint8_t cmd4[] = { 0x50, 0xff, 0xff, 0xff, 0xff }; // HLTB
+	static const uint8_t cmd3[] = { 0x50, 0xff, 0xff, 0xff, 0xff }; // HLTB
 	// ... and ATTRIB
-	static const uint8_t cmd5[] = { 0x1D, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff}; // ATTRIB
+	static const uint8_t cmd4[] = { 0x1D, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff}; // ATTRIB
 
 	// ... and we always respond with ATQB, PUPI = 820de174, Application Data = 0x20381922,
 	// supports only 106kBit/s in both directions, max frame size = 32Bytes,
@@ -391,14 +389,13 @@ void SimulateIso14443bTag(void)
 
 		// Good, look at the command now.
 		if ( (len == sizeof(cmd1) && memcmp(receivedCmd, cmd1, len) == 0)
-			|| (len == sizeof(cmd2) && memcmp(receivedCmd, cmd2, len) == 0)
-			|| (len == sizeof(cmd3) && memcmp(receivedCmd, cmd3, len) == 0) ) {
+			|| (len == sizeof(cmd2) && memcmp(receivedCmd, cmd2, len) == 0) ) {
 			resp = response1; 
 			respLen = sizeof(response1);
 			respCode = resp1Code; 
 			respCodeLen = resp1CodeLen;
-		} else if ( (len == sizeof(cmd4) && receivedCmd[0] == cmd4[0])
-			|| (len == sizeof(cmd5) && receivedCmd[0] == cmd5[0]) ) {
+		} else if ( (len == sizeof(cmd3) && receivedCmd[0] == cmd3[0])
+			|| (len == sizeof(cmd4) && receivedCmd[0] == cmd4[0]) ) {
 			resp = response2; 
 			respLen = sizeof(response2);
 			respCode = resp2Code; 
@@ -412,6 +409,7 @@ void SimulateIso14443bTag(void)
 				if(b1 != receivedCmd[len-2] || b2 != receivedCmd[len-1]) {
 					// Not so good, try again.
 					DbpString("+++CRC fail");
+		
 				} else {
 					DbpString("CRC passes");
 				}
