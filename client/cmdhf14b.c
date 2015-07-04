@@ -133,17 +133,19 @@ int CmdHF14BCmdRaw (const char *Cmd) {
 	bool crc = false;
 	bool power = false;
 	bool select = false;
+	bool SRx = false;
 	char buf[5] = "";
 	uint8_t data[100] = {0x00};
 	uint8_t datalen = 0;
 	unsigned int temp;
 	int i = 0;
 	if (strlen(Cmd)<3) {
-			PrintAndLog("Usage: hf 14b raw [-r] [-c] [-p] <0A 0B 0C ... hex>");
+			PrintAndLog("Usage: hf 14b raw [-r] [-c] [-p] [-s || -ss] <0A 0B 0C ... hex>");
 			PrintAndLog("       -r    do not read response");
 			PrintAndLog("       -c    calculate and append CRC");
 			PrintAndLog("       -p    leave the field on after receive");
 			PrintAndLog("       -s    active signal field ON with select");
+			PrintAndLog("       -ss   active signal field ON with select for SRx ST Microelectronics tags");
 			return 0;
 	}
 
@@ -169,6 +171,10 @@ int CmdHF14BCmdRaw (const char *Cmd) {
 				case 's':
 				case 'S':
 					select = true;
+					if (Cmd[i+2]=='s' || Cmd[i+2]=='S') {
+						SRx = true;
+						i++;
+					}
 					break;
 				default:
 					PrintAndLog("Invalid option");
@@ -192,7 +198,7 @@ int CmdHF14BCmdRaw (const char *Cmd) {
 			continue;
 		}
 		PrintAndLog("Invalid char on input");
-		return 1;
+		return 0;
 	}
 	if (datalen == 0)
 	{
@@ -202,31 +208,50 @@ int CmdHF14BCmdRaw (const char *Cmd) {
 
 	if (select){ //auto select 14b tag
 		uint8_t	cmd2[16];
-		uint8_t cmdLen = 3;
 		bool crc2 = true;
-		cmd2[0] = 0x05;
-		cmd2[1] = 0x00;
-		cmd2[2] = 0x08;
+		uint8_t cmdLen;
 
-		// REQB
+		if (SRx) {
+			// REQ SRx
+			cmdLen = 2;
+			cmd2[0] = 0x06;
+			cmd2[1] = 0x00;
+		} else {
+			cmdLen = 3;
+			// REQB
+			cmd2[0] = 0x05;
+			cmd2[1] = 0x00;
+			cmd2[2] = 0x08;
+		}
+
 		if (HF14BCmdRaw(true, &crc2, true, cmd2, &cmdLen, false)==0) return rawClose();
 
-		if (cmd2[0] != 0x50 || cmdLen != 14 || !crc2) return rawClose();
+		if ( SRx && (cmdLen != 3 || !crc2) ) return rawClose();
+		else if (cmd2[0] != 0x50 || cmdLen != 14 || !crc2) return rawClose();
+		
+		uint8_t chipID = 0;
+		if (SRx) {
+			// select
+			chipID = cmd2[0];
+			cmd2[0] = 0x0E;
+			cmd2[1] = chipID;
+			cmdLen = 2;
+		} else {
+			// attrib
+			cmd2[0] = 0x1D; 
+			// UID from cmd2[1 - 4]
+			cmd2[5] = 0x00;
+			cmd2[6] = 0x08;
+			cmd2[7] = 0x01;
+			cmd2[8] = 0x00;
+			cmdLen = 9;
+		}
 
-		cmd2[0] = 0x1D; 
-		// UID from data[1 - 4]
-		cmd2[5] = 0x00;
-		cmd2[6] = 0x08;
-		cmd2[7] = 0x01;
-		cmd2[8] = 0x00;
-		cmdLen = 9;
-
-		// attrib
 		if (HF14BCmdRaw(true, &crc2, true, cmd2, &cmdLen, false)==0) return rawClose();
 
 		if (cmdLen != 3 || !crc2) return rawClose();
+		if (SRx && cmd2[0] != chipID) return rawClose();
 	}
-
 	return HF14BCmdRaw(reply, &crc, power, data, &datalen, true);
 }
 
