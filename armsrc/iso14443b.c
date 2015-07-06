@@ -19,6 +19,9 @@
 #define RECEIVE_SAMPLES_TIMEOUT 2000
 #define ISO14443B_DMA_BUFFER_SIZE 256
 
+// PCB Block number for APDUs
+static uint8_t pcb_blocknum = 0;
+
 //=============================================================================
 // An ISO 14443 Type B tag. We listen for commands from the reader, using
 // a UART kind of thing that's implemented in software. When we get a
@@ -896,6 +899,98 @@ static void CodeAndTransmit14443bAsReader(const uint8_t *cmd, int len)
 	}
 }
 
+/* Sends an APDU to the tag
+ * TODO: check CRC and preamble
+ */
+int iso14443b_apdu(uint8_t const *message, size_t message_length, uint8_t *response)
+{
+	uint8_t message_frame[message_length + 4];
+	// PCB
+	message_frame[0] = 0x0A | pcb_blocknum;
+	pcb_blocknum ^= 1;
+	// CID
+	message_frame[1] = 0;
+	// INF
+	memcpy(message_frame + 2, message, message_length);
+	// EDC (CRC)
+	ComputeCrc14443(CRC_14443_B, message_frame, message_length + 2, &message_frame[message_length + 2], &message_frame[message_length + 3]);
+	// send
+	CodeAndTransmit14443bAsReader(message_frame, message_length + 4);
+	// get response
+	GetSamplesFor14443bDemod(RECEIVE_SAMPLES_TIMEOUT*100, TRUE);
+	if(Demod.len < 3)
+	{
+		return 0;
+	}
+	// TODO: Check CRC
+	// copy response contents
+	if(response != NULL)
+	{
+		memcpy(response, Demod.output, Demod.len);
+	}
+	return Demod.len;
+}
+
+/* Perform the ISO 14443 B Card Selection procedure
+ * Currently does NOT do any collision handling.
+ * It expects 0-1 cards in the device's range.
+ * TODO: Support multiple cards (perform anticollision)
+ * TODO: Verify CRC checksums
+ */
+int iso14443b_select_card()
+{
+	// WUPB command (including CRC)
+	// Note: WUPB wakes up all tags, REQB doesn't wake up tags in HALT state
+	static const uint8_t wupb[] = { 0x05, 0x00, 0x08, 0x39, 0x73 };
+	// ATTRIB command (with space for CRC)
+	uint8_t attrib[] = { 0x1D, 0x00, 0x00, 0x00, 0x00, 0x00, 0x08, 0x00, 0x00, 0x00, 0x00};
+
+	// first, wake up the tag
+	CodeAndTransmit14443bAsReader(wupb, sizeof(wupb));
+	GetSamplesFor14443bDemod(RECEIVE_SAMPLES_TIMEOUT, TRUE);
+	// ATQB too short?
+	if (Demod.len < 14)
+	{
+		return 2;
+	}
+
+    // select the tag
+    // copy the PUPI to ATTRIB
+    memcpy(attrib + 1, Demod.output + 1, 4);
+    /* copy the protocol info from ATQB (Protocol Info -> Protocol_Type) into
+    ATTRIB (Param 3) */
+    attrib[7] = Demod.output[10] & 0x0F;
+    ComputeCrc14443(CRC_14443_B, attrib, 9, attrib + 9, attrib + 10);
+    CodeAndTransmit14443bAsReader(attrib, sizeof(attrib));
+    GetSamplesFor14443bDemod(RECEIVE_SAMPLES_TIMEOUT, TRUE);
+    // Answer to ATTRIB too short?
+    if(Demod.len < 3)
+	{
+		return 2;
+	}
+	// reset PCB block number
+	pcb_blocknum = 0;
+	return 1;
+}
+
+// Set up ISO 14443 Type B communication (similar to iso14443a_setup)
+void iso14443b_setup() {
+	FpgaDownloadAndGo(FPGA_BITSTREAM_HF);
+	// Set up the synchronous serial port
+	FpgaSetupSsc();
+	// connect Demodulated Signal to ADC:
+	SetAdcMuxFor(GPIO_MUXSEL_HIPKD);
+
+	// Signal field is on with the appropriate LED
+    LED_D_ON();
+	FpgaWriteConfWord(FPGA_MAJOR_MODE_HF_READER_TX | FPGA_HF_READER_TX_SHALLOW_MOD);
+
+	// Start the timer
+	StartCountSspClk();
+
+	DemodReset();
+	UartReset();
+}
 
 //-----------------------------------------------------------------------------
 // Read a SRI512 ISO 14443B tag.
