@@ -311,7 +311,7 @@ static int GetIso14443bCommandFromReader(uint8_t *received, uint16_t *len)
 			}
 		}
 	}
-	
+
 	return FALSE;
 }
 
@@ -353,7 +353,7 @@ void SimulateIso14443bTag(void)
 	// prepare the (only one) tag answer:
 	CodeIso14443bAsTag(response1, sizeof(response1));
 	uint8_t *resp1Code = BigBuf_malloc(ToSendMax);
-	memcpy(resp1Code, ToSend, ToSendMax); 
+	memcpy(resp1Code, ToSend, ToSendMax);
 	uint16_t resp1CodeLen = ToSendMax;
 
 	// We need to listen to the high-frequency, peak-detected path.
@@ -377,9 +377,9 @@ void SimulateIso14443bTag(void)
 		// Good, look at the command now.
 		if ( (len == sizeof(cmd1) && memcmp(receivedCmd, cmd1, len) == 0)
 			|| (len == sizeof(cmd2) && memcmp(receivedCmd, cmd2, len) == 0) ) {
-			resp = response1; 
+			resp = response1;
 			respLen = sizeof(response1);
-			respCode = resp1Code; 
+			respCode = resp1Code;
 			respCodeLen = resp1CodeLen;
 		} else {
 			Dbprintf("new cmd from reader: len=%d, cmdsRecvd=%d", len, cmdsRecvd);
@@ -429,13 +429,13 @@ void SimulateIso14443bTag(void)
 				(void)b;
 			}
 		}
-		
+
 		// trace the response:
 		if (tracing) {
 			uint8_t parity[MAX_PARITY_SIZE];
 			LogTrace(resp, respLen, 0, 0, parity, FALSE);
 		}
-			
+
 	}
 }
 
@@ -513,7 +513,7 @@ static RAMFUNC int Handle14443bSamplesDemod(int ci, int cq)
 		} else { \
 			v -= cq; \
 		} \
-	}		
+	}
  */
 // Subcarrier amplitude v = sqrt(ci^2 + cq^2), approximated here by max(abs(ci),abs(cq)) + 1/2*min(abs(ci),abs(cq)))
 #define CHECK_FOR_SUBCARRIER() { \
@@ -547,7 +547,7 @@ static RAMFUNC int Handle14443bSamplesDemod(int ci, int cq)
 			} \
 		} \
 	}
-	
+
 	switch(Demod.state) {
 		case DEMOD_UNSYNCD:
 			CHECK_FOR_SUBCARRIER();
@@ -645,7 +645,7 @@ static RAMFUNC int Handle14443bSamplesDemod(int ci, int cq)
 					Demod.metric -= Demod.thisBit;
 				}
 				(Demod.metricN)++;
-*/				
+*/
 
 				Demod.shiftReg >>= 1;
 				if(Demod.thisBit > 0) {	// logic '1'
@@ -713,10 +713,10 @@ static void GetSamplesFor14443bDemod(int n, bool quiet)
 	// Allocate memory from BigBuf for some buffers
 	// free all previous allocations first
 	BigBuf_free();
-	
+
 	// The response (tag -> reader) that we're receiving.
 	uint8_t *receivedResponse = BigBuf_malloc(MAX_FRAME_SIZE);
-	
+
 	// The DMA buffer, used to stream samples from the FPGA
 	int8_t *dmaBuf = (int8_t*) BigBuf_malloc(ISO14443B_DMA_BUFFER_SIZE);
 
@@ -1090,7 +1090,7 @@ void RAMFUNC SnoopIso14443b(void)
 
 	bool TagIsActive = FALSE;
 	bool ReaderIsActive = FALSE;
-	
+
 	// And now we loop, receiving samples.
 	for(;;) {
 		int behindBy = (lastRxCounter - AT91C_BASE_PDC_SSC->PDC_RCR) &
@@ -1201,7 +1201,7 @@ void SendRawCommand14443B(uint32_t datalen, uint32_t recv, uint8_t powerfield, u
 	FpgaSetupSsc();
 
 	set_tracing(TRUE);
-	
+
 	CodeAndTransmit14443bAsReader(data, datalen);
 
 	if(recv) {
@@ -1209,7 +1209,7 @@ void SendRawCommand14443B(uint32_t datalen, uint32_t recv, uint8_t powerfield, u
 		uint16_t iLen = MIN(Demod.len, USB_CMD_DATA_SIZE);
 		cmd_send(CMD_ACK, iLen, 0, 0, Demod.output, iLen);
 	}
-	
+
 	if(!powerfield) {
 		FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
 		LED_D_OFF();
