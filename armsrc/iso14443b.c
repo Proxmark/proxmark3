@@ -19,6 +19,9 @@
 #define RECEIVE_SAMPLES_TIMEOUT 2000
 #define ISO14443B_DMA_BUFFER_SIZE 256
 
+// PCB Block number for APDUs
+static uint8_t pcb_blocknum = 0;
+
 //=============================================================================
 // An ISO 14443 Type B tag. We listen for commands from the reader, using
 // a UART kind of thing that's implemented in software. When we get a
@@ -311,7 +314,7 @@ static int GetIso14443bCommandFromReader(uint8_t *received, uint16_t *len)
 			}
 		}
 	}
-	
+
 	return FALSE;
 }
 
@@ -353,7 +356,7 @@ void SimulateIso14443bTag(void)
 	// prepare the (only one) tag answer:
 	CodeIso14443bAsTag(response1, sizeof(response1));
 	uint8_t *resp1Code = BigBuf_malloc(ToSendMax);
-	memcpy(resp1Code, ToSend, ToSendMax); 
+	memcpy(resp1Code, ToSend, ToSendMax);
 	uint16_t resp1CodeLen = ToSendMax;
 
 	// We need to listen to the high-frequency, peak-detected path.
@@ -377,9 +380,9 @@ void SimulateIso14443bTag(void)
 		// Good, look at the command now.
 		if ( (len == sizeof(cmd1) && memcmp(receivedCmd, cmd1, len) == 0)
 			|| (len == sizeof(cmd2) && memcmp(receivedCmd, cmd2, len) == 0) ) {
-			resp = response1; 
+			resp = response1;
 			respLen = sizeof(response1);
-			respCode = resp1Code; 
+			respCode = resp1Code;
 			respCodeLen = resp1CodeLen;
 		} else {
 			Dbprintf("new cmd from reader: len=%d, cmdsRecvd=%d", len, cmdsRecvd);
@@ -429,13 +432,13 @@ void SimulateIso14443bTag(void)
 				(void)b;
 			}
 		}
-		
+
 		// trace the response:
 		if (tracing) {
 			uint8_t parity[MAX_PARITY_SIZE];
 			LogTrace(resp, respLen, 0, 0, parity, FALSE);
 		}
-			
+
 	}
 }
 
@@ -513,7 +516,7 @@ static RAMFUNC int Handle14443bSamplesDemod(int ci, int cq)
 		} else { \
 			v -= cq; \
 		} \
-	}		
+	}
  */
 // Subcarrier amplitude v = sqrt(ci^2 + cq^2), approximated here by max(abs(ci),abs(cq)) + 1/2*min(abs(ci),abs(cq)))
 #define CHECK_FOR_SUBCARRIER() { \
@@ -547,7 +550,7 @@ static RAMFUNC int Handle14443bSamplesDemod(int ci, int cq)
 			} \
 		} \
 	}
-	
+
 	switch(Demod.state) {
 		case DEMOD_UNSYNCD:
 			CHECK_FOR_SUBCARRIER();
@@ -645,7 +648,7 @@ static RAMFUNC int Handle14443bSamplesDemod(int ci, int cq)
 					Demod.metric -= Demod.thisBit;
 				}
 				(Demod.metricN)++;
-*/				
+*/
 
 				Demod.shiftReg >>= 1;
 				if(Demod.thisBit > 0) {	// logic '1'
@@ -713,10 +716,10 @@ static void GetSamplesFor14443bDemod(int n, bool quiet)
 	// Allocate memory from BigBuf for some buffers
 	// free all previous allocations first
 	BigBuf_free();
-	
+
 	// The response (tag -> reader) that we're receiving.
 	uint8_t *receivedResponse = BigBuf_malloc(MAX_FRAME_SIZE);
-	
+
 	// The DMA buffer, used to stream samples from the FPGA
 	int8_t *dmaBuf = (int8_t*) BigBuf_malloc(ISO14443B_DMA_BUFFER_SIZE);
 
@@ -896,6 +899,98 @@ static void CodeAndTransmit14443bAsReader(const uint8_t *cmd, int len)
 	}
 }
 
+/* Sends an APDU to the tag
+ * TODO: check CRC and preamble
+ */
+int iso14443b_apdu(uint8_t const *message, size_t message_length, uint8_t *response)
+{
+	uint8_t message_frame[message_length + 4];
+	// PCB
+	message_frame[0] = 0x0A | pcb_blocknum;
+	pcb_blocknum ^= 1;
+	// CID
+	message_frame[1] = 0;
+	// INF
+	memcpy(message_frame + 2, message, message_length);
+	// EDC (CRC)
+	ComputeCrc14443(CRC_14443_B, message_frame, message_length + 2, &message_frame[message_length + 2], &message_frame[message_length + 3]);
+	// send
+	CodeAndTransmit14443bAsReader(message_frame, message_length + 4);
+	// get response
+	GetSamplesFor14443bDemod(RECEIVE_SAMPLES_TIMEOUT*100, TRUE);
+	if(Demod.len < 3)
+	{
+		return 0;
+	}
+	// TODO: Check CRC
+	// copy response contents
+	if(response != NULL)
+	{
+		memcpy(response, Demod.output, Demod.len);
+	}
+	return Demod.len;
+}
+
+/* Perform the ISO 14443 B Card Selection procedure
+ * Currently does NOT do any collision handling.
+ * It expects 0-1 cards in the device's range.
+ * TODO: Support multiple cards (perform anticollision)
+ * TODO: Verify CRC checksums
+ */
+int iso14443b_select_card()
+{
+	// WUPB command (including CRC)
+	// Note: WUPB wakes up all tags, REQB doesn't wake up tags in HALT state
+	static const uint8_t wupb[] = { 0x05, 0x00, 0x08, 0x39, 0x73 };
+	// ATTRIB command (with space for CRC)
+	uint8_t attrib[] = { 0x1D, 0x00, 0x00, 0x00, 0x00, 0x00, 0x08, 0x00, 0x00, 0x00, 0x00};
+
+	// first, wake up the tag
+	CodeAndTransmit14443bAsReader(wupb, sizeof(wupb));
+	GetSamplesFor14443bDemod(RECEIVE_SAMPLES_TIMEOUT, TRUE);
+	// ATQB too short?
+	if (Demod.len < 14)
+	{
+		return 2;
+	}
+
+    // select the tag
+    // copy the PUPI to ATTRIB
+    memcpy(attrib + 1, Demod.output + 1, 4);
+    /* copy the protocol info from ATQB (Protocol Info -> Protocol_Type) into
+    ATTRIB (Param 3) */
+    attrib[7] = Demod.output[10] & 0x0F;
+    ComputeCrc14443(CRC_14443_B, attrib, 9, attrib + 9, attrib + 10);
+    CodeAndTransmit14443bAsReader(attrib, sizeof(attrib));
+    GetSamplesFor14443bDemod(RECEIVE_SAMPLES_TIMEOUT, TRUE);
+    // Answer to ATTRIB too short?
+    if(Demod.len < 3)
+	{
+		return 2;
+	}
+	// reset PCB block number
+	pcb_blocknum = 0;
+	return 1;
+}
+
+// Set up ISO 14443 Type B communication (similar to iso14443a_setup)
+void iso14443b_setup() {
+	FpgaDownloadAndGo(FPGA_BITSTREAM_HF);
+	// Set up the synchronous serial port
+	FpgaSetupSsc();
+	// connect Demodulated Signal to ADC:
+	SetAdcMuxFor(GPIO_MUXSEL_HIPKD);
+
+	// Signal field is on with the appropriate LED
+    LED_D_ON();
+	FpgaWriteConfWord(FPGA_MAJOR_MODE_HF_READER_TX | FPGA_HF_READER_TX_SHALLOW_MOD);
+
+	// Start the timer
+	StartCountSspClk();
+
+	DemodReset();
+	UartReset();
+}
 
 //-----------------------------------------------------------------------------
 // Read a SRI512 ISO 14443B tag.
@@ -1090,7 +1185,7 @@ void RAMFUNC SnoopIso14443b(void)
 
 	bool TagIsActive = FALSE;
 	bool ReaderIsActive = FALSE;
-	
+
 	// And now we loop, receiving samples.
 	for(;;) {
 		int behindBy = (lastRxCounter - AT91C_BASE_PDC_SSC->PDC_RCR) &
@@ -1201,7 +1296,7 @@ void SendRawCommand14443B(uint32_t datalen, uint32_t recv, uint8_t powerfield, u
 	FpgaSetupSsc();
 
 	set_tracing(TRUE);
-	
+
 	CodeAndTransmit14443bAsReader(data, datalen);
 
 	if(recv) {
@@ -1209,7 +1304,7 @@ void SendRawCommand14443B(uint32_t datalen, uint32_t recv, uint8_t powerfield, u
 		uint16_t iLen = MIN(Demod.len, USB_CMD_DATA_SIZE);
 		cmd_send(CMD_ACK, iLen, 0, 0, Demod.output, iLen);
 	}
-	
+
 	if(!powerfield) {
 		FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
 		LED_D_OFF();
