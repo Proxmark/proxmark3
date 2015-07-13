@@ -2,11 +2,16 @@
 All notable changes to this project will be documented in this file.
 This project uses the changelog in accordance with [keepchangelog](http://keepachangelog.com/). Please use this to write notable changes, which is not the same as git commit log...
 
-## [Unreleased][unreleased]
+## [unreleased][unreleased]
+
+
+## [2.2.0][2015-07-12]
 
 ### Changed
 - Changed `hf 14b write` to `hf 14b sriwrite` as it only applied to sri tags (marshmellow)
 - Added `hf 14b info` to `hf search` (marshmellow)
+- Added compression of fpga config and data, *BOOTROM REFLASH REQUIRED* (piwi)
+- Implemented better detection of mifare-tags that are not vulnerable to classic attacks (`hf mf mifare`, `hf mf nested`) (piwi)
 
 ### Added
 - Add `hf 14b info` to find and print info about std 14b tags and sri tags (using 14b raw commands in the client)  (marshmellow)
