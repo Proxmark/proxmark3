@@ -22,6 +22,7 @@
 #include "util.h"
 #include "cmdlf.h"
 #include "cmdlfhid.h"
+#include "cmdlfawid.h"
 #include "cmdlfti.h"
 #include "cmdlfem4x.h"
 #include "cmdlfhitag.h"
@@ -1130,6 +1131,7 @@ static command_t CommandTable[] =
 	{"config",      CmdLFSetConfig,     0, "Set config for LF sampling, bit/sample, decimation, frequency"},
 	{"flexdemod",   CmdFlexdemod,       1, "Demodulate samples for FlexPass"},
 	{"hid",         CmdLFHID,           1, "{ HID RFIDs... }"},
+	{"awid",		CmdLFAWID,		    1, "{ AWID RFIDs... }"},
 	{"io",       	  CmdLFIO,	          1, "{ ioProx tags... }"},
 	{"indalademod", CmdIndalaDemod,     1, "['224'] -- Demodulate samples for Indala 64 bit UID (option '224' for 224 bit)"},
 	{"indalaclone", CmdIndalaClone,     0, "<UID> ['l']-- Clone Indala to T55x7 (tag must be in antenna)(UID in HEX)(option 'l' for 224 UID"},
