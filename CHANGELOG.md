@@ -4,6 +4,8 @@ This project uses the changelog in accordance with [keepchangelog](http://keepac
 
 ## [unreleased][unreleased]
 
+### Changed
+- EPA functions (`hf epa`) now support both ISO 14443-A and 14443-B cards (frederikmoellers)
 
 ## [2.2.0][2015-07-12]
 
