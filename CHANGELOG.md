@@ -4,6 +4,9 @@ This project uses the changelog in accordance with [keepchangelog](http://keepac
 
 ## [unreleased][unreleased]
 
+### Added
+- AWID26 command context added as 'lf awid' containing realtime demodulation as well as cloning/simulation based on tag numbers (Craig Young)
+
 ### Changed
 - EPA functions (`hf epa`) now support both ISO 14443-A and 14443-B cards (frederikmoellers)
 
