@@ -19,10 +19,54 @@
 
 static int CmdHelp(const char *Cmd);
 
+
+int usage_lf_awid_fskdemod(void) {
+  PrintAndLog("Enables AWID26 compatible reader mode printing details of scanned AWID26 tags.");
+  PrintAndLog("By default, values are printed and logged until the button is pressed or another USB command is issued.");
+  PrintAndLog("If the ['1'] option is provided, reader mode is exited after reading a single AWID26 card.");
+  PrintAndLog("");
+  PrintAndLog("Usage:  lf awid fskdemod ['1']");
+  PrintAndLog("  Options : ");
+  PrintAndLog("  1 : (optional) stop after reading a single card");
+  PrintAndLog("");
+  PrintAndLog("   sample : lf awid fskdemod");
+  PrintAndLog("          : lf awid fskdemod 1");
+  return 0;
+}
+
+int usage_lf_awid_sim(void) {
+  PrintAndLog("Enables simulation of AWID26 card with specified facility-code and card number.");
+  PrintAndLog("Simulation runs until the button is pressed or another USB command is issued.");
+  PrintAndLog("Per AWID26 format, the facility-code is 8-bit and the card number is 16-bit.  Larger values are truncated.");
+  PrintAndLog("");
+  PrintAndLog("Usage:  lf awid sim <Facility-Code> <Card-Number>");
+  PrintAndLog("  Options : ");
+  PrintAndLog("  <Facility-Code> : 8-bit value representing the AWID facility code");
+  PrintAndLog("  <Card Number>   : 16-bit value representing the AWID card number");
+  PrintAndLog("");
+  PrintAndLog("   sample : lf awid sim 224 1337");
+  return 0;
+}
+
+int usage_lf_awid_clone(void) {
+  PrintAndLog("Enables cloning of AWID26 card with specified facility-code and card number onto T55x7.");
+  PrintAndLog("The T55x7 must be on the antenna when issuing this command.  T55x7 blocks are calculated and printed in the process.");
+  PrintAndLog("Per AWID26 format, the facility-code is 8-bit and the card number is 16-bit.  Larger values are truncated.");
+  PrintAndLog("");
+  PrintAndLog("Usage:  lf awid clone <Facility-Code> <Card-Number>");
+  PrintAndLog("  Options : ");
+  PrintAndLog("  <Facility-Code> : 8-bit value representing the AWID facility code");
+  PrintAndLog("  <Card Number>   : 16-bit value representing the AWID card number");
+  PrintAndLog("");
+  PrintAndLog("   sample : lf awid clone 224 1337");
+  return 0;
+}
+
 int CmdAWIDDemodFSK(const char *Cmd)
 {
   int findone=0;
-        if(Cmd[0]=='1') findone=1;
+  if(Cmd[0]=='1') findone=1;
+  if (Cmd[0]=='h' || Cmd[0] == 'H') return usage_lf_awid_fskdemod();
   UsbCommand c={CMD_AWID_DEMOD_FSK};
   c.arg[0]=findone;
   SendCommand(&c);
@@ -98,8 +142,7 @@ int CmdAWIDSim(const char *Cmd)
   uint64_t arg2 = 50; // clk RF/50 invert=0
   BS = BitStream;
   if (sscanf(Cmd, "%u %u", &fc, &cn ) != 2) {
-    PrintAndLog("Usage: lf awid sim <facility-code> <card number>");
-    return 0;
+    return usage_lf_awid_sim();
   }
 
   fcode=(fc & 0x000000FF);
@@ -137,8 +180,7 @@ int CmdAWIDClone(const char *Cmd)
   
 
   if (sscanf(Cmd, "%u %u", &fc, &cn ) != 2) {
-    PrintAndLog("Usage: lf awid clone <facility-code> <card number>");
-    return 0;
+    return usage_lf_awid_clone();
   }
 
   if ((fc & 0xFF) != fc) {
