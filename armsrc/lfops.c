@@ -399,14 +399,10 @@ void SimulateTagLowFrequency(int period, int gap, int ledcontrol)
  #define OPEN_COIL()		HIGH(GPIO_SSC_DOUT)
 
 	i = 0;
-	byte_t rx[sizeof(UsbCommand)]; // Storage for usb_read call in loop
 	for(;;) {
 		//wait until SSC_CLK goes HIGH
 		while(!(AT91C_BASE_PIOA->PIO_PDSR & GPIO_SSC_CLK)) {
-			// Craig Young - Adding a usb_read() here to avoid abort on empty UsbCommand
-			// My OS X client does this preventing simulation.
-			// Performance hit should be non-existent since the read is only performed if usb_poll is true
-			if(BUTTON_PRESS() || (usb_poll() && usb_read(rx,sizeof(UsbCommand)))) {
+			if(BUTTON_PRESS() || (usb_poll_validate_length() )) {
 				DbpString("Stopped");
 				return;
 			}
