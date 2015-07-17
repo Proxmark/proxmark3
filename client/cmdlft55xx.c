@@ -242,6 +242,7 @@ int CmdT55xxReadBlock(const char *Cmd) {
 		c.d.asBytes[0] = 0x1; 
 	}
 
+	clearCommandBuffer();
 	SendCommand(&c);
 	if ( !WaitForResponseTimeout(CMD_ACK,NULL,2500) ) {
 		PrintAndLog("command execution time out");
@@ -681,6 +682,7 @@ int CmdT55xxWriteBlock(const char *Cmd)
 		c.d.asBytes[0] = 0x1; 
 		PrintAndLog("pwd   : 0x%08X", password);
 	}
+	clearCommandBuffer();
 	SendCommand(&c);
 	if (!WaitForResponseTimeout(CMD_ACK, &resp, 1000)){
 		PrintAndLog("Error occurred, device did not ACK write operation. (May be due to old firmware)");
@@ -883,6 +885,7 @@ int AquireData( uint8_t block ){
 		// c.d.asBytes[0] = 0x1; 
 	// }
 
+	clearCommandBuffer();
 	SendCommand(&c);
 	if ( !WaitForResponseTimeout(CMD_ACK,NULL,2500) ) {
 		PrintAndLog("command execution time out");
