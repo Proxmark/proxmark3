@@ -1,3 +1,5 @@
+// version 2.1.0
+// add readkeyfile,writekeyfile,modify dump,iso write and calcEkey functions.
 //-----------------------------------------------------------------------------
 // Copyright (C) 2010 iZsh <izsh at fail0verflow.com>
 // Copyright (C) 2011 Gerhard de Koning Gans
@@ -20,5 +22,10 @@ int CmdHFiClassList(const char *Cmd);
 int HFiClassReader(const char *Cmd, bool loop, bool verbose);
 int CmdHFiClassReader(const char *Cmd);
 int CmdHFiClassReader_Replay(const char *Cmd);
-
+int CmdHFiClassReadKeyFile(const char *filename);
+int CmdHFiClassWriteKeyFile(const char *Cmd);
+int CmdHFiClass_iso14443A_write(const char *Cmd);
+int CmdHFiClassCalcEKey(const char *Cmd);
+int CmdHFiClassRestore(const char *cmd);
+int CmdHFiClass_TestMac(const char *Cmd);
 #endif

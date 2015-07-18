@@ -1903,131 +1903,57 @@ void ReaderIClass_Replay(uint8_t arg0, uint8_t *MAC) {
 
 	LED_A_OFF();
 }
-
-//2. Create Read method (cut-down from above) based off responses from 1. 
-//   Since we have the MAC could continue to use replay function.
-//3. Create Write method
-/*
-void IClass_iso14443A_write(uint8_t arg0, uint8_t blockNo, uint8_t *data, uint8_t *MAC) {
-	uint8_t act_all[]     = { 0x0a };
-	uint8_t identify[]    = { 0x0c };
-	uint8_t select[]      = { 0x81, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
-	uint8_t readcheck_cc[]= { 0x88, 0x02 };
-	uint8_t check[]       = { 0x05, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
-	uint8_t read[]        = { 0x0c, 0x00, 0x00, 0x00 };
-	uint8_t write[]       = { 0x87, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
-	
-    uint16_t crc = 0;
-	
-	uint8_t* resp = (((uint8_t *)BigBuf) + 3560);
-
-	// Reset trace buffer
-    memset(trace, 0x44, RECV_CMD_OFFSET);
-	traceLen = 0;
-
-	// Setup SSC
-	FpgaSetupSsc();
-	// Start from off (no field generated)
-	// Signal field is off with the appropriate LED
-	LED_D_OFF();
-	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
-	SpinDelay(200);
-
-	SetAdcMuxFor(GPIO_MUXSEL_HIPKD);
-
-	// Now give it time to spin up.
-	// Signal field is on with the appropriate LED
-	FpgaWriteConfWord(FPGA_MAJOR_MODE_HF_ISO14443A | FPGA_HF_ISO14443A_READER_MOD);
-	SpinDelay(200);
-
-	LED_A_ON();
-
-	for(int i=0;i<1;i++) {
-	
-		if(traceLen > TRACE_SIZE) {
-			DbpString("Trace full");
-			break;
-		}
-		
-		if (BUTTON_PRESS()) break;
-
-		// Send act_all
-		ReaderTransmitIClass(act_all, 1);
-		// Card present?
-		if(ReaderReceiveIClass(resp)) {
-			ReaderTransmitIClass(identify, 1);
-			if(ReaderReceiveIClass(resp) == 10) {
-				// Select card          
-				memcpy(&select[1],resp,8);
-				ReaderTransmitIClass(select, sizeof(select));
-
-				if(ReaderReceiveIClass(resp) == 10) {
-					Dbprintf("     Selected CSN: %02x %02x %02x %02x %02x %02x %02x %02x",
-					resp[0], resp[1], resp[2],
-					resp[3], resp[4], resp[5],
-					resp[6], resp[7]);
-				}
-				// Card selected
-				Dbprintf("Readcheck on Sector 2");
-				ReaderTransmitIClass(readcheck_cc, sizeof(readcheck_cc));
-				if(ReaderReceiveIClass(resp) == 8) {
-				   Dbprintf("     CC: %02x %02x %02x %02x %02x %02x %02x %02x",
-					resp[0], resp[1], resp[2],
-					resp[3], resp[4], resp[5],
-					resp[6], resp[7]);
-				}else return;
-				Dbprintf("Authenticate");
-				//for now replay captured auth (as cc not updated)
-				memcpy(check+5,MAC,4);
-				Dbprintf("     AA: %02x %02x %02x %02x",
-					check[5], check[6], check[7],check[8]);
-				ReaderTransmitIClass(check, sizeof(check));
-				if(ReaderReceiveIClass(resp) == 4) {
-				   Dbprintf("     AR: %02x %02x %02x %02x",
-					resp[0], resp[1], resp[2],resp[3]);
-				}else {
-				  Dbprintf("Error: Authentication Fail!");
-				  return;
-				}
-				Dbprintf("Write Block");
-				
-				//read configuration for max block number
-				read_success=false;
-				read[1]=1;
-				uint8_t *blockno=&read[1];
-				crc = iclass_crc16((char *)blockno,1);
-				read[2] = crc >> 8;
-				read[3] = crc & 0xff;
-				while(!read_success){
-				      ReaderTransmitIClass(read, sizeof(read));
-				      if(ReaderReceiveIClass(resp) == 10) {
-					 read_success=true;
-					 mem=resp[5];
-					 memory.k16= (mem & 0x80);
-					 memory.book= (mem & 0x20);
-					 memory.k2= (mem & 0x8);
-					 memory.lockauth= (mem & 0x2);
-					 memory.keyaccess= (mem & 0x1);
-
-				      }
-				}
-				if (memory.k16){
-				  cardsize=255;
-				}else cardsize=32;
-				//check card_size
-				
-				memcpy(write+1,blockNo,1);
-				memcpy(write+2,data,8);
-				memcpy(write+10,mac,4);
-				while(!send_success){
-				  ReaderTransmitIClass(write, sizeof(write));
-				  if(ReaderReceiveIClass(resp) == 10) {
-				    write_success=true;
-				}
-			}//
-		}
-		WDT_HIT();
-	}
-	
-	LED_A_OFF();
-}*/
+void IClass_Authentication(uint8_t *MAC){
+    uint8_t check[]       = { 0x05, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
+    uint8_t resp[ICLASS_BUFFER_SIZE];
+    memcpy(check+5,MAC,4);
+    
+    sendCmdGetResponseWithRetries(check, sizeof(check),resp, 8, 5);
+    // successful
+}
+void IClass_iso14443A_write(uint8_t blockNo, uint8_t *data) {
+    uint8_t write[]       = { 0x87, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
+    
+    write[1] = blockNo;
+    memcpy(write + 2,data,8); // data
+    memcpy(write+10,data + 8,4); // mac no
+    uint8_t r[12];
+    
+    // 0x87
+    sendCmdGetResponseWithRetries(write,sizeof(write),r,sizeof(r),5);
+    Dbprintf("reply [%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x]",r[0],r[1],r[2],r[3],r[4],r[5],r[6],r[7],r[8],r[9],r[10],r[11]);
+    
+    if (memcmp(data,r,8) == 0)
+        Dbprintf("Write block [%02x] ok",blockNo);
+    else
+        Dbprintf("Write block [%02x] fail",blockNo);
+}
+void IClass_Clone(uint8_t startblock,uint8_t endblock,uint8_t *data){
+    uint8_t write[]       = { 0x87, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
+    uint8_t r[12];
+    int i;
+    int written = 0;
+    int total_block = (endblock - startblock) + 1;
+    for (i = 0; i < total_block;i++){
+        // block number
+        write[0] = 0x87;
+        write[1] = i + startblock;
+        // data
+        memcpy(write + 2,data + (i * 12),8);
+        // mac number
+        memcpy(write + 10,data + ((i * 12) + 8), 4);
+        sendCmdGetResponseWithRetries(write,sizeof(write),r,sizeof(r),5);
+        
+        if (memcmp(write + 2,r,8) == 0){
+            Dbprintf("Write block [%02x] ok",i + 6);
+            written++;
+        }
+        else
+            Dbprintf("Write block [%02x] fail",i + 6);
+    }
+    if (written == total_block)
+        Dbprintf("Clone complete");
+    else
+        Dbprintf("Clone incomplete");
+    
+}

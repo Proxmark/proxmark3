@@ -30,7 +30,7 @@
 #include "cmdlfpcf7931.h"
 #include "cmdlfio.h"
 #include "lfdemod.h"
-
+#include "cmdlfviking.h"
 static int CmdHelp(const char *Cmd);
 
 /* send a command before reading */
@@ -1148,6 +1148,7 @@ static command_t CommandTable[] =
 	{"vchdemod",    CmdVchDemod,        1, "['clone'] -- Demodulate samples for VeriChip"},
 	{"t55xx",       CmdLFT55XX,         1, "{ T55xx RFIDs... }"},
 	{"pcf7931",     CmdLFPCF7931,       1, "{PCF7931 RFIDs...}"},
+    {"viking",      CmdLFViking,        1, "{Viking RFIDs..}"},
 	{NULL, NULL, 0, NULL}
 };
 

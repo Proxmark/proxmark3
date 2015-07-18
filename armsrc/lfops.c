@@ -2062,3 +2062,14 @@ void EM4xWriteWord(uint32_t Data, uint8_t Address, uint32_t Pwd, uint8_t PwdMode
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF); // field off
 	LED_D_OFF();
 }
+void CopyViKingtoT55x7(uint32_t block1,uint32_t block2)
+{
+    LED_D_ON();
+    T55xxWriteBlock(block1,1,0,0);
+    T55xxWriteBlock(block2,2,0,0);
+
+    T55xxWriteBlock(T55x7_MODULATION_MANCHESTER | T55x7_BITRATE_RF_32 | 2 << T5555_MAXBLOCK_SHIFT,0,0,1);
+    LED_D_OFF();
+    DbpString("DONE!");
+}
+

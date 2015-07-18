@@ -453,3 +453,32 @@ void xor(unsigned char *dst, unsigned char *src, size_t len) {
 int32_t le24toh (uint8_t data[3]) {
     return (data[2] << 16) | (data[1] << 8) | data[0];
 }
+size_t bytes_to_bits(const uint8_t *src,size_t src_size,uint8_t *des,size_t des_size){
+    int i,j,k;
+    int count = 0;
+    // check src_size and des_size
+    if ((src_size * 8) > des_size)
+        return -1;
+    // convert 1 bytes to 8 bits at the time
+    for (j = 0;j < src_size;j++){
+        for (i = 0;i < 8;i++){
+            k = src[j] >> i;
+            if (k & 1)
+                *(des + (j * 8) + (7 - i)) = 1;
+            else
+                *(des + (j * 8) + (7 - i)) = 0;
+            count++;
+        }
+    }
+    return count;
+}
+void print_arraybinary(const uint8_t *b,size_t c){
+    int i;
+    for (i = 0;i < c;i++){
+        if (*(b + i) == 0)
+            printf("0");
+        else
+            printf("1");
+    }
+    printf("\n");
+}
