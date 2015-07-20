@@ -409,7 +409,7 @@ int CmdVersion(const char *Cmd)
 	UsbCommand resp = {0, {0, 0, 0}};
 
 	SendCommand(&c);
-	if (WaitForResponseTimeout(CMD_ACK,&resp,1000) && Cmd != NULL) {
+	if (WaitForResponseTimeout(CMD_ACK,&resp,1000)) {
 		PrintAndLog("Prox/RFID mark3 RFID instrument");
 		PrintAndLog((char*)resp.d.asBytes);
 		lookupChipID(resp.arg[0], resp.arg[1]);
