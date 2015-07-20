@@ -667,6 +667,7 @@ void UsbPacketReceived(uint8_t *packet, int len)
 			break;
 		case CMD_T55XX_WRITE_BLOCK:
 			T55xxWriteBlock(c->arg[0], c->arg[1], c->arg[2], c->d.asBytes[0]);
+			cmd_send(CMD_ACK,0,0,0,0,0);
 			break;
 		case CMD_T55XX_READ_TRACE:
 			T55xxReadTrace();
