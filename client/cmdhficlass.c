@@ -31,9 +31,14 @@
 #include "loclass/fileutils.h"
 #include "protocols.h"
 #include "usb_cmd.h"
-
+typedef struct iclass_block {
+    uint8_t d[8];
+} iclass_block_t;
 static int CmdHelp(const char *Cmd);
-
+static uint8_t GLOBAL_KEY[8] = {0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00};
+static uint8_t HS_KEY[8]     = {0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00};
+static uint8_t BLANK_KEY[8]  = {0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00};
+static bool    HS_KEY_LOAD   = false;
 int xorbits_8(uint8_t val)
 {
 	uint8_t res = val ^ (val >> 1); //1st pass
@@ -42,7 +47,117 @@ int xorbits_8(uint8_t val)
 	res = res ^ (res >> 4); 			// 4th pass
 	return res & 1;
 }
+void CmdHFiClass_printkey(const char* keyname,const uint8_t *key){
+    printf("%s : %02X%02X%02X%02X%02X%02X%02X%02X\n",keyname,key[0],key[1],key[2],key[3],key[4],key[5],key[6],key[7]);
+}
+int readKeyfile(const char *filename, size_t len, uint8_t* buffer)
+{
+    FILE *f = fopen(filename, "rb");
+    if(!f) {
+        PrintAndLog("Failed to read from file '%s'", filename);
+        return 1;
+    }
+    fseek(f, 0, SEEK_END);
+    long fsize = ftell(f);
+    fseek(f, 0, SEEK_SET);
+    size_t bytes_read = fread(buffer, 1, len, f);
+    fclose(f);
+    if(fsize != len)
+    {
+        PrintAndLog("Warning, file size is %d, expected %d", fsize, len);
+        return 1;
+    }
+    if(bytes_read != len)
+    {
+        PrintAndLog("Warning, could only read %d bytes, expected %d" ,bytes_read, len);
+        return 1;
+    }
+    return 0;
+}
 
+int usage_iclass_readkeyfile(){
+    printf("usage: hf iclass readkeyfile <filename>\n");
+    return 0;
+}
+int CmdHFiClassReadKeyFile(const char *Cmd){
+    uint8_t key[8];
+    if ( (strlen(Cmd) < 1) || (readKeyfile(Cmd,sizeof(key),key) != 0)) {
+        return usage_iclass_readkeyfile();
+    }
+    CmdHFiClass_printkey("Key ",key);
+    return 0;
+}
+int usage_iclass_savekeyfile(){
+    printf("usage: hf iclass writekeyfile <KEY> filename\n");
+    return 0;
+}
+int CmdHFiClassSaveKeyFile(const char *Cmd){
+    char filename[50];
+    uint8_t key[8];
+    FILE *file;
+    if (param_gethex(Cmd, 0, key, 16))
+    {
+        PrintAndLog("KEY must include 16 HEX symbols");
+        return 1;
+    }
+    if (param_getstr(Cmd,1,filename) < 1)
+        return usage_iclass_savekeyfile();
+
+    file = fopen(filename,"wb");
+    
+    if (file == NULL) {
+        printf("error opening file %s\n",filename);
+        return 0;
+    }
+    if (fwrite(&key,sizeof(key),1,file))
+    printf("write key to file was successful\n");
+    else
+    printf("write key to file was fail\n");
+    fclose(file);
+    return 0;
+}
+
+int CmdHFiClass_SendAuthentication(uint8_t *MAC){
+    UsbCommand d = {CMD_ICLASS_AUTHENTICATION, {0}};
+    memcpy(d.d.asBytes,MAC, 4);
+    SendCommand(&d);
+    return 0;
+
+}
+int CmdHFiClass_SendACK(uint8_t *CSN,uint8_t *CCNR) {
+
+    UsbCommand resp;
+    UsbCommand c = {CMD_READER_ICLASS, {0}};
+    c.arg[0] = FLAG_ICLASS_READER_ONLY_ONCE| FLAG_ICLASS_READER_CC;
+    SendCommand(&c);
+    
+    if (!WaitForResponseTimeout(CMD_ACK,&resp,4500))
+    {
+        PrintAndLog("Command execute timeout");
+        return 1;
+    }
+    
+    uint8_t isOK    = resp.arg[0] & 0xff;
+    uint8_t * data  = resp.d.asBytes;
+    
+    memcpy(CSN,data,8);
+    memcpy(CCNR,data+16,8);
+
+    if(isOK <= 1){
+        PrintAndLog("Failed to obtain CC! Aborting");
+        return 1;
+    }
+    
+    PrintAndLog("CSN: %s",sprint_hex(CSN,8));
+    return 0;
+}
+int CmdHFiClass_SendReadBlock(uint8_t blockno,uint8_t *rdata){
+    UsbCommand d = {CMD_ICLASS_READBLOCK, {blockno}};
+    memcpy(d.d.asBytes,rdata,sizeof(uint8_t *));
+    SendCommand(&d);
+    
+    return 0;
+}
 int CmdHFiClassList(const char *Cmd)
 {
 	PrintAndLog("Deprecated command, use 'hf list iclass' instead");
@@ -230,162 +345,124 @@ int CmdHFiClassReader_Replay(const char *Cmd)
 
 	return 0;
 }
-
+int usage_hf_iclass_dump(){
+    PrintAndLog("Usage:  hf iclass dump [e]");
+    PrintAndLog("        Key    - A 16 byte master key");
+    PrintAndLog("        e      - If 'e' is specified, HS_KEY will be used otherwise standard key");
+    return 0;
+}
 int CmdHFiClassReader_Dump(const char *Cmd)
 {
-	uint8_t readerType = 0;
-	uint8_t MAC[4]={0x00,0x00,0x00,0x00};
-	uint8_t KEY[8]={0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00};
-	uint8_t CSN[8]={0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00};
-	uint8_t CCNR[12]={0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00};
-	//uint8_t CC_temp[8]={0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00};
-	uint8_t div_key[8]={0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00};
-	uint8_t keytable[128] = {0};
-	int elite = 0;
-	uint8_t *used_key;
-	int i;
-	if (strlen(Cmd)<1)
-	{
-		PrintAndLog("Usage:  hf iclass dump <Key> [e]");
-		PrintAndLog("        Key    - A 16 byte master key");
-		PrintAndLog("        e      - If 'e' is specified, the key is interpreted as the 16 byte");
-		PrintAndLog("                 Custom Key (KCus), which can be obtained via reader-attack");
-		PrintAndLog("                 See 'hf iclass sim 2'. This key should be on iclass-format");
-		PrintAndLog("        sample: hf iclass dump 0011223344556677");
+    uint8_t readerType = 0;
+    uint8_t MAC[4]={0x00,0x00,0x00,0x00};
+    uint8_t KEY[8]={0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00};
+    uint8_t CSN[8]={0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00};
+    uint8_t CCNR[12]={0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00};
+    //uint8_t CC_temp[8]={0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00};
+    uint8_t div_key[8]={0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00};
+    uint8_t keytable[128] = {0};
+    int elite = 0;
+    uint8_t *used_key;
+    int i;
+    
+    if (param_getchar(Cmd, 0) == 'e')
+    {
+        PrintAndLog("Elite switch on");
+        elite = 1;
+        memcpy(KEY,HS_KEY,sizeof(KEY));
+        //calc h2
+        hash2(KEY, keytable);
+        //printarr_human_readable("keytable", keytable, 128);
+    }
+    else
+        memcpy(KEY,GLOBAL_KEY,sizeof(KEY));
+    
+    UsbCommand resp;
+    uint8_t key_sel[8] = {0};
+    uint8_t key_sel_p[8] = { 0 };
+    // send ACK
+    if (CmdHFiClass_SendACK(CSN,CCNR) != 0)
+    return 1;
 
 
-		return 0;
-	}
-
-	if (param_gethex(Cmd, 0, KEY, 16))
-	{
-		PrintAndLog("KEY must include 16 HEX symbols");
-		return 1;
-	}
-
-	if (param_getchar(Cmd, 1) == 'e')
-	{
-		PrintAndLog("Elite switch on");
-		elite = 1;
-
-		//calc h2
-		hash2(KEY, keytable);
-		printarr_human_readable("keytable", keytable, 128);
-
-	}
-
-	UsbCommand resp;
-	uint8_t key_sel[8] = {0};
-	uint8_t key_sel_p[8] = { 0 };
-
-	UsbCommand c = {CMD_READER_ICLASS, {0}};
-	c.arg[0] = FLAG_ICLASS_READER_ONLY_ONCE| FLAG_ICLASS_READER_CC;
-	SendCommand(&c);
-
-
-
-	if (!WaitForResponseTimeout(CMD_ACK,&resp,4500))
-	{
-		PrintAndLog("Command execute timeout");
-		return 0;
-	}
-
-	uint8_t isOK    = resp.arg[0] & 0xff;
-	uint8_t * data  = resp.d.asBytes;
-
-	memcpy(CSN,data,8);
-	memcpy(CCNR,data+16,8);
-
-	PrintAndLog("isOk:%02x", isOK);
-
-	if(isOK > 0)
-	{
-		PrintAndLog("CSN: %s",sprint_hex(CSN,8));
-	}
-	if(isOK <= 1){
-		PrintAndLog("Failed to obtain CC! Aborting");
-		return 0;
-	}
-	//Status 2 or higher
-
-	if(elite)
-	{
-		//Get the key index (hash1)
-		uint8_t key_index[8] = {0};
-
-		hash1(CSN, key_index);
-		printvar("hash1", key_index,8);
-		for(i = 0; i < 8 ; i++)
-			key_sel[i] = keytable[key_index[i]] & 0xFF;
-		PrintAndLog("Pre-fortified 'permuted' HS key that would be needed by an iclass reader to talk to above CSN:");
-		printvar("k_sel", key_sel,8);
-		//Permute from iclass format to standard format
-		permutekey_rev(key_sel,key_sel_p);
-		used_key = key_sel_p;
-	}else{
-		used_key = KEY;
-	}
-
-	PrintAndLog("Pre-fortified key that would be needed by the OmniKey reader to talk to above CSN:");
-	printvar("Used key",used_key,8);
-	diversifyKey(CSN,used_key, div_key);
-	PrintAndLog("Hash0, a.k.a diversified key, that is computed using Ksel and stored in the card (Block 3):");
-	printvar("Div key", div_key, 8);
-	printvar("CC_NR:",CCNR,12);
-	doMAC(CCNR,div_key, MAC);
-	printvar("MAC", MAC, 4);
-
-	uint8_t iclass_data[32000] = {0};
-	uint32_t iclass_datalen = 0;
-	uint32_t iclass_blocksFailed = 0;//Set to 1 if dump was incomplete
-
-	UsbCommand d = {CMD_READER_ICLASS_REPLAY, {readerType}};
-	memcpy(d.d.asBytes, MAC, 4);
-	clearCommandBuffer();
-	SendCommand(&d);
-	PrintAndLog("Waiting for device to dump data. Press button on device and key on keyboard to abort...");
-	while (true) {
-		printf(".");
-		if (ukbhit()) {
-			getchar();
-			printf("\naborted via keyboard!\n");
-			break;
-		}
-		if(WaitForResponseTimeout(CMD_ACK,&resp,4500))
-		{
-			uint32_t dataLength = resp.arg[0];
-			iclass_blocksFailed |= resp.arg[1];
-			if(dataLength > 0)
-			{
-				PrintAndLog("Got %d bytes data (total so far %d)" ,dataLength,iclass_datalen);
-				memcpy(iclass_data+iclass_datalen, resp.d.asBytes,dataLength);
-				iclass_datalen += dataLength;
-			}else
-			{//Last transfer, datalength 0 means the dump is finished
-				PrintAndLog("Dumped %d bytes of data from tag. ", iclass_datalen);
-				if(iclass_blocksFailed)
-				{
-					PrintAndLog("OBS! Some blocks failed to be dumped correctly!");
-				}
-				if(iclass_datalen > 0)
-				{
-					char filename[100] = {0};
-					//create a preferred filename
-					snprintf(filename, 100,"iclass_tagdump-%02x%02x%02x%02x%02x%02x%02x%02x",
-							 CSN[0],CSN[1],CSN[2],CSN[3],
-							CSN[4],CSN[5],CSN[6],CSN[7]);
-					//Place the div_key in block 3
-					memcpy(iclass_data+(3*8), div_key, 8);
-					saveFile(filename,"bin",iclass_data, iclass_datalen );
-				}
-				//Aaaand we're finished
-				return 0;
-			}
-		}
-	}
-
-
-	return 0;
+    //Status 2 or higher
+    
+    if(elite)
+    {
+        //Get the key index (hash1)
+        uint8_t key_index[8] = {0};
+        
+        hash1(CSN, key_index);
+        //printvar("hash1", key_index,8);
+        for(i = 0; i < 8 ; i++)
+            key_sel[i] = keytable[key_index[i]] & 0xFF;
+        //PrintAndLog("Pre-fortified 'permuted' HS key that would be needed by an iclass reader to talk to above CSN:");
+        //printvar("k_sel", key_sel,8);
+        //Permute from iclass format to standard format
+        permutekey_rev(key_sel,key_sel_p);
+        used_key = key_sel_p;
+    }else{
+        used_key = KEY;
+    }
+    
+    //PrintAndLog("Pre-fortified key that would be needed by the OmniKey reader to talk to above CSN:");
+    //printvar("Used key",used_key,8);
+    diversifyKey(CSN,used_key, div_key);
+    //PrintAndLog("Hash0, a.k.a diversified key, that is computed using Ksel and stored in the card (Block 3):");
+    //printvar("Div key", div_key, 8);
+    //printvar("CC_NR:",CCNR,12);
+    doMAC(CCNR,div_key, MAC);
+    //printvar("MAC", MAC, 4);
+    
+    uint8_t iclass_data[32000] = {0};
+    uint32_t iclass_datalen = 0;
+    uint32_t iclass_blocksFailed = 0;//Set to 1 if dump was incomplete
+    
+    UsbCommand d = {CMD_READER_ICLASS_REPLAY, {readerType}};
+    memcpy(d.d.asBytes, MAC, 4);
+    clearCommandBuffer();
+    SendCommand(&d);
+    PrintAndLog("Waiting for device to dump data. Press button on device and key on keyboard to abort...");
+    while (true) {
+        printf(".");
+        if (ukbhit()) {
+            getchar();
+            printf("\naborted via keyboard!\n");
+            break;
+        }
+        if(WaitForResponseTimeout(CMD_ACK,&resp,4500))
+        {
+            uint32_t dataLength = resp.arg[0];
+            iclass_blocksFailed |= resp.arg[1];
+            if(dataLength > 0)
+            {
+                PrintAndLog("Got %d bytes data (total so far %d)" ,dataLength,iclass_datalen);
+                memcpy(iclass_data+iclass_datalen, resp.d.asBytes,dataLength);
+                iclass_datalen += dataLength;
+            }else
+            {//Last transfer, datalength 0 means the dump is finished
+                PrintAndLog("Dumped %d bytes of data from tag. ", iclass_datalen);
+                if(iclass_blocksFailed)
+                {
+                    PrintAndLog("OBS! Some blocks failed to be dumped correctly!");
+                }
+                if(iclass_datalen > 0)
+                {
+                    char filename[100] = {0};
+                    //create a preferred filename
+                    snprintf(filename, 100,"iclass_tagdump-%02x%02x%02x%02x%02x%02x%02x%02x",
+                             CSN[0],CSN[1],CSN[2],CSN[3],
+                             CSN[4],CSN[5],CSN[6],CSN[7]);
+                    //Place the div_key in block 3
+                    memcpy(iclass_data+(3*8), div_key, 8);
+                    saveFile(filename,"bin",iclass_data, iclass_datalen );
+                }
+                //Aaaand we're finished
+                return 0;
+            }
+        }
+    }
+    return 0;
 }
 
 int hf_iclass_eload_usage()
@@ -477,31 +554,6 @@ int usage_hf_iclass_decrypt()
 	return 1;
 }
 
-int readKeyfile(const char *filename, size_t len, uint8_t* buffer)
-{
-	FILE *f = fopen(filename, "rb");
-	if(!f) {
-		PrintAndLog("Failed to read from file '%s'", filename);
-		return 1;
-	}
-	fseek(f, 0, SEEK_END);
-	long fsize = ftell(f);
-	fseek(f, 0, SEEK_SET);
-	size_t bytes_read = fread(buffer, 1, len, f);
-	fclose(f);
-	if(fsize != len)
-	{
-		PrintAndLog("Warning, file size is %d, expected %d", fsize, len);
-		return 1;
-	}
-	if(bytes_read != len)
-	{
-		PrintAndLog("Warning, could only read %d bytes, expected %d" ,bytes_read, len);
-		return 1;
-	}
-	return 0;
-}
-
 int CmdHFiClassDecrypt(const char *Cmd)
 {
 	uint8_t key[16] = { 0 };
@@ -559,83 +611,51 @@ int CmdHFiClassDecrypt(const char *Cmd)
 
 	return 0;
 }
-
+void Calc_wb_mac(uint8_t blockno,uint8_t *data,uint8_t *div_key,uint8_t MAC[4]){
+    uint8_t WB[9];
+    WB[0] = blockno;
+    memcpy(WB + 1,data,8);
+    // do mac 9 bytes
+    doMAC_N(WB,sizeof(WB),div_key,MAC);
+}
 int CmdHFiClass_iso14443A_write(const char *Cmd)
 {
-	uint8_t readerType = 0;
-	uint8_t MAC[4]={0x00,0x00,0x00,0x00};
-	uint8_t KEY[8]={0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00};
-	uint8_t CSN[8]={0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00};
-	uint8_t CCNR[12]={0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00};
-	uint8_t div_key[8]={0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00};
-
-	uint8_t blockNo=0;
+	uint8_t blockno=0;
 	uint8_t bldata[8]={0};
+    uint8_t MAC[4]={0x00,0x00,0x00,0x00};
 
-	if (strlen(Cmd)<3)
-	{
-		PrintAndLog("Usage:  hf iclass write <Key> <Block> <Data>");
-		PrintAndLog("        sample: hf iclass write 0011223344556677 10 AAAAAAAAAAAAAAAA");
-		return 0;
-	}
+    uint8_t KEY[8]={0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00};
+    uint8_t CSN[8]={0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00};
+    uint8_t CCNR[12]={0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00};
+    uint8_t div_key[8]={0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00};
 
-	if (param_gethex(Cmd, 0, KEY, 16))
-	{
-		PrintAndLog("KEY must include 16 HEX symbols");
-		return 1;
-	}
+    if (param_gethex(Cmd, 0,&blockno, 2))
+    {
+        PrintAndLog("Block No must include 2 HEX symbols");
+        return 1;
+    }
+    if (param_gethex(Cmd, 1, bldata, 16))
+    {
+        PrintAndLog("Block data must include 16 HEX symbols");
+        return 1;
+    }
+    // tell the reader to send ACK and get CSN + CCNR
+    if (CmdHFiClass_SendACK(CSN,CCNR) != 0)
+    return 1;
+    
+    memcpy(KEY,GLOBAL_KEY,sizeof(KEY));
+    diversifyKey(CSN,KEY, div_key);
+    doMAC(CCNR,div_key, MAC);
+    // send authentication
+    CmdHFiClass_SendAuthentication(MAC);
+    // send write command
+    Calc_wb_mac(blockno,bldata,div_key,MAC);
+    UsbCommand w = {CMD_ICLASS_ISO14443A_WRITE, {blockno}};
+    memcpy(w.d.asBytes, bldata, 8);
+    memcpy(w.d.asBytes + 8,MAC, 4);
 
-	blockNo = param_get8(Cmd, 1);
-	if (blockNo>32)
-	{
-		PrintAndLog("Error: Maximum number of blocks is 32 for iClass 2K Cards!");
-		return 1;
-	}
-	if (param_gethex(Cmd, 2, bldata, 8))
-	{
-		PrintAndLog("Block data must include 8 HEX symbols");
-		return 1;
-	}
-
-	UsbCommand c = {CMD_ICLASS_ISO14443A_WRITE, {0}};
-	SendCommand(&c);
-	UsbCommand resp;
-
-	if (WaitForResponseTimeout(CMD_ACK,&resp,4500)) {
-		uint8_t isOK    = resp.arg[0] & 0xff;
-		uint8_t * data  = resp.d.asBytes;
-
-		memcpy(CSN,data,8);
-		memcpy(CCNR,data+8,8);
-		PrintAndLog("DEBUG: %s",sprint_hex(CSN,8));
-		PrintAndLog("DEBUG: %s",sprint_hex(CCNR,8));
-		PrintAndLog("isOk:%02x", isOK);
-	} else {
-		PrintAndLog("Command execute timeout");
-	}
-
-	diversifyKey(CSN,KEY, div_key);
-
-	PrintAndLog("Div Key: %s",sprint_hex(div_key,8));
-	doMAC(CCNR, div_key, MAC);
-
-	UsbCommand c2 = {CMD_ICLASS_ISO14443A_WRITE, {readerType,blockNo}};
-	memcpy(c2.d.asBytes, bldata, 8);
-	memcpy(c2.d.asBytes+8, MAC, 4);
-	SendCommand(&c2);
-
-	if (WaitForResponseTimeout(CMD_ACK,&resp,1500)) {
-		uint8_t isOK    = resp.arg[0] & 0xff;
-		uint8_t * data  = resp.d.asBytes;
-
-		if (isOK)
-			PrintAndLog("isOk:%02x data:%s", isOK, sprint_hex(data, 4));
-		else
-			PrintAndLog("isOk:%02x", isOK);
-	} else {
-		PrintAndLog("Command execute timeout");
-	}
-	return 0;
+    SendCommand(&w);
+    return 0;
 }
 int CmdHFiClass_loclass(const char *Cmd)
 {
@@ -682,23 +702,406 @@ int CmdHFiClass_loclass(const char *Cmd)
 
 	return 0;
 }
-
-static command_t CommandTable[] = 
+int usage_hf_iclass_readtagfile(){
+    PrintAndLog("Usage: hf iclass readtagfile <filename>");
+    return 1;
+}
+void printIclassDumpContents(uint8_t* iclass_dump,uint8_t startblock,uint8_t endblock,size_t filesize){
+    uint8_t blockdata[8];
+    uint8_t mem_config;
+    memcpy(&mem_config, iclass_dump + 13,1);
+    uint8_t maxmemcount;
+    uint8_t filemaxblock = filesize / 8;
+    if (mem_config == 0x80)
+        maxmemcount = 255;
+    else
+        maxmemcount = 32;
+    
+    if (startblock == 0)
+        startblock = 6;
+    if ((endblock > maxmemcount) || (endblock == 0))
+        endblock = maxmemcount;
+    if (endblock > filemaxblock)
+        endblock = filemaxblock;
+    int i = startblock;
+    int j;
+    while (i < endblock){
+        printf("block[%02x]: ",i);
+        memcpy(blockdata,iclass_dump + (i * 8),8);
+        for (j = 0;j < 8;j++)
+            printf("%02x",blockdata[j]);
+        printf("\n");
+        i++;
+    }
+    if ((i < filemaxblock) && (i < maxmemcount)){
+        printf("block[%02x]: ",i);
+        memcpy(blockdata,iclass_dump + (i * 8),8);
+        for (j = 0;j < 8;j++)
+            printf("%02x",blockdata[j]);
+        printf("\n");
+    }
+}
+int CmdHFiClassReadTagFile(const char *Cmd)
 {
-	{"help",	CmdHelp,			1,	"This help"},
-	{"list",	CmdHFiClassList,	0,	"[Deprecated] List iClass history"},
-	{"snoop",	CmdHFiClassSnoop,	0,	"Eavesdrop iClass communication"},
-	{"sim",	CmdHFiClassSim,		0,	"Simulate iClass tag"},
-	{"reader",CmdHFiClassReader,	0,	"Read an iClass tag"},
-	{"replay",CmdHFiClassReader_Replay,	0,	"Read an iClass tag via Reply Attack"},
-	{"dump",	CmdHFiClassReader_Dump,	0,		"Authenticate and Dump iClass tag"},
-//	{"write",	CmdHFiClass_iso14443A_write,	0,	"Authenticate and Write iClass block"},
-	{"loclass",	CmdHFiClass_loclass,	1,	"Use loclass to perform bruteforce of reader attack dump"},
-	{"eload",   CmdHFiClassELoad,    0,     "[experimental] Load data into iclass emulator memory"},
-	{"decrypt", CmdHFiClassDecrypt,  1,     "Decrypt tagdump" },
-	{NULL, NULL, 0, NULL}
-};
+    int startblock = 0;
+    int endblock = 0;
+    char tempnum[5];
+    FILE *f;
+    char filename[FILE_PATH_SIZE];
+    if (param_getstr(Cmd, 0, filename) < 1)
+        return usage_hf_iclass_readtagfile();
+    if (param_getstr(Cmd,1,(char *)&tempnum) < 1)
+        startblock = 0;
+    else
+        sscanf(tempnum,"%d",&startblock);
+    
+    if (param_getstr(Cmd,2,(char *)&tempnum) < 1)
+        endblock = 0;
+    else
+        sscanf(tempnum,"%d",&endblock);
+    // file handling and reading
+    f = fopen(filename,"rb");
+    if(!f) {
+        PrintAndLog("Failed to read from file '%s'", filename);
+        return 1;
+    }
+    fseek(f, 0, SEEK_END);
+    long fsize = ftell(f);
+    fseek(f, 0, SEEK_SET);
+    
+    uint8_t *dump = malloc(fsize);
+    
+    
+    size_t bytes_read = fread(dump, 1, fsize, f);
+    fclose(f);
+    uint8_t *csn = dump;
+    printf("CSN :      %02x %02x %02x %02x %02x %02x %02x %02x\n",csn[0],csn[1],csn[2],csn[3],csn[4],csn[5],csn[6],csn[7]);
+//    printIclassDumpInfo(dump);
+    printIclassDumpContents(dump,startblock,endblock,bytes_read);
+    free(dump);
+    return 0;
+}
+int usage_hf_iclass_calckey(){
+    PrintAndLog("error please load ekey");
+    return 1;
+}
+uint64_t xorcheck(uint64_t sdiv,uint64_t hdiv){
+    uint64_t new_div = 0x00;
+    new_div ^= sdiv;
+    new_div ^= hdiv;
+    return new_div;
+}
+uint64_t hexarray_to_uint64(uint8_t *key){
+    char temp[17];
+    uint64_t uint_key;
+    for (int i = 0;i < 8;i++)
+        sprintf(&temp[(i *2)],"%02X",key[i]);
+    temp[16] = '\0';
+    if (sscanf(temp,"%016llX",&uint_key) < 1)
+        return 0;
+    return uint_key;
+}
+int CmdHFiClassCalcEKey(const char *Cmd){
+    
+    uint8_t CSN[8]={0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00};
+    uint8_t std_div_key[8]={0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00};
+    uint8_t elite_div_key[8]={0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00};
+    uint8_t keytable[128] = {0};
+    uint8_t key_index[8] = {0};
+    uint64_t new_div_key;
+    uint64_t i_elite_div_key;
+    uint64_t i_std_div_key;
+    int i;
+    if (!HS_KEY_LOAD)
+        return usage_hf_iclass_calckey();
+    
+    hash2(HS_KEY, keytable);
+    
+    UsbCommand resp;
+    uint8_t key_sel[8] = {0};
+    uint8_t key_sel_p[8] = { 0 };
+    
+    UsbCommand c = {CMD_READER_ICLASS, {0}};
+    c.arg[0] = FLAG_ICLASS_READER_ONLY_ONCE| FLAG_ICLASS_READER_CC;
+    SendCommand(&c);
+    
+    if (!WaitForResponseTimeout(CMD_ACK,&resp,4500))
+    {
+        PrintAndLog("Command execute timeout");
+        return 0;
+    }
+    
+    uint8_t isOK    = resp.arg[0] & 0xff;
+    uint8_t * data  = resp.d.asBytes;
+    
+    memcpy(CSN,data,8);
+    
+//    PrintAndLog("isOk:%02x", isOK);
+    
+    if(isOK > 0)
+    {
+        PrintAndLog("CSN: %s",sprint_hex(CSN,8));
+    }
+    if(isOK <= 1){
+        PrintAndLog("Failed to obtain CC! Aborting");
+        return 0;
+    }
+    diversifyKey(CSN, GLOBAL_KEY, std_div_key);
+    
+//    printvar("(S)Div key", std_div_key, 8);
+    hash1(CSN, key_index);
+    for(i = 0; i < 8 ; i++)
+        key_sel[i] = keytable[key_index[i]] & 0xFF;
+    
+    //Permute from iclass format to standard format
+    permutekey_rev(key_sel,key_sel_p);
+    diversifyKey(CSN,key_sel_p, elite_div_key);
+//    printvar("(E)Div key", elite_div_key, 8);
+    i_elite_div_key = hexarray_to_uint64(elite_div_key);
+    i_std_div_key = hexarray_to_uint64(std_div_key);
+    new_div_key = xorcheck(i_std_div_key,i_elite_div_key);
+    printf("(E)Div key : %016llx\n",new_div_key);
+    return 0;
+    
+}
+int usage_hf_iclass_load(){
+    PrintAndLog("Usage:  hf iclass load <tagfile.bin> <start block> <end block>");
+    PrintAndLog("        sample: hf iclass write iclass_tagdump-121345.bin 6 19");
+    return -1;
+}
+// load data from tag file and write to another iclass tag
+int CmdHFiClass_load(const char *Cmd){
+    
+    if (strlen(Cmd) < 3)
+        return usage_hf_iclass_load();
+    int startblock = 0;
+    int endblock = 0;
+    char tempnum[5];
+    uint8_t mem_config;
+    FILE *f;
+    char filename[FILE_PATH_SIZE];
+    if (param_getstr(Cmd, 0, filename) < 1)
+        return usage_hf_iclass_load();
+    
+    if (param_getstr(Cmd,1,(char *)&tempnum) < 1)
+        startblock = 6;
+    else
+        sscanf(tempnum,"%d",&startblock);
+    
+    if (param_getstr(Cmd,2,(char *)&tempnum) < 1)
+        endblock = 0;
+    else
+        sscanf(tempnum,"%d",&endblock);
+    
+    // file handling and reading
+    f = fopen(filename,"rb");
+    if(!f) {
+        PrintAndLog("Failed to read from file '%s'", filename);
+        return 1;
+    }
+    fseek(f, 0, SEEK_END);
+    long fsize = ftell(f);
+    fseek(f, 0, SEEK_SET);
+    
+    uint8_t *dump = malloc(fsize);
+    
+    size_t bytes_read = fread(dump, 1, fsize, f);
+    fclose(f);
+    
+    memcpy(&mem_config,dump + 13,1);
+    uint8_t maxmemcount;
+    
+    uint8_t filemaxblock = bytes_read / 8;
+    if (mem_config == 0x80)
+        maxmemcount = 255;
+    else
+        maxmemcount = 32;
+    
+    if (startblock == 0)
+        startblock = 6;
+    if ((endblock > maxmemcount) || (endblock == 0))
+        endblock = maxmemcount;
+    if (endblock > filemaxblock)
+        endblock = filemaxblock;
+    
+    return 0;
+}
+int CmdHFIClassReadBlock(const char *Cmd){
+    uint8_t blockno=0;
+    uint8_t MAC[4]={0x00,0x00,0x00,0x00};
+    uint8_t KEY[8]={0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00};
+    uint8_t CSN[8]={0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00};
+    uint8_t CCNR[12]={0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00};
+    uint8_t div_key[8]={0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00};
+    
+    if (param_gethex(Cmd, 0,&blockno, 2))
+    {
+        PrintAndLog("Block No must include 2 HEX symbols");
+        return 1;
+    }
+    // tell the reader to send ACK and get CSN + CCNR
+    if (CmdHFiClass_SendACK(CSN,CCNR) != 0)
+    return 1;
+    
+    memcpy(KEY,GLOBAL_KEY,sizeof(KEY));
+    //    PrintAndLog("Pre-fortified key that would be needed by the OmniKey reader to talk to above CSN:");
+    //    printvar("Used key",KEY,8);
+    diversifyKey(CSN,KEY, div_key);
+    //    PrintAndLog("Hash0, a.k.a diversified key, that is computed using Ksel and stored in the card (Block 3):");
+    //    printvar("Div key", div_key, 8);
+    //    printvar("CC_NR:",CCNR,8);
+    doMAC(CCNR,div_key, MAC);
+    //    printvar("MAC", MAC, 4);
+    CmdHFiClass_SendAuthentication(MAC);
+    
+    // not yet implement
+    
+    return 0;
+}
 
+
+
+int CmdHFiClassCloneTag_Usage(){
+    PrintAndLog("Usage:  hf iclass clone <tagfile.bin> <start block> <end block> -e <KEY>");
+    PrintAndLog("        sample: hf iclass clone iclass_tagdump-121345.bin 6 19 -e 1122334455667788");
+    return -1;
+}
+int CmdHFiClassCloneTag(const char *Cmd){
+    if (strlen(Cmd) < 3)
+        return CmdHFiClassCloneTag_Usage();
+
+    int startblock = 0;
+    int endblock = 0;
+    char tempnum[5];
+    FILE *f;
+
+    iclass_block_t tag_data[26];
+    uint8_t MAC[4]={0x00,0x00,0x00,0x00};
+    uint8_t KEY[8]={0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00};
+    uint8_t CSN[8]={0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00};
+    uint8_t CCNR[12]={0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00};
+    uint8_t div_key[8]={0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00};
+   
+    char filename[FILE_PATH_SIZE];
+    // get tagfile parameter
+    if (param_getstr(Cmd, 0, filename) < 1)
+        return usage_hf_iclass_load();
+    // get start block parameter
+    if (param_getstr(Cmd,1,(char *)&tempnum) < 1)
+        startblock = 6;
+    else
+        sscanf(tempnum,"%x",&startblock);
+    // get end block parameter
+    if (param_getstr(Cmd,2,(char *)&tempnum) < 1)
+        endblock = 0;
+    else
+        sscanf(tempnum,"%x",&endblock);
+    
+    
+    // file handling and reading
+    f = fopen(filename,"rb");
+    if(!f) {
+        PrintAndLog("Failed to read from file '%s'", filename);
+        return 1;
+    }
+    
+   // now read data from the file from block 6 --- 19
+    // ok we will use this struct [data 8 bytes][MAC 4 bytes] for each block calculate all mac number for each data
+    // then copy to usbcommand->asbytes; the max is 32 - 6 = 24 block 12 bytes each block 288 bytes then we can only accept to clone 21 blocks at the time,
+    // else we have to create a share memory
+    int i;
+    fseek(f,6*8,SEEK_SET);
+    fread(tag_data,sizeof(iclass_block_t),32 - 6,f);
+    for (i = 0;i < 32 - 6; i++){
+        printf("block [%02x] [%02x%02x%02x%02x%02x%02x%02x%02x]\n",i + 6,tag_data[i].d[0],tag_data[i].d[1],tag_data[i].d[2],tag_data[i].d[3],tag_data[i].d[4],tag_data[i].d[5],tag_data[i].d[6],tag_data[i].d[7]);
+    }
+    
+    // tell the reader to send ACK and get CSN + CCNR
+    if (CmdHFiClass_SendACK(CSN,CCNR) != 0)
+        return 1;
+    
+    memcpy(KEY,GLOBAL_KEY,sizeof(KEY));
+    //    PrintAndLog("Pre-fortified key that would be needed by the OmniKey reader to talk to above CSN:");
+    //    printvar("Used key",KEY,8);
+    diversifyKey(CSN,KEY, div_key);
+    //    PrintAndLog("Hash0, a.k.a diversified key, that is computed using Ksel and stored in the card (Block 3):");
+    //    printvar("Div key", div_key, 8);
+    //    printvar("CC_NR:",CCNR,8);
+    doMAC(CCNR,div_key, MAC);
+    //    printvar("MAC", MAC, 4);
+    
+    // now authentication with the card
+    CmdHFiClass_SendAuthentication(MAC);
+    
+
+    // everythings is ready now
+    UsbCommand w = {CMD_ICLASS_CLONE,{startblock,endblock}};
+    uint8_t *ptr;
+    // calculate all mac for every the block we will write
+    for (i = startblock;i <= endblock;i++){
+        Calc_wb_mac(i,tag_data[i - 6].d,div_key,MAC);
+        // usb command d start pointer = d + (i - 6) * 12
+        // memcpy(pointer,tag_data[i - 6],8) 8 bytes
+        // memcpy(pointer + 8,mac,sizoof(mac) 4 bytes;
+        // next one
+        ptr = w.d.asBytes + (i - 6) * 12;
+        memcpy(ptr, &(tag_data[i - 6].d[0]), 8);
+        memcpy(ptr + 8,MAC, 4);
+    }
+    uint8_t p[12];
+    for (i = 0; i <= endblock - startblock;i++){
+        memcpy(p,w.d.asBytes + (i * 12),12);
+        printf("block [%02x]",i + 6);
+        printf(" [%02x%02x%02x%02x%02x%02x%02x%02x]",p[0],p[1],p[2],p[3],p[4],p[5],p[6],p[7]);
+        printf(" MAC [%02x%02x%02x%02x]\n",p[8],p[9],p[10],p[11]);
+    }
+    SendCommand(&w);
+    return 0;
+}
+int CmdHFiClassEKey_usage(){
+    PrintAndLog(" Usage: hf iclass ekey [filename] to load the key");
+    PrintAndLog("Sample: hf iclass ekey helloworld.key [load key from file]");
+    PrintAndLog("Sample: hf iclass ekey [show the current ekey]");
+    return -1;
+}
+int CmdHFiClassEKey(const char *Cmd){
+    if (strlen(Cmd) > 1)
+    {
+        if (readKeyfile(Cmd,sizeof(HS_KEY),HS_KEY) != 0)
+        {
+            HS_KEY_LOAD = false;
+            memcpy(HS_KEY,BLANK_KEY,sizeof(BLANK_KEY));
+            return CmdHFiClassEKey_usage();
+        }
+        HS_KEY_LOAD = true;
+    }
+    else
+    CmdHFiClass_printkey("HS Key",HS_KEY);
+    return 0;
+}
+static command_t CommandTable[] =
+{
+    {"help",        CmdHelp,                    	1,	"This help"},
+    {"list",        CmdHFiClassList,            	0,	"[Deprecated] List iClass history"},
+    {"snoop",       CmdHFiClassSnoop,           	0,	"Eavesdrop iClass communication"},
+    {"sim",         CmdHFiClassSim,             	0,	"Simulate iClass tag"},
+    {"reader",      CmdHFiClassReader,          	0,	"Read an iClass tag"},
+    {"replay",      CmdHFiClassReader_Replay,       0,	"Read an iClass tag via Reply Attack"},
+    {"dump",        CmdHFiClassReader_Dump,         0,	"Authenticate and Dump iClass tag"},
+    {"write",       CmdHFiClass_iso14443A_write,	0,	"Authenticate and Write iClass block"},
+    {"read",        CmdHFIClassReadBlock,           0,  "Authenticate and Read iClass block"},
+    {"load",        CmdHFiClass_load,           	0,	"Load from tagfile to iclass card"},
+    {"loclass",     CmdHFiClass_loclass,            1,	"Use loclass to perform bruteforce of reader attack dump"},
+    {"eload",   	CmdHFiClassELoad,               0,  "[experimental] Load data into iclass emulator memory"},
+    {"decrypt", 	CmdHFiClassDecrypt,             1,  "Decrypt tagdump" },
+    {"readtagfile",	CmdHFiClassReadTagFile,         1,	"Display Content from tagfile"},
+    {"ediv",        CmdHFiClassCalcEKey,            0,	"Give Diversify key for this card to write to block 3"},
+    {"readkey",     CmdHFiClassReadKeyFile,         1,	"Read and display key from file"},
+    {"savekey",     CmdHFiClassSaveKeyFile,         1,	"Write key to file"},
+    {"clone",       CmdHFiClassCloneTag,            0,  "Clone tag"},
+    {"ekey",        CmdHFiClassEKey,                1,  "Load HS key from file or show current HS Key"},
+    {NULL,          NULL,                           0,  NULL}
+};
 int CmdHFiClass(const char *Cmd)
 {
 	CmdsParse(CommandTable, Cmd);

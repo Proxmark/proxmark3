@@ -894,7 +894,12 @@ void UsbPacketReceived(uint8_t *packet, int len)
 			break;
 		case CMD_AWID_DEMOD_FSK: // Set realtime AWID demodulation
 			CmdAWIDdemodFSK(c->arg[0], 0, 0, 1);
-                        break;
+            break;
+        case CMD_VIKING_CLONE_TAG:
+            CopyViKingtoT55x7(c->arg[0],c->arg[1]);
+            break;
+
+    
 #endif
 
 #ifdef WITH_HITAG
@@ -1076,9 +1081,19 @@ void UsbPacketReceived(uint8_t *packet, int len)
 		case CMD_READER_ICLASS_REPLAY:
 		    ReaderIClass_Replay(c->arg[0], c->d.asBytes);
 			break;
-	case CMD_ICLASS_EML_MEMSET:
+        case CMD_ICLASS_EML_MEMSET:
 			emlSet(c->d.asBytes,c->arg[0], c->arg[1]);
 			break;
+        case CMD_ICLASS_ISO14443A_WRITE:
+            IClass_iso14443A_write(c->arg[0],c->d.asBytes);
+            break;
+        case CMD_ICLASS_AUTHENTICATION:
+            IClass_Authentication(c->d.asBytes);
+            break;
+        case CMD_ICLASS_CLONE:
+            IClass_Clone(c->arg[0],c->arg[1],c->d.asBytes);
+            break;
+            
 #endif
 
 		case CMD_BUFF_CLEAR:

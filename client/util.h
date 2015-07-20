@@ -65,3 +65,4 @@ void wiegand_add_parity(char *target, char *source, char length);
 
 void xor(unsigned char *dst, unsigned char *src, size_t len);
 int32_t le24toh(uint8_t data[3]);
+size_t bytes_to_bits(const uint8_t *src,size_t src_size,uint8_t *des,size_t des_size);

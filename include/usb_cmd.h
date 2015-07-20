@@ -96,6 +96,8 @@ typedef struct{
 #define CMD_ASK_SIM_TAG                                                   0x021F
 #define CMD_PSK_SIM_TAG                                                   0x0220
 #define CMD_AWID_DEMOD_FSK                                                0x0221
+#define CMD_VIKING_CLONE_TAG                                              0x0222
+
 
 /* CMD_SET_ADC_MUX: ext1 is 0 for lopkd, 1 for loraw, 2 for hipkd, 3 for hiraw */
 
@@ -135,6 +137,9 @@ typedef struct{
 #define CMD_READER_ICLASS_REPLAY                                          0x0395
 #define CMD_ICLASS_ISO14443A_WRITE                                        0x0397
 #define CMD_ICLASS_EML_MEMSET                                             0x0398
+#define CMD_ICLASS_AUTHENTICATION                                         0x0399
+#define CMD_ICLASS_READBLOCK                                              0x039A
+#define CMD_ICLASS_CLONE                                                  0x039B
 
 // For measurements of the antenna tuning
 #define CMD_MEASURE_ANTENNA_TUNING                                        0x0400
