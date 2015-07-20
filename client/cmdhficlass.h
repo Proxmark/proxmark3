@@ -20,5 +20,11 @@ int CmdHFiClassList(const char *Cmd);
 int HFiClassReader(const char *Cmd, bool loop, bool verbose);
 int CmdHFiClassReader(const char *Cmd);
 int CmdHFiClassReader_Replay(const char *Cmd);
+int CmdHFiClassReadKeyFile(const char *filename);
+int CmdHFiClassWriteKeyFile(const char *Cmd);
+int CmdHFiClass_ReadBlock(const char *Cmd);
+int CmdHFiClass_WriteBlock(const char *Cmd);
+int CmdHFiClassCalcEKey(const char *Cmd);
+int CmdHFiClass_TestMac(const char *Cmd);
 
 #endif

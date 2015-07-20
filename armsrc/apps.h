@@ -149,9 +149,6 @@ void 	OnSuccess();
 void 	OnError(uint8_t reason);
 
 
-
-
-
 /// iso15693.h
 void RecordRawAdcSamplesIso15693(void);
 void AcquireRawAdcSamplesIso15693(void);
@@ -167,6 +164,12 @@ void SimulateIClass(uint32_t arg0, uint32_t arg1, uint32_t arg2, uint8_t *datain
 void ReaderIClass(uint8_t arg0);
 void ReaderIClass_Replay(uint8_t arg0,uint8_t *MAC);
 void IClass_iso14443A_GetPublic(uint8_t arg0);
+void iClass_Authentication(uint8_t *MAC);
+void iClass_WriteBlock(uint8_t blockNo, uint8_t keyType, uint8_t *data);
+void iClass_ReadBlk(uint8_t blockNo, uint8_t keyType);
+bool iClass_ReadBlock(uint8_t blockNo, uint8_t keyType, uint8_t *readdata);
+void iClass_Dump(uint8_t blockno, uint8_t numblks, uint8_t keyType);
+void iClass_Clone(uint8_t startblock, uint8_t endblock, uint8_t keyType, uint8_t *data);
 
 // hitag2.h
 void SnoopHitag(uint32_t type);

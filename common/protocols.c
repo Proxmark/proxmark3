@@ -74,24 +74,30 @@ void fuse_config(const picopass_hdr *hdr)
 	if( isset( fuses, FUSE_RA)) prnt("	RA: Read access enabled");
 	else prnt("	RA: Read access not enabled");
 }
-void mem_config(const picopass_hdr *hdr)
+void mem_app_config(const picopass_hdr *hdr)
 {
 	uint8_t mem = hdr->conf.mem_config;
-	if( isset (mem, 0x80)) prnt("	Mem: 16KBits (255 * 8 bytes)");
-	else prnt("	Mem: 2 KBits ( 32 * 8 bytes)");
-
-}
-void applimit_config(const picopass_hdr *hdr)
-{
 	uint8_t applimit = hdr->conf.app_limit;
-	prnt("	AA1: blocks 6-%d", applimit);
-	prnt("	AA2: blocks %d-", (applimit+1));
+	if (applimit < 6) applimit = 26;
+	uint8_t kb=2;
+	uint8_t maxBlk = 32;
+	if( isset(mem, 0x10) && notset(mem, 0x80)){
+		// 2kb default
+	} else if( isset(mem, 0x80) && notset(mem, 0x10)){
+		kb = 16;
+		maxBlk = 255; //16kb
+	} else {
+		kb = 32;
+		maxBlk = 255;
+	}
+	prnt("  Mem: %u KBits ( %u * 8 bytes) [%02X]", kb, maxBlk, mem);
+	prnt("	AA1: blocks 06-%02X", applimit);
+	prnt("	AA2: blocks %02X-%02X", (applimit+1), (hdr->conf.mem_config));
 }
 void print_picopass_info(const picopass_hdr *hdr)
 {
 	fuse_config(hdr);
-	mem_config(hdr);
-	applimit_config(hdr);
+	mem_app_config(hdr);
 }
 void printIclassDumpInfo(uint8_t* iclass_dump)
 {

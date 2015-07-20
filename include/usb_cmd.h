@@ -128,12 +128,16 @@ typedef struct{
 #define CMD_EPA_PACE_COLLECT_NONCE                                        0x038A
 #define CMD_EPA_PACE_REPLAY                                               0x038B
 
+#define CMD_ICLASS_CLONE                                                  0x0390
+#define CMD_ICLASS_DUMP                                                   0x0391
 #define CMD_SNOOP_ICLASS                                                  0x0392
 #define CMD_SIMULATE_TAG_ICLASS                                           0x0393
 #define CMD_READER_ICLASS                                                 0x0394
 #define CMD_READER_ICLASS_REPLAY                                          0x0395
-#define CMD_ICLASS_ISO14443A_WRITE                                        0x0397
+#define CMD_ICLASS_READBLOCK                                              0x0396
+#define CMD_ICLASS_WRITEBLOCK                                             0x0397
 #define CMD_ICLASS_EML_MEMSET                                             0x0398
+#define CMD_ICLASS_AUTHENTICATION                                         0x0399
 
 // For measurements of the antenna tuning
 #define CMD_MEASURE_ANTENNA_TUNING                                        0x0400
@@ -204,6 +208,7 @@ typedef struct{
 #define FLAG_ICLASS_READER_CONF         0x08
 #define FLAG_ICLASS_READER_AA           0x10
 #define FLAG_ICLASS_READER_ONE_TRY      0x20
+#define FLAG_ICLASS_READER_CEDITKEY     0x40
 
 
 
