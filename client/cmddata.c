@@ -26,8 +26,8 @@
 #include "crc16.h"
 
 uint8_t DemodBuffer[MAX_DEMOD_BUF_LEN];
-uint8_t g_debugMode;
-size_t DemodBufferLen;
+uint8_t g_debugMode=0;
+size_t DemodBufferLen=0;
 static int CmdHelp(const char *Cmd);
 
 //set the demod buffer with given array of binary (one bit per byte)
@@ -1491,9 +1491,9 @@ int CmdFDXBdemodBI(const char *Cmd){
 
 	setDemodBuf(BitStream, 128, preambleIndex);
 
-	// remove but don't verify parity. (pType = 2)
+	// remove marker bits (1's every 9th digit after preamble) (pType = 2)
 	size = removeParity(BitStream, preambleIndex + 11, 9, 2, 117);
-	if ( size <= 103 ) {
+	if ( size != 104 ) {
 		if (g_debugMode) PrintAndLog("Error removeParity:: %d", size);
 		return 0;
 	}

@@ -16,6 +16,7 @@ This project uses the changelog in accordance with [keepchangelog](http://keepac
 ## [2.2.0][2015-07-12]
 
 ### Changed
+- Added `hf 14b raw -s` option to auto select a 14b std tag before raw command 
 - Changed `hf 14b write` to `hf 14b sriwrite` as it only applied to sri tags (marshmellow)
 - Added `hf 14b info` to `hf search` (marshmellow)
 - Added compression of fpga config and data, *BOOTROM REFLASH REQUIRED* (piwi)
