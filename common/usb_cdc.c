@@ -293,31 +293,47 @@ bool usb_poll()
   return (pUdp->UDP_CSR[AT91C_EP_OUT] & btReceiveBank);
 }
 
+/**
+	In github PR #129, some users appears to get a false positive from
+	usb_poll, which returns true, but the usb_read operation
+	still returns 0.
+	This check is basically the same as above, but also checks
+	that the length available to read is non-zero, thus hopefully fixes the
+	bug.
+**/
+bool usb_poll_validate_length()
+{
+
+	if (!usb_check()) return false;
+	if (!(pUdp->UDP_CSR[AT91C_EP_OUT] & btReceiveBank)) return false;
+	return (pUdp->UDP_CSR[AT91C_EP_OUT] >> 16) >  0;
+}
+
 //*----------------------------------------------------------------------------
 //* \fn    usb_read
 //* \brief Read available data from Endpoint OUT
 //*----------------------------------------------------------------------------
 uint32_t usb_read(byte_t* data, size_t len) {
-  byte_t bank = btReceiveBank;
+	byte_t bank = btReceiveBank;
 	uint32_t packetSize, nbBytesRcv = 0;
-  uint32_t time_out = 0;
+	uint32_t time_out = 0;
   
 	while (len)  {
 		if (!usb_check()) break;
 
 		if ( pUdp->UDP_CSR[AT91C_EP_OUT] & bank ) {
 			packetSize = MIN(pUdp->UDP_CSR[AT91C_EP_OUT] >> 16, len);
-      len -= packetSize;
+			len -= packetSize;
 			while(packetSize--)
 				data[nbBytesRcv++] = pUdp->UDP_FDR[AT91C_EP_OUT];
 			pUdp->UDP_CSR[AT91C_EP_OUT] &= ~(bank);
 			if (bank == AT91C_UDP_RX_DATA_BK0) {
 				bank = AT91C_UDP_RX_DATA_BK1;
-      } else {
+			} else {
 				bank = AT91C_UDP_RX_DATA_BK0;
-      }
+			}
 		}
-    if (time_out++ == 0x1fff) break;
+		if (time_out++ == 0x1fff) break;
 	}
 
 	btReceiveBank = bank;
