@@ -25,6 +25,7 @@
 #include <hitag2.h>
 #include "lfsampling.h"
 #include "BigBuf.h"
+#include "mifareutil.h"
 #ifdef WITH_LCD
  #include "LCD.h"
 #endif
@@ -296,6 +297,19 @@ void SendVersion(void)
 	uint32_t text_and_rodata_section_size = (uint32_t)&__data_src_start__ - (uint32_t)&_flash_start;
 	uint32_t compressed_data_section_size = common_area.arg1;
 	cmd_send(CMD_ACK, *(AT91C_DBGU_CIDR), text_and_rodata_section_size + compressed_data_section_size, 0, VersionString, strlen(VersionString));
+}
+/**
+  * Prints runtime information about the PM3.
+**/
+void SendStatus(void)
+{
+	BigBuf_print_status();
+	Fpga_print_status();
+	printConfig(); //LF Sampling config
+	Dbprintf("Various");
+	Dbprintf("  MF_DBGLEVEL......%d", MF_DBGLEVEL);
+	Dbprintf("  ToSendMax........%d",ToSendMax);
+	Dbprintf("  ToSendBit........%d",ToSendBit);
 }
 
 #if defined(WITH_ISO14443a_StandAlone) || defined(WITH_LF)
@@ -1143,7 +1157,12 @@ void UsbPacketReceived(uint8_t *packet, int len)
 		case CMD_VERSION:
 			SendVersion();
 			break;
-
+		case CMD_STATUS:
+			SendStatus();
+			break;
+		case CMD_PING:
+			cmd_send(CMD_ACK,0,0,0,0,0);
+			break;
 #ifdef WITH_LCD
 		case CMD_LCD_RESET:
 			LCDReset();
