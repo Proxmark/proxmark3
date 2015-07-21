@@ -1918,7 +1918,6 @@ void iClass_Authentication(uint8_t *MAC) {
 	bool isOK;
 	isOK = sendCmdGetResponseWithRetries(check, sizeof(check),resp, 4, 5);
 	cmd_send(CMD_ACK,isOK,0,0,0,0);
-	//Dbprintf("isOK %d, Tag response : %02x%02x%02x%02x",isOK,resp[0],resp[1],resp[2],resp[3]);
 }
 bool iClass_ReadBlock(uint8_t blockNo, uint8_t keyType, uint8_t *readdata) {
 	uint8_t readcmd[] = {keyType, blockNo}; //0x88, 0x00
@@ -1936,7 +1935,6 @@ void iClass_ReadBlk(uint8_t blockno, uint8_t keyType) {
 	uint8_t readblockdata[8];
 	bool isOK = false;
 	isOK = iClass_ReadBlock(blockno, keyType, readblockdata);
-	//Dbprintf("read block [%02x] [%02x%02x%02x%02x%02x%02x%02x%02x]",blockNo,readblockdata[0],readblockdata[1],readblockdata[2],readblockdata[3],readblockdata[4],readblockdata[5],readblockdata[6],readblockdata[7]);
 	cmd_send(CMD_ACK,isOK,0,0,readblockdata,8);
 }
 
@@ -1964,11 +1962,6 @@ void iClass_Dump(uint8_t blockno, uint8_t numblks, uint8_t keyType) {
 			}
 		}
 		memcpy(dataout+(blkCnt*8),readblockdata,8);
-		/*Dbprintf("| %02x | %02x%02x%02x%02x%02x%02x%02x%02x |",
-			blockno+blkCnt, readblockdata[0], readblockdata[1], readblockdata[2],
-			readblockdata[3], readblockdata[4], readblockdata[5],
-			readblockdata[6], readblockdata[7]);
-		*/
 	}
 	//return pointer to dump memory in arg3
 	cmd_send(CMD_ACK,isOK,blkCnt,BigBuf_max_traceLen(),0,0);
@@ -1985,7 +1978,6 @@ bool iClass_WriteBlock_ext(uint8_t blockNo, uint8_t keyType, uint8_t *data) {
 	uint8_t resp[10];
 	bool isOK;
 	isOK = sendCmdGetResponseWithRetries(write,sizeof(write),resp,sizeof(resp),5);
-	//Dbprintf("reply       [%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x]",resp[0],resp[1],resp[2],resp[3],resp[4],resp[5],resp[6],resp[7],resp[8],resp[9]);
 	if (isOK) {
 		isOK = iClass_ReadBlock(blockNo, keyType, readblockdata);
 		//try again
@@ -1993,7 +1985,6 @@ bool iClass_WriteBlock_ext(uint8_t blockNo, uint8_t keyType, uint8_t *data) {
 			isOK = iClass_ReadBlock(blockNo, keyType, readblockdata);
 	}
 	if (isOK) {
-		//Dbprintf("read block  [%02x] [%02x%02x%02x%02x%02x%02x%02x%02x]",blockNo,readblockdata[0],readblockdata[1],readblockdata[2],readblockdata[3],readblockdata[4],readblockdata[5],readblockdata[6],readblockdata[7]);
 		if (memcmp(write+2,readblockdata,sizeof(readblockdata)) != 0){
 			isOK=false;
 		}
