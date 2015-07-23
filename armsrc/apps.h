@@ -166,11 +166,12 @@ void ReaderIClass(uint8_t arg0);
 void ReaderIClass_Replay(uint8_t arg0,uint8_t *MAC);
 void IClass_iso14443A_GetPublic(uint8_t arg0);
 void iClass_Authentication(uint8_t *MAC);
-void iClass_WriteBlock(uint8_t blockNo, uint8_t keyType, uint8_t *data);
-void iClass_ReadBlk(uint8_t blockNo, uint8_t keyType);
-bool iClass_ReadBlock(uint8_t blockNo, uint8_t keyType, uint8_t *readdata);
-void iClass_Dump(uint8_t blockno, uint8_t numblks, uint8_t keyType);
-void iClass_Clone(uint8_t startblock, uint8_t endblock, uint8_t keyType, uint8_t *data);
+void iClass_WriteBlock(uint8_t blockNo, uint8_t *data);
+void iClass_ReadBlk(uint8_t blockNo);
+bool iClass_ReadBlock(uint8_t blockNo, uint8_t *readdata);
+void iClass_Dump(uint8_t blockno, uint8_t numblks);
+void iClass_Clone(uint8_t startblock, uint8_t endblock, uint8_t *data);
+void iClass_ReadCheck(uint8_t	blockNo, uint8_t keyType);
 
 // hitag2.h
 void SnoopHitag(uint32_t type);

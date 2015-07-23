@@ -1769,8 +1769,8 @@ void ReaderIClass(uint8_t arg0) {
 		}
 		LED_B_OFF();
 	}
-    cmd_send(CMD_ACK,0,0,0,card_data, 0);
-    LED_A_OFF();
+	cmd_send(CMD_ACK,0,0,0,card_data, 0);
+	LED_A_OFF();
 }
 
 void ReaderIClass_Replay(uint8_t arg0, uint8_t *MAC) {
@@ -1911,51 +1911,63 @@ void ReaderIClass_Replay(uint8_t arg0, uint8_t *MAC) {
 	LED_A_OFF();
 }
 
+void iClass_ReadCheck(uint8_t	blockNo, uint8_t keyType) {
+	uint8_t readcheck[] = { keyType, blockNo };
+	uint8_t resp[] = {0,0,0,0,0,0,0,0};
+	size_t isOK = 0;
+	isOK = sendCmdGetResponseWithRetries(readcheck, sizeof(readcheck), resp, sizeof(resp), 6);
+	cmd_send(CMD_ACK,isOK,0,0,0,0);
+}
+
 void iClass_Authentication(uint8_t *MAC) {
-	uint8_t check[] = { 0x05, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
+	uint8_t check[] = { ICLASS_CMD_CHECK, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
 	uint8_t resp[ICLASS_BUFFER_SIZE];
 	memcpy(check+5,MAC,4);
 	bool isOK;
-	isOK = sendCmdGetResponseWithRetries(check, sizeof(check),resp, 4, 5);
+	isOK = sendCmdGetResponseWithRetries(check, sizeof(check), resp, 4, 6);
 	cmd_send(CMD_ACK,isOK,0,0,0,0);
 }
-bool iClass_ReadBlock(uint8_t blockNo, uint8_t keyType, uint8_t *readdata) {
-	uint8_t readcmd[] = {keyType, blockNo}; //0x88, 0x00
-	uint8_t resp[8];
-	size_t isOK = 1;
+bool iClass_ReadBlock(uint8_t blockNo, uint8_t *readdata) {
+	uint8_t readcmd[] = {ICLASS_CMD_READ_OR_IDENTIFY, blockNo, 0x00, 0x00}; //0x88, 0x00 // can i use 0C?
+	char bl = blockNo;
+	uint16_t rdCrc = iclass_crc16(&bl, 1);
+	readcmd[2] = rdCrc >> 8;
+	readcmd[3] = rdCrc & 0xff;
+	uint8_t resp[] = {0,0,0,0,0,0,0,0,0,0};
+	bool isOK = false;
 
-	readcmd[1] = blockNo;
-	isOK = sendCmdGetResponseWithRetries(readcmd, sizeof(readcmd),resp, 8, 5);
-	memcpy(readdata,resp,sizeof(resp));
+	//readcmd[1] = blockNo;
+	isOK = sendCmdGetResponseWithRetries(readcmd, sizeof(readcmd), resp, 10, 10);
+	memcpy(readdata, resp, sizeof(resp));
 
 	return isOK;
 }
 
-void iClass_ReadBlk(uint8_t blockno, uint8_t keyType) {
-	uint8_t readblockdata[8];
+void iClass_ReadBlk(uint8_t blockno) {
+	uint8_t readblockdata[] = {0,0,0,0,0,0,0,0,0,0};
 	bool isOK = false;
-	isOK = iClass_ReadBlock(blockno, keyType, readblockdata);
-	cmd_send(CMD_ACK,isOK,0,0,readblockdata,8);
+	isOK = iClass_ReadBlock(blockno, readblockdata);
+	cmd_send(CMD_ACK, isOK, 0, 0, readblockdata, 8);
 }
 
-void iClass_Dump(uint8_t blockno, uint8_t numblks, uint8_t keyType) {
-	uint8_t readblockdata[8];
+void iClass_Dump(uint8_t blockno, uint8_t numblks) {
+	uint8_t readblockdata[] = {0,0,0,0,0,0,0,0,0,0};
 	bool isOK = false;
 	uint8_t blkCnt = 0;
 
 	BigBuf_free();
 	uint8_t *dataout = BigBuf_malloc(255*8);
-	memset(dataout,0xFF,255*8);
 	if (dataout == NULL){
 		Dbprintf("out of memory");
 		OnError(1);
 		return;
 	}
+	memset(dataout,0xFF,255*8);
 
 	for (;blkCnt < numblks; blkCnt++) {
-		isOK = iClass_ReadBlock(blockno+blkCnt, keyType, readblockdata);
-		if (!isOK || (readblockdata[0] == 0xBB || readblockdata[7] == 0x33 || readblockdata[2] == 0xBB)) { //try again
-			isOK = iClass_ReadBlock(blockno+blkCnt, keyType, readblockdata);
+		isOK = iClass_ReadBlock(blockno+blkCnt, readblockdata);
+		if (!isOK || (readblockdata[0] == 0xBB || readblockdata[7] == 0xBB || readblockdata[2] == 0xBB)) { //try again
+			isOK = iClass_ReadBlock(blockno+blkCnt, readblockdata);
 			if (!isOK) {
 				Dbprintf("Block %02X failed to read", blkCnt+blockno);
 				break;
@@ -1970,30 +1982,26 @@ void iClass_Dump(uint8_t blockno, uint8_t numblks, uint8_t keyType) {
 	BigBuf_free();
 }
 
-bool iClass_WriteBlock_ext(uint8_t blockNo, uint8_t keyType, uint8_t *data) {
-	uint8_t write[] = { 0x87, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
-	uint8_t readblockdata[8];
-	write[1] = blockNo;
+bool iClass_WriteBlock_ext(uint8_t blockNo, uint8_t *data) {
+	uint8_t write[] = { ICLASS_CMD_UPDATE, blockNo, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
+	//uint8_t readblockdata[10];
+	//write[1] = blockNo;
 	memcpy(write+2, data, 12); // data + mac
-	uint8_t resp[10];
+	uint8_t resp[] = {0,0,0,0,0,0,0,0,0,0};
 	bool isOK;
-	isOK = sendCmdGetResponseWithRetries(write,sizeof(write),resp,sizeof(resp),5);
+	isOK = sendCmdGetResponseWithRetries(write,sizeof(write),resp,sizeof(resp),10);
 	if (isOK) {
-		isOK = iClass_ReadBlock(blockNo, keyType, readblockdata);
-		//try again
-		if (!isOK || (readblockdata[0] == 0xBB || readblockdata[7] == 0xBB || readblockdata[2] == 0xBB)) 
-			isOK = iClass_ReadBlock(blockNo, keyType, readblockdata);
-	}
-	if (isOK) {
-		if (memcmp(write+2,readblockdata,sizeof(readblockdata)) != 0){
-			isOK=false;
+		//Dbprintf("WriteResp: %02X%02X%02X%02X%02X%02X%02X%02X%02X%02X",resp[0],resp[1],resp[2],resp[3],resp[4],resp[5],resp[6],resp[7],resp[8],resp[9]);
+		if (memcmp(write+2,resp,8)) {
+			//error try again
+			isOK = sendCmdGetResponseWithRetries(write,sizeof(write),resp,sizeof(resp),10);
 		}
 	}
 	return isOK;
 }
 
-void iClass_WriteBlock(uint8_t blockNo, uint8_t keyType, uint8_t *data) {
-	bool isOK = iClass_WriteBlock_ext(blockNo, keyType, data);
+void iClass_WriteBlock(uint8_t blockNo, uint8_t *data) {
+	bool isOK = iClass_WriteBlock_ext(blockNo, data);
 	if (isOK){
 		Dbprintf("Write block [%02x] successful",blockNo);
 	} else {
@@ -2002,17 +2010,17 @@ void iClass_WriteBlock(uint8_t blockNo, uint8_t keyType, uint8_t *data) {
 	cmd_send(CMD_ACK,isOK,0,0,0,0);	
 }
 
-void iClass_Clone(uint8_t startblock, uint8_t endblock, uint8_t keyType, uint8_t *data) {
+void iClass_Clone(uint8_t startblock, uint8_t endblock, uint8_t *data) {
 	int i;
 	int written = 0;
 	int total_block = (endblock - startblock) + 1;
 	for (i = 0; i < total_block;i++){
 		// block number
-		if (iClass_WriteBlock_ext(i+startblock, keyType, data+(i*12))){
+		if (iClass_WriteBlock_ext(i+startblock, data+(i*12))){
 			Dbprintf("Write block [%02x] successful",i + startblock);
 			written++;
 		} else {
-			if (iClass_WriteBlock_ext(i+startblock, keyType, data+(i*12))){
+			if (iClass_WriteBlock_ext(i+startblock, data+(i*12))){
 				Dbprintf("Write block [%02x] successful",i + startblock);
 				written++;
 			} else {

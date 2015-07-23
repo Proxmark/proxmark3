@@ -472,7 +472,7 @@ static bool select_only(uint8_t *CSN, uint8_t *CCNR, bool use_credit_key, bool v
 	UsbCommand resp;
 
 	UsbCommand c = {CMD_READER_ICLASS, {0}};
-	c.arg[0] = FLAG_ICLASS_READER_ONLY_ONCE| FLAG_ICLASS_READER_CC;
+	c.arg[0] = FLAG_ICLASS_READER_ONLY_ONCE | FLAG_ICLASS_READER_CC | FLAG_ICLASS_READER_ONE_TRY;
 	if (use_credit_key)
 		c.arg[0] |= FLAG_ICLASS_READER_CEDITKEY;
 
@@ -651,6 +651,7 @@ int CmdHFiClassReader_Dump(const char *Cmd) {
 	SendCommand(&c);
 	if (!WaitForResponseTimeout(CMD_ACK, &resp, 4500)) {
 		PrintAndLog("Command execute timeout");
+		ul_switch_off_field();
 		return 0;
 	}
 	uint8_t readStatus = resp.arg[0] & 0xff;
@@ -658,6 +659,7 @@ int CmdHFiClassReader_Dump(const char *Cmd) {
 
 	if(readStatus == 0){
 		PrintAndLog("No tag found...");
+		ul_switch_off_field();
 		return 0;
 	}
 	if( readStatus & (FLAG_ICLASS_READER_CSN|FLAG_ICLASS_READER_CONF|FLAG_ICLASS_READER_CC)){
@@ -673,6 +675,7 @@ int CmdHFiClassReader_Dump(const char *Cmd) {
 		}
 		if (numblks > maxBlk) numblks = maxBlk;
 	}
+	ul_switch_off_field();
 	// authenticate debit key and get div_key - later store in dump block 3
 	if (!select_and_auth(KEY, MAC, div_key, use_credit_key, elite, false)){
 		//try twice - for some reason it sometimes fails the first time...
@@ -683,17 +686,19 @@ int CmdHFiClassReader_Dump(const char *Cmd) {
 	}
 	
 	// begin dump
-	UsbCommand w = {CMD_ICLASS_DUMP, {blockno, numblks-blockno+1, 0x88}};
+	UsbCommand w = {CMD_ICLASS_DUMP, {blockno, numblks-blockno+1}};
 	clearCommandBuffer();
 	SendCommand(&w);
 	if (!WaitForResponseTimeout(CMD_ACK, &resp, 4500)) {
 		PrintAndLog("Command execute time-out 1");
+		ul_switch_off_field();
 		return 1;
 	}
 	uint32_t blocksRead = resp.arg[1];
 	uint8_t isOK = resp.arg[0] & 0xff;
 	if (!isOK && !blocksRead) {
 		PrintAndLog("Read Block Failed");
+		ul_switch_off_field();
 		return 0;
 	}
 	uint32_t startindex = resp.arg[2];
@@ -724,17 +729,18 @@ int CmdHFiClassReader_Dump(const char *Cmd) {
 			// setup dump and start
 			w.arg[0] = blockno + blocksRead;
 			w.arg[1] = maxBlk - (blockno + blocksRead);
-			w.arg[2] = 0x18;
 			clearCommandBuffer();
 			SendCommand(&w);
 			if (!WaitForResponseTimeout(CMD_ACK, &resp, 4500)) {
 				PrintAndLog("Command execute timeout 2");
+				ul_switch_off_field();
 				return 0;
 			}
 			uint8_t isOK = resp.arg[0] & 0xff;
 			blocksRead = resp.arg[1];
 			if (!isOK && !blocksRead) {
 				PrintAndLog("Read Block Failed 2");
+				ul_switch_off_field();
 				return 0;
 			}		
 
@@ -776,16 +782,15 @@ int CmdHFiClassReader_Dump(const char *Cmd) {
 static int WriteBlock(uint8_t blockno, uint8_t *bldata, uint8_t *KEY, bool use_credit_key, bool elite, bool verbose) {
 	uint8_t MAC[4]={0x00,0x00,0x00,0x00};
 	uint8_t div_key[8]={0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00};
-	uint8_t keyType = (use_credit_key) ? 0x18 : 0x88;
 	if (!select_and_auth(KEY, MAC, div_key, use_credit_key, elite, verbose))
 		return 0;
 
 	UsbCommand resp;
 
 	Calc_wb_mac(blockno,bldata,div_key,MAC);
-	UsbCommand w = {CMD_ICLASS_WRITEBLOCK, {blockno, keyType}};
+	UsbCommand w = {CMD_ICLASS_WRITEBLOCK, {blockno}};
 	memcpy(w.d.asBytes, bldata, 8);
-	memcpy(w.d.asBytes + 8,MAC, 4);
+	memcpy(w.d.asBytes + 8, MAC, 4);
 	
 	clearCommandBuffer();
 	SendCommand(&w);
@@ -800,7 +805,6 @@ static int WriteBlock(uint8_t blockno, uint8_t *bldata, uint8_t *KEY, bool use_c
 		return 0;
 	}
 	PrintAndLog("Write Block Successful");
-
 	return 1;
 }
 
@@ -820,7 +824,7 @@ int usage_hf_iclass_writeblock(void) {
 
 int CmdHFiClass_WriteBlock(const char *Cmd) {
 	uint8_t blockno=0;
-	uint8_t bldata[8]={0};
+	uint8_t bldata[8]={0,0,0,0,0,0,0,0};
 	uint8_t KEY[8]={0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00};
 	uint8_t keyNbr = 0;
 	uint8_t dataLen = 0;
@@ -891,8 +895,9 @@ int CmdHFiClass_WriteBlock(const char *Cmd) {
 	}
 
 	if (cmdp < 6) return usage_hf_iclass_writeblock();
-
-	return WriteBlock(blockno, bldata, KEY, use_credit_key, elite, true);
+	int ans = WriteBlock(blockno, bldata, KEY, use_credit_key, elite, true);
+	ul_switch_off_field();
+	return ans;
 }
 
 int usage_hf_iclass_clone(void) {
@@ -1027,7 +1032,7 @@ int CmdHFiClassCloneTag(const char *Cmd) {
 	if (!select_and_auth(KEY, MAC, div_key, use_credit_key, elite, true))
 		return 0;
 
-	UsbCommand w = {CMD_ICLASS_CLONE,{startblock,endblock,((use_credit_key) ? 0x18 : 0x88)}};
+	UsbCommand w = {CMD_ICLASS_CLONE,{startblock,endblock}};
 	uint8_t *ptr;
 	// calculate all mac for every the block we will write
 	for (i = startblock; i <= endblock; i++){
@@ -1065,7 +1070,7 @@ static int ReadBlock(uint8_t *KEY, uint8_t blockno, uint8_t keyType, bool elite,
 		return 0;
 
 	UsbCommand resp;
-	UsbCommand w = {CMD_ICLASS_READBLOCK, {blockno, keyType}};
+	UsbCommand w = {CMD_ICLASS_READBLOCK, {blockno}};
 	clearCommandBuffer();
 	SendCommand(&w);
 	if (!WaitForResponseTimeout(CMD_ACK,&resp,4500))

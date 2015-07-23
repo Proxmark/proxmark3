@@ -87,6 +87,7 @@ local _commands = {
 	CMD_EPA_PACE_COLLECT_NONCE =                                         0x038A,
 	--//CMD_EPA_ =                                                         0x038B,
 
+	CMD_ICLASS_READCHECK =                                               0x038F,
 	CMD_ICLASS_CLONE =                                                   0x0390,
 	CMD_ICLASS_DUMP =                                                    0x0391,
 	CMD_SNOOP_ICLASS =                                                   0x0392,
