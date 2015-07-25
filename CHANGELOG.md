@@ -6,12 +6,14 @@ This project uses the changelog in accordance with [keepchangelog](http://keepac
 
 ### Added
 - ISO14443a stand-alone operation with ARM CFLAG="WITH_ISO14443a_StandAlone". This code can read & emulate two banks of 14a tag UIDs and write to "magic" cards  (Craig Young) 
-
-### Added
 - AWID26 command context added as 'lf awid' containing realtime demodulation as well as cloning/simulation based on tag numbers (Craig Young)
+- Added 'hw status'. This command makes the ARM print out some runtime information. (holiman) 
+- Added 'hw ping'. This command just sends a usb packets and checks if the pm3 is responsive. Can be used to abort certain operations which supports abort over usb. (holiman)
 
 ### Changed
+- Revised workflow for StandAloneMode14a (Craig Young)
 - EPA functions (`hf epa`) now support both ISO 14443-A and 14443-B cards (frederikmoellers)
+- 'hw version' only talks to ARM at startup, after that the info is cached. (pwpiwi)
 
 ## [2.2.0][2015-07-12]
 

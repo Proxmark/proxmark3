@@ -25,6 +25,7 @@
 #include <hitag2.h>
 #include "lfsampling.h"
 #include "BigBuf.h"
+#include "mifareutil.h"
 #ifdef WITH_LCD
  #include "LCD.h"
 #endif
@@ -297,6 +298,19 @@ void SendVersion(void)
 	uint32_t compressed_data_section_size = common_area.arg1;
 	cmd_send(CMD_ACK, *(AT91C_DBGU_CIDR), text_and_rodata_section_size + compressed_data_section_size, 0, VersionString, strlen(VersionString));
 }
+/**
+  * Prints runtime information about the PM3.
+**/
+void SendStatus(void)
+{
+	BigBuf_print_status();
+	Fpga_print_status();
+	printConfig(); //LF Sampling config
+	Dbprintf("Various");
+	Dbprintf("  MF_DBGLEVEL......%d", MF_DBGLEVEL);
+	Dbprintf("  ToSendMax........%d",ToSendMax);
+	Dbprintf("  ToSendBit........%d",ToSendBit);
+}
 
 #if defined(WITH_ISO14443a_StandAlone) || defined(WITH_LF)
 
@@ -329,11 +343,14 @@ void StandAloneMode14a()
 	FpgaDownloadAndGo(FPGA_BITSTREAM_HF);
 
 	int selected = 0;
-	int playing = 0;
+	int playing = 0, iGotoRecord = 0, iGotoClone = 0;
 	int cardRead[OPTS] = {0};
 	uint8_t readUID[10] = {0};
 	uint32_t uid_1st[OPTS]={0};
 	uint32_t uid_2nd[OPTS]={0};
+	uint32_t uid_tmp1 = 0;
+	uint32_t uid_tmp2 = 0;
+	iso14a_card_select_t hi14a_card[OPTS];
 
 	LED(selected + 1, 0);
 
@@ -341,24 +358,17 @@ void StandAloneMode14a()
 	{
 		usb_poll();
 		WDT_HIT();
-
-		// Was our button held down or pressed?
-		int button_pressed = BUTTON_HELD(1000);
 		SpinDelay(300);
 
-		// Button was held for a second, begin recording
-		if (button_pressed > 0 && cardRead[selected] == 0)
+		if (iGotoRecord == 1 || cardRead[selected] == 0)
 		{
+			iGotoRecord = 0;
 			LEDsoff();
 			LED(selected + 1, 0);
 			LED(LED_RED2, 0);
 
 			// record
 			Dbprintf("Enabling iso14443a reader mode for [Bank: %u]...", selected);
-
-			// wait for button to be released
-			while(BUTTON_PRESS())
-				WDT_HIT();
 			/* need this delay to prevent catching some weird data */
 			SpinDelay(500);
 			/* Code for reading from 14a tag */
@@ -369,22 +379,54 @@ void StandAloneMode14a()
 			for ( ; ; )
 			{
 				WDT_HIT();
-				if (!iso14443a_select_card(uid, NULL, &cuid))
+				if (BUTTON_PRESS()) {
+					if (cardRead[selected]) {
+						Dbprintf("Button press detected -- replaying card in bank[%d]", selected);
+						break;
+					}
+					else if (cardRead[(selected+1)%OPTS]) {
+						Dbprintf("Button press detected but no card in bank[%d] so playing from bank[%d]", selected, (selected+1)%OPTS);
+						selected = (selected+1)%OPTS;
+						break; // playing = 1;
+					}
+					else {
+						Dbprintf("Button press detected but no stored tag to play. (Ignoring button)");
+						SpinDelay(300);
+					}
+				}
+				if (!iso14443a_select_card(uid, &hi14a_card[selected], &cuid))
 					continue;
 				else
 				{
 					Dbprintf("Read UID:"); Dbhexdump(10,uid,0);
 					memcpy(readUID,uid,10*sizeof(uint8_t));
-					uint8_t *dst = (uint8_t *)&uid_1st[selected];
+					uint8_t *dst = (uint8_t *)&uid_tmp1;
 					// Set UID byte order
 					for (int i=0; i<4; i++)
 						dst[i] = uid[3-i];
-					dst = (uint8_t *)&uid_2nd[selected];
+					dst = (uint8_t *)&uid_tmp2;
 					for (int i=0; i<4; i++)
 						dst[i] = uid[7-i];
-					break;
+					if (uid_1st[(selected+1)%OPTS] == uid_tmp1 && uid_2nd[(selected+1)%OPTS] == uid_tmp2) {
+						Dbprintf("Card selected has same UID as what is stored in the other bank. Skipping.");
+					}
+					else {
+						if (uid_tmp2) {
+							Dbprintf("Bank[%d] received a 7-byte UID",selected);
+							uid_1st[selected] = (uid_tmp1)>>8;
+							uid_2nd[selected] = (uid_tmp1<<24) + (uid_tmp2>>8);
+						}
+						else {
+							Dbprintf("Bank[%d] received a 4-byte UID",selected);
+							uid_1st[selected] = uid_tmp1;
+							uid_2nd[selected] = uid_tmp2;
+						}
+						break;
+					}
 				}
 			}
+			Dbprintf("ATQA = %02X%02X",hi14a_card[selected].atqa[0],hi14a_card[selected].atqa[1]);
+			Dbprintf("SAK = %02X",hi14a_card[selected].sak);
 			LEDsoff();
 			LED(LED_GREEN,  200);
 			LED(LED_ORANGE, 200);
@@ -393,101 +435,101 @@ void StandAloneMode14a()
 
 			LEDsoff();
 			LED(selected + 1, 0);
-			// Finished recording
 
-			// If we were previously playing, set playing off
-			// so next button push begins playing what we recorded
-			playing = 0;
+			// Next state is replay:
+			playing = 1;
 
 			cardRead[selected] = 1;
-
 		}
-		/* MF UID clone */
-		else if (button_pressed > 0 && cardRead[selected] == 1)
+		/* MF Classic UID clone */
+		else if (iGotoClone==1)
 		{
-					LEDsoff();
-					LED(selected + 1, 0);
-					LED(LED_ORANGE, 250);
+			iGotoClone=0;
+			LEDsoff();
+			LED(selected + 1, 0);
+			LED(LED_ORANGE, 250);
 
 
-					// record
-					Dbprintf("Preparing to Clone card [Bank: %x]; uid: %08x", selected, uid_1st[selected]);
+			// record
+			Dbprintf("Preparing to Clone card [Bank: %x]; uid: %08x", selected, uid_1st[selected]);
 
-					// wait for button to be released
-					while(BUTTON_PRESS())
-					{
-						// Delay cloning until card is in place
-						WDT_HIT();
-					}
-					Dbprintf("Starting clone. [Bank: %u]", selected);
-					// need this delay to prevent catching some weird data
-					SpinDelay(500);
-					// Begin clone function here:
-					/* Example from client/mifarehost.c for commanding a block write for "magic Chinese" cards:
-							UsbCommand c = {CMD_MIFARE_CSETBLOCK, {wantWipe, params & (0xFE | (uid == NULL ? 0:1)), blockNo}};
-							memcpy(c.d.asBytes, data, 16);
-							SendCommand(&c);
+			// wait for button to be released
+			while(BUTTON_PRESS())
+			{
+				// Delay cloning until card is in place
+				WDT_HIT();
+			}
+			Dbprintf("Starting clone. [Bank: %u]", selected);
+			// need this delay to prevent catching some weird data
+			SpinDelay(500);
+			// Begin clone function here:
+			/* Example from client/mifarehost.c for commanding a block write for "magic Chinese" cards:
+					UsbCommand c = {CMD_MIFARE_CSETBLOCK, {wantWipe, params & (0xFE | (uid == NULL ? 0:1)), blockNo}};
+					memcpy(c.d.asBytes, data, 16);
+					SendCommand(&c);
 
-						Block read is similar:
-							UsbCommand c = {CMD_MIFARE_CGETBLOCK, {params, 0, blockNo}};
-						We need to imitate that call with blockNo 0 to set a uid.
+					Block read is similar:
+					UsbCommand c = {CMD_MIFARE_CGETBLOCK, {params, 0, blockNo}};
+					We need to imitate that call with blockNo 0 to set a uid.
 
-						The get and set commands are handled in this file:
-							// Work with "magic Chinese" card
-							case CMD_MIFARE_CSETBLOCK:
-									MifareCSetBlock(c->arg[0], c->arg[1], c->arg[2], c->d.asBytes);
-									break;
-							case CMD_MIFARE_CGETBLOCK:
-									MifareCGetBlock(c->arg[0], c->arg[1], c->arg[2], c->d.asBytes);
-													//
-									break;
+					The get and set commands are handled in this file:
+					// Work with "magic Chinese" card
+					case CMD_MIFARE_CSETBLOCK:
+						MifareCSetBlock(c->arg[0], c->arg[1], c->arg[2], c->d.asBytes);
+						break;
+					case CMD_MIFARE_CGETBLOCK:
+						MifareCGetBlock(c->arg[0], c->arg[1], c->arg[2], c->d.asBytes);
+						break;
 
-						mfCSetUID provides example logic for UID set workflow:
-							-Read block0 from card in field with MifareCGetBlock()
-							-Configure new values without replacing reserved bytes
-									memcpy(block0, uid, 4); // Copy UID bytes from byte array
-									// Mifare UID BCC
-									block0[4] = block0[0]^block0[1]^block0[2]^block0[3]; // BCC on byte 5
-									Bytes 5-7 are reserved SAK and ATQA for mifare classic
-							-Use mfCSetBlock(0, block0, oldUID, wantWipe, CSETBLOCK_SINGLE_OPER) to write it
-					*/
-					uint8_t oldBlock0[16] = {0}, newBlock0[16] = {0}, testBlock0[16] = {0};
-					// arg0 = Flags == CSETBLOCK_SINGLE_OPER=0x1F, arg1=returnSlot, arg2=blockNo
-					MifareCGetBlock(0x1F, 1, 0, oldBlock0);
-					Dbprintf("UID from target tag: %02X%02X%02X%02X", oldBlock0[0],oldBlock0[1],oldBlock0[2],oldBlock0[3]);
-					memcpy(newBlock0,oldBlock0,16);
-					// Copy uid_1st for bank (2nd is for longer UIDs not supported if classic)
+				mfCSetUID provides example logic for UID set workflow:
+					-Read block0 from card in field with MifareCGetBlock()
+					-Configure new values without replacing reserved bytes
+							memcpy(block0, uid, 4); // Copy UID bytes from byte array
+							// Mifare UID BCC
+							block0[4] = block0[0]^block0[1]^block0[2]^block0[3]; // BCC on byte 5
+							Bytes 5-7 are reserved SAK and ATQA for mifare classic
+					-Use mfCSetBlock(0, block0, oldUID, wantWipe, CSETBLOCK_SINGLE_OPER) to write it
+			*/
+			uint8_t oldBlock0[16] = {0}, newBlock0[16] = {0}, testBlock0[16] = {0};
+			// arg0 = Flags == CSETBLOCK_SINGLE_OPER=0x1F, arg1=returnSlot, arg2=blockNo
+			MifareCGetBlock(0x3F, 1, 0, oldBlock0);
+			if (oldBlock0[0] == 0 && oldBlock0[0] == oldBlock0[1]  && oldBlock0[1] == oldBlock0[2] && oldBlock0[2] == oldBlock0[3]) {
+				Dbprintf("No changeable tag detected. Returning to replay mode for bank[%d]", selected);
+				playing = 1;
+			}
+			else {
+				Dbprintf("UID from target tag: %02X%02X%02X%02X", oldBlock0[0],oldBlock0[1],oldBlock0[2],oldBlock0[3]);
+				memcpy(newBlock0,oldBlock0,16);
+				// Copy uid_1st for bank (2nd is for longer UIDs not supported if classic)
 
-					newBlock0[0] = uid_1st[selected]>>24;
-					newBlock0[1] = 0xFF & (uid_1st[selected]>>16);
-					newBlock0[2] = 0xFF & (uid_1st[selected]>>8);
-					newBlock0[3] = 0xFF & (uid_1st[selected]);
-					newBlock0[4] = newBlock0[0]^newBlock0[1]^newBlock0[2]^newBlock0[3];
-					// arg0 = needWipe, arg1 = workFlags, arg2 = blockNo, datain
-					MifareCSetBlock(0, 0xFF,0, newBlock0);
-					MifareCGetBlock(0x1F, 1, 0, testBlock0);
-					if (memcmp(testBlock0,newBlock0,16)==0)
-					{
-						DbpString("Cloned successfull!");
-						cardRead[selected] = 0; // Only if the card was cloned successfully should we clear it
-					}
-					LEDsoff();
-					LED(selected + 1, 0);
-					// Finished recording
-
-					// If we were previously playing, set playing off
-					// so next button push begins playing what we recorded
+				newBlock0[0] = uid_1st[selected]>>24;
+				newBlock0[1] = 0xFF & (uid_1st[selected]>>16);
+				newBlock0[2] = 0xFF & (uid_1st[selected]>>8);
+				newBlock0[3] = 0xFF & (uid_1st[selected]);
+				newBlock0[4] = newBlock0[0]^newBlock0[1]^newBlock0[2]^newBlock0[3];
+				// arg0 = needWipe, arg1 = workFlags, arg2 = blockNo, datain
+				MifareCSetBlock(0, 0xFF,0, newBlock0);
+				MifareCGetBlock(0x3F, 1, 0, testBlock0);
+				if (memcmp(testBlock0,newBlock0,16)==0)
+				{
+					DbpString("Cloned successfull!");
+					cardRead[selected] = 0; // Only if the card was cloned successfully should we clear it
 					playing = 0;
+					iGotoRecord = 1;
+					selected = (selected+1) % OPTS;
+				}
+				else {
+					Dbprintf("Clone failed. Back to replay mode on bank[%d]", selected);
+					playing = 1;
+				}
+			}
+			LEDsoff();
+			LED(selected + 1, 0);
 
 		}
 		// Change where to record (or begin playing)
-		else if (button_pressed && cardRead[selected])
+		else if (playing==1) // button_pressed == BUTTON_SINGLE_CLICK && cardRead[selected])
 		{
-			// Next option if we were previously playing
-			if (playing)
-				selected = (selected + 1) % OPTS;
-			playing = !playing;
-
 			LEDsoff();
 			LED(selected + 1, 0);
 
@@ -496,19 +538,45 @@ void StandAloneMode14a()
 			{
 				LED(LED_GREEN, 0);
 				DbpString("Playing");
-				while (!BUTTON_HELD(500)) { // Loop simulating tag until the button is held a half-sec
+				for ( ; ; ) {
+					WDT_HIT();
+					int button_action = BUTTON_HELD(1000);
+					if (button_action == 0) { // No button action, proceed with sim
+						uint8_t data[512] = {0}; // in case there is a read command received we shouldn't break
 						Dbprintf("Simulating ISO14443a tag with uid[0]: %08x, uid[1]: %08x [Bank: %u]", uid_1st[selected],uid_2nd[selected],selected);
-						SimulateIso14443aTag(1,uid_1st[selected],uid_2nd[selected],NULL);
+						if (hi14a_card[selected].sak == 8 && hi14a_card[selected].atqa[0] == 4 && hi14a_card[selected].atqa[1] == 0) {
+							DbpString("Mifare Classic");
+							SimulateIso14443aTag(1,uid_1st[selected], uid_2nd[selected], data); // Mifare Classic
+						}
+						else if (hi14a_card[selected].sak == 0 && hi14a_card[selected].atqa[0] == 0x44 && hi14a_card[selected].atqa[1] == 0) {
+							DbpString("Mifare Ultralight");
+							SimulateIso14443aTag(2,uid_1st[selected],uid_2nd[selected],data); // Mifare Ultralight
+						}
+						else if (hi14a_card[selected].sak == 20 && hi14a_card[selected].atqa[0] == 0x44 && hi14a_card[selected].atqa[1] == 3) {
+							DbpString("Mifare DESFire");
+							SimulateIso14443aTag(3,uid_1st[selected],uid_2nd[selected],data); // Mifare DESFire
+						}
+						else {
+							Dbprintf("Unrecognized tag type -- defaulting to Mifare Classic emulation");
+							SimulateIso14443aTag(1,uid_1st[selected], uid_2nd[selected], data);
+						}
 					}
-				//cardRead[selected] = 1;
-				Dbprintf("Done playing [Bank: %u]",selected);
+					else if (button_action == BUTTON_SINGLE_CLICK) {
+						selected = (selected + 1) % OPTS;
+						Dbprintf("Done playing. Switching to record mode on bank %d",selected);
+						iGotoRecord = 1;
+						break;
+					}
+					else if (button_action == BUTTON_HOLD) {
+						Dbprintf("Playtime over. Begin cloning...");
+						iGotoClone = 1;
+						break;
+					}
+					WDT_HIT();
+				}
 
 				/* We pressed a button so ignore it here with a delay */
 				SpinDelay(300);
-
-				// when done, we're done playing, move to next option
-				selected = (selected + 1) % OPTS;
-				playing = !playing;
 				LEDsoff();
 				LED(selected + 1, 0);
 			}
@@ -1143,7 +1211,12 @@ void UsbPacketReceived(uint8_t *packet, int len)
 		case CMD_VERSION:
 			SendVersion();
 			break;
-
+		case CMD_STATUS:
+			SendStatus();
+			break;
+		case CMD_PING:
+			cmd_send(CMD_ACK,0,0,0,0,0);
+			break;
 #ifdef WITH_LCD
 		case CMD_LCD_RESET:
 			LCDReset();
