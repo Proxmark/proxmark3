@@ -28,7 +28,7 @@ extern void BigBuf_Clear(void);
 extern uint8_t *BigBuf_malloc(uint16_t);
 extern void BigBuf_free(void);
 extern void BigBuf_free_keep_EM(void);
-
+extern void BigBuf_print_status(void);
 extern uint16_t BigBuf_get_traceLen(void);
 extern void clear_trace();
 extern void set_tracing(bool enable);
