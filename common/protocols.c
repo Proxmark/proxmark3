@@ -11,13 +11,13 @@
 
 
 typedef struct {
-	uint8_t app_limit;
-	uint8_t otp[2];
-	uint8_t block_writelock;
-	uint8_t chip_config;
-	uint8_t mem_config;
-	uint8_t eas;
-	uint8_t fuses;
+	uint8_t app_limit;      //[8]
+	uint8_t otp[2];         //[9-10]
+	uint8_t block_writelock;//[11]
+	uint8_t chip_config;    //[12]
+	uint8_t mem_config;     //[13]
+	uint8_t eas;            //[14]
+	uint8_t fuses;          //[15]
 }picopass_conf_block;
 
 
@@ -74,25 +74,48 @@ void fuse_config(const picopass_hdr *hdr)
 	if( isset( fuses, FUSE_RA)) prnt("	RA: Read access enabled");
 	else prnt("	RA: Read access not enabled");
 }
+
+void getMemConfig(uint8_t mem_cfg, uint8_t chip_cfg, uint8_t *max_blk, uint8_t *books, uint8_t *kb) {
+	// mem-bit 5, mem-bit 7, chip-bit 4: defines chip type
+	if(isset(chip_cfg, 0x10) && notset(mem_cfg, 0x80) && notset(mem_cfg, 0x20)) {
+		kb = 2;
+		books = 1;
+		max_blk = 31;
+	} else if(isset(chip_cfg, 0x10) && isset(mem_cfg, 0x80) && notset(mem_cfg, 0x20)) {
+		kb = 16;
+		books = 2;
+		max_blk = 255; //16kb
+	} else if(notset(chip_cfg, 0x10) && notset(mem_cfg, 0x80) && notset(mem_cfg, 0x20)) {
+		kb = 16;
+		books = 16;
+		max_blk = 255; //16kb
+	} else if(isset(chip_cfg, 0x10) && isset(mem_cfg, 0x80) && isset(mem_cfg, 0x20)) {
+		kb = 32;
+		books = 2;
+		max_blk = 255; //16kb
+	} else if(notset(chip_cfg, 0x10) && notset(mem_cfg, 0x80) && isset(mem_cfg, 0x20)) {
+		kb = 32;
+		books = 16;
+		max_blk = 255; //16kb
+	} else {
+		kb = 32;
+		max_blk = 255;
+	}
+}
+
 void mem_app_config(const picopass_hdr *hdr)
 {
 	uint8_t mem = hdr->conf.mem_config;
+	uint8_t chip = hdr->conf.chip_config;
 	uint8_t applimit = hdr->conf.app_limit;
 	if (applimit < 6) applimit = 26;
-	uint8_t kb=2;
-	uint8_t maxBlk = 32;
-	if( isset(mem, 0x10) && notset(mem, 0x80)){
-		// 2kb default
-	} else if( isset(mem, 0x80) && notset(mem, 0x10)){
-		kb = 16;
-		maxBlk = 255; //16kb
-	} else {
-		kb = 32;
-		maxBlk = 255;
-	}
-	prnt("  Mem: %u KBits ( %u * 8 bytes) [%02X]", kb, maxBlk, mem);
+	uint8_t kb = 2;
+	uint8_t books = 1;
+	uint8_t max_blk = 31;
+	getMemConfig(mem, chip, &max_blk, &books, &kb);
+	prnt("  Mem: %u KBits/%u Books (%u * 8 bytes) [%02X]", kb, books, max_blk, mem);
 	prnt("	AA1: blocks 06-%02X", applimit);
-	prnt("	AA2: blocks %02X-%02X", (applimit+1), (hdr->conf.mem_config));
+	prnt("	AA2: blocks %02X-%02X", applimit+1, max_blk);
 }
 void print_picopass_info(const picopass_hdr *hdr)
 {
