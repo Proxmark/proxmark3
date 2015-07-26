@@ -554,7 +554,7 @@ int CmdHFiClassReader_Dump(const char *Cmd) {
 	uint8_t blockno = 0;
 	uint8_t numblks = 0;
 	uint8_t maxBlk = 31;
-	uint8_t books = 1;
+	uint8_t app_areas = 1;
 	uint8_t kb = 2;
 	uint8_t KEY[8] = {0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00};
 	uint8_t CreditKEY[8] = {0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00};
@@ -668,7 +668,7 @@ int CmdHFiClassReader_Dump(const char *Cmd) {
 		memcpy(tag_data, data, 8*3);
 		blockno+=2; // 2 to force re-read of block 2 later. (seems to respond differently..)
 		numblks = data[8];
-		getMemConfig(data[13], data[12], &maxBlk, &books, &kb);
+		getMemConfig(data[13], data[12], &maxBlk, &app_areas, &kb);
 		// large memory - not able to dump pages currently
 		if (numblks > maxBlk) numblks = maxBlk;
 	}

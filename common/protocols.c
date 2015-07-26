@@ -75,31 +75,32 @@ void fuse_config(const picopass_hdr *hdr)
 	else prnt("	RA: Read access not enabled");
 }
 
-void getMemConfig(uint8_t mem_cfg, uint8_t chip_cfg, uint8_t *max_blk, uint8_t *books, uint8_t *kb) {
+void getMemConfig(uint8_t mem_cfg, uint8_t chip_cfg, uint8_t *max_blk, uint8_t *app_areas, uint8_t *kb) {
 	// mem-bit 5, mem-bit 7, chip-bit 4: defines chip type
 	if(isset(chip_cfg, 0x10) && notset(mem_cfg, 0x80) && notset(mem_cfg, 0x20)) {
-		kb = 2;
-		books = 1;
-		max_blk = 31;
+		*kb = 2;
+		*app_areas = 2;
+		*max_blk = 31;
 	} else if(isset(chip_cfg, 0x10) && isset(mem_cfg, 0x80) && notset(mem_cfg, 0x20)) {
-		kb = 16;
-		books = 2;
-		max_blk = 255; //16kb
+		*kb = 16;
+		*app_areas = 2;
+		*max_blk = 255; //16kb
 	} else if(notset(chip_cfg, 0x10) && notset(mem_cfg, 0x80) && notset(mem_cfg, 0x20)) {
-		kb = 16;
-		books = 16;
-		max_blk = 255; //16kb
+		*kb = 16;
+		*app_areas = 16;
+		*max_blk = 255; //16kb
 	} else if(isset(chip_cfg, 0x10) && isset(mem_cfg, 0x80) && isset(mem_cfg, 0x20)) {
-		kb = 32;
-		books = 2;
-		max_blk = 255; //16kb
+		*kb = 32;
+		*app_areas = 3;
+		*max_blk = 255; //16kb
 	} else if(notset(chip_cfg, 0x10) && notset(mem_cfg, 0x80) && isset(mem_cfg, 0x20)) {
-		kb = 32;
-		books = 16;
-		max_blk = 255; //16kb
+		*kb = 32;
+		*app_areas = 17;
+		*max_blk = 255; //16kb
 	} else {
-		kb = 32;
-		max_blk = 255;
+		*kb = 32;
+		*app_areas = 2;
+		*max_blk = 255;
 	}
 }
 
@@ -110,10 +111,10 @@ void mem_app_config(const picopass_hdr *hdr)
 	uint8_t applimit = hdr->conf.app_limit;
 	if (applimit < 6) applimit = 26;
 	uint8_t kb = 2;
-	uint8_t books = 1;
+	uint8_t app_areas = 2;
 	uint8_t max_blk = 31;
-	getMemConfig(mem, chip, &max_blk, &books, &kb);
-	prnt("  Mem: %u KBits/%u Books (%u * 8 bytes) [%02X]", kb, books, max_blk, mem);
+	getMemConfig(mem, chip, &max_blk, &app_areas, &kb);
+	prnt("  Mem: %u KBits/%u App Areas (%u * 8 bytes) [%02X]", kb, app_areas, max_blk, mem);
 	prnt("	AA1: blocks 06-%02X", applimit);
 	prnt("	AA2: blocks %02X-%02X", applimit+1, max_blk);
 }

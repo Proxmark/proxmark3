@@ -196,6 +196,6 @@ NXP/Philips CUSTOM COMMANDS
 
 
 void printIclassDumpInfo(uint8_t* iclass_dump);
-void getMemConfig(uint8_t mem_cfg, uint8_t chip_cfg, uint8_t *max_blk, uint8_t *books, uint8_t *kb);
+void getMemConfig(uint8_t mem_cfg, uint8_t chip_cfg, uint8_t *max_blk, uint8_t *app_areas, uint8_t *kb);
 
 #endif // PROTOCOLS_H
