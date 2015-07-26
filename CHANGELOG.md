@@ -5,12 +5,18 @@ This project uses the changelog in accordance with [keepchangelog](http://keepac
 ## [unreleased][unreleased]
 
 ### Added
+- `hf iclass managekeys` to save, load and manage iclass keys.  (adjusted most commands to accept a loaded key in memory) (marshmellow)
+- `hf iclass readblk` to select, authenticate, and read 1 block from an iclass card (marshmellow)
+- `hf iclass writeblk` to select, authenticate, adn write 1 block to an iclass card (or picopass) (marshmellow + others)
+- `hf iclass clone` to take a saved dump file and clone selected blocks to a new tag (marshmellow + others)
+- `hf iclass calcnewkey` - to calculate the div_key change to change a key - (experimental) (marshmellow + others)
+- `hf iclass encryptblk` - to encrypt a data block hex to prep for writing that block (marshmellow)
 - ISO14443a stand-alone operation with ARM CFLAG="WITH_ISO14443a_StandAlone". This code can read & emulate two banks of 14a tag UIDs and write to "magic" cards  (Craig Young) 
-
-### Added
 - AWID26 command context added as 'lf awid' containing realtime demodulation as well as cloning/simulation based on tag numbers (Craig Young)
 
 ### Changed
+- changed `lf config t <threshold>` to be 0 - 128 and will trigger on + or - threshold value (marshmellow) 
+- `hf iclass dump` cli options - can now dump AA1 and AA2 with different keys in one run (does not go to muliple pages for the larger tags yet)
 - EPA functions (`hf epa`) now support both ISO 14443-A and 14443-B cards (frederikmoellers)
 
 ## [2.2.0][2015-07-12]
