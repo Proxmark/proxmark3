@@ -7,7 +7,7 @@ This project uses the changelog in accordance with [keepchangelog](http://keepac
 ### Added
 - `hf iclass managekeys` to save, load and manage iclass keys.  (adjusted most commands to accept a loaded key in memory) (marshmellow)
 - `hf iclass readblk` to select, authenticate, and read 1 block from an iclass card (marshmellow)
-- `hf iclass writeblk` to select, authenticate, adn write 1 block to an iclass card (or picopass) (marshmellow + others)
+- `hf iclass writeblk` to select, authenticate, and write 1 block to an iclass card (or picopass) (marshmellow + others)
 - `hf iclass clone` to take a saved dump file and clone selected blocks to a new tag (marshmellow + others)
 - `hf iclass calcnewkey` - to calculate the div_key change to change a key - (experimental) (marshmellow + others)
 - `hf iclass encryptblk` - to encrypt a data block hex to prep for writing that block (marshmellow)
