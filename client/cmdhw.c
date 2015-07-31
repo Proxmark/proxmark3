@@ -431,12 +431,11 @@ int CmdStatus(const char *Cmd)
 {
 	uint8_t speed_test_buffer[USB_CMD_DATA_SIZE];
 	sample_buf = speed_test_buffer;
-	#define USB_SPEED_TEST_SIZE (1000*USB_CMD_DATA_SIZE)
 
 	clearCommandBuffer();
-	UsbCommand c = {CMD_STATUS, {USB_SPEED_TEST_SIZE}};
+	UsbCommand c = {CMD_STATUS};
 	SendCommand(&c);
-	if (!WaitForResponseTimeout(CMD_ACK,&c,1500)) {
+	if (!WaitForResponseTimeout(CMD_ACK,&c,1900)) {
 		PrintAndLog("Status command failed. USB Speed Test timed out");
 	}
 	return 0;
