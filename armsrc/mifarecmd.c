@@ -642,8 +642,8 @@ void MifareNested(uint32_t arg0, uint32_t arg1, uint32_t calibrate, uint8_t *dat
 	// free eventually allocated BigBuf memory
 	BigBuf_free();
 
-	clear_trace();
-	set_tracing(false);
+	if (calibrate) clear_trace();
+	set_tracing(true);
 	
 	// statistics on nonce distance
 	int16_t isOK = 0;
@@ -820,18 +820,18 @@ void MifareNested(uint32_t arg0, uint32_t arg1, uint32_t calibrate, uint8_t *dat
 
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
 	LEDsoff();
-	set_tracing(TRUE);
 }
 
 //-----------------------------------------------------------------------------
 // MIFARE check keys. key count up to 85. 
 // 
 //-----------------------------------------------------------------------------
-void MifareChkKeys(uint8_t arg0, uint8_t arg1, uint8_t arg2, uint8_t *datain)
+void MifareChkKeys(uint16_t arg0, uint8_t arg1, uint8_t arg2, uint8_t *datain)
 {
   // params
-	uint8_t blockNo = arg0;
-	uint8_t keyType = arg1;
+	uint8_t blockNo = arg0 & 0xff;
+	uint8_t keyType = (arg0 >> 8) & 0xff;
+	bool clearTrace = arg1;
 	uint8_t keyCount = arg2;
 	uint64_t ui64Key = 0;
 	
@@ -853,7 +853,7 @@ void MifareChkKeys(uint8_t arg0, uint8_t arg1, uint8_t arg2, uint8_t *datain)
 	LED_C_OFF();
 	iso14443a_setup(FPGA_HF_ISO14443A_READER_LISTEN);
 
-	clear_trace();
+	if (clearTrace) clear_trace();
 	set_tracing(TRUE);
 
 	for (i = 0; i < keyCount; i++) {
@@ -1143,6 +1143,7 @@ void MifareCGetBlock(uint32_t arg0, uint32_t arg1, uint32_t arg2, uint8_t *datai
 	// bit 2 - need HALT after sequence
 	// bit 3 - need init FPGA and field before sequence
 	// bit 4 - need reset FPGA and LED
+	// bit 5 - need to set datain instead of issuing USB reply (called via ARM for StandAloneMode14a)
 	uint8_t workFlags = arg0;
 	uint8_t blockNo = arg2;
 	
@@ -1202,7 +1203,12 @@ void MifareCGetBlock(uint32_t arg0, uint32_t arg1, uint32_t arg2, uint8_t *datai
 	}
 	
 	LED_B_ON();
-	cmd_send(CMD_ACK,isOK,0,0,data,18);
+	if (workFlags & 0x20) {
+		if (isOK)
+			memcpy(datain, data, 18);
+	}
+	else
+		cmd_send(CMD_ACK,isOK,0,0,data,18);
 	LED_B_OFF();
 
 	if ((workFlags & 0x10) || (!isOK)) {

@@ -1070,7 +1070,6 @@ void SimulateIso14443aTag(int tagType, int uid_1st, int uid_2nd, byte_t* data)
 	LED_A_ON();
 	for(;;) {
 		// Clean receive command buffer
-		
 		if(!GetIso14443aCommandFromReader(receivedCmd, receivedCmdPar, &len)) {
 			DbpString("Button press");
 			break;

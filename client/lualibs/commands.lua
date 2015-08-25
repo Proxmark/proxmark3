@@ -20,7 +20,8 @@ local _commands = {
 	CMD_BUFF_CLEAR =                                                     0x0105,
 	CMD_READ_MEM =                                                       0x0106,
 	CMD_VERSION =                                                        0x0107,
-
+	CMD_STATUS =                                                         0x0108,
+	CMD_PING =                                                           0x0109,
 	--// For low-frequency tags
 	CMD_READ_TI_TYPE =                                                   0x0202,
 	CMD_WRITE_TI_TYPE =                                                  0x0203,
@@ -54,6 +55,7 @@ local _commands = {
 	CMD_FSK_SIM_TAG =                                                    0x021E,
 	CMD_ASK_SIM_TAG =                                                    0x021F,
 	CMD_PSK_SIM_TAG =                                                    0x0220,
+	CMD_AWID_DEMOD_FSK =                                                 0x0221,
 
 	--/* CMD_SET_ADC_MUX: ext1 is 0 for lopkd, 1 for loraw, 2 for hipkd, 3 for hiraw */
 

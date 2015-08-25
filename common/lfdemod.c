@@ -580,7 +580,7 @@ int IOdemodFSK(uint8_t *dest, size_t size)
 
 // by marshmellow
 // takes a array of binary values, start position, length of bits per parity (includes parity bit),
-//   Parity Type (1 for odd; 0 for even; 2 for just drop it), and binary Length (length to run) 
+//   Parity Type (1 for odd; 0 for even; 2 Always 1's), and binary Length (length to run) 
 size_t removeParity(uint8_t *BitStream, size_t startIdx, uint8_t pLen, uint8_t pType, size_t bLen)
 {
 	uint32_t parityWd = 0;
@@ -590,10 +590,12 @@ size_t removeParity(uint8_t *BitStream, size_t startIdx, uint8_t pLen, uint8_t p
 			parityWd = (parityWd << 1) | BitStream[startIdx+word+bit];
 			BitStream[j++] = (BitStream[startIdx+word+bit]);
 		}
-		j--;
+		j--; // overwrite parity with next data
 		// if parity fails then return 0
-		if (pType != 2) {
-			if (parityTest(parityWd, pLen, pType) == 0) return -1;
+		if (pType == 2) { // then marker bit which should be a 1
+			if (!BitStream[j]) return 0;
+		} else {
+			if (parityTest(parityWd, pLen, pType) == 0) return 0;			
 		}
 		bitCnt+=(pLen-1);
 		parityWd = 0;

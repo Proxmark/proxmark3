@@ -60,6 +60,8 @@ typedef struct{
 #define CMD_BUFF_CLEAR                                                    0x0105
 #define CMD_READ_MEM                                                      0x0106
 #define CMD_VERSION                                                       0x0107
+#define CMD_STATUS														  0x0108
+#define CMD_PING														  0x0109
 
 // For low-frequency tags
 #define CMD_READ_TI_TYPE                                                  0x0202
@@ -95,6 +97,7 @@ typedef struct{
 #define CMD_FSK_SIM_TAG                                                   0x021E
 #define CMD_ASK_SIM_TAG                                                   0x021F
 #define CMD_PSK_SIM_TAG                                                   0x0220
+#define CMD_AWID_DEMOD_FSK                                                0x0221
 
 /* CMD_SET_ADC_MUX: ext1 is 0 for lopkd, 1 for loraw, 2 for hipkd, 3 for hiraw */
 

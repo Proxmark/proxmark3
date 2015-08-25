@@ -69,6 +69,7 @@ void CmdFSKsimTAG(uint16_t arg1, uint16_t arg2, size_t size, uint8_t *BitStream)
 void CmdASKsimTag(uint16_t arg1, uint16_t arg2, size_t size, uint8_t *BitStream);
 void CmdPSKsimTag(uint16_t arg1, uint16_t arg2, size_t size, uint8_t *BitStream);
 void CmdHIDdemodFSK(int findone, int *high, int *low, int ledcontrol);
+void CmdAWIDdemodFSK(int findone, int *high, int *low, int ledcontrol); // Realtime demodulation mode for AWID26
 void CmdEM410xdemod(int findone, int *high, int *low, int ledcontrol);
 void CmdIOdemodFSK(int findone, int *high, int *low, int ledcontrol);
 void CopyIOtoT55x7(uint32_t hi, uint32_t lo, uint8_t longFMT); // Clone an ioProx card to T5557/T5567
@@ -121,7 +122,7 @@ void MifareWriteBlock(uint8_t arg0, uint8_t arg1, uint8_t arg2, uint8_t *datain)
 //void MifareUWriteBlockCompat(uint8_t arg0,uint8_t *datain);
 void MifareUWriteBlock(uint8_t arg0, uint8_t arg1, uint8_t *datain);
 void MifareNested(uint32_t arg0, uint32_t arg1, uint32_t arg2, uint8_t *datain);
-void MifareChkKeys(uint8_t arg0, uint8_t arg1, uint8_t arg2, uint8_t *datain);
+void MifareChkKeys(uint16_t arg0, uint8_t arg1, uint8_t arg2, uint8_t *datain);
 void Mifare1ksim(uint8_t arg0, uint8_t arg1, uint8_t arg2, uint8_t *datain);
 void MifareSetDbgLvl(uint32_t arg0, uint32_t arg1, uint32_t arg2, uint8_t *datain);
 void MifareEMemClr(uint32_t arg0, uint32_t arg1, uint32_t arg2, uint8_t *datain);

@@ -88,6 +88,16 @@ void BigBuf_free_keep_EM(void)
 	}
 }
 
+void BigBuf_print_status(void)
+{
+	Dbprintf("Memory");
+	Dbprintf("  BIGBUF_SIZE.............%d", BIGBUF_SIZE);
+	Dbprintf("  BigBuf_hi  .............%d", BigBuf_hi);
+	Dbprintf("Tracing");
+	Dbprintf("  tracing ................%d", tracing);
+	Dbprintf("  traceLen ...............%d", traceLen);
+}
+
 
 // return the maximum trace length (i.e. the unallocated size of BigBuf)
 uint16_t BigBuf_max_traceLen(void)
