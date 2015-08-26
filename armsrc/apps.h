@@ -61,6 +61,7 @@ void AcquireRawAdcSamples125k(int divisor);
 void ModThenAcquireRawAdcSamples125k(int delay_off,int period_0,int period_1,uint8_t *command);
 void ReadTItag(void);
 void WriteTItag(uint32_t idhi, uint32_t idlo, uint16_t crc);
+
 void AcquireTiType(void);
 void AcquireRawBitsTI(void);
 void SimulateTagLowFrequency(int period, int gap, int ledcontrol);
@@ -85,6 +86,11 @@ int DemodPCF7931(uint8_t **outBlocks);
 int IsBlock0PCF7931(uint8_t *Block);
 int IsBlock1PCF7931(uint8_t *Block);
 void ReadPCF7931();
+void SendCmdPCF7931(uint32_t * tab);
+bool AddBytePCF7931(uint8_t byte, uint32_t * tab, int32_t l, int32_t p);
+bool AddBitPCF7931(bool b, uint32_t * tab, int32_t l, int32_t p);
+bool AddPatternPCF7931(uint32_t a, uint32_t b, uint32_t c, uint32_t * tab);
+void WritePCF7931(uint8_t pass1, uint8_t pass2, uint8_t pass3, uint8_t pass4, uint8_t pass5, uint8_t pass6, uint8_t pass7, uint16_t init_delay, int32_t l, int32_t p, uint8_t address, uint8_t byte, uint8_t data);
 void EM4xReadWord(uint8_t Address, uint32_t Pwd, uint8_t PwdMode);
 void EM4xWriteWord(uint32_t Data, uint8_t Address, uint32_t Pwd, uint8_t PwdMode);
 
