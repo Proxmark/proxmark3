@@ -321,7 +321,7 @@ void WriteTItag(uint32_t idhi, uint32_t idlo, uint16_t crc)
 {
 
 
-FpgaDownloadAndGo(FPGA_BITSTREAM_LF);
+	FpgaDownloadAndGo(FPGA_BITSTREAM_LF);
 	if(crc == 0) {
 		crc = update_crc16(crc, (idlo)&0xff);
 		crc = update_crc16(crc, (idlo>>8)&0xff);
