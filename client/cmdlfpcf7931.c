@@ -22,7 +22,7 @@
 
 static int CmdHelp(const char *Cmd);
 
-struct pcf7931_config configPcf = {{0x8F,0xEF,0x0D,0xA5,0xED,0x05,0xA1},17500,{-10,30}};
+struct pcf7931_config configPcf = {{0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF},17500,{0,0}};
 
 int CmdLFPCF7931Read(const char *Cmd)
 {
@@ -60,13 +60,13 @@ int CmdLFPCF7931Config(const char *Cmd)
   }
 
   //default values
-  configPcf.password[0] = 0x8F;  
-  configPcf.password[1] = 0xEF;  
-  configPcf.password[2] = 0x0D;  
-  configPcf.password[3] = 0xA5;  
-  configPcf.password[4] = 0xED;  
-  configPcf.password[5] = 0x05;  
-  configPcf.password[6] = 0xA1;
+  configPcf.password[0] = 0xFF;  
+  configPcf.password[1] = 0xFF;  
+  configPcf.password[2] = 0xFF;  
+  configPcf.password[3] = 0xFF;  
+  configPcf.password[4] = 0xFF;  
+  configPcf.password[5] = 0xFF;  
+  configPcf.password[6] = 0xFF;
 
   configPcf.init_delay = 17500;
   configPcf.offset[0] = -10; 
