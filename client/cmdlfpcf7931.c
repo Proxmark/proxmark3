@@ -42,8 +42,8 @@ int CmdLFPCF7931Config(const char *Cmd)
       if(res == 7) configPcf.init_delay = 17500; //default value
       
       if(res<=8){
-        configPcf.offset[0] = -10; //default value
-        configPcf.offset[1] = 30; //default value
+        configPcf.offset[0] = 0; //default value
+        configPcf.offset[1] = 0; //default value
       }
      
       if(res < 1){
