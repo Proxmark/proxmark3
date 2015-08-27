@@ -1840,12 +1840,6 @@ void ReadPCF7931() {
 			Dbprintf("%02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x",
 					 Blocks[i][0], Blocks[i][1], Blocks[i][2], Blocks[i][3], Blocks[i][4], Blocks[i][5], Blocks[i][6], Blocks[i][7],
 					Blocks[i][8], Blocks[i][9], Blocks[i][10], Blocks[i][11], Blocks[i][12], Blocks[i][13], Blocks[i][14], Blocks[i][15]);
-		if(i==3){	
-			if(Blocks[3][0] == 0xAA)
-			Dbprintf("Solde actuel : %d centimes,  solde précédent : %d centimes", (Blocks[3][1] << 8 | Blocks[3][2]), (Blocks[3][6] << 8 | Blocks[3][7]));
-			else
-			Dbprintf("Solde actuel : %d centimes,  solde précédent : %d centimes", (Blocks[3][6] << 8 | Blocks[3][7]), (Blocks[3][1] << 8 | Blocks[3][2]));
-		}
 		}else
 			Dbprintf("<missing block %d>", i);
 	}
