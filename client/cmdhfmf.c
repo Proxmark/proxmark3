@@ -679,25 +679,15 @@ int CmdHF14AMfNested(const char *Cmd)
 
 		PrintAndLog("Testing known keys. Sector count=%d", SectorsCnt);
 		for (i = 0; i < SectorsCnt; i++) {
-			PrintAndLog(". test sector: %03d of %03d", i, SectorsCnt);
 			for (j = 0; j < 2; j++) {
 				if (e_sector[i].foundKey[j]) continue;
 				
-				// new loop to iterate through the given keys
-				for (int h = 0; h < sizeof(keyBlock)/6; h++){
-					res = mfCheckKeys(FirstBlockOfSector(i), j, true, 6, (uint8_t*)(keyBlock + h * 6), &key64);
-
+				res = mfCheckKeys(FirstBlockOfSector(i), j, true, 6, keyBlock, &key64);
 				
-					if (!res) {
-						e_sector[i].Key[j] = key64;
-						e_sector[i].foundKey[j] = 1;
-						NumFound++; // found a new one
-						break;
-					}else if(res == 1){
-						PrintAndLog("Error: No response from Proxmark.\n");
-						free(triedOnes);
-						free(e_sector);
-					}
+				if (!res) {
+					e_sector[i].Key[j] = key64;
+					e_sector[i].foundKey[j] = 1;
+					NumFound++;
 				}
 			}
 		}
