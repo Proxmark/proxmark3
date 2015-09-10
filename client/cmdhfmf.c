@@ -534,8 +534,9 @@ int CmdHF14AMfRestore(const char *Cmd)
 
 int CmdHF14AMfNested(const char *Cmd)
 {
-	int i, j, res, iterations;
+	int i, j, res, iterations, NumFound, NumFoundOld;
 	sector *e_sector = NULL;
+	bool *triedOnes = NULL;
 	uint8_t blockNo = 0;
 	uint8_t keyType = 0;
 	uint8_t trgBlockNo = 0;
@@ -655,6 +656,8 @@ int CmdHF14AMfNested(const char *Cmd)
 		clock_t time1;
 		time1 = clock();
 
+		NumFound = 0; // did not foud a key, yet
+		triedOnes = calloc(2 * SectorsCnt, sizeof(bool));
 		e_sector = calloc(SectorsCnt, sizeof(sector));
 		if (e_sector == NULL) return 1;
 		
@@ -676,52 +679,89 @@ int CmdHF14AMfNested(const char *Cmd)
 
 		PrintAndLog("Testing known keys. Sector count=%d", SectorsCnt);
 		for (i = 0; i < SectorsCnt; i++) {
+			PrintAndLog(". test sector: %03d of %03d", i, SectorsCnt);
 			for (j = 0; j < 2; j++) {
 				if (e_sector[i].foundKey[j]) continue;
 				
-				res = mfCheckKeys(FirstBlockOfSector(i), j, true, 6, keyBlock, &key64);
+				// new loop to iterate through the given keys
+				for (int h = 0; h < sizeof(keyBlock)/6; h++){
+					res = mfCheckKeys(FirstBlockOfSector(i), j, true, 6, (uint8_t*)(keyBlock + h * 6), &key64);
+
 				
-				if (!res) {
-					e_sector[i].Key[j] = key64;
-					e_sector[i].foundKey[j] = 1;
+					if (!res) {
+						e_sector[i].Key[j] = key64;
+						e_sector[i].foundKey[j] = 1;
+						NumFound++; // found a new one
+						break;
+					}else if(res == 1){
+						PrintAndLog("Error: No response from Proxmark.\n");
+						free(triedOnes);
+						free(e_sector);
+					}
 				}
 			}
 		}
 		
 		// nested sectors
-		iterations = 0;
-		PrintAndLog("nested...");
-		bool calibrate = true;
-		for (i = 0; i < NESTED_SECTOR_RETRY; i++) {
-			for (uint8_t sectorNo = 0; sectorNo < SectorsCnt; sectorNo++) {
-				for (trgKeyType = 0; trgKeyType < 2; trgKeyType++) { 
-					if (e_sector[sectorNo].foundKey[trgKeyType]) continue;
-					PrintAndLog("-----------------------------------------------");
-					int16_t isOK = mfnested(blockNo, keyType, key, FirstBlockOfSector(sectorNo), trgKeyType, keyBlock, calibrate);
-					if(isOK) {
-						switch (isOK) {
-							case -1 : PrintAndLog("Error: No response from Proxmark.\n"); break;
-							case -2 : PrintAndLog("Button pressed. Aborted.\n"); break;
-							case -3 : PrintAndLog("Tag isn't vulnerable to Nested Attack (random numbers are not predictable).\n"); break;
-							default : PrintAndLog("Unknown Error.\n");
-						}
-						free(e_sector);
-						return 2;
-					} else {
-						calibrate = false;
-					}
-					
-					iterations++;
 
-					key64 = bytes_to_num(keyBlock, 6);
-					if (key64) {
-						PrintAndLog("Found valid key:%012"llx, key64);
-						e_sector[sectorNo].foundKey[trgKeyType] = 1;
-						e_sector[sectorNo].Key[trgKeyType] = key64;
+		iterations = 0;
+		do{
+			NumFoundOld = NumFound;
+			// find a new sector or key for the sector
+			for (i = 0; i < SectorsCnt; i++) {
+				for (j = 0; j < 2; j++) {
+					if (e_sector[i].foundKey[j]){
+						if(!triedOnes[2 * i + j]){
+							triedOnes[2 * i + j] = true; // try this one
+							// reset default values
+							num_to_bytes(e_sector[i].Key[j], 6, key);
+							keyType = j;
+							blockNo = FirstBlockOfSector(i);
+							PrintAndLog("\nTrying block %03d type %01d", blockNo, keyType);
+							goto start;
+						}
 					}
 				}
 			}
-		}
+
+			start:
+			PrintAndLog("# Keys found so far: %03d \n", NumFound);
+			PrintAndLog("nested...");
+			bool calibrate = true;
+			for (i = 0; i < NESTED_SECTOR_RETRY; i++) {
+				for (uint8_t sectorNo = 0; sectorNo < SectorsCnt; sectorNo++) {
+					for (trgKeyType = 0; trgKeyType < 2; trgKeyType++) { 
+						if (e_sector[sectorNo].foundKey[trgKeyType]) continue;
+						PrintAndLog("-----------------------------------------------");
+						int16_t isOK = mfnested(blockNo, keyType, key, FirstBlockOfSector(sectorNo), trgKeyType, keyBlock, calibrate);
+						if(isOK) {
+							switch (isOK) {
+								case -1 : PrintAndLog("Error: No response from Proxmark.\n"); break;
+								case -2 : PrintAndLog("Button pressed. Aborted.\n"); break;
+								case -3 : PrintAndLog("Tag isn't vulnerable to Nested Attack (random numbers are not predictable).\n"); break;
+								default : PrintAndLog("Unknown Error.\n");
+							}
+							free(triedOnes);
+							free(e_sector);
+							return 2;
+						} else {
+							calibrate = false;
+						}
+						
+						iterations++;
+
+						key64 = bytes_to_num(keyBlock, 6);
+						if (key64) {
+							PrintAndLog("Found valid key:%012"llx, key64);
+							e_sector[sectorNo].foundKey[trgKeyType] = 1;
+							e_sector[sectorNo].Key[trgKeyType] = key64;
+							NumFound++;
+						}
+					}
+				}
+			}
+		}while((NumFound != NumFoundOld) && (NumFound < 2 * SectorsCnt));
+		free(triedOnes);
 
 		printf("Time in nested: %1.3f (%1.3f sec per key)\n\n", ((float)clock() - time1)/CLOCKS_PER_SEC, ((float)clock() - time1)/iterations/CLOCKS_PER_SEC);
 		
