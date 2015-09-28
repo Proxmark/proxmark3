@@ -690,7 +690,6 @@ int CmdHFSearch(const char *Cmd){
 
 static command_t CommandTable[] = 
 {
-<<<<<<< HEAD
 	{"help",	CmdHelp,		1, "This help"},
 	{"14a",		CmdHF14A,		1, "{ ISO14443A RFIDs... }"},
 	{"14b",		CmdHF14B,		1, "{ ISO14443B RFIDs... }"},
@@ -703,22 +702,8 @@ static command_t CommandTable[] =
 	{"topaz",	CmdHFTopaz,		1, "{ TOPAZ (NFC Type 1) RFIDs... }"},
 	{"tune",	CmdHFTune,		0, "Continuously measure HF antenna tuning"},
 	{"list",	CmdHFList,		1, "List protocol data in trace buffer"},
+	{"search",	CmdHFSearch,	1, "Search for known HF tags [preliminary]"},
 	{NULL,		NULL,			0, NULL}
-=======
-  {"help",        CmdHelp,          1, "This help"},
-  {"14a",         CmdHF14A,         1, "{ ISO14443A RFIDs... }"},
-  {"14b",         CmdHF14B,         1, "{ ISO14443B RFIDs... }"},
-  {"15",          CmdHF15,          1, "{ ISO15693 RFIDs... }"},
-  {"epa",         CmdHFEPA,         1, "{ German Identification Card... }"},
-  {"legic",       CmdHFLegic,       0, "{ LEGIC RFIDs... }"},
-  {"iclass",      CmdHFiClass,      1, "{ ICLASS RFIDs... }"},
-  {"mf",          CmdHFMF,          1, "{ MIFARE RFIDs... }"},
-  {"mfu",         CmdHFMFUltra,     1, "{ MIFARE Ultralight RFIDs... }"},
-  {"tune",        CmdHFTune,        0, "Continuously measure HF antenna tuning"},
-  {"list",        CmdHFList,        1, "List protocol data in trace buffer"},
-  {"search",      CmdHFSearch,      1, "Search for known HF tags [preliminary]"},
-	{NULL, NULL, 0, NULL}
->>>>>>> master
 };
 
 int CmdHF(const char *Cmd)
