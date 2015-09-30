@@ -2016,6 +2016,7 @@ void ReaderMifare(bool first_try)
 	byte_t par_list[8] = {0x00};
 	byte_t ks_list[8] = {0x00};
 
+	#define PRNG_SEQUENCE_LENGTH  (1 << 16);
 	static uint32_t sync_time;
 	static uint32_t sync_cycles;
 	int catch_up_cycles = 0;
@@ -2026,7 +2027,7 @@ void ReaderMifare(bool first_try)
 	if (first_try) { 
 		mf_nr_ar3 = 0;
 		sync_time = GetCountSspClk() & 0xfffffff8;
-		sync_cycles = 65536;									// theory: Mifare Classic's random generator repeats every 2^16 cycles (and so do the nonces).
+		sync_cycles = PRNG_SEQUENCE_LENGTH;							// theory: Mifare Classic's random generator repeats every 2^16 cycles (and so do the tag nonces).
 		nt_attacked = 0;
 		nt = 0;
 		par[0] = 0;
@@ -2043,8 +2044,12 @@ void ReaderMifare(bool first_try)
 	LED_C_OFF();
 	
 
-	#define DARKSIDE_MAX_TRIES	32		// number of tries to sync on PRNG cycle. Then give up.
-	uint16_t unsuccessfull_tries = 0;
+	#define MAX_UNEXPECTED_RANDOM	4		// maximum number of unexpected (i.e. real) random numbers when trying to sync. Then give up.
+	#define MAX_SYNC_TRIES			16
+	uint16_t unexpected_random = 0;
+	uint16_t sync_tries = 0;
+	int16_t debug_info_nr = -1;
+	uint32_t debug_info[MAX_SYNC_TRIES];
 	
 	for(uint16_t i = 0; TRUE; i++) {
 		
@@ -2062,16 +2067,20 @@ void ReaderMifare(bool first_try)
 			continue;
 		}
 
-		sync_time = (sync_time & 0xfffffff8) + sync_cycles + catch_up_cycles;
-		catch_up_cycles = 0;
+		if (debug_info_nr == -1) {
+			sync_time = (sync_time & 0xfffffff8) + sync_cycles + catch_up_cycles;
+			catch_up_cycles = 0;
 
-		// if we missed the sync time already, advance to the next nonce repeat
-		while(GetCountSspClk() > sync_time) {
-			sync_time = (sync_time & 0xfffffff8) + sync_cycles;
-		}
+			// if we missed the sync time already, advance to the next nonce repeat
+			while(GetCountSspClk() > sync_time) {
+				sync_time = (sync_time & 0xfffffff8) + sync_cycles;
+			}
 
-		// Transmit MIFARE_CLASSIC_AUTH at synctime. Should result in returning the same tag nonce (== nt_attacked) 
-		ReaderTransmit(mf_auth, sizeof(mf_auth), &sync_time);
+			// Transmit MIFARE_CLASSIC_AUTH at synctime. Should result in returning the same tag nonce (== nt_attacked) 
+			ReaderTransmit(mf_auth, sizeof(mf_auth), &sync_time);
+		} else {
+			ReaderTransmit(mf_auth, sizeof(mf_auth), NULL);
+		}			
 
 		// Receive the (4 Byte) "random" nonce
 		if (!ReaderReceive(receivedAnswer, receivedAnswerPar)) {
@@ -2089,19 +2098,32 @@ void ReaderMifare(bool first_try)
 			int nt_distance = dist_nt(previous_nt, nt);
 			if (nt_distance == 0) {
 				nt_attacked = nt;
-			}
-			else {
+			} else {
 				if (nt_distance == -99999) { // invalid nonce received
-					unsuccessfull_tries++;
-					if (!nt_attacked && unsuccessfull_tries > DARKSIDE_MAX_TRIES) {
+					unexpected_random++;
+					if (!nt_attacked && unexpected_random > MAX_UNEXPECTED_RANDOM) {
 						isOK = -3;		// Card has an unpredictable PRNG. Give up	
 						break;
 					} else {
 						continue;		// continue trying...
 					}
 				}
+				if (++sync_tries > MAX_SYNC_TRIES) {
+					if (sync_tries > 2 * MAX_SYNC_TRIES) {
+						isOK = -4; 			// Card's PRNG runs at an unexpected frequency or resets unexpectedly
+						break;
+					} else {				// continue for a while, just to collect some debug info
+						debug_info[++debug_info_nr] = nt_distance;
+						continue;
+					}
+				}
 				sync_cycles = (sync_cycles - nt_distance);
-				if (MF_DBGLEVEL >= 3) Dbprintf("calibrating in cycle %d. nt_distance=%d, Sync_cycles: %d\n", i, nt_distance, sync_cycles);
+				if (sync_cycles <= 0) {
+					sync_cycles += PRNG_SEQUENCE_LENGTH;
+				}
+				if (MF_DBGLEVEL >= 3) {
+					Dbprintf("calibrating in cycle %d. nt_distance=%d, Sync_cycles: %d\n", i, nt_distance, sync_cycles);
+				}
 				continue;
 			}
 		}
@@ -2172,6 +2194,14 @@ void ReaderMifare(bool first_try)
 
 
 	mf_nr_ar[3] &= 0x1F;
+
+	if (isOK == -4) {
+		if (MF_DBGLEVEL >= 3) {
+			for(uint16_t i = 0; i < MAX_SYNC_TRIES; i++) {
+				Dbprintf("collected debug info[%d] = %d\n", i, debug_info[i]);
+			}
+		}
+	}
 	
 	byte_t buf[28];
 	memcpy(buf + 0,  uid, 4);
