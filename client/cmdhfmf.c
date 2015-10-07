@@ -1949,6 +1949,13 @@ int CmdHF14AMfSniff(const char *Cmd){
 	return 0;
 }
 
+//needs nt, ar, at, Data to decrypt
+int CmdDecryptTraceCmds(const char *Cmd){
+	uint8_t data[50];
+	int len = 0;
+	param_gethex_ex(Cmd,3,data,&len);
+	return tryDecryptWord(param_get32ex(Cmd,0,0,16),param_get32ex(Cmd,1,0,16),param_get32ex(Cmd,2,0,16),data,len/2);
+}
 
 static command_t CommandTable[] =
 {
@@ -1977,6 +1984,7 @@ static command_t CommandTable[] =
   {"cgetsc",	CmdHF14AMfCGetSc,		0, "Read sector - Magic Chinese card"},
   {"cload",		CmdHF14AMfCLoad,		0, "Load dump into magic Chinese card"},
   {"csave",		CmdHF14AMfCSave,		0, "Save dump from magic Chinese card into file or emulator"},
+  {"decrypt", CmdDecryptTraceCmds,1, "[nt] [ar_enc] [at_enc] [data] - to decrypt snoop or trace"},
   {NULL, NULL, 0, NULL}
 };
 
