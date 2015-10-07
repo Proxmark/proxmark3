@@ -18,6 +18,7 @@
 #include "cmdhw.h"
 #include "cmdmain.h"
 #include "cmddata.h"
+#include "data.h"
 
 /* low-level hardware control */
 
@@ -405,33 +406,72 @@ int CmdTune(const char *Cmd)
 int CmdVersion(const char *Cmd)
 {
 
+	clearCommandBuffer();
 	UsbCommand c = {CMD_VERSION};
-	UsbCommand resp = {0, {0, 0, 0}};
+	static UsbCommand resp = {0, {0, 0, 0}};
 
-	SendCommand(&c);
-	if (WaitForResponseTimeout(CMD_ACK,&resp,1000)) {
+	if (resp.arg[0] == 0 && resp.arg[1] == 0) { // no cached information available
+		SendCommand(&c);
+		if (WaitForResponseTimeout(CMD_ACK,&resp,1000)) {
+			PrintAndLog("Prox/RFID mark3 RFID instrument");
+			PrintAndLog((char*)resp.d.asBytes);
+			lookupChipID(resp.arg[0], resp.arg[1]);
+		}
+	} else {
+		PrintAndLog("[[[ Cached information ]]]\n");
 		PrintAndLog("Prox/RFID mark3 RFID instrument");
 		PrintAndLog((char*)resp.d.asBytes);
 		lookupChipID(resp.arg[0], resp.arg[1]);
+		PrintAndLog("");
 	}
+	return 0;
+}
 
+int CmdStatus(const char *Cmd)
+{
+	uint8_t speed_test_buffer[USB_CMD_DATA_SIZE];
+	sample_buf = speed_test_buffer;
+
+	clearCommandBuffer();
+	UsbCommand c = {CMD_STATUS};
+	SendCommand(&c);
+	if (!WaitForResponseTimeout(CMD_ACK,&c,1900)) {
+		PrintAndLog("Status command failed. USB Speed Test timed out");
+	}
+	return 0;
+}
+
+
+int CmdPing(const char *Cmd)
+{
+	clearCommandBuffer();
+	UsbCommand resp;
+	UsbCommand c = {CMD_PING};
+	SendCommand(&c);
+	if (WaitForResponseTimeout(CMD_ACK,&resp,1000)) {
+		PrintAndLog("Ping successfull");
+	}else{
+		PrintAndLog("Ping failed");
+	}
 	return 0;
 }
 
 static command_t CommandTable[] = 
 {
-  {"help",          CmdHelp,        1, "This help"},
-  {"detectreader",  CmdDetectReader,0, "['l'|'h'] -- Detect external reader field (option 'l' or 'h' to limit to LF or HF)"},
-  {"fpgaoff",       CmdFPGAOff,     0, "Set FPGA off"},
-  {"lcd",           CmdLCD,         0, "<HEX command> <count> -- Send command/data to LCD"},
-  {"lcdreset",      CmdLCDReset,    0, "Hardware reset LCD"},
-  {"readmem",       CmdReadmem,     0, "[address] -- Read memory at decimal address from flash"},
-  {"reset",         CmdReset,       0, "Reset the Proxmark3"},
-  {"setlfdivisor",  CmdSetDivisor,  0, "<19 - 255> -- Drive LF antenna at 12Mhz/(divisor+1)"},
-  {"setmux",        CmdSetMux,      0, "<loraw|hiraw|lopkd|hipkd> -- Set the ADC mux to a specific value"},
-  {"tune",          CmdTune,        0, "Measure antenna tuning"},
-  {"version",       CmdVersion,     0, "Show version information about the connected Proxmark"},
-  {NULL, NULL, 0, NULL}
+	{"help",          CmdHelp,        1, "This help"},
+	{"detectreader",  CmdDetectReader,0, "['l'|'h'] -- Detect external reader field (option 'l' or 'h' to limit to LF or HF)"},
+	{"fpgaoff",       CmdFPGAOff,     0, "Set FPGA off"},
+	{"lcd",           CmdLCD,         0, "<HEX command> <count> -- Send command/data to LCD"},
+	{"lcdreset",      CmdLCDReset,    0, "Hardware reset LCD"},
+	{"readmem",       CmdReadmem,     0, "[address] -- Read memory at decimal address from flash"},
+	{"reset",         CmdReset,       0, "Reset the Proxmark3"},
+	{"setlfdivisor",  CmdSetDivisor,  0, "<19 - 255> -- Drive LF antenna at 12Mhz/(divisor+1)"},
+	{"setmux",        CmdSetMux,      0, "<loraw|hiraw|lopkd|hipkd> -- Set the ADC mux to a specific value"},
+	{"tune",          CmdTune,        0, "Measure antenna tuning"},
+	{"version",       CmdVersion,     0, "Show version information about the connected Proxmark"},
+	{"status",        CmdStatus,      0, "Show runtime status information about the connected Proxmark"},
+	{"ping",          CmdPing,        0, "Test if the pm3 is responsive"},
+	{NULL, NULL, 0, NULL}
 };
 
 int CmdHW(const char *Cmd)

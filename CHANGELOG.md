@@ -13,11 +13,19 @@ This project uses the changelog in accordance with [keepchangelog](http://keepac
 - `hf iclass encryptblk` - to encrypt a data block hex to prep for writing that block (marshmellow)
 - ISO14443a stand-alone operation with ARM CFLAG="WITH_ISO14443a_StandAlone". This code can read & emulate two banks of 14a tag UIDs and write to "magic" cards  (Craig Young) 
 - AWID26 command context added as 'lf awid' containing realtime demodulation as well as cloning/simulation based on tag numbers (Craig Young)
+- Added 'hw status'. This command makes the ARM print out some runtime information. (holiman) 
+- Added 'hw ping'. This command just sends a usb packets and checks if the pm3 is responsive. Can be used to abort certain operations which supports abort over usb. (holiman)
+- Added `data hex2bin` and `data bin2hex` for command line conversion between binary and hexadecimal (holiman)
 
 ### Changed
+<<<<<<< HEAD
 - changed `lf config t <threshold>` to be 0 - 128 and will trigger on + or - threshold value (marshmellow) 
 - `hf iclass dump` cli options - can now dump AA1 and AA2 with different keys in one run (does not go to muliple pages for the larger tags yet)
+=======
+- Revised workflow for StandAloneMode14a (Craig Young)
+>>>>>>> Proxmark/master
 - EPA functions (`hf epa`) now support both ISO 14443-A and 14443-B cards (frederikmoellers)
+- 'hw version' only talks to ARM at startup, after that the info is cached. (pwpiwi)
 
 ## [2.2.0][2015-07-12]
 
