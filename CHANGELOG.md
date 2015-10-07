@@ -18,12 +18,9 @@ This project uses the changelog in accordance with [keepchangelog](http://keepac
 - Added `data hex2bin` and `data bin2hex` for command line conversion between binary and hexadecimal (holiman)
 
 ### Changed
-<<<<<<< HEAD
 - changed `lf config t <threshold>` to be 0 - 128 and will trigger on + or - threshold value (marshmellow) 
 - `hf iclass dump` cli options - can now dump AA1 and AA2 with different keys in one run (does not go to muliple pages for the larger tags yet)
-=======
 - Revised workflow for StandAloneMode14a (Craig Young)
->>>>>>> Proxmark/master
 - EPA functions (`hf epa`) now support both ISO 14443-A and 14443-B cards (frederikmoellers)
 - 'hw version' only talks to ARM at startup, after that the info is cached. (pwpiwi)
 
