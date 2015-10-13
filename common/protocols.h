@@ -99,7 +99,7 @@ NXP/Philips CUSTOM COMMANDS
 #define ICLASS_CMD_CHECK            0x05
 #define ICLASS_CMD_DETECT           0x0F
 #define ICLASS_CMD_HALT             0x00
-#define ICLASS_CMD_UPDATE			0x87
+#define ICLASS_CMD_UPDATE           0x87
 #define ICLASS_CMD_ACT              0x8E
 #define ICLASS_CMD_READ4            0x06
 
@@ -196,5 +196,6 @@ NXP/Philips CUSTOM COMMANDS
 
 
 void printIclassDumpInfo(uint8_t* iclass_dump);
+void getMemConfig(uint8_t mem_cfg, uint8_t chip_cfg, uint8_t *max_blk, uint8_t *app_areas, uint8_t *kb);
 
 #endif // PROTOCOLS_H
