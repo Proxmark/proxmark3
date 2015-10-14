@@ -13,17 +13,23 @@
 #define CMDLFPCF7931_H__
 
 struct pcf7931_config{
-	uint8_t password[7];
-	uint16_t init_delay;
-	int16_t offset[2];
+	uint8_t Pwd[7];
+	uint16_t InitDelay;
+	int16_t OffsetWidth;
+	int16_t OffsetPosition;
 };
+
+int pcf7931_resetConfig();
+int pcf7931_printConfig();
+
+int usage_pcf7931_read();
+int usage_pcf7931_write();
+int usage_pcf7931_config();
 
 int CmdLFPCF7931(const char *Cmd);
 
 int CmdLFPCF7931Read(const char *Cmd);
-
 int CmdLFPCF7931Write(const char *Cmd);
-
 int CmdLFPCF7931Config(const char *Cmd);
 
 #endif
