@@ -137,7 +137,7 @@ int CmdLFPCF7931Write(const char *Cmd){
 	if ( param_getdec(Cmd, 0, &block) ) return usage_pcf7931_write();
 	if ( param_getdec(Cmd, 1, &bytepos) ) return usage_pcf7931_write();
 	
-	if ( (block > 7) || (bytepos > 3) ) return usage_pcf7931_write();
+	if ( (block > 7) || (bytepos > 15) ) return usage_pcf7931_write();
 
 	data  = param_get8ex(Cmd, 2, 0, 16);
 	
