@@ -369,7 +369,9 @@ size_t fsk_wave_demod(uint8_t * dest, size_t size, uint8_t fchigh, uint8_t fclow
 	if (fclow==0) fclow=8;
 	//set the threshold close to 0 (graph) or 128 std to avoid static
 	uint8_t threshold_value = 123; 
-
+	size_t preLastSample = 0;
+	size_t LastSample = 0;
+	size_t currSample = 0;
 	// sync to first lo-hi transition, and threshold
 
 	// Need to threshold first sample
@@ -389,13 +391,22 @@ size_t fsk_wave_demod(uint8_t * dest, size_t size, uint8_t fchigh, uint8_t fclow
 
 		// Check for 0->1 transition
 		if (dest[idx-1] < dest[idx]) { // 0 -> 1 transition
-			if ((idx-last_transition)<(fclow-2)){            //0-5 = garbage noise
+			preLastSample = LastSample;
+			LastSample = currSample;
+			currSample = idx-last_transition;
+			if (currSample < (fclow-2)){            //0-5 = garbage noise
 				//do nothing with extra garbage
-			} else if ((idx-last_transition) < (fchigh-1)) { //6-8 = 8 waves
+			} else if (currSample < (fchigh-1)) { //6-8 = 8 sample waves
+				if (LastSample > (fchigh-2) && preLastSample < (fchigh-1)){
+					dest[numBits-1]=1;  //correct last 9 wave surrounded by 8 waves
+				}
 				dest[numBits++]=1;
-			} else if ((idx-last_transition) > (fchigh+1) && !numBits) { //12 + and first bit = garbage 
+
+			} else if (currSample > (fchigh+1) && !numBits) { //12 + and first bit = garbage 
 				//do nothing with beginning garbage
-			} else {                                         //9+ = 10 waves
+			} else if (currSample == (fclow+1) && LastSample == (fclow-1)) { // had a 7 then a 9 should be two 8's
+				dest[numBits++]=1;
+			} else {                                         //9+ = 10 sample waves
 				dest[numBits++]=0;
 			}
 			last_transition = idx;

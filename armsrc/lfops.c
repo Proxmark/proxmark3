@@ -1085,6 +1085,7 @@ void CmdIOdemodFSK(int findone, int *high, int *low, int ledcontrol)
 #define T55x7_MODULATION_FSK2a		0x00007000
 #define T55x7_MODULATION_MANCHESTER	0x00008000
 #define T55x7_MODULATION_BIPHASE	0x00010000
+#define T55x7_MODULATION_DIPHASE	0x00018000
 #define T55x7_BITRATE_RF_8		0
 #define T55x7_BITRATE_RF_16		0x00040000
 #define T55x7_BITRATE_RF_32		0x00080000
@@ -1126,7 +1127,9 @@ void CmdIOdemodFSK(int findone, int *high, int *low, int ledcontrol)
 #define WRITE_1   50*8 // was 400 // SPEC: 48*8 to 64*8 - typ 56*8 (or 56fc)  432 for T55x7; 448 for E5550
 
 #define T55xx_SAMPLES_SIZE      12000 // 32 x 32 x 10  (32 bit times numofblock (7), times clock skip..)
-
+#define T55xx_READ_UPPER_THRESHOLD 128+40  // 50
+#define T55xx_READ_TOL   5
+//#define T55xx_READ_LOWER_THRESHOLD 128-40  //-50
 // Write one bit to card
 void T55xxWriteBit(int bit)
 {
@@ -1148,7 +1151,7 @@ void T55xxWriteBlock(uint32_t Data, uint32_t Block, uint32_t Pwd, uint8_t PwdMod
 
 	// Set up FPGA, 125kHz
 	// Wait for config.. (192+8190xPOW)x8 == 67ms
-	LFSetupFPGAForADC(0, true);
+	LFSetupFPGAForADC(95, true);
 
 	// Now start writting
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
@@ -1184,7 +1187,7 @@ void T55xxWriteBlock(uint32_t Data, uint32_t Block, uint32_t Pwd, uint8_t PwdMod
 void TurnReadLFOn(){
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_LF_ADC | FPGA_LF_ADC_READER_FIELD);
 	// Give it a bit of time for the resonant antenna to settle.
-	SpinDelayUs(8*150);
+	SpinDelayUs(50*8); //155*8
 }
 
 
@@ -1196,13 +1199,26 @@ void T55xxReadBlock(uint32_t Block, uint32_t Pwd, uint8_t PwdMode)
 	uint16_t bufferlength = BigBuf_max_traceLen();
 	if ( bufferlength > T55xx_SAMPLES_SIZE )
 		bufferlength = T55xx_SAMPLES_SIZE;
-
+	Block &= 0x7; //make sure block is at max 7
 	// Clear destination buffer before sending the command
 	memset(dest, 0x80, bufferlength);
 
 	// Set up FPGA, 125kHz
 	// Wait for config.. (192+8190xPOW)x8 == 67ms
-	LFSetupFPGAForADC(0, true);
+
+	LFSetupFPGAForADC(95, true);
+	FpgaWriteConfWord(FPGA_MAJOR_MODE_LF_ADC | FPGA_LF_ADC_READER_FIELD);
+
+	// Connect the A/D to the peak-detected low-frequency path.
+	SetAdcMuxFor(GPIO_MUXSEL_LOPKD);
+
+	// Now set up the SSC to get the ADC samples that are now streaming at us.
+	FpgaSetupSsc();
+
+	// Give it a bit of time for the resonant antenna to settle.
+	//SpinDelayUs(8*200);  //192FC
+	SpinDelay(50);
+
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
 	SpinDelayUs(START_GAP);
 
@@ -1224,16 +1240,34 @@ void T55xxReadBlock(uint32_t Block, uint32_t Pwd, uint8_t PwdMode)
 	TurnReadLFOn();
 	// Now do the acquisition
 	i = 0;
+	bool startFound = false;
+	bool highFound = false;
+	uint8_t curSample = 0;
+	uint8_t firstSample = 0;
 	for(;;) {
 		if (AT91C_BASE_SSC->SSC_SR & AT91C_SSC_TXRDY) {
 			AT91C_BASE_SSC->SSC_THR = 0x43;
 			LED_D_ON();
 		}
 		if (AT91C_BASE_SSC->SSC_SR & AT91C_SSC_RXRDY) {
-			dest[i] = (uint8_t)AT91C_BASE_SSC->SSC_RHR;
-			i++;
-			LED_D_OFF();
-			if (i >= bufferlength) break;
+			curSample = (uint8_t)AT91C_BASE_SSC->SSC_RHR;
+			
+			// find first high sample
+			if (!startFound && curSample > T55xx_READ_UPPER_THRESHOLD) {
+				if (curSample > firstSample) firstSample = curSample;
+				highFound = true;
+			} else if (!highFound) {
+				continue;
+			}
+
+			// skip until samples begin to change
+			if (startFound || curSample < firstSample-T55xx_READ_TOL){
+				if (!startFound) dest[i++] = firstSample;
+				startFound = true;
+				dest[i++] = curSample;
+				LED_D_OFF();
+				if (i >= bufferlength) break;
+			}
 		}
 	}
 
@@ -1266,17 +1300,34 @@ void T55xxReadTrace(void){
 	TurnReadLFOn();
 
 	// Now do the acquisition
+	bool startFound = false;// false;
+	bool highFound = false;
+	uint8_t curSample = 0;
+	uint8_t firstSample = 0;
 	for(;;) {
 		if (AT91C_BASE_SSC->SSC_SR & AT91C_SSC_TXRDY) {
 			AT91C_BASE_SSC->SSC_THR = 0x43;
 			LED_D_ON();
 		}
 		if (AT91C_BASE_SSC->SSC_SR & AT91C_SSC_RXRDY) {
-			dest[i] = (uint8_t)AT91C_BASE_SSC->SSC_RHR;
-			i++;
-			LED_D_OFF();
+			curSample = (uint8_t)AT91C_BASE_SSC->SSC_RHR;
+			
+			// find first high sample
+			if (!startFound && curSample > T55xx_READ_UPPER_THRESHOLD) {
+				if (curSample > firstSample) firstSample = curSample;
+				highFound = true;
+			} else if (!highFound) {
+				continue;
+			}
 
-			if (i >= bufferlength) break;
+			// skip until samples begin to change
+			if (startFound || curSample < firstSample-T55xx_READ_TOL){
+				if (!startFound) dest[i++] = firstSample;
+				startFound = true;
+				dest[i++] = curSample;
+				LED_D_OFF();
+				if (i >= bufferlength) break;
+			}
 		}
 	}
 
