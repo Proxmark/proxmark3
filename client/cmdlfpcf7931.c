@@ -67,7 +67,7 @@ int usage_pcf7931_write(){
 	PrintAndLog("Options:");
 	PrintAndLog("       h          This help");
 	PrintAndLog("       blockaddress   Block to save [0-7]");
-	PrintAndLog("       byteaddress    Index of byte inside block to write [0-3]");
+	PrintAndLog("       byteaddress    Index of byte inside block to write [0-15]");
 	PrintAndLog("       data           one byte of data (hex)");
 	PrintAndLog("Examples:");
 	PrintAndLog("      lf pcf7931 write 2 1 FF");

@@ -250,10 +250,10 @@ int CmdT55xxReadBlock(const char *Cmd) {
 	}
 	
 	uint8_t got[12000];
-	GetFromBigBuf(got,sizeof(got),0);
+	GetFromBigBuf(got, sizeof(got), 0);
 	WaitForResponse(CMD_ACK,NULL);
-	setGraphBuf(got, 12000);
-	DemodBufferLen=0;
+	setGraphBuf(got, sizeof(got));
+	//DemodBufferLen=0;
 	if (!DecodeT55xxBlock()) return 3;
 	char blk[10]={0};
 	sprintf(blk,"%d", block);

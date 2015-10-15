@@ -103,7 +103,6 @@ void LFSetupFPGAForADC(int divisor, bool lf_field)
 	FpgaSetupSsc();
 }
 
-
 /**
  * Does the sample acquisition. If threshold is specified, the actual sampling
  * is not commenced until the threshold has been reached.
@@ -154,9 +153,6 @@ uint32_t DoAcquisition(uint8_t decimation, uint32_t bits_per_sample, bool averag
 			if ((trigger_threshold > 0) && (sample < (trigger_threshold+128)) && (sample > (128-trigger_threshold))) // 
 				continue;
 		
-			//if (trigger_threshold > 0 && sample < trigger_threshold) // 
-				//continue;
-
 			trigger_threshold = 0;
 			sample_total_numbers++;
 
@@ -251,4 +247,57 @@ uint32_t SampleLF(bool printCfg)
 uint32_t SnoopLF()
 {
 	return ReadLF(false, true);
+}
+
+/**
+* acquisition of T55x7 LF signal. Similart to other LF, but adjusted with @marshmellows thresholds
+* the data is collected in BigBuf.
+**/
+void doT55x7Acquisition(void){
+
+	#define T55xx_SAMPLES_SIZE 12000 // 32 x 32 x 10  (32 bit times numofblock (7), times clock skip..)
+	#define T55xx_READ_UPPER_THRESHOLD 128+40  // 50
+	#define T55xx_READ_TOL   5
+
+	uint8_t *dest = BigBuf_get_addr();
+	uint16_t bufsize = BigBuf_max_traceLen();
+	
+	if ( bufsize > T55xx_SAMPLES_SIZE )
+		bufsize = T55xx_SAMPLES_SIZE;
+
+	//memset(dest, 0, bufsize);
+		
+	uint16_t i = 0;
+	bool startFound = false;
+	bool highFound = false;
+	uint8_t curSample = 0;
+	uint8_t firstSample = 0;
+	for(;;) {
+		if (AT91C_BASE_SSC->SSC_SR & AT91C_SSC_TXRDY) {
+			AT91C_BASE_SSC->SSC_THR = 0x43;
+			LED_D_ON();
+		}
+		if (AT91C_BASE_SSC->SSC_SR & AT91C_SSC_RXRDY) {
+			curSample = (uint8_t)AT91C_BASE_SSC->SSC_RHR;
+			
+			// find first high sample
+			if (!startFound && curSample > T55xx_READ_UPPER_THRESHOLD) {
+				if (curSample > firstSample) 
+					firstSample = curSample;
+				highFound = true;
+			} else if (!highFound) {
+				continue;
+			}
+
+			// skip until samples begin to change
+			if (startFound || curSample < firstSample-T55xx_READ_TOL){
+				if (!startFound) 
+					dest[i++] = firstSample;
+				startFound = true;
+				dest[i++] = curSample;
+			LED_D_OFF();
+			if (i >= bufsize) break;
+			}
+		}
+	}
 }
