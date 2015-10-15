@@ -193,6 +193,94 @@ int mfnested(uint8_t blockNo, uint8_t keyType, uint8_t * key, uint8_t trgBlockNo
 	return 0;
 }
 
+
+int mfnestedhard(uint8_t blockNo, uint8_t keyType, uint8_t *key, uint8_t trgBlockNo, uint8_t trgKeyType, bool nonce_file_read, bool nonce_file_write, bool slow) 
+{
+	UsbCommand resp;
+	FILE *fnonces = NULL;
+	uint32_t total_num_nonces = 0;
+	uint32_t flags = 0;
+	bool initialize = true;
+	clock_t time1;
+	//StateList_t statelists[2];
+	//struct Crypto1State *p1, *p2, *p3, *p4;
+
+	if (nonce_file_read) {
+		// don't acquire nonces, use pre-acquired data from file nonces.bin
+		PrintAndLog("Reading nonces not yet implemented.");
+	} else {
+		// acquire nonces.
+		time1 = clock();
+		do {
+			clearCommandBuffer();
+			flags |= initialize ? 0x0001 : 0;
+			flags |= slow ? 0x0002 : 0;
+			UsbCommand c = {CMD_MIFARE_ACQUIRE_ENCRYPTED_NONCES, {blockNo + keyType * 0x100, trgBlockNo + trgKeyType * 0x100, flags}};
+			memcpy(c.d.asBytes, key, 6);
+			SendCommand(&c);
+
+			initialize = false;
+
+			if (!WaitForResponseTimeout(CMD_ACK, &resp, 3000)) {
+				return -1;
+			}
+
+			if (resp.arg[0]) {
+				return resp.arg[0];  // error during nested
+			}
+
+			uint32_t cuid = resp.arg[1];
+			uint16_t num_acquired_nonces = resp.arg[2];
+			
+			//PrintAndLog("Received %d nonces", num_acquired_nonces);
+
+			if (nonce_file_write && fnonces == NULL) {
+				if ((fnonces = fopen("nonces.bin","wb")) == NULL) { 
+					PrintAndLog("Could not create file nonces.bin");
+					return 1;
+				}
+				PrintAndLog("Writing acquired nonces to binary file nonces.bin...");
+				fwrite(&cuid, 1, sizeof(cuid), fnonces);
+				fwrite(&trgBlockNo, 1, sizeof(trgBlockNo), fnonces);
+				fwrite(&trgKeyType, 1, sizeof(trgKeyType), fnonces);
+			}
+
+			uint32_t nt_enc1, nt_enc2;
+			uint8_t par_enc;
+			uint8_t *bufp = resp.d.asBytes;
+			for (uint16_t i = 0; i < num_acquired_nonces/2; i++) {
+				memcpy(&nt_enc1, bufp, sizeof(nt_enc1));
+				bufp += sizeof(nt_enc1);
+				memcpy(&nt_enc2, bufp, sizeof(nt_enc2));
+				bufp += sizeof(nt_enc2);
+				memcpy(&par_enc, bufp, sizeof(par_enc));
+				bufp += sizeof(par_enc);
+				//printf("Encrypted nonce: %08x, encrypted_parity: %02x\n", nt_enc1, par_enc >> 4);
+				//printf("Encrypted nonce: %08x, encrypted_parity: %02x\n", nt_enc2, par_enc & 0x0f);
+				if (nonce_file_write) {
+					fwrite(&nt_enc1, 1, sizeof(nt_enc1), fnonces);
+					fwrite(&nt_enc2, 1, sizeof(nt_enc2), fnonces);
+					fwrite(&par_enc, 1, sizeof(par_enc), fnonces);
+				}
+			}
+
+			total_num_nonces += num_acquired_nonces;
+			
+		} while (total_num_nonces < 5000);
+
+		if (nonce_file_write) {
+			fclose(fnonces);
+		}
+		
+		PrintAndLog("Acquired a total of %d nonces at a rate of %d nonces/minute", total_num_nonces, total_num_nonces*60*CLOCKS_PER_SEC/(clock() - time1));
+	}	
+
+	PrintAndLog("Attack not yet implemented");
+	
+	return 0;
+}
+
+
 int mfCheckKeys (uint8_t blockNo, uint8_t keyType, bool clear_trace, uint8_t keycnt, uint8_t * keyBlock, uint64_t * key){
 
 	*key = 0;
