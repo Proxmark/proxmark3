@@ -49,13 +49,18 @@ int usage_t55xx_config(){
 	return 0;
 }
 int usage_t55xx_read(){
-	PrintAndLog("Usage:  lf t55xx read <block> <password>");
+	PrintAndLog("Usage:  lf t55xx read <block> <password> <override_safety>");
 	PrintAndLog("     <block>, block number to read. Between 0-7");
 	PrintAndLog("     <password>, OPTIONAL password (8 hex characters)");
+	PrintAndLog("     <override_safety>, OPTIONAL override safety check = 1");
+	PrintAndLog("     ****WARNING****");
+	PrintAndLog("     Use of read with password on a tag not configured for a pwd");
+	PrintAndLog("     can damage the tag");
 	PrintAndLog("");
 	PrintAndLog("Examples:");
-	PrintAndLog("      lf t55xx read 0           - read data from block 0");
-	PrintAndLog("      lf t55xx read 0 feedbeef  - read data from block 0 password feedbeef");
+	PrintAndLog("      lf t55xx read 0            - read data from block 0");
+	PrintAndLog("      lf t55xx read 0 feedbeef   - read data from block 0 password feedbeef");
+	PrintAndLog("      lf t55xx read 0 feedbeef 1 - read data from block 0 password feedbeef safety check");
 	PrintAndLog("");
 	return 0;
 }
@@ -217,29 +222,38 @@ int CmdT55xxSetConfig(const char *Cmd) {
 int CmdT55xxReadBlock(const char *Cmd) {
 	int block = -1;
 	int password = 0xFFFFFFFF; //default to blank Block 7
-
+	int override = 0;
 	char cmdp = param_getchar(Cmd, 0);
 	if (cmdp == 'h' || cmdp == 'H')
 		return usage_t55xx_read();
 
-	int res = sscanf(Cmd, "%d %x", &block, &password);
+	int res = sscanf(Cmd, "%d %x %d", &block, &password, &override);
 
-	if ( res < 1 || res > 2 )
+	if ( res < 1 || res > 3 )
 		return usage_t55xx_read();
 
-	
-	if ((block < 0) | (block > 7)) {
+	if ((block < 0) || (block > 7)) {
 		PrintAndLog("Block must be between 0 and 7");
 		return 1;
-	}	
+	}
 
 	UsbCommand c = {CMD_T55XX_READ_BLOCK, {0, block, 0}};
- 	c.d.asBytes[0] = 0x0; 
+	c.d.asBytes[0] = 0x0;
 
 	//Password mode
-	if ( res == 2 ) {
-		c.arg[2] = password;
-		c.d.asBytes[0] = 0x1; 
+	if ( res > 1 ) {
+		// try reading the config block and verify that PWD bit is set before doing this!
+		AquireData( CONFIGURATION_BLOCK );
+		if ( !tryDetectModulation() && !override) {
+			PrintAndLog("Safety Check: Could not detect if PWD bit is set in config block. Exits.");
+			return 1;
+		} else if (override) {
+			PrintAndLog("Safety Check Overriden - proceeding despite risk");
+			c.arg[2] = password;
+			c.d.asBytes[0] = 0x1;
+		} else {
+			PrintAndLog("Safety Check: PWD bit is NOT set in config block. Reading without password...");	
+		}
 	}
 
 	clearCommandBuffer();
