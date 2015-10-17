@@ -975,7 +975,7 @@ void UsbPacketReceived(uint8_t *packet, int len)
 			CopyIndala224toT55x7(c->d.asDwords[0], c->d.asDwords[1], c->d.asDwords[2], c->d.asDwords[3], c->d.asDwords[4], c->d.asDwords[5], c->d.asDwords[6]);
 			break;
 		case CMD_T55XX_READ_BLOCK:
-			T55xxReadBlock(c->arg[1], c->arg[2],c->d.asBytes[0]);
+			T55xxReadBlock(c->arg[0], c->arg[1], c->arg[2]);
 			break;
 		case CMD_T55XX_WRITE_BLOCK:
 			T55xxWriteBlock(c->arg[0], c->arg[1], c->arg[2], c->d.asBytes[0]);

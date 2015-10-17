@@ -121,12 +121,12 @@ static int CmdHelp(const char *Cmd);
 int CmdT55xxSetConfig(const char *Cmd) {
 
 	uint8_t offset = 0;
-	bool errors = FALSE;
-	uint8_t cmdp = 0;
 	char modulation[5] = {0x00};
 	char tmp = 0x00;
 	uint8_t bitRate = 0;
 	uint8_t rates[9] = {8,16,32,40,50,64,100,128,0};
+	uint8_t cmdp = 0;
+	bool errors = FALSE;
 	while(param_getchar(Cmd, cmdp) != 0x00 && !errors)
 	{
 		tmp = param_getchar(Cmd, cmdp);
@@ -220,39 +220,72 @@ int CmdT55xxSetConfig(const char *Cmd) {
 }
 
 int CmdT55xxReadBlock(const char *Cmd) {
-	int block = -1;
-	int password = 0xFFFFFFFF; //default to blank Block 7
-	int override = 0;
-	char cmdp = param_getchar(Cmd, 0);
-	if (cmdp == 'h' || cmdp == 'H')
-		return usage_t55xx_read();
-
-	int res = sscanf(Cmd, "%d %x %d", &block, &password, &override);
-
-	if ( res < 1 || res > 3 )
-		return usage_t55xx_read();
-
-	if ((block < 0) || (block > 7)) {
+	uint8_t block = 255;
+	uint8_t wake = 0;
+	uint8_t usepwd = 0;
+	uint32_t password = 0xFFFFFFFF; //default to blank Block 7
+	uint8_t override = 0;
+	uint8_t cmdp = 0;
+	bool errors = false;
+	while(param_getchar(Cmd, cmdp) != 0x00 && !errors) {
+		switch(param_getchar(Cmd, cmdp)) {
+		case 'h':
+		case 'H':
+			return usage_t55xx_read();
+		case 'b':
+		case 'B':
+			errors |= param_getdec(Cmd, cmdp+1, &block);
+			cmdp+=2;
+			break;
+		case 'o':
+		case 'O':
+			override = 1;
+			cmdp++;
+			break;
+		case 'p':
+		case 'P':
+			password = param_get32ex(Cmd, cmdp+1, 0, 10);
+			usepwd = 1;
+			cmdp+=2;
+			break;
+		case 'w':
+		case 'W':
+			wake = 1;
+			cmdp++;
+			break;
+		default:
+			PrintAndLog("Unknown parameter '%c'", param_getchar(Cmd, cmdp));
+			errors = true;
+			break;
+		}
+	}
+	if (errors) return usage_t55xx_read();
+	if (wake && !usepwd) {
+		PrintAndLog("Wake command must use a pwd");
+		return 1;
+	}
+	if ((block > 7) && !wake) {
 		PrintAndLog("Block must be between 0 and 7");
 		return 1;
 	}
 
-	UsbCommand c = {CMD_T55XX_READ_BLOCK, {0, block, 0}};
-	c.d.asBytes[0] = 0x0;
+	UsbCommand c = {CMD_T55XX_READ_BLOCK, {0, block, password}};
 
 	//Password mode
-	if ( res > 1 ) {
+	if ( usepwd || wake ) {
 		// try reading the config block and verify that PWD bit is set before doing this!
-		AquireData( CONFIGURATION_BLOCK );
-		if ( !tryDetectModulation() && !override) {
-			PrintAndLog("Safety Check: Could not detect if PWD bit is set in config block. Exits.");
-			return 1;
-		} else if (override) {
-			PrintAndLog("Safety Check Overriden - proceeding despite risk");
-			c.arg[2] = password;
-			c.d.asBytes[0] = 0x1;
+		if ( wake || override ) {
+			c.arg[0] = (wake<<8) & usepwd;
+			if ( !wake && override )
+				PrintAndLog("Safety Check Overriden - proceeding despite risk");
 		} else {
-			PrintAndLog("Safety Check: PWD bit is NOT set in config block. Reading without password...");	
+			AquireData( CONFIGURATION_BLOCK );
+			if ( !tryDetectModulation() ) {
+				PrintAndLog("Safety Check: Could not detect if PWD bit is set in config block. Exits.");
+				return 1;
+			} else {
+				PrintAndLog("Safety Check: PWD bit is NOT set in config block. Reading without password...");	
+			}
 		}
 	}
 
@@ -270,7 +303,11 @@ int CmdT55xxReadBlock(const char *Cmd) {
 	//DemodBufferLen=0;
 	if (!DecodeT55xxBlock()) return 3;
 	char blk[10]={0};
-	sprintf(blk,"%d", block);
+	if ( wake ) {
+		sprintf(blk,"wake");
+	} else {
+		sprintf(blk,"%d", block);
+	}
 	printT55xxBlock(blk);
 	return 0;
 }

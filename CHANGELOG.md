@@ -5,6 +5,7 @@ This project uses the changelog in accordance with [keepchangelog](http://keepac
 ## [unreleased][unreleased]
 
 ### Added
+- `lf t55xx read w` added wake with password then read following stream option to standard t55xx read commands (marshmellow)
 - `hf iclass managekeys` to save, load and manage iclass keys.  (adjusted most commands to accept a loaded key in memory) (marshmellow)
 - `hf iclass readblk` to select, authenticate, and read 1 block from an iclass card (marshmellow)
 - `hf iclass writeblk` to select, authenticate, and write 1 block to an iclass card (or picopass) (marshmellow + others)

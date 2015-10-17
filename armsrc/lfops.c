@@ -1202,9 +1202,10 @@ void T55xxWriteBlock(uint32_t Data, uint32_t Block, uint32_t Pwd, uint8_t PwdMod
 }
 
 // Read one card block in page 0
-void T55xxReadBlock(uint32_t Block, uint32_t Pwd, uint8_t PwdMode) {
+void T55xxReadBlock(uint16_t arg0, uint8_t Block, uint32_t Pwd) {
 	LED_A_ON();
-
+	uint8_t PwdMode = arg0 & 0xFF;
+	uint8_t wake = arg0 >> 8;
 	uint32_t i = 0;
 
 	//clear buffer now so it does not interfere with timing later
@@ -1237,17 +1238,21 @@ void T55xxReadBlock(uint32_t Block, uint32_t Pwd, uint8_t PwdMode) {
 	T55xxWriteBit(1);
 	T55xxWriteBit(0); //Page 0
 
-	if (PwdMode == 1){
+	if (PwdMode || wake){
 		// Send Pwd
 		for (i = 0x80000000; i != 0; i >>= 1)
 			T55xxWriteBit(Pwd & i);
 	}
-	// Send a zero bit separation
-	T55xxWriteBit(0);
 
-	// Send Block number
-	for (i = 0x04; i != 0; i >>= 1)
-		T55xxWriteBit(Block & i);
+	// reading a block - send rest of read block cmd else skip for wake command
+	if (!wake) {
+		// Send a zero bit separation
+		T55xxWriteBit(0);
+
+		// Send Block number
+		for (i = 0x04; i != 0; i >>= 1)
+			T55xxWriteBit(Block & i);		
+	}
 
 	// Turn field on to read the response
 	TurnReadLFOn(READ_GAP);
