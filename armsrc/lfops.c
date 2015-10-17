@@ -25,7 +25,7 @@
  * @param period_1
  * @param command
  */
-void ModThenAcquireRawAdcSamples125k(int delay_off, int period_0, int period_1, uint8_t *command)
+void ModThenAcquireRawAdcSamples125k(uint32_t delay_off, uint32_t period_0, uint32_t period_1, uint8_t *command)
 {
 
 	int divisor_used = 95; // 125 KHz

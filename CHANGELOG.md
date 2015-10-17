@@ -18,6 +18,10 @@ This project uses the changelog in accordance with [keepchangelog](http://keepac
 - Added `data hex2bin` and `data bin2hex` for command line conversion between binary and hexadecimal (holiman)
 
 ### Changed
+- added lf t5xx read with password safety check and warning text
+- Adjusted LF FSK demod to account for cross threshold fluctuations (898 count waves will adjust the 9 to 8 now...) more accurate.
+- Adjusted timings for t55xx commands.  more reliable now.
+- `lf cmdread` adjusted input methods and added help text (marshmellow & iceman)
 - changed `lf config t <threshold>` to be 0 - 128 and will trigger on + or - threshold value (marshmellow) 
 - `hf iclass dump` cli options - can now dump AA1 and AA2 with different keys in one run (does not go to muliple pages for the larger tags yet)
 - Revised workflow for StandAloneMode14a (Craig Young)
