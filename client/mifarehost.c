@@ -194,6 +194,137 @@ int mfnested(uint8_t blockNo, uint8_t keyType, uint8_t * key, uint8_t trgBlockNo
 }
 
 
+typedef struct noncelistentry {
+	uint32_t NonceAndPar;	// concatenated last 24 bits of nonce and parity
+	void *next;
+} noncelistentry_t;
+
+
+typedef struct noncelist {
+	uint16_t num;
+	uint8_t Sum;
+	noncelistentry_t *first;
+} noncelist_t;
+
+
+noncelist_t nonces[256];
+uint16_t first_byte_Sum = 0;
+uint16_t first_byte_num = 0;
+
+
+int add_nonce(uint32_t nonce, uint8_t par) 
+{
+	uint8_t first_byte = nonce >> 24;
+	uint32_t NonceAndPar = (nonce << 8) | (par & 0x07);
+	noncelistentry_t *p1 = nonces[first_byte].first;
+	noncelistentry_t *p2 = NULL;
+
+	if (p1 == NULL) {	// first nonce with this 1st byte
+		first_byte_num++;
+		first_byte_Sum += parity((nonce & 0xff000000) | (par & 0x08)); // 1st byte sum property
+	}
+
+	while (p1 != NULL && p1->NonceAndPar < NonceAndPar) {
+		p2 = p1;
+		p1 = p1->next;
+	}
+	
+	if (p1 == NULL) { // need to add at the end of the list
+		if (p2 == NULL) { // list is empty yet
+			p2 = nonces[first_byte].first = malloc(sizeof(noncelistentry_t));
+		} else {
+			p2 = p2->next = malloc(sizeof(noncelistentry_t));
+		}
+	} else if (p1->NonceAndPar != NonceAndPar) {	// quite unlikely for hardened cards, but don't want to add a nonce twice
+		if (p2 == NULL) {	// need to insert at start of list
+			p2 = nonces[first_byte].first = malloc(sizeof(noncelistentry_t));
+		} else {
+			p2 = p2->next = malloc(sizeof(noncelistentry_t));
+		}
+	} else {
+		return (first_byte_num==256?first_byte_Sum:-1);
+	}
+
+	p2->next = p1;
+	p2->NonceAndPar = NonceAndPar;
+	nonces[first_byte].num++;
+	nonces[first_byte].Sum += parity(NonceAndPar & 0xff000004); // 2nd byte sum property
+
+	return (first_byte_num==256?first_byte_Sum:-1);
+}
+
+
+uint16_t SumPropertyOdd(struct Crypto1State *s)
+{ 
+	uint16_t oddsum = 0;
+	for (uint16_t j = 0; j < 16; j++) {
+		uint32_t oddstate = s->odd;
+		uint16_t part_sum = 0;
+		for (uint16_t i = 0; i < 5; i++) {
+			part_sum ^= filter(oddstate);
+			oddstate = (oddstate << 1) | ((j >> (3-i)) & 0x01) ;
+		}
+		oddsum += part_sum;
+	}
+	return oddsum;
+}
+
+
+uint16_t SumPropertyEven(struct Crypto1State *s)
+{
+	uint16_t evensum = 0;
+	for (uint16_t j = 0; j < 16; j++) {
+		uint32_t evenstate = s->even;
+		uint16_t part_sum = 0;
+		for (uint16_t i = 0; i < 4; i++) {
+			evenstate = (evenstate << 1) | ((j >> (3-i)) & 0x01) ;
+			part_sum ^= filter(evenstate);
+		}
+		evensum += part_sum;
+	}
+	return evensum;
+}
+
+
+uint16_t SumProperty(struct Crypto1State *s)
+{
+	uint16_t sum_odd = SumPropertyOdd(s);
+	uint16_t sum_even = SumPropertyEven(s);
+	return (sum_odd*(16-sum_even) + (16-sum_odd)*sum_even);
+}
+	
+	
+void TestSumProperty()
+{
+	uint32_t statistics[257];
+	struct Crypto1State cs;
+	
+	for (uint16_t i = 0; i < 257; i++) {
+		statistics[i] = 0;
+	}
+	time_t time1 = clock();
+	
+	#define NUM_STATISTICS 1000000
+	for (uint32_t i = 0; i < NUM_STATISTICS; i++) {
+		cs.odd = (rand() & 0xfff) << 12 | (rand() & 0xfff);
+		cs.even = (rand() & 0xfff) << 12 | (rand() & 0xfff);
+		uint16_t sum_property = SumProperty(&cs);
+		statistics[sum_property] += 1;
+		if (i%(NUM_STATISTICS/100) == 0) printf("."); 
+	}
+	
+	printf("\nCalculated %d Sum properties in %0.3f seconds (%0.0f calcs/second)\n", NUM_STATISTICS, ((float)clock() - time1)/CLOCKS_PER_SEC, NUM_STATISTICS/((float)clock() - time1)*CLOCKS_PER_SEC);
+	for (uint16_t i = 0; i < 257; i++) {
+		if (statistics[i] != 0) {
+			printf("probability[%3d] = %0.5f\n", i, (float)statistics[i]/NUM_STATISTICS);
+		}
+	}
+
+}
+	
+	
+
+	
 int mfnestedhard(uint8_t blockNo, uint8_t keyType, uint8_t *key, uint8_t trgBlockNo, uint8_t trgKeyType, bool nonce_file_read, bool nonce_file_write, bool slow) 
 {
 	UsbCommand resp;
@@ -202,13 +333,53 @@ int mfnestedhard(uint8_t blockNo, uint8_t keyType, uint8_t *key, uint8_t trgBloc
 	uint32_t flags = 0;
 	bool initialize = true;
 	clock_t time1;
+	uint8_t read_buf[9];
+	uint32_t nt_enc1, nt_enc2;
+	uint8_t par_enc;
+	uint32_t cuid;
+	
+	// initialize the list of nonces
+	for (uint16_t i = 0; i < 256; i++) {
+		nonces[i].num = 0;
+		nonces[i].Sum = 0;
+		nonces[i].first = NULL;
+	}
+	first_byte_num = 0;
+	first_byte_Sum = 0;
+		
 	//StateList_t statelists[2];
 	//struct Crypto1State *p1, *p2, *p3, *p4;
 
 	if (nonce_file_read) {
 		// don't acquire nonces, use pre-acquired data from file nonces.bin
-		PrintAndLog("Reading nonces not yet implemented.");
+		if ((fnonces = fopen("nonces.bin","rb")) == NULL) { 
+			PrintAndLog("Could not open file nonces.bin");
+			return 1;
+		}
+		PrintAndLog("Reading nonces from file nonces.bin...");
+		if (fread(read_buf, 1, 6, fnonces) == 0) {
+			PrintAndLog("File reading error.");
+			fclose(fnonces);
+			return 1;
+		}
+		cuid = bytes_to_num(read_buf, 4);
+		trgBlockNo = bytes_to_num(read_buf+4, 1);
+		trgKeyType = bytes_to_num(read_buf+5, 1);
+
+		while (!feof(fnonces)) {
+			fread(read_buf, 1, 9, fnonces);
+			nt_enc1 = bytes_to_num(read_buf, 4);
+			nt_enc2 = bytes_to_num(read_buf+4, 4);
+			par_enc = bytes_to_num(read_buf+8, 1);
+			add_nonce(nt_enc1, par_enc >> 4);
+			add_nonce(nt_enc2, par_enc & 0x0f);
+			total_num_nonces += 2;
+		}
+		fclose(fnonces);
+		PrintAndLog("Read %d nonces from file", total_num_nonces);
+		
 	} else {
+
 		// acquire nonces.
 		time1 = clock();
 		do {
@@ -229,7 +400,7 @@ int mfnestedhard(uint8_t blockNo, uint8_t keyType, uint8_t *key, uint8_t trgBloc
 				return resp.arg[0];  // error during nested
 			}
 
-			uint32_t cuid = resp.arg[1];
+			cuid = resp.arg[1];
 			uint16_t num_acquired_nonces = resp.arg[2];
 			
 			//PrintAndLog("Received %d nonces", num_acquired_nonces);
@@ -249,18 +420,24 @@ int mfnestedhard(uint8_t blockNo, uint8_t keyType, uint8_t *key, uint8_t trgBloc
 			uint8_t par_enc;
 			uint8_t *bufp = resp.d.asBytes;
 			for (uint16_t i = 0; i < num_acquired_nonces/2; i++) {
-				memcpy(&nt_enc1, bufp, sizeof(nt_enc1));
+				nt_enc1 = bytes_to_num(bufp, sizeof(nt_enc1));
 				bufp += sizeof(nt_enc1);
-				memcpy(&nt_enc2, bufp, sizeof(nt_enc2));
+				nt_enc2 = bytes_to_num(bufp, sizeof(nt_enc2));
 				bufp += sizeof(nt_enc2);
-				memcpy(&par_enc, bufp, sizeof(par_enc));
+				par_enc = bytes_to_num(bufp, sizeof(par_enc));
 				bufp += sizeof(par_enc);
+				
+				add_nonce(nt_enc1, par_enc >> 4);
+				add_nonce(nt_enc2, par_enc & 0x0f);
+				
 				//printf("Encrypted nonce: %08x, encrypted_parity: %02x\n", nt_enc1, par_enc >> 4);
 				//printf("Encrypted nonce: %08x, encrypted_parity: %02x\n", nt_enc2, par_enc & 0x0f);
 				if (nonce_file_write) {
-					fwrite(&nt_enc1, 1, sizeof(nt_enc1), fnonces);
-					fwrite(&nt_enc2, 1, sizeof(nt_enc2), fnonces);
-					fwrite(&par_enc, 1, sizeof(par_enc), fnonces);
+					uint8_t buffer[9];
+					num_to_bytes(nt_enc1, 4, buffer);
+					num_to_bytes(nt_enc2, 4, buffer+4);
+					num_to_bytes(par_enc, 1, buffer+8);
+					fwrite(buffer, 1, 9, fnonces);
 				}
 			}
 
@@ -275,7 +452,11 @@ int mfnestedhard(uint8_t blockNo, uint8_t keyType, uint8_t *key, uint8_t trgBloc
 		PrintAndLog("Acquired a total of %d nonces at a rate of %d nonces/minute", total_num_nonces, total_num_nonces*60*CLOCKS_PER_SEC/(clock() - time1));
 	}	
 
-	PrintAndLog("Attack not yet implemented");
+	PrintAndLog("first_byte_num: %d, first_byte_Sum: %d", first_byte_num, first_byte_Sum);
+
+	TestSumProperty();
+	
+	PrintAndLog("Generation of candidate list and brute force phase not yet implemented");
 	
 	return 0;
 }
