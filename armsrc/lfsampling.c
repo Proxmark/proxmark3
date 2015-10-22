@@ -272,20 +272,24 @@ void doT55x7Acquisition(void){
 	bool highFound = false;
 	uint8_t curSample = 0;
 	uint8_t firstSample = 0;
-	for(;;) {
+	uint16_t skipCnt = 0;
+	while(!BUTTON_PRESS() && skipCnt<1000) {
+		WDT_HIT();
 		if (AT91C_BASE_SSC->SSC_SR & AT91C_SSC_TXRDY) {
 			AT91C_BASE_SSC->SSC_THR = 0x43;
 			LED_D_ON();
 		}
 		if (AT91C_BASE_SSC->SSC_SR & AT91C_SSC_RXRDY) {
 			curSample = (uint8_t)AT91C_BASE_SSC->SSC_RHR;
-			
+			LED_D_OFF();
+
 			// find first high sample
 			if (!startFound && curSample > T55xx_READ_UPPER_THRESHOLD) {
 				if (curSample > firstSample) 
 					firstSample = curSample;
 				highFound = true;
 			} else if (!highFound) {
+				skipCnt++;
 				continue;
 			}
 
@@ -295,9 +299,9 @@ void doT55x7Acquisition(void){
 					dest[i++] = firstSample;
 				startFound = true;
 				dest[i++] = curSample;
-			LED_D_OFF();
-			if (i >= bufsize) break;
+				if (i >= bufsize-1) break;
 			}
 		}
+		//skipCnt++;
 	}
 }

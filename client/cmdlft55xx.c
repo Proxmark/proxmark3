@@ -28,13 +28,14 @@
 
 #define CONFIGURATION_BLOCK 0x00
 #define TRACE_BLOCK 0x01
+#define REGULAR_READ_MODE_BLOCK 0xFF
 
 // Default configuration
 t55xx_conf_block_t config = { .modulation = DEMOD_ASK, .inverted = FALSE, .offset = 0x00, .block0 = 0x00};
 
 int usage_t55xx_config(){
 	PrintAndLog("Usage: lf t55xx config [d <demodulation>] [i 1] [o <offset>]");
-	PrintAndLog("Options:        ");
+	PrintAndLog("Options:");
 	PrintAndLog("       h                        This help");
 	PrintAndLog("       b <8|16|32|40|50|64|100|128>     Set bitrate");
 	PrintAndLog("       d <FSK|FSK1|FSK1a|FSK2|FSK2a|ASK|PSK1|PSK2|NRZ|BI|BIa>  Set demodulation FSK / ASK / PSK / NRZ / Biphase / Biphase A");
@@ -49,35 +50,40 @@ int usage_t55xx_config(){
 	return 0;
 }
 int usage_t55xx_read(){
-	PrintAndLog("Usage:  lf t55xx read <block> <password> <override_safety>");
-	PrintAndLog("     <block>, block number to read. Between 0-7");
-	PrintAndLog("     <password>, OPTIONAL password (8 hex characters)");
-	PrintAndLog("     <override_safety>, OPTIONAL override safety check = 1");
+	PrintAndLog("Usage:  lf t55xx read b <block> p <password> <override_safety> <page1>");
+	PrintAndLog("Options:");
+	PrintAndLog("     b <block>, block number to read. Between 0-7");
+	PrintAndLog("     p <password>, OPTIONAL password (8 hex characters)");
+	PrintAndLog("     o, OPTIONAL override safety check");
+	PrintAndLog("     1, OPTIONAL read Page 1 instead of Page 0");
 	PrintAndLog("     ****WARNING****");
 	PrintAndLog("     Use of read with password on a tag not configured for a pwd");
 	PrintAndLog("     can damage the tag");
 	PrintAndLog("");
 	PrintAndLog("Examples:");
-	PrintAndLog("      lf t55xx read 0            - read data from block 0");
-	PrintAndLog("      lf t55xx read 0 feedbeef   - read data from block 0 password feedbeef");
-	PrintAndLog("      lf t55xx read 0 feedbeef 1 - read data from block 0 password feedbeef safety check");
+	PrintAndLog("      lf t55xx read b 0            - read data from block 0");
+	PrintAndLog("      lf t55xx read b 0 p feedbeef   - read data from block 0 password feedbeef");
+	PrintAndLog("      lf t55xx read b 0 p feedbeef o - read data from block 0 password feedbeef safety check");
 	PrintAndLog("");
 	return 0;
 }
 int usage_t55xx_write(){
-	PrintAndLog("Usage:  lf t55xx wr <block> <data> [password]");
-	PrintAndLog("     <block>, block number to write. Between 0-7");
-	PrintAndLog("     <data>,  4 bytes of data to write (8 hex characters)");
-	PrintAndLog("     [password], OPTIONAL password 4bytes (8 hex characters)");
+	PrintAndLog("Usage:  lf t55xx wr b <block> d <data> p [password] [1]");
+	PrintAndLog("Options:");
+	PrintAndLog("     b <block>,    block number to write. Between 0-7");
+	PrintAndLog("     d <data>,     4 bytes of data to write (8 hex characters)");
+	PrintAndLog("     p [password], OPTIONAL password 4bytes (8 hex characters)");
+	PrintAndLog("     1,            OPTIONAL write Page 1 instead of Page 0");
 	PrintAndLog("");
 	PrintAndLog("Examples:");
-	PrintAndLog("      lf t55xx wr 3 11223344           - write 11223344 to block 3");
-	PrintAndLog("      lf t55xx wr 3 11223344 feedbeef  - write 11223344 to block 3 password feedbeef");
+	PrintAndLog("      lf t55xx wr b 3 d 11223344            - write 11223344 to block 3");
+	PrintAndLog("      lf t55xx wr b 3 d 11223344 p feedbeef - write 11223344 to block 3 password feedbeef");
 	PrintAndLog("");
 	return 0;
 }
 int usage_t55xx_trace() {
 	PrintAndLog("Usage:  lf t55xx trace [1]");
+	PrintAndLog("Options:");
 	PrintAndLog("     [graph buffer data], if set, use Graphbuffer otherwise read data from tag.");
 	PrintAndLog("");
 	PrintAndLog("Examples:");
@@ -88,6 +94,7 @@ int usage_t55xx_trace() {
 }
 int usage_t55xx_info() {
 	PrintAndLog("Usage:  lf t55xx info [1]");
+	PrintAndLog("Options:");
 	PrintAndLog("     [graph buffer data], if set, use Graphbuffer otherwise read data from tag.");
 	PrintAndLog("");
 	PrintAndLog("Examples:");
@@ -97,22 +104,37 @@ int usage_t55xx_info() {
 	return 0;
 }
 int usage_t55xx_dump(){
-	PrintAndLog("Usage:  lf t55xx dump <password>");
-    PrintAndLog("     <password>, OPTIONAL password 4bytes (8 hex symbols)");
+	PrintAndLog("Usage:  lf t55xx dump <password> [o]");
+	PrintAndLog("Options:");
+	PrintAndLog("     <password>, OPTIONAL password 4bytes (8 hex symbols)");
+	PrintAndLog("     <Override>, OPTIONAL Force pwd read despite danger to card");
 	PrintAndLog("");
 	PrintAndLog("Examples:");
 	PrintAndLog("      lf t55xx dump");
-	PrintAndLog("      lf t55xx dump feedbeef");
+	PrintAndLog("      lf t55xx dump feedbeef o");
 	PrintAndLog("");
 	return 0;
 }
 int usage_t55xx_detect(){
-	PrintAndLog("Usage:  lf t55xx detect");
+	PrintAndLog("Usage:  lf t55xx detect [1]");
+	PrintAndLog("Options:");
+	PrintAndLog("     [graph buffer data], if set, use Graphbuffer otherwise read data from tag.");
 	PrintAndLog("");
 	PrintAndLog("Examples:");
 	PrintAndLog("      lf t55xx detect");
 	PrintAndLog("      lf t55xx detect 1");
 	PrintAndLog("");
+	return 0;
+}
+int usage_t55xx_wakup(){
+	PrintAndLog("Usage:  lf t55xx wakeup [h] p <password>");
+	PrintAndLog("This commands send the Answer-On-Request command and leaves the readerfield ON afterwards.");
+	PrintAndLog("Options:");
+	PrintAndLog("     h             - this help");
+	PrintAndLog("     p <password>  - password 4bytes (8 hex symbols)");
+	PrintAndLog("");
+	PrintAndLog("Examples:");
+		PrintAndLog("      lf t55xx wakeup p 11223344  - send wakeup password");
 	return 0;
 }
 
@@ -206,27 +228,51 @@ int CmdT55xxSetConfig(const char *Cmd) {
 	}
 
 	// No args
-	if (cmdp == 0) {
-		printConfiguration( config );
-		return 0;
-	}
-	//Validations
-	if (errors)
-		return usage_t55xx_config();
+	if (cmdp == 0) return printConfiguration( config );
 
- 	config.block0 = 0;
- 	printConfiguration ( config );
-	return 0;
+	//Validations
+	if (errors) return usage_t55xx_config();
+
+	config.block0 = 0;
+	return printConfiguration ( config );
+}
+
+int T55xxReadBlock(uint8_t block, bool page1, bool usepwd, bool override, uint32_t password){
+	//Password mode
+	if ( usepwd ) {
+		// try reading the config block and verify that PWD bit is set before doing this!
+		if ( !override ) {
+			if ( !AquireData(0, CONFIGURATION_BLOCK, false, 0 ) ) return 0;
+			if ( !tryDetectModulation() ) {
+				PrintAndLog("Safety Check: Could not detect if PWD bit is set in config block. Exits.");
+				return 0;
+			} else {
+				PrintAndLog("Safety Check: PWD bit is NOT set in config block. Reading without password...");	
+				usepwd = false;
+				page1 = false;
+			}
+		} else {
+			PrintAndLog("Safety Check Overriden - proceeding despite risk");
+		}
+	}
+
+	if (!AquireData(page1, block, usepwd, password) )	return 0;
+	if (!DecodeT55xxBlock()) return 0;
+
+	char blk[10]={0};
+	sprintf(blk,"%d", block);
+	printT55xxBlock(blk);	
+	return 1;
 }
 
 int CmdT55xxReadBlock(const char *Cmd) {
-	uint8_t block = 255;
-	uint8_t wake = 0;
-	uint8_t usepwd = 0;
-	uint32_t password = 0xFFFFFFFF; //default to blank Block 7
-	uint8_t override = 0;
-	uint8_t cmdp = 0;
+	uint8_t block = REGULAR_READ_MODE_BLOCK;
+	uint32_t password = 0; //default to blank Block 7
+	bool usepwd = false;
+	bool override = false;
+	bool page1 = false;
 	bool errors = false;
+	uint8_t cmdp = 0;
 	while(param_getchar(Cmd, cmdp) != 0x00 && !errors) {
 		switch(param_getchar(Cmd, cmdp)) {
 		case 'h':
@@ -235,22 +281,21 @@ int CmdT55xxReadBlock(const char *Cmd) {
 		case 'b':
 		case 'B':
 			errors |= param_getdec(Cmd, cmdp+1, &block);
-			cmdp+=2;
+			cmdp += 2;
 			break;
 		case 'o':
 		case 'O':
-			override = 1;
+			override = true;
 			cmdp++;
 			break;
 		case 'p':
 		case 'P':
-			password = param_get32ex(Cmd, cmdp+1, 0, 10);
-			usepwd = 1;
-			cmdp+=2;
+			password = param_get32ex(Cmd, cmdp+1, 0, 16);
+			usepwd = true;
+			cmdp += 2;
 			break;
-		case 'w':
-		case 'W':
-			wake = 1;
+		case '1':
+			page1 = true;
 			cmdp++;
 			break;
 		default:
@@ -260,56 +305,14 @@ int CmdT55xxReadBlock(const char *Cmd) {
 		}
 	}
 	if (errors) return usage_t55xx_read();
-	if (wake && !usepwd) {
-		PrintAndLog("Wake command must use a pwd");
-		return 1;
-	}
-	if ((block > 7) && !wake) {
+
+	if (block > 7 && block != REGULAR_READ_MODE_BLOCK	) {
 		PrintAndLog("Block must be between 0 and 7");
-		return 1;
+		return 0;
 	}
-
-	UsbCommand c = {CMD_T55XX_READ_BLOCK, {0, block, password}};
-
-	//Password mode
-	if ( usepwd || wake ) {
-		// try reading the config block and verify that PWD bit is set before doing this!
-		if ( wake || override ) {
-			c.arg[0] = (wake<<8) & usepwd;
-			if ( !wake && override )
-				PrintAndLog("Safety Check Overriden - proceeding despite risk");
-		} else {
-			AquireData( CONFIGURATION_BLOCK );
-			if ( !tryDetectModulation() ) {
-				PrintAndLog("Safety Check: Could not detect if PWD bit is set in config block. Exits.");
-				return 1;
-			} else {
-				PrintAndLog("Safety Check: PWD bit is NOT set in config block. Reading without password...");	
-			}
-		}
-	}
-
-	clearCommandBuffer();
-	SendCommand(&c);
-	if ( !WaitForResponseTimeout(CMD_ACK,NULL,2500) ) {
-		PrintAndLog("command execution time out");
-		return 2;
-	}
-	
-	uint8_t got[12000];
-	GetFromBigBuf(got, sizeof(got), 0);
-	WaitForResponse(CMD_ACK,NULL);
-	setGraphBuf(got, sizeof(got));
-	//DemodBufferLen=0;
-	if (!DecodeT55xxBlock()) return 3;
-	char blk[10]={0};
-	if ( wake ) {
-		sprintf(blk,"wake");
-	} else {
-		sprintf(blk,"%d", block);
-	}
-	printT55xxBlock(blk);
-	return 0;
+	PrintAndLog("Reading Page %d:", page1);	
+	PrintAndLog("blk | hex data | binary");
+	return T55xxReadBlock(block, page1, usepwd, override, password);
 }
 
 bool DecodeT55xxBlock(){
@@ -320,9 +323,6 @@ bool DecodeT55xxBlock(){
 	uint8_t bitRate[8] = {8,16,32,40,50,64,100,128};
 	DemodBufferLen = 0x00;
 
-	//trim 1/2 a clock from beginning
-	//snprintf(cmdStr, sizeof(buf),"%d", bitRate[config.bitrate]/2 );
-	//CmdLtrim(cmdStr);
 	switch( config.modulation ){
 		case DEMOD_FSK:
 			snprintf(cmdStr, sizeof(buf),"%d %d", bitRate[config.bitrate], config.inverted );
@@ -374,17 +374,17 @@ int CmdT55xxDetect(const char *Cmd){
 		return usage_t55xx_detect();
 	
 	if (strlen(Cmd)==0)
-		AquireData( CONFIGURATION_BLOCK );
+		if ( !AquireData(0, CONFIGURATION_BLOCK, false, 0) )
+			return 0;
 
 	if ( !tryDetectModulation() )
 		PrintAndLog("Could not detect modulation automatically. Try setting it manually with \'lf t55xx config\'");
 
-	return 0;
+	return 1;
 }
 
 // detect configuration?
 bool tryDetectModulation(){
-	//char cmdStr[8] = {0};
 	uint8_t hits = 0;
 	t55xx_conf_block_t tests[15];
 	int bitRate=0;
@@ -392,8 +392,6 @@ bool tryDetectModulation(){
 	save_restoreGB(1);
 	if (GetFskClock("", FALSE, FALSE)){ 
 		fskClocks(&fc1, &fc2, &clk, FALSE);
-		//sprintf(cmdStr,"%d", clk/2);
-		//CmdLtrim(cmdStr);
 		if ( FSKrawDemod("0 0", FALSE) && test(DEMOD_FSK, &tests[hits].offset, &bitRate)){
 			tests[hits].modulation = DEMOD_FSK;
 			if (fc1==8 && fc2 == 5)
@@ -420,8 +418,6 @@ bool tryDetectModulation(){
 	} else {
 		clk = GetAskClock("", FALSE, FALSE);
 		if (clk>0) {
-			//sprintf(cmdStr,"%d", clk/2);
-			//CmdLtrim(cmdStr);
 			if ( ASKDemod("0 0 0", FALSE, FALSE, 1) && test(DEMOD_ASK, &tests[hits].offset, &bitRate)) {
 				tests[hits].modulation = DEMOD_ASK;
 				tests[hits].bitrate = bitRate;
@@ -455,8 +451,6 @@ bool tryDetectModulation(){
 		save_restoreGB(0);
 		clk = GetNrzClock("", FALSE, FALSE);
 		if (clk>0) {
-			//sprintf(cmdStr,"%d", clk/2);
-			//CmdLtrim(cmdStr);
 			if ( NRZrawDemod("0 0 1", FALSE)  && test(DEMOD_NRZ, &tests[hits].offset, &bitRate)) {
 				tests[hits].modulation = DEMOD_NRZ;
 				tests[hits].bitrate = bitRate;
@@ -478,9 +472,6 @@ bool tryDetectModulation(){
 		save_restoreGB(0);
 		clk = GetPskClock("", FALSE, FALSE);
 		if (clk>0) {
-			//PrintAndLog("clk %d",clk);
-			//sprintf(cmdStr,"%d", clk/2);
-			//CmdLtrim(cmdStr);	
 			if ( PSKDemod("0 0 1", FALSE) && test(DEMOD_PSK1, &tests[hits].offset, &bitRate)) {
 				tests[hits].modulation = DEMOD_PSK1;
 				tests[hits].bitrate = bitRate;
@@ -666,14 +657,14 @@ void printT55xxBlock(const char *blockNum){
 		bits[i - config.offset]=DemodBuffer[i];
 
 	blockData = PackBits(0, 32, bits);
-	PrintAndLog("[%s] 0x%08X  %s", blockNum, blockData, sprint_bin(bits,32));
+	PrintAndLog("  %s | %08X | %s", blockNum, blockData, sprint_bin(bits,32));
 }
 
 int special(const char *Cmd) {
 	uint32_t blockData = 0;
 	uint8_t bits[32] = {0x00};
 
-	PrintAndLog("[OFFSET] [DATA] [BINARY]");
+	PrintAndLog("OFFSET | DATA       | BINARY");
 	PrintAndLog("----------------------------------------------------");
 	int i,j = 0;
 	for (; j < 64; ++j){
@@ -683,86 +674,142 @@ int special(const char *Cmd) {
 	
 		blockData = PackBits(0, 32, bits);
 		
-		PrintAndLog("[%02d] 0x%08X  %s",j , blockData, sprint_bin(bits,32));	
+		PrintAndLog("    %02d | 0x%08X | %s",j , blockData, sprint_bin(bits,32));	
 	}
 	return 0;
 }
 
-void printConfiguration( t55xx_conf_block_t b){
+int printConfiguration( t55xx_conf_block_t b){
 	PrintAndLog("Modulation : %s", GetSelectedModulationStr(b.modulation) );
 	PrintAndLog("Bit Rate   : %s", GetBitRateStr(b.bitrate) );
 	PrintAndLog("Inverted   : %s", (b.inverted) ? "Yes" : "No" );
 	PrintAndLog("Offset     : %d", b.offset);
 	PrintAndLog("Block0     : 0x%08X", b.block0);
 	PrintAndLog("");
+	return 0;
 }
 
-int CmdT55xxWriteBlock(const char *Cmd)
-{
-	int block = 8; //default to invalid block
-	int data = 0xFFFFFFFF; //default to blank Block 
-	int password = 0xFFFFFFFF; //default to blank Block 7
-	
-	char cmdp = param_getchar(Cmd, 0);
-	if (cmdp == 'h' || cmdp == 'H') {
-		usage_t55xx_write();
-		return 0;
+int CmdT55xxWakeUp(const char *Cmd) {
+	uint32_t password = 0;
+	uint8_t cmdp = 0;
+	bool errors = true;
+	while(param_getchar(Cmd, cmdp) != 0x00) {
+		switch(param_getchar(Cmd, cmdp)) {
+		case 'h':
+		case 'H':
+			return usage_t55xx_wakup();
+		case 'p':
+		case 'P':
+			password = param_get32ex(Cmd, cmdp+1, 0xFFFFFFFF, 16);
+			cmdp += 2;
+			errors = false;
+			break;
+		default:
+			PrintAndLog("Unknown parameter '%c'", param_getchar(Cmd, cmdp));
+			errors = true;
+			break;
+		}
 	}
-  
-	int res = sscanf(Cmd, "%d %x %x",&block, &data, &password);
-	
-	if ( res < 2 || res > 3) {
-		usage_t55xx_write();
-		return 1;
+	if (errors) return usage_t55xx_wakup();
+
+	UsbCommand c = {CMD_T55XX_WAKEUP, {password, 0, 0}};
+	clearCommandBuffer();
+	SendCommand(&c);
+	PrintAndLog("Wake up command sent. Try read now");
+	return 0;
+}
+
+int CmdT55xxWriteBlock(const char *Cmd) {
+	uint8_t block = 0xFF; //default to invalid block
+	uint32_t data = 0xFFFFFFFF; //default to blank Block 
+	uint32_t password = 0xFFFFFFFF; //default to blank Block 7
+	bool usepwd = false;
+	bool page1 = false;	
+	bool gotdata = false;
+	bool errors = false;
+	uint8_t cmdp = 0;
+	while(param_getchar(Cmd, cmdp) != 0x00 && !errors) {
+		switch(param_getchar(Cmd, cmdp)) {
+		case 'h':
+		case 'H':
+			return usage_t55xx_write();
+		case 'b':
+		case 'B':
+			errors |= param_getdec(Cmd, cmdp+1, &block);
+			cmdp += 2;
+			break;
+		case 'd':
+		case 'D':
+			data = param_get32ex(Cmd, cmdp+1, 0, 16);
+			gotdata	= true;
+			cmdp += 2;
+			break;
+		case 'p':
+		case 'P':
+			password = param_get32ex(Cmd, cmdp+1, 0, 16);
+			usepwd = true;
+			cmdp += 2;
+			break;
+		case '1':
+			page1 = true;
+			cmdp++;
+			break;
+		default:
+			PrintAndLog("Unknown parameter '%c'", param_getchar(Cmd, cmdp));
+			errors = true;
+			break;
+		}
 	}
+	if (errors || !gotdata) return usage_t55xx_write();
 
 	if (block > 7) {
 		PrintAndLog("Block number must be between 0 and 7");
-		return 1;
+		return 0;
 	}
 	
 	UsbCommand c = {CMD_T55XX_WRITE_BLOCK, {data, block, 0}};
 	UsbCommand resp;
- 	c.d.asBytes[0] = 0x0; 
+ 	c.d.asBytes[0] = (page1) ? 0x2 : 0; 
 
-	PrintAndLog("Writing to block: %d  data  : 0x%08X", block, data);
+	PrintAndLog("Writing to page: %d  block: %d  data : 0x%08X", page1, block, data);
 
 	//Password mode
-	if (res == 3) {
+	if (usepwd) {
 		c.arg[2] = password;
-		c.d.asBytes[0] = 0x1; 
+		c.d.asBytes[0] |= 0x1; 
 		PrintAndLog("pwd   : 0x%08X", password);
 	}
 	clearCommandBuffer();
 	SendCommand(&c);
 	if (!WaitForResponseTimeout(CMD_ACK, &resp, 1000)){
 		PrintAndLog("Error occurred, device did not ACK write operation. (May be due to old firmware)");
-		return -1;
+		return 0;
 	}
-	return 0;
+	return 1;
 }
 
-int CmdT55xxReadTrace(const char *Cmd)
-{
+int CmdT55xxReadTrace(const char *Cmd) {
 	char cmdp = param_getchar(Cmd, 0);
-	
+	bool pwdmode = false;
+	uint32_t password = 0;
 	if (strlen(Cmd) > 1 || cmdp == 'h' || cmdp == 'H') 
 		return usage_t55xx_trace();
 
 	if (strlen(Cmd)==0)
-		AquireData( TRACE_BLOCK );
+		if ( !AquireData( TRACE_BLOCK, REGULAR_READ_MODE_BLOCK, pwdmode, password ) )
+			return 0;
 	
-	if (!DecodeT55xxBlock()) return 1;
+	if (!DecodeT55xxBlock()) return 0;
 
-	if ( !DemodBufferLen) return 1;
-	
+	if ( !DemodBufferLen) return 0;
+
 	RepaintGraphWindow();
 	uint8_t repeat = 0;
 	if (config.offset > 5) 
 		repeat = 32;
 	uint8_t si = config.offset+repeat;
-	uint32_t bl0     = PackBits(si, 32, DemodBuffer);
-	uint32_t bl1     = PackBits(si+32, 32, DemodBuffer);
+	uint32_t bl1     = PackBits(si, 32, DemodBuffer);
+	uint32_t bl2     = PackBits(si+32, 32, DemodBuffer);
 	
 	uint32_t acl     = PackBits(si, 8,  DemodBuffer); si += 8;
 	uint32_t mfc     = PackBits(si, 8,  DemodBuffer); si += 8;
@@ -783,7 +830,7 @@ int CmdT55xxReadTrace(const char *Cmd)
 
 	if ( acl != 0xE0 ) {
 		PrintAndLog("The modulation is most likely wrong since the ACL is not 0xE0. ");
-		return 1;
+		return 0;
 	}
 
 	PrintAndLog("");
@@ -800,8 +847,8 @@ int CmdT55xxReadTrace(const char *Cmd)
 	PrintAndLog("     Die Number   : %d", dw);
 	PrintAndLog("-------------------------------------------------------------");
 	PrintAndLog(" Raw Data - Page 1");
-	PrintAndLog("     Block 0  : 0x%08X  %s", bl0, sprint_bin(DemodBuffer+config.offset+repeat,32) );
-	PrintAndLog("     Block 1  : 0x%08X  %s", bl1, sprint_bin(DemodBuffer+config.offset+repeat+32,32) );
+	PrintAndLog("     Block 1  : 0x%08X  %s", bl1, sprint_bin(DemodBuffer+config.offset+repeat,32) );
+	PrintAndLog("     Block 2  : 0x%08X  %s", bl2, sprint_bin(DemodBuffer+config.offset+repeat+32,32) );
 	PrintAndLog("-------------------------------------------------------------");
 
 	/*
@@ -830,13 +877,16 @@ int CmdT55xxInfo(const char *Cmd){
 		Normal mode
 		Extended mode
 	*/
+	bool pwdmode = false;
+	uint32_t password = 0;
 	char cmdp = param_getchar(Cmd, 0);
 
 	if (strlen(Cmd) > 1 || cmdp == 'h' || cmdp == 'H')
 		return usage_t55xx_info();
 	
 	if (strlen(Cmd)==0)
-		AquireData( CONFIGURATION_BLOCK );
+		if ( !AquireData( 0, CONFIGURATION_BLOCK, pwdmode, password ) )
+			return 1;
 
 	if (!DecodeT55xxBlock()) return 1;
 
@@ -887,67 +937,59 @@ int CmdT55xxInfo(const char *Cmd){
 
 int CmdT55xxDump(const char *Cmd){
 
-	char s[20] = {0x00};
-	uint8_t pwd[4] = {0x00};
-
+	uint32_t password = 0;
 	char cmdp = param_getchar(Cmd, 0);
-	if ( cmdp == 'h' || cmdp == 'H') {
-		usage_t55xx_dump();
-		return 0;
-	}
+	bool override = false;
+	if ( cmdp == 'h' || cmdp == 'H') return usage_t55xx_dump();
 
-	bool hasPwd = ( strlen(Cmd) > 0);	
-	if ( hasPwd ){
-		if (param_gethex(Cmd, 0, pwd, 8)) {
-			PrintAndLog("password must include 8 HEX symbols");
-			return 1;
-		}
+	bool usepwd = ( strlen(Cmd) > 0);	
+	if ( usepwd ){
+		password = param_get32ex(Cmd, 0, 0, 16);
+		if (param_getchar(Cmd, 1) =='o' )
+			override = true;
 	}
 	
-	for ( int i = 0; i <8; ++i){
-		memset(s,0,sizeof(s));
+	PrintAndLog("Reading Page 0:");	
+	PrintAndLog("blk | hex data | binary");
+	for ( uint8_t i = 0; i <8; ++i){
+		T55xxReadBlock(i, 0, usepwd, override, password);
+		/*memset(s,0,sizeof(s));
 		if ( hasPwd ) {
-			sprintf(s,"%d %02x%02x%02x%02x", i, pwd[0],pwd[1],pwd[2],pwd[3]);
+			if ( override ) {
+				sprintf(s,"b %d p %02x%02x%02x%02x o", i, pwd[0],pwd[1],pwd[2],pwd[3]);				
+			} else {
+				sprintf(s,"b %d p %02x%02x%02x%02x", i, pwd[0],pwd[1],pwd[2],pwd[3]);				
+			}
 		} else {
-			sprintf(s,"%d", i);
+			sprintf(s,"b %d", i);
 		}
-		CmdT55xxReadBlock(s);
+		CmdT55xxReadBlock(s);*/
 	}
-	return 0;
+	PrintAndLog("Reading Page 1:");	
+	PrintAndLog("blk | hex data | binary");
+	for ( uint8_t	i = 0; i<4; i++){
+		T55xxReadBlock(i, 1, usepwd, override, password);		
+	}
+	return 1;
 }
 
-int AquireData( uint8_t block ){
+int AquireData( uint8_t page, uint8_t block, bool pwdmode, uint32_t password ){
 
-	UsbCommand c;
-	
-	if ( block == CONFIGURATION_BLOCK ) 
-		c.cmd = CMD_T55XX_READ_BLOCK;
-	else if (block == TRACE_BLOCK )
-		c.cmd = CMD_T55XX_READ_TRACE;
-		
-	c.arg[0] = 0x00;
-	c.arg[1] = 0x00;
-	c.arg[2] = 0x00;
-	c.d.asBytes[0] = 0x0; 
-
-	//Password mode
-	// if ( res == 2 ) {
-		// c.arg[2] = password;
-		// c.d.asBytes[0] = 0x1; 
-	// }
+	uint8_t arg0 = (page<<1) | pwdmode;
+	UsbCommand c = {CMD_T55XX_READ_BLOCK, {arg0, block, password}};
 
 	clearCommandBuffer();
 	SendCommand(&c);
 	if ( !WaitForResponseTimeout(CMD_ACK,NULL,2500) ) {
 		PrintAndLog("command execution time out");
-		return 1;
+		return 0;
 	}
 
 	uint8_t got[12000];
 	GetFromBigBuf(got,sizeof(got),0);
 	WaitForResponse(CMD_ACK,NULL);
-	setGraphBuf(got, 12000);
-	return 0;
+	setGraphBuf(got, sizeof(got));
+	return 1;
 }
 
 char * GetBitRateStr(uint32_t id){
@@ -1128,12 +1170,13 @@ static command_t CommandTable[] =
   {"help",   CmdHelp,           1, "This help"},
   {"config", CmdT55xxSetConfig, 1, "Set/Get T55XX configuration (modulation, inverted, offset, rate)"},
   {"detect", CmdT55xxDetect,    0, "[1] Try detecting the tag modulation from reading the configuration block."},
-  {"read",   CmdT55xxReadBlock, 0, "<block> [password] -- Read T55xx block data (page 0) [optional password]"},
-  {"write",  CmdT55xxWriteBlock,0, "<block> <data> [password] -- Write T55xx block data (page 0) [optional password]"},
+  {"read",   CmdT55xxReadBlock, 0, "b <block> p [password] [o] [1] -- Read T55xx block data (page 0) [optional password]"},
+  {"write",  CmdT55xxWriteBlock,0, "b <block> d <data> p [password] [1] -- Write T55xx block data (page 0) [optional password]"},
   {"trace",  CmdT55xxReadTrace, 0, "[1] Show T55xx traceability data (page 1/ blk 0-1)"},
   {"info",   CmdT55xxInfo,      0, "[1] Show T55xx configuration data (page 0/ blk 0)"},
-  {"dump",   CmdT55xxDump,      0, "[password] Dump T55xx card block 0-7. [optional password]"},
+  {"dump",   CmdT55xxDump,      0, "[password] [o] Dump T55xx card block 0-7. [optional password]"},
   {"special", special,          0, "Show block changes with 64 different offsets"},
+  {"wakeup", CmdT55xxWakeUp,    0, "Send AOR wakeup command"},
   {NULL, NULL, 0, NULL}
 };
 

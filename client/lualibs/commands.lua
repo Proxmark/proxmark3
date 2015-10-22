@@ -44,7 +44,7 @@ local _commands = {
 	CMD_INDALA_CLONE_TAG_L =                                             0x0213,
 	CMD_T55XX_READ_BLOCK =                                               0x0214,
 	CMD_T55XX_WRITE_BLOCK =                                              0x0215,
-	CMD_T55XX_READ_TRACE =                                               0x0216,
+	--//CMD_T55XX_READ_TRACE =                                               0x0216,
 	CMD_PCF7931_READ =                                                   0x0217,
 	CMD_EM4X_READ_WORD =                                                 0x0218,
 	CMD_EM4X_WRITE_WORD =                                                0x0219,
@@ -56,7 +56,7 @@ local _commands = {
 	CMD_ASK_SIM_TAG =                                                    0x021F,
 	CMD_PSK_SIM_TAG =                                                    0x0220,
 	CMD_AWID_DEMOD_FSK =                                                 0x0221,
-
+	CMD_T55XX_WAKEUP =                                                   0x0224,
 	--/* CMD_SET_ADC_MUX: ext1 is 0 for lopkd, 1 for loraw, 2 for hipkd, 3 for hiraw */
 
 	--// For the 13.56 MHz tags

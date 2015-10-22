@@ -81,7 +81,9 @@ void CopyIndala64toT55x7(int hi, int lo); // Clone Indala 64-bit tag by UID to T
 void CopyIndala224toT55x7(int uid1, int uid2, int uid3, int uid4, int uid5, int uid6, int uid7); // Clone Indala 224-bit tag by UID to T55x7
 void T55xxWriteBlock(uint32_t Data, uint32_t Block, uint32_t Pwd, uint8_t PwdMode);
 void T55xxReadBlock(uint16_t arg0, uint8_t Block, uint32_t Pwd);
-void T55xxReadTrace(void);
+void T55xxWakeUp(uint32_t Pwd);
+void TurnReadLFOn();
+//void T55xxReadTrace(void);
 void EM4xReadWord(uint8_t Address, uint32_t Pwd, uint8_t PwdMode);
 void EM4xWriteWord(uint32_t Data, uint8_t Address, uint32_t Pwd, uint8_t PwdMode);
 

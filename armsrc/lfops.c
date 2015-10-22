@@ -1160,9 +1160,10 @@ void T55xxWriteBit(int bit) {
 }
 
 // Write one card block in page 0, no lock
-void T55xxWriteBlock(uint32_t Data, uint32_t Block, uint32_t Pwd, uint8_t PwdMode) {
+void T55xxWriteBlock(uint32_t Data, uint32_t Block, uint32_t Pwd, uint8_t arg) {
 	LED_A_ON();
-
+	bool PwdMode = arg & 0x1;
+	uint8_t Page = (arg & 0x2)>>1;
 	uint32_t i = 0;
 
 	// Set up FPGA, 125kHz
@@ -1174,8 +1175,8 @@ void T55xxWriteBlock(uint32_t Data, uint32_t Block, uint32_t Pwd, uint8_t PwdMod
 
 	// Opcode 10
 	T55xxWriteBit(1);
-	T55xxWriteBit(0); //Page 0
-	if (PwdMode == 1){
+	T55xxWriteBit(Page); //Page 0
+	if (PwdMode){
 		// Send Pwd
 		for (i = 0x80000000; i != 0; i >>= 1)
 			T55xxWriteBit(Pwd & i);
@@ -1194,6 +1195,10 @@ void T55xxWriteBlock(uint32_t Data, uint32_t Block, uint32_t Pwd, uint8_t PwdMod
 	// Perform write (nominal is 5.6 ms for T55x7 and 18ms for E5550,
 	// so wait a little more)
 	TurnReadLFOn(20 * 1000);
+		//could attempt to do a read to confirm write took
+		// as the tag should repeat back the new block 
+		// until it is reset, but to confirm it we would 
+		// need to know the current block 0 config mode
 
 	// turn field off
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
@@ -1204,9 +1209,10 @@ void T55xxWriteBlock(uint32_t Data, uint32_t Block, uint32_t Pwd, uint8_t PwdMod
 // Read one card block in page 0
 void T55xxReadBlock(uint16_t arg0, uint8_t Block, uint32_t Pwd) {
 	LED_A_ON();
-	uint8_t PwdMode = arg0 & 0xFF;
-	uint8_t wake = arg0 >> 8;
+	bool PwdMode = arg0 & 0x1;
+	uint8_t Page = (arg0 & 0x2) >> 1;
 	uint32_t i = 0;
+	bool RegReadMode = (Block == 0xFF);
 
 	//clear buffer now so it does not interfere with timing later
 	BigBuf_Clear_ext(false);
@@ -1223,7 +1229,7 @@ void T55xxReadBlock(uint16_t arg0, uint8_t Block, uint32_t Pwd) {
 	SetAdcMuxFor(GPIO_MUXSEL_LOPKD);
 
 	// Now set up the SSC to get the ADC samples that are now streaming at us.
-	FpgaSetupSsc();
+	FpgaSetpSsc();
 
 	// Give it a bit of time for the resonant antenna to settle.
 	//SpinDelayUs(8*200);  //192FC
@@ -1236,23 +1242,20 @@ void T55xxReadBlock(uint16_t arg0, uint8_t Block, uint32_t Pwd) {
 
 	// Opcode 10
 	T55xxWriteBit(1);
-	T55xxWriteBit(0); //Page 0
+	T55xxWriteBit(Page); //Page 0
 
-	if (PwdMode || wake){
+	if (PwdMode){
 		// Send Pwd
 		for (i = 0x80000000; i != 0; i >>= 1)
 			T55xxWriteBit(Pwd & i);
 	}
+	// Send a zero bit separation
+	T55xxWriteBit(0);
 
-	// reading a block - send rest of read block cmd else skip for wake command
-	if (!wake) {
-		// Send a zero bit separation
-		T55xxWriteBit(0);
-
-		// Send Block number
+	// Send Block number (if direct access mode)
+	if (!RegReadMode)
 		for (i = 0x04; i != 0; i >>= 1)
 			T55xxWriteBit(Block & i);		
-	}
 
 	// Turn field on to read the response
 	TurnReadLFOn(READ_GAP);
@@ -1266,6 +1269,7 @@ void T55xxReadBlock(uint16_t arg0, uint8_t Block, uint32_t Pwd) {
 	LED_A_OFF();
 }
 
+/*
 // Read card traceability data (page 1)
 void T55xxReadTrace(void){
 	LED_A_ON();
@@ -1294,6 +1298,29 @@ void T55xxReadTrace(void){
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
 	cmd_send(CMD_ACK,0,0,0,0,0);
 	LED_A_OFF();
+}
+*/
+void T55xxWakeUp(uint32_t Pwd){
+	LED_B_ON();
+	uint32_t i = 0;
+	
+	// Set up FPGA, 125kHz
+	LFSetupFPGAForADC(95, true);
+	
+	// Trigger T55x7 Direct Access Mode
+	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
+	SpinDelayUs(START_GAP);
+	
+	// Opcode 10
+	T55xxWriteBit(1);
+	T55xxWriteBit(0); //Page 0
+
+	// Send Pwd
+	for (i = 0x80000000; i != 0; i >>= 1)
+		T55xxWriteBit(Pwd & i);
+
+	// Turn and leave field on to let the begin repeating transmission
+	TurnReadLFOn(20*1000);
 }
 
 /*-------------- Cloning routines -----------*/

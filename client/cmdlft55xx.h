@@ -55,12 +55,12 @@ char * GetModelStrFromCID(uint32_t cid);
 char * GetSelectedModulationStr( uint8_t id);
 uint32_t PackBits(uint8_t start, uint8_t len, uint8_t *bitstream);
 void printT55xxBlock(const char *demodStr);
-void printConfiguration( t55xx_conf_block_t b);
+int printConfiguration( t55xx_conf_block_t b);
 
 bool DecodeT55xxBlock();
 bool tryDetectModulation();
 bool test(uint8_t mode, uint8_t *offset, int *fndBitRate);
 int special(const char *Cmd);
-int AquireData( uint8_t block );
+int AquireData( uint8_t page, uint8_t block, bool pwdmode, uint32_t password );
 
 #endif
