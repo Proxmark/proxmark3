@@ -1220,23 +1220,10 @@ void T55xxReadBlock(uint16_t arg0, uint8_t Block, uint32_t Pwd) {
 	//make sure block is at max 7
 	Block &= 0x7;
 
-	// Set up FPGA, 125kHz
+	// Set up FPGA, 125kHz to power up the tag
 	LFSetupFPGAForADC(95, true);
-  /*
-	FpgaWriteConfWord(FPGA_MAJOR_MODE_LF_ADC | FPGA_LF_ADC_READER_FIELD);
 
-	// Connect the A/D to the peak-detected low-frequency path.
-	SetAdcMuxFor(GPIO_MUXSEL_LOPKD);
-
-	// Now set up the SSC to get the ADC samples that are now streaming at us.
-	FpgaSetpSsc();
-
-	// Give it a bit of time for the resonant antenna to settle.
-	//SpinDelayUs(8*200);  //192FC
-	SpinDelay(50);
-  */
-
-  // Trigger T55x7 Direct Access Mode
+	// Trigger T55x7 Direct Access Mode with start gap
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
 	SpinDelayUs(START_GAP);
 

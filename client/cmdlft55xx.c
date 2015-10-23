@@ -50,30 +50,30 @@ int usage_t55xx_config(){
 	return 0;
 }
 int usage_t55xx_read(){
-	PrintAndLog("Usage:  lf t55xx read b <block> p <password> <override_safety> <page1>");
+	PrintAndLog("Usage:  lf t55xx read [b <block>] [p <password>] <override_safety> <page1>");
 	PrintAndLog("Options:");
-	PrintAndLog("     b <block>, block number to read. Between 0-7");
-	PrintAndLog("     p <password>, OPTIONAL password (8 hex characters)");
-	PrintAndLog("     o, OPTIONAL override safety check");
-	PrintAndLog("     1, OPTIONAL read Page 1 instead of Page 0");
+	PrintAndLog("     b <block>    - block number to read. Between 0-7");
+	PrintAndLog("     p <password> - OPTIONAL password (8 hex characters)");
+	PrintAndLog("     o            - OPTIONAL override safety check");
+	PrintAndLog("     1            - OPTIONAL read Page 1 instead of Page 0");
 	PrintAndLog("     ****WARNING****");
 	PrintAndLog("     Use of read with password on a tag not configured for a pwd");
 	PrintAndLog("     can damage the tag");
 	PrintAndLog("");
 	PrintAndLog("Examples:");
-	PrintAndLog("      lf t55xx read b 0            - read data from block 0");
+	PrintAndLog("      lf t55xx read b 0              - read data from block 0");
 	PrintAndLog("      lf t55xx read b 0 p feedbeef   - read data from block 0 password feedbeef");
 	PrintAndLog("      lf t55xx read b 0 p feedbeef o - read data from block 0 password feedbeef safety check");
 	PrintAndLog("");
 	return 0;
 }
 int usage_t55xx_write(){
-	PrintAndLog("Usage:  lf t55xx wr b <block> d <data> p [password] [1]");
+	PrintAndLog("Usage:  lf t55xx wr [b <block>] [d <data>] [p <password>] [1]");
 	PrintAndLog("Options:");
-	PrintAndLog("     b <block>,    block number to write. Between 0-7");
-	PrintAndLog("     d <data>,     4 bytes of data to write (8 hex characters)");
-	PrintAndLog("     p [password], OPTIONAL password 4bytes (8 hex characters)");
-	PrintAndLog("     1,            OPTIONAL write Page 1 instead of Page 0");
+	PrintAndLog("     b <block>    - block number to write. Between 0-7");
+	PrintAndLog("     d <data>     - 4 bytes of data to write (8 hex characters)");
+	PrintAndLog("     p <password> - OPTIONAL password 4bytes (8 hex characters)");
+	PrintAndLog("     1            - OPTIONAL write Page 1 instead of Page 0");
 	PrintAndLog("");
 	PrintAndLog("Examples:");
 	PrintAndLog("      lf t55xx wr b 3 d 11223344            - write 11223344 to block 3");
@@ -84,7 +84,7 @@ int usage_t55xx_write(){
 int usage_t55xx_trace() {
 	PrintAndLog("Usage:  lf t55xx trace [1]");
 	PrintAndLog("Options:");
-	PrintAndLog("     [graph buffer data], if set, use Graphbuffer otherwise read data from tag.");
+	PrintAndLog("     [graph buffer data]  - if set, use Graphbuffer otherwise read data from tag.");
 	PrintAndLog("");
 	PrintAndLog("Examples:");
 	PrintAndLog("      lf t55xx trace");
@@ -95,7 +95,7 @@ int usage_t55xx_trace() {
 int usage_t55xx_info() {
 	PrintAndLog("Usage:  lf t55xx info [1]");
 	PrintAndLog("Options:");
-	PrintAndLog("     [graph buffer data], if set, use Graphbuffer otherwise read data from tag.");
+	PrintAndLog("     [graph buffer data]  - if set, use Graphbuffer otherwise read data from tag.");
 	PrintAndLog("");
 	PrintAndLog("Examples:");
 	PrintAndLog("      lf t55xx info");
@@ -106,8 +106,8 @@ int usage_t55xx_info() {
 int usage_t55xx_dump(){
 	PrintAndLog("Usage:  lf t55xx dump <password> [o]");
 	PrintAndLog("Options:");
-	PrintAndLog("     <password>, OPTIONAL password 4bytes (8 hex symbols)");
-	PrintAndLog("     <Override>, OPTIONAL Force pwd read despite danger to card");
+	PrintAndLog("     <password>  - OPTIONAL password 4bytes (8 hex symbols)");
+	PrintAndLog("     o           - OPTIONAL override, force pwd read despite danger to card");
 	PrintAndLog("");
 	PrintAndLog("Examples:");
 	PrintAndLog("      lf t55xx dump");
@@ -118,7 +118,7 @@ int usage_t55xx_dump(){
 int usage_t55xx_detect(){
 	PrintAndLog("Usage:  lf t55xx detect [1]");
 	PrintAndLog("Options:");
-	PrintAndLog("     [graph buffer data], if set, use Graphbuffer otherwise read data from tag.");
+	PrintAndLog("     [graph buffer data]  - if set, use Graphbuffer otherwise read data from tag.");
 	PrintAndLog("");
 	PrintAndLog("Examples:");
 	PrintAndLog("      lf t55xx detect");
