@@ -618,7 +618,6 @@ void MifareAcquireEncryptedNonces(uint32_t arg0, uint32_t arg1, uint32_t flags, 
 	pcs = &mpcs;
 	uint8_t receivedAnswer[MAX_MIFARE_FRAME_SIZE];
 	int16_t isOK = 0;
-	uint8_t nt_enc1[4];
 	uint8_t par_enc[1];
 	uint8_t nt_par_enc = 0;
 	uint8_t buf[USB_CMD_DATA_SIZE];
@@ -631,15 +630,16 @@ void MifareAcquireEncryptedNonces(uint32_t arg0, uint32_t arg1, uint32_t flags, 
 	ui64Key = bytes_to_num(datain, 6);
 	bool initialize = flags & 0x0001;
 	bool slow = flags & 0x0002;
-
-	#define AUTHENTICATION_TIMEOUT 848			// card times out 1ms after wrong authentication according to NXP documentation
+	bool field_off = flags & 0x0004;
+	
+	#define AUTHENTICATION_TIMEOUT 848			// card times out 1ms after wrong authentication (according to NXP documentation)
 	#define PRE_AUTHENTICATION_LEADTIME 400		// some (non standard) cards need a pause after select before they are ready for first authentication 
 	
 	LED_A_ON();
 	LED_C_OFF();
-	iso14443a_setup(FPGA_HF_ISO14443A_READER_LISTEN);
 
 	if (initialize) {
+		iso14443a_setup(FPGA_HF_ISO14443A_READER_LISTEN);
 		clear_trace();
 		set_tracing(true);
 	}
@@ -648,11 +648,12 @@ void MifareAcquireEncryptedNonces(uint32_t arg0, uint32_t arg1, uint32_t flags, 
 	
 	uint16_t num_nonces = 0;
 	bool have_uid = false;
-	for (uint16_t i = 0; i <= USB_CMD_DATA_SIZE - 4 - 4 - 1; ) {
+	for (uint16_t i = 0; i <= USB_CMD_DATA_SIZE - 9; ) {
 
 		// Test if the action was cancelled
 		if(BUTTON_PRESS()) {
-			isOK = -2;
+			isOK = 2;
+			field_off = true;
 			break;
 		}
 
@@ -670,7 +671,7 @@ void MifareAcquireEncryptedNonces(uint32_t arg0, uint32_t arg1, uint32_t flags, 
 			}
 			have_uid = true;	
 		} else { // no need for anticollision. We can directly select the card
-			if(!iso14443a_select_card(uid, NULL, &cuid, false, cascade_levels)) {
+			if(!iso14443a_select_card(uid, NULL, NULL, false, cascade_levels)) {
 				if (MF_DBGLEVEL >= 1)	Dbprintf("AcquireNonces: Can't select card (UID)");
 				continue;
 			}
@@ -701,22 +702,18 @@ void MifareAcquireEncryptedNonces(uint32_t arg0, uint32_t arg1, uint32_t flags, 
 		
 		num_nonces++;
 		if (num_nonces % 2) {
-			memcpy(nt_enc1, receivedAnswer, 4);
-			nt_par_enc = par_enc[0];
+			memcpy(buf+i, receivedAnswer, 4);
+			nt_par_enc = par_enc[0] & 0xf0;
 		} else {
-			nt_par_enc |= par_enc[0];
-			memcpy(&buf[i], nt_enc1, 4);
-			i += 4;
-			memcpy(&buf[i], receivedAnswer, 4);
-			i += 4;
-			memcpy(&buf[i], &nt_par_enc, 1);
-			i += 1;
+			nt_par_enc |= par_enc[0] >> 4;
+			memcpy(buf+i+4, receivedAnswer, 4);
+			memcpy(buf+i+8, &nt_par_enc, 1);
+			i += 9;
 		}
 
 		// wait for the card to become ready again
 		while(GetCountSspClk() < timeout);
-
-		
+	
 	}
 
 	LED_C_OFF();
@@ -724,14 +721,15 @@ void MifareAcquireEncryptedNonces(uint32_t arg0, uint32_t arg1, uint32_t flags, 
 	crypto1_destroy(pcs);
 	
 	LED_B_ON();
-	memcpy(&cuid, uid+(cascade_levels-1)*3, 4);
 	cmd_send(CMD_ACK, isOK, cuid, num_nonces, buf, sizeof(buf));
 	LED_B_OFF();
 
 	if (MF_DBGLEVEL >= 3)	DbpString("AcquireEncryptedNonces finished");
 
-	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
-	LEDsoff();
+	if (field_off) {
+		FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
+		LEDsoff();
+	}
 }
 
 

@@ -871,8 +871,9 @@ int CmdHF14AMfNestedHard(const char *Cmd)
 	int16_t isOK = mfnestedhard(blockNo, keyType, key, trgBlockNo, trgKeyType, nonce_file_read, nonce_file_write, slow);
 	if (isOK) {
 		switch (isOK) {
-			case -1 : PrintAndLog("Error: No response from Proxmark.\n"); break;
-			case -2 : PrintAndLog("Button pressed. Aborted.\n"); break;
+			case 1 : PrintAndLog("Error: No response from Proxmark.\n"); break;
+			case 2 : PrintAndLog("Button pressed. Aborted.\n"); break;
+			case 3 : PrintAndLog("File error. Aborted.\n"); break;
 			default : PrintAndLog("Unknown Error.\n");
 		}
 		return 2;
