@@ -9,6 +9,7 @@
 //-----------------------------------------------------------------------------
 
 #include "cmdhfmf.h"
+#include "cmdhfmfhard.h"
 
 static int CmdHelp(const char *Cmd);
 
@@ -873,8 +874,7 @@ int CmdHF14AMfNestedHard(const char *Cmd)
 		switch (isOK) {
 			case 1 : PrintAndLog("Error: No response from Proxmark.\n"); break;
 			case 2 : PrintAndLog("Button pressed. Aborted.\n"); break;
-			case 3 : PrintAndLog("File error. Aborted.\n"); break;
-			default : PrintAndLog("Unknown Error.\n");
+			default : break;
 		}
 		return 2;
 	}
