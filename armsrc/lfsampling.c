@@ -253,17 +253,16 @@ uint32_t SnoopLF()
 * acquisition of T55x7 LF signal. Similart to other LF, but adjusted with @marshmellows thresholds
 * the data is collected in BigBuf.
 **/
-void doT55x7Acquisition(void){
+void doT55x7Acquisition(size_t sample_size) {
 
-	#define T55xx_SAMPLES_SIZE 12000 // 32 x 32 x 10  (32 bit times numofblock (7), times clock skip..)
 	#define T55xx_READ_UPPER_THRESHOLD 128+40  // 50
 	#define T55xx_READ_TOL   5
 
 	uint8_t *dest = BigBuf_get_addr();
 	uint16_t bufsize = BigBuf_max_traceLen();
 	
-	if ( bufsize > T55xx_SAMPLES_SIZE )
-		bufsize = T55xx_SAMPLES_SIZE;
+	if ( bufsize > sample_size )
+		bufsize = sample_size;
 
 	//memset(dest, 0, bufsize);
 		

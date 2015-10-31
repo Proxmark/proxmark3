@@ -983,9 +983,9 @@ void UsbPacketReceived(uint8_t *packet, int len)
 		case CMD_T55XX_WAKEUP:
 			T55xxWakeUp(c->arg[0]);
 			break;
-		//case CMD_T55XX_READ_TRACE:
-		//	T55xxReadTrace();
-		//	break;
+		case CMD_T55XX_RESET_READ:
+			T55xxResetRead();
+			break;
 		case CMD_PCF7931_READ:
 			ReadPCF7931();
 			break;

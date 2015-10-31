@@ -47,6 +47,7 @@ int CmdT55xxWriteBlock(const char *Cmd);
 int CmdT55xxReadTrace(const char *Cmd);
 int CmdT55xxInfo(const char *Cmd);
 int CmdT55xxDetect(const char *Cmd);
+int CmdResetRead(const char *Cmd);
 
 char * GetBitRateStr(uint32_t id);
 char * GetSaferStr(uint32_t id);
