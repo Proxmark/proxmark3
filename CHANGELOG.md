@@ -5,6 +5,8 @@ This project uses the changelog in accordance with [keepchangelog](http://keepac
 ## [unreleased][unreleased]
 
 ### Added
+- `lf t55xx resetread` added reset then read command - should allow determining start
+of stream transmissions (marshmellow)
 - `lf t55xx wakeup` added wake with password (AOR) to allow lf search or standard lf read after (iceman, marshmellow)
 - `hf iclass managekeys` to save, load and manage iclass keys.  (adjusted most commands to accept a loaded key in memory) (marshmellow)
 - `hf iclass readblk` to select, authenticate, and read 1 block from an iclass card (marshmellow)
