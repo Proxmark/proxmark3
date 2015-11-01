@@ -255,7 +255,7 @@ uint32_t SnoopLF()
 **/
 void doT55x7Acquisition(size_t sample_size) {
 
-	#define T55xx_READ_UPPER_THRESHOLD 128+40  // 50
+	#define T55xx_READ_UPPER_THRESHOLD 128+40  // 40 grph
 	#define T55xx_READ_TOL   5
 
 	uint8_t *dest = BigBuf_get_addr();
@@ -264,8 +264,6 @@ void doT55x7Acquisition(size_t sample_size) {
 	if ( bufsize > sample_size )
 		bufsize = sample_size;
 
-	//memset(dest, 0, bufsize);
-		
 	uint16_t i = 0;
 	bool startFound = false;
 	bool highFound = false;
@@ -282,7 +280,7 @@ void doT55x7Acquisition(size_t sample_size) {
 			curSample = (uint8_t)AT91C_BASE_SSC->SSC_RHR;
 			LED_D_OFF();
 
-			// find first high sample
+			// skip until the first high sample above threshold
 			if (!startFound && curSample > T55xx_READ_UPPER_THRESHOLD) {
 				if (curSample > firstSample) 
 					firstSample = curSample;
@@ -292,15 +290,17 @@ void doT55x7Acquisition(size_t sample_size) {
 				continue;
 			}
 
-			// skip until samples begin to change
+			// skip until first high samples begin to change
 			if (startFound || curSample < firstSample-T55xx_READ_TOL){
-				if (!startFound) 
+				// if just found start - recover last sample
+				if (!startFound) {
 					dest[i++] = firstSample;
-				startFound = true;
+					startFound = true;
+				}
+				// collect samples
 				dest[i++] = curSample;
 				if (i >= bufsize-1) break;
 			}
 		}
-		//skipCnt++;
 	}
 }

@@ -1113,6 +1113,9 @@ void T55xxWriteBit(int bit) {
 // Send T5577 reset command then read stream (see if we can identify the start of the stream)
 void T55xxResetRead(void) {
 	LED_A_ON();
+	//clear buffer now so it does not interfere with timing later
+	BigBuf_Clear_ext(false);
+
 	// Set up FPGA, 125kHz
 	LFSetupFPGAForADC(95, true);
 
@@ -1128,7 +1131,7 @@ void T55xxResetRead(void) {
 	TurnReadLFOn(READ_GAP);
 
 	// Acquisition
-	doT55x7Acquisition(39999);
+	doT55x7Acquisition(BigBuf_max_traceLen());
 
 	// Turn the field off
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF); // field off
@@ -1266,7 +1269,7 @@ void T55xxWakeUp(uint32_t Pwd){
 void WriteT55xx(uint32_t *blockdata, uint8_t startblock, uint8_t numblocks) {
 	// write last block first and config block last (if included)
 	for (uint8_t i = numblocks+startblock; i > startblock; i--) {
-		Dbprintf("write- Blk: %d, d:%08X",i-1,blockdata[i-1]);
+		//Dbprintf("write- Blk: %d, d:%08X",i-1,blockdata[i-1]);
 		T55xxWriteBlockExt(blockdata[i-1],i-1,0,0);
 	}
 }
@@ -1319,7 +1322,7 @@ void CopyHIDtoT55x7(uint32_t hi2, uint32_t hi, uint32_t lo, uint8_t longFMT) {
 	DbpString("DONE!");
 }
 
-void CopyIOtoT55x7(uint32_t hi, uint32_t lo, uint8_t longFMT) {
+void CopyIOtoT55x7(uint32_t hi, uint32_t lo) {
 	uint32_t data[] = {T55x7_BITRATE_RF_64 | T55x7_MODULATION_FSK2a | (2 << T55x7_MAXBLOCK_SHIFT), hi, lo};
 
 	LED_D_ON();

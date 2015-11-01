@@ -39,6 +39,9 @@ typedef struct {
 		RF_128 = 0x07,
 	} bitrate;
 } t55xx_conf_block_t;
+t55xx_conf_block_t Get_t55xx_Config();
+void Set_t55xx_Config(t55xx_conf_block_t conf);
+
 
 int CmdLFT55XX(const char *Cmd);
 int CmdT55xxSetConfig(const char *Cmd);
