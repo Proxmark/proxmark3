@@ -25,7 +25,42 @@
 #include "util.h"
 #include "nonce2key/crapto1.h"
 
+static const float p_K[257] = {		// the probability that a random nonce has a Sum Property == K 
+	0.0290, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 
+	0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000,
+	0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 
+	0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000,
+	0.0083, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 
+	0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000,
+	0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 
+	0.0006, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000,
+	0.0339, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 
+	0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000,
+	0.0048, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 
+	0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000,
+	0.0934, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 
+	0.0119, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000,
+	0.0489, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 
+	0.0602, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000,
+	0.4180, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 
+	0.0602, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000,
+	0.0489, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 
+	0.0119, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000,
+	0.0934, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 
+	0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000,
+	0.0048, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 
+	0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000,
+	0.0339, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 
+	0.0006, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000,
+	0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 
+	0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000,
+	0.0083, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 
+	0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000,
+	0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000,
+	0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000,
+	0.0290 };
 
+		
 typedef struct noncelistentry {
 	uint32_t nonce_enc;
 	uint8_t par_enc;
@@ -36,6 +71,7 @@ typedef struct noncelist {
 	uint16_t num;
 	uint16_t Sum;
 	uint16_t Sum8_guess;
+	uint8_t BitFlip[2];
 	float Sum8_prob;
 	bool updated;
 	noncelistentry_t *first;
@@ -49,6 +85,9 @@ static uint16_t first_byte_num = 0;
 static uint8_t best_first_byte;
 static uint16_t guessed_Sum8;
 static float guessed_Sum8_confidence;
+
+#define MAX_BEST_BYTES 20
+static uint8_t best_first_bytes[MAX_BEST_BYTES];
 
 
 typedef enum {
@@ -74,6 +113,7 @@ typedef struct {
 
 partial_indexed_statelist_t partial_statelist_odd[17];
 partial_indexed_statelist_t partial_statelist_even[17];
+partial_indexed_statelist_t statelist_bitflip;
 
 statelist_t *candidates = NULL;
 
@@ -211,49 +251,16 @@ static float sum_probability(uint16_t K, uint16_t n, uint16_t k)
 {
 	const uint16_t N = 256;
 	
-	const float p[257] = {
-		0.0290, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 
-		0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000,
-		0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 
-		0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000,
-		0.0083, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 
-		0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000,
-		0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 
-		0.0006, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000,
-		0.0339, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 
-		0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000,
-		0.0048, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 
-		0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000,
-		0.0934, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 
-		0.0119, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000,
-		0.0489, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 
-		0.0602, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000,
-		0.4180, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 
-		0.0602, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000,
-		0.0489, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 
-		0.0119, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000,
-		0.0934, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 
-		0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000,
-		0.0048, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 
-		0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000,
-		0.0339, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 
-		0.0006, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000,
-		0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 
-		0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000,
-		0.0083, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 
-		0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000,
-		0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000,
-		0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000,
-		0.02900 };	
+	
 
-		if (k > K || p[K] == 0.0) return 0.0;
+		if (k > K || p_K[K] == 0.0) return 0.0;
 
 		double p_T_is_k_when_S_is_K = p_hypergeometric(N, K, n, k);
-		double p_S_is_K = p[K];
+		double p_S_is_K = p_K[K];
 		double p_T_is_k = 0;
 		for (uint16_t i = 0; i <= 256; i++) {
-			if (p[i] != 0.0) {
-				p_T_is_k += p[i] * p_hypergeometric(N, i, n, k);
+			if (p_K[i] != 0.0) {
+				p_T_is_k += p_K[i] * p_hypergeometric(N, i, n, k);
 			}
 		}
 		return(p_T_is_k_when_S_is_K * p_S_is_K / p_T_is_k);
@@ -355,12 +362,54 @@ static void Tests()
 		SumProperty(pcs), pcs->odd & 0x00ffffff, pcs->even & 0x00ffffff);
 	crypto1_destroy(pcs);
 
+	printf("\nTests: BitFlipProperties odd/even:\n");
+	for (uint16_t i = 0; i < 256; i++) {
+		printf("[%3d]:%c%c ", i, nonces[i].BitFlip[ODD_STATE]?'o':' ', nonces[i].BitFlip[EVEN_STATE]?'e':' ');
+		if (i % 8 == 7) {
+			printf("\n");
+		}
 	}
+	printf("\nTests: number of states with BitFlipProperty: %d, (= %1.3f%% of total states)\n", statelist_bitflip.len, 100.0 * statelist_bitflip.len / (1<<20));
 	
+	printf("\nTests: Best %d first bytes:\n", MAX_BEST_BYTES);
+	for (uint16_t i = 0; i < MAX_BEST_BYTES; i++) {
+		uint8_t best_byte = best_first_bytes[i];
+		uint16_t best_num = nonces[best_byte].num;
+		uint16_t best_sum = nonces[best_byte].Sum;
+		uint16_t best_sum8 = nonces[best_byte].Sum8_guess;
+		float confidence = nonces[best_byte].Sum8_prob;
+		printf("Byte: %02x, n = %2d, k = %2d, Sum(a8): %3d, Confidence: %2.1f%%\n", best_byte, best_num, best_sum, best_sum8, confidence*100);
+	}
+}
+
+
+static void sort_best_first_bytes(void)
+{
+	for (uint16_t i = 0; i < 256; i++ ) {
+		uint16_t j = 0;
+		float prob1 = nonces[i].Sum8_prob;
+		float prob2 = nonces[best_first_bytes[0]].Sum8_prob;
+		while (prob1 < prob2 && j < MAX_BEST_BYTES-1) {
+			prob2 = nonces[best_first_bytes[++j]].Sum8_prob;
+		}
+		if (prob1 >= prob2) {
+			for (uint16_t k = MAX_BEST_BYTES-1; k > j; k--) {
+				best_first_bytes[k] = best_first_bytes[k-1];
+			}
+			best_first_bytes[j] = i;
+		}
+	}
+}
+
 
 static float estimate_second_byte_sum(uint8_t *best_first_byte, uint16_t *best_Sum8_guess) 
 {
 	float max_prob = 0.0;
+	
+	for (uint16_t i = 0; i < MAX_BEST_BYTES; i++) {
+		best_first_bytes[i] = 0;
+	}
+	
 	for (uint16_t first_byte = 0; first_byte < 256; first_byte++) {
 		float Sum8_prob = 0.0;
 		uint16_t Sum8 = 0;
@@ -382,7 +431,15 @@ static float estimate_second_byte_sum(uint8_t *best_first_byte, uint16_t *best_S
 			*best_Sum8_guess = nonces[first_byte].Sum8_guess;
 		}
 	}
-	return max_prob;
+	
+	sort_best_first_bytes();
+
+	float total_prob = 1.0;
+	for (uint16_t i = 0; i < 10; i++) {
+		total_prob *= nonces[best_first_bytes[i]].Sum8_prob;
+	}
+	
+	return total_prob;
 }	
 
 
@@ -437,13 +494,15 @@ int static acquire_nonces(uint8_t blockNo, uint8_t keyType, uint8_t *key, uint8_
 	uint32_t flags = 0;
 	uint8_t write_buf[9];
 	uint32_t total_num_nonces = 0;
-	uint32_t next_thousand = 1000;
+	uint32_t next_fivehundred = 500;
 	uint32_t total_added_nonces = 0;
 	FILE *fnonces = NULL;
 	UsbCommand resp;
 
-	#define CONFIDENCE_THRESHOLD	0.95		// Collect nonces until we are certain enough to have guessed Sum(a8) correctly
+	#define CONFIDENCE_THRESHOLD	0.8		// Collect nonces until we are certain enough that the following brute force is successfull
 
+	printf("Acquiring nonces...\n");
+	
 	clearCommandBuffer();
 
 	do {
@@ -505,16 +564,12 @@ int static acquire_nonces(uint8_t blockNo, uint8_t keyType, uint8_t *key, uint8_
 		
 		if (first_byte_num == 256 ) {
 			// printf("first_byte_num = %d, first_byte_Sum = %d\n", first_byte_num, first_byte_Sum);
-			float last_confidence = guessed_Sum8_confidence;
-			uint16_t last_Sum8 = guessed_Sum8;
 			guessed_Sum8_confidence = estimate_second_byte_sum(&best_first_byte, &guessed_Sum8);
-			if (guessed_Sum8_confidence > last_confidence || guessed_Sum8 != last_Sum8 || total_num_nonces > next_thousand) {
-				next_thousand = (total_num_nonces/1000+1) * 1000;
-				PrintAndLog("Acquired %5d nonces (%5d with distinct bytes 0 and 1). Guessed Sum(a8) = %3d for first nonce byte = 0x%02x, probability for correct guess = %1.2f%%",
+			if (total_num_nonces > next_fivehundred) {
+				next_fivehundred = (total_num_nonces/500+1) * 500;
+				printf("Acquired %5d nonces (%5d with distinct bytes 0 and 1). Probability that we correctly guessed Sum(a8) for ten different bytes = %1.2f%%\n",
 					total_num_nonces, 
 					total_added_nonces,
-					guessed_Sum8, 
-					best_first_byte, 
 					guessed_Sum8_confidence*100);
 			}
 			if (guessed_Sum8_confidence >= CONFIDENCE_THRESHOLD) {
@@ -547,6 +602,9 @@ int static acquire_nonces(uint8_t blockNo, uint8_t keyType, uint8_t *key, uint8_
 
 static int init_partial_statelists(void)
 {
+	const uint32_t sizes_odd[17] = { 125601, 0, 17607, 0, 73421, 0, 182033, 0, 248801, 0, 181737, 0, 74241, 0, 18387, 0, 126757 };
+	const uint32_t sizes_even[17] = { 62862, 0, 8934, 0, 37153, 0, 89354, 0, 124401, 0, 92532, 0, 36679, 0, 9064, 0, 63318 };
+	
 	printf("Allocating memory for partial statelists...\n");
 	for (uint16_t i = 0; i <= 16; i++) {
 		partial_statelist_odd[i].len = 0;
@@ -554,7 +612,7 @@ static int init_partial_statelists(void)
 			partial_statelist_odd[i].states = NULL;
 		} else {	
 			// 20 Bits are relevant for odd states. Less than a half per Sum is expected
-			partial_statelist_odd[i].states = malloc(sizeof(uint32_t) << 19);  
+			partial_statelist_odd[i].states = malloc(sizeof(uint32_t) * sizes_odd[i]);  
 			if (partial_statelist_odd[i].states == NULL) {
 				PrintAndLog("Cannot allocate enough memory. Aborting");
 				return 4;
@@ -568,7 +626,7 @@ static int init_partial_statelists(void)
 			partial_statelist_even[i].states = NULL;
 		} else {
 			// 19 Bits are relevant for even states. Less than a half per Sum is expected
-			partial_statelist_even[i].states = malloc(sizeof(uint32_t) << 18);
+			partial_statelist_even[i].states = malloc(sizeof(uint32_t) * sizes_even[i]);
 			if (partial_statelist_even[i].states == NULL) {
 				PrintAndLog("Cannot allocate enough memory. Aborting");
 				return 4;
@@ -626,6 +684,29 @@ static int init_partial_statelists(void)
 	return 0;
 }	
 		
+
+static void init_BitFlip_statelist(void)
+{
+	printf("Generating bitflip statelist...\n");
+	uint32_t *p = statelist_bitflip.states = malloc(sizeof(uint32_t) << 20);
+	uint32_t index = -1;
+	for (uint32_t state = 0; state < (1 << 20); state++) {
+		if (filter(state) != filter(state^1)) {
+			if ((state & 0x000ff000) != index) {
+				index = state & 0x000ff000;
+			}
+			if (statelist_bitflip.index[index >> 12] == NULL) {
+				statelist_bitflip.index[index >> 12] = p;
+			}
+			*p++ = state;
+		}
+	}
+	// set len and add End Of List marker
+	statelist_bitflip.len = p - statelist_bitflip.states;
+	*p = 0xffffffff;
+	statelist_bitflip.states = realloc(statelist_bitflip.states, sizeof(uint32_t) * (statelist_bitflip.len + 1));
+}
+
 		
 static void add_state(statelist_t *sl, uint32_t state, odd_even_t odd_even)
 {
@@ -782,11 +863,34 @@ static void generate_candidates(uint16_t sum_a0, uint16_t sum_a8)
 	for (statelist_t *sl = candidates; sl != NULL; sl = sl->next) {
 		maximum_states += (uint64_t)sl->len[ODD_STATE] * sl->len[EVEN_STATE] * 2;
 	}
-	printf("Estimated number of possible keys with S(a0) = %d AND S(a8)=%d: %lld (2^%1.1f)\n", sum_a0, sum_a8, maximum_states, log(maximum_states)/log(2.0));
+	printf("Estimated number of remaining possible keys: %lld (2^%1.1f)\n", maximum_states, log(maximum_states)/log(2.0));
 
 	TestIfKeyExists(0xffffffffffff);
 	TestIfKeyExists(0xa0a1a2a3a4a5);
 	
+}
+
+
+static void Check_for_FilterFlipProperties(void)
+{
+	printf("Checking for Filter Flip Properties...\n");
+
+	for (uint16_t i = 0; i < 256; i++) {
+		nonces[i].BitFlip[ODD_STATE] = false;
+		nonces[i].BitFlip[EVEN_STATE] = false;
+	}
+	
+	for (uint16_t i = 0; i < 256; i++) {
+		uint8_t parity1 = (nonces[i].first->par_enc) >> 3;				// parity of first byte
+		uint8_t parity2_odd = (nonces[i^0x80].first->par_enc) >> 3;  	// XOR 0x80 = last bit flipped
+		uint8_t parity2_even = (nonces[i^0x40].first->par_enc) >> 3;	// XOR 0x40 = second last bit flipped
+		
+		if (parity1 == parity2_odd) {				// has Bit Flip Property for odd bits
+			nonces[i].BitFlip[ODD_STATE] = true;
+		} else if (parity1 == parity2_even) {		// has Bit Flip Property for even bits
+			nonces[i].BitFlip[EVEN_STATE] = true;
+		}
+	}
 }
 
 
@@ -809,6 +913,7 @@ int mfnestedhard(uint8_t blockNo, uint8_t keyType, uint8_t *key, uint8_t trgBloc
 	guessed_Sum8_confidence = 0.0;
 		
 	init_partial_statelists();
+	init_BitFlip_statelist();
 	
 	if (nonce_file_read) {  	// use pre-acquired data from file nonces.bin
 		if (read_nonce_file() != 0) {
@@ -822,18 +927,26 @@ int mfnestedhard(uint8_t blockNo, uint8_t keyType, uint8_t *key, uint8_t trgBloc
 		}
 	}
 
+	Check_for_FilterFlipProperties();
+
 	Tests();
 
 	PrintAndLog("");
 	PrintAndLog("Sum(a0) = %d", first_byte_Sum);
-	PrintAndLog("Guess for Sum(a8) = %d for first nonce byte = 0x%02x, n = %d, k = %d, probability for correct guess = %1.0f%%\n", 
-		guessed_Sum8,
-		best_first_byte,
-		nonces[best_first_byte].num,
-		nonces[best_first_byte].Sum,
-		guessed_Sum8_confidence*100);		
+	PrintAndLog("Best 10 first bytes: %02x, %02x, %02x, %02x, %02x, %02x, %02x, %02x, %02x, %02x",
+		best_first_bytes[0],
+		best_first_bytes[1],
+		best_first_bytes[2],
+		best_first_bytes[3],
+		best_first_bytes[4],
+		best_first_bytes[5],
+		best_first_bytes[6],
+		best_first_bytes[7],
+		best_first_bytes[8],
+		best_first_bytes[9]  );
+	PrintAndLog("Confidence that all respective Sum(a8) properties are guessed correctly: %2.1f%%", guessed_Sum8_confidence * 100);
 
-	generate_candidates(first_byte_Sum, guessed_Sum8);
+	generate_candidates(first_byte_Sum, nonces[best_first_bytes[0]].Sum8_guess);
 	
 	PrintAndLog("Brute force phase not yet implemented");
 	
