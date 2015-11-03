@@ -598,7 +598,7 @@ static command_t CommandTable[] =
   {"tune",        CmdHFTune,        0, "Continuously measure HF antenna tuning"},
   {"list",        CmdHFList,        1, "List protocol data in trace buffer"},
   {"search",      CmdHFSearch,      1, "Search for known HF tags [preliminary]"},
-  {"snoop",       CmdHFSnoop,       0, "<samples to skip (10000)> <triggers to skip (1)> Generic LF/HF Snoop in Testing stage"},
+  {"snoop",       CmdHFSnoop,       0, "<samples to skip (10000)> <triggers to skip (1)> Generic HF Snoop"},
   {NULL, NULL, 0, NULL}
 };
 
