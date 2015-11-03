@@ -576,6 +576,14 @@ int CmdHFSearch(const char *Cmd){
 	return 0;
 }
 
+int CmdHFSnoop(const char *Cmd)
+{
+	char * pEnd;
+	UsbCommand c = {CMD_HF_SNIFFER, {strtol(Cmd, &pEnd,0),strtol(pEnd, &pEnd,0),0}};
+	SendCommand(&c);
+	return 0;
+}
+
 static command_t CommandTable[] = 
 {
   {"help",        CmdHelp,          1, "This help"},
@@ -590,7 +598,8 @@ static command_t CommandTable[] =
   {"tune",        CmdHFTune,        0, "Continuously measure HF antenna tuning"},
   {"list",        CmdHFList,        1, "List protocol data in trace buffer"},
   {"search",      CmdHFSearch,      1, "Search for known HF tags [preliminary]"},
-	{NULL, NULL, 0, NULL}
+  {"snoop",       CmdHFSnoop,       0, "<samples to skip (10000)> <triggers to skip (1)> Generic HF Snoop"},
+  {NULL, NULL, 0, NULL}
 };
 
 int CmdHF(const char *Cmd)
