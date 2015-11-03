@@ -57,14 +57,14 @@ CORESRCS = 	uart.c \
 
 
 CMDSRCS = 	nonce2key/crapto1.c\
-		nonce2key/crypto1.c\
-		nonce2key/nonce2key.c\
-		loclass/cipher.c \
-		loclass/cipherutils.c \
-		loclass/des.c \
-		loclass/ikeys.c \
-		loclass/elite_crack.c\
-		loclass/fileutils.c\
+			nonce2key/crypto1.c\
+			nonce2key/nonce2key.c\
+			loclass/cipher.c \
+			loclass/cipherutils.c \
+			loclass/des.c \
+			loclass/ikeys.c \
+			loclass/elite_crack.c\
+			loclass/fileutils.c\
 			mifarehost.c\
 			crc.c \
 			crc16.c \
@@ -85,6 +85,7 @@ CMDSRCS = 	nonce2key/crapto1.c\
 			cmdhficlass.c \
 			cmdhfmf.c \
             cmdhfmfu.c \
+			cmdhftopaz.c \
 			cmdhw.c \
 			cmdlf.c \
 			cmdlfio.c \

@@ -17,6 +17,8 @@ This project uses the changelog in accordance with [keepchangelog](http://keepac
 - Added 'hw ping'. This command just sends a usb packets and checks if the pm3 is responsive. Can be used to abort certain operations which supports abort over usb. (holiman)
 - Added `data hex2bin` and `data bin2hex` for command line conversion between binary and hexadecimal (holiman)
 - Added 'hf snoop'. This command take digitalized signal from FPGA and put in BigBuffer. (pwpiwi + enio)
+- Added Topaz (NFC type 1) protocol support ('hf topaz reader', 'hf list topaz', 'hf 14a raw -T', 'hf topaz snoop'). (piwi)
+- Added option c to 'hf list' (mark CRC bytes) (piwi)
 
 ### Changed
 - changed `lf config t <threshold>` to be 0 - 128 and will trigger on + or - threshold value (marshmellow) 
