@@ -243,7 +243,7 @@ void getMemConfig(uint8_t mem_cfg, uint8_t chip_cfg, uint8_t *max_blk, uint8_t *
 #define T5555_PSK_RF_8              0x00000200
 #define T5555_USE_PWD               0x00000400
 #define T5555_USE_AOR               0x00000800
-#define T5555_BITRATE_SHIFT         12
+#define T5555_BITRATE_SHIFT         12 //(RF=2n+2)   ie 64=2*0x1F+2   or n = (RF-2)/2
 #define T5555_FAST_WRITE            0x00004000
 #define T5555_PAGE_SELECT           0x00008000
 

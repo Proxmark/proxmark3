@@ -1130,8 +1130,6 @@ int CmdFSKdemodParadox(const char *Cmd)
 //print ioprox ID and some format details
 int CmdFSKdemodIO(const char *Cmd)
 {
-	//raw fsk demod no manchester decoding no start bit finding just get binary from wave
-	//set defaults
 	int idx=0;
 	//something in graphbuffer?
 	if (GraphTraceLen < 65) {
@@ -1220,11 +1218,6 @@ int CmdFSKdemodIO(const char *Cmd)
 //print full AWID Prox ID and some bit format details if found
 int CmdFSKdemodAWID(const char *Cmd)
 {
-
-	//int verbose=1;
-	//sscanf(Cmd, "%i", &verbose);
-
-	//raw fsk demod no manchester decoding no start bit finding just get binary from wave
 	uint8_t BitStream[MAX_GRAPH_TRACE_LEN]={0};
 	size_t size = getFromGraphBuf(BitStream);
 	if (size==0) return 0;
@@ -1423,7 +1416,6 @@ int CmdFSKdemodPyramid(const char *Cmd)
 	uint32_t fc = 0;
 	uint32_t cardnum = 0;
 	uint32_t code1 = 0;
-	//uint32_t code2 = 0;
 	if (fmtLen==26){
 		fc = bytebits_to_byte(BitStream+73, 8);
 		cardnum = bytebits_to_byte(BitStream+81, 16);

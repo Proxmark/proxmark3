@@ -197,21 +197,13 @@ int CmdEM410xWrite(const char *Cmd)
 	}
 
 	// Check Clock
-	if (card == 1)
-	{
-		// Default: 64
-		if (clock == 0)
-			clock = 64;
+	// Default: 64
+	if (clock == 0)
+		clock = 64;
 
-		// Allowed clock rates: 16, 32 and 64
-		if ((clock != 16) && (clock != 32) && (clock != 64)) {
-			PrintAndLog("Error! Clock rate %d not valid. Supported clock rates are 16, 32 and 64.\n", clock);
-			return 0;
-		}
-	}
-	else if (clock != 0)
-	{
-		PrintAndLog("Error! Clock rate is only supported on T55x7 tags.\n");
+	// Allowed clock rates: 16, 32, 40 and 64
+	if ((clock != 16) && (clock != 32) && (clock != 64) && (clock != 40)) {
+		PrintAndLog("Error! Clock rate %d not valid. Supported clock rates are 16, 32, 40 and 64.\n", clock);
 		return 0;
 	}
 
@@ -221,11 +213,11 @@ int CmdEM410xWrite(const char *Cmd)
 		//   provide for backwards-compatibility for older firmware, and to avoid
 		//   having to add another argument to CMD_EM410X_WRITE_TAG, we just store
 		//   the clock rate in bits 8-15 of the card value
-		card = (card & 0xFF) | (((uint64_t)clock << 8) & 0xFF00);
-	}
-	else if (card == 0)
+		card = (card & 0xFF) | ((clock << 8) & 0xFF00);
+	}	else if (card == 0) {
 		PrintAndLog("Writing %s tag with UID 0x%010" PRIx64, "T5555", id, clock);
-	else {
+		card = (card & 0xFF) | ((clock << 8) & 0xFF00);
+	} else {
 		PrintAndLog("Error! Bad card type selected.\n");
 		return 0;
 	}
