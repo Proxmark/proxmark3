@@ -73,22 +73,23 @@ int CmdEM410xSim(const char *Cmd)
 	uint8_t uid[5] = {0x00};
 
 	if (cmdp == 'h' || cmdp == 'H') {
-		PrintAndLog("Usage:  lf em4x 410xsim <UID>");
+		PrintAndLog("Usage:  lf em4x em410xsim <UID> <clock>");
 		PrintAndLog("");
-		PrintAndLog("     sample: lf em4x 410xsim 0F0368568B");
+		PrintAndLog("     sample: lf em4x em410xsim 0F0368568B");
 		return 0;
 	}
+	/* clock is 64 in EM410x tags */
+	int clock = 64;
 
 	if (param_gethex(Cmd, 0, uid, 10)) {
 		PrintAndLog("UID must include 10 HEX symbols");
 		return 0;
 	}
-	
-	PrintAndLog("Starting simulating UID %02X%02X%02X%02X%02X", uid[0],uid[1],uid[2],uid[3],uid[4]);
+	param_getdec(Cmd,1,&clock);
+
+	PrintAndLog("Starting simulating UID %02X%02X%02X%02X%02X  clock: %d", uid[0],uid[1],uid[2],uid[3],uid[4],clock);
 	PrintAndLog("Press pm3-button to about simulation");
 
-	/* clock is 64 in EM410x tags */
-	int clock = 64;
 
 	/* clear our graph */
 	ClearGraph(0);
