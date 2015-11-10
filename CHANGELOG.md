@@ -5,6 +5,8 @@ This project uses the changelog in accordance with [keepchangelog](http://keepac
 ## [unreleased][unreleased]
 
 ### Added
+- Added viking demod to `lf search` (marshmellow)
+- `data askvikingdemod` demod viking id tag from graphbuffer (marshmellow)
 - `lf t55xx resetread` added reset then read command - should allow determining start
 of stream transmissions (marshmellow)
 - `lf t55xx wakeup` added wake with password (AOR) to allow lf search or standard lf read after (iceman, marshmellow)
@@ -24,6 +26,7 @@ of stream transmissions (marshmellow)
 - Added option c to 'hf list' (mark CRC bytes) (piwi)
 
 ### Changed
+- Adjusted lf em410x em410xsim to accept a clock argument
 - Adjusted lf t55xx dump to allow overriding the safety check and warning text (marshmellow)
 - Adjusted lf t55xx write input variables (marshmellow)
 - Adjusted lf t55xx read with password safety check and warning text and adjusted the input variables (marshmellow & iceman)

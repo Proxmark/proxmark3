@@ -597,6 +597,23 @@ int IOdemodFSK(uint8_t *dest, size_t size)
 		return (int) startIdx;
 	}
 	return -5;
+} 
+
+// by marshmellow
+// find viking preamble 0xF200 in already demoded data
+int VikingDemod_AM(uint8_t *dest, size_t *size) {
+	if (justNoise(dest, *size)) return -1;
+	//make sure buffer has data
+	if (*size < 64*2) return -2;
+
+	size_t startIdx = 0;
+	uint8_t preamble[] = {1,1,1,1,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
+	uint8_t errChk = preambleSearch(dest, preamble, sizeof(preamble), size, &startIdx);
+	if (errChk == 0) return -4; //preamble not found
+
+	if (*size != 64) return -5;
+	//return start position
+	return (int) startIdx;
 }
 
 // by marshmellow

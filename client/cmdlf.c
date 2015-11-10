@@ -1155,6 +1155,12 @@ int CmdLFfind(const char *Cmd)
 		return 1;
 	}	
 
+	ans=CmdVikingDemod("");
+	if (ans>0) {
+		PrintAndLog("\nValid Viking ID Found!");
+		return 1;
+	}	
+
 	ans=CmdPSKNexWatch("");
 	if (ans>0) {
 		PrintAndLog("\nValid NexWatch ID Found!");

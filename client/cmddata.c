@@ -637,6 +637,32 @@ int CmdG_Prox_II_Demod(const char *Cmd)
 	return 1;
 }
 
+//by marshmellow
+//see ASKDemod for what args are accepted
+int CmdVikingDemod(const char *Cmd)
+{
+	if (!ASKDemod(Cmd, false, false, 1)) {
+		if (g_debugMode) PrintAndLog("ASKDemod failed");
+		return 0;
+	}
+	size_t size = DemodBufferLen;
+	//call lfdemod.c demod for gProxII
+	int ans = VikingDemod_AM(DemodBuffer, &size);
+	if (ans < 0) {
+		if (g_debugMode) PrintAndLog("Error Viking_Demod");
+		return 0;
+	}
+	//got a good demod
+	uint32_t raw1 = bytebits_to_byte(DemodBuffer+ans, 32);
+	uint32_t raw2 = bytebits_to_byte(DemodBuffer+ans+32, 32);
+	uint32_t cardid = bytebits_to_byte(DemodBuffer+ans+24, 32);
+	uint8_t checksum = bytebits_to_byte(DemodBuffer+ans+32+24, 8);
+	PrintAndLog("Viking Tag Found: Card ID %08X, Checksum: %02X", cardid, checksum);
+	PrintAndLog("Raw: %08X%08X", raw1,raw2);
+	setDemodBuf(DemodBuffer+ans, 64, 0);
+	return 1;
+}
+
 //by marshmellow - see ASKDemod
 int Cmdaskrawdemod(const char *Cmd)
 {
@@ -2345,6 +2371,7 @@ static command_t CommandTable[] =
 	{"askedgedetect",   CmdAskEdgeDetect,   1, "[threshold] Adjust Graph for manual ask demod using the length of sample differences to detect the edge of a wave (use 20-45, def:25)"},
 	{"askem410xdemod",  CmdAskEM410xDemod,  1, "[clock] [invert<0|1>] [maxErr] -- Demodulate an EM410x tag from GraphBuffer (args optional)"},
 	{"askgproxiidemod", CmdG_Prox_II_Demod, 1, "Demodulate a G Prox II tag from GraphBuffer"},
+	{"askvikingdemod",  CmdVikingDemod,     1, "Demodulate a Viking tag from GraphBuffer"},
 	{"autocorr",        CmdAutoCorr,        1, "[window length] [g] -- Autocorrelation over window - g to save back to GraphBuffer (overwrite)"},
 	{"biphaserawdecode",CmdBiphaseDecodeRaw,1, "[offset] [invert<0|1>] [maxErr] -- Biphase decode bin stream in DemodBuffer (offset = 0|1 bits to shift the decode start)"},
 	{"bin2hex",         Cmdbin2hex,         1, "bin2hex <digits>     -- Converts binary to hexadecimal"},
