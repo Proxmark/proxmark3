@@ -646,7 +646,7 @@ int CmdVikingDemod(const char *Cmd)
 		return 0;
 	}
 	size_t size = DemodBufferLen;
-	//call lfdemod.c demod for gProxII
+	//call lfdemod.c demod for Viking
 	int ans = VikingDemod_AM(DemodBuffer, &size);
 	if (ans < 0) {
 		if (g_debugMode) PrintAndLog("Error Viking_Demod %d", ans);
@@ -1505,6 +1505,10 @@ int CmdFDXBdemodBI(const char *Cmd){
 	int preambleIndex = FDXBdemodBI(BitStream, &size);
 	if (preambleIndex < 0){
 		if (g_debugMode) PrintAndLog("Error FDXBDemod , no startmarker found :: %d",preambleIndex);
+		return 0;
+	}
+	if (size != 128) {
+		if (g_debugMode) PrintAndLog("Error incorrect data length found");
 		return 0;
 	}
 
