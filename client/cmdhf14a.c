@@ -352,16 +352,16 @@ int CmdHF14AReader(const char *Cmd)
 						PrintAndLog("                     x0 -> <1 kByte");
 						break;
 					case 0x01:
-						PrintAndLog("                     x0 -> 1 kByte");
+						PrintAndLog("                     x1 -> 1 kByte");
 						break;
 					case 0x02:
-						PrintAndLog("                     x0 -> 2 kByte");
+						PrintAndLog("                     x2 -> 2 kByte");
 						break;
 					case 0x03:
-						PrintAndLog("                     x0 -> 4 kByte");
+						PrintAndLog("                     x3 -> 4 kByte");
 						break;
 					case 0x04:
-						PrintAndLog("                     x0 -> 8 kByte");
+						PrintAndLog("                     x4 -> 8 kByte");
 						break;
 				}
 				switch (card.ats[pos + 3] & 0xf0) {
