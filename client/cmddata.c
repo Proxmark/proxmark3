@@ -637,6 +637,32 @@ int CmdG_Prox_II_Demod(const char *Cmd)
 	return 1;
 }
 
+//by marshmellow
+//see ASKDemod for what args are accepted
+int CmdVikingDemod(const char *Cmd)
+{
+	if (!ASKDemod(Cmd, false, false, 1)) {
+		if (g_debugMode) PrintAndLog("ASKDemod failed");
+		return 0;
+	}
+	size_t size = DemodBufferLen;
+	//call lfdemod.c demod for gProxII
+	int ans = VikingDemod_AM(DemodBuffer, &size);
+	if (ans < 0) {
+		if (g_debugMode) PrintAndLog("Error Viking_Demod %d", ans);
+		return 0;
+	}
+	//got a good demod
+	uint32_t raw1 = bytebits_to_byte(DemodBuffer+ans, 32);
+	uint32_t raw2 = bytebits_to_byte(DemodBuffer+ans+32, 32);
+	uint32_t cardid = bytebits_to_byte(DemodBuffer+ans+24, 32);
+	uint8_t checksum = bytebits_to_byte(DemodBuffer+ans+32+24, 8);
+	PrintAndLog("Viking Tag Found: Card ID %08X, Checksum: %02X", cardid, checksum);
+	PrintAndLog("Raw: %08X%08X", raw1,raw2);
+	setDemodBuf(DemodBuffer+ans, 64, 0);
+	return 1;
+}
+
 //by marshmellow - see ASKDemod
 int Cmdaskrawdemod(const char *Cmd)
 {
@@ -1130,8 +1156,6 @@ int CmdFSKdemodParadox(const char *Cmd)
 //print ioprox ID and some format details
 int CmdFSKdemodIO(const char *Cmd)
 {
-	//raw fsk demod no manchester decoding no start bit finding just get binary from wave
-	//set defaults
 	int idx=0;
 	//something in graphbuffer?
 	if (GraphTraceLen < 65) {
@@ -1220,11 +1244,6 @@ int CmdFSKdemodIO(const char *Cmd)
 //print full AWID Prox ID and some bit format details if found
 int CmdFSKdemodAWID(const char *Cmd)
 {
-
-	//int verbose=1;
-	//sscanf(Cmd, "%i", &verbose);
-
-	//raw fsk demod no manchester decoding no start bit finding just get binary from wave
 	uint8_t BitStream[MAX_GRAPH_TRACE_LEN]={0};
 	size_t size = getFromGraphBuf(BitStream);
 	if (size==0) return 0;
@@ -1423,7 +1442,6 @@ int CmdFSKdemodPyramid(const char *Cmd)
 	uint32_t fc = 0;
 	uint32_t cardnum = 0;
 	uint32_t code1 = 0;
-	//uint32_t code2 = 0;
 	if (fmtLen==26){
 		fc = bytebits_to_byte(BitStream+73, 8);
 		cardnum = bytebits_to_byte(BitStream+81, 16);
@@ -1597,61 +1615,33 @@ int CmdIndalaDecode(const char *Cmd)
 		return 0;
 	}
 	uint8_t invert=0;
-	ans = indala26decode(DemodBuffer, &DemodBufferLen, &invert);
-	if (ans < 1) {
+	size_t size = DemodBufferLen;
+	size_t startIdx = indala26decode(DemodBuffer, &size, &invert);
+	if (startIdx < 1) {
 		if (g_debugMode==1)
 			PrintAndLog("Error2: %d",ans);
 		return -1;
 	}
-	char showbits[251]={0x00};
+	setDemodBuf(DemodBuffer, size, startIdx);
 	if (invert)
 		if (g_debugMode==1)
 			PrintAndLog("Had to invert bits");
 
+	PrintAndLog("BitLen: %d",DemodBufferLen);
 	//convert UID to HEX
 	uint32_t uid1, uid2, uid3, uid4, uid5, uid6, uid7;
-	int idx;
-	uid1=0;
-	uid2=0;
-	PrintAndLog("BitLen: %d",DemodBufferLen);
-	if (DemodBufferLen==64){
-		for( idx=0; idx<64; idx++) {
-			uid1=(uid1<<1)|(uid2>>31);
-			if (DemodBuffer[idx] == 0) {
-				uid2=(uid2<<1)|0;
-				showbits[idx]='0';
-			} else {
-				uid2=(uid2<<1)|1;
-				showbits[idx]='1';
-			}
-		}
-		showbits[idx]='\0';
-		PrintAndLog("Indala UID=%s (%x%08x)", showbits, uid1, uid2);
-	}
-	else {
-		uid3=0;
-		uid4=0;
-		uid5=0;
-		uid6=0;
-		uid7=0;
-		for( idx=0; idx<DemodBufferLen; idx++) {
-			uid1=(uid1<<1)|(uid2>>31);
-			uid2=(uid2<<1)|(uid3>>31);
-			uid3=(uid3<<1)|(uid4>>31);
-			uid4=(uid4<<1)|(uid5>>31);
-			uid5=(uid5<<1)|(uid6>>31);
-			uid6=(uid6<<1)|(uid7>>31);
-			if (DemodBuffer[idx] == 0) {
-				uid7=(uid7<<1)|0;
-				showbits[idx]='0';
-			}
-			else {
-				uid7=(uid7<<1)|1;
-				showbits[idx]='1';
-			}
-		}
-		showbits[idx]='\0';
-		PrintAndLog("Indala UID=%s (%x%08x%08x%08x%08x%08x%08x)", showbits, uid1, uid2, uid3, uid4, uid5, uid6, uid7);
+	uid1=bytebits_to_byte(DemodBuffer,32);
+	uid2=bytebits_to_byte(DemodBuffer+32,32);
+	if (DemodBufferLen==64) {
+		PrintAndLog("Indala UID=%s (%x%08x)", sprint_bin(DemodBuffer,DemodBufferLen), uid1, uid2);
+	} else {
+		uid3=bytebits_to_byte(DemodBuffer+64,32);
+		uid4=bytebits_to_byte(DemodBuffer+96,32);
+		uid5=bytebits_to_byte(DemodBuffer+128,32);
+		uid6=bytebits_to_byte(DemodBuffer+160,32);
+		uid7=bytebits_to_byte(DemodBuffer+192,32);
+		PrintAndLog("Indala UID=%s (%x%08x%08x%08x%08x%08x%08x)", 
+		    sprint_bin(DemodBuffer,DemodBufferLen), uid1, uid2, uid3, uid4, uid5, uid6, uid7);
 	}
 	if (g_debugMode){
 		PrintAndLog("DEBUG: printing demodbuffer:");
@@ -2353,6 +2343,7 @@ static command_t CommandTable[] =
 	{"askedgedetect",   CmdAskEdgeDetect,   1, "[threshold] Adjust Graph for manual ask demod using the length of sample differences to detect the edge of a wave (use 20-45, def:25)"},
 	{"askem410xdemod",  CmdAskEM410xDemod,  1, "[clock] [invert<0|1>] [maxErr] -- Demodulate an EM410x tag from GraphBuffer (args optional)"},
 	{"askgproxiidemod", CmdG_Prox_II_Demod, 1, "Demodulate a G Prox II tag from GraphBuffer"},
+	{"askvikingdemod",  CmdVikingDemod,     1, "Demodulate a Viking tag from GraphBuffer"},
 	{"autocorr",        CmdAutoCorr,        1, "[window length] [g] -- Autocorrelation over window - g to save back to GraphBuffer (overwrite)"},
 	{"biphaserawdecode",CmdBiphaseDecodeRaw,1, "[offset] [invert<0|1>] [maxErr] -- Biphase decode bin stream in DemodBuffer (offset = 0|1 bits to shift the decode start)"},
 	{"bin2hex",         Cmdbin2hex,         1, "bin2hex <digits>     -- Converts binary to hexadecimal"},

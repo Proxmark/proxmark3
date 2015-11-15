@@ -16,6 +16,7 @@
 #include "string.h"
 #include "lfdemod.h"
 #include "lfsampling.h"
+#include "protocols.h"
 #include "usb_cdc.h" //test
 
 /**
@@ -25,7 +26,7 @@
  * @param period_1
  * @param command
  */
-void ModThenAcquireRawAdcSamples125k(int delay_off, int period_0, int period_1, uint8_t *command)
+void ModThenAcquireRawAdcSamples125k(uint32_t delay_off, uint32_t period_0, uint32_t period_1, uint8_t *command)
 {
 
 	int divisor_used = 95; // 125 KHz
@@ -648,7 +649,6 @@ static void biphaseSimBit(uint8_t c, int *n, uint8_t clock, uint8_t *phase)
 		memset(dest+(*n), c ^ *phase, clock);
 		*phase ^= 1;
 	}
-
 }
 
 // args clock, ask/man or askraw, invert, transmission separator
@@ -768,7 +768,7 @@ void CmdHIDdemodFSK(int findone, int *high, int *low, int ledcontrol)
 	// Configure to go in 125Khz listen mode
 	LFSetupFPGAForADC(95, true);
 
-	while(!BUTTON_PRESS()) {
+	while(!BUTTON_PRESS() && !usb_poll_validate_length()) {
 
 		WDT_HIT();
 		if (ledcontrol) LED_A_ON();
@@ -857,7 +857,7 @@ void CmdAWIDdemodFSK(int findone, int *high, int *low, int ledcontrol)
 	// Configure to go in 125Khz listen mode
 	LFSetupFPGAForADC(95, true);
 
-	while(!BUTTON_PRESS()) {
+	while(!BUTTON_PRESS() && !usb_poll_validate_length()) {
 
 		WDT_HIT();
 		if (ledcontrol) LED_A_ON();
@@ -948,7 +948,7 @@ void CmdEM410xdemod(int findone, int *high, int *low, int ledcontrol)
 	// Configure to go in 125Khz listen mode
 	LFSetupFPGAForADC(95, true);
 
-	while(!BUTTON_PRESS()) {
+	while(!BUTTON_PRESS() && !usb_poll_validate_length()) {
 
 		WDT_HIT();
 		if (ledcontrol) LED_A_ON();
@@ -1007,7 +1007,7 @@ void CmdIOdemodFSK(int findone, int *high, int *low, int ledcontrol)
 	// Configure to go in 125Khz listen mode
 	LFSetupFPGAForADC(95, true);
 
-	while(!BUTTON_PRESS()) {
+	while(!BUTTON_PRESS() && !usb_poll_validate_length()) {
 		WDT_HIT();
 		if (ledcontrol) LED_A_ON();
 		DoAcquisition_default(-1,true);
@@ -1062,237 +1062,225 @@ void CmdIOdemodFSK(int findone, int *high, int *low, int ledcontrol)
 }
 
 /*------------------------------
- * T5555/T5557/T5567 routines
+ * T5555/T5557/T5567/T5577 routines
  *------------------------------
  */
 
-/* T55x7 configuration register definitions */
-#define T55x7_POR_DELAY			0x00000001
-#define T55x7_ST_TERMINATOR		0x00000008
-#define T55x7_PWD			0x00000010
-#define T55x7_MAXBLOCK_SHIFT		5
-#define T55x7_AOR			0x00000200
-#define T55x7_PSKCF_RF_2		0
-#define T55x7_PSKCF_RF_4		0x00000400
-#define T55x7_PSKCF_RF_8		0x00000800
-#define T55x7_MODULATION_DIRECT		0
-#define T55x7_MODULATION_PSK1		0x00001000
-#define T55x7_MODULATION_PSK2		0x00002000
-#define T55x7_MODULATION_PSK3		0x00003000
-#define T55x7_MODULATION_FSK1		0x00004000
-#define T55x7_MODULATION_FSK2		0x00005000
-#define T55x7_MODULATION_FSK1a		0x00006000
-#define T55x7_MODULATION_FSK2a		0x00007000
-#define T55x7_MODULATION_MANCHESTER	0x00008000
-#define T55x7_MODULATION_BIPHASE	0x00010000
-#define T55x7_BITRATE_RF_8		0
-#define T55x7_BITRATE_RF_16		0x00040000
-#define T55x7_BITRATE_RF_32		0x00080000
-#define T55x7_BITRATE_RF_40		0x000C0000
-#define T55x7_BITRATE_RF_50		0x00100000
-#define T55x7_BITRATE_RF_64		0x00140000
-#define T55x7_BITRATE_RF_100		0x00180000
-#define T55x7_BITRATE_RF_128		0x001C0000
-
-/* T5555 (Q5) configuration register definitions */
-#define T5555_ST_TERMINATOR		0x00000001
-#define T5555_MAXBLOCK_SHIFT		0x00000001
-#define T5555_MODULATION_MANCHESTER	0
-#define T5555_MODULATION_PSK1		0x00000010
-#define T5555_MODULATION_PSK2		0x00000020
-#define T5555_MODULATION_PSK3		0x00000030
-#define T5555_MODULATION_FSK1		0x00000040
-#define T5555_MODULATION_FSK2		0x00000050
-#define T5555_MODULATION_BIPHASE	0x00000060
-#define T5555_MODULATION_DIRECT		0x00000070
-#define T5555_INVERT_OUTPUT		0x00000080
-#define T5555_PSK_RF_2			0
-#define T5555_PSK_RF_4			0x00000100
-#define T5555_PSK_RF_8			0x00000200
-#define T5555_USE_PWD			0x00000400
-#define T5555_USE_AOR			0x00000800
-#define T5555_BITRATE_SHIFT		12
-#define T5555_FAST_WRITE		0x00004000
-#define T5555_PAGE_SELECT		0x00008000
+/* NOTE: T55x7/T5555 configuration register definitions moved to protocols.h */
 
 /*
- * Relevant times in microsecond
+ * Relevant communication times in microsecond
  * To compensate antenna falling times shorten the write times
  * and enlarge the gap ones.
+ * Q5 tags seems to have issues when these values changes. 
  */
 #define START_GAP 31*8 // was 250 // SPEC:  1*8 to 50*8 - typ 15*8 (or 15fc)
 #define WRITE_GAP 20*8 // was 160 // SPEC:  1*8 to 20*8 - typ 10*8 (or 10fc)
 #define WRITE_0   18*8 // was 144 // SPEC: 16*8 to 32*8 - typ 24*8 (or 24fc)
 #define WRITE_1   50*8 // was 400 // SPEC: 48*8 to 64*8 - typ 56*8 (or 56fc)  432 for T55x7; 448 for E5550
+#define READ_GAP  52*8 
 
-#define T55xx_SAMPLES_SIZE      12000 // 32 x 32 x 10  (32 bit times numofblock (7), times clock skip..)
+//  VALUES TAKEN FROM EM4x function: SendForward
+//  START_GAP = 440;       (55*8) cycles at 125Khz (8us = 1cycle)
+//  WRITE_GAP = 128;       (16*8)
+//  WRITE_1   = 256 32*8;  (32*8) 
+
+//  These timings work for 4469/4269/4305 (with the 55*8 above)
+//  WRITE_0 = 23*8 , 9*8  SpinDelayUs(23*8); 
+
+// Sam7s has several timers, we will use the source TIMER_CLOCK1 (aka AT91C_TC_CLKS_TIMER_DIV1_CLOCK)
+// TIMER_CLOCK1 = MCK/2, MCK is running at 48 MHz, Timer is running at 48/2 = 24 MHz
+// Hitag units (T0) have duration of 8 microseconds (us), which is 1/125000 per second (carrier)
+// T0 = TIMER_CLOCK1 / 125000 = 192
+// 1 Cycle = 8 microseconds(us)  == 1 field clock
+
+void TurnReadLFOn(int delay) {
+	FpgaWriteConfWord(FPGA_MAJOR_MODE_LF_ADC | FPGA_LF_ADC_READER_FIELD);
+	// Give it a bit of time for the resonant antenna to settle.
+	SpinDelayUs(delay); //155*8 //50*8
+}
 
 // Write one bit to card
-void T55xxWriteBit(int bit)
-{
-	FpgaDownloadAndGo(FPGA_BITSTREAM_LF);
-	FpgaSendCommand(FPGA_CMD_SET_DIVISOR, 95); //125Khz
-	FpgaWriteConfWord(FPGA_MAJOR_MODE_LF_ADC | FPGA_LF_ADC_READER_FIELD);
-	if (bit == 0)
-		SpinDelayUs(WRITE_0);
+void T55xxWriteBit(int bit) {
+	if (!bit)
+		TurnReadLFOn(WRITE_0);
 	else
-		SpinDelayUs(WRITE_1);
+		TurnReadLFOn(WRITE_1);
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
 	SpinDelayUs(WRITE_GAP);
 }
 
-// Write one card block in page 0, no lock
-void T55xxWriteBlock(uint32_t Data, uint32_t Block, uint32_t Pwd, uint8_t PwdMode)
-{
-	uint32_t i = 0;
+// Send T5577 reset command then read stream (see if we can identify the start of the stream)
+void T55xxResetRead(void) {
+	LED_A_ON();
+	//clear buffer now so it does not interfere with timing later
+	BigBuf_Clear_ext(false);
 
 	// Set up FPGA, 125kHz
-	// Wait for config.. (192+8190xPOW)x8 == 67ms
-	LFSetupFPGAForADC(0, true);
+	LFSetupFPGAForADC(95, true);
 
-	// Now start writting
+	// Trigger T55x7 in mode.
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
 	SpinDelayUs(START_GAP);
 
-	// Opcode
+	// reset tag - op code 00
+	T55xxWriteBit(0);
+	T55xxWriteBit(0);
+
+	// Turn field on to read the response
+	TurnReadLFOn(READ_GAP);
+
+	// Acquisition
+	doT55x7Acquisition(BigBuf_max_traceLen());
+
+	// Turn the field off
+	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF); // field off
+	cmd_send(CMD_ACK,0,0,0,0,0);    
+	LED_A_OFF();
+}
+
+// Write one card block in page 0, no lock
+void T55xxWriteBlockExt(uint32_t Data, uint32_t Block, uint32_t Pwd, uint8_t arg) {
+	LED_A_ON();
+	bool PwdMode = arg & 0x1;
+	uint8_t Page = (arg & 0x2)>>1;
+	uint32_t i = 0;
+
+	// Set up FPGA, 125kHz
+	LFSetupFPGAForADC(95, true);
+
+	// Trigger T55x7 in mode.
+	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
+	SpinDelayUs(START_GAP);
+
+	// Opcode 10
 	T55xxWriteBit(1);
-	T55xxWriteBit(0); //Page 0
-	if (PwdMode == 1){
-		// Pwd
+	T55xxWriteBit(Page); //Page 0
+	if (PwdMode){
+		// Send Pwd
 		for (i = 0x80000000; i != 0; i >>= 1)
 			T55xxWriteBit(Pwd & i);
 	}
-	// Lock bit
+	// Send Lock bit
 	T55xxWriteBit(0);
 
-	// Data
+	// Send Data
 	for (i = 0x80000000; i != 0; i >>= 1)
 		T55xxWriteBit(Data & i);
 
-	// Block
+	// Send Block number
 	for (i = 0x04; i != 0; i >>= 1)
 		T55xxWriteBit(Block & i);
 
-	// Now perform write (nominal is 5.6 ms for T55x7 and 18ms for E5550,
+	// Perform write (nominal is 5.6 ms for T55x7 and 18ms for E5550,
 	// so wait a little more)
-	FpgaSendCommand(FPGA_CMD_SET_DIVISOR, 95); //125Khz
-	FpgaWriteConfWord(FPGA_MAJOR_MODE_LF_ADC | FPGA_LF_ADC_READER_FIELD);
-	SpinDelay(20);
+	TurnReadLFOn(20 * 1000);
+		//could attempt to do a read to confirm write took
+		// as the tag should repeat back the new block 
+		// until it is reset, but to confirm it we would 
+		// need to know the current block 0 config mode
+
+	// turn field off
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
+	LED_A_OFF();
 }
 
-void TurnReadLFOn(){
-	FpgaWriteConfWord(FPGA_MAJOR_MODE_LF_ADC | FPGA_LF_ADC_READER_FIELD);
-	// Give it a bit of time for the resonant antenna to settle.
-	SpinDelayUs(8*150);
+// Write one card block in page 0, no lock
+void T55xxWriteBlock(uint32_t Data, uint32_t Block, uint32_t Pwd, uint8_t arg) {
+	T55xxWriteBlockExt(Data, Block, Pwd, arg);
+	cmd_send(CMD_ACK,0,0,0,0,0);
 }
-
 
 // Read one card block in page 0
-void T55xxReadBlock(uint32_t Block, uint32_t Pwd, uint8_t PwdMode)
-{
+void T55xxReadBlock(uint16_t arg0, uint8_t Block, uint32_t Pwd) {
+	LED_A_ON();
+	bool PwdMode = arg0 & 0x1;
+	uint8_t Page = (arg0 & 0x2) >> 1;
 	uint32_t i = 0;
-	uint8_t *dest = BigBuf_get_addr();
-	uint16_t bufferlength = BigBuf_max_traceLen();
-	if ( bufferlength > T55xx_SAMPLES_SIZE )
-		bufferlength = T55xx_SAMPLES_SIZE;
+	bool RegReadMode = (Block == 0xFF);
 
-	// Clear destination buffer before sending the command
-	memset(dest, 0x80, bufferlength);
+	//clear buffer now so it does not interfere with timing later
+	BigBuf_Clear_ext(false);
 
-	// Set up FPGA, 125kHz
-	// Wait for config.. (192+8190xPOW)x8 == 67ms
-	LFSetupFPGAForADC(0, true);
+	//make sure block is at max 7
+	Block &= 0x7;
+
+	// Set up FPGA, 125kHz to power up the tag
+	LFSetupFPGAForADC(95, true);
+
+	// Trigger T55x7 Direct Access Mode with start gap
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
 	SpinDelayUs(START_GAP);
 
-	// Opcode
+	// Opcode 1[page]
 	T55xxWriteBit(1);
-	T55xxWriteBit(0); //Page 0
-	if (PwdMode == 1){
-		// Pwd
+	T55xxWriteBit(Page); //Page 0
+
+	if (PwdMode){
+		// Send Pwd
 		for (i = 0x80000000; i != 0; i >>= 1)
 			T55xxWriteBit(Pwd & i);
 	}
-	// Lock bit
+	// Send a zero bit separation
 	T55xxWriteBit(0);
-	// Block
-	for (i = 0x04; i != 0; i >>= 1)
-		T55xxWriteBit(Block & i);
+
+	// Send Block number (if direct access mode)
+	if (!RegReadMode)
+		for (i = 0x04; i != 0; i >>= 1)
+			T55xxWriteBit(Block & i);		
 
 	// Turn field on to read the response
-	TurnReadLFOn();
-	// Now do the acquisition
-	i = 0;
-	for(;;) {
-		if (AT91C_BASE_SSC->SSC_SR & AT91C_SSC_TXRDY) {
-			AT91C_BASE_SSC->SSC_THR = 0x43;
-			LED_D_ON();
-		}
-		if (AT91C_BASE_SSC->SSC_SR & AT91C_SSC_RXRDY) {
-			dest[i] = (uint8_t)AT91C_BASE_SSC->SSC_RHR;
-			i++;
-			LED_D_OFF();
-			if (i >= bufferlength) break;
-		}
-	}
+	TurnReadLFOn(READ_GAP);
 
-	cmd_send(CMD_ACK,0,0,0,0,0);    
+	// Acquisition
+	doT55x7Acquisition(12000);
+
+	// Turn the field off
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF); // field off
-	LED_D_OFF();
+	cmd_send(CMD_ACK,0,0,0,0,0);    
+	LED_A_OFF();
 }
 
-// Read card traceability data (page 1)
-void T55xxReadTrace(void){
-	
+void T55xxWakeUp(uint32_t Pwd){
+	LED_B_ON();
 	uint32_t i = 0;
-	uint8_t *dest = BigBuf_get_addr();
-	uint16_t bufferlength = BigBuf_max_traceLen();
-	if ( bufferlength > T55xx_SAMPLES_SIZE )
-		bufferlength= T55xx_SAMPLES_SIZE;
-
-	// Clear destination buffer before sending the command
-	memset(dest, 0x80, bufferlength);
-
-	LFSetupFPGAForADC(0, true);
+	
+	// Set up FPGA, 125kHz
+	LFSetupFPGAForADC(95, true);
+	
+	// Trigger T55x7 Direct Access Mode
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
 	SpinDelayUs(START_GAP);
-
-	// Opcode
+	
+	// Opcode 10
 	T55xxWriteBit(1);
-	T55xxWriteBit(1); //Page 1
+	T55xxWriteBit(0); //Page 0
 
-	// Turn field on to read the response
-	TurnReadLFOn();
+	// Send Pwd
+	for (i = 0x80000000; i != 0; i >>= 1)
+		T55xxWriteBit(Pwd & i);
 
-	// Now do the acquisition
-	for(;;) {
-		if (AT91C_BASE_SSC->SSC_SR & AT91C_SSC_TXRDY) {
-			AT91C_BASE_SSC->SSC_THR = 0x43;
-			LED_D_ON();
-		}
-		if (AT91C_BASE_SSC->SSC_SR & AT91C_SSC_RXRDY) {
-			dest[i] = (uint8_t)AT91C_BASE_SSC->SSC_RHR;
-			i++;
-			LED_D_OFF();
-
-			if (i >= bufferlength) break;
-		}
-	}
-
-	cmd_send(CMD_ACK,0,0,0,0,0);
-	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF); // field off
-	LED_D_OFF();
+	// Turn and leave field on to let the begin repeating transmission
+	TurnReadLFOn(20*1000);
 }
 
 /*-------------- Cloning routines -----------*/
-// Copy HID id to card and setup block 0 config
-void CopyHIDtoT55x7(uint32_t hi2, uint32_t hi, uint32_t lo, uint8_t longFMT)
-{
-	int data1=0, data2=0, data3=0, data4=0, data5=0, data6=0; //up to six blocks for long format
-	int last_block = 0;
 
-	if (longFMT){
+void WriteT55xx(uint32_t *blockdata, uint8_t startblock, uint8_t numblocks) {
+	// write last block first and config block last (if included)
+	for (uint8_t i = numblocks+startblock; i > startblock; i--) {
+		//Dbprintf("write- Blk: %d, d:%08X",i-1,blockdata[i-1]);
+		T55xxWriteBlockExt(blockdata[i-1],i-1,0,0);
+	}
+}
+
+// Copy HID id to card and setup block 0 config
+void CopyHIDtoT55x7(uint32_t hi2, uint32_t hi, uint32_t lo, uint8_t longFMT) {
+	uint32_t data[] = {0,0,0,0,0,0,0};
+	//int data1=0, data2=0, data3=0, data4=0, data5=0, data6=0; //up to six blocks for long format
+	uint8_t last_block = 0;
+
+	if (longFMT) {
 		// Ensure no more than 84 bits supplied
 		if (hi2>0xFFFFF) {
 			DbpString("Tags can only have 84 bits.");
@@ -1300,140 +1288,91 @@ void CopyHIDtoT55x7(uint32_t hi2, uint32_t hi, uint32_t lo, uint8_t longFMT)
 		}
 		// Build the 6 data blocks for supplied 84bit ID
 		last_block = 6;
-		data1 = 0x1D96A900; // load preamble (1D) & long format identifier (9E manchester encoded)
-		for (int i=0;i<4;i++) {
-			if (hi2 & (1<<(19-i)))
-				data1 |= (1<<(((3-i)*2)+1)); // 1 -> 10
-			else
-				data1 |= (1<<((3-i)*2)); // 0 -> 01
-		}
-
-		data2 = 0;
-		for (int i=0;i<16;i++) {
-			if (hi2 & (1<<(15-i)))
-				data2 |= (1<<(((15-i)*2)+1)); // 1 -> 10
-			else
-				data2 |= (1<<((15-i)*2)); // 0 -> 01
-		}
-
-		data3 = 0;
-		for (int i=0;i<16;i++) {
-			if (hi & (1<<(31-i)))
-				data3 |= (1<<(((15-i)*2)+1)); // 1 -> 10
-			else
-				data3 |= (1<<((15-i)*2)); // 0 -> 01
-		}
-
-		data4 = 0;
-		for (int i=0;i<16;i++) {
-			if (hi & (1<<(15-i)))
-				data4 |= (1<<(((15-i)*2)+1)); // 1 -> 10
-			else
-				data4 |= (1<<((15-i)*2)); // 0 -> 01
-		}
-
-		data5 = 0;
-		for (int i=0;i<16;i++) {
-			if (lo & (1<<(31-i)))
-				data5 |= (1<<(((15-i)*2)+1)); // 1 -> 10
-			else
-				data5 |= (1<<((15-i)*2)); // 0 -> 01
-		}
-
-		data6 = 0;
-		for (int i=0;i<16;i++) {
-			if (lo & (1<<(15-i)))
-				data6 |= (1<<(((15-i)*2)+1)); // 1 -> 10
-			else
-				data6 |= (1<<((15-i)*2)); // 0 -> 01
-		}
-	}
-	else {
+		// load preamble (1D) & long format identifier (9E manchester encoded)
+		data[1] = 0x1D96A900 | (manchesterEncode2Bytes((hi2 >> 16) & 0xF) & 0xFF);
+		// load raw id from hi2, hi, lo to data blocks (manchester encoded)
+		data[2] = manchesterEncode2Bytes(hi2 & 0xFFFF);
+		data[3] = manchesterEncode2Bytes(hi >> 16);
+		data[4] = manchesterEncode2Bytes(hi & 0xFFFF);
+		data[5] = manchesterEncode2Bytes(lo >> 16);
+		data[6] = manchesterEncode2Bytes(lo & 0xFFFF);
+	}	else {
 		// Ensure no more than 44 bits supplied
 		if (hi>0xFFF) {
 			DbpString("Tags can only have 44 bits.");
 			return;
 		}
-
 		// Build the 3 data blocks for supplied 44bit ID
 		last_block = 3;
-
-		data1 = 0x1D000000; // load preamble
-
-		for (int i=0;i<12;i++) {
-			if (hi & (1<<(11-i)))
-				data1 |= (1<<(((11-i)*2)+1)); // 1 -> 10
-			else
-				data1 |= (1<<((11-i)*2)); // 0 -> 01
-		}
-
-		data2 = 0;
-		for (int i=0;i<16;i++) {
-			if (lo & (1<<(31-i)))
-				data2 |= (1<<(((15-i)*2)+1)); // 1 -> 10
-			else
-				data2 |= (1<<((15-i)*2)); // 0 -> 01
-		}
-
-		data3 = 0;
-		for (int i=0;i<16;i++) {
-			if (lo & (1<<(15-i)))
-				data3 |= (1<<(((15-i)*2)+1)); // 1 -> 10
-			else
-				data3 |= (1<<((15-i)*2)); // 0 -> 01
-		}
+		// load preamble
+		data[1] = 0x1D000000 | (manchesterEncode2Bytes(hi) & 0xFFFFFF);
+		data[2] = manchesterEncode2Bytes(lo >> 16);
+		data[3] = manchesterEncode2Bytes(lo & 0xFFFF);
 	}
+	// load chip config block
+	data[0] = T55x7_BITRATE_RF_50 | T55x7_MODULATION_FSK2a | last_block << T55x7_MAXBLOCK_SHIFT;
+
+	//TODO add selection of chip for Q5 or T55x7
+	// data[0] = (((50-2)/2)<<T5555_BITRATE_SHIFT) | T5555_MODULATION_FSK2 | T5555_INVERT_OUTPUT | last_block << T5555_MAXBLOCK_SHIFT;
 
 	LED_D_ON();
 	// Program the data blocks for supplied ID
 	// and the block 0 for HID format
-	T55xxWriteBlock(data1,1,0,0);
-	T55xxWriteBlock(data2,2,0,0);
-	T55xxWriteBlock(data3,3,0,0);
-
-	if (longFMT) { // if long format there are 6 blocks
-		T55xxWriteBlock(data4,4,0,0);
-		T55xxWriteBlock(data5,5,0,0);
-		T55xxWriteBlock(data6,6,0,0);
-	}
-
-	// Config for HID (RF/50, FSK2a, Maxblock=3 for short/6 for long)
-	T55xxWriteBlock(T55x7_BITRATE_RF_50    |
-					T55x7_MODULATION_FSK2a |
-					last_block << T55x7_MAXBLOCK_SHIFT,
-					0,0,0);
+	WriteT55xx(data, 0, last_block+1);
 
 	LED_D_OFF();
 
 	DbpString("DONE!");
 }
 
-void CopyIOtoT55x7(uint32_t hi, uint32_t lo, uint8_t longFMT)
-{
-	int data1=0, data2=0; //up to six blocks for long format
-
-	data1 = hi;  // load preamble
-	data2 = lo;
+void CopyIOtoT55x7(uint32_t hi, uint32_t lo) {
+	uint32_t data[] = {T55x7_BITRATE_RF_64 | T55x7_MODULATION_FSK2a | (2 << T55x7_MAXBLOCK_SHIFT), hi, lo};
+	//TODO add selection of chip for Q5 or T55x7
+	// data[0] = (((64-2)/2)<<T5555_BITRATE_SHIFT) | T5555_MODULATION_FSK2 | T5555_INVERT_OUTPUT | 2 << T5555_MAXBLOCK_SHIFT;
 
 	LED_D_ON();
 	// Program the data blocks for supplied ID
-	// and the block 0 for HID format
-	T55xxWriteBlock(data1,1,0,0);
-	T55xxWriteBlock(data2,2,0,0);
+	// and the block 0 config
+	WriteT55xx(data, 0, 3);
 
-	//Config Block
-	T55xxWriteBlock(0x00147040,0,0,0);
 	LED_D_OFF();
 
+	DbpString("DONE!");
+}
+
+// Clone Indala 64-bit tag by UID to T55x7
+void CopyIndala64toT55x7(uint32_t hi, uint32_t lo) {
+	//Program the 2 data blocks for supplied 64bit UID
+	// and the Config for Indala 64 format (RF/32;PSK1 with RF/2;Maxblock=2)
+	uint32_t data[] = { T55x7_BITRATE_RF_32 | T55x7_MODULATION_PSK1 | (2 << T55x7_MAXBLOCK_SHIFT), hi, lo};
+	//TODO add selection of chip for Q5 or T55x7
+	// data[0] = (((32-2)/2)<<T5555_BITRATE_SHIFT) | T5555_MODULATION_PSK1 | 2 << T5555_MAXBLOCK_SHIFT;
+
+	WriteT55xx(data, 0, 3);
+	//Alternative config for Indala (Extended mode;RF/32;PSK1 with RF/2;Maxblock=2;Inverse data)
+	//	T5567WriteBlock(0x603E1042,0);
+	DbpString("DONE!");
+}
+// Clone Indala 224-bit tag by UID to T55x7
+void CopyIndala224toT55x7(uint32_t uid1, uint32_t uid2, uint32_t uid3, uint32_t uid4, uint32_t uid5, uint32_t uid6, uint32_t uid7) {
+	//Program the 7 data blocks for supplied 224bit UID
+	uint32_t data[] = {0, uid1, uid2, uid3, uid4, uid5, uid6, uid7};
+	// and the block 0 for Indala224 format	
+	//Config for Indala (RF/32;PSK1 with RF/2;Maxblock=7)
+	data[0] = T55x7_BITRATE_RF_32 | T55x7_MODULATION_PSK1 | (7 << T55x7_MAXBLOCK_SHIFT);
+	//TODO add selection of chip for Q5 or T55x7
+	// data[0] = (((32-2)/2)<<T5555_BITRATE_SHIFT) | T5555_MODULATION_PSK1 | 7 << T5555_MAXBLOCK_SHIFT;
+	WriteT55xx(data, 0, 8);
+	//Alternative config for Indala (Extended mode;RF/32;PSK1 with RF/2;Maxblock=7;Inverse data)
+	//	T5567WriteBlock(0x603E10E2,0);
 	DbpString("DONE!");
 }
 
 // Define 9bit header for EM410x tags
-#define EM410X_HEADER		0x1FF
+#define EM410X_HEADER		  0x1FF
 #define EM410X_ID_LENGTH	40
 
-void WriteEM410x(uint32_t card, uint32_t id_hi, uint32_t id_lo)
-{
+void WriteEM410x(uint32_t card, uint32_t id_hi, uint32_t id_lo) {
 	int i, id_bit;
 	uint64_t id = EM410X_HEADER;
 	uint64_t rev_id = 0;	// reversed ID
@@ -1493,362 +1432,29 @@ void WriteEM410x(uint32_t card, uint32_t id_hi, uint32_t id_lo)
 	LED_D_ON();
 
 	// Write EM410x ID
-	T55xxWriteBlock((uint32_t)(id >> 32), 1, 0, 0);
-	T55xxWriteBlock((uint32_t)id, 2, 0, 0);
+	uint32_t data[] = {0, id>>32, id & 0xFFFFFFFF};
 
-	// Config for EM410x (RF/64, Manchester, Maxblock=2)
-	if (card) {
-		// Clock rate is stored in bits 8-15 of the card value
-		clock = (card & 0xFF00) >> 8;
-		Dbprintf("Clock rate: %d", clock);
-		switch (clock)
-		{
-		case 32:
-			clock = T55x7_BITRATE_RF_32;
-			break;
-		case 16:
-			clock = T55x7_BITRATE_RF_16;
-			break;
-		case 0:
-			// A value of 0 is assumed to be 64 for backwards-compatibility
-			// Fall through...
-		case 64:
-			clock = T55x7_BITRATE_RF_64;
-			break;
-		default:
+	clock = (card & 0xFF00) >> 8;
+	clock = (clock == 0) ? 64 : clock;
+	Dbprintf("Clock rate: %d", clock);
+	if (card & 0xFF) { //t55x7
+		clock = GetT55xxClockBit(clock);			
+		if (clock == 0) {
 			Dbprintf("Invalid clock rate: %d", clock);
 			return;
 		}
-
-		// Writing configuration for T55x7 tag
-		T55xxWriteBlock(clock	    |
-						T55x7_MODULATION_MANCHESTER |
-						2 << T55x7_MAXBLOCK_SHIFT,
-						0, 0, 0);
+		data[0] = clock | T55x7_MODULATION_MANCHESTER | (2 << T55x7_MAXBLOCK_SHIFT);
+	} else { //t5555 (Q5)
+		clock = (clock-2)>>1;  //n = (RF-2)/2
+		data[0] = (clock << T5555_BITRATE_SHIFT) | T5555_MODULATION_MANCHESTER | (2 << T5555_MAXBLOCK_SHIFT);
 	}
-	else
-		// Writing configuration for T5555(Q5) tag
-		T55xxWriteBlock(0x1F << T5555_BITRATE_SHIFT |
-						T5555_MODULATION_MANCHESTER |
-						2 << T5555_MAXBLOCK_SHIFT,
-						0, 0, 0);
+
+	WriteT55xx(data, 0, 3);
 
 	LED_D_OFF();
 	Dbprintf("Tag %s written with 0x%08x%08x\n", card ? "T55x7":"T5555",
 			 (uint32_t)(id >> 32), (uint32_t)id);
 }
-
-// Clone Indala 64-bit tag by UID to T55x7
-void CopyIndala64toT55x7(int hi, int lo)
-{
-
-	//Program the 2 data blocks for supplied 64bit UID
-	// and the block 0 for Indala64 format
-	T55xxWriteBlock(hi,1,0,0);
-	T55xxWriteBlock(lo,2,0,0);
-	//Config for Indala (RF/32;PSK1 with RF/2;Maxblock=2)
-	T55xxWriteBlock(T55x7_BITRATE_RF_32    |
-					T55x7_MODULATION_PSK1 |
-					2 << T55x7_MAXBLOCK_SHIFT,
-					0, 0, 0);
-	//Alternative config for Indala (Extended mode;RF/32;PSK1 with RF/2;Maxblock=2;Inverse data)
-	//	T5567WriteBlock(0x603E1042,0);
-
-	DbpString("DONE!");
-
-}
-
-void CopyIndala224toT55x7(int uid1, int uid2, int uid3, int uid4, int uid5, int uid6, int uid7)
-{
-
-	//Program the 7 data blocks for supplied 224bit UID
-	// and the block 0 for Indala224 format
-	T55xxWriteBlock(uid1,1,0,0);
-	T55xxWriteBlock(uid2,2,0,0);
-	T55xxWriteBlock(uid3,3,0,0);
-	T55xxWriteBlock(uid4,4,0,0);
-	T55xxWriteBlock(uid5,5,0,0);
-	T55xxWriteBlock(uid6,6,0,0);
-	T55xxWriteBlock(uid7,7,0,0);
-	//Config for Indala (RF/32;PSK1 with RF/2;Maxblock=7)
-	T55xxWriteBlock(T55x7_BITRATE_RF_32    |
-					T55x7_MODULATION_PSK1 |
-					7 << T55x7_MAXBLOCK_SHIFT,
-					0,0,0);
-	//Alternative config for Indala (Extended mode;RF/32;PSK1 with RF/2;Maxblock=7;Inverse data)
-	//	T5567WriteBlock(0x603E10E2,0);
-
-	DbpString("DONE!");
-
-}
-
-
-#define abs(x) ( ((x)<0) ? -(x) : (x) )
-#define max(x,y) ( x<y ? y:x)
-
-int DemodPCF7931(uint8_t **outBlocks) {
-	uint8_t BitStream[256];
-	uint8_t Blocks[8][16];
-	uint8_t *GraphBuffer = BigBuf_get_addr();
-	int GraphTraceLen = BigBuf_max_traceLen();
-	int i, j, lastval, bitidx, half_switch;
-	int clock = 64;
-	int tolerance = clock / 8;
-	int pmc, block_done;
-	int lc, warnings = 0;
-	int num_blocks = 0;
-	int lmin=128, lmax=128;
-	uint8_t dir;
-
-	LFSetupFPGAForADC(95, true);
-	DoAcquisition_default(0, 0);
-
-
-	lmin = 64;
-	lmax = 192;
-
-	i = 2;
-
-	/* Find first local max/min */
-	if(GraphBuffer[1] > GraphBuffer[0]) {
-		while(i < GraphTraceLen) {
-			if( !(GraphBuffer[i] > GraphBuffer[i-1]) && GraphBuffer[i] > lmax)
-				break;
-			i++;
-		}
-		dir = 0;
-	}
-	else {
-		while(i < GraphTraceLen) {
-			if( !(GraphBuffer[i] < GraphBuffer[i-1]) && GraphBuffer[i] < lmin)
-				break;
-			i++;
-		}
-		dir = 1;
-	}
-
-	lastval = i++;
-	half_switch = 0;
-	pmc = 0;
-	block_done = 0;
-
-	for (bitidx = 0; i < GraphTraceLen; i++)
-	{
-		if ( (GraphBuffer[i-1] > GraphBuffer[i] && dir == 1 && GraphBuffer[i] > lmax) || (GraphBuffer[i-1] < GraphBuffer[i] && dir == 0 && GraphBuffer[i] < lmin))
-		{
-			lc = i - lastval;
-			lastval = i;
-
-			// Switch depending on lc length:
-			// Tolerance is 1/8 of clock rate (arbitrary)
-			if (abs(lc-clock/4) < tolerance) {
-				// 16T0
-				if((i - pmc) == lc) { /* 16T0 was previous one */
-					/* It's a PMC ! */
-					i += (128+127+16+32+33+16)-1;
-					lastval = i;
-					pmc = 0;
-					block_done = 1;
-				}
-				else {
-					pmc = i;
-				}
-			} else if (abs(lc-clock/2) < tolerance) {
-				// 32TO
-				if((i - pmc) == lc) { /* 16T0 was previous one */
-					/* It's a PMC ! */
-					i += (128+127+16+32+33)-1;
-					lastval = i;
-					pmc = 0;
-					block_done = 1;
-				}
-				else if(half_switch == 1) {
-					BitStream[bitidx++] = 0;
-					half_switch = 0;
-				}
-				else
-					half_switch++;
-			} else if (abs(lc-clock) < tolerance) {
-				// 64TO
-				BitStream[bitidx++] = 1;
-			} else {
-				// Error
-				warnings++;
-				if (warnings > 10)
-				{
-					Dbprintf("Error: too many detection errors, aborting.");
-					return 0;
-				}
-			}
-
-			if(block_done == 1) {
-				if(bitidx == 128) {
-					for(j=0; j<16; j++) {
-						Blocks[num_blocks][j] = 128*BitStream[j*8+7]+
-								64*BitStream[j*8+6]+
-								32*BitStream[j*8+5]+
-								16*BitStream[j*8+4]+
-								8*BitStream[j*8+3]+
-								4*BitStream[j*8+2]+
-								2*BitStream[j*8+1]+
-								BitStream[j*8];
-					}
-					num_blocks++;
-				}
-				bitidx = 0;
-				block_done = 0;
-				half_switch = 0;
-			}
-			if(i < GraphTraceLen)
-			{
-				if (GraphBuffer[i-1] > GraphBuffer[i]) dir=0;
-				else dir = 1;
-			}
-		}
-		if(bitidx==255)
-			bitidx=0;
-		warnings = 0;
-		if(num_blocks == 4) break;
-	}
-	memcpy(outBlocks, Blocks, 16*num_blocks);
-	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
-
-	return num_blocks;
-}
-
-int IsBlock0PCF7931(uint8_t *Block) {
-	// Assume RFU means 0 :)
-	if((memcmp(Block, "\x00\x00\x00\x00\x00\x00\x00\x01", 8) == 0) && memcmp(Block+9, "\x00\x00\x00\x00\x00\x00\x00", 7) == 0) // PAC enabled
-		return 1;
-	if((memcmp(Block+9, "\x00\x00\x00\x00\x00\x00\x00", 7) == 0) && Block[7] == 0) // PAC disabled, can it *really* happen ?
-		return 1;
-	return 0;
-}
-
-int IsBlock1PCF7931(uint8_t *Block) {
-	// Assume RFU means 0 :)
-	if(Block[10] == 0 && Block[11] == 0 && Block[12] == 0 && Block[13] == 0)
-		if((Block[14] & 0x7f) <= 9 && Block[15] <= 9)
-			return 1;
-
-	return 0;
-}
-
-#define ALLOC 16
-
-void ReadPCF7931() {
-	uint8_t Blocks[8][17];
-	uint8_t tmpBlocks[4][16];
-	int i, j, ind, ind2, n;
-	int num_blocks = 0;
-	int max_blocks = 8;
-	int ident = 0;
-	int error = 0;
-	int tries = 0;
-
-	memset(Blocks, 0, 8*17*sizeof(uint8_t));
-
-	do {
-		memset(tmpBlocks, 0, 4*16*sizeof(uint8_t));
-		n = DemodPCF7931((uint8_t**)tmpBlocks);
-		if(!n)
-			error++;
-		if(error==10 && num_blocks == 0) {
-			Dbprintf("Error, no tag or bad tag");
-			return;
-		}
-		else if (tries==20 || error==10) {
-			Dbprintf("Error reading the tag");
-			Dbprintf("Here is the partial content");
-			goto end;
-		}
-
-		for(i=0; i<n; i++)
-			Dbprintf("(dbg) %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x",
-					 tmpBlocks[i][0], tmpBlocks[i][1], tmpBlocks[i][2], tmpBlocks[i][3], tmpBlocks[i][4], tmpBlocks[i][5], tmpBlocks[i][6], tmpBlocks[i][7],
-					tmpBlocks[i][8], tmpBlocks[i][9], tmpBlocks[i][10], tmpBlocks[i][11], tmpBlocks[i][12], tmpBlocks[i][13], tmpBlocks[i][14], tmpBlocks[i][15]);
-		if(!ident) {
-			for(i=0; i<n; i++) {
-				if(IsBlock0PCF7931(tmpBlocks[i])) {
-					// Found block 0 ?
-					if(i < n-1 && IsBlock1PCF7931(tmpBlocks[i+1])) {
-						// Found block 1!
-						// \o/
-						ident = 1;
-						memcpy(Blocks[0], tmpBlocks[i], 16);
-						Blocks[0][ALLOC] = 1;
-						memcpy(Blocks[1], tmpBlocks[i+1], 16);
-						Blocks[1][ALLOC] = 1;
-						max_blocks = max((Blocks[1][14] & 0x7f), Blocks[1][15]) + 1;
-						// Debug print
-						Dbprintf("(dbg) Max blocks: %d", max_blocks);
-						num_blocks = 2;
-						// Handle following blocks
-						for(j=i+2, ind2=2; j!=i; j++, ind2++, num_blocks++) {
-							if(j==n) j=0;
-							if(j==i) break;
-							memcpy(Blocks[ind2], tmpBlocks[j], 16);
-							Blocks[ind2][ALLOC] = 1;
-						}
-						break;
-					}
-				}
-			}
-		}
-		else {
-			for(i=0; i<n; i++) { // Look for identical block in known blocks
-				if(memcmp(tmpBlocks[i], "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00", 16)) { // Block is not full of 00
-					for(j=0; j<max_blocks; j++) {
-						if(Blocks[j][ALLOC] == 1 && !memcmp(tmpBlocks[i], Blocks[j], 16)) {
-							// Found an identical block
-							for(ind=i-1,ind2=j-1; ind >= 0; ind--,ind2--) {
-								if(ind2 < 0)
-									ind2 = max_blocks;
-								if(!Blocks[ind2][ALLOC]) { // Block ind2 not already found
-									// Dbprintf("Tmp %d -> Block %d", ind, ind2);
-									memcpy(Blocks[ind2], tmpBlocks[ind], 16);
-									Blocks[ind2][ALLOC] = 1;
-									num_blocks++;
-									if(num_blocks == max_blocks) goto end;
-								}
-							}
-							for(ind=i+1,ind2=j+1; ind < n; ind++,ind2++) {
-								if(ind2 > max_blocks)
-									ind2 = 0;
-								if(!Blocks[ind2][ALLOC]) { // Block ind2 not already found
-									// Dbprintf("Tmp %d -> Block %d", ind, ind2);
-									memcpy(Blocks[ind2], tmpBlocks[ind], 16);
-									Blocks[ind2][ALLOC] = 1;
-									num_blocks++;
-									if(num_blocks == max_blocks) goto end;
-								}
-							}
-						}
-					}
-				}
-			}
-		}
-		tries++;
-		if (BUTTON_PRESS()) return;
-	} while (num_blocks != max_blocks);
- end:
-	Dbprintf("-----------------------------------------");
-	Dbprintf("Memory content:");
-	Dbprintf("-----------------------------------------");
-	for(i=0; i<max_blocks; i++) {
-		if(Blocks[i][ALLOC]==1){
-			Dbprintf("%02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x",
-					 Blocks[i][0], Blocks[i][1], Blocks[i][2], Blocks[i][3], Blocks[i][4], Blocks[i][5], Blocks[i][6], Blocks[i][7],
-					Blocks[i][8], Blocks[i][9], Blocks[i][10], Blocks[i][11], Blocks[i][12], Blocks[i][13], Blocks[i][14], Blocks[i][15]);
-		}else
-			Dbprintf("<missing block %d>", i);
-	}
-	Dbprintf("-----------------------------------------");
-	
-
-	return ;
-}
-
 
 //-----------------------------------
 // EM4469 / EM4305 routines
@@ -1961,14 +1567,8 @@ void SendForward(uint8_t fwd_bit_count) {
 
 	LED_D_ON();
 
-	//Field on
-	FpgaDownloadAndGo(FPGA_BITSTREAM_LF);
-	FpgaSendCommand(FPGA_CMD_SET_DIVISOR, 95); //125Khz
-	FpgaWriteConfWord(FPGA_MAJOR_MODE_LF_ADC | FPGA_LF_ADC_READER_FIELD);
-
-	// Give it a bit of time for the resonant antenna to settle.
-	// And for the tag to fully power up
-	SpinDelay(150);
+	// Set up FPGA, 125kHz
+	LFSetupFPGAForADC(95, true);
 
 	// force 1st mod pulse (start gap must be longer for 4305)
 	fwd_bit_sz--; //prepare next bit modulation
@@ -2013,7 +1613,11 @@ void EM4xReadWord(uint8_t Address, uint32_t Pwd, uint8_t PwdMode) {
 
 	uint8_t fwd_bit_count;
 	uint8_t *dest = BigBuf_get_addr();
-	int m=0, i=0;
+	uint16_t bufferlength = BigBuf_max_traceLen();
+	uint32_t i = 0;
+
+	// Clear destination buffer before sending the command
+	memset(dest, 0x80, bufferlength);
 
 	//If password mode do login
 	if (PwdMode == 1) EM4xLogin(Pwd);
@@ -2022,9 +1626,6 @@ void EM4xReadWord(uint8_t Address, uint32_t Pwd, uint8_t PwdMode) {
 	fwd_bit_count = Prepare_Cmd( FWD_CMD_READ );
 	fwd_bit_count += Prepare_Addr( Address );
 
-	m = BigBuf_max_traceLen();
-	// Clear destination buffer before sending the command
-	memset(dest, 128, m);
 	// Connect the A/D to the peak-detected low-frequency path.
 	SetAdcMuxFor(GPIO_MUXSEL_LOPKD);
 	// Now set up the SSC to get the ADC samples that are now streaming at us.
@@ -2041,10 +1642,11 @@ void EM4xReadWord(uint8_t Address, uint32_t Pwd, uint8_t PwdMode) {
 		if (AT91C_BASE_SSC->SSC_SR & AT91C_SSC_RXRDY) {
 			dest[i] = (uint8_t)AT91C_BASE_SSC->SSC_RHR;
 			i++;
-			if (i >= m) break;
+			if (i >= bufferlength) break;
 		}
 	}
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF); // field off
+	cmd_send(CMD_ACK,0,0,0,0,0);
 	LED_D_OFF();
 }
 
@@ -2066,262 +1668,4 @@ void EM4xWriteWord(uint32_t Data, uint8_t Address, uint32_t Pwd, uint8_t PwdMode
 	SpinDelay(20);
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF); // field off
 	LED_D_OFF();
-}
-
-
-#define T0_PCF 8 //period for the pcf7931 in us
-
-/* Write on a byte of a PCF7931 tag
- * @param address : address of the block to write
-   @param byte : address of the byte to write
-    @param data : data to write
- */
-void WritePCF7931(uint8_t pass1, uint8_t pass2, uint8_t pass3, uint8_t pass4, uint8_t pass5, uint8_t pass6, uint8_t pass7, uint16_t init_delay, int32_t l, int32_t p, uint8_t address, uint8_t byte, uint8_t data)
-{
-
-	uint32_t tab[1024]={0}; // data times frame
-	uint32_t u = 0;
-	uint8_t parity = 0;
-	bool comp = 0;
-
-
-	//BUILD OF THE DATA FRAME
-
-	//alimentation of the tag (time for initializing)
-	AddPatternPCF7931(init_delay, 0, 8192/2*T0_PCF, tab);
-
-	//PMC
-	Dbprintf("Initialization delay : %d us", init_delay);
-	AddPatternPCF7931(8192/2*T0_PCF + 319*T0_PCF+70, 3*T0_PCF, 29*T0_PCF, tab);
-
-	Dbprintf("Offsets : %d us on the low pulses width, %d us on the low pulses positions", l, p);
-
-	//password indication bit
-	AddBitPCF7931(1, tab, l, p);
-
-
-	//password (on 56 bits)
-	Dbprintf("Password (LSB first on each byte) : %02x %02x %02x %02x %02x %02x %02x", pass1,pass2,pass3,pass4,pass5,pass6,pass7);
-	AddBytePCF7931(pass1, tab, l, p);
-	AddBytePCF7931(pass2, tab, l, p);
-	AddBytePCF7931(pass3, tab, l, p);
-	AddBytePCF7931(pass4, tab, l, p);
-	AddBytePCF7931(pass5, tab, l, p);
-	AddBytePCF7931(pass6, tab, l, p);
-	AddBytePCF7931(pass7, tab, l, p);
-
-
-	//programming mode (0 or 1)
-	AddBitPCF7931(0, tab, l, p);
-
-	//block adress on 6 bits
-	Dbprintf("Block address : %02x", address);
-	for (u=0; u<6; u++)
-	{
-		if (address&(1<<u)) {	// bit 1
-			 parity++;
-			 AddBitPCF7931(1, tab, l, p);
-		} else{					// bit 0
-			 AddBitPCF7931(0, tab, l, p);
-		}
-	}
-
-	//byte address on 4 bits
-	Dbprintf("Byte address : %02x", byte);
-	for (u=0; u<4; u++)
-	{
-		if (byte&(1<<u)) {	// bit 1
-			 parity++;
-			 AddBitPCF7931(1, tab, l, p);
-		} else{				// bit 0
-			 AddBitPCF7931(0, tab, l, p);
-		}
-	}
-
-	//data on 8 bits
-	Dbprintf("Data : %02x", data);
-	for (u=0; u<8; u++)
-	{
-		if (data&(1<<u)) {	// bit 1
-			 parity++;
-			 AddBitPCF7931(1, tab, l, p);
-		} else{				//bit 0
-			 AddBitPCF7931(0, tab, l, p);
-		}
-	}
-
-
-	//parity bit
-	if((parity%2)==0){
-	 	AddBitPCF7931(0, tab, l, p); //even parity
-	}else{
-		AddBitPCF7931(1, tab, l, p);//odd parity
-	}
-
-	//time access memory
-	AddPatternPCF7931(5120+2680, 0, 0, tab);
-
-	//conversion of the scale time
-	for(u=0;u<500;u++){
-		tab[u]=(tab[u] * 3)/2;
-	}
-
-
-	//compennsation of the counter reload
-	while (!comp){
-		comp = 1;
-		for(u=0;tab[u]!=0;u++){
-			if(tab[u] > 0xFFFF){
-			  tab[u] -= 0xFFFF;
-			  comp = 0;
-			}
-		}
-	}
-
-	SendCmdPCF7931(tab);
-}
-
-
-
-/* Send a trame to a PCF7931 tags
- * @param tab : array of the data frame
- */
-
-void SendCmdPCF7931(uint32_t * tab){
-	uint16_t u=0;
-	uint16_t tempo=0;
-
-	Dbprintf("SENDING DATA FRAME...");
-
-	FpgaDownloadAndGo(FPGA_BITSTREAM_LF);
-
-	FpgaSendCommand(FPGA_CMD_SET_DIVISOR, 95); //125Khz
-
-	FpgaWriteConfWord(FPGA_MAJOR_MODE_LF_PASSTHRU );
-
-	LED_A_ON();
-
-	// steal this pin from the SSP and use it to control the modulation
-	AT91C_BASE_PIOA->PIO_PER = GPIO_SSC_DOUT;
-	AT91C_BASE_PIOA->PIO_OER = GPIO_SSC_DOUT;
-
-	//initialization of the timer
-	AT91C_BASE_PMC->PMC_PCER |= (0x1 << 12) | (0x1 << 13) | (0x1 << 14);
-	AT91C_BASE_TCB->TCB_BMR = AT91C_TCB_TC0XC0S_NONE | AT91C_TCB_TC1XC1S_TIOA0 | AT91C_TCB_TC2XC2S_NONE;
-	AT91C_BASE_TC0->TC_CCR = AT91C_TC_CLKDIS; // timer disable
-	AT91C_BASE_TC0->TC_CMR = AT91C_TC_CLKS_TIMER_DIV3_CLOCK;  //clock at 48/32 MHz
-	AT91C_BASE_TC0->TC_CCR = AT91C_TC_CLKEN;
-	AT91C_BASE_TCB->TCB_BCR = 1;
-
-
-	tempo = AT91C_BASE_TC0->TC_CV;
-	for(u=0;tab[u]!= 0;u+=3){
-
-
-		// modulate antenna
-		HIGH(GPIO_SSC_DOUT);
-		while(tempo !=  tab[u]){
-			tempo = AT91C_BASE_TC0->TC_CV;
-		}
-
-		// stop modulating antenna
-		LOW(GPIO_SSC_DOUT);
-		while(tempo !=  tab[u+1]){
-			tempo = AT91C_BASE_TC0->TC_CV;
-		}
-
-
-		// modulate antenna
-		HIGH(GPIO_SSC_DOUT);
-		while(tempo !=  tab[u+2]){
-			tempo = AT91C_BASE_TC0->TC_CV;
-		}
-
-
-	}
-
-	LED_A_OFF();
-	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
-	SpinDelay(200);
-
-
-	AT91C_BASE_TC0->TC_CCR = AT91C_TC_CLKDIS; // timer disable
-	DbpString("FINISH !");
-	DbpString("(Could be usefull to send the same trame many times)");
-	LED(0xFFFF, 1000);
-}
-
-
-/* Add a byte for building the data frame of PCF7931 tags 
- * @param b : byte to add
- * @param tab : array of the data frame
- * @param l : offset on low pulse width
- * @param p : offset on low pulse positioning
- */
-
-bool AddBytePCF7931(uint8_t byte, uint32_t * tab, int32_t l, int32_t p){
-
-	uint32_t u;
-	for (u=0; u<8; u++)
-	{
-		if (byte&(1<<u)) {	//bit à 1
-			if(AddBitPCF7931(1, tab, l, p)==1)return 1;
-		} else { //bit à 0
-			if(AddBitPCF7931(0, tab, l, p)==1)return 1;
-		}
-	}
-
-	return 0;
-}
-
-/* Add a bits for building the data frame of PCF7931 tags 
- * @param b : bit to add
- * @param tab : array of the data frame
- * @param l : offset on low pulse width
- * @param p : offset on low pulse positioning
- */
-bool AddBitPCF7931(bool b, uint32_t * tab, int32_t l, int32_t p){
-	uint8_t u = 0;
-
-	for(u=0;tab[u]!=0;u+=3){} //we put the cursor at the last value of the array
-	
-
-	if(b==1){	//add a bit 1
-		if(u==0) tab[u] = 34*T0_PCF+p;
-		else 	 tab[u] = 34*T0_PCF+tab[u-1]+p;
-
-		tab[u+1] = 6*T0_PCF+tab[u]+l;
-		tab[u+2] = 88*T0_PCF+tab[u+1]-l-p;
-		return 0;
-	}else{ 		//add a bit 0
-
-		if(u==0) tab[u] = 98*T0_PCF+p;
-		else  	 tab[u] = 98*T0_PCF+tab[u-1]+p;
-
-		tab[u+1] = 6*T0_PCF+tab[u]+l;
-		tab[u+2] = 24*T0_PCF+tab[u+1]-l-p;
-		return 0;
-	}
-
-	
-	return 1;
-}
-
-/* Add a custom pattern in the data frame
- * @param a : delay of the first high pulse
- * @param b : delay of the low pulse
- * @param c : delay of the last high pulse
- * @param tab : array of the data frame
- */
-bool AddPatternPCF7931(uint32_t a, uint32_t b, uint32_t c, uint32_t * tab){
-	uint32_t u = 0;
-	for(u=0;tab[u]!=0;u+=3){} //we put the cursor at the last value of the array
-
-	if(u==0) tab[u] = a;
-	else tab[u] = a + tab[u-1];
-
-	tab[u+1] = b+tab[u];
-	tab[u+2] = c+tab[u+1];
-
-	return 0;
 }

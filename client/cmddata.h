@@ -17,6 +17,7 @@ int CmdData(const char *Cmd);
 void printDemodBuff(void);
 void setDemodBuf(uint8_t *buff, size_t size, size_t startIdx);
 int CmdAskEM410xDemod(const char *Cmd);
+int CmdVikingDemod(const char *Cmd);
 int CmdG_Prox_II_Demod(const char *Cmd);
 int Cmdaskrawdemod(const char *Cmd);
 int Cmdaskmandemod(const char *Cmd);

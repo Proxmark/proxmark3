@@ -5,6 +5,11 @@ This project uses the changelog in accordance with [keepchangelog](http://keepac
 ## [unreleased][unreleased]
 
 ### Added
+- Added viking demod to `lf search` (marshmellow)
+- `data askvikingdemod` demod viking id tag from graphbuffer (marshmellow)
+- `lf t55xx resetread` added reset then read command - should allow determining start
+of stream transmissions (marshmellow)
+- `lf t55xx wakeup` added wake with password (AOR) to allow lf search or standard lf read after (iceman, marshmellow)
 - `hf iclass managekeys` to save, load and manage iclass keys.  (adjusted most commands to accept a loaded key in memory) (marshmellow)
 - `hf iclass readblk` to select, authenticate, and read 1 block from an iclass card (marshmellow)
 - `hf iclass writeblk` to select, authenticate, and write 1 block to an iclass card (or picopass) (marshmellow + others)
@@ -21,6 +26,13 @@ This project uses the changelog in accordance with [keepchangelog](http://keepac
 - Added option c to 'hf list' (mark CRC bytes) (piwi)
 
 ### Changed
+- Adjusted lf em410x em410xsim to accept a clock argument
+- Adjusted lf t55xx dump to allow overriding the safety check and warning text (marshmellow)
+- Adjusted lf t55xx write input variables (marshmellow)
+- Adjusted lf t55xx read with password safety check and warning text and adjusted the input variables (marshmellow & iceman)
+- Adjusted LF FSK demod to account for cross threshold fluctuations (898 count waves will adjust the 9 to 8 now...) more accurate.
+- Adjusted timings for t55xx commands.  more reliable now. (marshmellow & iceman)
+- `lf cmdread` adjusted input methods and added help text (marshmellow & iceman)
 - changed `lf config t <threshold>` to be 0 - 128 and will trigger on + or - threshold value (marshmellow) 
 - `hf iclass dump` cli options - can now dump AA1 and AA2 with different keys in one run (does not go to muliple pages for the larger tags yet)
 - Revised workflow for StandAloneMode14a (Craig Young)
