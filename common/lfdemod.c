@@ -282,6 +282,16 @@ int manrawdecode(uint8_t * BitStream, size_t *size, uint8_t invert)
 	return bestErr;
 }
 
+uint32_t manchesterEncode2Bytes(uint16_t datain) {
+	uint32_t output = 0;
+	uint8_t curBit = 0;
+	for (uint8_t i=0; i<16; i++) {
+		curBit = (datain >> (15-i) & 1);
+		output |= (1<<(((15-i)*2)+curBit));
+	}
+	return output;
+}
+
 //by marshmellow
 //encode binary data into binary manchester 
 int ManchesterEncode(uint8_t *BitStream, size_t size)
@@ -369,7 +379,9 @@ size_t fsk_wave_demod(uint8_t * dest, size_t size, uint8_t fchigh, uint8_t fclow
 	if (fclow==0) fclow=8;
 	//set the threshold close to 0 (graph) or 128 std to avoid static
 	uint8_t threshold_value = 123; 
-
+	size_t preLastSample = 0;
+	size_t LastSample = 0;
+	size_t currSample = 0;
 	// sync to first lo-hi transition, and threshold
 
 	// Need to threshold first sample
@@ -389,13 +401,22 @@ size_t fsk_wave_demod(uint8_t * dest, size_t size, uint8_t fchigh, uint8_t fclow
 
 		// Check for 0->1 transition
 		if (dest[idx-1] < dest[idx]) { // 0 -> 1 transition
-			if ((idx-last_transition)<(fclow-2)){            //0-5 = garbage noise
+			preLastSample = LastSample;
+			LastSample = currSample;
+			currSample = idx-last_transition;
+			if (currSample < (fclow-2)){            //0-5 = garbage noise
 				//do nothing with extra garbage
-			} else if ((idx-last_transition) < (fchigh-1)) { //6-8 = 8 waves
+			} else if (currSample < (fchigh-1)) { //6-8 = 8 sample waves
+				if (LastSample > (fchigh-2) && preLastSample < (fchigh-1)){
+					dest[numBits-1]=1;  //correct last 9 wave surrounded by 8 waves
+				}
 				dest[numBits++]=1;
-			} else if ((idx-last_transition) > (fchigh+1) && !numBits) { //12 + and first bit = garbage 
+
+			} else if (currSample > (fchigh+1) && !numBits) { //12 + and first bit = garbage 
 				//do nothing with beginning garbage
-			} else {                                         //9+ = 10 waves
+			} else if (currSample == (fclow+1) && LastSample == (fclow-1)) { // had a 7 then a 9 should be two 8's
+				dest[numBits++]=1;
+			} else {                                         //9+ = 10 sample waves
 				dest[numBits++]=0;
 			}
 			last_transition = idx;
@@ -576,6 +597,25 @@ int IOdemodFSK(uint8_t *dest, size_t size)
 		return (int) startIdx;
 	}
 	return -5;
+} 
+
+// by marshmellow
+// find viking preamble 0xF200 in already demoded data
+int VikingDemod_AM(uint8_t *dest, size_t *size) {
+	//make sure buffer has data
+	if (*size < 64*2) return -2;
+
+	size_t startIdx = 0;
+	uint8_t preamble[] = {1,1,1,1,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
+	uint8_t errChk = preambleSearch(dest, preamble, sizeof(preamble), size, &startIdx);
+	if (errChk == 0) return -4; //preamble not found
+	uint32_t checkCalc = bytebits_to_byte(dest+startIdx,8) ^ bytebits_to_byte(dest+startIdx+8,8) ^ bytebits_to_byte(dest+startIdx+16,8)
+	    ^ bytebits_to_byte(dest+startIdx+24,8) ^ bytebits_to_byte(dest+startIdx+32,8) ^ bytebits_to_byte(dest+startIdx+40,8) 
+	    ^ bytebits_to_byte(dest+startIdx+48,8) ^ bytebits_to_byte(dest+startIdx+56,8);
+	if ( checkCalc != 0xA8 ) return -5;
+	if (*size != 64) return -6;
+	//return start position
+	return (int) startIdx;
 }
 
 // by marshmellow
@@ -1033,63 +1073,20 @@ void psk2TOpsk1(uint8_t *BitStream, size_t size)
 int indala26decode(uint8_t *bitStream, size_t *size, uint8_t *invert)
 {
 	//26 bit 40134 format  (don't know other formats)
-	int i;
-	int long_wait=29;//29 leading zeros in format
-	int start;
-	int first = 0;
-	int first2 = 0;
-	int bitCnt = 0;
-	int ii;
-	// Finding the start of a UID
-	for (start = 0; start <= *size - 250; start++) {
-		first = bitStream[start];
-		for (i = start; i < start + long_wait; i++) {
-			if (bitStream[i] != first) {
-				break;
-			}
-		}
-		if (i == (start + long_wait)) {
-			break;
-		}
-	}
-	if (start == *size - 250 + 1) {
-		// did not find start sequence
-		return -1;
-	}
-	// Inverting signal if needed
-	if (first == 1) {
-		for (i = start; i < *size; i++) {
-			bitStream[i] = !bitStream[i];
-		}
-		*invert = 1;
-	}else *invert=0;
+	uint8_t preamble[] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1};
+	uint8_t preamble_i[] = {1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0};
+	size_t startidx = 0; 
+	if (!preambleSearch(bitStream, preamble, sizeof(preamble), size, &startidx)){
+		// if didn't find preamble try again inverting
+		if (!preambleSearch(bitStream, preamble_i, sizeof(preamble_i), size, &startidx)) return -1;
+		*invert ^= 1;
+	} 
+	if (*size != 64 && *size != 224) return -2;
+	if (*invert==1)
+		for (size_t i = startidx; i < *size; i++)
+			bitStream[i] ^= 1;
 
-	int iii;
-	//found start once now test length by finding next one
-	for (ii=start+29; ii <= *size - 250; ii++) {
-		first2 = bitStream[ii];
-		for (iii = ii; iii < ii + long_wait; iii++) {
-			if (bitStream[iii] != first2) {
-				break;
-			}
-		}
-		if (iii == (ii + long_wait)) {
-			break;
-		}
-	}
-	if (ii== *size - 250 + 1){
-		// did not find second start sequence
-		return -2;
-	}
-	bitCnt=ii-start;
-
-	// Dumping UID
-	i = start;
-	for (ii = 0; ii < bitCnt; ii++) {
-		bitStream[ii] = bitStream[i++];
-	}
-	*size=bitCnt;
-	return 1;
+	return (int) startidx;
 }
 
 // by marshmellow - demodulate NRZ wave (both similar enough)

@@ -26,6 +26,7 @@
 #include "lfsampling.h"
 #include "BigBuf.h"
 #include "mifareutil.h"
+#include "pcf7931.h"
 #ifdef WITH_LCD
  #include "LCD.h"
 #endif
@@ -945,7 +946,7 @@ void UsbPacketReceived(uint8_t *packet, int len)
 			CmdIOdemodFSK(c->arg[0], 0, 0, 1);
 			break;
 		case CMD_IO_CLONE_TAG:
-			CopyIOtoT55x7(c->arg[0], c->arg[1], c->d.asBytes[0]);
+			CopyIOtoT55x7(c->arg[0], c->arg[1]);
 			break;
 		case CMD_EM410X_DEMOD:
 			CmdEM410xdemod(c->arg[0], 0, 0, 1);
@@ -974,21 +975,22 @@ void UsbPacketReceived(uint8_t *packet, int len)
 			CopyIndala224toT55x7(c->d.asDwords[0], c->d.asDwords[1], c->d.asDwords[2], c->d.asDwords[3], c->d.asDwords[4], c->d.asDwords[5], c->d.asDwords[6]);
 			break;
 		case CMD_T55XX_READ_BLOCK:
-			T55xxReadBlock(c->arg[1], c->arg[2],c->d.asBytes[0]);
+			T55xxReadBlock(c->arg[0], c->arg[1], c->arg[2]);
 			break;
 		case CMD_T55XX_WRITE_BLOCK:
 			T55xxWriteBlock(c->arg[0], c->arg[1], c->arg[2], c->d.asBytes[0]);
-			cmd_send(CMD_ACK,0,0,0,0,0);
 			break;
-		case CMD_T55XX_READ_TRACE:
-			T55xxReadTrace();
+		case CMD_T55XX_WAKEUP:
+			T55xxWakeUp(c->arg[0]);
+			break;
+		case CMD_T55XX_RESET_READ:
+			T55xxResetRead();
 			break;
 		case CMD_PCF7931_READ:
 			ReadPCF7931();
-			cmd_send(CMD_ACK,0,0,0,0,0);
 			break;
 		case CMD_PCF7931_WRITE:
-			WritePCF7931(c->d.asDwords[0],c->d.asDwords[1],c->d.asDwords[2],c->d.asDwords[3],c->d.asDwords[4],c->d.asDwords[5],c->d.asDwords[6], c->d.asDwords[9], c->d.asDwords[7]-128,c->d.asDwords[8]-128, c->arg[0], c->arg[1], c->arg[2]);
+			WritePCF7931(c->d.asBytes[0],c->d.asBytes[1],c->d.asBytes[2],c->d.asBytes[3],c->d.asBytes[4],c->d.asBytes[5],c->d.asBytes[6], c->d.asBytes[9], c->d.asBytes[7]-128,c->d.asBytes[8]-128, c->arg[0], c->arg[1], c->arg[2]);
 			break;
 		case CMD_EM4X_READ_WORD:
 			EM4xReadWord(c->arg[1], c->arg[2],c->d.asBytes[0]);
@@ -998,7 +1000,7 @@ void UsbPacketReceived(uint8_t *packet, int len)
 			break;
 		case CMD_AWID_DEMOD_FSK: // Set realtime AWID demodulation
 			CmdAWIDdemodFSK(c->arg[0], 0, 0, 1);
-                        break;
+			break;
 #endif
 
 #ifdef WITH_HITAG
@@ -1181,10 +1183,33 @@ void UsbPacketReceived(uint8_t *packet, int len)
 			ReaderIClass(c->arg[0]);
 			break;
 		case CMD_READER_ICLASS_REPLAY:
-		    ReaderIClass_Replay(c->arg[0], c->d.asBytes);
+			ReaderIClass_Replay(c->arg[0], c->d.asBytes);
 			break;
-	case CMD_ICLASS_EML_MEMSET:
+		case CMD_ICLASS_EML_MEMSET:
 			emlSet(c->d.asBytes,c->arg[0], c->arg[1]);
+			break;
+		case CMD_ICLASS_WRITEBLOCK:
+			iClass_WriteBlock(c->arg[0], c->d.asBytes);
+			break;
+		case CMD_ICLASS_READCHECK:  // auth step 1
+			iClass_ReadCheck(c->arg[0], c->arg[1]);
+			break;
+		case CMD_ICLASS_READBLOCK:
+			iClass_ReadBlk(c->arg[0]);
+			break;
+		case CMD_ICLASS_AUTHENTICATION: //check
+			iClass_Authentication(c->d.asBytes);
+			break;
+		case CMD_ICLASS_DUMP:
+			iClass_Dump(c->arg[0], c->arg[1]);
+			break;
+		case CMD_ICLASS_CLONE:
+			iClass_Clone(c->arg[0], c->arg[1], c->d.asBytes);
+			break;
+#endif
+#ifdef WITH_HFSNOOP
+		case CMD_HF_SNIFFER:
+			HfSnoop(c->arg[0], c->arg[1]);
 			break;
 #endif
 
@@ -1323,7 +1348,7 @@ void  __attribute__((noreturn)) AppMain(void)
 	AT91C_BASE_PMC->PMC_SCER = AT91C_PMC_PCK0;
 	// PCK0 is PLL clock / 4 = 96Mhz / 4 = 24Mhz
 	AT91C_BASE_PMC->PMC_PCKR[0] = AT91C_PMC_CSS_PLL_CLK |
-		AT91C_PMC_PRES_CLK_4;
+		AT91C_PMC_PRES_CLK_4; //  4 for 24Mhz pck0, 2 for 48 MHZ pck0
 	AT91C_BASE_PIOA->PIO_OER = GPIO_PCK0;
 
 	// Reset SPI

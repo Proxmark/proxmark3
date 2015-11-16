@@ -73,7 +73,7 @@ typedef struct {
 #define CMD_INDALA_CLONE_TAG_L                                            0x0213
 #define CMD_T55XX_READ_BLOCK                                              0x0214
 #define CMD_T55XX_WRITE_BLOCK                                             0x0215
-#define CMD_T55XX_READ_TRACE                                              0x0216
+#define CMD_T55XX_RESET_READ                                              0x0216
 #define CMD_PCF7931_READ                                                  0x0217
 #define CMD_EM4X_READ_WORD                                                0x0218
 #define CMD_EM4X_WRITE_WORD                                               0x0219
@@ -85,6 +85,7 @@ typedef struct {
 #define CMD_ASK_SIM_TAG                                                   0x021F
 #define CMD_PSK_SIM_TAG                                                   0x0220
 #define CMD_AWID_DEMOD_FSK                                                0x0221
+#define CMD_T55XX_WAKEUP                                                  0x0224
 
 /* CMD_SET_ADC_MUX: ext1 is 0 for lopkd, 1 for loraw, 2 for hipkd, 3 for hiraw */
 
@@ -115,9 +116,17 @@ typedef struct {
 #define CMD_WRITER_LEGIC_RF                                               0x0389
 #define CMD_EPA_PACE_COLLECT_NONCE                                        0x038A
 
+#define CMD_ICLASS_READCHECK                                              0x038F
+#define CMD_ICLASS_CLONE                                                  0x0390
+#define CMD_ICLASS_DUMP                                                   0x0391
 #define CMD_SNOOP_ICLASS                                                  0x0392
 #define CMD_SIMULATE_TAG_ICLASS                                           0x0393
 #define CMD_READER_ICLASS                                                 0x0394
+#define CMD_READER_ICLASS_REPLAY                                          0x0395
+#define CMD_ICLASS_READBLOCK                                              0x0396
+#define CMD_ICLASS_WRITEBLOCK                                             0x0397
+#define CMD_ICLASS_EML_MEMSET                                             0x0398
+#define CMD_ICLASS_AUTHENTICATION                                         0x0399
 
 // For measurements of the antenna tuning
 #define CMD_MEASURE_ANTENNA_TUNING                                        0x0400

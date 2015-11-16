@@ -15,6 +15,7 @@
 #include "cmdparser.h"
 #include "proxmark3.h"
 
+
 void CmdsHelp(const command_t Commands[])
 {
   if (Commands[0].Name == NULL)
@@ -28,48 +29,51 @@ void CmdsHelp(const command_t Commands[])
   }
 }
 
-void CmdsParse(const command_t Commands[], const char *Cmd)
+
+int CmdsParse(const command_t Commands[], const char *Cmd)
 {
-  if(strcmp( Cmd, "XX_internal_command_dump_XX") == 0)
-  {// Help dump children
-      dumpCommandsRecursive(Commands, 0);
-      return;
-  }
-  if(strcmp( Cmd, "XX_internal_command_dump_markdown_XX") == 0)
-  {// Markdown help dump children
-      dumpCommandsRecursive(Commands, 1);
-      return;
-  }
-  char cmd_name[32];
-  int len = 0;
-  memset(cmd_name, 0, 32);
-  sscanf(Cmd, "%31s%n", cmd_name, &len);
-  int i = 0;
-  while (Commands[i].Name && strcmp(Commands[i].Name, cmd_name))
-    ++i;
+	if(strcmp( Cmd, "XX_internal_command_dump_XX") == 0)
+	{// Help dump children
+		dumpCommandsRecursive(Commands, 0);
+		return 0;
+	}
+	if(strcmp( Cmd, "XX_internal_command_dump_markdown_XX") == 0)
+	{// Markdown help dump children
+		dumpCommandsRecursive(Commands, 1);
+		return 0;
+	}
+	char cmd_name[32];
+	int len = 0;
+	memset(cmd_name, 0, 32);
+	sscanf(Cmd, "%31s%n", cmd_name, &len);
+	int i = 0;
+	while (Commands[i].Name && strcmp(Commands[i].Name, cmd_name))
+		++i;
 
-  /* try to find exactly one prefix-match */
-  if(!Commands[i].Name) {
-    int last_match = 0;
-    int matches = 0;
+	/* try to find exactly one prefix-match */
+	if(!Commands[i].Name) {
+		int last_match = 0;
+		int matches = 0;
 
-    for(i=0;Commands[i].Name;i++) {
-      if( !strncmp(Commands[i].Name, cmd_name, strlen(cmd_name)) ) {
-        last_match = i;
-        matches++;
-      }
-    }
-    if(matches == 1) i=last_match;
-  }
+		for(i=0;Commands[i].Name;i++) {
+			if( !strncmp(Commands[i].Name, cmd_name, strlen(cmd_name)) ) {
+				last_match = i;
+				matches++;
+			}
+		}
+		if(matches == 1) i=last_match;
+	}
 
-  if (Commands[i].Name) {
-    while (Cmd[len] == ' ')
-      ++len;
-    Commands[i].Parse(Cmd + len);
-  } else {
-    // show help for selected hierarchy or if command not recognised
-    CmdsHelp(Commands);
-  }
+	if (Commands[i].Name) {
+		while (Cmd[len] == ' ')
+			++len;
+	return Commands[i].Parse(Cmd + len);
+	} else {
+		// show help for selected hierarchy or if command not recognised
+		CmdsHelp(Commands);
+	}
+
+	return 0;
 }
 
 char pparent[512] = {0};
