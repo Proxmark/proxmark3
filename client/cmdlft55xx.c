@@ -718,7 +718,7 @@ void printT55xxBlock(const char *blockNum){
 
 	for (; i < endpos; ++i)
 		bits[i - config.offset]=DemodBuffer[i];
-	//print second round of read data (more accurate due to antenna settling)
+
 	blockData = PackBits(0, 32, bits);
 
 	PrintAndLog("  %s | %08X | %s", blockNum, blockData, sprint_bin(bits,32));
