@@ -1715,7 +1715,7 @@ int NRZrawDemod(const char *Cmd, bool verbose)
 	size_t BitLen = getFromGraphBuf(BitStream);
 	if (BitLen==0) return 0;
 	int errCnt=0;
-	errCnt = nrzRawDemod(BitStream, &BitLen, &clk, &invert, maxErr);
+	errCnt = nrzRawDemod(BitStream, &BitLen, &clk, &invert);
 	if (errCnt > maxErr){
 		if (g_debugMode) PrintAndLog("Too many errors found, clk: %d, invert: %d, numbits: %d, errCnt: %d",clk,invert,BitLen,errCnt);
 		return 0;
