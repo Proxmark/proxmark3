@@ -124,7 +124,7 @@ int CmdFlexdemod(const char *Cmd)
 		}
 	}
 
-#define LONG_WAIT 100
+ #define LONG_WAIT 100
 	int start;
 	for (start = 0; start < GraphTraceLen - LONG_WAIT; start++) {
 		int first = GraphBuffer[start];
@@ -206,10 +206,13 @@ int CmdIndalaDemod(const char *Cmd)
 	uint8_t rawbits[4096];
 	int rawbit = 0;
 	int worst = 0, worstPos = 0;
- // PrintAndLog("Expecting a bit less than %d raw bits", GraphTraceLen / 32);
+	// PrintAndLog("Expecting a bit less than %d raw bits", GraphTraceLen / 32);
+	
+	// loop through raw signal - since we know it is psk1 rf/32 fc/2 skip every other value (+=2)
 	for (i = 0; i < GraphTraceLen-1; i += 2) {
 		count += 1;
 		if ((GraphBuffer[i] > GraphBuffer[i + 1]) && (state != 1)) {
+			// appears redundant - marshmellow
 			if (state == 0) {
 				for (j = 0; j <  count - 8; j += 16) {
 					rawbits[rawbit++] = 0;
@@ -222,6 +225,7 @@ int CmdIndalaDemod(const char *Cmd)
 			state = 1;
 			count = 0;
 		} else if ((GraphBuffer[i] < GraphBuffer[i + 1]) && (state != 0)) {
+			//appears redundant
 			if (state == 1) {
 				for (j = 0; j <  count - 8; j += 16) {
 					rawbits[rawbit++] = 1;

@@ -268,7 +268,7 @@ void doT55x7Acquisition(size_t sample_size) {
 	bool startFound = false;
 	bool highFound = false;
 	uint8_t curSample = 0;
-	uint8_t firstSample = 0;
+	uint8_t lastSample = 0;
 	uint16_t skipCnt = 0;
 	while(!BUTTON_PRESS() && skipCnt<1000) {
 		WDT_HIT();
@@ -282,19 +282,18 @@ void doT55x7Acquisition(size_t sample_size) {
 
 			// skip until the first high sample above threshold
 			if (!startFound && curSample > T55xx_READ_UPPER_THRESHOLD) {
-				if (curSample > firstSample) 
-					firstSample = curSample;
+				if (curSample > lastSample) 
+					lastSample = curSample;
 				highFound = true;
 			} else if (!highFound) {
 				skipCnt++;
 				continue;
 			}
-
 			// skip until first high samples begin to change
-			if (startFound || curSample < firstSample-T55xx_READ_TOL){
+			if (startFound || curSample < T55xx_READ_UPPER_THRESHOLD-T55xx_READ_TOL){
 				// if just found start - recover last sample
 				if (!startFound) {
-					dest[i++] = firstSample;
+					dest[i++] = lastSample;
 					startFound = true;
 				}
 				// collect samples
