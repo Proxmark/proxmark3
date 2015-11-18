@@ -1580,6 +1580,9 @@ int PSKDemod(const char *Cmd, bool verbose)
 		//invalid carrier
 		return 0;
 	}
+	if (g_debugMode){
+		PrintAndLog("Carrier: rf/%d",carrier);
+	}
 	int errCnt=0;
 	errCnt = pskRawDemod(BitStream, &BitLen, &clk, &invert);
 	if (errCnt > maxErr){
@@ -1621,7 +1624,7 @@ int CmdIndalaDecode(const char *Cmd)
 	uint8_t invert=0;
 	size_t size = DemodBufferLen;
 	size_t startIdx = indala26decode(DemodBuffer, &size, &invert);
-	if (startIdx < 1) {
+	if (startIdx < 1 || size > 224) {
 		if (g_debugMode==1)
 			PrintAndLog("Error2: %d",ans);
 		return -1;

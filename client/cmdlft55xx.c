@@ -529,7 +529,8 @@ bool tryDetectModulation(){
 				}
 			} // inverse waves does not affect this demod
 		}
-	}		
+	}	
+	save_restoreGB(0);	
 	if ( hits == 1) {
 		config.modulation = tests[0].modulation;
 		config.bitrate = tests[0].bitrate;

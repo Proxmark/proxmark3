@@ -1128,13 +1128,6 @@ int CmdLFfind(const char *Cmd)
 		return 1;
 	}
 
-	//add psk and indala
-	ans=CmdIndalaDecode("");
-	if (ans>0) {
-		PrintAndLog("\nValid Indala ID Found!");
-		return 1;
-	}
-
 	ans=CmdAskEM410xDemod("");
 	if (ans>0) {
 		PrintAndLog("\nValid EM410x ID Found!");
@@ -1164,6 +1157,12 @@ int CmdLFfind(const char *Cmd)
 		PrintAndLog("\nValid Viking ID Found!");
 		return 1;
 	}	
+
+	ans=CmdIndalaDecode("");
+	if (ans>0) {
+		PrintAndLog("\nValid Indala ID Found!");
+		return 1;
+	}
 
 	ans=CmdPSKNexWatch("");
 	if (ans>0) {
