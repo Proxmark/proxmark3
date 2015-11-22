@@ -1,0 +1,1 @@
+LF antenna CAD / CAM / MFG files. Put here as it was in the original zip file too. Didn't modified the layout file, only CAM generation.
