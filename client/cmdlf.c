@@ -423,6 +423,7 @@ int CmdIndalaClone(const char *Cmd)
 		c.arg[1] = uid2;
 	}
 
+	clearCommandBuffer();
 	SendCommand(&c);
 	return 0;
 }
@@ -545,6 +546,7 @@ int CmdLFSetConfig(const char *Cmd)
 	//Averaging is a flag on high-bit of arg[1]
 	UsbCommand c = {CMD_SET_LF_SAMPLING_CONFIG};
 	memcpy(c.d.asBytes,&config,sizeof(sample_config));
+	clearCommandBuffer();
 	SendCommand(&c);
 	return 0;
 }
@@ -561,6 +563,7 @@ int CmdLFRead(const char *Cmd)
 	if (param_getchar(Cmd, cmdp) == 's') arg1 = true; //suppress print
 	//And ship it to device
 	UsbCommand c = {CMD_ACQUIRE_RAW_ADC_SAMPLES_125K, {arg1,0,0}};
+	clearCommandBuffer();
 	SendCommand(&c);
 	//WaitForResponse(CMD_ACK,NULL);	
 	if ( !WaitForResponseTimeout(CMD_ACK,NULL,2500) ) {
@@ -580,6 +583,7 @@ int CmdLFSnoop(const char *Cmd)
 	}
 
 	UsbCommand c = {CMD_LF_SNOOP_RAW_ADC_SAMPLES};
+	clearCommandBuffer();
 	SendCommand(&c);
 	WaitForResponse(CMD_ACK,NULL);
 	return 0;
@@ -626,6 +630,7 @@ int CmdLFSim(const char *Cmd)
 	printf("\n");
 	PrintAndLog("Starting to simulate");
 	UsbCommand c = {CMD_SIMULATE_TAG_125K, {GraphTraceLen, gap, 0}};
+	clearCommandBuffer();
 	SendCommand(&c);
 	return 0;
 }
@@ -775,6 +780,7 @@ int CmdLFfskSim(const char *Cmd)
 	UsbCommand c = {CMD_FSK_SIM_TAG, {arg1, arg2, size}};
 
 	memcpy(c.d.asBytes, DemodBuffer, size);
+	clearCommandBuffer();
 	SendCommand(&c);
 	return 0;
 }
@@ -868,6 +874,7 @@ int CmdLFaskSim(const char *Cmd)
 	UsbCommand c = {CMD_ASK_SIM_TAG, {arg1, arg2, size}};
 	PrintAndLog("preparing to sim ask data: %d bits", size);
 	memcpy(c.d.asBytes, DemodBuffer, size);
+	clearCommandBuffer();
 	SendCommand(&c);
 	return 0;
 }
@@ -975,6 +982,7 @@ int CmdLFpskSim(const char *Cmd)
 	UsbCommand c = {CMD_PSK_SIM_TAG, {arg1, arg2, size}};
 	PrintAndLog("DEBUG: Sending DemodBuffer Length: %d", size);
 	memcpy(c.d.asBytes, DemodBuffer, size);
+	clearCommandBuffer();
 	SendCommand(&c);
 	
 	return 0;

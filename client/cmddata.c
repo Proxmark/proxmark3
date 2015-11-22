@@ -125,9 +125,7 @@ int CmdPrintDemodBuff(const char *Cmd)
 		if (numBits==0) return 0;
 		PrintAndLog("DemodBuffer: %s",hex);		
 	} else {
-		//setDemodBuf(DemodBuffer, DemodBufferLen-offset, offset);
-		char *bin = sprint_bin_break(DemodBuffer+offset,numBits,16);
-		PrintAndLog("DemodBuffer:\n%s",bin);
+		PrintAndLog("DemodBuffer:\n%s", sprint_bin_break(DemodBuffer+offset,numBits,16));
 	}
 	return 1;
 }
@@ -656,7 +654,7 @@ int CmdVikingDemod(const char *Cmd)
 	uint32_t raw1 = bytebits_to_byte(DemodBuffer+ans, 32);
 	uint32_t raw2 = bytebits_to_byte(DemodBuffer+ans+32, 32);
 	uint32_t cardid = bytebits_to_byte(DemodBuffer+ans+24, 32);
-	uint8_t checksum = bytebits_to_byte(DemodBuffer+ans+32+24, 8);
+	uint8_t  checksum = bytebits_to_byte(DemodBuffer+ans+32+24, 8);
 	PrintAndLog("Viking Tag Found: Card ID %08X, Checksum: %02X", cardid, checksum);
 	PrintAndLog("Raw: %08X%08X", raw1,raw2);
 	setDemodBuf(DemodBuffer+ans, 64, 0);
@@ -1481,6 +1479,17 @@ int CmdFSKdemodPyramid(const char *Cmd)
 // NATIONAL CODE, ICAR database
 // COUNTRY CODE (ISO3166) or http://cms.abvma.ca/uploads/ManufacturersISOsandCountryCodes.pdf
 // FLAG (animal/non-animal)
+/*
+38 IDbits   
+10 country code 
+1 extra app bit
+14 reserved bits
+1 animal bit
+16 ccitt CRC chksum over 64bit ID CODE.
+24 appli bits.
+
+-- sample: 985121004515220  [ 37FF65B88EF94 ]
+*/
 int CmdFDXBdemodBI(const char *Cmd){
 
 	int invert = 1;
@@ -1640,7 +1649,7 @@ int CmdIndalaDecode(const char *Cmd)
 	uid1=bytebits_to_byte(DemodBuffer,32);
 	uid2=bytebits_to_byte(DemodBuffer+32,32);
 	if (DemodBufferLen==64) {
-		PrintAndLog("Indala UID=%s (%x%08x)", sprint_bin(DemodBuffer,DemodBufferLen), uid1, uid2);
+		PrintAndLog("Indala UID=%s (%x%08x)", sprint_bin_break(DemodBuffer,DemodBufferLen,16), uid1, uid2);
 	} else {
 		uid3=bytebits_to_byte(DemodBuffer+64,32);
 		uid4=bytebits_to_byte(DemodBuffer+96,32);
@@ -1648,7 +1657,7 @@ int CmdIndalaDecode(const char *Cmd)
 		uid6=bytebits_to_byte(DemodBuffer+160,32);
 		uid7=bytebits_to_byte(DemodBuffer+192,32);
 		PrintAndLog("Indala UID=%s (%x%08x%08x%08x%08x%08x%08x)", 
-		    sprint_bin(DemodBuffer,DemodBufferLen), uid1, uid2, uid3, uid4, uid5, uid6, uid7);
+		    sprint_bin_break(DemodBuffer,DemodBufferLen,16), uid1, uid2, uid3, uid4, uid5, uid6, uid7);
 	}
 	if (g_debugMode){
 		PrintAndLog("DEBUG: printing demodbuffer:");
@@ -1964,10 +1973,7 @@ int getSamples(const char *Cmd, bool silent)
 
 	int n = strtol(Cmd, NULL, 0);
 
-	if (n == 0)
-		n = sizeof(got);
-
-	if (n > sizeof(got))
+	if (n == 0 || n > sizeof(got))
 		n = sizeof(got);
 
 	PrintAndLog("Reading %d bytes from device memory\n", n);
@@ -2384,7 +2390,7 @@ static command_t CommandTable[] =
 	{"samples",         CmdSamples,         0, "[512 - 40000] -- Get raw samples for graph window (GraphBuffer)"},
 	{"save",            CmdSave,            1, "<filename> -- Save trace (from graph window)"},
 	{"scale",           CmdScale,           1, "<int> -- Set cursor display scale"},
-	{"setdebugmode",    CmdSetDebugMode,    1, "<0|1> -- Turn on or off Debugging Mode for demods"},
+	{"setdebugmode",    CmdSetDebugMode,    1, "<0|1|2> -- Turn on or off Debugging Level for lf demods"},
 	{"shiftgraphzero",  CmdGraphShiftZero,  1, "<shift> -- Shift 0 for Graphed wave + or - shift value"},
 	{"dirthreshold",    CmdDirectionalThreshold,   1, "<thres up> <thres down> -- Max rising higher up-thres/ Min falling lower down-thres, keep rest as prev."},
 	{"tune",            CmdTuneSamples,     0, "Get hw tune samples for graph window"},
