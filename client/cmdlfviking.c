@@ -83,7 +83,7 @@ int CmdVikingClone(const char *Cmd) {
 	return 0;
 }
 
-int CmdVikingSim(static char *Cmd) {
+int CmdVikingSim(const char *Cmd) {
 	uint32_t id = 0;
 	uint64_t rawID = 0;
 	uint8_t clk = 32, encoding = 1, separator = 0, invert = 0;
