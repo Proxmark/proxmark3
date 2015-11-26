@@ -593,9 +593,9 @@ int static acquire_nonces(uint8_t blockNo, uint8_t keyType, uint8_t *key, uint8_
 			if (total_num_nonces > next_fivehundred) {
 				next_fivehundred = (total_num_nonces/500+1) * 500;
 				printf("Acquired %5d nonces (%5d with distinct bytes 0 and 1). Number of bytes with probability for correctly guessed Sum(a8) > %1.1f%%: %d\n",
-					CONFIDENCE_THRESHOLD * 100.0,
 					total_num_nonces, 
 					total_added_nonces,
+					CONFIDENCE_THRESHOLD * 100.0,
 					num_good_first_bytes);
 			}
 			if (num_good_first_bytes >= GOOD_BYTES_REQUIRED) {
