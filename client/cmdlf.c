@@ -29,6 +29,7 @@
 #include "cmdlft55xx.h"
 #include "cmdlfpcf7931.h"
 #include "cmdlfio.h"
+#include "cmdlfviking.h"
 #include "lfdemod.h"
 
 static int CmdHelp(const char *Cmd);
@@ -1213,14 +1214,15 @@ int CmdLFfind(const char *Cmd)
 static command_t CommandTable[] = 
 {
 	{"help",        CmdHelp,            1, "This help"},
-	{"awid",        CmdLFAWID,          1, "{ AWID RFIDs... }"},
-	{"em4x",        CmdLFEM4X,          1, "{ EM4X RFIDs... }"},
-	{"hid",         CmdLFHID,           1, "{ HID RFIDs... }"},
+	{"awid",        CmdLFAWID,          1, "{ AWID RFIDs...    }"},
+	{"em4x",        CmdLFEM4X,          1, "{ EM4X RFIDs...    }"},
+	{"hid",         CmdLFHID,           1, "{ HID RFIDs...     }"},
 	{"hitag",       CmdLFHitag,         1, "{ Hitag tags and transponders... }"},
-	{"io",          CmdLFIO,            1, "{ ioProx tags... }"},
+	{"io",          CmdLFIO,            1, "{ ioProx tags...   }"},
 	{"pcf7931",     CmdLFPCF7931,       1, "{ PCF7931 RFIDs... }"},
-	{"t55xx",       CmdLFT55XX,         1, "{ T55xx RFIDs... }"},
-	{"ti",          CmdLFTI,            1, "{ TI RFIDs... }"},
+	{"t55xx",       CmdLFT55XX,         1, "{ T55xx RFIDs...   }"},
+	{"ti",          CmdLFTI,            1, "{ TI RFIDs...      }"},
+	{"viking",      CmdLFViking,        1, "{ Viking tags...   }"},
 	{"cmdread",     CmdLFCommandRead,   0, "<d period> <z period> <o period> <c command> ['H'] -- Modulate LF reader field to send command before read (all periods in microseconds) (option 'H' for 134)"},
 	{"config",      CmdLFSetConfig,     0, "Set config for LF sampling, bit/sample, decimation, frequency"},
 	{"flexdemod",   CmdFlexdemod,       1, "Demodulate samples for FlexPass"},

@@ -11,6 +11,6 @@
 int CmdLFViking(const char *Cmd);
 int CmdVikingRead(const char *Cmd);
 int CmdVikingClone(const char *Cmd);
-int CmdVikingSim(static char *Cmd);
+int CmdVikingSim(const char *Cmd);
 #endif
 

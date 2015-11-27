@@ -48,7 +48,7 @@ int usage_lf_viking_sim(void) {
 uint64_t getVikingBits(uint32_t id) {
 	//calc checksum
 	uint8_t checksum = (id>>24) ^ ((id>>16) & 0xFF) ^ ((id>>8) & 0xFF) ^ (id & 0xFF) ^ 0xF2 ^ 0xA8;
-	return (0xF2 << 56) | (id << 8) | checksum;
+	return ((uint64_t)0xF2 << 56) | (id << 8) | checksum;
 }
 //by marshmellow
 //see ASKDemod for what args are accepted
@@ -68,7 +68,7 @@ int CmdVikingClone(const char *Cmd) {
 	char cmdp = param_getchar(Cmd, 0);
 	if (strlen(Cmd) < 0 || cmdp == 'h' || cmdp == 'H') return usage_lf_viking_clone();
 
-	id = param_get32ex(Cmd, 0, 0, 16)
+	id = param_get32ex(Cmd, 0, 0, 16);
 	if (id == 0) return usage_lf_viking_clone();
 	if (param_getchar(Cmd, 1)=='Q' || param_getchar(Cmd, 1)=='q')
 		Q5 = true;
@@ -87,9 +87,10 @@ int CmdVikingSim(const char *Cmd) {
 	uint32_t id = 0;
 	uint64_t rawID = 0;
 	uint8_t clk = 32, encoding = 1, separator = 0, invert = 0;
+	char cmdp = param_getchar(Cmd, 0);
 
 	if (strlen(Cmd) < 0 || cmdp == 'h' || cmdp == 'H') return usage_lf_viking_sim();
-	id = param_get32ex(Cmd, 0, 0, 16)
+	id = param_get32ex(Cmd, 0, 0, 16);
 	if (id == 0) return usage_lf_viking_sim();
 
 	rawID = getVikingBits(id);
@@ -104,6 +105,7 @@ int CmdVikingSim(const char *Cmd) {
   num_to_bytebits(rawID, 64, c.d.asBytes);
 	clearCommandBuffer();
   SendCommand(&c);
+  return 0;
 }
 
 static command_t CommandTable[] = {
