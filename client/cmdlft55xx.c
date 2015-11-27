@@ -125,13 +125,15 @@ int usage_t55xx_dump(){
 	return 0;
 }
 int usage_t55xx_detect(){
-	PrintAndLog("Usage:  lf t55xx detect [1]");
+	PrintAndLog("Usage:  lf t55xx detect [1] [p <password>]");
 	PrintAndLog("Options:");
-	PrintAndLog("     [graph buffer data]  - if set, use Graphbuffer otherwise read data from tag.");
+	PrintAndLog("     1             - if set, use Graphbuffer otherwise read data from tag.");
+	PrintAndLog("     p <password>  - OPTIONAL password (8 hex characters)");
 	PrintAndLog("");
 	PrintAndLog("Examples:");
 	PrintAndLog("      lf t55xx detect");
 	PrintAndLog("      lf t55xx detect 1");
+	PrintAndLog("      lf t55xx detect p 11223344");
 	PrintAndLog("");
 	return 0;
 }
@@ -393,28 +395,41 @@ bool DecodeT55xxBlock(){
 }
 
 int CmdT55xxDetect(const char *Cmd){
+	bool errors = FALSE;
+	bool useGB = FALSE;
+	bool usepwd = FALSE;
+	uint32_t password = 0;
+	uint8_t cmdp = 0;
 
-	uint32_t password = 0; //default to blank Block 7
-
-	char cmdp = param_getchar(Cmd, 0);
-	if (strlen(Cmd) > 1 || cmdp == 'h' || cmdp == 'H') return usage_t55xx_detect();
-
-	bool usepwd = ( strlen(Cmd) > 0);	
-	if ( usepwd ){
-		password = param_get32ex(Cmd, 0, 0, 16);
-		// if (param_getchar(Cmd, 1) =='o' )
-			// override = true;
+	while(param_getchar(Cmd, cmdp) != 0x00 && !errors) {
+		switch(param_getchar(Cmd, cmdp)) {
+		case 'h':
+		case 'H':
+			return usage_t55xx_detect();
+		case 'p':
+		case 'P':
+			password = param_get32ex(Cmd, cmdp+1, 0, 16);
+			usepwd = TRUE;
+			cmdp += 2;
+			break;
+		case '1':
+			// use Graphbuffer data
+			useGB = TRUE;
+			cmdp++;
+			break;
+		default:
+			PrintAndLog("Unknown parameter '%c'", param_getchar(Cmd, cmdp));
+			errors = true;
+			break;
+		}
 	}
-
+	if (errors) return usage_t55xx_detect();
 	
-	if (strlen(Cmd)==1) {
-		password = param_get32ex(Cmd, 0, 0, 16);
-		//if (param_getchar(Cmd, 1) =='o' ) override = true;
+	if ( !useGB) {
+		if ( !AquireData(T55x7_PAGE0, T55x7_CONFIGURATION_BLOCK, usepwd, password) )
+			return 0;
 	}
-
-	if ( !AquireData(T55x7_PAGE0, T55x7_CONFIGURATION_BLOCK, usepwd, password) )
-		return 0;
-		
+	
 	if ( !tryDetectModulation() )
 		PrintAndLog("Could not detect modulation automatically. Try setting it manually with \'lf t55xx config\'");
 
