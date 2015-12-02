@@ -10,7 +10,7 @@
 #include "apps.h"
 #include "util.h"
 #include "string.h"
-
+#include "usb_cdc.h" // for usb_poll_validate_length
 #include "lfsampling.h"
 
 sample_config config = { 1, 8, 1, 95, 0 } ;
@@ -272,7 +272,7 @@ void doT55x7Acquisition(size_t sample_size) {
 	uint8_t curSample = 0;
 	uint8_t lastSample = 0;
 	uint16_t skipCnt = 0;
-	while(!BUTTON_PRESS() && skipCnt<1000) {
+	while(!BUTTON_PRESS() && !usb_poll_validate_length() && skipCnt<1000 && i<bufsize ) {
 		WDT_HIT();
 		if (AT91C_BASE_SSC->SSC_SR & AT91C_SSC_TXRDY) {
 			AT91C_BASE_SSC->SSC_THR = 0x43;
@@ -311,7 +311,6 @@ void doT55x7Acquisition(size_t sample_size) {
 				}
 				// collect samples
 				dest[i++] = curSample;
-				if (i >= bufsize-1) break;
 			}
 		}
 	}

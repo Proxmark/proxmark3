@@ -29,6 +29,7 @@
 #define T55x7_CONFIGURATION_BLOCK 0x00
 #define T55x7_PAGE0 0x00
 #define T55x7_PAGE1 0x01
+#define T55x7_PWD	0x00000010
 #define REGULAR_READ_MODE_BLOCK 0xFF
 
 // Default configuration
@@ -148,11 +149,24 @@ int usage_t55xx_wakup(){
 		PrintAndLog("      lf t55xx wakeup p 11223344  - send wakeup password");
 	return 0;
 }
+int usage_t55xx_bruteforce(){
+	PrintAndLog("Usage: lf t55xx bruteforce <start password> <end password> [i <*.dic>]");
+	PrintAndLog("       password must be 4 bytes (8 hex symbols)");
+	PrintAndLog("Options:");
+	PrintAndLog("     h         - this help");
+	PrintAndLog("     i <*.dic> - loads a default keys dictionary file <*.dic>");
+	PrintAndLog("");
+	PrintAndLog("Examples:");
+	PrintAndLog("       lf t55xx bruteforce aaaaaaaa bbbbbbbb");
+	PrintAndLog("       lf t55xx bruteforce i mykeys.dic");
+	PrintAndLog("");
+	return 0;
+}
 
 static int CmdHelp(const char *Cmd);
 
 void printT5xxHeader(uint8_t page){
-	PrintAndLog("Reading Page %d:", page);	
+	PrintAndLog("Reading Page %d:", page);
 	PrintAndLog("blk | hex data | binary");
 	PrintAndLog("----+----------+---------------------------------");	
 }
@@ -442,7 +456,6 @@ bool tryDetectModulation(){
 	t55xx_conf_block_t tests[15];
 	int bitRate=0;
 	uint8_t fc1 = 0, fc2 = 0, clk=0;
-	save_restoreGB(1);
 
 	if (GetFskClock("", FALSE, FALSE)){ 
 		fskClocks(&fc1, &fc2, &clk, FALSE);
@@ -502,7 +515,7 @@ bool tryDetectModulation(){
 			}
 		}
 		//undo trim from ask
-		save_restoreGB(0);
+		//save_restoreGB(0);
 		clk = GetNrzClock("", FALSE, FALSE);
 		if (clk>0) {
 			if ( NRZrawDemod("0 0 1", FALSE)  && test(DEMOD_NRZ, &tests[hits].offset, &bitRate, clk, &tests[hits].Q5)) {
@@ -522,9 +535,9 @@ bool tryDetectModulation(){
 			}
 		}
 		
-		//undo trim from nrz
-		save_restoreGB(0);
+		// allow undo
 		// skip first 160 samples to allow antenna to settle in (psk gets inverted occasionally otherwise)
+		save_restoreGB(1);
 		CmdLtrim("160");
 		clk = GetPskClock("", FALSE, FALSE);
 		if (clk>0) {
@@ -565,8 +578,9 @@ bool tryDetectModulation(){
 				}
 			} // inverse waves does not affect this demod
 		}
+		//undo trim samples
+		save_restoreGB(0);
 	}	
-	save_restoreGB(0);	
 	if ( hits == 1) {
 		config.modulation = tests[0].modulation;
 		config.bitrate = tests[0].bitrate;
@@ -1297,19 +1311,161 @@ int CmdT55xxWipe(const char *Cmd) {
 	return 0;
 }
 
+int CmdT55xxBruteForce(const char *Cmd) {
+
+	// load a default pwd file.
+	char buf[9];
+	char filename[FILE_PATH_SIZE]={0};
+	int keycnt = 0;
+	uint8_t stKeyBlock = 20;
+	uint8_t *keyBlock = NULL, *p;
+	keyBlock = calloc(stKeyBlock, 6);
+	if (keyBlock == NULL) return 1;
+
+	uint32_t start_password = 0x00000000; //start password
+	uint32_t end_password   = 0xFFFFFFFF; //end   password
+	bool found = false;
+
+	char cmdp = param_getchar(Cmd, 0);
+	if (cmdp == 'h' || cmdp == 'H') return usage_t55xx_bruteforce();
+
+	if (cmdp == 'i' || cmdp == 'I') {
+
+		int len = strlen(Cmd+2);
+		if (len > FILE_PATH_SIZE) len = FILE_PATH_SIZE;
+		memcpy(filename, Cmd+2, len);
+
+		FILE * f = fopen( filename , "r");
+
+		if ( !f ) {
+			PrintAndLog("File: %s: not found or locked.", filename);
+			free(keyBlock);
+			return 1;
+		}
+
+		while( fgets(buf, sizeof(buf), f) ){
+			if (strlen(buf) < 8 || buf[7] == '\n') continue;
+
+			while (fgetc(f) != '\n' && !feof(f)) ;  //goto next line
+
+			//The line start with # is comment, skip
+			if( buf[0]=='#' ) continue;
+
+			if (!isxdigit(buf[0])){
+				PrintAndLog("File content error. '%s' must include 8 HEX symbols", buf);
+				continue;
+			}
+			
+			buf[8] = 0;
+
+			if ( stKeyBlock - keycnt < 2) {
+				p = realloc(keyBlock, 6*(stKeyBlock+=10));
+				if (!p) {
+					PrintAndLog("Cannot allocate memory for defaultKeys");
+					free(keyBlock);
+					return 2;
+				}
+				keyBlock = p;
+			}
+			memset(keyBlock + 4 * keycnt, 0, 4);
+			num_to_bytes(strtoll(buf, NULL, 16), 4, keyBlock + 4*keycnt);
+			PrintAndLog("chk custom pwd[%2d] %08X", keycnt, bytes_to_num(keyBlock + 4*keycnt, 4));
+			keycnt++;
+			memset(buf, 0, sizeof(buf));
+		}
+		fclose(f);
+		
+		if (keycnt == 0) {
+			PrintAndLog("No keys found in file");
+			return 1;
+		}
+		PrintAndLog("Loaded %d keys", keycnt);
+		
+		// loop
+		uint64_t testpwd = 0x00;
+		for (uint16_t c = 0; c < keycnt; ++c ) {
+
+			if (ukbhit()) {
+				getchar();
+				printf("\naborted via keyboard!\n");
+				return 0;
+			}
+
+			testpwd = bytes_to_num(keyBlock + 4*c, 4);
+
+			PrintAndLog("Testing %08X", testpwd);
+
+			if ( !AquireData(T55x7_PAGE0, T55x7_CONFIGURATION_BLOCK, TRUE, testpwd)) {
+				PrintAndLog("Aquireing data from device failed. Quitting");
+				return 0;
+			}
+
+			found = tryDetectModulation();
+
+			if ( found ) {
+				PrintAndLog("Found valid password: [%08X]", testpwd);
+				return 0;
+			}
+		}
+		PrintAndLog("Password NOT found.");
+		return 0;
+	}
+
+	// Try to read Block 7, first :)
+
+	// incremental pwd range search
+	start_password = param_get32ex(Cmd, 0, 0, 16);
+	end_password = param_get32ex(Cmd, 1, 0, 16);
+	
+	if ( start_password >= end_password ) return usage_t55xx_bruteforce();
+
+	PrintAndLog("Search password range [%08X -> %08X]", start_password, end_password);
+
+	uint32_t i = start_password;
+
+	while ((!found) && (i <= end_password)){
+
+	printf(".");
+	fflush(stdout);
+	if (ukbhit()) {
+		getchar();
+		printf("\naborted via keyboard!\n");
+		return 0;
+	}
+
+	if (!AquireData(T55x7_PAGE0, T55x7_CONFIGURATION_BLOCK, TRUE, i)) {
+		PrintAndLog("Aquireing data from device failed. Quitting");
+		return 0;
+	}
+	found = tryDetectModulation();
+	    
+	if (found) break;
+	i++;
+	}
+
+	PrintAndLog("");
+
+	if (found)
+	PrintAndLog("Found valid password: [%08x]", i);
+	else
+	PrintAndLog("Password NOT found. Last tried: [%08x]", --i);
+	return 0;
+}
+
 static command_t CommandTable[] = {
-  {"help",     CmdHelp,           1, "This help"},
-  {"config",   CmdT55xxSetConfig, 1, "Set/Get T55XX configuration (modulation, inverted, offset, rate)"},
-  {"detect",   CmdT55xxDetect,    1, "[1] Try detecting the tag modulation from reading the configuration block."},
-  {"read",     CmdT55xxReadBlock, 0, "b <block> p [password] [o] [1] -- Read T55xx block data. Optional [p password], [override], [page1]"},
-  {"resetread",CmdResetRead,      0, "Send Reset Cmd then lf read the stream to attempt to identify the start of it (needs a demod and/or plot after)"},
-  {"write",    CmdT55xxWriteBlock,0, "b <block> d <data> p [password] [1] -- Write T55xx block data. Optional [p password], [page1]"},
-  {"trace",    CmdT55xxReadTrace, 1, "[1] Show T55x7 traceability data (page 1/ blk 0-1)"},
-  {"info",     CmdT55xxInfo,      1, "[1] Show T55x7 configuration data (page 0/ blk 0)"},
-  {"dump",     CmdT55xxDump,      0, "[password] [o] Dump T55xx card block 0-7. Optional [password], [override]"},
-  {"special",  special,           0, "Show block changes with 64 different offsets"},
-  {"wakeup",   CmdT55xxWakeUp,    0, "Send AOR wakeup command"},
-  {"wipe",     CmdT55xxWipe,      0, "Wipe a T55xx tag and set defaults (will destroy any data on tag)"},
+  {"help",      CmdHelp,           1, "This help"},
+	{"bruteforce",CmdT55xxBruteForce,0, "<start password> <end password> [i <*.dic>] Simple bruteforce attack to find password"},
+  {"config",    CmdT55xxSetConfig, 1, "Set/Get T55XX configuration (modulation, inverted, offset, rate)"},
+  {"detect",    CmdT55xxDetect,    1, "[1] Try detecting the tag modulation from reading the configuration block."},
+  {"read",      CmdT55xxReadBlock, 0, "b <block> p [password] [o] [1] -- Read T55xx block data. Optional [p password], [override], [page1]"},
+  {"resetread", CmdResetRead,      0, "Send Reset Cmd then lf read the stream to attempt to identify the start of it (needs a demod and/or plot after)"},
+  {"write",     CmdT55xxWriteBlock,0, "b <block> d <data> p [password] [1] -- Write T55xx block data. Optional [p password], [page1]"},
+  {"trace",     CmdT55xxReadTrace, 1, "[1] Show T55x7 traceability data (page 1/ blk 0-1)"},
+  {"info",      CmdT55xxInfo,      1, "[1] Show T55x7 configuration data (page 0/ blk 0)"},
+  {"dump",      CmdT55xxDump,      0, "[password] [o] Dump T55xx card block 0-7. Optional [password], [override]"},
+  {"special",   special,           0, "Show block changes with 64 different offsets"},
+  {"wakeup",    CmdT55xxWakeUp,    0, "Send AOR wakeup command"},
+  {"wipe",      CmdT55xxWipe,      0, "Wipe a T55xx tag and set defaults (will destroy any data on tag)"},
   {NULL, NULL, 0, NULL}
 };
 
