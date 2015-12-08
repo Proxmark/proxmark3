@@ -9,10 +9,12 @@
 //-----------------------------------------------------------------------------
 
 #include "util.h"
+#define MAX_BIN_BREAK_LENGTH   (3072+384+1)
 
 #ifndef _WIN32
 #include <termios.h>
 #include <sys/ioctl.h> 
+
 
 int ukbhit(void)
 {
@@ -123,16 +125,25 @@ char *sprint_hex(const uint8_t *data, const size_t len) {
 }
 
 char *sprint_bin_break(const uint8_t *data, const size_t len, const uint8_t breaks) {
-	
-	int maxLen = ( len > 1020) ? 1020 : len;
-	static char buf[1024];
-	memset(buf, 0x00, 1024);
+	// make sure we don't go beyond our char array memory
+	int max_len = ( len+(len/breaks) > MAX_BIN_BREAK_LENGTH ) ? MAX_BIN_BREAK_LENGTH : len+(len/breaks);
+	static char buf[MAX_BIN_BREAK_LENGTH]; // 3072 + end of line characters if broken at 8 bits
+	//clear memory
+	memset(buf, 0x00, sizeof(buf));
 	char *tmp = buf;
 
-	for (size_t i=0; i < maxLen; ++i){
-		sprintf(tmp++, "%u", data[i]);
-		if (breaks > 0 && !((i+1) % breaks))
+	size_t in_index = 0;
+	// loop through the out_index to make sure we don't go too far
+	for (size_t out_index=0; out_index < max_len; out_index++) {
+		// set character
+		sprintf(tmp++, "%u", data[in_index]);
+		// check if a line break is needed
+		if ( (breaks > 0) && !((in_index+1) % breaks) && (out_index+1 != max_len) ) {
+			// increment and print line break
+			out_index++;
 			sprintf(tmp++, "%s","\n");
+		}
+		in_index++;
 	}
 
 	return buf;
