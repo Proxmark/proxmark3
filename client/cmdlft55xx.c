@@ -385,17 +385,23 @@ bool DecodeT55xxBlock(){
 			break;
 		case DEMOD_PSK1:
 			// skip first 160 samples to allow antenna to settle in (psk gets inverted occasionally otherwise)
+			save_restoreGB(1);
 			CmdLtrim("160");
 			snprintf(cmdStr, sizeof(buf),"%d %d 6", bitRate[config.bitrate], config.inverted );
 			ans = PSKDemod(cmdStr, FALSE);
+			//undo trim samples
+			save_restoreGB(0);
 			break;
 		case DEMOD_PSK2: //inverted won't affect this
 		case DEMOD_PSK3: //not fully implemented
 			// skip first 160 samples to allow antenna to settle in (psk gets inverted occasionally otherwise)
+			save_restoreGB(1);
 			CmdLtrim("160");
 			snprintf(cmdStr, sizeof(buf),"%d 0 6", bitRate[config.bitrate] );
 			ans = PSKDemod(cmdStr, FALSE);
 			psk1TOpsk2(DemodBuffer, DemodBufferLen);
+			//undo trim samples
+			save_restoreGB(0);
 			break;
 		case DEMOD_NRZ:
 			snprintf(cmdStr, sizeof(buf),"%d %d 1", bitRate[config.bitrate], config.inverted );
@@ -1310,7 +1316,7 @@ int CmdT55xxWipe(const char *Cmd) {
 		if (!CmdT55xxWriteBlock(ptrData))
 			PrintAndLog("Error writing blk %d", blk);
 
-		memset(writeData, sizeof(writeData), 0x00);
+		memset(writeData, 0x00, sizeof(writeData));
 	}
 	return 0;
 }
