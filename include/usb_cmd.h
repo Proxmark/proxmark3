@@ -99,6 +99,7 @@ typedef struct{
 #define CMD_ASK_SIM_TAG                                                   0x021F
 #define CMD_PSK_SIM_TAG                                                   0x0220
 #define CMD_AWID_DEMOD_FSK                                                0x0221
+#define CMD_VIKING_CLONE_TAG                                              0x0223
 #define CMD_T55XX_WAKEUP                                                  0x0224
 
 

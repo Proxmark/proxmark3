@@ -98,6 +98,7 @@ CMDSRCS = 	nonce2key/crapto1.c\
 			cmdmain.c \
 			cmdlft55xx.c \
 			cmdlfpcf7931.c\
+			cmdlfviking.c\
 			pm3_binlib.c\
 			scripting.c\
 			cmdscript.c\

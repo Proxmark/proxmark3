@@ -16,6 +16,7 @@
 #include <stdint.h>
 
 //generic
+size_t   addParity(uint8_t *BitSource, uint8_t *dest, uint8_t sourceLen, uint8_t pLen, uint8_t pType);
 int      askdemod(uint8_t *BinStream, size_t *size, int *clk, int *invert, int maxErr, uint8_t amp, uint8_t askType);
 int      BiphaseRawDecode(uint8_t * BitStream, size_t *size, int offset, int invert);
 uint32_t bytebits_to_byte(uint8_t* src, size_t numbits);
@@ -32,7 +33,7 @@ int      getHiLo(uint8_t *BitStream, size_t size, int *high, int *low, uint8_t f
 uint32_t manchesterEncode2Bytes(uint16_t datain);
 int      ManchesterEncode(uint8_t *BitStream, size_t size);
 int      manrawdecode(uint8_t *BitStream, size_t *size, uint8_t invert);
-int      nrzRawDemod(uint8_t *dest, size_t *size, int *clk, int *invert, int maxErr);
+int      nrzRawDemod(uint8_t *dest, size_t *size, int *clk, int *invert);
 uint8_t  parityTest(uint32_t bits, uint8_t bitLen, uint8_t pType);
 uint8_t  preambleSearch(uint8_t *BitStream, uint8_t *preamble, size_t pLen, size_t *size, size_t *startIdx);
 int      pskRawDemod(uint8_t dest[], size_t *size, int *clock, int *invert);
