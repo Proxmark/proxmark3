@@ -469,7 +469,7 @@ bool tryDetectModulation(){
 
 	if (GetFskClock("", FALSE, FALSE)){ 
 		fskClocks(&fc1, &fc2, &clk, FALSE);
-		if ( FSKrawDemod("0 0", FALSE) && test(DEMOD_FSK, &tests[hits].offset, &bitRate, clk, &tests[hits].Q5)){
+		if ( FSKrawDemod("0 0", FALSE) && test(DEMOD_FSK, &tests[hits].offset, &bitRate, clk, &tests[hits].Q5)) {
 			tests[hits].modulation = DEMOD_FSK;
 			if (fc1==8 && fc2 == 5)
 				tests[hits].modulation = DEMOD_FSK1a;
@@ -486,7 +486,6 @@ bool tryDetectModulation(){
 				tests[hits].modulation = DEMOD_FSK1;
 			else if (fc1 == 10 && fc2 == 8)
 				tests[hits].modulation = DEMOD_FSK2a;
-
 			tests[hits].bitrate = bitRate;
 			tests[hits].inverted = TRUE;
 			tests[hits].block0 = PackBits(tests[hits].offset, 32, DemodBuffer);
@@ -597,6 +596,7 @@ bool tryDetectModulation(){
 		config.inverted = tests[0].inverted;
 		config.offset = tests[0].offset;
 		config.block0 = tests[0].block0;
+		config.Q5 = tests[0].Q5;
 		printConfiguration( config );
 		return TRUE;
 	}
@@ -683,12 +683,12 @@ bool testQ5(uint8_t mode, uint8_t *offset, int *fndBitRate, uint8_t	clk){
 		uint8_t safer     = PackBits(si, 4, DemodBuffer); si += 4;     //master key
 		uint8_t resv      = PackBits(si, 8, DemodBuffer); si += 8;
 		// 2nibble must be zeroed.
-		if (safer != 0x6) continue;
+		if (safer != 0x6 && safer != 0x9) continue;
 		if ( resv > 0x00) continue;
 		//uint8_t	pageSel   = PackBits(si, 1, DemodBuffer); si += 1;
 		//uint8_t fastWrite = PackBits(si, 1, DemodBuffer); si += 1;
 		si += 1+1;
-		int bitRate       = PackBits(si, 5, DemodBuffer)*2 + 2; si += 5;     //bit rate
+		int bitRate       = PackBits(si, 6, DemodBuffer)*2 + 2; si += 6;     //bit rate
 		if (bitRate > 128 || bitRate < 8) continue;
 
 		//uint8_t AOR       = PackBits(si, 1, DemodBuffer); si += 1;   

@@ -142,7 +142,7 @@ char *sprint_bin_break(const uint8_t *data, const size_t len, const uint8_t brea
 	for (size_t out_index=0; out_index < max_len; out_index++) {
 		// set character
 		sprintf(tmp++, "%u", data[in_index]);
-		// check if a line break is needed
+		// check if a line break is needed and we have room to print it in our array
 		if ( (breaks > 0) && !((in_index+1) % breaks) && (out_index+1 != max_len) ) {
 			// increment and print line break
 			out_index++;
@@ -271,7 +271,7 @@ char param_getchar(const char *line, int paramnum)
 
 uint8_t param_get8(const char *line, int paramnum)
 {
-	return param_get8ex(line, paramnum, 10, 0);
+	return param_get8ex(line, paramnum, 0, 10);
 }
 
 /**
