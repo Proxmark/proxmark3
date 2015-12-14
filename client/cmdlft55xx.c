@@ -183,7 +183,6 @@ int CmdT55xxSetConfig(const char *Cmd) {
 	uint8_t bitRate = 0;
 	uint8_t rates[9] = {8,16,32,40,50,64,100,128,0};
 	uint8_t cmdp = 0;
-	config.Q5 = FALSE;
 	bool errors = FALSE;
 	while(param_getchar(Cmd, cmdp) != 0x00 && !errors)
 	{
@@ -672,6 +671,15 @@ bool testQ5Modulation(uint8_t	mode, uint8_t	modread){
 	return FALSE;
 }
 
+int convertQ5bitRate(uint8_t bitRateRead) {
+	uint8_t expected[] = {8, 16, 32, 40, 50, 64, 100, 128};
+	for (int i=0; i<8; i++)
+		if (expected[i] == bitRateRead)
+			return i;
+
+	return -1;
+}
+
 bool testQ5(uint8_t mode, uint8_t *offset, int *fndBitRate, uint8_t	clk){
 
 	if ( DemodBufferLen < 64 ) return FALSE;
@@ -703,7 +711,8 @@ bool testQ5(uint8_t mode, uint8_t *offset, int *fndBitRate, uint8_t	clk){
 		//test modulation
 		if (!testQ5Modulation(mode, modread)) continue;
 		if (bitRate != clk) continue;
-		*fndBitRate = bitRate;
+		*fndBitRate = convertQ5bitRate(bitRate);
+		if (*fndBitRate < 0) continue;
 		*offset = idx;
 
 		return TRUE;
@@ -1109,44 +1118,25 @@ int AquireData( uint8_t page, uint8_t block, bool pwdmode, uint32_t password ){
 	return 1;
 }
 
-char * GetBitRateStr(uint32_t id){
- 	static char buf[25];
+char * GetBitRateStr(uint32_t id) {
+	static char buf[25];
 
 	char *retStr = buf;
-		switch (id){
-		case 0: 
-			snprintf(retStr,sizeof(buf),"%d - RF/8",id);
-			break;
-		case 1:
-			snprintf(retStr,sizeof(buf),"%d - RF/16",id);
-			break;
-		case 2:		
-			snprintf(retStr,sizeof(buf),"%d - RF/32",id);
-			break;
-		case 3:
-			snprintf(retStr,sizeof(buf),"%d - RF/40",id);
-			break;
-		case 4:
-			snprintf(retStr,sizeof(buf),"%d - RF/50",id);
-			break;
-		case 5:
-			snprintf(retStr,sizeof(buf),"%d - RF/64",id);
-			break;
-		case 6:
-			snprintf(retStr,sizeof(buf),"%d - RF/100",id);
-			break;
-		case 7:
-			snprintf(retStr,sizeof(buf),"%d - RF/128",id);
-			break;
-		default:
-			snprintf(retStr,sizeof(buf),"%d - (Unknown)",id);
-			break;
-		}
-
+	switch (id) {
+		case 0:   snprintf(retStr,sizeof(buf),"%d - RF/8",id);   break;
+		case 1:   snprintf(retStr,sizeof(buf),"%d - RF/16",id);  break;
+		case 2:   snprintf(retStr,sizeof(buf),"%d - RF/32",id);  break;
+		case 3:   snprintf(retStr,sizeof(buf),"%d - RF/40",id);  break;
+		case 4:   snprintf(retStr,sizeof(buf),"%d - RF/50",id);  break;
+		case 5:   snprintf(retStr,sizeof(buf),"%d - RF/64",id);  break;
+		case 6:   snprintf(retStr,sizeof(buf),"%d - RF/100",id); break;
+		case 7:   snprintf(retStr,sizeof(buf),"%d - RF/128",id); break;
+		default:  snprintf(retStr,sizeof(buf),"%d - (Unknown)",id); break;
+	}
 	return buf;
 }
 
-char * GetSaferStr(uint32_t id){
+char * GetSaferStr(uint32_t id) {
 	static char buf[40];
 	char *retStr = buf;
 	
