@@ -49,6 +49,7 @@ of stream transmissions (marshmellow)
 - Revised workflow for StandAloneMode14a (Craig Young)
 - EPA functions (`hf epa`) now support both ISO 14443-A and 14443-B cards (frederikmoellers)
 - 'hw version' only talks to ARM at startup, after that the info is cached. (pwpiwi)
+- Added `r` option to iclass functions - allows key to be provided in raw block 3/4 format 
 
 ## [2.2.0][2015-07-12]
 
