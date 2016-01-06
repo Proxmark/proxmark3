@@ -166,6 +166,19 @@ int usage_t55xx_bruteforce(){
 	PrintAndLog("");
 	return 0;
 }
+int usage_t55xx_wipe(){
+	PrintAndLog("Usage:  lf t55xx wipe [h] [Q5]");
+	PrintAndLog("This commands wipes a tag, fills blocks 1-7 with zeros and a default configuration block");
+	PrintAndLog("Options:");
+	PrintAndLog("     h   - this help");
+	PrintAndLog("     Q5  - indicates to use the T5555 (Q5) default configuration block");
+	PrintAndLog("");
+	PrintAndLog("Examples:");
+	PrintAndLog("      lf t55xx wipe    -  wipes a t55x7 tag,    config block 0x000880E0");
+	PrintAndLog("      lf t55xx wipe Q5 -  wipes a t5555 Q5 tag, config block 0x6001F004");
+	return 0;
+}
+
 
 static int CmdHelp(const char *Cmd);
 
@@ -415,6 +428,13 @@ bool DecodeT55xxBlock(){
 			return FALSE;
 	}
 	return (bool) ans;
+}
+
+bool DecodeT5555TraceBlock() {
+	DemodBufferLen = 0x00;
+	
+	// According to datasheet. Always: RF/64, not inverted, Manchester
+	return (bool) ASKDemod("64 0 1", FALSE, FALSE, 1);
 }
 
 int CmdT55xxDetect(const char *Cmd){
@@ -935,58 +955,107 @@ int CmdT55xxReadTrace(const char *Cmd) {
 	if (strlen(Cmd)==0)
 		if ( !AquireData( T55x7_PAGE1, REGULAR_READ_MODE_BLOCK, pwdmode, password ) )
 			return 0;
-	
-	if (!DecodeT55xxBlock()) return 0;
 
-	if ( !DemodBufferLen) return 0;
+	if ( config.Q5 ) {
+		if (!DecodeT5555TraceBlock()) return 0;
+	} else {
+		if (!DecodeT55xxBlock()) return 0;
+	}
+
+	if ( !DemodBufferLen ) return 0;
 
 	RepaintGraphWindow();
-	uint8_t repeat = 0;
-	if (config.offset > 5) 
-		repeat = 32;
+	uint8_t repeat = (config.offset > 5) ? 32 : 0;
+
 	uint8_t si = config.offset+repeat;
 	uint32_t bl1     = PackBits(si, 32, DemodBuffer);
 	uint32_t bl2     = PackBits(si+32, 32, DemodBuffer);
-	
-	uint32_t acl     = PackBits(si, 8,  DemodBuffer); si += 8;
-	uint32_t mfc     = PackBits(si, 8,  DemodBuffer); si += 8;
-	uint32_t cid     = PackBits(si, 5,  DemodBuffer); si += 5;
-	uint32_t icr     = PackBits(si, 3,  DemodBuffer); si += 3;
-	uint32_t year    = PackBits(si, 4,  DemodBuffer); si += 4;
-	uint32_t quarter = PackBits(si, 2,  DemodBuffer); si += 2;
-	uint32_t lotid   = PackBits(si, 14, DemodBuffer); si += 14;
-	uint32_t wafer   = PackBits(si, 5,  DemodBuffer); si += 5;
-	uint32_t dw      = PackBits(si, 15, DemodBuffer); 
-	
-	time_t t = time(NULL);
-	struct tm tm = *localtime(&t);
-	if ( year > tm.tm_year-110)
-		year += 2000;
-	else
-		year += 2010;
 
-	if (config.Q5) PrintAndLog("*** Warning *** Info read off a Q5 will not work as expected");
-	if ( acl != 0xE0 ) {
-		PrintAndLog("The modulation is most likely wrong since the ACL is not 0xE0. ");
-		return 0;
+	if (config.Q5) {
+		uint32_t hdr = PackBits(si, 9,  DemodBuffer); si += 9;
+
+		if (hdr != 0x1FF) {
+			PrintAndLog("Invalid Q5 Trace data header (expected 0x1FF, found %X)", hdr);
+			return 0;
+		}
+
+		t5555_tracedata_t data = {.bl1 = bl1, .bl2 = bl2, .icr = 0, .lotidc = '?', .lotid = 0, .wafer = 0, .dw =0};
+
+		data.icr     = PackBits(si, 2,  DemodBuffer); si += 2;
+		data.lotidc  = 'Z' - PackBits(si, 2,  DemodBuffer); si += 3;
+
+		data.lotid   = PackBits(si, 4,  DemodBuffer); si += 5;
+		data.lotid <<= 4;
+		data.lotid  |= PackBits(si, 4,  DemodBuffer); si += 5;
+		data.lotid <<= 4;
+		data.lotid  |= PackBits(si, 4,  DemodBuffer); si += 5;
+		data.lotid <<= 4;
+		data.lotid  |= PackBits(si, 4,  DemodBuffer); si += 5;
+		data.lotid <<= 1;
+		data.lotid  |= PackBits(si, 1,  DemodBuffer); si += 1;
+
+		data.wafer   = PackBits(si, 3,  DemodBuffer); si += 4;
+		data.wafer <<= 2;
+		data.wafer  |= PackBits(si, 2,  DemodBuffer); si += 2;
+
+		data.dw      = PackBits(si, 2,  DemodBuffer); si += 3;
+		data.dw    <<= 4;
+		data.dw     |= PackBits(si, 4,  DemodBuffer); si += 5;
+		data.dw    <<= 4;
+		data.dw     |= PackBits(si, 4,  DemodBuffer); si += 5;
+		data.dw    <<= 4;
+		data.dw     |= PackBits(si, 4,  DemodBuffer); si += 5;
+
+		printT5555Trace(data, repeat);
+
+	} else {
+
+		t55x7_tracedata_t data = {.bl1 = bl1, .bl2 = bl2, .acl = 0, .mfc = 0, .cid = 0, .year = 0, .quarter = 0, .icr = 0,  .lotid = 0, .wafer = 0, .dw = 0};
+		
+		data.acl = PackBits(si, 8,  DemodBuffer); si += 8;
+		if ( data.acl != 0xE0 ) {
+			PrintAndLog("The modulation is most likely wrong since the ACL is not 0xE0. ");
+			return 0;
+		}
+
+		data.mfc     = PackBits(si, 8,  DemodBuffer); si += 8;
+		data.cid     = PackBits(si, 5,  DemodBuffer); si += 5;
+		data.icr     = PackBits(si, 3,  DemodBuffer); si += 3;
+		data.year    = PackBits(si, 4,  DemodBuffer); si += 4;
+		data.quarter = PackBits(si, 2,  DemodBuffer); si += 2;
+		data.lotid   = PackBits(si, 14, DemodBuffer); si += 14;
+		data.wafer   = PackBits(si, 5,  DemodBuffer); si += 5;
+		data.dw      = PackBits(si, 15, DemodBuffer); 
+
+		time_t t = time(NULL);
+		struct tm tm = *localtime(&t);
+		if ( data.year > tm.tm_year-110)
+			data.year += 2000;
+		else
+			data.year += 2010;
+
+		printT55x7Trace(data, repeat);
 	}
-	PrintAndLog("");
-	PrintAndLog("-- T55xx Trace Information ----------------------------------");
+	return 0;
+}
+
+void printT55x7Trace( t55x7_tracedata_t data, uint8_t repeat ){
+	PrintAndLog("-- T55x7 Trace Information ----------------------------------");
 	PrintAndLog("-------------------------------------------------------------");
-	PrintAndLog(" ACL Allocation class (ISO/IEC 15963-1)  : 0x%02X (%d)", acl, acl);
-	PrintAndLog(" MFC Manufacturer ID (ISO/IEC 7816-6)    : 0x%02X (%d) - %s", mfc, mfc, getTagInfo(mfc));
-	PrintAndLog(" CID                                     : 0x%02X (%d) - %s", cid, cid, GetModelStrFromCID(cid));
-	PrintAndLog(" ICR IC Revision                         : %d",icr );
+	PrintAndLog(" ACL Allocation class (ISO/IEC 15963-1)  : 0x%02X (%d)", data.acl, data.acl);
+	PrintAndLog(" MFC Manufacturer ID (ISO/IEC 7816-6)    : 0x%02X (%d) - %s", data.mfc, data.mfc, getTagInfo(data.mfc));
+	PrintAndLog(" CID                                     : 0x%02X (%d) - %s", data.cid, data.cid, GetModelStrFromCID(data.cid));
+	PrintAndLog(" ICR IC Revision                         : %d", data.icr );
 	PrintAndLog(" Manufactured");
-	PrintAndLog("     Year/Quarter : %d/%d",year, quarter);
-	PrintAndLog("     Lot ID       : %d", lotid );
-	PrintAndLog("     Wafer number : %d", wafer);
-	PrintAndLog("     Die Number   : %d", dw);
+	PrintAndLog("     Year/Quarter : %d/%d", data.year, data.quarter);
+	PrintAndLog("     Lot ID       : %d", data.lotid );
+	PrintAndLog("     Wafer number : %d", data.wafer);
+	PrintAndLog("     Die Number   : %d", data.dw);
 	PrintAndLog("-------------------------------------------------------------");
 	PrintAndLog(" Raw Data - Page 1");
-	PrintAndLog("     Block 1  : 0x%08X  %s", bl1, sprint_bin(DemodBuffer+config.offset+repeat,32) );
-	PrintAndLog("     Block 2  : 0x%08X  %s", bl2, sprint_bin(DemodBuffer+config.offset+repeat+32,32) );
-	PrintAndLog("-------------------------------------------------------------");
+	PrintAndLog("     Block 1  : 0x%08X  %s", data.bl1, sprint_bin(DemodBuffer+config.offset+repeat,32) );
+	PrintAndLog("     Block 2  : 0x%08X  %s", data.bl2, sprint_bin(DemodBuffer+config.offset+repeat+32,32) );
+	PrintAndLog("-------------------------------------------------------------");	
 
 	/*
 	TRACE - BLOCK O
@@ -1004,10 +1073,36 @@ int CmdT55xxReadTrace(const char *Cmd) {
 		13-17	Wafer number
 		18-32	DW,  die number sequential
 	*/
-	
-  return 0;
 }
 
+void printT5555Trace( t5555_tracedata_t data, uint8_t repeat ){
+	PrintAndLog("-- T5555 (Q5) Trace Information -----------------------------");
+	PrintAndLog("-------------------------------------------------------------");
+	PrintAndLog(" ICR IC Revision  : %d", data.icr );	
+	PrintAndLog("     Lot          : %c%d", data.lotidc, data.lotid);
+	PrintAndLog("     Wafer number : %d", data.wafer);
+	PrintAndLog("     Die Number   : %d", data.dw);
+	PrintAndLog("-------------------------------------------------------------");
+	PrintAndLog(" Raw Data - Page 1");
+	PrintAndLog("     Block 1  : 0x%08X  %s", data.bl1, sprint_bin(DemodBuffer+config.offset+repeat,32) );
+	PrintAndLog("     Block 2  : 0x%08X  %s", data.bl2, sprint_bin(DemodBuffer+config.offset+repeat+32,32) );
+	
+	/*
+		** Q5 **
+		TRACE - BLOCK O and BLOCK1
+		Bits	Definition				HEX
+		1-9		Header                  0x1FF
+		10-11 IC Revision
+		12-13 Lot ID char
+		15-35 Lot ID (NB parity)
+		36-41 Wafer number (NB parity)
+		42-58 DW, die number sequential (NB parity)
+		60-63 Parity bits
+		64    Always zero
+	*/
+}
+
+//need to add Q5 info...
 int CmdT55xxInfo(const char *Cmd){
 	/*
 		Page 0 Block 0 Configuration data.
@@ -1027,6 +1122,7 @@ int CmdT55xxInfo(const char *Cmd){
 
 	if (!DecodeT55xxBlock()) return 1;
 
+	// too little space to start with
 	if ( DemodBufferLen < 32) return 1;
 
 	uint8_t si = config.offset;
@@ -1046,9 +1142,10 @@ int CmdT55xxInfo(const char *Cmd){
 	uint32_t fw       = PackBits(si, 1, DemodBuffer); si += 1;
 	uint32_t inv      = PackBits(si, 1, DemodBuffer); si += 1;	
 	uint32_t por      = PackBits(si, 1, DemodBuffer); si += 1;
+	
 	if (config.Q5) PrintAndLog("*** Warning *** Config Info read off a Q5 will not display as expected");
 	PrintAndLog("");
-	PrintAndLog("-- T55xx Configuration & Tag Information --------------------");
+	PrintAndLog("-- T55x7 Configuration & Tag Information --------------------");
 	PrintAndLog("-------------------------------------------------------------");
 	PrintAndLog(" Safer key                 : %s", GetSaferStr(safer));
 	PrintAndLog(" reserved                  : %d", resv);
@@ -1156,45 +1253,19 @@ char * GetModulationStr( uint32_t id){
 	char *retStr = buf;
 	
 	switch (id){
-		case 0: 
-			snprintf(retStr,sizeof(buf),"%d - DIRECT (ASK/NRZ)",id);
-			break;
-		case 1:
-			snprintf(retStr,sizeof(buf),"%d - PSK 1 phase change when input changes",id);
-			break;
-		case 2:		
-			snprintf(retStr,sizeof(buf),"%d - PSK 2 phase change on bitclk if input high",id);
-			break;
-		case 3:
-			snprintf(retStr,sizeof(buf),"%d - PSK 3 phase change on rising edge of input",id);
-			break;
-		case 4:
-			snprintf(retStr,sizeof(buf),"%d - FSK 1 RF/8  RF/5",id);
-			break;
-		case 5:
-			snprintf(retStr,sizeof(buf),"%d - FSK 2 RF/8  RF/10",id);
-			break;
-		case 6:
-			snprintf(retStr,sizeof(buf),"%d - FSK 1a RF/5  RF/8",id);
-			break;
-		case 7:
-			snprintf(retStr,sizeof(buf),"%d - FSK 2a RF/10  RF/8",id);
-			break;
-		case 8:
-			snprintf(retStr,sizeof(buf),"%d - Manchester",id);
-			break;
-		case 16:
-			snprintf(retStr,sizeof(buf),"%d - Biphase",id);
-			break;
-		case 0x18:
-			snprintf(retStr,sizeof(buf),"%d - Biphase a - AKA Conditional Dephase Encoding(CDP)",id);
-			break;
-		case 17:
-			snprintf(retStr,sizeof(buf),"%d - Reserved",id);
-			break;
-		default:
-			snprintf(retStr,sizeof(buf),"0x%02X (Unknown)",id);
-			break;
+		case 0: snprintf(retStr,sizeof(buf),"%d - DIRECT (ASK/NRZ)",id); break;
+		case 1: snprintf(retStr,sizeof(buf),"%d - PSK 1 phase change when input changes",id); break;
+		case 2:	snprintf(retStr,sizeof(buf),"%d - PSK 2 phase change on bitclk if input high",id); break;
+		case 3: snprintf(retStr,sizeof(buf),"%d - PSK 3 phase change on rising edge of input",id); break;
+		case 4: snprintf(retStr,sizeof(buf),"%d - FSK 1 RF/8  RF/5",id); break;
+		case 5: snprintf(retStr,sizeof(buf),"%d - FSK 2 RF/8  RF/10",id); break;
+		case 6: snprintf(retStr,sizeof(buf),"%d - FSK 1a RF/5  RF/8",id); break;
+		case 7: snprintf(retStr,sizeof(buf),"%d - FSK 2a RF/10  RF/8",id); break;
+		case 8: snprintf(retStr,sizeof(buf),"%d - Manchester",id); break;
+		case 16: snprintf(retStr,sizeof(buf),"%d - Biphase",id); break;
+		case 0x18: snprintf(retStr,sizeof(buf),"%d - Biphase a - AKA Conditional Dephase Encoding(CDP)",id); break;
+		case 17: snprintf(retStr,sizeof(buf),"%d - Reserved",id); break;
+		default: snprintf(retStr,sizeof(buf),"0x%02X (Unknown)",id); break;
 		}
 	return buf;
 }
@@ -1214,47 +1285,21 @@ char * GetSelectedModulationStr( uint8_t id){
 	static char buf[20];
 	char *retStr = buf;
 
-	switch (id){
-		case DEMOD_FSK:
-			snprintf(retStr,sizeof(buf),"FSK");
-			break;
-		case DEMOD_FSK1:
-			snprintf(retStr,sizeof(buf),"FSK1");
-			break;
-		case DEMOD_FSK1a:
-			snprintf(retStr,sizeof(buf),"FSK1a");
-			break;
-		case DEMOD_FSK2:
-			snprintf(retStr,sizeof(buf),"FSK2");
-			break;
-		case DEMOD_FSK2a:
-			snprintf(retStr,sizeof(buf),"FSK2a");
-			break;
-		case DEMOD_ASK:		
-			snprintf(retStr,sizeof(buf),"ASK");
-			break;
-		case DEMOD_NRZ:
-			snprintf(retStr,sizeof(buf),"DIRECT/NRZ");
-			break;
-		case DEMOD_PSK1:
-			snprintf(retStr,sizeof(buf),"PSK1");
-			break;
-		case DEMOD_PSK2:
-			snprintf(retStr,sizeof(buf),"PSK2");
-			break;
-		case DEMOD_PSK3:
-			snprintf(retStr,sizeof(buf),"PSK3");
-			break;
-		case DEMOD_BI:
-			snprintf(retStr,sizeof(buf),"BIPHASE");
-			break;
-		case DEMOD_BIa:
-			snprintf(retStr,sizeof(buf),"BIPHASEa - (CDP)");
-			break;
-		default:
-			snprintf(retStr,sizeof(buf),"(Unknown)");
-			break;
-		}
+	switch (id) {
+		case DEMOD_FSK:	snprintf(retStr,sizeof(buf),"FSK");	break;
+		case DEMOD_FSK1: snprintf(retStr,sizeof(buf),"FSK1"); break;
+		case DEMOD_FSK1a: snprintf(retStr,sizeof(buf),"FSK1a"); break;
+		case DEMOD_FSK2: snprintf(retStr,sizeof(buf),"FSK2"); break;
+		case DEMOD_FSK2a: snprintf(retStr,sizeof(buf),"FSK2a"); break;
+		case DEMOD_ASK: snprintf(retStr,sizeof(buf),"ASK"); break;
+		case DEMOD_NRZ: snprintf(retStr,sizeof(buf),"DIRECT/NRZ"); break;
+		case DEMOD_PSK1: snprintf(retStr,sizeof(buf),"PSK1"); break;
+		case DEMOD_PSK2: snprintf(retStr,sizeof(buf),"PSK2"); break;
+		case DEMOD_PSK3: snprintf(retStr,sizeof(buf),"PSK3"); break;
+		case DEMOD_BI: snprintf(retStr,sizeof(buf),"BIPHASE"); break;
+		case DEMOD_BIa: snprintf(retStr,sizeof(buf),"BIPHASEa - (CDP)"); break;
+		default: snprintf(retStr,sizeof(buf),"(Unknown)"); break;
+	}
 	return buf;
 }
 
@@ -1293,13 +1338,22 @@ int CmdT55xxWipe(const char *Cmd) {
 	char writeData[20] = {0};
 	char *ptrData = writeData;
 
+	char cmdp = param_getchar(Cmd, 0);	
+	if ( cmdp == 'h' || cmdp == 'H') return usage_t55xx_wipe();
+
+	bool Q5 = (cmdp == 'q' || cmdp == 'Q');
+
+	// Try with the default password to reset block 0
+	// With a pwd should work even if pwd bit not set
 	PrintAndLog("\nBeginning Wipe of a T55xx tag (assuming the tag is not password protected)\n");
 
-	//try with the default password to reset block 0  (with a pwd should work even if pwd bit not set)
-	snprintf(ptrData,sizeof(writeData),"b 0 d 00088040 p 0");
+	if ( Q5 ){
+		snprintf(ptrData,sizeof(writeData),"b 0 d 6001F004 p 0");
+	} else {
+		snprintf(ptrData,sizeof(writeData),"b 0 d 00088040 p 0");
+	}
 
-	if (!CmdT55xxWriteBlock(ptrData))
-		PrintAndLog("Error writing blk 0");
+	if (!CmdT55xxWriteBlock(ptrData)) PrintAndLog("Error writing blk 0");
 
 	for (uint8_t blk = 1; blk<8; blk++) {
 		snprintf(ptrData,sizeof(writeData),"b %d d 0", blk);
@@ -1343,7 +1397,7 @@ int CmdT55xxBruteForce(const char *Cmd) {
 			return 1;
 		}
 
-		while( fgets(buf, sizeof(buf), f) ){
+		while( fgets(buf, sizeof(buf), f) ) {
 			if (strlen(buf) < 8 || buf[7] == '\n') continue;
 
 			while (fgetc(f) != '\n' && !feof(f)) ;  //goto next line
@@ -1351,7 +1405,7 @@ int CmdT55xxBruteForce(const char *Cmd) {
 			//The line start with # is comment, skip
 			if( buf[0]=='#' ) continue;
 
-			if (!isxdigit(buf[0])){
+			if (!isxdigit(buf[0])) {
 				PrintAndLog("File content error. '%s' must include 8 HEX symbols", buf);
 				continue;
 			}
@@ -1416,39 +1470,39 @@ int CmdT55xxBruteForce(const char *Cmd) {
 	// incremental pwd range search
 	start_password = param_get32ex(Cmd, 0, 0, 16);
 	end_password = param_get32ex(Cmd, 1, 0, 16);
-	
+
 	if ( start_password >= end_password ) return usage_t55xx_bruteforce();
 
 	PrintAndLog("Search password range [%08X -> %08X]", start_password, end_password);
 
 	uint32_t i = start_password;
 
-	while ((!found) && (i <= end_password)){
+	while ((!found) && (i <= end_password)) {
 
-	printf(".");
-	fflush(stdout);
-	if (ukbhit()) {
-		getchar();
-		printf("\naborted via keyboard!\n");
-		return 0;
-	}
+		printf(".");
+		fflush(stdout);
+		if (ukbhit()) {
+			getchar();
+			printf("\naborted via keyboard!\n");
+			return 0;
+		}
 
-	if (!AquireData(T55x7_PAGE0, T55x7_CONFIGURATION_BLOCK, TRUE, i)) {
-		PrintAndLog("Aquireing data from device failed. Quitting");
-		return 0;
-	}
-	found = tryDetectModulation();
-	    
-	if (found) break;
-	i++;
+		if (!AquireData(T55x7_PAGE0, T55x7_CONFIGURATION_BLOCK, TRUE, i)) {
+			PrintAndLog("Aquireing data from device failed. Quitting");
+			return 0;
+		}
+		found = tryDetectModulation();
+
+		if (found) break;
+		i++;
 	}
 
 	PrintAndLog("");
 
 	if (found)
-	PrintAndLog("Found valid password: [%08x]", i);
+		PrintAndLog("Found valid password: [%08x]", i);
 	else
-	PrintAndLog("Password NOT found. Last tried: [%08x]", --i);
+		PrintAndLog("Password NOT found. Last tried: [%08x]", --i);
 	return 0;
 }
 
@@ -1465,7 +1519,7 @@ static command_t CommandTable[] = {
   {"dump",      CmdT55xxDump,      0, "[password] [o] Dump T55xx card block 0-7. Optional [password], [override]"},
   {"special",   special,           0, "Show block changes with 64 different offsets"},
   {"wakeup",    CmdT55xxWakeUp,    0, "Send AOR wakeup command"},
-  {"wipe",      CmdT55xxWipe,      0, "Wipe a T55xx tag and set defaults (will destroy any data on tag)"},
+  {"wipe",      CmdT55xxWipe,      0, "[q] Wipe a T55xx tag and set defaults (will destroy any data on tag)"},
   {NULL, NULL, 0, NULL}
 };
 
