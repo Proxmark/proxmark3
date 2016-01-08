@@ -10,7 +10,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <inttypes.h>
-#include <time.h>
+//#include <time.h>  //not used - marshmellow
 #include "proxmark3.h"
 #include "ui.h"
 #include "graph.h"
@@ -22,14 +22,14 @@
 #include "util.h"
 #include "data.h"
 #include "lfdemod.h"
-#include "../common/crc.h"
-#include "../common/iso14443crc.h"
-#include "cmdhf14a.h"
+//#include "../common/crc.h"  //not used - marshmellow
+//#include "../common/iso14443crc.h" //not used - marshmellow
+#include "cmdhf14a.h" //for getTagInfo
 
 #define T55x7_CONFIGURATION_BLOCK 0x00
 #define T55x7_PAGE0 0x00
 #define T55x7_PAGE1 0x01
-#define T55x7_PWD	0x00000010
+//#define T55x7_PWD	0x00000010
 #define REGULAR_READ_MODE_BLOCK 0xFF
 
 // Default configuration
