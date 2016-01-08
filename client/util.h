@@ -17,6 +17,9 @@
 #include <time.h>
 #include "data.h"
 
+#ifndef ROTR
+# define ROTR(x,n) (((uintmax_t)(x) >> (n)) | ((uintmax_t)(x) << ((sizeof(x) * 8) - (n))))
+#endif
 #ifndef MIN
 # define MIN(a, b) (((a) < (b)) ? (a) : (b))
 #endif
@@ -68,3 +71,4 @@ void wiegand_add_parity(uint8_t *target, uint8_t *source, uint8_t length);
 
 void xor(unsigned char *dst, unsigned char *src, size_t len);
 int32_t le24toh(uint8_t data[3]);
+void rol(uint8_t *data, const size_t len);
