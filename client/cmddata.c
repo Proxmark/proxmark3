@@ -982,7 +982,7 @@ int FSKrawDemod(const char *Cmd, bool verbose)
 
 		// Now output the bitstream to the scrollback by line of 16 bits
 		if (verbose || g_debugMode) {
-			PrintAndLog("\nUsing Clock:%d, invert:%d, fchigh:%d, fclow:%d", rfLen, invert, fchigh, fclow);
+			PrintAndLog("\nUsing Clock:%hu, invert:%hu, fchigh:%hu, fclow:%hu", rfLen, invert, fchigh, fclow);
 			PrintAndLog("%s decoded bitstream:",GetFSKType(fchigh,fclow,invert));
 			printDemodBuff();
 		}
