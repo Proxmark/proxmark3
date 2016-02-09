@@ -142,7 +142,7 @@ char *sprint_bin_break(const uint8_t *data, const size_t len, const uint8_t brea
 	for (size_t out_index=0; out_index < max_len; out_index++) {
 		// set character
 		sprintf(tmp++, "%u", data[in_index]);
-		// check if a line break is needed
+		// check if a line break is needed and we have room to print it in our array
 		if ( (breaks > 0) && !((in_index+1) % breaks) && (out_index+1 != max_len) ) {
 			// increment and print line break
 			out_index++;
@@ -271,7 +271,7 @@ char param_getchar(const char *line, int paramnum)
 
 uint8_t param_get8(const char *line, int paramnum)
 {
-	return param_get8ex(line, paramnum, 10, 0);
+	return param_get8ex(line, paramnum, 0, 10);
 }
 
 /**
@@ -496,4 +496,14 @@ void xor(unsigned char *dst, unsigned char *src, size_t len) {
 
 int32_t le24toh (uint8_t data[3]) {
     return (data[2] << 16) | (data[1] << 8) | data[0];
+}
+
+// RotateLeft - Ultralight, Desfire, works on byte level
+// 00-01-02  >> 01-02-00
+void rol(uint8_t *data, const size_t len){
+    uint8_t first = data[0];
+    for (size_t i = 0; i < len-1; i++) {
+        data[i] = data[i+1];
+    }
+    data[len-1] = first;
 }

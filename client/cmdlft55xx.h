@@ -11,6 +11,30 @@
 #define CMDLFT55XX_H__
 
 typedef struct {
+	uint32_t bl1;
+	uint32_t bl2; 
+	uint32_t acl; 
+	uint32_t mfc; 
+	uint32_t cid; 
+	uint32_t year; 
+	uint32_t quarter; 
+	uint32_t icr;
+	uint32_t lotid; 
+	uint32_t wafer; 
+	uint32_t dw;
+} t55x7_tracedata_t;
+
+typedef struct {
+	uint32_t bl1;
+	uint32_t bl2;
+	uint32_t icr;
+	char lotidc;
+	uint32_t lotid;
+	uint32_t wafer;
+	uint32_t dw;
+} t5555_tracedata_t;
+
+typedef struct {
 	enum {
 		DEMOD_NRZ  = 0x00,    
 		DEMOD_PSK1 = 0x01,
@@ -61,6 +85,7 @@ char * GetModulationStr( uint32_t id);
 char * GetModelStrFromCID(uint32_t cid);
 char * GetSelectedModulationStr( uint8_t id);
 uint32_t PackBits(uint8_t start, uint8_t len, uint8_t *bitstream);
+void printT5xxHeader(uint8_t page);
 void printT55xxBlock(const char *demodStr);
 int printConfiguration( t55xx_conf_block_t b);
 
@@ -69,5 +94,8 @@ bool tryDetectModulation();
 bool test(uint8_t mode, uint8_t *offset, int *fndBitRate, uint8_t clk, bool *Q5);
 int special(const char *Cmd);
 int AquireData( uint8_t page, uint8_t block, bool pwdmode, uint32_t password );
+
+void printT55x7Trace( t55x7_tracedata_t data, uint8_t repeat );
+void printT5555Trace( t5555_tracedata_t data, uint8_t repeat );
 
 #endif

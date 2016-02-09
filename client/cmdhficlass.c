@@ -406,7 +406,7 @@ int CmdHFiClassDecrypt(const char *Cmd) {
 	fclose(f);
 
 	saveFile(outfilename,"bin", decrypted, blocknum*8);
-
+	free(decrypted);
 	return 0;
 }
 
