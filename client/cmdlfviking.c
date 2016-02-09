@@ -74,8 +74,8 @@ int CmdVikingClone(const char *Cmd) {
 		Q5 = true;
 
 	rawID = getVikingBits(id);
-
-	UsbCommand c = {CMD_VIKING_CLONE_TAG,{rawID >> 32, rawID & 0xFFFF, Q5}};
+	PrintAndLog("Cloning - ID: %08X, Raw: %08X%08X",id,(uint32_t)(rawID >> 32),(uint32_t) (rawID & 0xFFFFFFFF));
+	UsbCommand c = {CMD_VIKING_CLONE_TAG,{rawID >> 32, rawID & 0xFFFFFFFF, Q5}};
 	clearCommandBuffer();
 	SendCommand(&c);
 	//check for ACK
