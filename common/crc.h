@@ -26,7 +26,7 @@ typedef struct crc {
  * final_xor is XORed onto the state before returning it from crc_result(). */
 extern void crc_init(crc_t *crc, int order, uint32_t polynom, uint32_t initial_value, uint32_t final_xor);
 
-/* Update the crc state. data is the data of length data_width bits (only the the
+/* Update the crc state. data is the data of length data_width bits (only the
  * data_width lower-most bits are used).
  */
 extern void crc_update(crc_t *crc, uint32_t data, int data_width);
