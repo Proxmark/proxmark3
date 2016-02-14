@@ -66,7 +66,7 @@ int CmdVikingClone(const char *Cmd) {
 	uint64_t rawID = 0;
 	bool Q5 = false;
 	char cmdp = param_getchar(Cmd, 0);
-	if (strlen(Cmd) < 0 || cmdp == 'h' || cmdp == 'H') return usage_lf_viking_clone();
+	if (strlen(Cmd) == 0 || cmdp == 'h' || cmdp == 'H') return usage_lf_viking_clone();
 
 	id = param_get32ex(Cmd, 0, 0, 16);
 	if (id == 0) return usage_lf_viking_clone();
@@ -74,8 +74,8 @@ int CmdVikingClone(const char *Cmd) {
 		Q5 = true;
 
 	rawID = getVikingBits(id);
-	PrintAndLog("Cloning - ID: %08X, Raw: %08X%08X",id,(uint32_t)(rawID >> 32),(uint32_t) (rawID & 0xFFFFFFFF));
-	UsbCommand c = {CMD_VIKING_CLONE_TAG,{rawID >> 32, rawID & 0xFFFFFFFF, Q5}};
+
+	UsbCommand c = {CMD_VIKING_CLONE_TAG,{rawID >> 32, rawID & 0xFFFF, Q5}};
 	clearCommandBuffer();
 	SendCommand(&c);
 	//check for ACK
@@ -89,7 +89,7 @@ int CmdVikingSim(const char *Cmd) {
 	uint8_t clk = 32, encoding = 1, separator = 0, invert = 0;
 	char cmdp = param_getchar(Cmd, 0);
 
-	if (strlen(Cmd) < 0 || cmdp == 'h' || cmdp == 'H') return usage_lf_viking_sim();
+	if (strlen(Cmd) == 0 || cmdp == 'h' || cmdp == 'H') return usage_lf_viking_sim();
 	id = param_get32ex(Cmd, 0, 0, 16);
 	if (id == 0) return usage_lf_viking_sim();
 

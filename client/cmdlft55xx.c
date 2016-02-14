@@ -1371,17 +1371,18 @@ int CmdT55xxBruteForce(const char *Cmd) {
 	char buf[9];
 	char filename[FILE_PATH_SIZE]={0};
 	int keycnt = 0;
+	int ch;
 	uint8_t stKeyBlock = 20;
-	uint8_t *keyBlock = NULL, *p;
-	keyBlock = calloc(stKeyBlock, 6);
-	if (keyBlock == NULL) return 1;
-
+	uint8_t *keyBlock = NULL, *p = NULL;
 	uint32_t start_password = 0x00000000; //start password
 	uint32_t end_password   = 0xFFFFFFFF; //end   password
 	bool found = false;
 
 	char cmdp = param_getchar(Cmd, 0);
 	if (cmdp == 'h' || cmdp == 'H') return usage_t55xx_bruteforce();
+
+	keyBlock = calloc(stKeyBlock, 6);
+	if (keyBlock == NULL) return 1;
 
 	if (cmdp == 'i' || cmdp == 'I') {
 
@@ -1417,6 +1418,7 @@ int CmdT55xxBruteForce(const char *Cmd) {
 				if (!p) {
 					PrintAndLog("Cannot allocate memory for defaultKeys");
 					free(keyBlock);
+					fclose(f);
 					return 2;
 				}
 				keyBlock = p;
@@ -1431,6 +1433,7 @@ int CmdT55xxBruteForce(const char *Cmd) {
 		
 		if (keycnt == 0) {
 			PrintAndLog("No keys found in file");
+			free(keyBlock);
 			return 1;
 		}
 		PrintAndLog("Loaded %d keys", keycnt);
@@ -1440,8 +1443,10 @@ int CmdT55xxBruteForce(const char *Cmd) {
 		for (uint16_t c = 0; c < keycnt; ++c ) {
 
 			if (ukbhit()) {
-				getchar();
+				ch = getchar();
+				(void)ch;
 				printf("\naborted via keyboard!\n");
+				free(keyBlock);
 				return 0;
 			}
 
@@ -1451,6 +1456,7 @@ int CmdT55xxBruteForce(const char *Cmd) {
 
 			if ( !AquireData(T55x7_PAGE0, T55x7_CONFIGURATION_BLOCK, TRUE, testpwd)) {
 				PrintAndLog("Aquireing data from device failed. Quitting");
+				free(keyBlock);
 				return 0;
 			}
 
@@ -1458,10 +1464,12 @@ int CmdT55xxBruteForce(const char *Cmd) {
 
 			if ( found ) {
 				PrintAndLog("Found valid password: [%08X]", testpwd);
+				free(keyBlock);
 				return 0;
 			}
 		}
 		PrintAndLog("Password NOT found.");
+		free(keyBlock);
 		return 0;
 	}
 
@@ -1471,8 +1479,10 @@ int CmdT55xxBruteForce(const char *Cmd) {
 	start_password = param_get32ex(Cmd, 0, 0, 16);
 	end_password = param_get32ex(Cmd, 1, 0, 16);
 
-	if ( start_password >= end_password ) return usage_t55xx_bruteforce();
-
+	if ( start_password >= end_password ) {
+		free(keyBlock);
+		return usage_t55xx_bruteforce();
+	}
 	PrintAndLog("Search password range [%08X -> %08X]", start_password, end_password);
 
 	uint32_t i = start_password;
@@ -1482,13 +1492,16 @@ int CmdT55xxBruteForce(const char *Cmd) {
 		printf(".");
 		fflush(stdout);
 		if (ukbhit()) {
-			getchar();
+			ch = getchar();
+			(void)ch;
 			printf("\naborted via keyboard!\n");
+			free(keyBlock);
 			return 0;
 		}
 
 		if (!AquireData(T55x7_PAGE0, T55x7_CONFIGURATION_BLOCK, TRUE, i)) {
 			PrintAndLog("Aquireing data from device failed. Quitting");
+			free(keyBlock);
 			return 0;
 		}
 		found = tryDetectModulation();
@@ -1503,6 +1516,8 @@ int CmdT55xxBruteForce(const char *Cmd) {
 		PrintAndLog("Found valid password: [%08x]", i);
 	else
 		PrintAndLog("Password NOT found. Last tried: [%08x]", --i);
+
+	free(keyBlock);
 	return 0;
 }
 
