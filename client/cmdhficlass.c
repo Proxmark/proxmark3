@@ -373,10 +373,13 @@ int CmdHFiClassDecrypt(const char *Cmd) {
 	//Open the tagdump-file
 	FILE *f;
 	char filename[FILE_PATH_SIZE];
-	if(opt == 'f' && param_getstr(Cmd, 1, filename) > 0)
-	{
+	if(opt == 'f' && param_getstr(Cmd, 1, filename) > 0) {
 		f = fopen(filename, "rb");
-	}else{
+		if ( f == NULL ) {
+			PrintAndLog("Could not find file %s", filename);
+			return 1;
+		}
+	} else {
 		return usage_hf_iclass_decrypt();
 	}
 
@@ -938,7 +941,7 @@ int usage_hf_iclass_clone(void) {
 }
 
 int CmdHFiClassCloneTag(const char *Cmd) {
-	char filename[FILE_PATH_SIZE];
+	char filename[FILE_PATH_SIZE] = {0};
 	char tempStr[50]={0};
 	uint8_t KEY[8]={0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00};
 	uint8_t keyNbr = 0;
@@ -1043,6 +1046,7 @@ int CmdHFiClassCloneTag(const char *Cmd) {
 
 	if (startblock<5) {
 		PrintAndLog("You cannot write key blocks this way. yet... make your start block > 4");
+		fclose(f);
 		return 0;
 	}
 	// now read data from the file from block 6 --- 19
