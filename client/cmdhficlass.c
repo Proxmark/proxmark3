@@ -33,8 +33,6 @@
 #include "usb_cmd.h"
 #include "cmdhfmfu.h"
 
-#define llX PRIx64
-
 static int CmdHelp(const char *Cmd);
 
 #define ICLASS_KEYS_MAX 8
@@ -1350,7 +1348,7 @@ uint64_t hexarray_to_uint64(uint8_t *key) {
 	for (int i = 0;i < 8;i++)
 		sprintf(&temp[(i *2)],"%02X",key[i]);
 	temp[16] = '\0';
-	if (sscanf(temp,"%016"llX,&uint_key) < 1)
+	if (sscanf(temp,"%016"llx,&uint_key) < 1)
 		return 0;
 	return uint_key;
 }

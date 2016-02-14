@@ -10,7 +10,6 @@
 #include <stdio.h>
 #include <string.h>
 #include <inttypes.h>
-//#include <time.h>  //not used - marshmellow
 #include "proxmark3.h"
 #include "ui.h"
 #include "graph.h"
@@ -22,8 +21,6 @@
 #include "util.h"
 #include "data.h"
 #include "lfdemod.h"
-//#include "../common/crc.h"  //not used - marshmellow
-//#include "../common/iso14443crc.h" //not used - marshmellow
 #include "cmdhf14a.h" //for getTagInfo
 
 #define T55x7_CONFIGURATION_BLOCK 0x00

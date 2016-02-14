@@ -91,6 +91,7 @@ int zlib_compress(FILE *infile[], uint8_t num_infiles, FILE *outfile)
 			for(uint16_t j = 0; j < num_infiles; j++) {
 				fclose(infile[j]);
 			}
+			free(fpga_config);
 			return(EXIT_FAILURE);
 		}
 
@@ -112,7 +113,7 @@ int zlib_compress(FILE *infile[], uint8_t num_infiles, FILE *outfile)
 	compressed_fpga_stream.avail_in = i;
 	compressed_fpga_stream.zalloc = fpga_deflate_malloc;
 	compressed_fpga_stream.zfree = fpga_deflate_free;
-	
+	compressed_fpga_stream.opaque = Z_NULL;
 	ret = deflateInit2(&compressed_fpga_stream, 
 						COMPRESS_LEVEL,
 						Z_DEFLATED,
@@ -187,6 +188,7 @@ int zlib_decompress(FILE *infile, FILE *outfile)
 	compressed_fpga_stream.avail_out = DECOMPRESS_BUF_SIZE;
 	compressed_fpga_stream.zalloc = fpga_deflate_malloc;
 	compressed_fpga_stream.zfree = fpga_deflate_free;
+	compressed_fpga_stream.opaque = Z_NULL;
 	
 	ret = inflateInit2(&compressed_fpga_stream, 0);
 	
@@ -195,9 +197,9 @@ int zlib_decompress(FILE *infile, FILE *outfile)
 			compressed_fpga_stream.next_in = inbuf;
 			uint16_t i = 0;
 			do {
-				uint8_t c = fgetc(infile);
+				int c = fgetc(infile);
 				if (!feof(infile)) {
-					inbuf[i++] = c;
+					inbuf[i++] = c & 0xFF;
 					compressed_fpga_stream.avail_in++;
 				} else {
 					break;
