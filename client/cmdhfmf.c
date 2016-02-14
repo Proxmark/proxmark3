@@ -875,6 +875,7 @@ int CmdHF14AMfChk(const char *Cmd)
 		break;
 	default:
 		PrintAndLog("Key type must be A , B or ?");
+		free(keyBlock);
 		return 1;
 	};
 	
@@ -926,6 +927,7 @@ int CmdHF14AMfChk(const char *Cmd)
 						if (!p) {
 							PrintAndLog("Cannot allocate memory for defKeys");
 							free(keyBlock);
+							fclose(f);
 							return 2;
 						}
 						keyBlock = p;
@@ -1219,7 +1221,7 @@ int CmdHF14AMfELoad(const char *Cmd)
 	if (numblk2 > 0) numBlocks = numblk2;	
 
 	len = param_getstr(Cmd,nameParamNo,filename);
-	if (len > FILE_PATH_SIZE - 4) len = FILE_PATH_SIZE - 4;
+	if (len > FILE_PATH_SIZE - 5) len = FILE_PATH_SIZE - 5;
 
 	fnameptr += len;
 
@@ -1316,7 +1318,7 @@ int CmdHF14AMfESave(const char *Cmd)
 
 	len = param_getstr(Cmd,nameParamNo,filename);
 	
-	if (len > FILE_PATH_SIZE - 4) len = FILE_PATH_SIZE - 4;
+	if (len > FILE_PATH_SIZE - 5) len = FILE_PATH_SIZE - 5;
 	
 	// user supplied filename?
 	if (len < 1) {
@@ -1593,7 +1595,7 @@ int CmdHF14AMfCLoad(const char *Cmd)
 		return 0;
 	} else {
 		len = strlen(Cmd);
-		if (len > FILE_PATH_SIZE - 4) len = FILE_PATH_SIZE - 4;
+		if (len > FILE_PATH_SIZE - 5) len = FILE_PATH_SIZE - 5;
 
 		memcpy(filename, Cmd, len);
 		fnameptr += len;
@@ -1762,7 +1764,7 @@ int CmdHF14AMfCSave(const char *Cmd) {
 		return 0;
 	} else {
 		len = strlen(Cmd);
-		if (len > FILE_PATH_SIZE - 4) len = FILE_PATH_SIZE - 4;
+		if (len > FILE_PATH_SIZE - 5) len = FILE_PATH_SIZE - 5;
 
 		// get filename based on UID
 		if (len < 1) {
@@ -1905,6 +1907,11 @@ int CmdHF14AMfSniff(const char *Cmd){
 					bufPtr = buf;
 					bufsize = traceLen;
 					memset(buf, 0x00, traceLen);
+				}
+				if (bufPtr == NULL) {
+					PrintAndLog("Cannot allocate memory for trace");
+					free(buf);
+					return 2;
 				}
 				memcpy(bufPtr, resp.d.asBytes, len);
 				bufPtr += len;
