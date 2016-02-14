@@ -1447,7 +1447,7 @@ static void TransmitIClassCommand(const uint8_t *cmd, int len, int *samples, int
     }
     WDT_HIT();
   }
-  if (samples) *samples = (c + *wait) << 3;
+  if (samples && wait) *samples = (c + *wait) << 3;
 }
 
 
