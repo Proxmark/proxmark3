@@ -17,15 +17,14 @@ int CmdHF14AMifare(const char *Cmd)
 	uint32_t uid = 0;
 	uint32_t nt = 0, nr = 0;
 	uint64_t par_list = 0, ks_list = 0, r_key = 0;
-	uint8_t isOK = 0;
-	uint8_t keyBlock[8] = {0};
+	int16_t isOK = 0;
 
 	UsbCommand c = {CMD_READER_MIFARE, {true, 0, 0}};
 
 	// message
 	printf("-------------------------------------------------------------------------\n");
 	printf("Executing command. Expected execution time: 25sec on average  :-)\n");
-	printf("Press the key on the proxmark3 device to abort both proxmark3 and client.\n");
+	printf("Press button on the proxmark3 device to abort both proxmark3 and client.\n");
 	printf("-------------------------------------------------------------------------\n");
 
 	
@@ -47,15 +46,22 @@ start:
 		}
 		
 		UsbCommand resp;
-		if (WaitForResponseTimeout(CMD_ACK,&resp,1000)) {
-			isOK  = resp.arg[0] & 0xff;
+		if (WaitForResponseTimeout(CMD_ACK, &resp, 1000)) {
+			isOK  = resp.arg[0];
 			uid = (uint32_t)bytes_to_num(resp.d.asBytes +  0, 4);
 			nt =  (uint32_t)bytes_to_num(resp.d.asBytes +  4, 4);
 			par_list = bytes_to_num(resp.d.asBytes +  8, 8);
 			ks_list = bytes_to_num(resp.d.asBytes +  16, 8);
 			nr = bytes_to_num(resp.d.asBytes + 24, 4);
 			printf("\n\n");
-			if (!isOK) PrintAndLog("Proxmark can't get statistic info. Execution aborted.\n");
+			switch (isOK) {
+				case -1 : PrintAndLog("Button pressed. Aborted.\n"); break;
+				case -2 : PrintAndLog("Card is not vulnerable to Darkside attack (doesn't send NACK on authentication requests).\n"); break;
+				case -3 : PrintAndLog("Card is not vulnerable to Darkside attack (its random number generator is not predictable).\n"); break;
+				case -4 : PrintAndLog("Card is not vulnerable to Darkside attack (its random number generator seems to be based on the wellknown");
+							PrintAndLog("generating polynomial with 16 effective bits only, but shows unexpected behaviour.\n"); break;
+				default: ;
+			}
 			break;
 		}
 	}	
@@ -69,22 +75,13 @@ start:
 	if (nonce2key(uid, nt, nr, par_list, ks_list, &r_key)) {
 		isOK = 2;
 		PrintAndLog("Key not found (lfsr_common_prefix list is null). Nt=%08x", nt);	
-	} else {
-		printf("------------------------------------------------------------------\n");
-		PrintAndLog("Key found:%012"llx" \n", r_key);
-
-		num_to_bytes(r_key, 6, keyBlock);
-		isOK = mfCheckKeys(0, 0, 1, keyBlock, &r_key);
-	}
-	
-	if (!isOK) 
-		PrintAndLog("Found valid key:%012"llx, r_key);
-	else
-	{
-		if (isOK != 2) PrintAndLog("Found invalid key. ");	
 		PrintAndLog("Failing is expected to happen in 25%% of all cases. Trying again with a different reader nonce...");
 		c.arg[0] = false;
 		goto start;
+	} else {
+		isOK = 0;
+		printf("------------------------------------------------------------------\n");
+		PrintAndLog("Found valid key:%012"llx" \n", r_key);
 	}
 	
 	PrintAndLog("");
@@ -622,8 +619,14 @@ int CmdHF14AMfNested(const char *Cmd)
 	
 	if (cmdp == 'o') {
 		PrintAndLog("--target block no:%3d, target key type:%c ", trgBlockNo, trgKeyType?'B':'A');
-		if (mfnested(blockNo, keyType, key, trgBlockNo, trgKeyType, keyBlock, true)) {
-			PrintAndLog("Nested error.");
+		int16_t isOK = mfnested(blockNo, keyType, key, trgBlockNo, trgKeyType, keyBlock, true);
+		if (isOK) {
+			switch (isOK) {
+				case -1 : PrintAndLog("Error: No response from Proxmark.\n"); break;
+				case -2 : PrintAndLog("Button pressed. Aborted.\n"); break;
+				case -3 : PrintAndLog("Tag isn't vulnerable to Nested Attack (random numbers are not predictable).\n"); break;
+				default : PrintAndLog("Unknown Error.\n");
+			}
 			return 2;
 		}
 		key64 = bytes_to_num(keyBlock, 6);
@@ -678,7 +681,7 @@ int CmdHF14AMfNested(const char *Cmd)
 			for (j = 0; j < 2; j++) {
 				if (e_sector[i].foundKey[j]) continue;
 				
-				res = mfCheckKeys(FirstBlockOfSector(i), j, 6, keyBlock, &key64);
+				res = mfCheckKeys(FirstBlockOfSector(i), j, true, 6, keyBlock, &key64);
 				
 				if (!res) {
 					e_sector[i].Key[j] = key64;
@@ -696,11 +699,17 @@ int CmdHF14AMfNested(const char *Cmd)
 				for (trgKeyType = 0; trgKeyType < 2; trgKeyType++) { 
 					if (e_sector[sectorNo].foundKey[trgKeyType]) continue;
 					PrintAndLog("-----------------------------------------------");
-					if(mfnested(blockNo, keyType, key, FirstBlockOfSector(sectorNo), trgKeyType, keyBlock, calibrate)) {
-						PrintAndLog("Nested error.\n");
+					int16_t isOK = mfnested(blockNo, keyType, key, FirstBlockOfSector(sectorNo), trgKeyType, keyBlock, calibrate);
+					if(isOK) {
+						switch (isOK) {
+							case -1 : PrintAndLog("Error: No response from Proxmark.\n"); break;
+							case -2 : PrintAndLog("Button pressed. Aborted.\n"); break;
+							case -3 : PrintAndLog("Tag isn't vulnerable to Nested Attack (random numbers are not predictable).\n"); break;
+							default : PrintAndLog("Unknown Error.\n");
+						}
 						free(e_sector);
-						return 2;					}
-					else {
+						return 2;
+					} else {
 						calibrate = false;
 					}
 					
@@ -956,7 +965,7 @@ int CmdHF14AMfChk(const char *Cmd)
 			uint32_t max_keys = keycnt>USB_CMD_DATA_SIZE/6?USB_CMD_DATA_SIZE/6:keycnt;
 			for (uint32_t c = 0; c < keycnt; c+=max_keys) {
 				uint32_t size = keycnt-c>max_keys?max_keys:keycnt-c;
-				res = mfCheckKeys(b, t, size, &keyBlock[6*c], &key64);
+				res = mfCheckKeys(b, t, true, size, &keyBlock[6*c], &key64);
 				if (res != 1) {
 					if (!res) {
 						PrintAndLog("Found valid key:[%012"llx"]",key64);
@@ -1942,6 +1951,13 @@ int CmdHF14AMfSniff(const char *Cmd){
 	return 0;
 }
 
+//needs nt, ar, at, Data to decrypt
+int CmdDecryptTraceCmds(const char *Cmd){
+	uint8_t data[50];
+	int len = 0;
+	param_gethex_ex(Cmd,3,data,&len);
+	return tryDecryptWord(param_get32ex(Cmd,0,0,16),param_get32ex(Cmd,1,0,16),param_get32ex(Cmd,2,0,16),data,len/2);
+}
 
 static command_t CommandTable[] =
 {
@@ -1970,6 +1986,7 @@ static command_t CommandTable[] =
   {"cgetsc",	CmdHF14AMfCGetSc,		0, "Read sector - Magic Chinese card"},
   {"cload",		CmdHF14AMfCLoad,		0, "Load dump into magic Chinese card"},
   {"csave",		CmdHF14AMfCSave,		0, "Save dump from magic Chinese card into file or emulator"},
+  {"decrypt", CmdDecryptTraceCmds,1, "[nt] [ar_enc] [at_enc] [data] - to decrypt snoop or trace"},
   {NULL, NULL, 0, NULL}
 };
 

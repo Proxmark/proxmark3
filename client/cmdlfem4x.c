@@ -21,8 +21,6 @@
 #include "cmdlfem4x.h"
 #include "lfdemod.h"
 
-#define llx PRIx64
-
 char *global_em410xId;
 
 static int CmdHelp(const char *Cmd);
@@ -58,7 +56,7 @@ int CmdEM410xRead(const char *Cmd)
 		return 0;
 	}
 	char id[12] = {0x00};
-	sprintf(id, "%010llx",lo);
+	sprintf(id, "%010"PRIx64,lo);
 	
 	global_em410xId = id;
 	return 1;
@@ -73,22 +71,23 @@ int CmdEM410xSim(const char *Cmd)
 	uint8_t uid[5] = {0x00};
 
 	if (cmdp == 'h' || cmdp == 'H') {
-		PrintAndLog("Usage:  lf em4x 410xsim <UID>");
+		PrintAndLog("Usage:  lf em4x em410xsim <UID> <clock>");
 		PrintAndLog("");
-		PrintAndLog("     sample: lf em4x 410xsim 0F0368568B");
+		PrintAndLog("     sample: lf em4x em410xsim 0F0368568B");
 		return 0;
 	}
+	/* clock is 64 in EM410x tags */
+	uint8_t clock = 64;
 
 	if (param_gethex(Cmd, 0, uid, 10)) {
 		PrintAndLog("UID must include 10 HEX symbols");
 		return 0;
 	}
-	
-	PrintAndLog("Starting simulating UID %02X%02X%02X%02X%02X", uid[0],uid[1],uid[2],uid[3],uid[4]);
+	param_getdec(Cmd,1, &clock);
+
+	PrintAndLog("Starting simulating UID %02X%02X%02X%02X%02X  clock: %d", uid[0],uid[1],uid[2],uid[3],uid[4],clock);
 	PrintAndLog("Press pm3-button to about simulation");
 
-	/* clock is 64 in EM410x tags */
-	int clock = 64;
 
 	/* clear our graph */
 	ClearGraph(0);
@@ -197,21 +196,13 @@ int CmdEM410xWrite(const char *Cmd)
 	}
 
 	// Check Clock
-	if (card == 1)
-	{
-		// Default: 64
-		if (clock == 0)
-			clock = 64;
+	// Default: 64
+	if (clock == 0)
+		clock = 64;
 
-		// Allowed clock rates: 16, 32 and 64
-		if ((clock != 16) && (clock != 32) && (clock != 64)) {
-			PrintAndLog("Error! Clock rate %d not valid. Supported clock rates are 16, 32 and 64.\n", clock);
-			return 0;
-		}
-	}
-	else if (clock != 0)
-	{
-		PrintAndLog("Error! Clock rate is only supported on T55x7 tags.\n");
+	// Allowed clock rates: 16, 32, 40 and 64
+	if ((clock != 16) && (clock != 32) && (clock != 64) && (clock != 40)) {
+		PrintAndLog("Error! Clock rate %d not valid. Supported clock rates are 16, 32, 40 and 64.\n", clock);
 		return 0;
 	}
 
@@ -221,11 +212,11 @@ int CmdEM410xWrite(const char *Cmd)
 		//   provide for backwards-compatibility for older firmware, and to avoid
 		//   having to add another argument to CMD_EM410X_WRITE_TAG, we just store
 		//   the clock rate in bits 8-15 of the card value
-		card = (card & 0xFF) | (((uint64_t)clock << 8) & 0xFF00);
-	}
-	else if (card == 0)
+		card = (card & 0xFF) | ((clock << 8) & 0xFF00);
+	}	else if (card == 0) {
 		PrintAndLog("Writing %s tag with UID 0x%010" PRIx64, "T5555", id, clock);
-	else {
+		card = (card & 0xFF) | ((clock << 8) & 0xFF00);
+	} else {
 		PrintAndLog("Error! Bad card type selected.\n");
 		return 0;
 	}
@@ -608,7 +599,7 @@ static command_t CommandTable[] =
 	{"help", CmdHelp, 1, "This help"},
 	{"em410xdemod", CmdEMdemodASK, 0, "[findone] -- Extract ID from EM410x tag (option 0 for continuous loop, 1 for only 1 tag)"},  
 	{"em410xread", CmdEM410xRead, 1, "[clock rate] -- Extract ID from EM410x tag in GraphBuffer"},
-	{"em410xsim", CmdEM410xSim, 0, "<UID> -- Simulate EM410x tag"},
+	{"em410xsim", CmdEM410xSim, 0, "<UID> [clock rate] -- Simulate EM410x tag"},
 	{"em410xwatch", CmdEM410xWatch, 0, "['h'] -- Watches for EM410x 125/134 kHz tags (option 'h' for 134)"},
 	{"em410xspoof", CmdEM410xWatchnSpoof, 0, "['h'] --- Watches for EM410x 125/134 kHz tags, and replays them. (option 'h' for 134)" },
 	{"em410xwrite", CmdEM410xWrite, 0, "<UID> <'0' T5555> <'1' T55x7> [clock rate] -- Write EM410x UID to T5555(Q5) or T55x7 tag, optionally setting clock rate"},

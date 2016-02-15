@@ -10,14 +10,14 @@
 #include "apps.h"
 #include "util.h"
 #include "string.h"
-
+#include "usb_cdc.h" // for usb_poll_validate_length
 #include "lfsampling.h"
 
 sample_config config = { 1, 8, 1, 95, 0 } ;
 
 void printConfig()
 {
-	Dbprintf("Sampling config: ");
+	Dbprintf("LF Sampling config: ");
 	Dbprintf("  [q] divisor:           %d ", config.divisor);
 	Dbprintf("  [b] bps:               %d ", config.bits_per_sample);
 	Dbprintf("  [d] decimation:        %d ", config.decimation);
@@ -103,7 +103,6 @@ void LFSetupFPGAForADC(int divisor, bool lf_field)
 	FpgaSetupSsc();
 }
 
-
 /**
  * Does the sample acquisition. If threshold is specified, the actual sampling
  * is not commenced until the threshold has been reached.
@@ -119,8 +118,7 @@ void LFSetupFPGAForADC(int divisor, bool lf_field)
  * @param silent - is true, now outputs are made. If false, dbprints the status
  * @return the number of bits occupied by the samples.
  */
-
-uint32_t DoAcquisition(uint8_t decimation, uint32_t bits_per_sample, bool averaging, int trigger_threshold,bool silent)
+uint32_t DoAcquisition(uint8_t decimation, uint32_t bits_per_sample, bool averaging, int trigger_threshold, bool silent)
 {
 	//.
 	uint8_t *dest = BigBuf_get_addr();
@@ -151,9 +149,10 @@ uint32_t DoAcquisition(uint8_t decimation, uint32_t bits_per_sample, bool averag
 		if (AT91C_BASE_SSC->SSC_SR & AT91C_SSC_RXRDY) {
 			sample = (uint8_t)AT91C_BASE_SSC->SSC_RHR;
 			LED_D_OFF();
-			if (trigger_threshold > 0 && sample < trigger_threshold)
+			// threshold either high or low values 128 = center 0.  if trigger = 178 
+			if ((trigger_threshold > 0) && (sample < (trigger_threshold+128)) && (sample > (128-trigger_threshold))) // 
 				continue;
-
+		
 			trigger_threshold = 0;
 			sample_total_numbers++;
 
@@ -248,4 +247,71 @@ uint32_t SampleLF(bool printCfg)
 uint32_t SnoopLF()
 {
 	return ReadLF(false, true);
+}
+
+/**
+* acquisition of T55x7 LF signal. Similart to other LF, but adjusted with @marshmellows thresholds
+* the data is collected in BigBuf.
+**/
+void doT55x7Acquisition(size_t sample_size) {
+
+	#define T55xx_READ_UPPER_THRESHOLD 128+60  // 60 grph
+	#define T55xx_READ_LOWER_THRESHOLD 128-60  // -60 grph
+	#define T55xx_READ_TOL   5
+
+	uint8_t *dest = BigBuf_get_addr();
+	uint16_t bufsize = BigBuf_max_traceLen();
+	
+	if ( bufsize > sample_size )
+		bufsize = sample_size;
+
+	uint16_t i = 0;
+	bool startFound = false;
+	bool highFound = false;
+	bool lowFound = false;
+	uint8_t curSample = 0;
+	uint8_t lastSample = 0;
+	uint16_t skipCnt = 0;
+	while(!BUTTON_PRESS() && !usb_poll_validate_length() && skipCnt<1000 && i<bufsize ) {
+		WDT_HIT();
+		if (AT91C_BASE_SSC->SSC_SR & AT91C_SSC_TXRDY) {
+			AT91C_BASE_SSC->SSC_THR = 0x43;
+			LED_D_ON();
+		}
+		if (AT91C_BASE_SSC->SSC_SR & AT91C_SSC_RXRDY) {
+			curSample = (uint8_t)AT91C_BASE_SSC->SSC_RHR;
+			LED_D_OFF();
+
+			// skip until the first high sample above threshold
+			if (!startFound && curSample > T55xx_READ_UPPER_THRESHOLD) {
+				//if (curSample > lastSample) 
+				//	lastSample = curSample;
+				highFound = true;
+			} else if (!highFound) {
+				skipCnt++;
+				continue;
+			}
+			// skip until the first Low sample below threshold
+			if (!startFound && curSample < T55xx_READ_LOWER_THRESHOLD) {
+				//if (curSample > lastSample) 
+				lastSample = curSample;
+				lowFound = true;
+			} else if (!lowFound) {
+				skipCnt++;
+				continue;
+			}
+
+
+			// skip until first high samples begin to change
+			if (startFound || curSample > T55xx_READ_LOWER_THRESHOLD+T55xx_READ_TOL){
+				// if just found start - recover last sample
+				if (!startFound) {
+					dest[i++] = lastSample;
+					startFound = true;
+				}
+				// collect samples
+				dest[i++] = curSample;
+			}
+		}
+	}
 }

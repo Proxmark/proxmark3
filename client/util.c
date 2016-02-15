@@ -9,10 +9,12 @@
 //-----------------------------------------------------------------------------
 
 #include "util.h"
+#define MAX_BIN_BREAK_LENGTH   (3072+384+1)
 
 #ifndef _WIN32
 #include <termios.h>
 #include <sys/ioctl.h> 
+
 
 int ukbhit(void)
 {
@@ -21,7 +23,7 @@ int ukbhit(void)
   static struct termios Otty, Ntty;
 
 
-  tcgetattr( 0, &Otty);
+  if ( tcgetattr( 0, &Otty) == -1 ) return -1;
   Ntty = Otty;
 
   Ntty.c_iflag          = 0;       /* input mode                */
@@ -123,16 +125,31 @@ char *sprint_hex(const uint8_t *data, const size_t len) {
 }
 
 char *sprint_bin_break(const uint8_t *data, const size_t len, const uint8_t breaks) {
-	
-	int maxLen = ( len > 1020) ? 1020 : len;
-	static char buf[1024];
-	memset(buf, 0x00, 1024);
+	// make sure we don't go beyond our char array memory
+	int max_len;
+	if (breaks==0)
+		max_len = ( len > MAX_BIN_BREAK_LENGTH ) ? MAX_BIN_BREAK_LENGTH : len;
+	else
+		max_len = ( len+(len/breaks) > MAX_BIN_BREAK_LENGTH ) ? MAX_BIN_BREAK_LENGTH : len+(len/breaks);
+
+	static char buf[MAX_BIN_BREAK_LENGTH]; // 3072 + end of line characters if broken at 8 bits
+	//clear memory
+	memset(buf, 0x00, sizeof(buf));
 	char *tmp = buf;
 
-	for (size_t i=0; i < maxLen; ++i){
-		sprintf(tmp++, "%u", data[i]);
-		if (breaks > 0 && !((i+1) % breaks))
+	size_t in_index = 0;
+	// loop through the out_index to make sure we don't go too far
+	for (size_t out_index=0; out_index < max_len; out_index++) {
+		// set character - (should be binary but verify it isn't more than 1 digit)
+		if (data[in_index]<10)
+			sprintf(tmp++, "%u", data[in_index]);
+		// check if a line break is needed and we have room to print it in our array
+		if ( (breaks > 0) && !((in_index+1) % breaks) && (out_index+1 != max_len) ) {
+			// increment and print line break
+			out_index++;
 			sprintf(tmp++, "%s","\n");
+		}
+		in_index++;
 	}
 
 	return buf;
@@ -158,6 +175,13 @@ uint64_t bytes_to_num(uint8_t* src, size_t len)
 		src++;
 	}
 	return num;
+}
+
+void num_to_bytebits(uint64_t	n, size_t len, uint8_t *dest) {
+	while (len--) {
+		dest[len] = n & 1;
+		n >>= 1;
+	}
 }
 
 // aa,bb,cc,dd,ee,ff,gg,hh, ii,jj,kk,ll,mm,nn,oo,pp
@@ -333,7 +357,28 @@ int param_gethex(const char *line, int paramnum, uint8_t * data, int hexcnt)
 
 	return 0;
 }
+int param_gethex_ex(const char *line, int paramnum, uint8_t * data, int *hexcnt)
+{
+	int bg, en, temp, i;
 
+	//if (hexcnt % 2)
+	//	return 1;
+	
+	if (param_getptr(line, &bg, &en, paramnum)) return 1;
+
+	*hexcnt = en - bg + 1;
+	if (*hexcnt % 2) //error if not complete hex bytes
+		return 1;
+
+	for(i = 0; i < *hexcnt; i += 2) {
+		if (!(isxdigit(line[bg + i]) && isxdigit(line[bg + i + 1])) )	return 1;
+		
+		sscanf((char[]){line[bg + i], line[bg + i + 1], 0}, "%X", &temp);
+		data[i / 2] = temp & 0xff;
+	}	
+
+	return 0;
+}
 int param_getstr(const char *line, int paramnum, char * str)
 {
 	int bg, en;
@@ -425,7 +470,7 @@ void binarraytobinstring(char *target, char *source,  int length)
 }
 
 // return parity bit required to match type
-uint8_t GetParity( char *bits, uint8_t type, int length)
+uint8_t GetParity( uint8_t *bits, uint8_t type, int length)
 {
     int x;
 
@@ -437,7 +482,7 @@ uint8_t GetParity( char *bits, uint8_t type, int length)
 }
 
 // add HID parity to binary array: EVEN prefix for 1st half of ID, ODD suffix for 2nd half
-void wiegand_add_parity(char *target, char *source, char length)
+void wiegand_add_parity(uint8_t *target, uint8_t *source, uint8_t length)
 {
     *(target++)= GetParity(source, EVEN, length / 2);
     memcpy(target, source, length);
@@ -452,4 +497,14 @@ void xor(unsigned char *dst, unsigned char *src, size_t len) {
 
 int32_t le24toh (uint8_t data[3]) {
     return (data[2] << 16) | (data[1] << 8) | data[0];
+}
+
+// RotateLeft - Ultralight, Desfire, works on byte level
+// 00-01-02  >> 01-02-00
+void rol(uint8_t *data, const size_t len){
+    uint8_t first = data[0];
+    for (size_t i = 0; i < len-1; i++) {
+        data[i] = data[i+1];
+    }
+    data[len-1] = first;
 }

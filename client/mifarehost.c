@@ -69,7 +69,7 @@ void* nested_worker_thread(void *arg)
 
 int mfnested(uint8_t blockNo, uint8_t keyType, uint8_t * key, uint8_t trgBlockNo, uint8_t trgKeyType, uint8_t * resultKey, bool calibrate) 
 {
-	uint16_t i, len;
+	uint16_t i;
 	uint32_t uid;
 	UsbCommand resp;
 
@@ -77,31 +77,29 @@ int mfnested(uint8_t blockNo, uint8_t keyType, uint8_t * key, uint8_t trgBlockNo
 	struct Crypto1State *p1, *p2, *p3, *p4;
 	
 	// flush queue
-	WaitForResponseTimeout(CMD_ACK,NULL,100);
+	WaitForResponseTimeout(CMD_ACK, NULL, 100);
 	
 	UsbCommand c = {CMD_MIFARE_NESTED, {blockNo + keyType * 0x100, trgBlockNo + trgKeyType * 0x100, calibrate}};
 	memcpy(c.d.asBytes, key, 6);
 	SendCommand(&c);
 
-	if (WaitForResponseTimeout(CMD_ACK,&resp,1500)) {
-		len = resp.arg[1];
-		if (len == 2) {	
-			memcpy(&uid, resp.d.asBytes, 4);
-			PrintAndLog("uid:%08x len=%d trgbl=%d trgkey=%x", uid, len, (uint16_t)resp.arg[2] & 0xff, (uint16_t)resp.arg[2] >> 8);
-			
-			for (i = 0; i < 2; i++) {
-				statelists[i].blockNo = resp.arg[2] & 0xff;
-				statelists[i].keyType = (resp.arg[2] >> 8) & 0xff;
-				statelists[i].uid = uid;
+	if (!WaitForResponseTimeout(CMD_ACK, &resp, 1500)) {
+		return -1;
+	}
 
-				memcpy(&statelists[i].nt,  (void *)(resp.d.asBytes + 4 + i * 8 + 0), 4);
-				memcpy(&statelists[i].ks1, (void *)(resp.d.asBytes + 4 + i * 8 + 4), 4);
-			}
-		}
-		else {
-			PrintAndLog("Got 0 keys from proxmark."); 
-			return 1;
-		}
+	if (resp.arg[0]) {
+		return resp.arg[0];  // error during nested
+	}
+		
+	memcpy(&uid, resp.d.asBytes, 4);
+	PrintAndLog("uid:%08x trgbl=%d trgkey=%x", uid, (uint16_t)resp.arg[2] & 0xff, (uint16_t)resp.arg[2] >> 8);
+	
+	for (i = 0; i < 2; i++) {
+		statelists[i].blockNo = resp.arg[2] & 0xff;
+		statelists[i].keyType = (resp.arg[2] >> 8) & 0xff;
+		statelists[i].uid = uid;
+		memcpy(&statelists[i].nt,  (void *)(resp.d.asBytes + 4 + i * 8 + 0), 4);
+		memcpy(&statelists[i].ks1, (void *)(resp.d.asBytes + 4 + i * 8 + 4), 4);
 	}
 	
 	// calc keys
@@ -183,7 +181,7 @@ int mfnested(uint8_t blockNo, uint8_t keyType, uint8_t * key, uint8_t trgBlockNo
 		crypto1_get_lfsr(statelists[0].head.slhead + i, &key64);
 		num_to_bytes(key64, 6, keyBlock);
 		key64 = 0;
-		if (!mfCheckKeys(statelists[0].blockNo, statelists[0].keyType, 1, keyBlock, &key64)) {
+		if (!mfCheckKeys(statelists[0].blockNo, statelists[0].keyType, false, 1, keyBlock, &key64)) {
 			num_to_bytes(key64, 6, resultKey);
 			break;
 		}
@@ -195,11 +193,11 @@ int mfnested(uint8_t blockNo, uint8_t keyType, uint8_t * key, uint8_t trgBlockNo
 	return 0;
 }
 
-int mfCheckKeys (uint8_t blockNo, uint8_t keyType, uint8_t keycnt, uint8_t * keyBlock, uint64_t * key){
+int mfCheckKeys (uint8_t blockNo, uint8_t keyType, bool clear_trace, uint8_t keycnt, uint8_t * keyBlock, uint64_t * key){
 
 	*key = 0;
 
-	UsbCommand c = {CMD_MIFARE_CHKKEYS, {blockNo, keyType, keycnt}};
+	UsbCommand c = {CMD_MIFARE_CHKKEYS, {((blockNo & 0xff) | ((keyType&0xff)<<8)), clear_trace, keycnt}};
 	memcpy(c.d.asBytes, keyBlock, 6 * keycnt);
 	SendCommand(&c);
 
@@ -619,5 +617,25 @@ int mfTraceDecode(uint8_t *data_src, int len, bool wantSaveToEmlFile) {
 		return 1;
 	}
 
+	return 0;
+}
+
+int tryDecryptWord(uint32_t nt, uint32_t ar_enc, uint32_t at_enc, uint8_t *data, int len){
+	/*
+	uint32_t nt;      // tag challenge
+	uint32_t ar_enc;  // encrypted reader response
+	uint32_t at_enc;  // encrypted tag response
+	*/
+	if (traceCrypto1) {
+		crypto1_destroy(traceCrypto1);
+	}
+	ks2 = ar_enc ^ prng_successor(nt, 64);
+	ks3 = at_enc ^ prng_successor(nt, 96);
+	traceCrypto1 = lfsr_recovery64(ks2, ks3);
+
+	mf_crypto1_decrypt(traceCrypto1, data, len, 0);
+
+	PrintAndLog("Decrypted data: [%s]", sprint_hex(data,len) );
+	crypto1_destroy(traceCrypto1);
 	return 0;
 }

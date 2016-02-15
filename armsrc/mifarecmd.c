@@ -44,9 +44,9 @@ void MifareReadBlock(uint8_t arg0, uint8_t arg1, uint8_t arg2, uint8_t *datain)
 	struct Crypto1State *pcs;
 	pcs = &mpcs;
 
-	// clear trace
-	clear_trace();
 	iso14443a_setup(FPGA_HF_ISO14443A_READER_LISTEN);
+
+	clear_trace();
 
 	LED_A_ON();
 	LED_B_OFF();
@@ -95,8 +95,10 @@ void MifareUC_Auth(uint8_t arg0, uint8_t *keybytes){
 	bool turnOffField = (arg0 == 1);
 
 	LED_A_ON(); LED_B_OFF(); LED_C_OFF();
-	clear_trace();
+
 	iso14443a_setup(FPGA_HF_ISO14443A_READER_LISTEN);
+
+	clear_trace();
 
 	if(!iso14443a_select_card(NULL, NULL, NULL)) {
 		if (MF_DBGLEVEL >= MF_DBG_ERROR) Dbprintf("Can't select card");
@@ -129,8 +131,9 @@ void MifareUReadBlock(uint8_t arg0, uint8_t arg1, uint8_t *datain)
 
 	LEDsoff();
 	LED_A_ON();
-	clear_trace();
 	iso14443a_setup(FPGA_HF_ISO14443A_READER_LISTEN);
+
+	clear_trace();
 
 	int len = iso14443a_select_card(NULL, NULL, NULL);
 	if(!len) {
@@ -199,10 +202,9 @@ void MifareReadSector(uint8_t arg0, uint8_t arg1, uint8_t arg2, uint8_t *datain)
 	struct Crypto1State *pcs;
 	pcs = &mpcs;
 
-	// clear trace
-	clear_trace();
-
 	iso14443a_setup(FPGA_HF_ISO14443A_READER_LISTEN);
+
+	clear_trace();
 
 	LED_A_ON();
 	LED_B_OFF();
@@ -252,6 +254,10 @@ void MifareReadSector(uint8_t arg0, uint8_t arg1, uint8_t arg2, uint8_t *datain)
 // datain = KEY bytes
 void MifareUReadCard(uint8_t arg0, uint16_t arg1, uint8_t arg2, uint8_t *datain)
 {
+	LEDsoff();
+	LED_A_ON();
+	iso14443a_setup(FPGA_HF_ISO14443A_READER_LISTEN);
+
 	// free eventually allocated BigBuf memory
 	BigBuf_free();
 	clear_trace();
@@ -268,10 +274,6 @@ void MifareUReadCard(uint8_t arg0, uint16_t arg1, uint8_t arg2, uint8_t *datain)
 		OnError(1);
 		return;
 	}
-
-	LEDsoff();
-	LED_A_ON();
-	iso14443a_setup(FPGA_HF_ISO14443A_READER_LISTEN);
 
 	int len = iso14443a_select_card(NULL, NULL, NULL);
 	if (!len) {
@@ -366,10 +368,9 @@ void MifareWriteBlock(uint8_t arg0, uint8_t arg1, uint8_t arg2, uint8_t *datain)
 	struct Crypto1State *pcs;
 	pcs = &mpcs;
 
-	// clear trace
-	clear_trace();
-
 	iso14443a_setup(FPGA_HF_ISO14443A_READER_LISTEN);
+
+	clear_trace();
 
 	LED_A_ON();
 	LED_B_OFF();
@@ -472,8 +473,9 @@ void MifareUWriteBlock(uint8_t arg0, uint8_t arg1, uint8_t *datain)
 	
 	LEDsoff();
 	LED_A_ON();
-	clear_trace();
 	iso14443a_setup(FPGA_HF_ISO14443A_READER_LISTEN);
+
+	clear_trace();
 
 	if(!iso14443a_select_card(NULL, NULL, NULL)) {
 		if (MF_DBGLEVEL >= 1) Dbprintf("Can't select card");
@@ -530,8 +532,9 @@ void MifareUSetPwd(uint8_t arg0, uint8_t *datain){
 	memcpy(pwd, datain, 16);
 	
 	LED_A_ON(); LED_B_OFF(); LED_C_OFF();
-	clear_trace();
 	iso14443a_setup(FPGA_HF_ISO14443A_READER_LISTEN);
+
+	clear_trace();
 
 	if(!iso14443a_select_card(NULL, NULL, NULL)) {
 		if (MF_DBGLEVEL >= 1) Dbprintf("Can't select card");
@@ -632,19 +635,20 @@ void MifareNested(uint32_t arg0, uint32_t arg1, uint32_t calibrate, uint8_t *dat
 	uint32_t auth1_time, auth2_time;
 	static uint16_t delta_time;
 
-	// free eventually allocated BigBuf memory
-	BigBuf_free();
-	// clear trace
-	clear_trace();
-	set_tracing(false);
-	
-	iso14443a_setup(FPGA_HF_ISO14443A_READER_LISTEN);
-
 	LED_A_ON();
 	LED_C_OFF();
+	iso14443a_setup(FPGA_HF_ISO14443A_READER_LISTEN);
 
+	// free eventually allocated BigBuf memory
+	BigBuf_free();
 
+	if (calibrate) clear_trace();
+	set_tracing(true);
+	
 	// statistics on nonce distance
+	int16_t isOK = 0;
+	#define NESTED_MAX_TRIES 12
+	uint16_t unsuccessfull_tries = 0;
 	if (calibrate) {	// for first call only. Otherwise reuse previous calibration
 		LED_B_ON();
 		WDT_HIT();
@@ -654,6 +658,12 @@ void MifareNested(uint32_t arg0, uint32_t arg1, uint32_t calibrate, uint8_t *dat
 		delta_time = 0;
 		
 		for (rtr = 0; rtr < 17; rtr++) {
+
+			// Test if the action was cancelled
+			if(BUTTON_PRESS()) {
+				isOK = -2;
+				break;
+			}
 
 			// prepare next select. No need to power down the card.
 			if(mifare_classic_halt(pcs, cuid)) {
@@ -702,14 +712,17 @@ void MifareNested(uint32_t arg0, uint32_t arg1, uint32_t calibrate, uint8_t *dat
 					delta_time = auth2_time - auth1_time + 32;  // allow some slack for proper timing
 				}
 				if (MF_DBGLEVEL >= 3) Dbprintf("Nested: calibrating... ntdist=%d", i);
+			} else {
+				unsuccessfull_tries++;
+				if (unsuccessfull_tries > NESTED_MAX_TRIES) {	// card isn't vulnerable to nested attack (random numbers are not predictable)
+					isOK = -3;
+				}
 			}
 		}
-		
-		if (rtr <= 1)	return;
 
 		davg = (davg + (rtr - 1)/2) / (rtr - 1);
 		
-		if (MF_DBGLEVEL >= 3) Dbprintf("min=%d max=%d avg=%d, delta_time=%d", dmin, dmax, davg, delta_time);
+		if (MF_DBGLEVEL >= 3) Dbprintf("rtr=%d isOK=%d min=%d max=%d avg=%d, delta_time=%d", rtr, isOK, dmin, dmax, davg, delta_time);
 
 		dmin = davg - 2;
 		dmax = davg + 2;
@@ -722,7 +735,7 @@ void MifareNested(uint32_t arg0, uint32_t arg1, uint32_t calibrate, uint8_t *dat
 	LED_C_ON();
 
 	//  get crypted nonces for target sector
-	for(i=0; i < 2; i++) { // look for exactly two different nonces
+	for(i=0; i < 2 && !isOK; i++) { // look for exactly two different nonces
 
 		target_nt[i] = 0;
 		while(target_nt[i] == 0) { // continue until we have an unambiguous nonce
@@ -800,25 +813,25 @@ void MifareNested(uint32_t arg0, uint32_t arg1, uint32_t calibrate, uint8_t *dat
 	memcpy(buf+16, &target_ks[1], 4);
 	
 	LED_B_ON();
-	cmd_send(CMD_ACK, 0, 2, targetBlockNo + (targetKeyType * 0x100), buf, sizeof(buf));
+	cmd_send(CMD_ACK, isOK, 0, targetBlockNo + (targetKeyType * 0x100), buf, sizeof(buf));
 	LED_B_OFF();
 
 	if (MF_DBGLEVEL >= 3)	DbpString("NESTED FINISHED");
 
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
 	LEDsoff();
-	set_tracing(TRUE);
 }
 
 //-----------------------------------------------------------------------------
 // MIFARE check keys. key count up to 85. 
 // 
 //-----------------------------------------------------------------------------
-void MifareChkKeys(uint8_t arg0, uint8_t arg1, uint8_t arg2, uint8_t *datain)
+void MifareChkKeys(uint16_t arg0, uint8_t arg1, uint8_t arg2, uint8_t *datain)
 {
   // params
-	uint8_t blockNo = arg0;
-	uint8_t keyType = arg1;
+	uint8_t blockNo = arg0 & 0xff;
+	uint8_t keyType = (arg0 >> 8) & 0xff;
+	bool clearTrace = arg1;
 	uint8_t keyCount = arg2;
 	uint64_t ui64Key = 0;
 	
@@ -835,15 +848,13 @@ void MifareChkKeys(uint8_t arg0, uint8_t arg1, uint8_t arg2, uint8_t *datain)
 	int OLD_MF_DBGLEVEL = MF_DBGLEVEL;	
 	MF_DBGLEVEL = MF_DBG_NONE;
 	
-	// clear trace
-	clear_trace();
-	set_tracing(TRUE);
-
-	iso14443a_setup(FPGA_HF_ISO14443A_READER_LISTEN);
-
 	LED_A_ON();
 	LED_B_OFF();
 	LED_C_OFF();
+	iso14443a_setup(FPGA_HF_ISO14443A_READER_LISTEN);
+
+	if (clearTrace) clear_trace();
+	set_tracing(TRUE);
 
 	for (i = 0; i < keyCount; i++) {
 		if(mifare_classic_halt(pcs, cuid)) {
@@ -890,16 +901,23 @@ void MifareSetDbgLvl(uint32_t arg0, uint32_t arg1, uint32_t arg2, uint8_t *datai
 //-----------------------------------------------------------------------------
 // Work with emulator memory
 // 
+// Note: we call FpgaDownloadAndGo(FPGA_BITSTREAM_HF) here although FPGA is not
+// involved in dealing with emulator memory. But if it is called later, it might
+// destroy the Emulator Memory.
 //-----------------------------------------------------------------------------
+
 void MifareEMemClr(uint32_t arg0, uint32_t arg1, uint32_t arg2, uint8_t *datain){
+	FpgaDownloadAndGo(FPGA_BITSTREAM_HF);
 	emlClearMem();
 }
 
 void MifareEMemSet(uint32_t arg0, uint32_t arg1, uint32_t arg2, uint8_t *datain){
+	FpgaDownloadAndGo(FPGA_BITSTREAM_HF);
 	emlSetMem(datain, arg0, arg1); // data, block num, blocks count
 }
 
 void MifareEMemGet(uint32_t arg0, uint32_t arg1, uint32_t arg2, uint8_t *datain){
+	FpgaDownloadAndGo(FPGA_BITSTREAM_HF);
 	byte_t buf[USB_CMD_DATA_SIZE];
 	emlGetMem(buf, arg0, arg1); // data, block num, blocks count (max 4)
 
@@ -926,15 +944,13 @@ void MifareECardLoad(uint32_t arg0, uint32_t arg1, uint32_t arg2, uint8_t *datai
 	byte_t dataoutbuf2[16];
 	uint8_t uid[10];
 
-	// clear trace
-	clear_trace();
-	set_tracing(false);
-	
-	iso14443a_setup(FPGA_HF_ISO14443A_READER_LISTEN);
-
 	LED_A_ON();
 	LED_B_OFF();
 	LED_C_OFF();
+	iso14443a_setup(FPGA_HF_ISO14443A_READER_LISTEN);
+	
+	clear_trace();
+	set_tracing(false);
 	
 	bool isOK = true;
 
@@ -1028,10 +1044,10 @@ void MifareCSetBlock(uint32_t arg0, uint32_t arg1, uint32_t arg2, uint8_t *datai
 		LED_A_ON();
 		LED_B_OFF();
 		LED_C_OFF();
+		iso14443a_setup(FPGA_HF_ISO14443A_READER_LISTEN);
 	
 		clear_trace();
 		set_tracing(TRUE);
-		iso14443a_setup(FPGA_HF_ISO14443A_READER_LISTEN);
 	}
 
 	while (true) {
@@ -1127,6 +1143,7 @@ void MifareCGetBlock(uint32_t arg0, uint32_t arg1, uint32_t arg2, uint8_t *datai
 	// bit 2 - need HALT after sequence
 	// bit 3 - need init FPGA and field before sequence
 	// bit 4 - need reset FPGA and LED
+	// bit 5 - need to set datain instead of issuing USB reply (called via ARM for StandAloneMode14a)
 	uint8_t workFlags = arg0;
 	uint8_t blockNo = arg2;
 	
@@ -1146,10 +1163,10 @@ void MifareCGetBlock(uint32_t arg0, uint32_t arg1, uint32_t arg2, uint8_t *datai
 		LED_A_ON();
 		LED_B_OFF();
 		LED_C_OFF();
-	
+		iso14443a_setup(FPGA_HF_ISO14443A_READER_LISTEN);
+
 		clear_trace();
 		set_tracing(TRUE);
-		iso14443a_setup(FPGA_HF_ISO14443A_READER_LISTEN);
 	}
 
 	while (true) {
@@ -1186,7 +1203,12 @@ void MifareCGetBlock(uint32_t arg0, uint32_t arg1, uint32_t arg2, uint8_t *datai
 	}
 	
 	LED_B_ON();
-	cmd_send(CMD_ACK,isOK,0,0,data,18);
+	if (workFlags & 0x20) {
+		if (isOK)
+			memcpy(datain, data, 18);
+	}
+	else
+		cmd_send(CMD_ACK,isOK,0,0,data,18);
 	LED_B_OFF();
 
 	if ((workFlags & 0x10) || (!isOK)) {
@@ -1224,7 +1246,7 @@ void MifareCIdent(){
 	cmd_send(CMD_ACK,isOK,0,0,0,0);
 }
 
-			//
+//
 // DESFIRE
 //
 
@@ -1234,8 +1256,8 @@ void Mifare_DES_Auth1(uint8_t arg0, uint8_t *datain){
 	uint8_t uid[10] = {0x00};
 	uint32_t cuid;
     
-	clear_trace();
 	iso14443a_setup(FPGA_HF_ISO14443A_READER_LISTEN);
+	clear_trace();
 
 	int len = iso14443a_select_card(uid, NULL, &cuid);
 	if(!len) {

@@ -51,8 +51,14 @@ uint8_t *BigBuf_get_EM_addr(void)
 // clear ALL of BigBuf
 void BigBuf_Clear(void)
 {
+	BigBuf_Clear_ext(true);
+}
+// clear ALL of BigBuf
+void BigBuf_Clear_ext(bool verbose)
+{
 	memset(BigBuf,0,BIGBUF_SIZE);
-	Dbprintf("Buffer cleared (%i bytes)",BIGBUF_SIZE);
+	if (verbose) 
+		Dbprintf("Buffer cleared (%i bytes)",BIGBUF_SIZE);
 }
 
 
@@ -88,6 +94,16 @@ void BigBuf_free_keep_EM(void)
 	}
 }
 
+void BigBuf_print_status(void)
+{
+	Dbprintf("Memory");
+	Dbprintf("  BIGBUF_SIZE.............%d", BIGBUF_SIZE);
+	Dbprintf("  BigBuf_hi  .............%d", BigBuf_hi);
+	Dbprintf("Tracing");
+	Dbprintf("  tracing ................%d", tracing);
+	Dbprintf("  traceLen ...............%d", traceLen);
+}
+
 
 // return the maximum trace length (i.e. the unallocated size of BigBuf)
 uint16_t BigBuf_max_traceLen(void)
@@ -96,9 +112,6 @@ uint16_t BigBuf_max_traceLen(void)
 }
 
 void clear_trace() {
-	uint8_t *trace = BigBuf_get_addr();
-	uint16_t max_traceLen = BigBuf_max_traceLen();
-	memset(trace, 0x44, max_traceLen);
 	traceLen = 0;
 }
 
@@ -171,18 +184,19 @@ bool RAMFUNC LogTrace(const uint8_t *btBytes, uint16_t iLen, uint32_t timestamp_
 	traceLen += iLen;
 
 	// parity bytes
-	if (parity != NULL && iLen != 0) {
-		memcpy(trace + traceLen, parity, num_paritybytes);
+	if (num_paritybytes != 0) {
+		if (parity != NULL) {
+			memcpy(trace + traceLen, parity, num_paritybytes);
+		} else {
+			memset(trace + traceLen, 0x00, num_paritybytes);
+		}
 	}
 	traceLen += num_paritybytes;
 
-	if(traceLen +4 < max_traceLen)
-	{	//If it hadn't been cleared, for whatever reason..
-		memset(trace+traceLen,0x44, 4);
-	}
-
 	return TRUE;
 }
+
+
 int LogTraceHitag(const uint8_t * btBytes, int iBits, int iSamples, uint32_t dwParity, int readerToTag)
 {
 	/**
@@ -224,6 +238,8 @@ int LogTraceHitag(const uint8_t * btBytes, int iBits, int iSamples, uint32_t dwP
 
 	return TRUE;
 }
+
+
 // Emulator memory
 uint8_t emlSet(uint8_t *data, uint32_t offset, uint32_t length){
 	uint8_t* mem = BigBuf_get_EM_addr();
