@@ -23,7 +23,7 @@ int ukbhit(void)
   static struct termios Otty, Ntty;
 
 
-  tcgetattr( 0, &Otty);
+  if ( tcgetattr( 0, &Otty) == -1 ) return -1;
   Ntty = Otty;
 
   Ntty.c_iflag          = 0;       /* input mode                */
@@ -140,8 +140,9 @@ char *sprint_bin_break(const uint8_t *data, const size_t len, const uint8_t brea
 	size_t in_index = 0;
 	// loop through the out_index to make sure we don't go too far
 	for (size_t out_index=0; out_index < max_len; out_index++) {
-		// set character
-		sprintf(tmp++, "%u", data[in_index]);
+		// set character - (should be binary but verify it isn't more than 1 digit)
+		if (data[in_index]<10)
+			sprintf(tmp++, "%u", data[in_index]);
 		// check if a line break is needed and we have room to print it in our array
 		if ( (breaks > 0) && !((in_index+1) % breaks) && (out_index+1 != max_len) ) {
 			// increment and print line break

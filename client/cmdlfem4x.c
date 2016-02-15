@@ -21,8 +21,6 @@
 #include "cmdlfem4x.h"
 #include "lfdemod.h"
 
-#define llx PRIx64
-
 char *global_em410xId;
 
 static int CmdHelp(const char *Cmd);
@@ -58,7 +56,7 @@ int CmdEM410xRead(const char *Cmd)
 		return 0;
 	}
 	char id[12] = {0x00};
-	sprintf(id, "%010llx",lo);
+	sprintf(id, "%010"PRIx64,lo);
 	
 	global_em410xId = id;
 	return 1;
