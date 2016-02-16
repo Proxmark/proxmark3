@@ -94,7 +94,7 @@ void FillFileNameByUID(char *fileName, uint8_t * uid, char *ext, int byteCount) 
 	memset(fileName, 0x00, 200);
 	
 	for (int j = 0; j < byteCount; j++, fnameptr += 2)
-		sprintf(fnameptr, "%02x", uid[j]); 
+		sprintf(fnameptr, "%02x", (unsigned int) uid[j]); 
 	sprintf(fnameptr, "%s", ext); 
 }
 
@@ -119,7 +119,7 @@ char *sprint_hex(const uint8_t *data, const size_t len) {
 	size_t i;
 
 	for (i=0; i < maxLen; ++i, tmp += 3)
-		sprintf(tmp, "%02x ", data[i]);
+		sprintf(tmp, "%02x ", (unsigned int) data[i]);
 
 	return buf;
 }
@@ -142,7 +142,7 @@ char *sprint_bin_break(const uint8_t *data, const size_t len, const uint8_t brea
 	for (size_t out_index=0; out_index < max_len; out_index++) {
 		// set character - (should be binary but verify it isn't more than 1 digit)
 		if (data[in_index]<10)
-			sprintf(tmp++, "%u", data[in_index]);
+			sprintf(tmp++, "%u", (unsigned int) data[in_index]);
 		// check if a line break is needed and we have room to print it in our array
 		if ( (breaks > 0) && !((in_index+1) % breaks) && (out_index+1 != max_len) ) {
 			// increment and print line break
@@ -215,7 +215,7 @@ char * printBits(size_t const size, void const * const ptr)
         {
             byte = b[i] & (1<<j);
             byte >>= j;
-            sprintf(tmp, "%u", byte);
+            sprintf(tmp, "%u", (unsigned int)byte);
 			tmp++;
         }
     }
@@ -451,7 +451,7 @@ int binarraytohex(char *target,char *source, int length)
     {
         for(i= x= 0 ; i < 4 ; ++i)
             x +=  ( source[i] << (3 - i));
-        sprintf(target,"%X", x);
+        sprintf(target,"%X", (unsigned int)x);
         ++target;
         source += 4;
         j -= 4;

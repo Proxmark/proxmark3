@@ -277,7 +277,8 @@ int AskEm410xDecode(bool verbose, uint32_t *hi, uint64_t *lo )
 
 int AskEm410xDemod(const char *Cmd, uint32_t *hi, uint64_t *lo, bool verbose)
 {
-	if (!ASKDemod(Cmd, FALSE, FALSE, 1)) return 0;
+	bool st = TRUE;
+	if (!ASKDemod_ext(Cmd, FALSE, FALSE, 1, &st)) return 0;
 	return AskEm410xDecode(verbose, hi, lo);
 }
 
@@ -312,8 +313,7 @@ int CmdAskEM410xDemod(const char *Cmd)
 //verbose will print results and demoding messages
 //emSearch will auto search for EM410x format in bitstream
 //askType switches decode: ask/raw = 0, ask/manchester = 1 
-int ASKDemod(const char *Cmd, bool verbose, bool emSearch, uint8_t askType)
-{
+int ASKDemod_ext(const char *Cmd, bool verbose, bool emSearch, uint8_t askType, bool *stCheck) {
 	int invert=0;
 	int clk=0;
 	int maxErr=100;
@@ -334,15 +334,22 @@ int ASKDemod(const char *Cmd, bool verbose, bool emSearch, uint8_t askType)
 	if (amp == 'a' || amp == 'A') askAmp=1; 
 	size_t BitLen = getFromGraphBuf(BitStream);
 	if (g_debugMode) PrintAndLog("DEBUG: Bitlen from grphbuff: %d",BitLen);
-	if (BitLen<255) return 0;
-	if (maxLen<BitLen && maxLen != 0) BitLen = maxLen;
-
+	if (BitLen < 255) return 0;
+	if (maxLen < BitLen && maxLen != 0) BitLen = maxLen;
+	int foundclk = 0;
+	bool st = false;
+	if (*stCheck) st = DetectST(BitStream, &BitLen, &foundclk);
+	if (st) {
+		*stCheck = st;
+		clk = (clk == 0) ? foundclk : clk;
+		if (verbose || g_debugMode) PrintAndLog("\nFound Sequence Terminator");
+	}
 	int errCnt = askdemod(BitStream, &BitLen, &clk, &invert, maxErr, askAmp, askType);
 	if (errCnt<0 || BitLen<16){  //if fatal error (or -1)
 		if (g_debugMode) PrintAndLog("DEBUG: no data found %d, errors:%d, bitlen:%d, clock:%d",errCnt,invert,BitLen,clk);
 		return 0;
 	}
-	if (errCnt>maxErr){
+	if (errCnt > maxErr){
 		if (g_debugMode) PrintAndLog("DEBUG: Too many errors found, errors:%d, bits:%d, clock:%d",errCnt, BitLen, clk);
 		return 0;
 	}
@@ -365,6 +372,10 @@ int ASKDemod(const char *Cmd, bool verbose, bool emSearch, uint8_t askType)
 	}
 	return 1;
 }
+int ASKDemod(const char *Cmd, bool verbose, bool emSearch, uint8_t askType) {
+	bool st = false;
+	return ASKDemod_ext(Cmd, verbose, emSearch, askType, &st);
+}
 
 //by marshmellow
 //takes 5 arguments - clock, invert, maxErr, maxLen as integers and amplify as char == 'a'
@@ -374,7 +385,8 @@ int Cmdaskmandemod(const char *Cmd)
 {
 	char cmdp = param_getchar(Cmd, 0);
 	if (strlen(Cmd) > 25 || cmdp == 'h' || cmdp == 'H') {
-		PrintAndLog("Usage:  data rawdemod am [clock] <invert> [maxError] [maxLen] [amplify]");
+		PrintAndLog("Usage:  data rawdemod am <s> [clock] <invert> [maxError] [maxLen] [amplify]");
+		PrintAndLog("     ['s'] optional, check for Sequence Terminator");
 		PrintAndLog("     [set clock as integer] optional, if not set, autodetect");
 		PrintAndLog("     <invert>, 1 to invert output");
 		PrintAndLog("     [set maximum allowed errors], default = 100");
@@ -388,7 +400,13 @@ int Cmdaskmandemod(const char *Cmd)
 		PrintAndLog("          : data rawdemod am 64 1 0 = demod an ask/manchester tag from GraphBuffer using a clock of RF/64, inverting data and allowing 0 demod errors");
 		return 0;
 	}
-	return ASKDemod(Cmd, TRUE, TRUE, 1);
+	bool st = TRUE;
+	if (Cmd[0]=='s') 
+		return ASKDemod_ext(Cmd++, TRUE, TRUE, 1, &st);
+	else if (Cmd[1] == 's')
+		return ASKDemod_ext(Cmd+=2, TRUE, TRUE, 1, &st);
+	else
+		return ASKDemod(Cmd, TRUE, TRUE, 1);
 }
 
 //by marshmellow
@@ -595,7 +613,7 @@ int CmdG_Prox_II_Demod(const char *Cmd)
 		if ((idx+1) % 5 == 0){
 			//spacer bit - should be 0
 			if (DemodBuffer[startIdx+idx] != 0) {
-				if (g_debugMode) PrintAndLog("Error spacer not 0: %d, pos: %d",DemodBuffer[startIdx+idx],startIdx+idx);
+				if (g_debugMode) PrintAndLog("Error spacer not 0: %u, pos: %u", (unsigned int)DemodBuffer[startIdx+idx],(unsigned int)(startIdx+idx));
 				return 0;
 			}
 			continue;
@@ -603,21 +621,21 @@ int CmdG_Prox_II_Demod(const char *Cmd)
 		if (keyCnt<8){ //lsb first
 			xorKey = xorKey | (DemodBuffer[startIdx+idx]<<keyCnt);
 			keyCnt++;
-			if (keyCnt==8 && g_debugMode) PrintAndLog("xorKey Found: %02x", xorKey);
+			if (keyCnt==8 && g_debugMode) PrintAndLog("xorKey Found: %02x", (unsigned int)xorKey);
 			continue;
 		}
 		//lsb first
 		ByteStream[ByteCnt] = ByteStream[ByteCnt] | (DemodBuffer[startIdx+idx]<<bitCnt);
 		bitCnt++;
 		if (bitCnt % 8 == 0){
-			if (g_debugMode) PrintAndLog("byte %d: %02x",ByteCnt,ByteStream[ByteCnt]);
+			if (g_debugMode) PrintAndLog("byte %u: %02x", (unsigned int)ByteCnt, ByteStream[ByteCnt]);
 			bitCnt=0;
 			ByteCnt++;
 		}
 	}
 	for (uint8_t i = 0; i < ByteCnt; i++){
 		ByteStream[i] ^= xorKey; //xor
-		if (g_debugMode) PrintAndLog("byte %d after xor: %02x", i, ByteStream[i]);
+		if (g_debugMode) PrintAndLog("byte %u after xor: %02x", (unsigned int)i, ByteStream[i]);
 	}
 	//now ByteStream contains 64 bytes of decrypted raw tag data
 	// 
@@ -631,13 +649,13 @@ int CmdG_Prox_II_Demod(const char *Cmd)
 	if (fmtLen==36){
 		FC = ((ByteStream[3] & 0x7F)<<7) | (ByteStream[4]>>1);
 		Card = ((ByteStream[4]&1)<<19) | (ByteStream[5]<<11) | (ByteStream[6]<<3) | (ByteStream[7]>>5);
-		PrintAndLog("G-Prox-II Found: FmtLen %d, FC %d, Card %d",fmtLen,FC,Card);
+		PrintAndLog("G-Prox-II Found: FmtLen %d, FC %d, Card %d", fmtLen, FC, Card);
 	} else if(fmtLen==26){
 		FC = ((ByteStream[3] & 0x7F)<<1) | (ByteStream[4]>>7);
 		Card = ((ByteStream[4]&0x7F)<<9) | (ByteStream[5]<<1) | (ByteStream[6]>>7);
-		PrintAndLog("G-Prox-II Found: FmtLen %d, FC %d, Card %d",fmtLen,FC,Card);    
+		PrintAndLog("G-Prox-II Found: FmtLen %d, FC %d, Card %d",(unsigned int)fmtLen,FC,Card);
 	} else {
-		PrintAndLog("Unknown G-Prox-II Fmt Found: FmtLen %d",fmtLen);
+		PrintAndLog("Unknown G-Prox-II Fmt Found: FmtLen %d",(int)fmtLen);
 	}
 	PrintAndLog("Raw: %08x%08x%08x", raw1,raw2,raw3);
 	setDemodBuf(DemodBuffer+ans, 96, 0);
@@ -664,7 +682,7 @@ int CmdVikingDemod(const char *Cmd)
 	uint32_t raw2 = bytebits_to_byte(DemodBuffer+ans+32, 32);
 	uint32_t cardid = bytebits_to_byte(DemodBuffer+ans+24, 32);
 	uint8_t  checksum = bytebits_to_byte(DemodBuffer+ans+32+24, 8);
-	PrintAndLog("Viking Tag Found: Card ID %08X, Checksum: %02X", cardid, checksum);
+	PrintAndLog("Viking Tag Found: Card ID %08X, Checksum: %02X", cardid, (unsigned int) checksum);
 	PrintAndLog("Raw: %08X%08X", raw1,raw2);
 	setDemodBuf(DemodBuffer+ans, 64, 0);
 	return 1;
@@ -952,6 +970,7 @@ int FSKrawDemod(const char *Cmd, bool verbose)
 	invert = param_get8(Cmd, 1);
 	fchigh = param_get8(Cmd, 2);
 	fclow = param_get8(Cmd, 3);
+
 	if (strlen(Cmd)>0 && strlen(Cmd)<=2) {
 		if (rfLen==1) {
 			invert = 1;   //if invert option only is used
@@ -961,7 +980,6 @@ int FSKrawDemod(const char *Cmd, bool verbose)
 	uint8_t BitStream[MAX_GRAPH_TRACE_LEN]={0};
 	size_t BitLen = getFromGraphBuf(BitStream);
 	if (BitLen==0) return 0;
-	if (g_debugMode==2) PrintAndLog("DEBUG: Got samples");	
 	//get field clock lengths
 	uint16_t fcs=0;
 	if (!fchigh || !fclow) {
@@ -989,6 +1007,7 @@ int FSKrawDemod(const char *Cmd, bool verbose)
 			PrintAndLog("%s decoded bitstream:",GetFSKType(fchigh,fclow,invert));
 			printDemodBuff();
 		}
+
 		return 1;
 	} else {
 		if (g_debugMode) PrintAndLog("no FSK data found");
