@@ -919,7 +919,8 @@ int CmdDetectClockRate(const char *Cmd)
 
 char *GetFSKType(uint8_t fchigh, uint8_t fclow, uint8_t invert)
 {
-	char *fskType;
+	static char fType[8];
+	char *fskType = fType;
 	if (fchigh==10 && fclow==8){
 		if (invert) //fsk2a
 			fskType = "FSK2a";
