@@ -106,7 +106,7 @@ local _keys = {
     '776974687573', -- RKF ÖstgötaTrafiken Key B
 
     --[[
-    The keys below are taken from from https://code.google.com/p/mifare-key-cracker/downloads/list
+    The keys below are taken from https://code.google.com/p/mifare-key-cracker/downloads/list
     --]]
 
     'bd493a3962b6',
@@ -129,7 +129,7 @@ local _keys = {
     '123456789abc',
 	
 	--[[
-    The keys below are taken from from https://github.com/4ZM/mfterm/blob/master/dictionary.txt
+    The keys below are taken from https://github.com/4ZM/mfterm/blob/master/dictionary.txt
     --]]
 	
 	'abcdef123456', -- Key from ladyada.net
@@ -199,7 +199,7 @@ local function uniq(list)
             table.insert(foobar, value);
         end
     end
-    --print("final list length length ", #foobar)
+    --print("final list length ", #foobar)
     return foobar
 end
 
