@@ -784,14 +784,14 @@ bool test(uint8_t mode, uint8_t *offset, int *fndBitRate, uint8_t clk, bool *Q5)
 		uint8_t extend   = PackBits(si, 1, DemodBuffer); si += 1;     //bit 15 extended mode
 		uint8_t modread  = PackBits(si, 5, DemodBuffer); si += 5+2+1; 
 		//uint8_t pskcr   = PackBits(si, 2, DemodBuffer); si += 2+1;  //could check psk cr
-		uint8_t nml01    = PackBits(si, 1, DemodBuffer); si += 1+5;   //bit 24, 30, 31 could be tested for 0 if not extended mode
-		uint8_t nml02    = PackBits(si, 2, DemodBuffer); si += 2;
+		//uint8_t nml01    = PackBits(si, 1, DemodBuffer); si += 1+5;   //bit 24, 30, 31 could be tested for 0 if not extended mode
+		//uint8_t nml02    = PackBits(si, 2, DemodBuffer); si += 2;
 		
 		//if extended mode
 		bool extMode =( (safer == 0x6 || safer == 0x9) && extend) ? TRUE : FALSE;
 
 		if (!extMode){
-			if (nml01 || nml02 || xtRate) continue;
+			if (xtRate) continue;  //nml01 || nml02 ||  caused issues on noralys tags
 		}
 		//test modulation
 		if (!testModulation(mode, modread)) continue;
