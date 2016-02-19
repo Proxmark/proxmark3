@@ -855,7 +855,7 @@ int printConfiguration( t55xx_conf_block_t b){
 	PrintAndLog("Bit Rate   : %s", GetBitRateStr(b.bitrate) );
 	PrintAndLog("Inverted   : %s", (b.inverted) ? "Yes" : "No" );
 	PrintAndLog("Offset     : %d", b.offset);
-	PrintAndLog("Seq. Term. : %d", (b.ST) ? "Yes" : "No" );
+	PrintAndLog("Seq. Term. : %s", (b.ST) ? "Yes" : "No" );
 	PrintAndLog("Block0     : 0x%08X", b.block0);
 	PrintAndLog("");
 	return 0;
