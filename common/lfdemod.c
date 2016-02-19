@@ -1529,11 +1529,12 @@ bool DetectST(uint8_t buffer[], size_t *size, int *foundclock) {
 	uint8_t fndClk[] = {8,16,32,40,50,64,128};
 	int clk = 0; 
 	int tol = 0;
-	int i, j, skip, start, end, low, high, minClk;
+	int i, j, skip, start, end, low, high, minClk, waveStart;
 	bool complete = false;
 	int tmpbuff[bufsize / 64];
+	int waveLen[bufsize / 64];
 	size_t testsize = (bufsize < 512) ? bufsize : 512;
-	//int phaseoff = 0;
+	int phaseoff = 0;
 	high = low = 128;
 	memset(tmpbuff, 0, sizeof(tmpbuff));
 
@@ -1541,7 +1542,6 @@ bool DetectST(uint8_t buffer[], size_t *size, int *foundclock) {
 		if (g_debugMode==2) prnt("DEBUG STT: just noise detected - quitting");
 		return false; //just noise
 	}
-
 	i = 0;
 	j = 0;
 	minClk = 255;
@@ -1560,11 +1560,14 @@ bool DetectST(uint8_t buffer[], size_t *size, int *foundclock) {
 		start= i;
 		while ((buffer[i] < high) && (i < bufsize))
 			++i;
+		//first high point for this wave
+		waveStart = i;
 		while ((buffer[i] > low) && (i < bufsize))
 			++i;
 		if (j >= (bufsize/64)) {
 			break;
 		}
+		waveLen[j] = i - waveStart; //first high to first low
 		tmpbuff[j++] = i - start;
 		if (i-start < minClk && i < bufsize) {
 			minClk = i - start;
@@ -1592,10 +1595,10 @@ bool DetectST(uint8_t buffer[], size_t *size, int *foundclock) {
 	start = -1;
 	for (i = 0; i < j - 4; ++i) {
 		skip += tmpbuff[i];
-		if (tmpbuff[i] >= clk*1-tol && tmpbuff[i] <= (clk*2)+tol) {           //1 to 2 clocks depending on 2 bits prior
-			if (tmpbuff[i+1] >= clk*2-tol && tmpbuff[i+1] <= clk*2+tol) {       //2 clocks
-				if (tmpbuff[i+2] >= (clk*3)/2-tol && tmpbuff[i+2] <= clk*2+tol) { //1 1/2 to 2 clocks
-					if (tmpbuff[i+3] >= clk*1-tol && tmpbuff[i+3] <= (clk*3)/2+tol) { //1 to 1 1/2 clocks for end of ST + first bit
+		if (tmpbuff[i] >= clk*1-tol && tmpbuff[i] <= (clk*2)+tol && waveLen[i] < clk+tol) {           //1 to 2 clocks depending on 2 bits prior
+			if (tmpbuff[i+1] >= clk*2-tol && tmpbuff[i+1] <= clk*2+tol && waveLen[i+1] > clk*3/2-tol) {       //2 clocks and wave size is 1 1/2
+				if (tmpbuff[i+2] >= (clk*3)/2-tol && tmpbuff[i+2] <= clk*2+tol && waveLen[i+2] > clk-tol) { //1 1/2 to 2 clocks and at least one full clock wave
+					if (tmpbuff[i+3] >= clk*1-tol && tmpbuff[i+3] <= clk*2+tol) { //1 to 2 clocks for end of ST + first bit
 						start = i + 3;
 						break;
 					}
@@ -1608,7 +1611,11 @@ bool DetectST(uint8_t buffer[], size_t *size, int *foundclock) {
 		if (g_debugMode==2) prnt("DEBUG STT: first STT not found - quitting");
 		return false;
 	}
-
+	if (waveLen[i+2] > clk*1+tol)
+		phaseoff = 0;
+	else
+		phaseoff = clk/2;
+	
 	// skip over the remainder of ST
 	skip += clk*7/2; //3.5 clocks from tmpbuff[i] = end of st - also aligns for ending point
 
@@ -1617,9 +1624,9 @@ bool DetectST(uint8_t buffer[], size_t *size, int *foundclock) {
 	for (i += 3; i < j - 4; ++i) {
 		end += tmpbuff[i];
 		if (tmpbuff[i] >= clk*1-tol && tmpbuff[i] <= (clk*2)+tol) {           //1 to 2 clocks depending on 2 bits prior
-			if (tmpbuff[i+1] >= clk*2-tol && tmpbuff[i+1] <= clk*2+tol) {       //2 clocks
-				if (tmpbuff[i+2] >= (clk*3)/2-tol && tmpbuff[i+2] <= clk*2+tol) { //1 1/2 to 2 clocks
-					if (tmpbuff[i+3] >= clk*1-tol && tmpbuff[i+3] <= (clk*3)/2+tol) { //1 to 1 1/2 clocks for end of ST + first bit
+			if (tmpbuff[i+1] >= clk*2-tol && tmpbuff[i+1] <= clk*2+tol && waveLen[i+1] > clk*3/2-tol) {       //2 clocks and wave size is 1 1/2
+				if (tmpbuff[i+2] >= (clk*3)/2-tol && tmpbuff[i+2] <= clk*2+tol && waveLen[i+2] > clk-tol) { //1 1/2 to 2 clocks and at least one full clock wave
+					if (tmpbuff[i+3] >= clk*1-tol && tmpbuff[i+3] <= clk*2+tol) { //1 to 2 clocks for end of ST + first bit
 						complete = true;
 						break;
 					}
@@ -1627,12 +1634,13 @@ bool DetectST(uint8_t buffer[], size_t *size, int *foundclock) {
 			}
 		}
 	}
+	end -= phaseoff;
 	//didn't find second ST - ERROR
 	if (!complete) {
 		if (g_debugMode==2) prnt("DEBUG STT: second STT not found - quitting");
 		return false;
 	}
-	if (g_debugMode==2) prnt("DEBUG STT: start of data: %d end of data: %d, datalen: %d, clk: %d, bits: %d", skip, end, end-skip, clk, (end-skip)/clk);
+	if (g_debugMode==2) prnt("DEBUG STT: start of data: %d end of data: %d, datalen: %d, clk: %d, bits: %d, phaseoff: %d", skip, end, end-skip, clk, (end-skip)/clk, phaseoff);
 	//now begin to trim out ST so we can use normal demod cmds
 	start = skip;
 	size_t datalen = end - start;
