@@ -30,7 +30,7 @@ int DemodPCF7931(uint8_t **outBlocks) {
 	int lmin=128, lmax=128;
 	uint8_t dir;
 	//clear read buffer
-	BigBuf_Clear_keep_EM(void);
+	BigBuf_Clear_keep_EM();
 
 	LFSetupFPGAForADC(95, true);
 	DoAcquisition_default(0, true);

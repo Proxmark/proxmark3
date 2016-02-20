@@ -38,7 +38,7 @@ void ModThenAcquireRawAdcSamples125k(uint32_t delay_off, uint32_t period_0, uint
 	sample_config sc = { 0,0,1, divisor_used, 0};
 	setSamplingConfig(&sc);
 	//clear read buffer
-	BigBuf_Clear_keep_EM(void);
+	BigBuf_Clear_keep_EM();
 
 	/* Make sure the tag is reset */
 	FpgaDownloadAndGo(FPGA_BITSTREAM_LF);
@@ -755,7 +755,7 @@ void CmdHIDdemodFSK(int findone, int *high, int *low, int ledcontrol)
 	LFSetupFPGAForADC(95, true);
 
 	//clear read buffer
-	BigBuf_Clear_keep_EM(void);
+	BigBuf_Clear_keep_EM();
 
 	while(!BUTTON_PRESS() && !usb_poll_validate_length()) {
 
@@ -843,7 +843,7 @@ void CmdAWIDdemodFSK(int findone, int *high, int *low, int ledcontrol)
 	size_t size; 
 	int idx=0;
 	//clear read buffer
-	BigBuf_Clear_keep_EM(void);
+	BigBuf_Clear_keep_EM();
 	// Configure to go in 125Khz listen mode
 	LFSetupFPGAForADC(95, true);
 
@@ -935,7 +935,7 @@ void CmdEM410xdemod(int findone, int *high, int *low, int ledcontrol)
 	uint32_t hi=0;
 	uint64_t lo=0;
 	//clear read buffer
-	BigBuf_Clear_keep_EM(void);
+	BigBuf_Clear_keep_EM();
 	// Configure to go in 125Khz listen mode
 	LFSetupFPGAForADC(95, true);
 
@@ -996,7 +996,7 @@ void CmdIOdemodFSK(int findone, int *high, int *low, int ledcontrol)
 	uint8_t facilitycode=0;
 	uint16_t number=0;
 	//clear read buffer
-	BigBuf_Clear_keep_EM(void);
+	BigBuf_Clear_keep_EM();
 	// Configure to go in 125Khz listen mode
 	LFSetupFPGAForADC(95, true);
 
@@ -1090,7 +1090,7 @@ void T55xxWriteBit(int bit) {
 void T55xxResetRead(void) {
 	LED_A_ON();
 	//clear buffer now so it does not interfere with timing later
-	BigBuf_Clear_ext(false);
+	BigBuf_Clear_keep_EM();
 
 	// Set up FPGA, 125kHz
 	LFSetupFPGAForADC(95, true);
