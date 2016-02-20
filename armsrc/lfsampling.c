@@ -124,7 +124,7 @@ uint32_t DoAcquisition(uint8_t decimation, uint32_t bits_per_sample, bool averag
 	uint8_t *dest = BigBuf_get_addr();
     int bufsize = BigBuf_max_traceLen();
 
-	memset(dest, 0, bufsize);
+	//memset(dest, 0, bufsize); //creates issues with cmdread (marshmellow)
 
 	if(bits_per_sample < 1) bits_per_sample = 1;
 	if(bits_per_sample > 8) bits_per_sample = 8;
