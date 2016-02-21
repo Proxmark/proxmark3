@@ -379,7 +379,7 @@ void WriteTItag(uint32_t idhi, uint32_t idlo, uint16_t crc)
 	AcquireTiType();
 
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
-	DbpString("Now use tiread to check");
+	DbpString("Now use `lf ti read` to check");
 }
 
 void SimulateTagLowFrequency(int period, int gap, int ledcontrol)
@@ -1415,7 +1415,7 @@ void WriteEM410x(uint32_t card, uint32_t id_hi, uint32_t id_lo) {
 	LED_D_ON();
 
 	// Write EM410x ID
-	uint32_t data[] = {0, id>>32, id & 0xFFFFFFFF};
+	uint32_t data[] = {0, (uint32_t)(id>>32), (uint32_t)(id & 0xFFFFFFFF)};
 
 	clock = (card & 0xFF00) >> 8;
 	clock = (clock == 0) ? 64 : clock;

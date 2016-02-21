@@ -539,7 +539,7 @@ int CmdLFSetConfig(const char *Cmd)
 		return usage_lf_config();
 	}
 	//Bps is limited to 8, so fits in lower half of arg1
-	if(bps >> 8) bps = 8;
+	if(bps >> 4) bps = 8;
 
 	sample_config config = {
 		decimation,bps,averaging,divisor,trigger_threshold

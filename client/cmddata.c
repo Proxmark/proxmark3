@@ -848,16 +848,18 @@ int CmdUndec(const char *Cmd)
 	uint8_t factor = param_get8ex(Cmd, 0,2, 10);
 	//We have memory, don't we?
 	int swap[MAX_GRAPH_TRACE_LEN] = { 0 };
-	uint32_t g_index = 0 ,s_index = 0;
-	while(g_index < GraphTraceLen && s_index < MAX_GRAPH_TRACE_LEN)
+	uint32_t g_index = 0, s_index = 0;
+	while(g_index < GraphTraceLen && s_index + factor < MAX_GRAPH_TRACE_LEN)
 	{
 		int count = 0;
-		for(count = 0; count < factor && s_index+count < MAX_GRAPH_TRACE_LEN; count ++)
+		for(count = 0; count < factor && s_index + count < MAX_GRAPH_TRACE_LEN; count++)
 			swap[s_index+count] = GraphBuffer[g_index];
-		s_index+=count;
+
+		s_index += count;
+		g_index++;
 	}
 
-	memcpy(GraphBuffer,swap, s_index * sizeof(int));
+	memcpy(GraphBuffer, swap, s_index * sizeof(int));
 	GraphTraceLen = s_index;
 	RepaintGraphWindow();
 	return 0;
@@ -2334,9 +2336,8 @@ int Cmdbin2hex(const char *Cmd)
 	return 0;
 }
 
-int usage_data_hex2bin(){
-
-	PrintAndLog("Usage: data bin2hex <binary_digits>");
+int usage_data_hex2bin() {
+	PrintAndLog("Usage: data hex2bin <hex_digits>");
 	PrintAndLog("       This function will ignore all non-hexadecimal characters (but stop reading on whitespace)");
 	return 0;
 
