@@ -61,6 +61,10 @@ void BigBuf_Clear_ext(bool verbose)
 		Dbprintf("Buffer cleared (%i bytes)",BIGBUF_SIZE);
 }
 
+void BigBuf_Clear_keep_EM(void)
+{
+	memset(BigBuf,0,BigBuf_hi);
+}
 
 // allocate a chunk of memory from BigBuf. We allocate high memory first. The unallocated memory
 // at the beginning of BigBuf is always for traces/samples

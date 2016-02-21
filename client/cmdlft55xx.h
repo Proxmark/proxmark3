@@ -63,6 +63,7 @@ typedef struct {
 		RF_128 = 0x07,
 	} bitrate;
 	bool Q5;
+	bool ST;
 } t55xx_conf_block_t;
 t55xx_conf_block_t Get_t55xx_Config();
 void Set_t55xx_Config(t55xx_conf_block_t conf);
