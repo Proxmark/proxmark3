@@ -603,7 +603,7 @@ int CmdG_Prox_II_Demod(const char *Cmd)
 		return 0;
 	}
 	//got a good demod of 96 bits
-	uint32_t ByteStream[8] = {0x00};
+	uint8_t ByteStream[8] = {0x00};
 	uint8_t xorKey=0;
 	size_t startIdx = ans + 6; //start after 6 bit preamble
 
@@ -642,15 +642,7 @@ int CmdG_Prox_II_Demod(const char *Cmd)
 		PrintAndLog("G-Prox-II Found: FmtLen %d, FC %u, Card %u", (int)fmtLen, FC, Card);
 	} else {
 		PrintAndLog("Unknown G-Prox-II Fmt Found: FmtLen %d",(int)fmtLen);
-		PrintAndLog("Decoded Raw: %02x%02x%02x%02x%02x%02x%02x%02x", 
-		    ByteStream[0],
-		    ByteStream[1],
-		    ByteStream[2],
-		    ByteStream[3],
-		    ByteStream[4],
-		    ByteStream[5],
-		    ByteStream[6],
-		    ByteStream[7]);
+		PrintAndLog("Decoded Raw: %s", sprint_hex(ByteStream, 8)); 
 	}
 	PrintAndLog("Raw: %08x%08x%08x", raw1,raw2,raw3);
 	setDemodBuf(DemodBuffer+ans, 96, 0);
