@@ -642,6 +642,7 @@ static void biphaseSimBit(uint8_t c, int *n, uint8_t clock, uint8_t *phase)
 		memset(dest+(*n), c ^ *phase, clock);
 		*phase ^= 1;
 	}
+	*n += clock;
 }
 
 // args clock, ask/man or askraw, invert, transmission separator
@@ -659,7 +660,7 @@ void CmdASKsimTag(uint16_t arg1, uint16_t arg2, size_t size, uint8_t *BitStream)
 		for (i=0; i<size; i++){
 			biphaseSimBit(BitStream[i]^invert, &n, clk, &phase);
 		}
-		if (BitStream[0]==BitStream[size-1]){ //run a second set inverted to keep phase in check
+		if (phase==1) { //run a second set inverted to keep phase in check
 			for (i=0; i<size; i++){
 				biphaseSimBit(BitStream[i]^invert, &n, clk, &phase);
 			}
@@ -685,7 +686,7 @@ void CmdASKsimTag(uint16_t arg1, uint16_t arg2, size_t size, uint8_t *BitStream)
 	//Dbprintf("%d%d%d%d%d%d%d%d%d%d%d%d%d%d%d%d", dest[i],dest[i+1],dest[i+2],dest[i+3],dest[i+4],dest[i+5],dest[i+6],dest[i+7],dest[i+8],dest[i+9],dest[i+10],dest[i+11],dest[i+12],dest[i+13],dest[i+14],dest[i+15]);
 	//i+=16;
 	//Dbprintf("%d%d%d%d%d%d%d%d%d%d%d%d%d%d%d%d", dest[i],dest[i+1],dest[i+2],dest[i+3],dest[i+4],dest[i+5],dest[i+6],dest[i+7],dest[i+8],dest[i+9],dest[i+10],dest[i+11],dest[i+12],dest[i+13],dest[i+14],dest[i+15]);
-
+	
 	if (ledcontrol) LED_A_ON();
 	SimulateTagLowFrequency(n, 0, ledcontrol);
 	if (ledcontrol) LED_A_OFF();
