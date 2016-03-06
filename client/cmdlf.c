@@ -13,24 +13,25 @@
 #include <string.h>
 #include <limits.h>
 #include "proxmark3.h"
-#include "data.h"
-#include "graph.h"
-#include "ui.h"
-#include "cmdparser.h"
-#include "cmdmain.h"
-#include "cmddata.h"
-#include "util.h"
 #include "cmdlf.h"
-#include "cmdlfhid.h"
-#include "cmdlfawid.h"
-#include "cmdlfti.h"
-#include "cmdlfem4x.h"
-#include "cmdlfhitag.h"
-#include "cmdlft55xx.h"
-#include "cmdlfpcf7931.h"
-#include "cmdlfio.h"
-#include "cmdlfviking.h"
-#include "lfdemod.h"
+#include "util.h"        // for parsing cli command utils
+#include "ui.h"          // for show graph controls
+#include "graph.h"       // for graph data
+#include "cmdparser.h"   // for getting cli commands included in cmdmain.h
+#include "cmdmain.h"     // for sending cmds to device
+#include "data.h"        // for GetFromBigBuf
+#include "cmddata.h"     // for `lf search`
+#include "cmdlfawid.h"   // for awid menu
+#include "cmdlfem4x.h"   // for em4x menu
+#include "cmdlfhid.h"    // for hid menu
+#include "cmdlfhitag.h"  // for hitag menu
+#include "cmdlfio.h"     // for ioprox menu
+#include "cmdlft55xx.h"  // for t55xx menu
+#include "cmdlfti.h"     // for ti menu
+#include "cmdlfpresco.h" // for presco menu
+#include "cmdlfpcf7931.h"// for pcf7931 menu
+#include "cmdlfpyramid.h"// for pyramid menu
+#include "cmdlfviking.h" // for viking menu
 
 static int CmdHelp(const char *Cmd);
 
@@ -1220,7 +1221,9 @@ static command_t CommandTable[] =
 	{"hid",         CmdLFHID,           1, "{ HID RFIDs...     }"},
 	{"hitag",       CmdLFHitag,         1, "{ Hitag tags and transponders... }"},
 	{"io",          CmdLFIO,            1, "{ ioProx tags...   }"},
+	{"presco",      CmdLFPresco,        1, "{ Presco RFIDs... }"},
 	{"pcf7931",     CmdLFPCF7931,       1, "{ PCF7931 RFIDs... }"},
+	{"pyramid",     CmdLFPyramid,       1, "{ Farpointe/Pyramid RFIDs... }"},
 	{"t55xx",       CmdLFT55XX,         1, "{ T55xx RFIDs...   }"},
 	{"ti",          CmdLFTI,            1, "{ TI RFIDs...      }"},
 	{"viking",      CmdLFViking,        1, "{ Viking tags...   }"},

@@ -13,8 +13,8 @@
 
 #ifndef LFDEMOD_H__
 #define LFDEMOD_H__
-#include <stdint.h>
-#include "common.h"  //for bool
+#include <stdint.h>  // for uint_32+
+#include <stdbool.h> // for bool
 
 //generic
 size_t   addParity(uint8_t *BitSource, uint8_t *dest, uint8_t sourceLen, uint8_t pLen, uint8_t pType);
@@ -54,5 +54,5 @@ int indala26decode(uint8_t *bitStream, size_t *size, uint8_t *invert);
 int ParadoxdemodFSK(uint8_t *dest, size_t *size, uint32_t *hi2, uint32_t *hi, uint32_t *lo);
 int PyramiddemodFSK(uint8_t *dest, size_t *size);
 int VikingDemod_AM(uint8_t *dest, size_t *size);
-
+int PrescoDemod(uint8_t *dest, size_t *size);
 #endif
