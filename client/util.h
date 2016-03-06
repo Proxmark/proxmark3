@@ -9,7 +9,7 @@
 //-----------------------------------------------------------------------------
 
 #include <stdio.h>
-#include <stdint.h>  included in data.h
+#include <stdint.h>  //included in data.h
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
