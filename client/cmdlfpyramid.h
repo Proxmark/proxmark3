@@ -8,17 +8,6 @@
 //-----------------------------------------------------------------------------
 #ifndef CMDLFPYRAMID_H__
 #define CMDLFPYRAMID_H__
-#include "proxmark3.h"
-#include "ui.h"
-#include "util.h"
-#include "graph.h"
-#include "cmdparser.h"
-#include "cmddata.h"
-#include "cmdmain.h"
-#include "cmdlf.h"
-#include "protocols.h"  // for T55xx config register definitions
-#include "lfdemod.h"    // parityTest
-#include "crc.h"
 
 int CmdLFPyramid(const char *Cmd);
 int CmdPyramidClone(const char *Cmd);

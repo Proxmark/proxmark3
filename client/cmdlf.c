@@ -14,6 +14,7 @@
 #include <limits.h>
 #include "proxmark3.h"
 #include "cmdlf.h"
+#include "lfdemod.h"     // for psk2TOpsk1
 #include "util.h"        // for parsing cli command utils
 #include "ui.h"          // for show graph controls
 #include "graph.h"       // for graph data
@@ -664,7 +665,7 @@ int usage_lf_simask(void)
 	PrintAndLog("       b              sim ask/biphase");
 	PrintAndLog("       m              sim ask/manchester - Default");
 	PrintAndLog("       r              sim ask/raw");
-	PrintAndLog("       s              TBD- -to enable a gap between playback repetitions - default: no gap");
+	PrintAndLog("       s              add t55xx Sequence Terminator gap - default: no gaps (only manchester)");
 	PrintAndLog("       d <hexdata>    Data to sim as hex - omit to sim from DemodBuffer");
 	return 0;
 }

@@ -9,6 +9,18 @@
 #include <string.h>
 #include <inttypes.h>
 #include "cmdlfpyramid.h"
+#include "proxmark3.h"
+#include "ui.h"
+#include "util.h"
+#include "graph.h"
+#include "cmdparser.h"
+#include "cmddata.h"
+#include "cmdmain.h"
+#include "cmdlf.h"
+#include "protocols.h"  // for T55xx config register definitions
+#include "lfdemod.h"    // parityTest
+#include "crc.h"
+
 static int CmdHelp(const char *Cmd);
 
 int usage_lf_pyramid_clone(void){
@@ -20,6 +32,7 @@ int usage_lf_pyramid_clone(void){
 	PrintAndLog("Options :");
 	PrintAndLog("  <Facility-Code> :  8-bit value facility code");
 	PrintAndLog("  <Card Number>   : 16-bit value card number");
+	PrintAndLog("  Q5              : optional - clone to Q5 (T5555) instead of T55x7 chip");
 	PrintAndLog("");
 	PrintAndLog("Sample  : lf pyramid clone 123 11223");
 	return 0;
@@ -96,13 +109,14 @@ int CmdPyramidClone(const char *Cmd) {
 	if ( !GetPyramidBits(facilitycode, cardnumber, bs)) {
 		PrintAndLog("Error with tag bitstream generation.");
 		return 1;
-	}	
-
-//	if (param_getchar(Cmd, 3) == 'Q' || param_getchar(Cmd, 3) == 'q')
-//		blocks[0] = T5555_MODULATION_FSK2 | 50<<T5555_BITRATE_SHIFT | 4<<T5555_MAXBLOCK_SHIFT;
+	}
 
 	//Pyramid - compat mode, FSK2a, data rate 50, 4 data blocks
 	blocks[0] = T55x7_MODULATION_FSK2a | T55x7_BITRATE_RF_50 | 4<<T55x7_MAXBLOCK_SHIFT;
+
+	if (param_getchar(Cmd, 3) == 'Q' || param_getchar(Cmd, 3) == 'q')
+		blocks[0] = T5555_MODULATION_FSK2 | T5555_INVERT_OUTPUT | 50<<T5555_BITRATE_SHIFT | 4<<T5555_MAXBLOCK_SHIFT;
+
 	blocks[1] = bytebits_to_byte(bs,32);
 	blocks[2] = bytebits_to_byte(bs+32,32);
 	blocks[3] = bytebits_to_byte(bs+64,32);
@@ -127,7 +141,7 @@ int CmdPyramidClone(const char *Cmd) {
 			return -1;
 		}
 	}
-    return 0;
+	return 0;
 }
 
 int CmdPyramidSim(const char *Cmd) {
@@ -136,11 +150,11 @@ int CmdPyramidSim(const char *Cmd) {
 	if (strlen(Cmd) == 0 || cmdp == 'h' || cmdp == 'H') return usage_lf_pyramid_sim();
 
 	uint32_t facilitycode = 0, cardnumber = 0, fc = 0, cn = 0;
-	
+
 	uint8_t bs[128];
 	size_t size = sizeof(bs);
 	memset(bs, 0x00, size);
-	
+
 	// Pyramid uses:  fcHigh: 10, fcLow: 8, clk: 50, invert: 0
 	uint64_t arg1, arg2;
 	arg1 = (10 << 8) + 8;
@@ -150,14 +164,14 @@ int CmdPyramidSim(const char *Cmd) {
 
 	facilitycode = (fc & 0x000000FF);
 	cardnumber = (cn & 0x0000FFFF);
-	
+
 	if ( !GetPyramidBits(facilitycode, cardnumber, bs)) {
 		PrintAndLog("Error with tag bitstream generation.");
 		return 1;
-	}	
+	}
 
 	PrintAndLog("Simulating Farpointe/Pyramid - Facility Code: %u, CardNumber: %u", facilitycode, cardnumber );
-	
+
 	UsbCommand c = {CMD_FSK_SIM_TAG, {arg1, arg2, size}};
 	memcpy(c.d.asBytes, bs, size);
 	clearCommandBuffer();
@@ -166,20 +180,20 @@ int CmdPyramidSim(const char *Cmd) {
 }
 
 static command_t CommandTable[] = {
-    {"help",	CmdHelp,		1, "This help"},
-	{"read",	CmdPyramidRead,  0, "Attempt to read and extract tag data"},
-	{"clone",	CmdPyramidClone, 0, "<Facility-Code> <Card Number>  clone pyramid tag"},
-	{"sim",		CmdPyramidSim,   0, "<Facility-Code> <Card Number>  simulate pyramid tag"},
-    {NULL, NULL, 0, NULL}
+	{"help",  CmdHelp,         1, "This help"},
+	{"read",  CmdPyramidRead,  0, "Attempt to read and extract tag data"},
+	{"clone", CmdPyramidClone, 0, "<Facility-Code> <Card Number>  clone pyramid tag"},
+	{"sim",   CmdPyramidSim,   0, "<Facility-Code> <Card Number>  simulate pyramid tag"},
+	{NULL, NULL, 0, NULL}
 };
 
 int CmdLFPyramid(const char *Cmd) {
 	clearCommandBuffer();
-    CmdsParse(CommandTable, Cmd);
-    return 0;
+	CmdsParse(CommandTable, Cmd);
+	return 0;
 }
 
 int CmdHelp(const char *Cmd) {
-    CmdsHelp(CommandTable);
-    return 0;
+	CmdsHelp(CommandTable);
+	return 0;
 }

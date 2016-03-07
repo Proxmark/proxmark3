@@ -8,23 +8,17 @@
 //-----------------------------------------------------------------------------
 #ifndef CMDLFPRESCO_H__
 #define CMDLFPRESCO_H__
-#include "proxmark3.h"
-#include "ui.h"
-#include "util.h"
-#include "graph.h"
-#include "cmdparser.h"
-#include "cmddata.h"
-#include "cmdmain.h"
-#include "cmdlf.h"
-#include "protocols.h"  // for T55xx config register definitions
-#include "lfdemod.h"    // parityTest
+
+#include <stdint.h>  //uint_32+
+#include <stdbool.h> //bool
+
 int CmdLFPresco(const char *Cmd);
 int CmdPrescoClone(const char *Cmd);
-//int CmdPrescoSim(const char *Cmd);
+int CmdPrescoSim(const char *Cmd);
+
+int GetWiegandFromPresco(const char *id, uint32_t *sitecode, uint32_t *usercode, uint32_t *fullcode, bool *Q5);
 
 int usage_lf_presco_clone(void);
 int usage_lf_presco_sim(void);
-
-int GetWiegandFromPresco(const char *id, uint32_t *sitecode, uint32_t *usercode);
 #endif
 
