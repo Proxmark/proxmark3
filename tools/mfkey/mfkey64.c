@@ -23,7 +23,7 @@ int main (int argc, char *argv[]) {
   printf("Recover key from only one complete authentication!\n\n");
 
   if (argc < 6 ) {
-    printf(" syntax: %s <uid> <nt> <{nr}> <{ar}> <{at}> <[enc]> [enc...]\n\n", argv[0]);
+    printf(" syntax: %s <uid> <nt> <{nr}> <{ar}> <{at}> [enc] [enc...]\n\n", argv[0]);
     return 1;
   }
 
