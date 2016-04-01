@@ -15,6 +15,7 @@
 *.moc.cpp
 *.z
 *.exe
+hardnested_stats.txt
 proxmark
 proxmark3
 flasher
