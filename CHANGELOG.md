@@ -2,7 +2,7 @@
 All notable changes to this project will be documented in this file.
 This project uses the changelog in accordance with [keepchangelog](http://keepachangelog.com/). Please use this to write notable changes, which is not the same as git commit log...
 
-## [unreleased][unreleased]
+## [2.3.0][2016-04-08]
 
 ### Added
 - Added experimental HitagS support (Oguzhan Cicek, Hendrik Schwartke, Ralf Spenneberg)
@@ -35,6 +35,7 @@ of stream transmissions (marshmellow)
 - Added option c to 'hf list' (mark CRC bytes) (piwi)
 
 ### Changed
+- Added possibility to perform decryption using `mfkey64`. See [PR](https://github.com/Proxmark/proxmark3/pull/168) (zhovner)
 - Added `[l] <length>` option to data printdemodbuffer
 - Adjusted lf awid clone to optionally clone to Q5 tags
 - Adjusted lf t55xx detect to find Q5 tags (t5555) instead of just t55x7
