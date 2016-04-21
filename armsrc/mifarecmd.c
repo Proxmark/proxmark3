@@ -1059,10 +1059,7 @@ void MifareCSetBlock(uint32_t arg0, uint32_t arg1, uint32_t arg2, uint8_t *datai
 				break;
 			};
 
-			if(mifare_classic_halt(NULL, cuid)) {
-				if (MF_DBGLEVEL >= 1)	Dbprintf("Halt error");
-				break;
-			};
+			mifare_classic_halt(NULL, cuid);
 		};
 	
 		// reset chip
@@ -1079,10 +1076,7 @@ void MifareCSetBlock(uint32_t arg0, uint32_t arg1, uint32_t arg2, uint8_t *datai
 				break;
 			};
 
-			if(mifare_classic_halt(NULL, cuid)) {
-				if (MF_DBGLEVEL >= 1)	Dbprintf("Halt error");
-				break;
-			};
+			mifare_classic_halt(NULL, cuid);
 		};	
 
 		// write block
@@ -1115,10 +1109,7 @@ void MifareCSetBlock(uint32_t arg0, uint32_t arg1, uint32_t arg2, uint8_t *datai
 		};	
 	
 		if (workFlags & 0x04) {
-			if (mifare_classic_halt(NULL, cuid)) {
-				if (MF_DBGLEVEL >= 1)	Dbprintf("Halt error");
-				break;
-			};
+			mifare_classic_halt(NULL, cuid);
 		}
 		
 		isOK = 1;
@@ -1192,10 +1183,7 @@ void MifareCGetBlock(uint32_t arg0, uint32_t arg1, uint32_t arg2, uint8_t *datai
 		memcpy(data, receivedAnswer, 18);
 		
 		if (workFlags & 0x04) {
-			if (mifare_classic_halt(NULL, cuid)) {
-				if (MF_DBGLEVEL >= 1)	Dbprintf("Halt error");
-				break;
-			};
+			mifare_classic_halt(NULL, cuid);
 		}
 		
 		isOK = 1;
@@ -1222,6 +1210,7 @@ void MifareCIdent(){
 	// card commands
 	uint8_t wupC1[]       = { 0x40 }; 
 	uint8_t wupC2[]       = { 0x43 }; 
+	uint8_t halt_ret	  = 0;
 	
 	// variables
 	byte_t isOK = 1;
@@ -1239,7 +1228,8 @@ void MifareCIdent(){
 		isOK = 0;
 	};
 
-	if (mifare_classic_halt(NULL, 0)) {
+	halt_ret = mifare_classic_halt(NULL, 0);
+	if (halt_ret && halt_ret != 4) {
 		isOK = 0;
 	};
 
