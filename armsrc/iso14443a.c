@@ -2022,15 +2022,17 @@ int32_t dist_nt(uint32_t nt1, uint32_t nt2) {
 // Cloning MiFare Classic Rail and Building Passes, Anywhere, Anytime"
 // (article by Nicolas T. Courtois, 2009)
 //-----------------------------------------------------------------------------
-void ReaderMifare(bool first_try)
+void ReaderMifare(bool first_try, uint8_t blockNo, uint8_t keyType)
 {
 	// Mifare AUTH
-	uint8_t mf_auth[]    = { 0x60,0x00,0xf5,0x7b };
+	uint8_t mf_auth[]    = { 0x60 + (keyType & 0x01), blockNo ,0x00,0x00 };
 	uint8_t mf_nr_ar[]   = { 0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00 };
 	static uint8_t mf_nr_ar3;
 
 	uint8_t receivedAnswer[MAX_MIFARE_FRAME_SIZE];
 	uint8_t receivedAnswerPar[MAX_MIFARE_PARITY_SIZE];
+
+	AppendCrc14443a(mf_auth, 2);
 
 	if (first_try) { 
 		iso14443a_setup(FPGA_HF_ISO14443A_READER_MOD);
