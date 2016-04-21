@@ -88,8 +88,16 @@ start:
 	// error
 	if (isOK != 1) return 1;
 	
-	// execute original function from util nonce2key
-	if (nonce2key(uid, nt, nr, par_list, ks_list, &r_key)) {
+	if (par_list == 0)
+	{
+		//parity is all zero,try special attack!just wait for few more seconds...
+		isOK = magic_nonce2key(uid, nt, nr, par_list, ks_list, &r_key, blockNo, keyType);
+	} else {
+		// execute original function from util nonce2key
+		isOK = nonce2key(uid, nt, nr, par_list, ks_list, &r_key);
+	}
+
+	if (isOK) {
 		isOK = 2;
 		PrintAndLog("Key not found (lfsr_common_prefix list is null). Nt=%08x", nt);	
 		PrintAndLog("Failing is expected to happen in 25%% of all cases. Trying again with a different reader nonce...");
