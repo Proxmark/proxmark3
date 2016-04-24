@@ -52,7 +52,7 @@ int nonce2key(uint32_t uid, uint32_t nt, uint32_t nr, uint64_t par_info, uint64_
   
   state = lfsr_common_prefix(nr, rr, ks3x, par, 0);
 	state_s = 0;
-	for (i = 0; (state) && ((state + i)->odd != -1 || (state + i)->even != ) && (i < 10); i++)
+	for (i = 0; (state) && ((state + i)->odd != -1 || (state + i)->even != -1) && (i < 10); i++)
 	{
     printf("%08x|%08x\n",(state+i)->odd, (state+i)->even);
 		state_s = state + i;

@@ -2058,7 +2058,7 @@ void ReaderMifare(bool first_try, uint8_t blockNo, uint8_t keyType)
 	byte_t par_list[8] = {0x00};
 	byte_t ks_list[8] = {0x00};
 
-	#define PRNG_SEQUENCE_LENGTH  (1 << 16);
+	#define PRNG_SEQUENCE_LENGTH  (1 << 16)
 	static uint32_t sync_time;
 	static int32_t sync_cycles;
 	int catch_up_cycles = 0;
@@ -2195,12 +2195,16 @@ void ReaderMifare(bool first_try, uint8_t blockNo, uint8_t keyType)
 						isOK = -4; 			// Card's PRNG runs at an unexpected frequency or resets unexpectedly
 						break;
 					} else {				// continue for a while, just to collect some debug info
-						debug_info[strategy][debug_info_nr] = nt_distance;
-						debug_info_nr++;
-						if (debug_info_nr == NUM_DEBUG_INFOS) {
-							strategy++;
-							debug_info_nr = 0;
+						if (-1 != debug_info_nr)
+						{
+							debug_info[strategy][debug_info_nr] = nt_distance;
+							if (debug_info_nr == NUM_DEBUG_INFOS) {
+								strategy++;
+								if (MF_DBGLEVEL >= 3) Dbprintf("strategy:%d", strategy);
+								debug_info_nr = 0;
+							}
 						}
+						debug_info_nr++;
 						continue;
 					}
 				}
@@ -2214,11 +2218,13 @@ void ReaderMifare(bool first_try, uint8_t blockNo, uint8_t keyType)
 				continue;
 			}
 		}
+		if (MF_DBGLEVEL >= 3) Dbprintf("par: %d\n",par[0]);
 
 		if ((nt != nt_attacked) && nt_attacked) { 	// we somehow lost sync. Try to catch up again...
 			catch_up_cycles = -dist_nt(nt_attacked, nt);
 			if (catch_up_cycles == 99999) {			// invalid nonce received. Don't resync on that one.
 				catch_up_cycles = 0;
+				if (MF_DBGLEVEL >= 3) Dbprintf("invalid nonce received. Don't resync on that one\n");
 				continue;
 			}
 			catch_up_cycles /= elapsed_prng_sequences;
