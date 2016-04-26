@@ -2218,7 +2218,6 @@ void ReaderMifare(bool first_try, uint8_t blockNo, uint8_t keyType)
 				continue;
 			}
 		}
-		if (MF_DBGLEVEL >= 3) Dbprintf("par: %d\n",par[0]);
 
 		if ((nt != nt_attacked) && nt_attacked) { 	// we somehow lost sync. Try to catch up again...
 			catch_up_cycles = -dist_nt(nt_attacked, nt);
@@ -2277,6 +2276,7 @@ void ReaderMifare(bool first_try, uint8_t blockNo, uint8_t keyType)
 			if (nt_diff == 0 && first_try)
 			{
 				par[0]++;
+				if (MF_DBGLEVEL >= 3) Dbprintf("par: %d\n",par[0]);
 				if (par[0] == 0x00) {		// tried all 256 possible parities without success. Card doesn't send NACK.
 					isOK = -2;
 					break;
