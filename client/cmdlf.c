@@ -62,7 +62,6 @@ int CmdLFCommandRead(const char *Cmd)
 	bool errors = FALSE;
 	//uint8_t divisor = 95; //125khz
 	uint8_t cmdp = 0;
-	int strLength = 0;
 	while(param_getchar(Cmd, cmdp) != 0x00)
 	{
 		switch(param_getchar(Cmd, cmdp))
@@ -78,7 +77,7 @@ int CmdLFCommandRead(const char *Cmd)
 			cmdp++;
 			break;
 		case 'c':
-			strLength = param_getstr(Cmd, cmdp+1, (char *)&c.d.asBytes);
+			param_getstr(Cmd, cmdp+1, (char *)&c.d.asBytes);
 			cmdp+=2;
 			break;
 		case 'd':
