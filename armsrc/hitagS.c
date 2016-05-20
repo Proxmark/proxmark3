@@ -12,7 +12,6 @@
 //-----------------------------------------------------------------------------
 
 
-#include <stdio.h>
 #include <stdlib.h>
 #include "proxmark3.h"
 #include "apps.h"
