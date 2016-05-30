@@ -33,6 +33,7 @@ of stream transmissions (marshmellow)
 - Added 'hf snoop'. This command take digitalized signal from FPGA and put in BigBuffer. (pwpiwi + enio)
 - Added Topaz (NFC type 1) protocol support ('hf topaz reader', 'hf list topaz', 'hf 14a raw -T', 'hf topaz snoop'). (piwi)
 - Added option c to 'hf list' (mark CRC bytes) (piwi)
+- Added option `l` or `h` to `hw tune` to save time and unnecessary fpga writes if you are only interested in lf or hf.
 
 ### Changed
 - Added `[l] <length>` option to data printdemodbuffer
