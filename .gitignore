@@ -21,6 +21,7 @@ flasher
 version.c
 lua
 luac
+fpga_compress
 
 fpga/*
 !fpga/tests

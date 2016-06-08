@@ -182,13 +182,9 @@ int AvgAdc(int ch) // was static - merlok
 	return (a + 15) >> 5;
 }
 
-void MeasureAntennaTuning(void)
+void MeasureAntennaTuningLfOnly(int *vLf125, int *vLf134, int *peakf, int *peakv, uint8_t LF_Results[])
 {
-	uint8_t LF_Results[256];
-	int i, adcval = 0, peak = 0, peakv = 0, peakf = 0; //ptr = 0 
-	int vLf125 = 0, vLf134 = 0, vHf = 0;	// in mV
-
-	LED_B_ON();
+	int i, adcval = 0, peak = 0;
 
 /*
  * Sweeps the useful LF range of the proxmark from
@@ -198,38 +194,67 @@ void MeasureAntennaTuning(void)
  * the resonating frequency of your LF antenna
  * ( hopefully around 95 if it is tuned to 125kHz!)
  */
-  
-  	FpgaDownloadAndGo(FPGA_BITSTREAM_LF);
+
+	FpgaDownloadAndGo(FPGA_BITSTREAM_LF);
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_LF_ADC | FPGA_LF_ADC_READER_FIELD);
 	for (i=255; i>=19; i--) {
-    WDT_HIT();
+		WDT_HIT();
 		FpgaSendCommand(FPGA_CMD_SET_DIVISOR, i);
 		SpinDelay(20);
 		adcval = ((MAX_ADC_LF_VOLTAGE * AvgAdc(ADC_CHAN_LF)) >> 10);
-		if (i==95) 	vLf125 = adcval; // voltage at 125Khz
-		if (i==89) 	vLf134 = adcval; // voltage at 134Khz
+		if (i==95) *vLf125 = adcval; // voltage at 125Khz
+		if (i==89) *vLf134 = adcval; // voltage at 134Khz
 
 		LF_Results[i] = adcval>>8; // scale int to fit in byte for graphing purposes
 		if(LF_Results[i] > peak) {
-			peakv = adcval;
+			*peakv = adcval;
 			peak = LF_Results[i];
-			peakf = i;
+			*peakf = i;
 			//ptr = i;
 		}
 	}
 
 	for (i=18; i >= 0; i--) LF_Results[i] = 0;
-	
-	LED_A_ON();
+
+	return;
+}
+
+void MeasureAntennaTuningHfOnly(int *vHf)
+{
 	// Let the FPGA drive the high-frequency antenna around 13.56 MHz.
-  	FpgaDownloadAndGo(FPGA_BITSTREAM_HF);
+	LED_A_ON();
+	FpgaDownloadAndGo(FPGA_BITSTREAM_HF);
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_HF_READER_RX_XCORR);
 	SpinDelay(20);
-	vHf = (MAX_ADC_HF_VOLTAGE * AvgAdc(ADC_CHAN_HF)) >> 10;
+	*vHf = (MAX_ADC_HF_VOLTAGE * AvgAdc(ADC_CHAN_HF)) >> 10;
+	LED_A_OFF();
+
+	return;
+}
+
+void MeasureAntennaTuning(int mode)
+{
+	uint8_t LF_Results[256] = {0};
+	int peakv = 0, peakf = 0;
+	int vLf125 = 0, vLf134 = 0, vHf = 0; // in mV
+
+	LED_B_ON();
+
+	if (((mode & FLAG_TUNE_ALL) == FLAG_TUNE_ALL) && (FpgaGetCurrent() == FPGA_BITSTREAM_HF)) {
+		// Reverse "standard" order if HF already loaded, to avoid unnecessary swap.
+		MeasureAntennaTuningHfOnly(&vHf);
+		MeasureAntennaTuningLfOnly(&vLf125, &vLf134, &peakf, &peakv, LF_Results);
+	} else {
+		if (mode & FLAG_TUNE_LF) {
+			MeasureAntennaTuningLfOnly(&vLf125, &vLf134, &peakf, &peakv, LF_Results);
+		}
+		if (mode & FLAG_TUNE_HF) {
+			MeasureAntennaTuningHfOnly(&vHf);
+		}
+	}
 
 	cmd_send(CMD_MEASURED_ANTENNA_TUNING, vLf125 | (vLf134<<16), vHf, peakf | (peakv<<16), LF_Results, 256);
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
-	LED_A_OFF();
 	LED_B_OFF();
 	return;
 }
@@ -1231,7 +1256,7 @@ void UsbPacketReceived(uint8_t *packet, int len)
 			break;
 
 		case CMD_MEASURE_ANTENNA_TUNING:
-			MeasureAntennaTuning();
+			MeasureAntennaTuning(c->arg[0]);
 			break;
 
 		case CMD_MEASURE_ANTENNA_TUNING_HF:

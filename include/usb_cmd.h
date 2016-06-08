@@ -228,6 +228,11 @@ typedef struct{
 #define FLAG_ICLASS_READER_CEDITKEY     0x40
 
 
+//hw tune args
+#define FLAG_TUNE_LF   1
+#define FLAG_TUNE_HF   2
+#define FLAG_TUNE_ALL  3
+
 
 // CMD_DEVICE_INFO response packet has flags in arg[0], flag definitions:
 /* Whether a bootloader that understands the common_area is present */
