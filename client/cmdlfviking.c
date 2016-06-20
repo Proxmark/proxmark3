@@ -47,8 +47,8 @@ int usage_lf_viking_sim(void) {
 
 uint64_t getVikingBits(uint32_t id) {
 	//calc checksum
-	uint8_t checksum = (id>>24) ^ ((id>>16) & 0xFF) ^ ((id>>8) & 0xFF) ^ (id & 0xFF) ^ 0xF2 ^ 0xA8;
-	return ((uint64_t)0xF2 << 56) | (id << 8) | checksum;
+	uint8_t checksum = ((id>>24) & 0xFF) ^ ((id>>16) & 0xFF) ^ ((id>>8) & 0xFF) ^ (id & 0xFF) ^ 0xF2 ^ 0xA8;
+	return ((uint64_t)0xF2 << 56) | ((uint64_t)id << 8) | checksum;
 }
 //by marshmellow
 //see ASKDemod for what args are accepted
