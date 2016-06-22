@@ -19,5 +19,6 @@
 #include "common.h"
 
 int nonce2key(uint32_t uid, uint32_t nt, uint32_t nr, uint64_t par_info, uint64_t ks_info, uint64_t * key); 
+uint64_t mfkey32(uint32_t uid, uint32_t nt, uint32_t nr0_enc, uint32_t ar0_enc, uint32_t nr1_enc, uint32_t ar1_enc);
 
 #endif
