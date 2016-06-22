@@ -2307,6 +2307,18 @@ void ReaderMifare(bool first_try)
 	set_tracing(FALSE);
 }
 
+typedef struct {
+  uint32_t cuid;
+  uint8_t  sector;
+  uint8_t  keytype;
+  uint32_t nonce;
+  uint32_t ar;
+  uint32_t nr;
+  uint32_t nonce2;
+  uint32_t ar2;
+  uint32_t nr2;
+} nonces_t;
+
 /**
   *MIFARE 1K simulate.
   *
@@ -2353,12 +2365,18 @@ void Mifare1ksim(uint8_t flags, uint8_t exitAfterNReads, uint8_t arg2, uint8_t *
 	uint8_t rAUTH_NT[] = {0x01, 0x02, 0x03, 0x04};
 	uint8_t rAUTH_AT[] = {0x00, 0x00, 0x00, 0x00};
 		
-	//Here, we collect UID,NT,AR,NR,UID2,NT2,AR2,NR2
+	//Here, we collect UID,sector,keytype,NT,AR,NR,NT2,AR2,NR2
 	// This can be used in a reader-only attack.
 	// (it can also be retrieved via 'hf 14a list', but hey...
-	uint32_t ar_nr_responses[] = {0,0,0,0,0,0,0,0};
-	uint8_t ar_nr_collected = 0;
+	
+	//allow collecting up to 4 sets of nonces to allow recovery of 4 keys (2 keyA & 2 keyB)
+	// must be set in multiples of 2 (for 1 keyA and 1 keyB)
+	#define ATTACK_KEY_COUNT 4
+	nonces_t ar_nr_resp[ATTACK_KEY_COUNT]; 
+	memset(ar_nr_resp, 0x00, sizeof(ar_nr_resp));
 
+	uint8_t ar_nr_collected[ATTACK_KEY_COUNT];
+	memset(ar_nr_collected, 0x00, sizeof(ar_nr_collected));
 	// Authenticate response - nonce
 	uint32_t nonce = bytes_to_num(rAUTH_NT, 4);
 	
@@ -2506,16 +2524,35 @@ void Mifare1ksim(uint8_t flags, uint8_t exitAfterNReads, uint8_t arg2, uint8_t *
 
 				uint32_t ar = bytes_to_num(receivedCmd, 4);
 				uint32_t nr = bytes_to_num(&receivedCmd[4], 4);
-
-				//Collect AR/NR
-				if(ar_nr_collected < 2){
-					if(ar_nr_responses[2] != ar)
-					{// Avoid duplicates... probably not necessary, ar should vary. 
-						ar_nr_responses[ar_nr_collected*4] = cuid;
-						ar_nr_responses[ar_nr_collected*4+1] = nonce;
-						ar_nr_responses[ar_nr_collected*4+2] = ar;
-						ar_nr_responses[ar_nr_collected*4+3] = nr;
-						ar_nr_collected++;
+	
+				//Collect AR/NR per key/sector
+				if(flags & FLAG_NR_AR_ATTACK) {
+					for (uint8_t i = 0; i < ATTACK_KEY_COUNT; i++) {
+						if(cardAUTHKEY > 0 && i < (ATTACK_KEY_COUNT/2) ) {
+							i=ATTACK_KEY_COUNT/2;  //keyB skip to keyB
+						} else if (cardAUTHKEY == 0 && i == ATTACK_KEY_COUNT/2) {
+							break; //should not get here - quit
+						}
+						// if first auth for sector, or matches sector of previous auth
+						if ( ar_nr_collected[i]==0 || (cardAUTHSC == ar_nr_resp[i].sector && ar_nr_collected[i] > 0) ) {
+							if(ar_nr_collected[i] < 2) {
+								if(ar_nr_resp[ar_nr_collected[i]].ar != ar)
+								{// Avoid duplicates... probably not necessary, ar should vary. 
+									if (ar_nr_collected[i]==0) {
+										ar_nr_resp[i].cuid = cuid;
+										ar_nr_resp[i].sector = cardAUTHSC;
+										ar_nr_resp[i].nonce = nonce;
+										ar_nr_resp[i].ar = ar;
+										ar_nr_resp[i].nr = nr;
+									} else {
+										ar_nr_resp[i].ar2 = ar;
+										ar_nr_resp[i].nr2 = nr;
+									}
+									ar_nr_collected[i]++;
+									break;
+								}
+							}
+						}
 					}
 				}
 
@@ -2537,6 +2574,7 @@ void Mifare1ksim(uint8_t flags, uint8_t exitAfterNReads, uint8_t arg2, uint8_t *
 					break;
 				}
 
+				//auth successful
 				ans = prng_successor(nonce, 96) ^ crypto1_word(pcs, 0, 0);
 
 				num_to_bytes(ans, 4, rAUTH_AT);
@@ -2780,37 +2818,29 @@ void Mifare1ksim(uint8_t flags, uint8_t exitAfterNReads, uint8_t arg2, uint8_t *
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
 	LEDsoff();
 
+	if(flags & FLAG_NR_AR_ATTACK && MF_DBGLEVEL >= 1)
+	{
+		for ( uint8_t	i = 0; i < ATTACK_KEY_COUNT; i++) {
+			if (ar_nr_collected[i] == 2) {
+				Dbprintf("Collected two pairs of AR/NR which can be used to extract %s from reader for sector %d:", (i<ATTACK_KEY_COUNT/2) ? "keyA" : "keyB", ar_nr_resp[i].sector);
+				Dbprintf("../tools/mfkey/mfkey32 %08x %08x %08x %08x %08x %08x",
+						ar_nr_resp[i].cuid,  //UID
+						ar_nr_resp[i].nonce, //NT
+						ar_nr_resp[i].ar,    //AR1
+						ar_nr_resp[i].nr,    //NR1
+						ar_nr_resp[i].ar2,   //AR2
+						ar_nr_resp[i].nr2    //NR2
+						);
+			}
+		}	
+	}
+	if (MF_DBGLEVEL >= 1)	Dbprintf("Emulator stopped. Tracing: %d  trace length: %d ",	tracing, BigBuf_get_traceLen());
+
 	if(flags & FLAG_INTERACTIVE)// Interactive mode flag, means we need to send ACK
 	{
 		//May just aswell send the collected ar_nr in the response aswell
-		cmd_send(CMD_ACK,CMD_SIMULATE_MIFARE_CARD,0,0,&ar_nr_responses,ar_nr_collected*4*4);
+		cmd_send(CMD_ACK,CMD_SIMULATE_MIFARE_CARD,0,0,&ar_nr_resp,sizeof(ar_nr_resp));
 	}
-
-	if(flags & FLAG_NR_AR_ATTACK)
-	{
-		if(ar_nr_collected > 1) {
-			Dbprintf("Collected two pairs of AR/NR which can be used to extract keys from reader:");
-			Dbprintf("../tools/mfkey/mfkey32 %08x %08x %08x %08x %08x %08x",
-					ar_nr_responses[0], // UID
-					ar_nr_responses[1], //NT
-					ar_nr_responses[2], //AR1
-					ar_nr_responses[3], //NR1
-					ar_nr_responses[6], //AR2
-					ar_nr_responses[7] //NR2
-					);
-		} else {
-			Dbprintf("Failed to obtain two AR/NR pairs!");
-			if(ar_nr_collected >0) {
-				Dbprintf("Only got these: UID=%08x, nonce=%08x, AR1=%08x, NR1=%08x",
-						ar_nr_responses[0], // UID
-						ar_nr_responses[1], //NT
-						ar_nr_responses[2], //AR1
-						ar_nr_responses[3] //NR1
-						);
-			}
-		}
-	}
-	if (MF_DBGLEVEL >= 1)	Dbprintf("Emulator stopped. Tracing: %d  trace length: %d ",	tracing, BigBuf_get_traceLen());
 	
 }
 

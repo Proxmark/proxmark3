@@ -9,6 +9,7 @@
 //-----------------------------------------------------------------------------
 
 #include "cmdhfmf.h"
+#include "./nonce2key/nonce2key.h"
 
 static int CmdHelp(const char *Cmd);
 
@@ -28,7 +29,7 @@ int CmdHF14AMifare(const char *Cmd)
 	printf("-------------------------------------------------------------------------\n");
 
 	
-start:
+ start:
     clearCommandBuffer();
     SendCommand(&c);
 	
@@ -1078,6 +1079,64 @@ int CmdHF14AMf1kSim(const char *Cmd)
 		while(! WaitForResponseTimeout(CMD_ACK,&resp,1500)) {
 			//We're waiting only 1.5 s at a time, otherwise we get the
 			// annoying message about "Waiting for a response... "
+		}
+		//got a response
+		if (flags & FLAG_NR_AR_ATTACK) {
+			typedef struct {
+			  uint32_t cuid;
+			  uint8_t  sector;
+			  uint8_t  keytype;
+			  uint32_t nonce;
+			  uint32_t ar;
+			  uint32_t nr;
+			  uint32_t nonce2;
+			  uint32_t ar2;
+			  uint32_t nr2;
+			} nonces_t;
+			nonces_t ar_resp[4];
+			//uint32_t ar_responses[] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
+			uint64_t key = 0;
+			//uint64_t keyB = 0;
+			//uint8_t arnr_len = 8;
+			memcpy (ar_resp, resp.d.asBytes, sizeof(ar_resp));
+			
+			for (uint8_t i = 0; i<4; i++) {
+				if (ar_resp[i].ar2 > 0) {
+					key = mfkey32(ar_resp[i].cuid,ar_resp[i].nonce,ar_resp[i].ar,ar_resp[i].nr,ar_resp[i].ar2,ar_resp[i].nr2);
+					if (key>0) {
+						PrintAndLog("\nFound Key%s for sector %d: [%04x%08x]", (i<2) ? "A" : "B", ar_resp[i].sector, (uint32_t) (key>>32), (uint32_t) (key &0xFFFFFFFF));
+						//set emulator memory for key
+					}	
+				}
+			}
+			/*
+			if (ar_resp[1] && ar_responses[2] && ar_responses[3] && ar_responses[6] && ar_responses[7]) {
+				keyA = mfkey32(ar_responses[0],ar_responses[1],ar_responses[2],ar_responses[3],ar_responses[6],ar_responses[7]);
+				if (keyA>0) {
+					PrintAndLog("\nFound KeyA: [%04x%08x]\n\n", (uint32_t) (keyA>>32), (uint32_t) (keyA &0xFFFFFFFF));
+					//set emulator memory for key
+				} else {
+					keyA = mfkey32(ar_responses[0],ar_responses[1],ar_responses[2],ar_responses[3],ar_responses[6],ar_responses[7]);			
+					if (keyA>0) {
+						PrintAndLog("\nFound KeyA: [%04x%08x]\n\n", (uint32_t) (keyA>>32), (uint32_t) (keyA &0xFFFFFFFF));
+						//set emulator memory for key
+					}
+				}
+			} else {
+				PrintAndLog("keyA response error: %d %d %d %d %d",ar_responses[1] , ar_responses[2] , ar_responses[3] , ar_responses[6] , ar_responses[7]);
+			}
+			if (ar_responses[1] && ar_responses[2+arnr_len] && ar_responses[3+arnr_len] && ar_responses[6+arnr_len] && ar_responses[7+arnr_len]) {
+				keyB = mfkey32(ar_responses[0],ar_responses[1],ar_responses[2+arnr_len],ar_responses[3+arnr_len],ar_responses[6+arnr_len],ar_responses[7+arnr_len]);
+				if (keyB>0) {
+					PrintAndLog("\nFound KeyB: [%04x%08x]\n\n", (uint32_t) (keyB>>32), (uint32_t) (keyB & 0xFFFFFFFF));
+					//set emulator memory for key
+				}
+			}
+			if (keyA || keyB) {
+				//TODO retry sim with new keys in emulator memory? (somehow flag to check that to see if new key has successful auth now?)
+				//      to validate key is correct
+			}
+			*/
 		}
 	}
 	

@@ -12,6 +12,8 @@
 #ifndef __BIGBUF_H
 #define __BIGBUF_H
 
+#include <stdbool.h> // for bool
+#include "common.h"  // for ramfunc
 
 #define BIGBUF_SIZE				40000
 #define MAX_FRAME_SIZE			256		// maximum allowed ISO14443 frame
