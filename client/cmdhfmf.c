@@ -1072,6 +1072,7 @@ int CmdHF14AMf1kSim(const char *Cmd)
 	cmdp = param_getchar(Cmd, pnr);
 	if (cmdp == 'x' || cmdp == 'X') {
 		flags |= FLAG_NR_AR_ATTACK;
+		pnr++;
 	}
 
 	cmdp = param_getchar(Cmd, pnr);
@@ -1119,7 +1120,7 @@ int CmdHF14AMf1kSim(const char *Cmd)
 				if (ar_resp[i].ar2 > 0) {
 					//PrintAndLog("Trying sector %d, cuid %08x, nt %08x, ar %08x, nr %08x, ar2 %08x, nr2 %08x",ar_resp[i].sector, ar_resp[i].cuid,ar_resp[i].nonce,ar_resp[i].ar,ar_resp[i].nr,ar_resp[i].ar2,ar_resp[i].nr2);
 					if (mfkey32(ar_resp[i], &key)) {
-						PrintAndLog("Found Key%s for sector %d: [%04x%08x]", (ar_resp[i].keytype) ? "B" : "A", ar_resp[i].sector, (uint32_t) (key>>32), (uint32_t) (key &0xFFFFFFFF));
+						PrintAndLog("Found Key%s for sector %02d: [%04x%08x]", (ar_resp[i].keytype) ? "B" : "A", ar_resp[i].sector, (uint32_t) (key>>32), (uint32_t) (key &0xFFFFFFFF));
 
 						for (uint8_t ii = 0; ii<ATTACK_KEY_COUNT; ii++) {
 							if (key_cnt[ii]==0 || stSector[ii]==ar_resp[i].sector) {
@@ -1151,7 +1152,7 @@ int CmdHF14AMf1kSim(const char *Cmd)
 						char cmd1[36];
 						memset(cmd1,0x00,sizeof(cmd1));
 						snprintf(cmd1,sizeof(cmd1),"%04x%08xFF078069%04x%08x",(uint32_t) (sector_trailer[i].keyA>>32), (uint32_t) (sector_trailer[i].keyA &0xFFFFFFFF),(uint32_t) (sector_trailer[i].keyB>>32), (uint32_t) (sector_trailer[i].keyB &0xFFFFFFFF));
-						//PrintAndLog("%s",cmd1);
+						PrintAndLog("Setting Emulator Memory Block %02d: [%s]",stSector[i]*4+3, cmd1);
 						if (param_gethex(cmd1, 0, memBlock, 32)) {
 							PrintAndLog("block data must include 32 HEX symbols");
 							return 1;
@@ -1168,7 +1169,7 @@ int CmdHF14AMf1kSim(const char *Cmd)
 			for (uint8_t i = ATTACK_KEY_COUNT; i<ATTACK_KEY_COUNT*2; i++) {
 				if (ar_resp[i].ar2 > 0) {
 					if (tryMfk32_moebius(ar_resp[i], &key)) {
-						PrintAndLog("M-Found Key%s for sector %d: [%04x%08x]", (ar_resp[i].keytype) ? "B" : "A", ar_resp[i].sector, (uint32_t) (key>>32), (uint32_t) (key &0xFFFFFFFF));
+						PrintAndLog("M-Found Key%s for sector %02d: [%04x%08x]", (ar_resp[i].keytype) ? "B" : "A", ar_resp[i].sector, (uint32_t) (key>>32), (uint32_t) (key &0xFFFFFFFF));
 					}
 				}
 			}

@@ -2382,7 +2382,7 @@ void Mifare1ksim(uint8_t flags, uint8_t exitAfterNReads, uint8_t arg2, uint8_t *
 
 	uint8_t ar_nr_collected[ATTACK_KEY_COUNT*2];
 	memset(ar_nr_collected, 0x00, sizeof(ar_nr_collected));
-	bool collectMoebius = false;
+	bool gettingMoebius = false;
 	uint8_t	nonce1_count = 0;
 	uint8_t	nonce2_count = 0;
 	uint8_t	moebius_n_count = 0;
@@ -2623,7 +2623,7 @@ void Mifare1ksim(uint8_t flags, uint8_t exitAfterNReads, uint8_t arg2, uint8_t *
 				//Collect AR/NR per keytype & sector
 				if(flags & FLAG_NR_AR_ATTACK) {
 					for (uint8_t i = 0; i < ATTACK_KEY_COUNT; i++) {
-						if ( ar_nr_collected[i+mM]==0 || (cardAUTHSC == ar_nr_resp[i+mM].sector && cardAUTHKEY == ar_nr_resp[i+mM].keytype && ar_nr_collected[i+mM] > 0) ) {
+						if ( ar_nr_collected[i+mM]==0 || ((cardAUTHSC == ar_nr_resp[i+mM].sector) && (cardAUTHKEY == ar_nr_resp[i+mM].keytype) && (ar_nr_collected[i+mM] > 0)) ) {
 							// if first auth for sector, or matches sector and keytype of previous auth
 							if (ar_nr_collected[i+mM] < 2) {
 								// if we haven't already collected 2 nonces for this sector
@@ -2650,14 +2650,18 @@ void Mifare1ksim(uint8_t flags, uint8_t exitAfterNReads, uint8_t arg2, uint8_t *
 										ar_nr_resp[i+mM].nonce2 = nonce;
 										ar_nr_resp[i+mM].nr2 = nr;
 										ar_nr_resp[i+mM].ar2 = ar;
-										if (!collectMoebius) {
+										if (!gettingMoebius) {
 											nonce2_count++;
 											//check if this was the last second nonce we need for std attack
 											if ( nonce2_count == nonce1_count ) {
 												//done collecting std test switch to moebius
-												collectMoebius = true;
+												  //finish incrementing last sample
+												ar_nr_collected[i+mM]++; 
+												//switch to moebius collection
+												gettingMoebius = true;
 												mM = ATTACK_KEY_COUNT;
 												nonce = nonce*7;
+												break;
 											}
 										} else {
 											moebius_n_count++;
@@ -2666,15 +2670,16 @@ void Mifare1ksim(uint8_t flags, uint8_t exitAfterNReads, uint8_t arg2, uint8_t *
 										}
 									}
 									ar_nr_collected[i+mM]++;
-									break;
 								}
-							} else { //already collected 2 nonces for sector - reader looping? - quit
+							} else { //already collected 2 nonces for sector - dump out
 								//finished = true;
 							}
+							// we found right spot for this nonce stop looking
+							break;
 						}
 					}
 				}
-	
+
 				// --- crypto
 				crypto1_word(pcs, nr , 1);
 				cardRr = ar ^ crypto1_word(pcs, 0, 0);
@@ -2759,7 +2764,9 @@ void Mifare1ksim(uint8_t flags, uint8_t exitAfterNReads, uint8_t arg2, uint8_t *
 				}
 				
 				if (len == 4 && (receivedCmd[0] == 0x60 || receivedCmd[0] == 0x61)) {
-					if (receivedCmd[1] >= 16 * 4) {
+
+					// if authenticating to a block that shouldn't exist - as long as we are not doing the reader attack
+					if (receivedCmd[1] >= 16 * 4 && !(flags & FLAG_NR_AR_ATTACK)) {
 						//is this the correct response to an auth on a out of range block? marshmellow
 						EmSend4bit(mf_crypto1_encrypt4bit(pcs, CARD_NACK_NA));
 						if (MF_DBGLEVEL >= 2) Dbprintf("Reader tried to operate (0x%02x) on out of range block: %d (0x%02x), nacking",receivedCmd[0],receivedCmd[1],receivedCmd[1]);

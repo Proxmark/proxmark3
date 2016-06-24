@@ -164,14 +164,6 @@ bool mfkey32(nonces_t data, uint64_t *outputkey) {
 	clock_t t1 = clock();
 	bool isSuccess = FALSE;
 	uint8_t counter=0;
-	//PrintAndLog("Enter mfkey32");
-	//PrintAndLog("Trying sector %d, cuid %08x, nt %08x, nr %08x, ar %08x, nr2 %08x, ar2 %08x",data.sector, uid, nt,nr0_enc,ar0_enc,nr1_enc,ar1_enc);
-	// Generate lfsr succesors of the tag challenge
-	//prng_successor(nt, 64);
-	//prng_successor(nt, 96);
-
-	// Extract the keystream from the messages
-	//ks2 = ar0_enc ^ prng_successor(nt, 64);
 
 	s = lfsr_recovery32(ar0_enc ^ prng_successor(nt, 64), 0);
 
