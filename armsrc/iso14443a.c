@@ -2504,7 +2504,8 @@ void Mifare1ksim(uint8_t flags, uint8_t exitAfterNReads, uint8_t arg2, uint8_t *
 	set_tracing(TRUE);
 
 	bool finished = FALSE;
-	while (!BUTTON_PRESS() && !finished && !usb_poll_validate_length()) {
+	bool button_pushed = BUTTON_PRESS();
+	while (!button_pushed && !finished && !usb_poll_validate_length()) {
 		WDT_HIT();
 
 		// find reader field
@@ -2956,6 +2957,7 @@ void Mifare1ksim(uint8_t flags, uint8_t exitAfterNReads, uint8_t arg2, uint8_t *
 				break;
 			}
 		}
+		button_pushed = BUTTON_PRESS();
 	}
 
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
@@ -2996,7 +2998,7 @@ void Mifare1ksim(uint8_t flags, uint8_t exitAfterNReads, uint8_t arg2, uint8_t *
 	if(flags & FLAG_INTERACTIVE)// Interactive mode flag, means we need to send ACK
 	{
 		//Send the collected ar_nr in the response
-		cmd_send(CMD_ACK,CMD_SIMULATE_MIFARE_CARD,0,0,&ar_nr_resp,sizeof(ar_nr_resp));
+		cmd_send(CMD_ACK,CMD_SIMULATE_MIFARE_CARD,button_pushed,0,&ar_nr_resp,sizeof(ar_nr_resp));
 	}
 	
 }
