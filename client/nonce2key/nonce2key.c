@@ -192,7 +192,7 @@ bool mfkey32(nonces_t data, uint64_t *outputkey) {
 		PrintAndLog("Could not create file name stats.txt");
 		return 1;
 	}
-	fprintf(fout, "mfkey32,%d,%d,%s,%04x%08x,%.0Lf\r\n",counter,data.sector,(data.keytype) ? "B" : "A", (uint32_t)(outkey>>32) & 0xFFFF,(uint32_t)(outkey&0xFFFFFFFF),(long double)t1);
+	fprintf(fout, "mfkey32,%d,%08x,%d,%s,%04x%08x,%.0Lf\r\n", counter, data.cuid, data.sector, (data.keytype) ? "B" : "A", (uint32_t)(outkey>>32) & 0xFFFF,(uint32_t)(outkey&0xFFFFFFFF),(long double)t1);
 	fclose(fout);
 	return isSuccess;
 }
@@ -243,7 +243,7 @@ bool tryMfk32_moebius(nonces_t data, uint64_t *outputkey) {
 		PrintAndLog("Could not create file name stats.txt");
 		return 1;
 	}
-	fprintf(fout, "moebius,%d,%d,%s,%04x%08x,%0.Lf\r\n",counter,data.sector, (data.keytype) ? "B" : "A", (uint32_t) (outkey>>32),(uint32_t)(outkey&0xFFFFFFFF),(long double)t1);
+	fprintf(fout, "moebius,%d,%08x,%d,%s,%04x%08x,%0.Lf\r\n", counter, data.cuid, data.sector, (data.keytype) ? "B" : "A", (uint32_t) (outkey>>32),(uint32_t)(outkey&0xFFFFFFFF),(long double)t1);
 	fclose(fout);
 	return isSuccess;
 }
