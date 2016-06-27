@@ -5,6 +5,8 @@ This project uses the changelog in accordance with [keepchangelog](http://keepac
 ## [unreleased][unreleased]
 
 ### Added
+- Added lf pyramid commands (iceman)
+- Added lf presco commands - some bits not fully understood... (iceman)
 - Added experimental HitagS support (Oguzhan Cicek, Hendrik Schwartke, Ralf Spenneberg)
   see https://media.ccc.de/v/32c3-7166-sicherheit_von_125khz_transpondern_am_beispiel_hitag_s
   English video available
@@ -16,8 +18,7 @@ This project uses the changelog in accordance with [keepchangelog](http://keepac
 - `lf t55xx wipe`  - sets t55xx back to factory defaults
 - Added viking demod to `lf search` (marshmellow)
 - `data askvikingdemod` demod viking id tag from graphbuffer (marshmellow)
-- `lf t55xx resetread` added reset then read command - should allow determining start
-of stream transmissions (marshmellow)
+- `lf t55xx resetread` added reset then read command - should allow determining start of stream transmissions (marshmellow)
 - `lf t55xx wakeup` added wake with password (AOR) to allow lf search or standard lf read after (iceman, marshmellow)
 - `hf iclass managekeys` to save, load and manage iclass keys.  (adjusted most commands to accept a loaded key in memory) (marshmellow)
 - `hf iclass readblk` to select, authenticate, and read 1 block from an iclass card (marshmellow)
@@ -35,21 +36,29 @@ of stream transmissions (marshmellow)
 - Added option c to 'hf list' (mark CRC bytes) (piwi)
 
 ### Changed
-- Added `[l] <length>` option to data printdemodbuffer
-- Adjusted lf awid clone to optionally clone to Q5 tags
-- Adjusted lf t55xx detect to find Q5 tags (t5555) instead of just t55x7
-- Adjusted all lf NRZ demods - works more accurately and consistently (as long as you have strong signal)
-- Adjusted lf pskindalademod to reduce false positive reads.
-- Small adjustments to psk, nrz, and ask clock detect routines - more reliable.
-- Adjusted lf em410x em410xsim to accept a clock argument
+- Fixed bug in lf biphase sim - `lf simask b` (and any tagtype that relies on it - gproxii...) (marshmellow)
+- Fixed bug in lf viking clone/sim (iceman)
+- Fixed broken `data askedgedetect` (marshmellow)
+- Adjusted hf mf sim command (marshmellow)
+    added auto run mfkey32 to extract all keys 
+    also added f parameter to allow attacking with UIDs from a file (implies x and i parameters)
+    also added e parameter to allow adding the extracted keys to emulator memory for the next simulation
+    added 10 byte uid option
+- Added `[l] <length>` option to data printdemodbuffer (marshmellow)
+- Adjusted lf awid clone to optionally clone to Q5 tags (marshmellow)
+- Adjusted lf t55xx detect to find Q5 tags (t5555) instead of just t55x7 (marshmellow)
+- Adjusted all lf NRZ demods - works more accurately and consistently (as long as you have strong signal) (marshmellow)
+- Adjusted lf pskindalademod to reduce false positive reads. (marshmellow)
+- Small adjustments to psk, nrz, and ask clock detect routines - more reliable. (marshmellow)
+- Adjusted lf em410x em410xsim to accept a clock argument (marshmellow)
 - Adjusted lf t55xx dump to allow overriding the safety check and warning text (marshmellow)
 - Adjusted lf t55xx write input variables (marshmellow)
 - Adjusted lf t55xx read with password safety check and warning text and adjusted the input variables (marshmellow & iceman)
-- Adjusted LF FSK demod to account for cross threshold fluctuations (898 count waves will adjust the 9 to 8 now...) more accurate.
+- Adjusted LF FSK demod to account for cross threshold fluctuations (898 count waves will adjust the 9 to 8 now...) more accurate. (marshmellow)
 - Adjusted timings for t55xx commands.  more reliable now. (marshmellow & iceman)
 - `lf cmdread` adjusted input methods and added help text (marshmellow & iceman)
 - changed `lf config t <threshold>` to be 0 - 128 and will trigger on + or - threshold value (marshmellow) 
-- `hf iclass dump` cli options - can now dump AA1 and AA2 with different keys in one run (does not go to multiple pages for the larger tags yet)
+- `hf iclass dump` cli options - can now dump AA1 and AA2 with different keys in one run (does not go to multiple pages for the larger tags yet) (marshmellow)
 - Revised workflow for StandAloneMode14a (Craig Young)
 - EPA functions (`hf epa`) now support both ISO 14443-A and 14443-B cards (frederikmoellers)
 - 'hw version' only talks to ARM at startup, after that the info is cached. (pwpiwi)

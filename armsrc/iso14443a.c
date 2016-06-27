@@ -2336,7 +2336,6 @@ void Mifare1ksim(uint8_t flags, uint8_t exitAfterNReads, uint8_t arg2, uint8_t *
 {
 	int cardSTATE = MFEMUL_NOFIELD;
 	int _UID_LEN = 0; // 4, 7, 10
-	int _7BUID = 0;
 	int vHf = 0;	// in mV
 	int res;
 	uint32_t selTimer = 0;
@@ -2360,14 +2359,13 @@ void Mifare1ksim(uint8_t flags, uint8_t exitAfterNReads, uint8_t arg2, uint8_t *
 	uint8_t response[MAX_MIFARE_FRAME_SIZE];
 	uint8_t response_par[MAX_MIFARE_PARITY_SIZE];
 	
-	uint8_t rATQA[] = {0x04, 0x00}; // Mifare classic 1k 4BUID
+	uint8_t rATQA[]    = {0x04, 0x00}; // Mifare classic 1k 4BUID
 	uint8_t rUIDBCC1[] = {0xde, 0xad, 0xbe, 0xaf, 0x62};
 	uint8_t rUIDBCC2[] = {0xde, 0xad, 0xbe, 0xaf, 0x62}; // !!!
 	uint8_t rUIDBCC3[] = {0xde, 0xad, 0xbe, 0xaf, 0x62};
 
-	uint8_t rSAK[] = {0x08, 0xb6, 0xdd};
-	uint8_t rSAK1[] = {0x04, 0xda, 0x17};
-	uint8_t rSAK2[] = {0x04, 0xda, 0x17}; //need to look up
+	uint8_t rSAKfinal[]= {0x08, 0xb6, 0xdd};      // mifare 1k indicated
+	uint8_t rSAK1[]    = {0x04, 0xda, 0x17};      // indicate UID not finished
 
 	uint8_t rAUTH_NT[] = {0x01, 0x02, 0x03, 0x04};
 	uint8_t rAUTH_AT[] = {0x00, 0x00, 0x00, 0x00};
@@ -2375,8 +2373,8 @@ void Mifare1ksim(uint8_t flags, uint8_t exitAfterNReads, uint8_t arg2, uint8_t *
 	//Here, we collect UID,sector,keytype,NT,AR,NR,NT2,AR2,NR2
 	// This will be used in the reader-only attack.
 
-	//allow collecting up to 8 sets of nonces to allow recovery of 8 keys
-	#define ATTACK_KEY_COUNT 8
+	//allow collecting up to 8 sets of nonces to allow recovery of up to 8 keys
+	#define ATTACK_KEY_COUNT 8 // keep same as define in cmdhfmf.c -> readerAttack()
 	nonces_t ar_nr_resp[ATTACK_KEY_COUNT*2]; //*2 for 2 separate attack types
 	memset(ar_nr_resp, 0x00, sizeof(ar_nr_resp));
 
@@ -2404,7 +2402,6 @@ void Mifare1ksim(uint8_t flags, uint8_t exitAfterNReads, uint8_t arg2, uint8_t *
 		// 7B uid comes from data-portion of packet
 		memcpy(&rUIDBCC1[1],datain,3);
 		memcpy(rUIDBCC2, datain+3, 4);
-		_7BUID = true;
 		_UID_LEN = 7;
 	} else if (flags & FLAG_10B_UID_IN_DATA) {
 		memcpy(&rUIDBCC1[1], datain,   3);
@@ -2414,8 +2411,7 @@ void Mifare1ksim(uint8_t flags, uint8_t exitAfterNReads, uint8_t arg2, uint8_t *
 	} else {
 		// get UID from emul memory - guess at length
 		emlGetMemBt(receivedCmd, 7, 1);
-		_7BUID = !(receivedCmd[0] == 0x00);
-		if (!_7BUID) {                     // ---------- 4BUID
+		if (receivedCmd[0] == 0x00) {      // ---------- 4BUID
 			emlGetMemBt(rUIDBCC1, 0, 4);
 			_UID_LEN = 4;
 		} else {                           // ---------- 7BUID
@@ -2550,27 +2546,25 @@ void Mifare1ksim(uint8_t flags, uint8_t exitAfterNReads, uint8_t arg2, uint8_t *
 				break;
 			}
 			case MFEMUL_SELECT1:{
-				// select all
-				if (len == 2 && (receivedCmd[0] == 0x93 && receivedCmd[1] == 0x20)) {
+				// select all - 0x93 0x20
+				if (len == 2 && (receivedCmd[0] == ISO14443A_CMD_ANTICOLL_OR_SELECT && receivedCmd[1] == 0x20)) {
 					if (MF_DBGLEVEL >= 4)	Dbprintf("SELECT ALL received");
 					EmSendCmd(rUIDBCC1, sizeof(rUIDBCC1));
 					break;
 				}
 
-				if (MF_DBGLEVEL >= 4 && len == 9 && receivedCmd[0] == 0x93 && receivedCmd[1] == 0x70 )
-				{
-					Dbprintf("SELECT %02x%02x%02x%02x received",receivedCmd[2],receivedCmd[3],receivedCmd[4],receivedCmd[5]);
-				}
-				// select card
-				// check correct sak values... (marshmellow)
-				if (len == 9 && 
-						(receivedCmd[0] == 0x93 && receivedCmd[1] == 0x70 && memcmp(&receivedCmd[2], rUIDBCC1, 4) == 0)) {
+				// select card - 0x93 0x70 ...
+				if (len == 9 &&
+						(receivedCmd[0] == ISO14443A_CMD_ANTICOLL_OR_SELECT && receivedCmd[1] == 0x70 && memcmp(&receivedCmd[2], rUIDBCC1, 4) == 0)) {
+					if (MF_DBGLEVEL >= 4) 
+						Dbprintf("SELECT %02x%02x%02x%02x received",receivedCmd[2],receivedCmd[3],receivedCmd[4],receivedCmd[5]);
+					
 					switch(_UID_LEN) {
 						case 4:
 							cardSTATE = MFEMUL_WORK;
 							LED_B_ON();
 							if (MF_DBGLEVEL >= 4)	Dbprintf("--> WORK. anticol1 time: %d", GetTickCount() - selTimer);
-							EmSendCmd(rSAK, sizeof(rSAK));
+							EmSendCmd(rSAKfinal, sizeof(rSAKfinal));
 							break;
 						case 7:
 							cardSTATE	= MFEMUL_SELECT2;
@@ -2578,7 +2572,7 @@ void Mifare1ksim(uint8_t flags, uint8_t exitAfterNReads, uint8_t arg2, uint8_t *
 							break;
 						case 10:
 							cardSTATE	= MFEMUL_SELECT2;
-							EmSendCmd(rSAK2, sizeof(rSAK2));
+							EmSendCmd(rSAK1, sizeof(rSAK1));
 							break;
 						default:break;
 					}
@@ -2592,16 +2586,18 @@ void Mifare1ksim(uint8_t flags, uint8_t exitAfterNReads, uint8_t arg2, uint8_t *
 					LogTrace(Uart.output, Uart.len, Uart.startTime*16 - DELAY_AIR2ARM_AS_TAG, Uart.endTime*16 - DELAY_AIR2ARM_AS_TAG, Uart.parity, TRUE);
 					break;
 				}
+				// select all cl3 - 0x97 0x20
 				if (len == 2 && (receivedCmd[0] == ISO14443A_CMD_ANTICOLL_OR_SELECT_3 && receivedCmd[1] == 0x20)) {
 					EmSendCmd(rUIDBCC3, sizeof(rUIDBCC3));
 					break;
 				}
+				// select card cl3 - 0x97 0x70
 				if (len == 9 && 
 						(receivedCmd[0] == ISO14443A_CMD_ANTICOLL_OR_SELECT_3 &&
 						 receivedCmd[1] == 0x70 && 
 						 memcmp(&receivedCmd[2], rUIDBCC3, 4) == 0) ) {
 
-					EmSendCmd(rSAK2, sizeof(rSAK2));
+					EmSendCmd(rSAKfinal, sizeof(rSAKfinal));
 					cardSTATE = MFEMUL_WORK;
 					LED_B_ON();
 					if (MF_DBGLEVEL >= 4)	Dbprintf("--> WORK. anticol3 time: %d", GetTickCount() - selTimer);
@@ -2611,8 +2607,7 @@ void Mifare1ksim(uint8_t flags, uint8_t exitAfterNReads, uint8_t arg2, uint8_t *
 				break;
 			}
 			case MFEMUL_AUTH1:{
-				if( len != 8)
-				{
+				if( len != 8) {
 					cardSTATE_TO_IDLE();
 					LogTrace(Uart.output, Uart.len, Uart.startTime*16 - DELAY_AIR2ARM_AS_TAG, Uart.endTime*16 - DELAY_AIR2ARM_AS_TAG, Uart.parity, TRUE);
 					break;
@@ -2621,7 +2616,7 @@ void Mifare1ksim(uint8_t flags, uint8_t exitAfterNReads, uint8_t arg2, uint8_t *
 				uint32_t nr = bytes_to_num(receivedCmd, 4);
 				uint32_t ar = bytes_to_num(&receivedCmd[4], 4);
 	
-				//Collect AR/NR per keytype & sector
+				// Collect AR/NR per keytype & sector
 				if(flags & FLAG_NR_AR_ATTACK) {
 					for (uint8_t i = 0; i < ATTACK_KEY_COUNT; i++) {
 						if ( ar_nr_collected[i+mM]==0 || ((cardAUTHSC == ar_nr_resp[i+mM].sector) && (cardAUTHKEY == ar_nr_resp[i+mM].keytype) && (ar_nr_collected[i+mM] > 0)) ) {
@@ -2639,7 +2634,7 @@ void Mifare1ksim(uint8_t flags, uint8_t exitAfterNReads, uint8_t arg2, uint8_t *
 										ar_nr_resp[i+mM].nr = nr;
 										ar_nr_resp[i+mM].ar = ar;
 										nonce1_count++;
-										//add this nonce to first moebius nonce
+										// add this nonce to first moebius nonce
 										ar_nr_resp[i+ATTACK_KEY_COUNT].cuid = cuid;
 										ar_nr_resp[i+ATTACK_KEY_COUNT].sector = cardAUTHSC;
 										ar_nr_resp[i+ATTACK_KEY_COUNT].keytype = cardAUTHKEY;
@@ -2647,18 +2642,18 @@ void Mifare1ksim(uint8_t flags, uint8_t exitAfterNReads, uint8_t arg2, uint8_t *
 										ar_nr_resp[i+ATTACK_KEY_COUNT].nr = nr;
 										ar_nr_resp[i+ATTACK_KEY_COUNT].ar = ar;
 										ar_nr_collected[i+ATTACK_KEY_COUNT]++;
-									} else { //second nonce collect (std and moebius)
+									} else { // second nonce collect (std and moebius)
 										ar_nr_resp[i+mM].nonce2 = nonce;
 										ar_nr_resp[i+mM].nr2 = nr;
 										ar_nr_resp[i+mM].ar2 = ar;
 										if (!gettingMoebius) {
 											nonce2_count++;
-											//check if this was the last second nonce we need for std attack
+											// check if this was the last second nonce we need for std attack
 											if ( nonce2_count == nonce1_count ) {
-												//done collecting std test switch to moebius
-												  //finish incrementing last sample
+												// done collecting std test switch to moebius
+												// first finish incrementing last sample
 												ar_nr_collected[i+mM]++; 
-												//switch to moebius collection
+												// switch to moebius collection
 												gettingMoebius = true;
 												mM = ATTACK_KEY_COUNT;
 												nonce = nonce*7;
@@ -2666,14 +2661,12 @@ void Mifare1ksim(uint8_t flags, uint8_t exitAfterNReads, uint8_t arg2, uint8_t *
 											}
 										} else {
 											moebius_n_count++;
-											//if we've collected all the nonces we need - finish.
+											// if we've collected all the nonces we need - finish.
 											if (nonce1_count == moebius_n_count) finished = true;
 										}
 									}
 									ar_nr_collected[i+mM]++;
 								}
-							} else { //already collected 2 nonces for sector - dump out
-								//finished = true;
 							}
 							// we found right spot for this nonce stop looking
 							break;
@@ -2716,24 +2709,25 @@ void Mifare1ksim(uint8_t flags, uint8_t exitAfterNReads, uint8_t arg2, uint8_t *
 				if (!len) { 
 					LogTrace(Uart.output, Uart.len, Uart.startTime*16 - DELAY_AIR2ARM_AS_TAG, Uart.endTime*16 - DELAY_AIR2ARM_AS_TAG, Uart.parity, TRUE);
 					break;
-				}
-				if (len == 2 && (receivedCmd[0] == 0x95 && receivedCmd[1] == 0x20)) {
+				}	
+				// select all cl2 - 0x95 0x20
+				if (len == 2 && (receivedCmd[0] == ISO14443A_CMD_ANTICOLL_OR_SELECT_2 && receivedCmd[1] == 0x20)) {
 					EmSendCmd(rUIDBCC2, sizeof(rUIDBCC2));
 					break;
 				}
 
-				// select 2 card
+				// select cl2 card - 0x95 0x70 xxxxxxxxxxxx
 				if (len == 9 && 
-						(receivedCmd[0] == 0x95 && receivedCmd[1] == 0x70 && memcmp(&receivedCmd[2], rUIDBCC2, 4) == 0)) {
-					//which sak now? (marshmellow)
-					EmSendCmd(rSAK, sizeof(rSAK));
+						(receivedCmd[0] == ISO14443A_CMD_ANTICOLL_OR_SELECT_2 && receivedCmd[1] == 0x70 && memcmp(&receivedCmd[2], rUIDBCC2, 4) == 0)) {
 					switch(_UID_LEN) {
 						case 7:
+							EmSendCmd(rSAKfinal, sizeof(rSAKfinal));
 							cardSTATE = MFEMUL_WORK;
 							LED_B_ON();
 							if (MF_DBGLEVEL >= 4)	Dbprintf("--> WORK. anticol2 time: %d", GetTickCount() - selTimer);
 							break;
 						case 10:
+							EmSendCmd(rSAK1, sizeof(rSAK1));
 							cardSTATE = MFEMUL_SELECT3;
 							break;
 						default:break;
@@ -2963,8 +2957,7 @@ void Mifare1ksim(uint8_t flags, uint8_t exitAfterNReads, uint8_t arg2, uint8_t *
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
 	LEDsoff();
 
-	if(flags & FLAG_NR_AR_ATTACK && MF_DBGLEVEL >= 1)
-	{
+	if(flags & FLAG_NR_AR_ATTACK && MF_DBGLEVEL >= 1) {
 		for ( uint8_t	i = 0; i < ATTACK_KEY_COUNT; i++) {
 			if (ar_nr_collected[i] == 2) {
 				Dbprintf("Collected two pairs of AR/NR which can be used to extract %s from reader for sector %d:", (i<ATTACK_KEY_COUNT/2) ? "keyA" : "keyB", ar_nr_resp[i].sector);
@@ -2995,14 +2988,12 @@ void Mifare1ksim(uint8_t flags, uint8_t exitAfterNReads, uint8_t arg2, uint8_t *
 	}
 	if (MF_DBGLEVEL >= 1)	Dbprintf("Emulator stopped. Tracing: %d  trace length: %d ",	tracing, BigBuf_get_traceLen());
 
-	if(flags & FLAG_INTERACTIVE)// Interactive mode flag, means we need to send ACK
-	{
+	if(flags & FLAG_INTERACTIVE) { // Interactive mode flag, means we need to send ACK
 		//Send the collected ar_nr in the response
 		cmd_send(CMD_ACK,CMD_SIMULATE_MIFARE_CARD,button_pushed,0,&ar_nr_resp,sizeof(ar_nr_resp));
 	}
 	
 }
-
 
 
 //-----------------------------------------------------------------------------
