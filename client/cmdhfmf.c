@@ -1123,7 +1123,6 @@ int CmdHF14AMf1kSim(const char *Cmd) {
 	memset(filename, 0x00, sizeof(filename));
 	int len = 0;
 	char buf[64];
-	uint8_t uidBuffer[64];
 
 	uint8_t cmdp = 0;
 	bool errors = false;
@@ -1202,7 +1201,7 @@ int CmdHF14AMf1kSim(const char *Cmd) {
 		PrintAndLog("Loading file and simulating. Press keyboard to abort");
 		while(!feof(f) && !ukbhit()){
 			memset(buf, 0, sizeof(buf));
-			memset(uidBuffer, 0, sizeof(uidBuffer));
+			memset(uid, 0, sizeof(uid));
 
 			if (fgets(buf, sizeof(buf), f) == NULL) {			
 				if (count > 0) break;
@@ -1211,21 +1210,21 @@ int CmdHF14AMf1kSim(const char *Cmd) {
 				fclose(f);
 				return 2;
 			}
-			if(strlen(buf) && feof(f)) break;
+			if(!strlen(buf) && feof(f)) break;
 
-			uidlen = strlen(buf);
+			uidlen = strlen(buf)-1;
 			switch(uidlen) {
-				case 20: flags = FLAG_10B_UID_IN_DATA;	break; //not complete
-				case 14: flags = FLAG_7B_UID_IN_DATA; break;
-				case  8: flags = FLAG_4B_UID_IN_DATA; break;
+				case 20: flags |= FLAG_10B_UID_IN_DATA;	break; //not complete
+				case 14: flags |= FLAG_7B_UID_IN_DATA; break;
+				case  8: flags |= FLAG_4B_UID_IN_DATA; break;
 				default: 
-					PrintAndLog("uid in file wrong length at %d",count);
+					PrintAndLog("uid in file wrong length at %d (length: %d) [%s]",count, uidlen, buf);
 					fclose(f);
 					return 2;
 			}
 
 			for (uint8_t i = 0; i < uidlen; i += 2) {
-				sscanf(&buf[i], "%02x", (unsigned int *)&uidBuffer[i / 2]);
+				sscanf(&buf[i], "%02x", (unsigned int *)&uid[i / 2]);
 			}
 			
 			PrintAndLog("mf 1k sim uid: %s, numreads:%d, flags:%d (0x%02x) - press button to abort",

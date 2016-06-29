@@ -2375,15 +2375,15 @@ void Mifare1ksim(uint8_t flags, uint8_t exitAfterNReads, uint8_t arg2, uint8_t *
 
 	//allow collecting up to 8 sets of nonces to allow recovery of up to 8 keys
 	#define ATTACK_KEY_COUNT 8 // keep same as define in cmdhfmf.c -> readerAttack()
-	nonces_t ar_nr_resp[ATTACK_KEY_COUNT*2]; //*2 for 2 separate attack types
+	nonces_t ar_nr_resp[ATTACK_KEY_COUNT*2]; //*2 for 2 separate attack types (nml, moebius)
 	memset(ar_nr_resp, 0x00, sizeof(ar_nr_resp));
 
-	uint8_t ar_nr_collected[ATTACK_KEY_COUNT*2];
+	uint8_t ar_nr_collected[ATTACK_KEY_COUNT*2]; //*2 for 2nd attack type (moebius)
 	memset(ar_nr_collected, 0x00, sizeof(ar_nr_collected));
-	bool gettingMoebius = false;
 	uint8_t	nonce1_count = 0;
 	uint8_t	nonce2_count = 0;
 	uint8_t	moebius_n_count = 0;
+	bool gettingMoebius = false;
 	uint8_t	mM = 0; //moebius_modifier for collection storage
 
 	// Authenticate response - nonce
@@ -2511,7 +2511,7 @@ void Mifare1ksim(uint8_t flags, uint8_t exitAfterNReads, uint8_t arg2, uint8_t *
 				cardSTATE_TO_IDLE();
 				LED_A_ON();
 			}
-		} 
+		}
 		if (cardSTATE == MFEMUL_NOFIELD) continue;
 
 		//Now, get data
@@ -2523,7 +2523,7 @@ void Mifare1ksim(uint8_t flags, uint8_t exitAfterNReads, uint8_t arg2, uint8_t *
 		} else if (res == 1) {
 			break; 	//return value 1 means button press
 		}
-			
+
 		// REQ or WUP request in ANY state and WUP in HALTED state
 		if (len == 1 && ((receivedCmd[0] == ISO14443A_CMD_REQA && cardSTATE != MFEMUL_HALTED) || receivedCmd[0] == ISO14443A_CMD_WUPA)) {
 			selTimer = GetTickCount();
@@ -2992,7 +2992,6 @@ void Mifare1ksim(uint8_t flags, uint8_t exitAfterNReads, uint8_t arg2, uint8_t *
 		//Send the collected ar_nr in the response
 		cmd_send(CMD_ACK,CMD_SIMULATE_MIFARE_CARD,button_pushed,0,&ar_nr_resp,sizeof(ar_nr_resp));
 	}
-	
 }
 
 
