@@ -181,12 +181,12 @@ bool mfkey32(nonces_t data, uint64_t *outputkey) {
 			if (counter==20) break;
 		}
 	}
-	//free(s);
 	isSuccess = (counter == 1);
 	t1 = clock() - t1;
 	//if ( t1 > 0 ) PrintAndLog("Time in mfkey32: %.0f ticks \nFound %d possible keys", (float)t1, counter);
 	*outputkey = ( isSuccess ) ? outkey : 0;
 	crypto1_destroy(s);
+	/* //un-comment to save all keys to a stats.txt file 
 	FILE *fout;
 	if ((fout = fopen("stats.txt","ab")) == NULL) { 
 		PrintAndLog("Could not create file name stats.txt");
@@ -194,6 +194,7 @@ bool mfkey32(nonces_t data, uint64_t *outputkey) {
 	}
 	fprintf(fout, "mfkey32,%d,%08x,%d,%s,%04x%08x,%.0Lf\r\n", counter, data.cuid, data.sector, (data.keytype) ? "B" : "A", (uint32_t)(outkey>>32) & 0xFFFF,(uint32_t)(outkey&0xFFFFFFFF),(long double)t1);
 	fclose(fout);
+	*/
 	return isSuccess;
 }
 
@@ -205,7 +206,6 @@ bool tryMfk32_moebius(nonces_t data, uint64_t *outputkey) {
 	uint32_t nt0     = data.nonce;  // first tag challenge (nonce)
 	uint32_t nr0_enc = data.nr;  // first encrypted reader challenge
 	uint32_t ar0_enc = data.ar; // first encrypted reader response
-	//uint32_t uid1    = le32toh(data+16);
 	uint32_t nt1     = data.nonce2; // second tag challenge (nonce)
 	uint32_t nr1_enc = data.nr2; // second encrypted reader challenge
 	uint32_t ar1_enc = data.ar2; // second encrypted reader response	
@@ -238,6 +238,7 @@ bool tryMfk32_moebius(nonces_t data, uint64_t *outputkey) {
 	//if ( t1 > 0 ) PrintAndLog("Time in mfkey32_moebius: %.0f ticks \nFound %d possible keys", (float)t1,counter);
 	*outputkey = ( isSuccess ) ? outkey : 0;
 	crypto1_destroy(s);
+	/* // un-comment to output all keys to stats.txt
 	FILE *fout;
 	if ((fout = fopen("stats.txt","ab")) == NULL) { 
 		PrintAndLog("Could not create file name stats.txt");
@@ -245,6 +246,7 @@ bool tryMfk32_moebius(nonces_t data, uint64_t *outputkey) {
 	}
 	fprintf(fout, "moebius,%d,%08x,%d,%s,%04x%08x,%0.Lf\r\n", counter, data.cuid, data.sector, (data.keytype) ? "B" : "A", (uint32_t) (outkey>>32),(uint32_t)(outkey&0xFFFFFFFF),(long double)t1);
 	fclose(fout);
+	*/
 	return isSuccess;
 }
 

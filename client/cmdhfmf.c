@@ -1079,14 +1079,15 @@ void readerAttack(nonces_t ar_resp[], bool setEmulatorMem) {
 			}
 		}
 	}
-	//moebius attack
+	/*
+	//un-comment to use as well moebius attack
 	for (uint8_t i = ATTACK_KEY_COUNT; i<ATTACK_KEY_COUNT*2; i++) {
 		if (ar_resp[i].ar2 > 0) {
 			if (tryMfk32_moebius(ar_resp[i], &key)) {
 				PrintAndLog("M-Found Key%s for sector %02d: [%04x%08x]", (ar_resp[i].keytype) ? "B" : "A", ar_resp[i].sector, (uint32_t) (key>>32), (uint32_t) (key &0xFFFFFFFF));
 			}
 		}
-	}
+	}*/
 }
 
 int usage_hf14_mf1ksim(void) {
