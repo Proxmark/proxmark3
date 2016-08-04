@@ -214,14 +214,19 @@ int CmdLFHitagReader(const char *Cmd) {
 		} break;
 		case RHT2F_CRYPTO: {
 			num_to_bytes(param_get64ex(Cmd,1,0,16),6,htd->crypto.key);
-//			num_to_bytes(param_get32ex(Cmd,2,0,16),4,htd->auth.NrAr+4);
+			//			num_to_bytes(param_get32ex(Cmd,2,0,16),4,htd->auth.NrAr+4);
 		} break;
 		case RHT2F_TEST_AUTH_ATTEMPTS: {
 			// No additional parameters needed
 		} break;
+		case RHT2F_UID_ONLY: {
+			// No additional parameters needed
+		} break;
 		default: {
-			PrintAndLog("Error: unkown reader function %d",htf);
-			PrintAndLog("Hitag reader functions");
+			PrintAndLog("\nError: unkown reader function %d",htf);
+			PrintAndLog("");
+			PrintAndLog("Usage: hitag reader <Reader Function #>");
+			PrintAndLog("Reader Functions:");
 			PrintAndLog(" HitagS (0*)");
 			PrintAndLog("  01 <nr> <ar> (Challenge) read all pages from a Hitag S tag");
 			PrintAndLog("  02 <key> (set to 0 if no authentication is needed) read all pages from a Hitag S tag");
@@ -231,6 +236,7 @@ int CmdLFHitagReader(const char *Cmd) {
 			PrintAndLog("  22 <nr> <ar> (authentication)");
 			PrintAndLog("  23 <key> (authentication) key is in format: ISK high + ISK low");
 			PrintAndLog("  25 (test recorded authentications)");
+			PrintAndLog("  26 just read UID");
 			return 1;
 		} break;
 	}
@@ -238,32 +244,38 @@ int CmdLFHitagReader(const char *Cmd) {
 	// Copy the hitag2 function into the first argument
 	c.arg[0] = htf;
 
-  // Send the command to the proxmark
-  SendCommand(&c);
-  
-  UsbCommand resp;
-  WaitForResponse(CMD_ACK,&resp);
-  
-  // Check the return status, stored in the first argument
-  if (resp.arg[0] == false) return 1;
-    
-  uint32_t id = bytes_to_num(resp.d.asBytes,4);
-  char filename[256];
-  FILE* pf = NULL;
+	// Send the command to the proxmark
+	SendCommand(&c);
 
-  sprintf(filename,"%08x_%04x.ht2",id,(rand() & 0xffff));
-  if ((pf = fopen(filename,"wb")) == NULL) {
-    PrintAndLog("Error: Could not open file [%s]",filename);
-    return 1;
-  }
-  
-  // Write the 48 tag memory bytes to file and finalize
-  fwrite(resp.d.asBytes,1,48,pf);
-  fclose(pf);
+	UsbCommand resp;
+	WaitForResponse(CMD_ACK,&resp);
 
-  PrintAndLog("Succesfully saved tag memory to [%s]",filename);
-  
-  return 0;
+	// Check the return status, stored in the first argument
+	if (resp.arg[0] == false) return 1;
+	
+	uint32_t id = bytes_to_num(resp.d.asBytes,4);
+		
+	if (htf == RHT2F_UID_ONLY){
+		PrintAndLog("Valid Hitag2 tag found - UID: %08x",id);
+	} else {
+		char filename[256];
+		FILE* pf = NULL;
+
+		sprintf(filename,"%08x_%04x.ht2",id,(rand() & 0xffff));
+		if ((pf = fopen(filename,"wb")) == NULL) {
+		  PrintAndLog("Error: Could not open file [%s]",filename);
+		  return 1;
+		}
+
+		// Write the 48 tag memory bytes to file and finalize
+		fwrite(resp.d.asBytes,1,48,pf);
+		fclose(pf);
+
+		PrintAndLog("Succesfully saved tag memory to [%s]",filename);
+	}
+
+
+	return 0;
 }
 
 
