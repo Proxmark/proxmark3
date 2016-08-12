@@ -68,7 +68,7 @@ uint8_t parityTest(uint32_t bits, uint8_t bitLen, uint8_t pType)
 
 // by marshmellow
 // takes a array of binary values, start position, length of bits per parity (includes parity bit),
-//   Parity Type (1 for odd; 0 for even; 2 Always 1's), and binary Length (length to run) 
+//   Parity Type (1 for odd; 0 for even; 2 for Always 1's; 3 for Always 0's), and binary Length (length to run) 
 size_t removeParity(uint8_t *BitStream, size_t startIdx, uint8_t pLen, uint8_t pType, size_t bLen)
 {
 	uint32_t parityWd = 0;
@@ -80,10 +80,11 @@ size_t removeParity(uint8_t *BitStream, size_t startIdx, uint8_t pLen, uint8_t p
 		}
 		j--; // overwrite parity with next data
 		// if parity fails then return 0
-		if (pType == 2) { // then marker bit which should be a 1
-			if (!BitStream[j]) return 0;
-		} else {
-			if (parityTest(parityWd, pLen, pType) == 0) return 0;			
+		switch (pType) {
+			case 3: if (BitStream[j]==1) return 0; break; //should be 0 spacer bit
+			case 2: if (BitStream[j]==0) return 0; break; //should be 1 spacer bit
+			default: //test parity
+				if (parityTest(parityWd, pLen, pType) == 0) return 0; break;
 		}
 		bitCnt+=(pLen-1);
 		parityWd = 0;
@@ -95,7 +96,8 @@ size_t removeParity(uint8_t *BitStream, size_t startIdx, uint8_t pLen, uint8_t p
 
 // by marshmellow
 // takes a array of binary values, length of bits per parity (includes parity bit),
-//   Parity Type (1 for odd; 0 for even; 2 Always 1's), and binary Length (length to run)
+//   Parity Type (1 for odd; 0 for even; 2 Always 1's; 3 Always 0's), and binary Length (length to run)
+//   Make sure *dest is long enough to store original sourceLen + #_of_parities_to_be_added
 size_t addParity(uint8_t *BitSource, uint8_t *dest, uint8_t sourceLen, uint8_t pLen, uint8_t pType)
 {
 	uint32_t parityWd = 0;
@@ -106,10 +108,12 @@ size_t addParity(uint8_t *BitSource, uint8_t *dest, uint8_t sourceLen, uint8_t p
 			dest[j++] = (BitSource[word+bit]);
 		}
 		// if parity fails then return 0
-		if (pType == 2) { // then marker bit which should be a 1
-			dest[j++]=1;
-		} else {
-			dest[j++] = parityTest(parityWd, pLen-1, pType) ^ 1;
+		switch (pType) {
+			case 3: dest[j++]=0; break; // marker bit which should be a 0
+			case 2: dest[j++]=1; break; // marker bit which should be a 1
+			default: 
+				dest[j++] = parityTest(parityWd, pLen-1, pType) ^ 1;
+				break;
 		}
 		bitCnt += pLen;
 		parityWd = 0;
@@ -256,11 +260,14 @@ int cleanAskRawDemod(uint8_t *BinStream, size_t *size, int clk, int invert, int 
 //by marshmellow
 void askAmp(uint8_t *BitStream, size_t size)
 {
+	uint8_t Last = 128;
 	for(size_t i = 1; i<size; i++){
 		if (BitStream[i]-BitStream[i-1]>=30) //large jump up
-			BitStream[i]=127;
-		else if(BitStream[i]-BitStream[i-1]<=-20) //large jump down
-			BitStream[i]=-127;
+			Last = 255;
+		else if(BitStream[i-1]-BitStream[i]>=20) //large jump down
+			Last = 0;
+
+		BitStream[i-1] = Last;
 	}
 	return;
 }
@@ -460,10 +467,10 @@ int gProxII_Demod(uint8_t BitStream[], size_t *size)
 		//return start position
 		return (int) startIdx;
 	}
-	return -5;
+	return -5; //spacer bits not found - not a valid gproxII
 }
 
-//translate wave to 11111100000 (1 for each short wave 0 for each long wave)
+//translate wave to 11111100000 (1 for each short wave [higher freq] 0 for each long wave [lower freq])
 size_t fsk_wave_demod(uint8_t * dest, size_t size, uint8_t fchigh, uint8_t fclow)
 {
 	size_t last_transition = 0;
@@ -487,6 +494,7 @@ size_t fsk_wave_demod(uint8_t * dest, size_t size, uint8_t fchigh, uint8_t fclow
 	// count cycles between consecutive lo-hi transitions, there should be either 8 (fc/8)
 	// or 10 (fc/10) cycles but in practice due to noise etc we may end up with anywhere
 	// between 7 to 11 cycles so fuzz it by treat anything <9 as 8 and anything else as 10
+	//  (could also be fc/5 && fc/7 for fsk1 = 4-9)
 	for(idx = 161; idx < size-20; idx++) {
 		// threshold current value
 
@@ -494,23 +502,24 @@ size_t fsk_wave_demod(uint8_t * dest, size_t size, uint8_t fchigh, uint8_t fclow
 		else dest[idx] = 1;
 
 		// Check for 0->1 transition
-		if (dest[idx-1] < dest[idx]) { // 0 -> 1 transition
+		if (dest[idx-1] < dest[idx]) {
 			preLastSample = LastSample;
 			LastSample = currSample;
 			currSample = idx-last_transition;
-			if (currSample < (fclow-2)){            //0-5 = garbage noise (or 0-3)
+			if (currSample < (fclow-2)) {                   //0-5 = garbage noise (or 0-3)
 				//do nothing with extra garbage
-			} else if (currSample < (fchigh-1)) { //6-8 = 8 sample waves  or 3-6 = 5
+			} else if (currSample < (fchigh-1)) {           //6-8 = 8 sample waves  (or 3-6 = 5)
+				//correct previous 9 wave surrounded by 8 waves (or 6 surrounded by 5)
 				if (LastSample > (fchigh-2) && (preLastSample < (fchigh-1) || preLastSample	== 0 )){
-					dest[numBits-1]=1;  //correct previous 9 wave surrounded by 8 waves
+					dest[numBits-1]=1;
 				}
 				dest[numBits++]=1;
 
-			} else if (currSample > (fchigh) && !numBits) { //12 + and first bit = garbage 
+			} else if (currSample > (fchigh) && !numBits) { //12 + and first bit = unusable garbage 
 				//do nothing with beginning garbage
-			} else if (currSample == (fclow+1) && LastSample == (fclow-1)) { // had a 7 then a 9 should be two 8's
+			} else if (currSample == (fclow+1) && LastSample == (fclow-1)) { // had a 7 then a 9 should be two 8's (or 4 then a 6 should be two 5's)
 				dest[numBits++]=1;
-			} else {                                         //9+ = 10 sample waves
+			} else {                                        //9+ = 10 sample waves (or 6+ = 7)
 				dest[numBits++]=0;
 			}
 			last_transition = idx;
@@ -520,6 +529,7 @@ size_t fsk_wave_demod(uint8_t * dest, size_t size, uint8_t fchigh, uint8_t fclow
 }
 
 //translate 11111100000 to 10
+//rfLen = clock, fchigh = larger field clock, fclow = smaller field clock
 size_t aggregate_bits(uint8_t *dest, size_t size, uint8_t rfLen,
 		uint8_t invert, uint8_t fchigh, uint8_t fclow)
 {
@@ -529,8 +539,9 @@ size_t aggregate_bits(uint8_t *dest, size_t size, uint8_t rfLen,
 	uint32_t n=1;
 	for( idx=1; idx < size; idx++) {
 		n++;
-		if (dest[idx]==lastval) continue; 
+		if (dest[idx]==lastval) continue; //skip until we hit a transition
 		
+		//find out how many bits (n) we collected
 		//if lastval was 1, we have a 1->0 crossing
 		if (dest[idx-1]==1) {
 			n = (n * fclow + rfLen/2) / rfLen;
@@ -539,6 +550,7 @@ size_t aggregate_bits(uint8_t *dest, size_t size, uint8_t rfLen,
 		}
 		if (n == 0) n = 1;
 
+		//add to our destination the bits we collected		
 		memset(dest+numBits, dest[idx-1]^invert , n);
 		numBits += n;
 		n=0;
@@ -676,6 +688,19 @@ int VikingDemod_AM(uint8_t *dest, size_t *size) {
 	    ^ bytebits_to_byte(dest+startIdx+48,8) ^ bytebits_to_byte(dest+startIdx+56,8);
 	if ( checkCalc != 0xA8 ) return -5;
 	if (*size != 64) return -6;
+	//return start position
+	return (int) startIdx;
+}
+
+// find presco preamble 0x10D in already demoded data
+int PrescoDemod(uint8_t *dest, size_t *size) {
+	//make sure buffer has data
+	if (*size < 64*2) return -2;
+
+	size_t startIdx = 0;
+	uint8_t preamble[] = {1,0,0,0,0,1,1,0,1,0,0,0,0,0,0,0,0,0,0,0};
+	uint8_t errChk = preambleSearch(dest, preamble, sizeof(preamble), size, &startIdx);
+	if (errChk == 0) return -4; //preamble not found
 	//return start position
 	return (int) startIdx;
 }
@@ -1478,8 +1503,8 @@ int pskRawDemod(uint8_t dest[], size_t *size, int *clock, int *invert)
 	numBits += (firstFullWave / *clock);
 	//set start of wave as clock align
 	lastClkBit = firstFullWave;
-	//PrintAndLog("DEBUG: firstFullWave: %d, waveLen: %d",firstFullWave,fullWaveLen);  
-	//PrintAndLog("DEBUG: clk: %d, lastClkBit: %d", *clock, lastClkBit);
+	if (g_debugMode==2) prnt("DEBUG PSK: firstFullWave: %u, waveLen: %u",firstFullWave,fullWaveLen);  
+	if (g_debugMode==2) prnt("DEBUG: clk: %d, lastClkBit: %u, fc: %u", *clock, lastClkBit,(unsigned int) fc);
 	waveStart = 0;
 	dest[numBits++] = curPhase; //set first read bit
 	for (i = firstFullWave + fullWaveLen - 1; i < *size-3; i++){
@@ -1662,7 +1687,7 @@ bool DetectST(uint8_t buffer[], size_t *size, int *foundclock) {
 	i=0;
 	// warning - overwriting buffer given with raw wave data with ST removed...
 	while ( dataloc < bufsize-(clk/2) ) {
-		//compensate for long high at end of ST not being high... (we cut out the high part)
+		//compensate for long high at end of ST not being high due to signal loss... (and we cut out the start of wave high part)
 		if (buffer[dataloc]<high && buffer[dataloc]>low && buffer[dataloc+3]<high && buffer[dataloc+3]>low) {
 			for(i=0; i < clk/2-tol; ++i) {
 				buffer[dataloc+i] = high+5;
@@ -1677,7 +1702,7 @@ bool DetectST(uint8_t buffer[], size_t *size, int *foundclock) {
 			}
 		}
 		newloc += i;
-		//skip next ST
+		//skip next ST  -  we just assume it will be there from now on...
 		dataloc += clk*4;
 	}
 	*size = newloc;

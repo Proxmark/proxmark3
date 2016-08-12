@@ -149,3 +149,140 @@ int nonce2key(uint32_t uid, uint32_t nt, uint32_t nr, uint64_t par_info, uint64_
 	
 	return 1;
 }
+
+// 32 bit recover key from 2 nonces
+bool mfkey32(nonces_t data, uint64_t *outputkey) {
+	struct Crypto1State *s,*t;
+	uint64_t outkey = 0;
+	uint64_t key=0;     // recovered key
+	uint32_t uid     = data.cuid;
+	uint32_t nt      = data.nonce;  // first tag challenge (nonce)
+	uint32_t nr0_enc = data.nr;  // first encrypted reader challenge
+	uint32_t ar0_enc = data.ar;  // first encrypted reader response
+	uint32_t nr1_enc = data.nr2; // second encrypted reader challenge
+	uint32_t ar1_enc = data.ar2; // second encrypted reader response
+	clock_t t1 = clock();
+	bool isSuccess = FALSE;
+	uint8_t counter=0;
+
+	s = lfsr_recovery32(ar0_enc ^ prng_successor(nt, 64), 0);
+
+	for(t = s; t->odd | t->even; ++t) {
+		lfsr_rollback_word(t, 0, 0);
+		lfsr_rollback_word(t, nr0_enc, 1);
+		lfsr_rollback_word(t, uid ^ nt, 0);
+		crypto1_get_lfsr(t, &key);
+		crypto1_word(t, uid ^ nt, 0);
+		crypto1_word(t, nr1_enc, 1);
+		if (ar1_enc == (crypto1_word(t, 0, 0) ^ prng_successor(nt, 64))) {
+			//PrintAndLog("Found Key: [%012"llx"]",key);
+			outkey = key;
+			counter++;
+			if (counter==20) break;
+		}
+	}
+	isSuccess = (counter == 1);
+	t1 = clock() - t1;
+	//if ( t1 > 0 ) PrintAndLog("Time in mfkey32: %.0f ticks \nFound %d possible keys", (float)t1, counter);
+	*outputkey = ( isSuccess ) ? outkey : 0;
+	crypto1_destroy(s);
+	/* //un-comment to save all keys to a stats.txt file 
+	FILE *fout;
+	if ((fout = fopen("stats.txt","ab")) == NULL) { 
+		PrintAndLog("Could not create file name stats.txt");
+		return 1;
+	}
+	fprintf(fout, "mfkey32,%d,%08x,%d,%s,%04x%08x,%.0Lf\r\n", counter, data.cuid, data.sector, (data.keytype) ? "B" : "A", (uint32_t)(outkey>>32) & 0xFFFF,(uint32_t)(outkey&0xFFFFFFFF),(long double)t1);
+	fclose(fout);
+	*/
+	return isSuccess;
+}
+
+bool tryMfk32_moebius(nonces_t data, uint64_t *outputkey) {
+	struct Crypto1State *s, *t;
+	uint64_t outkey  = 0;
+	uint64_t key 	   = 0;			     // recovered key
+	uint32_t uid     = data.cuid;
+	uint32_t nt0     = data.nonce;  // first tag challenge (nonce)
+	uint32_t nr0_enc = data.nr;  // first encrypted reader challenge
+	uint32_t ar0_enc = data.ar; // first encrypted reader response
+	uint32_t nt1     = data.nonce2; // second tag challenge (nonce)
+	uint32_t nr1_enc = data.nr2; // second encrypted reader challenge
+	uint32_t ar1_enc = data.ar2; // second encrypted reader response	
+	bool isSuccess = FALSE;
+	int counter = 0;
+	
+	//PrintAndLog("Enter mfkey32_moebius");
+	clock_t t1 = clock();
+
+	s = lfsr_recovery32(ar0_enc ^ prng_successor(nt0, 64), 0);
+  
+	for(t = s; t->odd | t->even; ++t) {
+		lfsr_rollback_word(t, 0, 0);
+		lfsr_rollback_word(t, nr0_enc, 1);
+		lfsr_rollback_word(t, uid ^ nt0, 0);
+		crypto1_get_lfsr(t, &key);
+		
+		crypto1_word(t, uid ^ nt1, 0);
+		crypto1_word(t, nr1_enc, 1);
+		if (ar1_enc == (crypto1_word(t, 0, 0) ^ prng_successor(nt1, 64))) {
+			//PrintAndLog("Found Key: [%012"llx"]",key);
+			outkey=key;
+			++counter;
+			if (counter==20)
+				break;
+		}
+	}
+	isSuccess	= (counter == 1);
+	t1 = clock() - t1;
+	//if ( t1 > 0 ) PrintAndLog("Time in mfkey32_moebius: %.0f ticks \nFound %d possible keys", (float)t1,counter);
+	*outputkey = ( isSuccess ) ? outkey : 0;
+	crypto1_destroy(s);
+	/* // un-comment to output all keys to stats.txt
+	FILE *fout;
+	if ((fout = fopen("stats.txt","ab")) == NULL) { 
+		PrintAndLog("Could not create file name stats.txt");
+		return 1;
+	}
+	fprintf(fout, "moebius,%d,%08x,%d,%s,%04x%08x,%0.Lf\r\n", counter, data.cuid, data.sector, (data.keytype) ? "B" : "A", (uint32_t) (outkey>>32),(uint32_t)(outkey&0xFFFFFFFF),(long double)t1);
+	fclose(fout);
+	*/
+	return isSuccess;
+}
+
+int tryMfk64_ex(uint8_t *data, uint64_t *outputkey){
+	uint32_t uid    = le32toh(data);
+	uint32_t nt     = le32toh(data+4);  // tag challenge
+	uint32_t nr_enc = le32toh(data+8);  // encrypted reader challenge
+	uint32_t ar_enc = le32toh(data+12); // encrypted reader response	
+	uint32_t at_enc = le32toh(data+16);	// encrypted tag response
+	return tryMfk64(uid, nt, nr_enc, ar_enc, at_enc, outputkey);
+}
+
+int tryMfk64(uint32_t uid, uint32_t nt, uint32_t nr_enc, uint32_t ar_enc, uint32_t at_enc, uint64_t *outputkey){
+	uint64_t key 	= 0;				// recovered key
+	uint32_t ks2;     					// keystream used to encrypt reader response
+	uint32_t ks3;     					// keystream used to encrypt tag response
+	struct Crypto1State *revstate;
+	
+	PrintAndLog("Enter mfkey64");
+	clock_t t1 = clock();
+	
+	// Extract the keystream from the messages
+	ks2 = ar_enc ^ prng_successor(nt, 64);
+	ks3 = at_enc ^ prng_successor(nt, 96);
+	revstate = lfsr_recovery64(ks2, ks3);
+	lfsr_rollback_word(revstate, 0, 0);
+	lfsr_rollback_word(revstate, 0, 0);
+	lfsr_rollback_word(revstate, nr_enc, 1);
+	lfsr_rollback_word(revstate, uid ^ nt, 0);
+	crypto1_get_lfsr(revstate, &key);
+	PrintAndLog("Found Key: [%012"llx"]", key);
+	crypto1_destroy(revstate);
+	*outputkey = key;
+	
+	t1 = clock() - t1;
+	if ( t1 > 0 ) PrintAndLog("Time in mfkey64: %.0f ticks \n", (float)t1);
+	return 0;
+}
+

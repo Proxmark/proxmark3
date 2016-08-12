@@ -76,7 +76,7 @@ int usage_t55xx_read(){
 	return 0;
 }
 int usage_t55xx_write(){
-	PrintAndLog("Usage:  lf t55xx wr [b <block>] [d <data>] [p <password>] [1]");
+	PrintAndLog("Usage:  lf t55xx write [b <block>] [d <data>] [p <password>] [1]");
 	PrintAndLog("Options:");
 	PrintAndLog("     b <block>    - block number to write. Between 0-7");
 	PrintAndLog("     d <data>     - 4 bytes of data to write (8 hex characters)");
@@ -84,8 +84,8 @@ int usage_t55xx_write(){
 	PrintAndLog("     1            - OPTIONAL write Page 1 instead of Page 0");
 	PrintAndLog("");
 	PrintAndLog("Examples:");
-	PrintAndLog("      lf t55xx wr b 3 d 11223344            - write 11223344 to block 3");
-	PrintAndLog("      lf t55xx wr b 3 d 11223344 p feedbeef - write 11223344 to block 3 password feedbeef");
+	PrintAndLog("      lf t55xx write b 3 d 11223344            - write 11223344 to block 3");
+	PrintAndLog("      lf t55xx write b 3 d 11223344 p feedbeef - write 11223344 to block 3 password feedbeef");
 	PrintAndLog("");
 	return 0;
 }

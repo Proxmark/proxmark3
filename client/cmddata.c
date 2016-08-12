@@ -8,23 +8,22 @@
 // Data and Graph commands
 //-----------------------------------------------------------------------------
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <limits.h>
-#include "proxmark3.h"
-#include "data.h"
-#include "ui.h"
-#include "graph.h"
-#include "cmdparser.h"
+#include <stdio.h>    // also included in util.h
+#include <string.h>   // also included in util.h
+#include <limits.h>   // for CmdNorm INT_MIN && INT_MAX
+#include "data.h"     // also included in util.h
+#include "cmddata.h"
 #include "util.h"
 #include "cmdmain.h"
-#include "cmddata.h"
-#include "lfdemod.h"
-#include "usb_cmd.h"
-#include "crc.h"
-#include "crc16.h"
-#include "loclass/cipherutils.h"
+#include "proxmark3.h"
+#include "ui.h"       // for show graph controls
+#include "graph.h"    // for graph data
+#include "cmdparser.h"// already included in cmdmain.h
+#include "usb_cmd.h"  // already included in cmdmain.h and proxmark3.h
+#include "lfdemod.h"  // for demod code
+#include "crc.h"      // for pyramid checksum maxim
+#include "crc16.h"    // for FDXB demod checksum
+#include "loclass/cipherutils.h" // for decimating samples in getsamples
 
 uint8_t DemodBuffer[MAX_DEMOD_BUF_LEN];
 uint8_t g_debugMode=0;
@@ -592,7 +591,7 @@ int Cmdaskbiphdemod(const char *Cmd)
 int CmdG_Prox_II_Demod(const char *Cmd)
 {
 	if (!ASKbiphaseDemod(Cmd, FALSE)){
-		if (g_debugMode) PrintAndLog("ASKbiphaseDemod failed 1st try");
+		if (g_debugMode) PrintAndLog("Error gProxII: ASKbiphaseDemod failed 1st try");
 		return 0;
 	}
 	size_t size = DemodBufferLen;
@@ -602,46 +601,32 @@ int CmdG_Prox_II_Demod(const char *Cmd)
 		if (g_debugMode) PrintAndLog("Error gProxII_Demod");
 		return 0;
 	}
-	//got a good demod
-	uint32_t ByteStream[65] = {0x00};
+	//got a good demod of 96 bits
+	uint8_t ByteStream[8] = {0x00};
 	uint8_t xorKey=0;
-	uint8_t keyCnt=0;
-	uint8_t bitCnt=0;
-	uint8_t ByteCnt=0;
-	size_t startIdx = ans + 6; //start after preamble
-	for (size_t idx = 0; idx<size-6; idx++){
-		if ((idx+1) % 5 == 0){
-			//spacer bit - should be 0
-			if (DemodBuffer[startIdx+idx] != 0) {
-				if (g_debugMode) PrintAndLog("Error spacer not 0: %u, pos: %u", (unsigned int)DemodBuffer[startIdx+idx],(unsigned int)(startIdx+idx));
-				return 0;
-			}
-			continue;
-		} 
-		if (keyCnt<8){ //lsb first
-			xorKey = xorKey | (DemodBuffer[startIdx+idx]<<keyCnt);
-			keyCnt++;
-			if (keyCnt==8 && g_debugMode) PrintAndLog("xorKey Found: %02x", (unsigned int)xorKey);
-			continue;
-		}
-		//lsb first
-		ByteStream[ByteCnt] = ByteStream[ByteCnt] | (DemodBuffer[startIdx+idx]<<bitCnt);
-		bitCnt++;
-		if (bitCnt % 8 == 0){
-			if (g_debugMode) PrintAndLog("byte %u: %02x", (unsigned int)ByteCnt, ByteStream[ByteCnt]);
-			bitCnt=0;
-			ByteCnt++;
-		}
+	size_t startIdx = ans + 6; //start after 6 bit preamble
+
+	uint8_t bits_no_spacer[90];
+	//so as to not mess with raw DemodBuffer copy to a new sample array
+	memcpy(bits_no_spacer, DemodBuffer + startIdx, 90);
+	// remove the 18 (90/5=18) parity bits (down to 72 bits (96-6-18=72))
+	size_t bitLen = removeParity(bits_no_spacer, 0, 5, 3, 90); //source, startloc, paritylen, ptype, length_to_run
+	if (bitLen != 72) {
+		if (g_debugMode) PrintAndLog("Error gProxII: spacer removal did not produce 72 bits: %u, start: %u", bitLen, startIdx);
+		return 0;
 	}
-	for (uint8_t i = 0; i < ByteCnt; i++){
-		ByteStream[i] ^= xorKey; //xor
-		if (g_debugMode) PrintAndLog("byte %u after xor: %02x", (unsigned int)i, ByteStream[i]);
+	// get key and then get all 8 bytes of payload decoded
+	xorKey = (uint8_t)bytebits_to_byteLSBF(bits_no_spacer, 8);
+	for (size_t idx = 0; idx < 8; idx++) {
+		ByteStream[idx] = ((uint8_t)bytebits_to_byteLSBF(bits_no_spacer+8 + (idx*8),8)) ^ xorKey;
+		if (g_debugMode) PrintAndLog("byte %u after xor: %02x", (unsigned int)idx, ByteStream[idx]);
 	}
-	//now ByteStream contains 64 bytes of decrypted raw tag data
+	//now ByteStream contains 8 Bytes (64 bits) of decrypted raw tag data
 	// 
 	uint8_t fmtLen = ByteStream[0]>>2;
 	uint32_t FC = 0;
 	uint32_t Card = 0;
+	//get raw 96 bits to print
 	uint32_t raw1 = bytebits_to_byte(DemodBuffer+ans,32);
 	uint32_t raw2 = bytebits_to_byte(DemodBuffer+ans+32, 32);
 	uint32_t raw3 = bytebits_to_byte(DemodBuffer+ans+64, 32);
@@ -649,13 +634,14 @@ int CmdG_Prox_II_Demod(const char *Cmd)
 	if (fmtLen==36){
 		FC = ((ByteStream[3] & 0x7F)<<7) | (ByteStream[4]>>1);
 		Card = ((ByteStream[4]&1)<<19) | (ByteStream[5]<<11) | (ByteStream[6]<<3) | (ByteStream[7]>>5);
-		PrintAndLog("G-Prox-II Found: FmtLen %d, FC %d, Card %d", fmtLen, FC, Card);
+		PrintAndLog("G-Prox-II Found: FmtLen %d, FC %u, Card %u", (int)fmtLen, FC, Card);
 	} else if(fmtLen==26){
 		FC = ((ByteStream[3] & 0x7F)<<1) | (ByteStream[4]>>7);
 		Card = ((ByteStream[4]&0x7F)<<9) | (ByteStream[5]<<1) | (ByteStream[6]>>7);
-		PrintAndLog("G-Prox-II Found: FmtLen %d, FC %d, Card %d",(unsigned int)fmtLen,FC,Card);
+		PrintAndLog("G-Prox-II Found: FmtLen %d, FC %u, Card %u", (int)fmtLen, FC, Card);
 	} else {
 		PrintAndLog("Unknown G-Prox-II Fmt Found: FmtLen %d",(int)fmtLen);
+		PrintAndLog("Decoded Raw: %s", sprint_hex(ByteStream, 8)); 
 	}
 	PrintAndLog("Raw: %08x%08x%08x", raw1,raw2,raw3);
 	setDemodBuf(DemodBuffer+ans, 96, 0);
@@ -848,16 +834,18 @@ int CmdUndec(const char *Cmd)
 	uint8_t factor = param_get8ex(Cmd, 0,2, 10);
 	//We have memory, don't we?
 	int swap[MAX_GRAPH_TRACE_LEN] = { 0 };
-	uint32_t g_index = 0 ,s_index = 0;
-	while(g_index < GraphTraceLen && s_index < MAX_GRAPH_TRACE_LEN)
+	uint32_t g_index = 0, s_index = 0;
+	while(g_index < GraphTraceLen && s_index + factor < MAX_GRAPH_TRACE_LEN)
 	{
 		int count = 0;
-		for(count = 0; count < factor && s_index+count < MAX_GRAPH_TRACE_LEN; count ++)
+		for(count = 0; count < factor && s_index + count < MAX_GRAPH_TRACE_LEN; count++)
 			swap[s_index+count] = GraphBuffer[g_index];
-		s_index+=count;
+
+		s_index += count;
+		g_index++;
 	}
 
-	memcpy(GraphBuffer,swap, s_index * sizeof(int));
+	memcpy(GraphBuffer, swap, s_index * sizeof(int));
 	GraphTraceLen = s_index;
 	RepaintGraphWindow();
 	return 0;
@@ -891,13 +879,15 @@ int CmdGraphShiftZero(const char *Cmd)
 int CmdAskEdgeDetect(const char *Cmd)
 {
 	int thresLen = 25;
+	int Last = 0;
 	sscanf(Cmd, "%i", &thresLen); 
 
 	for(int i = 1; i<GraphTraceLen; i++){
 		if (GraphBuffer[i]-GraphBuffer[i-1]>=thresLen) //large jump up
-			GraphBuffer[i-1] = 127;
+			Last = 127;
 		else if(GraphBuffer[i]-GraphBuffer[i-1]<=-1*thresLen) //large jump down
-			GraphBuffer[i-1] = -127;
+			Last = -127;
+		GraphBuffer[i-1] = Last;
 	}
 	RepaintGraphWindow();
 	return 0;
@@ -1276,7 +1266,7 @@ int CmdFSKdemodAWID(const char *Cmd)
 	//get binary from fsk wave
 	int idx = AWIDdemodFSK(BitStream, &size);
 	if (idx<=0){
-		if (g_debugMode==1){
+		if (g_debugMode){
 			if (idx == -1)
 				PrintAndLog("DEBUG: Error - not enough samples");
 			else if (idx == -2)
@@ -1314,7 +1304,7 @@ int CmdFSKdemodAWID(const char *Cmd)
 
 	size = removeParity(BitStream, idx+8, 4, 1, 88);
 	if (size != 66){
-		if (g_debugMode==1) PrintAndLog("DEBUG: Error - at parity check-tag size does not match AWID format");
+		if (g_debugMode) PrintAndLog("DEBUG: Error - at parity check-tag size does not match AWID format");
 		return 0;
 	}
 	// ok valid card found!
@@ -1374,7 +1364,7 @@ int CmdFSKdemodPyramid(const char *Cmd)
 	//get binary from fsk wave
 	int idx = PyramiddemodFSK(BitStream, &size);
 	if (idx < 0){
-		if (g_debugMode==1){
+		if (g_debugMode){
 			if (idx == -5)
 				PrintAndLog("DEBUG: Error - not enough samples");
 			else if (idx == -1)
@@ -1430,7 +1420,7 @@ int CmdFSKdemodPyramid(const char *Cmd)
 
 	size = removeParity(BitStream, idx+8, 8, 1, 120);
 	if (size != 105){
-		if (g_debugMode==1) 
+		if (g_debugMode) 
 			PrintAndLog("DEBUG: Error at parity check - tag size does not match Pyramid format, SIZE: %d, IDX: %d, hi3: %x",size, idx, rawHi3);
 		return 0;
 	}
@@ -1653,21 +1643,21 @@ int CmdIndalaDecode(const char *Cmd)
 	}
 
 	if (!ans){
-		if (g_debugMode==1) 
+		if (g_debugMode) 
 			PrintAndLog("Error1: %d",ans);
 		return 0;
 	}
 	uint8_t invert=0;
 	size_t size = DemodBufferLen;
-	size_t startIdx = indala26decode(DemodBuffer, &size, &invert);
-	if (startIdx < 1 || size > 224) {
-		if (g_debugMode==1)
+	int startIdx = indala26decode(DemodBuffer, &size, &invert);
+	if (startIdx < 0 || size > 224) {
+		if (g_debugMode)
 			PrintAndLog("Error2: %d",ans);
 		return -1;
 	}
-	setDemodBuf(DemodBuffer, size, startIdx);
+	setDemodBuf(DemodBuffer, size, (size_t)startIdx);
 	if (invert)
-		if (g_debugMode==1)
+		if (g_debugMode)
 			PrintAndLog("Had to invert bits");
 
 	PrintAndLog("BitLen: %d",DemodBufferLen);
@@ -2344,9 +2334,8 @@ int Cmdbin2hex(const char *Cmd)
 	return 0;
 }
 
-int usage_data_hex2bin(){
-
-	PrintAndLog("Usage: data bin2hex <binary_digits>");
+int usage_data_hex2bin() {
+	PrintAndLog("Usage: data hex2bin <hex_digits>");
 	PrintAndLog("       This function will ignore all non-hexadecimal characters (but stop reading on whitespace)");
 	return 0;
 

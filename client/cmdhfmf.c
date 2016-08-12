@@ -9,6 +9,7 @@
 //-----------------------------------------------------------------------------
 
 #include "cmdhfmf.h"
+#include "./nonce2key/nonce2key.h"
 
 static int CmdHelp(const char *Cmd);
 
@@ -28,7 +29,7 @@ int CmdHF14AMifare(const char *Cmd)
 	printf("-------------------------------------------------------------------------\n");
 
 	
-start:
+ start:
     clearCommandBuffer();
     SendCommand(&c);
 	
@@ -1015,72 +1016,273 @@ int CmdHF14AMfChk(const char *Cmd)
 	return 0;
 }
 
-int CmdHF14AMf1kSim(const char *Cmd)
-{
-	uint8_t uid[7] = {0, 0, 0, 0, 0, 0, 0};
+void readerAttack(nonces_t ar_resp[], bool setEmulatorMem) {
+	#define ATTACK_KEY_COUNT 8 // keep same as define in iso14443a.c -> Mifare1ksim()
+	uint64_t key = 0;
+	typedef struct {
+			uint64_t keyA;
+			uint64_t keyB;
+	} st_t;
+	st_t sector_trailer[ATTACK_KEY_COUNT];
+	memset(sector_trailer, 0x00, sizeof(sector_trailer));
+
+	uint8_t	stSector[ATTACK_KEY_COUNT];
+	memset(stSector, 0x00, sizeof(stSector));
+	uint8_t key_cnt[ATTACK_KEY_COUNT];
+	memset(key_cnt, 0x00, sizeof(key_cnt));
+
+	for (uint8_t i = 0; i<ATTACK_KEY_COUNT; i++) {
+		if (ar_resp[i].ar2 > 0) {
+			//PrintAndLog("DEBUG: Trying sector %d, cuid %08x, nt %08x, ar %08x, nr %08x, ar2 %08x, nr2 %08x",ar_resp[i].sector, ar_resp[i].cuid,ar_resp[i].nonce,ar_resp[i].ar,ar_resp[i].nr,ar_resp[i].ar2,ar_resp[i].nr2);
+			if (mfkey32(ar_resp[i], &key)) {
+				PrintAndLog("  Found Key%s for sector %02d: [%04x%08x]", (ar_resp[i].keytype) ? "B" : "A", ar_resp[i].sector, (uint32_t) (key>>32), (uint32_t) (key &0xFFFFFFFF));
+
+				for (uint8_t ii = 0; ii<ATTACK_KEY_COUNT; ii++) {
+					if (key_cnt[ii]==0 || stSector[ii]==ar_resp[i].sector) {
+						if (ar_resp[i].keytype==0) {
+							//keyA
+							sector_trailer[ii].keyA = key;
+							stSector[ii] = ar_resp[i].sector;
+							key_cnt[ii]++;
+							break;
+						} else {
+							//keyB
+							sector_trailer[ii].keyB = key;
+							stSector[ii] = ar_resp[i].sector;
+							key_cnt[ii]++;
+							break;
+						}
+					}
+				}
+			}
+		}
+	}
+	//set emulator memory for keys
+	if (setEmulatorMem) {
+		for (uint8_t i = 0; i<ATTACK_KEY_COUNT; i++) {
+			if (key_cnt[i]>0) {
+				uint8_t	memBlock[16];
+				memset(memBlock, 0x00, sizeof(memBlock));
+				char cmd1[36];
+				memset(cmd1,0x00,sizeof(cmd1));
+				snprintf(cmd1,sizeof(cmd1),"%04x%08xFF078069%04x%08x",(uint32_t) (sector_trailer[i].keyA>>32), (uint32_t) (sector_trailer[i].keyA &0xFFFFFFFF),(uint32_t) (sector_trailer[i].keyB>>32), (uint32_t) (sector_trailer[i].keyB &0xFFFFFFFF));
+				PrintAndLog("Setting Emulator Memory Block %02d: [%s]",stSector[i]*4+3, cmd1);
+				if (param_gethex(cmd1, 0, memBlock, 32)) {
+					PrintAndLog("block data must include 32 HEX symbols");
+					return;
+				}
+				
+				UsbCommand c = {CMD_MIFARE_EML_MEMSET, {(stSector[i]*4+3), 1, 0}};
+				memcpy(c.d.asBytes, memBlock, 16);
+				clearCommandBuffer();
+				SendCommand(&c);			
+			}
+		}
+	}
+	/*
+	//un-comment to use as well moebius attack
+	for (uint8_t i = ATTACK_KEY_COUNT; i<ATTACK_KEY_COUNT*2; i++) {
+		if (ar_resp[i].ar2 > 0) {
+			if (tryMfk32_moebius(ar_resp[i], &key)) {
+				PrintAndLog("M-Found Key%s for sector %02d: [%04x%08x]", (ar_resp[i].keytype) ? "B" : "A", ar_resp[i].sector, (uint32_t) (key>>32), (uint32_t) (key &0xFFFFFFFF));
+			}
+		}
+	}*/
+}
+
+int usage_hf14_mf1ksim(void) {
+	PrintAndLog("Usage:  hf mf sim h u <uid (8, 14, or 20 hex symbols)> n <numreads> i x");
+	PrintAndLog("options:");
+	PrintAndLog("      h    this help");
+	PrintAndLog("      u    (Optional) UID 4,7 or 10 bytes. If not specified, the UID 4B from emulator memory will be used");
+	PrintAndLog("      n    (Optional) Automatically exit simulation after <numreads> blocks have been read by reader. 0 = infinite");
+	PrintAndLog("      i    (Optional) Interactive, means that console will not be returned until simulation finishes or is aborted");
+	PrintAndLog("      x    (Optional) Crack, performs the 'reader attack', nr/ar attack against a legitimate reader, fishes out the key(s)");
+	PrintAndLog("      e    (Optional) set keys found from 'reader attack' to emulator memory (implies x and i)");
+	PrintAndLog("      f    (Optional) get UIDs to use for 'reader attack' from file 'f <filename.txt>' (implies x and i)");
+	PrintAndLog("samples:");
+	PrintAndLog("           hf mf sim u 0a0a0a0a");
+	PrintAndLog("           hf mf sim u 11223344556677");
+	PrintAndLog("           hf mf sim u 112233445566778899AA");
+	PrintAndLog("           hf mf sim f uids.txt");
+	PrintAndLog("           hf mf sim u 0a0a0a0a e");
+		
+	return 0;
+}
+
+int CmdHF14AMf1kSim(const char *Cmd) {
+	UsbCommand resp;
+	uint8_t uid[10] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 	uint8_t exitAfterNReads = 0;
 	uint8_t flags = 0;
-
-	uint8_t cmdp = param_getchar(Cmd, 0);
-	
-	if (cmdp == 'h' || cmdp == 'H') {
-		PrintAndLog("Usage:  hf mf sim  u <uid (8 hex symbols)> n <numreads> i x");
-		PrintAndLog("           h    this help");
-		PrintAndLog("           u    (Optional) UID. If not specified, the UID from emulator memory will be used");
-		PrintAndLog("           n    (Optional) Automatically exit simulation after <numreads> blocks have been read by reader. 0 = infinite");
-		PrintAndLog("           i    (Optional) Interactive, means that console will not be returned until simulation finishes or is aborted");
-		PrintAndLog("           x    (Optional) Crack, performs the 'reader attack', nr/ar attack against a legitimate reader, fishes out the key(s)");
-		PrintAndLog("");
-		PrintAndLog("           sample: hf mf sim u 0a0a0a0a ");
-		return 0;
-	}
+	int uidlen = 0;
 	uint8_t pnr = 0;
-	if (param_getchar(Cmd, pnr) == 'u') {
-		if(param_gethex(Cmd, pnr+1, uid, 8) == 0)
-		{
-			flags |= FLAG_4B_UID_IN_DATA; // UID from packet
-		} else if(param_gethex(Cmd,pnr+1,uid,14) == 0) {
-			flags |= FLAG_7B_UID_IN_DATA;// UID from packet
-		} else {
-			PrintAndLog("UID, if specified, must include 8 or 14 HEX symbols");
+	bool setEmulatorMem = false;
+	bool attackFromFile = false;
+	FILE *f;
+	char filename[FILE_PATH_SIZE];
+	memset(filename, 0x00, sizeof(filename));
+	int len = 0;
+	char buf[64];
+
+	uint8_t cmdp = 0;
+	bool errors = false;
+
+	while(param_getchar(Cmd, cmdp) != 0x00) {
+		switch(param_getchar(Cmd, cmdp)) {
+		case 'e':
+		case 'E':
+			setEmulatorMem = true;
+			//implies x and i
+			flags |= FLAG_INTERACTIVE;
+			flags |= FLAG_NR_AR_ATTACK;
+			cmdp++;
+			break;
+		case 'f':
+		case 'F':
+			len = param_getstr(Cmd, cmdp+1, filename);
+			if (len < 1) {
+				PrintAndLog("error no filename found");
+				return 0;
+			}
+			attackFromFile = true;
+			//implies x and i
+			flags |= FLAG_INTERACTIVE;
+			flags |= FLAG_NR_AR_ATTACK;
+			cmdp += 2;
+			break;
+		case 'h':
+		case 'H':
+			return usage_hf14_mf1ksim();
+		case 'i':
+		case 'I':
+			flags |= FLAG_INTERACTIVE;
+			cmdp++;
+			break;
+		case 'n':
+		case 'N':
+			exitAfterNReads = param_get8(Cmd, pnr+1);
+			cmdp += 2;
+			break;
+		case 'u':
+		case 'U':
+			param_gethex_ex(Cmd, cmdp+1, uid, &uidlen);
+			switch(uidlen) {
+				case 20: flags = FLAG_10B_UID_IN_DATA;	break; //not complete
+				case 14: flags = FLAG_7B_UID_IN_DATA; break;
+				case  8: flags = FLAG_4B_UID_IN_DATA; break;
+				default: return usage_hf14_mf1ksim();
+			}
+			cmdp += 2;
+			break;
+		case 'x':
+		case 'X':
+			flags |= FLAG_NR_AR_ATTACK;
+			cmdp++;
+			break;
+		default:
+			PrintAndLog("Unknown parameter '%c'", param_getchar(Cmd, cmdp));
+			errors = true;
+			break;
+		}
+		if(errors) break;
+	}
+	//Validations
+	if(errors) return usage_hf14_mf1ksim();
+
+	//get uid from file
+	if (attackFromFile) {
+		int count = 0;
+		// open file
+		f = fopen(filename, "r");
+		if (f == NULL) {
+			PrintAndLog("File %s not found or locked", filename);
 			return 1;
 		}
-		pnr +=2;
-	}
-	if (param_getchar(Cmd, pnr) == 'n') {
-		exitAfterNReads = param_get8(Cmd,pnr+1);
-		pnr += 2;
-	}
-	if (param_getchar(Cmd, pnr) == 'i' ) {
-		//Using a flag to signal interactiveness, least significant bit
-		flags |= FLAG_INTERACTIVE;
-		pnr++;
-	}
+		PrintAndLog("Loading file and simulating. Press keyboard to abort");
+		while(!feof(f) && !ukbhit()){
+			memset(buf, 0, sizeof(buf));
+			memset(uid, 0, sizeof(uid));
 
-	if (param_getchar(Cmd, pnr) == 'x' ) {
-		//Using a flag to signal interactiveness, least significant bit
-		flags |= FLAG_NR_AR_ATTACK;
-	}
-	PrintAndLog(" uid:%s, numreads:%d, flags:%d (0x%02x) ",
+			if (fgets(buf, sizeof(buf), f) == NULL) {			
+				if (count > 0) break;
+				
+				PrintAndLog("File reading error.");
+				fclose(f);
+				return 2;
+			}
+			if(!strlen(buf) && feof(f)) break;
+
+			uidlen = strlen(buf)-1;
+			switch(uidlen) {
+				case 20: flags |= FLAG_10B_UID_IN_DATA;	break; //not complete
+				case 14: flags |= FLAG_7B_UID_IN_DATA; break;
+				case  8: flags |= FLAG_4B_UID_IN_DATA; break;
+				default: 
+					PrintAndLog("uid in file wrong length at %d (length: %d) [%s]",count, uidlen, buf);
+					fclose(f);
+					return 2;
+			}
+
+			for (uint8_t i = 0; i < uidlen; i += 2) {
+				sscanf(&buf[i], "%02x", (unsigned int *)&uid[i / 2]);
+			}
+			
+			PrintAndLog("mf 1k sim uid: %s, numreads:%d, flags:%d (0x%02x) - press button to abort",
+					flags & FLAG_4B_UID_IN_DATA ? sprint_hex(uid,4):
+						flags & FLAG_7B_UID_IN_DATA	? sprint_hex(uid,7): 
+							flags & FLAG_10B_UID_IN_DATA ? sprint_hex(uid,10): "N/A"
+					, exitAfterNReads, flags, flags);
+
+			UsbCommand c = {CMD_SIMULATE_MIFARE_CARD, {flags, exitAfterNReads,0}};
+			memcpy(c.d.asBytes, uid, sizeof(uid));
+			clearCommandBuffer();
+			SendCommand(&c);
+
+			while(! WaitForResponseTimeout(CMD_ACK,&resp,1500)) {
+				//We're waiting only 1.5 s at a time, otherwise we get the
+				// annoying message about "Waiting for a response... "
+			}
+			//got a response
+			nonces_t ar_resp[ATTACK_KEY_COUNT*2];
+			memcpy(ar_resp, resp.d.asBytes, sizeof(ar_resp));
+			readerAttack(ar_resp, setEmulatorMem);
+			if ((bool)resp.arg[1]) {
+				PrintAndLog("Device button pressed - quitting");
+				fclose(f);
+				return 4;
+			}
+			count++;
+		}
+		fclose(f);
+	} else { //not from file
+
+		PrintAndLog("mf 1k sim uid: %s, numreads:%d, flags:%d (0x%02x) ",
 				flags & FLAG_4B_UID_IN_DATA ? sprint_hex(uid,4):
-											  flags & FLAG_7B_UID_IN_DATA	? sprint_hex(uid,7): "N/A"
-				, exitAfterNReads, flags,flags);
+					flags & FLAG_7B_UID_IN_DATA	? sprint_hex(uid,7): 
+						flags & FLAG_10B_UID_IN_DATA ? sprint_hex(uid,10): "N/A"
+				, exitAfterNReads, flags, flags);
 
+		UsbCommand c = {CMD_SIMULATE_MIFARE_CARD, {flags, exitAfterNReads,0}};
+		memcpy(c.d.asBytes, uid, sizeof(uid));
+		clearCommandBuffer();
+		SendCommand(&c);
 
-	UsbCommand c = {CMD_SIMULATE_MIFARE_CARD, {flags, exitAfterNReads,0}};
-	memcpy(c.d.asBytes, uid, sizeof(uid));
-	SendCommand(&c);
-
-	if(flags & FLAG_INTERACTIVE)
-	{
-		UsbCommand resp;
-		PrintAndLog("Press pm3-button to abort simulation");
-		while(! WaitForResponseTimeout(CMD_ACK,&resp,1500)) {
-			//We're waiting only 1.5 s at a time, otherwise we get the
-			// annoying message about "Waiting for a response... "
+		if(flags & FLAG_INTERACTIVE) {
+			PrintAndLog("Press pm3-button to abort simulation");
+			while(! WaitForResponseTimeout(CMD_ACK,&resp,1500)) {
+				//We're waiting only 1.5 s at a time, otherwise we get the
+				// annoying message about "Waiting for a response... "
+			}
+			//got a response
+			if (flags & FLAG_NR_AR_ATTACK) {
+				nonces_t ar_resp[ATTACK_KEY_COUNT*2];
+				memcpy(ar_resp, resp.d.asBytes, sizeof(ar_resp));
+				readerAttack(ar_resp, setEmulatorMem);
+			}
 		}
 	}
-	
+
 	return 0;
 }
 

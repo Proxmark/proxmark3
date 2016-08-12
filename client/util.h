@@ -9,13 +9,12 @@
 //-----------------------------------------------------------------------------
 
 #include <stdio.h>
-#include <stdint.h>
-#include <stdio.h>
+#include <stdint.h>  //included in data.h
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
 #include <time.h>
-#include "data.h"
+#include "data.h"    //for FILE_PATH_SIZE
 
 #ifndef ROTR
 # define ROTR(x,n) (((uintmax_t)(x) >> (n)) | ((uintmax_t)(x) << ((sizeof(x) * 8) - (n))))
@@ -71,4 +70,5 @@ void wiegand_add_parity(uint8_t *target, uint8_t *source, uint8_t length);
 
 void xor(unsigned char *dst, unsigned char *src, size_t len);
 int32_t le24toh(uint8_t data[3]);
+uint32_t le32toh (uint8_t *data);
 void rol(uint8_t *data, const size_t len);
