@@ -1,0 +1,14 @@
+13/11/2015 Change list from original PCB:
+
+Main problem: more then 800 DRC errors when runing that in Eagle. Check out the following changes to make a more reliable PCB. Those are minor cosmetic changes, but ease your life to avoid short circuit.
+
+1. Eagle Layout / DRC rules / Masks / Limit: from 0mil to 16mil, thus ordinary GND and signal vias which smaller then 16mil wont be open at solder stop mask layer.
+
+2. Eagle Layout / DRC rules / Masks / Stop MAX: from 2mil to 0, this way the solder stop mask wont overlap silkscreen drawings. Also as per PCB assembly houses, it's recommended, they set their own scaling for production.
+
+3. Exporting all the parts in the proxmark3 Eagle Layout into a library for minor silkscreen edition: proxmark3_components  merged.lbr
+	- Editing components footprint as was overlapping with top stop mask
+
+4. Adding top, bottom, in1, in2 layer markings in PCB layout for better manufacturing identification	
+
+5. Generating 4 layer CAM files

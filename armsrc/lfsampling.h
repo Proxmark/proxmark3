@@ -2,6 +2,12 @@
 #define LFSAMPLING_H
 
 /**
+* acquisition of T55x7 LF signal. Similart to other LF, but adjusted with @marshmellows thresholds
+* the data is collected in BigBuf.
+**/
+void doT55x7Acquisition(size_t sample_size);
+
+/**
 * Initializes the FPGA for reader-mode (field on), and acquires the samples.
 * @return number of bits sampled
 **/
@@ -40,7 +46,6 @@ uint32_t DoAcquisition_config( bool silent);
 *
 **/
 void LFSetupFPGAForADC(int divisor, bool lf_field);
-
 
 /**
  * Called from the USB-handler to set the sampling configuration

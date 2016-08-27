@@ -67,9 +67,9 @@ int CmdIOClone(const char *Cmd)
 static command_t CommandTable[] = 
 {
   {"help",        CmdHelp,            1, "This help"},
-  //{"demod",	  CmdIOProxDemod,     1, "Demodulate Stream"},
+  //{"demod",       CmdIOProxDemod,     1, "Demodulate Stream"},
   {"fskdemod",    CmdIODemodFSK,      0, "['1'] Realtime IO FSK demodulator (option '1' for one tag only)"},
-  {"clone",	  CmdIOClone,         0, "Clone ioProx Tag"},
+  {"clone",       CmdIOClone,         0, "Clone ioProx Tag"},
   {NULL, NULL, 0, NULL}
 };
 

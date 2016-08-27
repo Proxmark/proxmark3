@@ -11,6 +11,30 @@
 #define CMDLFT55XX_H__
 
 typedef struct {
+	uint32_t bl1;
+	uint32_t bl2; 
+	uint32_t acl; 
+	uint32_t mfc; 
+	uint32_t cid; 
+	uint32_t year; 
+	uint32_t quarter; 
+	uint32_t icr;
+	uint32_t lotid; 
+	uint32_t wafer; 
+	uint32_t dw;
+} t55x7_tracedata_t;
+
+typedef struct {
+	uint32_t bl1;
+	uint32_t bl2;
+	uint32_t icr;
+	char lotidc;
+	uint32_t lotid;
+	uint32_t wafer;
+	uint32_t dw;
+} t5555_tracedata_t;
+
+typedef struct {
 	enum {
 		DEMOD_NRZ  = 0x00,    
 		DEMOD_PSK1 = 0x01,
@@ -38,15 +62,23 @@ typedef struct {
 		RF_100 = 0x06,
 		RF_128 = 0x07,
 	} bitrate;
+	bool Q5;
+	bool ST;
 } t55xx_conf_block_t;
+t55xx_conf_block_t Get_t55xx_Config();
+void Set_t55xx_Config(t55xx_conf_block_t conf);
+
 
 int CmdLFT55XX(const char *Cmd);
+int CmdT55xxBruteForce(const char *Cmd);
 int CmdT55xxSetConfig(const char *Cmd);
 int CmdT55xxReadBlock(const char *Cmd);
 int CmdT55xxWriteBlock(const char *Cmd);
 int CmdT55xxReadTrace(const char *Cmd);
 int CmdT55xxInfo(const char *Cmd);
 int CmdT55xxDetect(const char *Cmd);
+int CmdResetRead(const char *Cmd);
+int CmdT55xxWipe(const char *Cmd);
 
 char * GetBitRateStr(uint32_t id);
 char * GetSaferStr(uint32_t id);
@@ -54,13 +86,17 @@ char * GetModulationStr( uint32_t id);
 char * GetModelStrFromCID(uint32_t cid);
 char * GetSelectedModulationStr( uint8_t id);
 uint32_t PackBits(uint8_t start, uint8_t len, uint8_t *bitstream);
+void printT5xxHeader(uint8_t page);
 void printT55xxBlock(const char *demodStr);
-void printConfiguration( t55xx_conf_block_t b);
+int printConfiguration( t55xx_conf_block_t b);
 
 bool DecodeT55xxBlock();
 bool tryDetectModulation();
-bool test(uint8_t mode, uint8_t *offset, int *fndBitRate);
+bool test(uint8_t mode, uint8_t *offset, int *fndBitRate, uint8_t clk, bool *Q5);
 int special(const char *Cmd);
-int AquireData( uint8_t block );
+int AquireData( uint8_t page, uint8_t block, bool pwdmode, uint32_t password );
+
+void printT55x7Trace( t55x7_tracedata_t data, uint8_t repeat );
+void printT5555Trace( t5555_tracedata_t data, uint8_t repeat );
 
 #endif

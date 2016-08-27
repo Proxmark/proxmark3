@@ -99,7 +99,7 @@ NXP/Philips CUSTOM COMMANDS
 #define ICLASS_CMD_CHECK            0x05
 #define ICLASS_CMD_DETECT           0x0F
 #define ICLASS_CMD_HALT             0x00
-#define ICLASS_CMD_UPDATE			0x87
+#define ICLASS_CMD_UPDATE           0x87
 #define ICLASS_CMD_ACT              0x8E
 #define ICLASS_CMD_READ4            0x06
 
@@ -109,19 +109,24 @@ NXP/Philips CUSTOM COMMANDS
 #define ISO14443A_CMD_WUPA       0x52
 #define ISO14443A_CMD_ANTICOLL_OR_SELECT     0x93
 #define ISO14443A_CMD_ANTICOLL_OR_SELECT_2   0x95
+#define ISO14443A_CMD_ANTICOLL_OR_SELECT_3   0x97
 #define ISO14443A_CMD_WRITEBLOCK 0xA0 // or 0xA2 ?
 #define ISO14443A_CMD_HALT       0x50
 #define ISO14443A_CMD_RATS       0xE0
 
-#define MIFARE_AUTH_KEYA	    0x60
-#define MIFARE_AUTH_KEYB	    0x61
-#define MIFARE_MAGICWUPC1	    0x40
-#define MIFARE_MAGICWUPC2		0x43
-#define MIFARE_MAGICWIPEC		0x41
+#define MIFARE_AUTH_KEYA        0x60
+#define MIFARE_AUTH_KEYB        0x61
+#define MIFARE_MAGICWUPC1       0x40
+#define MIFARE_MAGICWUPC2       0x43
+#define MIFARE_MAGICWIPEC       0x41
 #define MIFARE_CMD_INC          0xC0
 #define MIFARE_CMD_DEC          0xC1
 #define MIFARE_CMD_RESTORE      0xC2
 #define MIFARE_CMD_TRANSFER     0xB0
+
+#define MIFARE_EV1_PERSONAL_UID 0x40
+#define MIFARE_EV1_SETMODE      0x43
+
 
 #define MIFARE_ULC_WRITE        0xA2
 //#define MIFARE_ULC__COMP_WRITE  0xA0
@@ -180,9 +185,25 @@ NXP/Philips CUSTOM COMMANDS
 #define ISO15693_READ_MULTI_SECSTATUS 0x2C
 
 
-#define ISO_14443A 0
-#define ICLASS     1
-#define ISO_14443B 2
+// Topaz command set:
+#define	TOPAZ_REQA						0x26	// Request
+#define	TOPAZ_WUPA						0x52	// WakeUp
+#define	TOPAZ_RID						0x78	// Read ID
+#define	TOPAZ_RALL						0x00	// Read All (all bytes)
+#define	TOPAZ_READ						0x01	// Read (a single byte)
+#define	TOPAZ_WRITE_E					0x53	// Write-with-erase (a single byte)
+#define	TOPAZ_WRITE_NE					0x1a	// Write-no-erase (a single byte)
+// additional commands for Dynamic Memory Model
+#define TOPAZ_RSEG						0x10	// Read segment
+#define TOPAZ_READ8						0x02	// Read (eight bytes)
+#define TOPAZ_WRITE_E8					0x54	// Write-with-erase (eight bytes)
+#define TOPAZ_WRITE_NE8					0x1B	// Write-no-erase (eight bytes)
+
+
+#define ISO_14443A	0
+#define ICLASS		1
+#define ISO_14443B	2
+#define TOPAZ		3
 
 //-- Picopass fuses
 #define FUSE_FPERS   0x80
@@ -194,7 +215,60 @@ NXP/Philips CUSTOM COMMANDS
 #define FUSE_FPROD0  0x02
 #define FUSE_RA      0x01
 
-
 void printIclassDumpInfo(uint8_t* iclass_dump);
+void getMemConfig(uint8_t mem_cfg, uint8_t chip_cfg, uint8_t *max_blk, uint8_t *app_areas, uint8_t *kb);
 
-#endif // PROTOCOLS_H
+/* T55x7 configuration register definitions */
+#define T55x7_POR_DELAY             0x00000001
+#define T55x7_ST_TERMINATOR         0x00000008
+#define T55x7_PWD                   0x00000010
+#define T55x7_MAXBLOCK_SHIFT        5
+#define T55x7_AOR                   0x00000200
+#define T55x7_PSKCF_RF_2            0
+#define T55x7_PSKCF_RF_4            0x00000400
+#define T55x7_PSKCF_RF_8            0x00000800
+#define T55x7_MODULATION_DIRECT     0
+#define T55x7_MODULATION_PSK1       0x00001000
+#define T55x7_MODULATION_PSK2       0x00002000
+#define T55x7_MODULATION_PSK3       0x00003000
+#define T55x7_MODULATION_FSK1       0x00004000
+#define T55x7_MODULATION_FSK2       0x00005000
+#define T55x7_MODULATION_FSK1a      0x00006000
+#define T55x7_MODULATION_FSK2a      0x00007000
+#define T55x7_MODULATION_MANCHESTER 0x00008000
+#define T55x7_MODULATION_BIPHASE    0x00010000
+#define T55x7_MODULATION_DIPHASE    0x00018000
+#define T55x7_BITRATE_RF_8          0
+#define T55x7_BITRATE_RF_16         0x00040000
+#define T55x7_BITRATE_RF_32         0x00080000
+#define T55x7_BITRATE_RF_40         0x000C0000
+#define T55x7_BITRATE_RF_50         0x00100000
+#define T55x7_BITRATE_RF_64         0x00140000
+#define T55x7_BITRATE_RF_100        0x00180000
+#define T55x7_BITRATE_RF_128        0x001C0000
+
+/* T5555 (Q5) configuration register definitions */
+#define T5555_ST_TERMINATOR         0x00000001
+#define T5555_MAXBLOCK_SHIFT        0x00000001
+#define T5555_MODULATION_MANCHESTER 0
+#define T5555_MODULATION_PSK1       0x00000010
+#define T5555_MODULATION_PSK2       0x00000020
+#define T5555_MODULATION_PSK3       0x00000030
+#define T5555_MODULATION_FSK1       0x00000040
+#define T5555_MODULATION_FSK2       0x00000050
+#define T5555_MODULATION_BIPHASE    0x00000060
+#define T5555_MODULATION_DIRECT     0x00000070
+#define T5555_INVERT_OUTPUT         0x00000080
+#define T5555_PSK_RF_2              0
+#define T5555_PSK_RF_4              0x00000100
+#define T5555_PSK_RF_8              0x00000200
+#define T5555_USE_PWD               0x00000400
+#define T5555_USE_AOR               0x00000800
+#define T5555_BITRATE_SHIFT         12 //(RF=2n+2)   ie 64=2*0x1F+2   or n = (RF-2)/2
+#define T5555_FAST_WRITE            0x00004000
+#define T5555_PAGE_SELECT           0x00008000
+
+uint32_t GetT55xxClockBit(uint32_t clock);
+
+#endif 
+// PROTOCOLS_H

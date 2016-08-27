@@ -44,7 +44,7 @@ local _commands = {
 	CMD_INDALA_CLONE_TAG_L =                                             0x0213,
 	CMD_T55XX_READ_BLOCK =                                               0x0214,
 	CMD_T55XX_WRITE_BLOCK =                                              0x0215,
-	CMD_T55XX_READ_TRACE =                                               0x0216,
+	CMD_T55XX_RESET_READ =                                               0x0216,
 	CMD_PCF7931_READ =                                                   0x0217,
 	CMD_EM4X_READ_WORD =                                                 0x0218,
 	CMD_EM4X_WRITE_WORD =                                                0x0219,
@@ -56,7 +56,8 @@ local _commands = {
 	CMD_ASK_SIM_TAG =                                                    0x021F,
 	CMD_PSK_SIM_TAG =                                                    0x0220,
 	CMD_AWID_DEMOD_FSK =                                                 0x0221,
-
+	CMD_VIKING_CLONE_TAG =                                               0x0223,
+	CMD_T55XX_WAKEUP =                                                   0x0224,
 	--/* CMD_SET_ADC_MUX: ext1 is 0 for lopkd, 1 for loraw, 2 for hipkd, 3 for hiraw */
 
 	--// For the 13.56 MHz tags
@@ -88,11 +89,17 @@ local _commands = {
 	CMD_EPA_PACE_COLLECT_NONCE =                                         0x038A,
 	--//CMD_EPA_ =                                                         0x038B,
 
+	CMD_ICLASS_READCHECK =                                               0x038F,
+	CMD_ICLASS_CLONE =                                                   0x0390,
+	CMD_ICLASS_DUMP =                                                    0x0391,
 	CMD_SNOOP_ICLASS =                                                   0x0392,
 	CMD_SIMULATE_TAG_ICLASS =                                            0x0393,
 	CMD_READER_ICLASS =                                                  0x0394,
-	CMD_READER_ICLASS_REPLAY =											 0x0395,
-	CMD_ICLASS_ISO14443A_WRITE =										 0x0397,
+	CMD_READER_ICLASS_REPLAY =                                           0x0395,
+	CMD_ICLASS_READBLOCK =                                               0x0396,
+	CMD_ICLASS_WRITEBLOCK =                                              0x0397,
+	CMD_ICLASS_EML_MEMSET =                                              0x0398,
+	CMD_ICLASS_AUTHENTICATION =                                          0x0399,
 
 	--// For measurements of the antenna tuning
 	CMD_MEASURE_ANTENNA_TUNING =                                         0x0400,

@@ -42,15 +42,15 @@ static int cmd_tail;//Starts as 0
 
 static command_t CommandTable[] = 
 {
-  {"help",  CmdHelp,  1, "This help. Use '<command> help' for details of a particular command."},
-  {"data",  CmdData,  1, "{ Plot window / data buffer manipulation... }"},
-  {"hf",    	CmdHF,    	1, "{ High Frequency commands... }"},
-  {"hw",    CmdHW,    1, "{ Hardware commands... }"},
-  {"lf",    	CmdLF,    	1, "{ Low Frequency commands... }"},
-  {"script", CmdScript,   1,"{ Scripting commands }"},
-  {"quit",  CmdQuit,  1, "Exit program"},
-  {"exit",  CmdQuit,  1, "Exit program"},
-  {NULL, NULL, 0, NULL}
+	{"help",	CmdHelp,	1, "This help. Use '<command> help' for details of a particular command."},
+	{"data", 	CmdData,	1, "{ Plot window / data buffer manipulation... }"},
+	{"hf",   	CmdHF,		1, "{ High Frequency commands... }"},
+	{"hw",   	CmdHW,		1, "{ Hardware commands... }"},
+	{"lf",   	CmdLF,		1, "{ Low Frequency commands... }"},
+	{"script",	CmdScript,	1, "{ Scripting commands }"},
+	{"quit", 	CmdQuit,	1, "Exit program"},
+	{"exit", 	CmdQuit,	1, "Exit program"},
+	{NULL, NULL, 0, NULL}
 };
 
 command_t* getTopLevelCommandTable()
@@ -65,8 +65,7 @@ int CmdHelp(const char *Cmd)
 
 int CmdQuit(const char *Cmd)
 {
-  exit(0);
-  return 0;
+  return 99;
 }
 /**
  * @brief This method should be called when sending a new command to the pm3. In case any old
@@ -164,8 +163,8 @@ bool WaitForResponse(uint32_t cmd, UsbCommand* response) {
 // Entry point into our code: called whenever the user types a command and
 // then presses Enter, which the full command line that they typed.
 //-----------------------------------------------------------------------------
-void CommandReceived(char *Cmd) {
-  CmdsParse(CommandTable, Cmd);
+int CommandReceived(char *Cmd) {
+	return CmdsParse(CommandTable, Cmd);
 }
 
 
@@ -178,10 +177,11 @@ void UsbCommandReceived(UsbCommand *UC)
 	switch(UC->cmd) {
 		// First check if we are handling a debug message
 		case CMD_DEBUG_PRINT_STRING: {
-			char s[USB_CMD_DATA_SIZE+1] = {0x00};
+			char s[USB_CMD_DATA_SIZE+1];
+			memset(s, 0x00, sizeof(s));
 			size_t len = MIN(UC->arg[0],USB_CMD_DATA_SIZE);
 			memcpy(s,UC->d.asBytes,len);
-			PrintAndLog("#db# %s       ", s);
+			PrintAndLog("#db# %s", s);
 			return;
 		} break;
 

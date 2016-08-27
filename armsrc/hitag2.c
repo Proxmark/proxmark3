@@ -411,7 +411,7 @@ static void hitag_reader_send_bit(int bit) {
 	// Binary puls length modulation (BPLM) is used to encode the data stream
 	// This means that a transmission of a one takes longer than that of a zero
 	
-	// Enable modulation, which means, drop the the field
+	// Enable modulation, which means, drop the field
 	HIGH(GPIO_SSC_DOUT);
 	
 	// Wait for 4-10 times the carrier period
@@ -442,7 +442,7 @@ static void hitag_reader_send_frame(const byte_t* frame, size_t frame_len)
 	}
 	// Send EOF 
 	AT91C_BASE_TC0->TC_CCR = AT91C_TC_SWTRG;
-	// Enable modulation, which means, drop the the field
+	// Enable modulation, which means, drop the field
 	HIGH(GPIO_SSC_DOUT);
 	// Wait for 4-10 times the carrier period
 	while(AT91C_BASE_TC0->TC_CV < T0*6);
@@ -1148,7 +1148,7 @@ void ReaderHitag(hitag_function htf, hitag_data* htd) {
       
 		case RHT2F_CRYPTO: {
 			DbpString("Authenticating using key:");
-			memcpy(key,htd->crypto.key,4);	  //HACK; 4 or 6??  I read both in the code.
+			memcpy(key,htd->crypto.key,6);	  //HACK; 4 or 6??  I read both in the code.
 			Dbhexdump(6,key,false);
 			blocknr = 0;
 			bQuiet = false;

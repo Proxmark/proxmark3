@@ -18,6 +18,7 @@
 #include "util.h"
 #include "nonce2key/nonce2key.h"
 #include "../common/iso15693tools.h"
+#include "iso14443crc.h"
 #include "../common/crc16.h"
 #include "../common/crc64.h"
 #include "../common/sha1.h"
@@ -228,6 +229,27 @@ static int l_iso15693_crc(lua_State *L)
 	return 1;
 }
 
+static int l_iso14443b_crc(lua_State *L)
+{
+	/* void ComputeCrc14443(int CrcType,
+                     const unsigned char *Data, int Length,
+                     unsigned char *TransmitFirst,
+                     unsigned char *TransmitSecond)
+	*/
+	unsigned char buf[USB_CMD_DATA_SIZE];
+	size_t len = 0;
+	const char *data = luaL_checklstring(L, 1, &len);
+	if (USB_CMD_DATA_SIZE < len)
+		len =  USB_CMD_DATA_SIZE-2;
+
+	for (int i = 0; i < len; i += 2) {
+		sscanf(&data[i], "%02x", (unsigned int *)&buf[i / 2]);
+	}
+	ComputeCrc14443(CRC_14443_B, buf, len, &buf[len], &buf[len+1]);
+
+	lua_pushlstring(L, (const char *)&buf, len+2);
+	return 1;
+}
 /*
  Simple AES 128 cbc hook up to OpenSSL.
  params:  key, input
@@ -426,6 +448,7 @@ int set_pm3_libraries(lua_State *L)
 		{"clearCommandBuffer",          l_clearCommandBuffer},
 		{"console",                     l_CmdConsole},
 		{"iso15693_crc",                l_iso15693_crc},
+		{"iso14443b_crc",               l_iso14443b_crc},
 		{"aes128_decrypt",              l_aes128decrypt_cbc},
 		{"aes128_decrypt_ecb",          l_aes128decrypt_ecb},
 		{"aes128_encrypt",              l_aes128encrypt_cbc},

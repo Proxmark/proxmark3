@@ -547,15 +547,20 @@ static RAMFUNC int Handle14443bSamplesDemod(int ci, int cq)
 	}
  */
 // Subcarrier amplitude v = sqrt(ci^2 + cq^2), approximated here by max(abs(ci),abs(cq)) + 1/2*min(abs(ci),abs(cq)))
+
+	//note: couldn't we just use MAX(ABS(ci),ABS(cq)) + (MIN(ABS(ci),ABS(cq))/2) from common.h - marshmellow
 #define CHECK_FOR_SUBCARRIER() { \
+		v = MAX(ABS(ci),ABS(cq)) + (MIN(ABS(ci),ABS(cq))/2); \
+ 	}
+		/*
 		if(ci < 0) { \
-			if(cq < 0) { /* ci < 0, cq < 0 */ \
+			if(cq < 0) { \ // ci < 0, cq < 0
 				if (cq < ci) { \
 					v = -cq - (ci >> 1); \
 				} else { \
 					v = -ci - (cq >> 1); \
 				} \
-			} else {	/* ci < 0, cq >= 0 */ \
+			} else {	\ // ci < 0, cq >= 0
 				if (cq < -ci) { \
 					v = -ci + (cq >> 1); \
 				} else { \
@@ -563,13 +568,13 @@ static RAMFUNC int Handle14443bSamplesDemod(int ci, int cq)
 				} \
 			} \
 		} else { \
-			if(cq < 0) { /* ci >= 0, cq < 0 */ \
+			if(cq < 0) { \ // ci >= 0, cq < 0
 				if (-cq < ci) { \
 					v = ci - (cq >> 1); \
 				} else { \
 					v = -cq + (ci >> 1); \
 				} \
-			} else {	/* ci >= 0, cq >= 0 */ \
+			} else {	\ // ci >= 0, cq >= 0
 				if (cq < ci) { \
 					v = ci + (cq >> 1); \
 				} else { \
@@ -578,6 +583,7 @@ static RAMFUNC int Handle14443bSamplesDemod(int ci, int cq)
 			} \
 		} \
 	}
+		*/
 
 	switch(Demod.state) {
 		case DEMOD_UNSYNCD:

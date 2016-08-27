@@ -51,10 +51,20 @@ uint8_t *BigBuf_get_EM_addr(void)
 // clear ALL of BigBuf
 void BigBuf_Clear(void)
 {
+	BigBuf_Clear_ext(true);
+}
+// clear ALL of BigBuf
+void BigBuf_Clear_ext(bool verbose)
+{
 	memset(BigBuf,0,BIGBUF_SIZE);
-	Dbprintf("Buffer cleared (%i bytes)",BIGBUF_SIZE);
+	if (verbose) 
+		Dbprintf("Buffer cleared (%i bytes)",BIGBUF_SIZE);
 }
 
+void BigBuf_Clear_keep_EM(void)
+{
+	memset(BigBuf,0,BigBuf_hi);
+}
 
 // allocate a chunk of memory from BigBuf. We allocate high memory first. The unallocated memory
 // at the beginning of BigBuf is always for traces/samples
@@ -178,8 +188,12 @@ bool RAMFUNC LogTrace(const uint8_t *btBytes, uint16_t iLen, uint32_t timestamp_
 	traceLen += iLen;
 
 	// parity bytes
-	if (parity != NULL && iLen != 0) {
-		memcpy(trace + traceLen, parity, num_paritybytes);
+	if (num_paritybytes != 0) {
+		if (parity != NULL) {
+			memcpy(trace + traceLen, parity, num_paritybytes);
+		} else {
+			memset(trace + traceLen, 0x00, num_paritybytes);
+		}
 	}
 	traceLen += num_paritybytes;
 
@@ -228,6 +242,8 @@ int LogTraceHitag(const uint8_t * btBytes, int iBits, int iSamples, uint32_t dwP
 
 	return TRUE;
 }
+
+
 // Emulator memory
 uint8_t emlSet(uint8_t *data, uint32_t offset, uint32_t length){
 	uint8_t* mem = BigBuf_get_EM_addr();

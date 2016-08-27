@@ -11,12 +11,19 @@
 #ifndef CMDDATA_H__
 #define CMDDATA_H__
 
+#include <stdlib.h>  //size_t
+#include <stdint.h>  //uint_32+
+#include <stdbool.h> //bool
+
+#include "cmdparser.h" // for command_t
+
 command_t * CmdDataCommands();
 
 int CmdData(const char *Cmd);
 void printDemodBuff(void);
 void setDemodBuf(uint8_t *buff, size_t size, size_t startIdx);
 int CmdAskEM410xDemod(const char *Cmd);
+int CmdVikingDemod(const char *Cmd);
 int CmdG_Prox_II_Demod(const char *Cmd);
 int Cmdaskrawdemod(const char *Cmd);
 int Cmdaskmandemod(const char *Cmd);
@@ -62,6 +69,7 @@ int AskEm410xDecode(bool verbose, uint32_t *hi, uint64_t *lo );
 int AskEm410xDemod(const char *Cmd, uint32_t *hi, uint64_t *lo, bool verbose);
 int ASKbiphaseDemod(const char *Cmd, bool verbose);
 int ASKDemod(const char *Cmd, bool verbose, bool emSearch, uint8_t askType);
+int ASKDemod_ext(const char *Cmd, bool verbose, bool emSearch, uint8_t askType, bool *stCheck);
 int FSKrawDemod(const char *Cmd, bool verbose);
 int PSKDemod(const char *Cmd, bool verbose);
 int NRZrawDemod(const char *Cmd, bool verbose);

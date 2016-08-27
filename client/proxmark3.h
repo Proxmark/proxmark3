@@ -16,6 +16,7 @@
 #include <inttypes.h>
 #define llx PRIx64
 #define lli PRIi64
+#define llu PRIu64
 #define hhu PRIu8
 
 #include "usb_cmd.h"

@@ -566,3 +566,7 @@ void Fpga_print_status(void)
 	else if(downloaded_bitstream == FPGA_BITSTREAM_LF) Dbprintf("  mode.............LF");
 	else Dbprintf("  mode.............%d", downloaded_bitstream);
 }
+
+int FpgaGetCurrent() {
+	return downloaded_bitstream;
+}

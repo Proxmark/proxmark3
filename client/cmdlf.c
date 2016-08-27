@@ -13,37 +13,104 @@
 #include <string.h>
 #include <limits.h>
 #include "proxmark3.h"
-#include "data.h"
-#include "graph.h"
-#include "ui.h"
-#include "cmdparser.h"
-#include "cmdmain.h"
-#include "cmddata.h"
-#include "util.h"
 #include "cmdlf.h"
-#include "cmdlfhid.h"
-#include "cmdlfawid.h"
-#include "cmdlfti.h"
-#include "cmdlfem4x.h"
-#include "cmdlfhitag.h"
-#include "cmdlft55xx.h"
-#include "cmdlfpcf7931.h"
-#include "cmdlfio.h"
-#include "lfdemod.h"
+#include "lfdemod.h"     // for psk2TOpsk1
+#include "util.h"        // for parsing cli command utils
+#include "ui.h"          // for show graph controls
+#include "graph.h"       // for graph data
+#include "cmdparser.h"   // for getting cli commands included in cmdmain.h
+#include "cmdmain.h"     // for sending cmds to device
+#include "data.h"        // for GetFromBigBuf
+#include "cmddata.h"     // for `lf search`
+#include "cmdlfawid.h"   // for awid menu
+#include "cmdlfem4x.h"   // for em4x menu
+#include "cmdlfhid.h"    // for hid menu
+#include "cmdlfhitag.h"  // for hitag menu
+#include "cmdlfio.h"     // for ioprox menu
+#include "cmdlft55xx.h"  // for t55xx menu
+#include "cmdlfti.h"     // for ti menu
+#include "cmdlfpresco.h" // for presco menu
+#include "cmdlfpcf7931.h"// for pcf7931 menu
+#include "cmdlfpyramid.h"// for pyramid menu
+#include "cmdlfviking.h" // for viking menu
 
 static int CmdHelp(const char *Cmd);
+
+
+
+int usage_lf_cmdread()
+{
+	PrintAndLog("Usage: lf cmdread d <delay period> z <zero period> o <one period> c <cmdbytes> [H] ");
+	PrintAndLog("Options:        ");
+	PrintAndLog("       h             This help");
+	PrintAndLog("       L             Low frequency (125 KHz)");
+	PrintAndLog("       H             High frequency (134 KHz)");
+	PrintAndLog("       d <delay>     delay OFF period");
+	PrintAndLog("       z <zero>      time period ZERO");
+	PrintAndLog("       o <one>       time period ONE");
+	PrintAndLog("       c <cmd>       Command bytes");
+	PrintAndLog("       ************* All periods in microseconds");
+	PrintAndLog("Examples:");
+	PrintAndLog("      lf cmdread d 80 z 100 o 200 c 11000");
+	PrintAndLog("      lf cmdread d 80 z 100 o 100 c 11000 H");
+	return 0;
+}
 
 /* send a command before reading */
 int CmdLFCommandRead(const char *Cmd)
 {
-	static char dummy[3];
-
-	dummy[0]= ' ';
-
+	static char dummy[3] = {0x20,0x00,0x00};
 	UsbCommand c = {CMD_MOD_THEN_ACQUIRE_RAW_ADC_SAMPLES_125K};
-	sscanf(Cmd, "%"lli" %"lli" %"lli" %s %s", &c.arg[0], &c.arg[1], &c.arg[2],(char*)(&c.d.asBytes),(char*)(&dummy+1));
-	// in case they specified 'h'
+	bool errors = FALSE;
+	//uint8_t divisor = 95; //125khz
+	uint8_t cmdp = 0;
+	while(param_getchar(Cmd, cmdp) != 0x00)
+	{
+		switch(param_getchar(Cmd, cmdp))
+		{
+		case 'h':
+			return usage_lf_cmdread();
+		case 'H':
+			//divisor = 88;
+			dummy[1]='h';
+			cmdp++;
+			break;
+		case 'L':
+			cmdp++;
+			break;
+		case 'c':
+			param_getstr(Cmd, cmdp+1, (char *)&c.d.asBytes);
+			cmdp+=2;
+			break;
+		case 'd':
+			c.arg[0] = param_get32ex(Cmd, cmdp+1, 0, 10);
+			cmdp+=2;
+			break;
+		case 'z':
+			c.arg[1] = param_get32ex(Cmd, cmdp+1, 0, 10);
+			cmdp+=2;
+			break;
+		case 'o':
+			c.arg[2] = param_get32ex(Cmd, cmdp+1, 0, 10);
+			cmdp+=2;
+			break;
+		default:
+			PrintAndLog("Unknown parameter '%c'", param_getchar(Cmd, cmdp));
+			errors = 1;
+			break;
+		}
+		if(errors) break;
+	}
+	// No args
+	if(cmdp == 0) errors = 1;
+
+	//Validations
+	if(errors) return usage_lf_cmdread();
+	
+	// in case they specified 'H'
 	strcpy((char *)&c.d.asBytes + strlen((char *)c.d.asBytes), dummy);
+
+	clearCommandBuffer();
 	SendCommand(&c);
 	return 0;
 }
@@ -59,7 +126,7 @@ int CmdFlexdemod(const char *Cmd)
 		}
 	}
 
-#define LONG_WAIT 100
+ #define LONG_WAIT 100
 	int start;
 	for (start = 0; start < GraphTraceLen - LONG_WAIT; start++) {
 		int first = GraphBuffer[start];
@@ -141,10 +208,13 @@ int CmdIndalaDemod(const char *Cmd)
 	uint8_t rawbits[4096];
 	int rawbit = 0;
 	int worst = 0, worstPos = 0;
- // PrintAndLog("Expecting a bit less than %d raw bits", GraphTraceLen / 32);
+	// PrintAndLog("Expecting a bit less than %d raw bits", GraphTraceLen / 32);
+	
+	// loop through raw signal - since we know it is psk1 rf/32 fc/2 skip every other value (+=2)
 	for (i = 0; i < GraphTraceLen-1; i += 2) {
 		count += 1;
 		if ((GraphBuffer[i] > GraphBuffer[i + 1]) && (state != 1)) {
+			// appears redundant - marshmellow
 			if (state == 0) {
 				for (j = 0; j <  count - 8; j += 16) {
 					rawbits[rawbit++] = 0;
@@ -157,6 +227,7 @@ int CmdIndalaDemod(const char *Cmd)
 			state = 1;
 			count = 0;
 		} else if ((GraphBuffer[i] < GraphBuffer[i + 1]) && (state != 0)) {
+			//appears redundant
 			if (state == 1) {
 				for (j = 0; j <  count - 8; j += 16) {
 					rawbits[rawbit++] = 1;
@@ -354,6 +425,7 @@ int CmdIndalaClone(const char *Cmd)
 		c.arg[1] = uid2;
 	}
 
+	clearCommandBuffer();
 	SendCommand(&c);
 	return 0;
 }
@@ -468,7 +540,7 @@ int CmdLFSetConfig(const char *Cmd)
 		return usage_lf_config();
 	}
 	//Bps is limited to 8, so fits in lower half of arg1
-	if(bps >> 8) bps = 8;
+	if(bps >> 4) bps = 8;
 
 	sample_config config = {
 		decimation,bps,averaging,divisor,trigger_threshold
@@ -476,6 +548,7 @@ int CmdLFSetConfig(const char *Cmd)
 	//Averaging is a flag on high-bit of arg[1]
 	UsbCommand c = {CMD_SET_LF_SAMPLING_CONFIG};
 	memcpy(c.d.asBytes,&config,sizeof(sample_config));
+	clearCommandBuffer();
 	SendCommand(&c);
 	return 0;
 }
@@ -492,8 +565,14 @@ int CmdLFRead(const char *Cmd)
 	if (param_getchar(Cmd, cmdp) == 's') arg1 = true; //suppress print
 	//And ship it to device
 	UsbCommand c = {CMD_ACQUIRE_RAW_ADC_SAMPLES_125K, {arg1,0,0}};
+	clearCommandBuffer();
 	SendCommand(&c);
-	WaitForResponse(CMD_ACK,NULL);
+	//WaitForResponse(CMD_ACK,NULL);	
+	if ( !WaitForResponseTimeout(CMD_ACK,NULL,2500) ) {
+		PrintAndLog("command execution time out");
+		return 1;
+	}
+
 	return 0;
 }
 
@@ -506,6 +585,7 @@ int CmdLFSnoop(const char *Cmd)
 	}
 
 	UsbCommand c = {CMD_LF_SNOOP_RAW_ADC_SAMPLES};
+	clearCommandBuffer();
 	SendCommand(&c);
 	WaitForResponse(CMD_ACK,NULL);
 	return 0;
@@ -552,6 +632,7 @@ int CmdLFSim(const char *Cmd)
 	printf("\n");
 	PrintAndLog("Starting to simulate");
 	UsbCommand c = {CMD_SIMULATE_TAG_125K, {GraphTraceLen, gap, 0}};
+	clearCommandBuffer();
 	SendCommand(&c);
 	return 0;
 }
@@ -583,7 +664,7 @@ int usage_lf_simask(void)
 	PrintAndLog("       b              sim ask/biphase");
 	PrintAndLog("       m              sim ask/manchester - Default");
 	PrintAndLog("       r              sim ask/raw");
-	PrintAndLog("       s              TBD- -to enable a gap between playback repetitions - default: no gap");
+	PrintAndLog("       s              add t55xx Sequence Terminator gap - default: no gaps (only manchester)");
 	PrintAndLog("       d <hexdata>    Data to sim as hex - omit to sim from DemodBuffer");
 	return 0;
 }
@@ -701,6 +782,7 @@ int CmdLFfskSim(const char *Cmd)
 	UsbCommand c = {CMD_FSK_SIM_TAG, {arg1, arg2, size}};
 
 	memcpy(c.d.asBytes, DemodBuffer, size);
+	clearCommandBuffer();
 	SendCommand(&c);
 	return 0;
 }
@@ -794,6 +876,7 @@ int CmdLFaskSim(const char *Cmd)
 	UsbCommand c = {CMD_ASK_SIM_TAG, {arg1, arg2, size}};
 	PrintAndLog("preparing to sim ask data: %d bits", size);
 	memcpy(c.d.asBytes, DemodBuffer, size);
+	clearCommandBuffer();
 	SendCommand(&c);
 	return 0;
 }
@@ -901,6 +984,7 @@ int CmdLFpskSim(const char *Cmd)
 	UsbCommand c = {CMD_PSK_SIM_TAG, {arg1, arg2, size}};
 	PrintAndLog("DEBUG: Sending DemodBuffer Length: %d", size);
 	memcpy(c.d.asBytes, DemodBuffer, size);
+	clearCommandBuffer();
 	SendCommand(&c);
 	
 	return 0;
@@ -1054,13 +1138,6 @@ int CmdLFfind(const char *Cmd)
 		return 1;
 	}
 
-	//add psk and indala
-	ans=CmdIndalaDecode("");
-	if (ans>0) {
-		PrintAndLog("\nValid Indala ID Found!");
-		return 1;
-	}
-
 	ans=CmdAskEM410xDemod("");
 	if (ans>0) {
 		PrintAndLog("\nValid EM410x ID Found!");
@@ -1085,6 +1162,18 @@ int CmdLFfind(const char *Cmd)
 		return 1;
 	}	
 
+	ans=CmdVikingDemod("");
+	if (ans>0) {
+		PrintAndLog("\nValid Viking ID Found!");
+		return 1;
+	}	
+
+	ans=CmdIndalaDecode("");
+	if (ans>0) {
+		PrintAndLog("\nValid Indala ID Found!");
+		return 1;
+	}
+
 	ans=CmdPSKNexWatch("");
 	if (ans>0) {
 		PrintAndLog("\nValid NexWatch ID Found!");
@@ -1105,7 +1194,8 @@ int CmdLFfind(const char *Cmd)
 				return 1;
 			}
 		}
-		ans=ASKDemod("0 0 0",TRUE,FALSE,1);
+		bool st = TRUE;
+		ans=ASKDemod_ext("0 0 0",TRUE,FALSE,1,&st);
 		if (ans>0) {
 			PrintAndLog("\nUnknown ASK Modulated and Manchester encoded Tag Found!");
 			PrintAndLog("\nif it does not look right it could instead be ASK/Biphase - try 'data rawdemod ab'");
@@ -1126,28 +1216,31 @@ int CmdLFfind(const char *Cmd)
 static command_t CommandTable[] = 
 {
 	{"help",        CmdHelp,            1, "This help"},
-	{"cmdread",     CmdLFCommandRead,   0, "<off period> <'0' period> <'1' period> <command> ['h'] -- Modulate LF reader field to send command before read (all periods in microseconds) (option 'h' for 134)"},
-	{"em4x",        CmdLFEM4X,          1, "{ EM4X RFIDs... }"},
+	{"awid",        CmdLFAWID,          1, "{ AWID RFIDs...    }"},
+	{"em4x",        CmdLFEM4X,          1, "{ EM4X RFIDs...    }"},
+	{"hid",         CmdLFHID,           1, "{ HID RFIDs...     }"},
+	{"hitag",       CmdLFHitag,         1, "{ Hitag tags and transponders... }"},
+	{"io",          CmdLFIO,            1, "{ ioProx tags...   }"},
+	{"presco",      CmdLFPresco,        1, "{ Presco RFIDs... }"},
+	{"pcf7931",     CmdLFPCF7931,       1, "{ PCF7931 RFIDs... }"},
+	{"pyramid",     CmdLFPyramid,       1, "{ Farpointe/Pyramid RFIDs... }"},
+	{"t55xx",       CmdLFT55XX,         1, "{ T55xx RFIDs...   }"},
+	{"ti",          CmdLFTI,            1, "{ TI RFIDs...      }"},
+	{"viking",      CmdLFViking,        1, "{ Viking tags...   }"},
+	{"cmdread",     CmdLFCommandRead,   0, "<d period> <z period> <o period> <c command> ['H'] -- Modulate LF reader field to send command before read (all periods in microseconds) (option 'H' for 134)"},
 	{"config",      CmdLFSetConfig,     0, "Set config for LF sampling, bit/sample, decimation, frequency"},
 	{"flexdemod",   CmdFlexdemod,       1, "Demodulate samples for FlexPass"},
-	{"hid",         CmdLFHID,           1, "{ HID RFIDs... }"},
-	{"awid",		CmdLFAWID,		    1, "{ AWID RFIDs... }"},
-	{"io",       	  CmdLFIO,	          1, "{ ioProx tags... }"},
 	{"indalademod", CmdIndalaDemod,     1, "['224'] -- Demodulate samples for Indala 64 bit UID (option '224' for 224 bit)"},
 	{"indalaclone", CmdIndalaClone,     0, "<UID> ['l']-- Clone Indala to T55x7 (tag must be in antenna)(UID in HEX)(option 'l' for 224 UID"},
 	{"read",        CmdLFRead,          0, "['s' silent] Read 125/134 kHz LF ID-only tag. Do 'lf read h' for help"},
 	{"search",      CmdLFfind,          1, "[offline] ['u'] Read and Search for valid known tag (in offline mode it you can load first then search) - 'u' to search for unknown tags"},
 	{"sim",         CmdLFSim,           0, "[GAP] -- Simulate LF tag from buffer with optional GAP (in microseconds)"},
-	{"simask",      CmdLFaskSim,        0, "[clock] [invert <1|0>] [manchester/raw <'m'|'r'>] [msg separator 's'] [d <hexdata>] -- Simulate LF ASK tag from demodbuffer or input"},
+	{"simask",      CmdLFaskSim,        0, "[clock] [invert <1|0>] [biphase/manchester/raw <'b'|'m'|'r'>] [msg separator 's'] [d <hexdata>] -- Simulate LF ASK tag from demodbuffer or input"},
 	{"simfsk",      CmdLFfskSim,        0, "[c <clock>] [i] [H <fcHigh>] [L <fcLow>] [d <hexdata>] -- Simulate LF FSK tag from demodbuffer or input"},
 	{"simpsk",      CmdLFpskSim,        0, "[1|2|3] [c <clock>] [i] [r <carrier>] [d <raw hex to sim>] -- Simulate LF PSK tag from demodbuffer or input"},
 	{"simbidir",    CmdLFSimBidir,      0, "Simulate LF tag (with bidirectional data transmission between reader and tag)"},
 	{"snoop",       CmdLFSnoop,         0, "['l'|'h'|<divisor>] [trigger threshold]-- Snoop LF (l:125khz, h:134khz)"},
-	{"ti",          CmdLFTI,            1, "{ TI RFIDs... }"},
-	{"hitag",       CmdLFHitag,         1, "{ Hitag tags and transponders... }"},
 	{"vchdemod",    CmdVchDemod,        1, "['clone'] -- Demodulate samples for VeriChip"},
-	{"t55xx",       CmdLFT55XX,         1, "{ T55xx RFIDs... }"},
-	{"pcf7931",     CmdLFPCF7931,       1, "{PCF7931 RFIDs...}"},
 	{NULL, NULL, 0, NULL}
 };
 

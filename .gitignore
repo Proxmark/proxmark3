@@ -1,6 +1,7 @@
 # .gitignore
 # don't push these files to the repository
 
+.history
 *.log
 *.eml
 *.o
@@ -20,6 +21,7 @@ flasher
 version.c
 lua
 luac
+fpga_compress
 
 fpga/*
 !fpga/tests
