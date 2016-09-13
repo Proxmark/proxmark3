@@ -19,9 +19,9 @@
 #define MAX(a,b) ((a)>(b)?(a):(b))
 
 // zlib configuration
-#define COMPRESS_LEVEL			9		// use best possible compression
-#define COMPRESS_WINDOW_BITS	15		// default = max = 15 for a window of 2^15 = 32KBytes
-#define COMPRESS_MEM_LEVEL		9		// determines the amount of memory allocated during compression. Default = 8.
+#define COMPRESS_LEVEL           9  // use best possible compression
+#define COMPRESS_WINDOW_BITS    15  // default = max = 15 for a window of 2^15 = 32KBytes
+#define COMPRESS_MEM_LEVEL       9  // determines the amount of memory allocated during compression. Default = 8.
 /* COMPRESS_STRATEGY can be 
 	Z_DEFAULT_STRATEGY (the default), 
 	Z_FILTERED (more huffmann, less string matching),
@@ -29,15 +29,15 @@
 	Z_RLE (distances limited to one)
 	Z_FIXED (prevents the use of dynamic Huffman codes)
 */	
-#define	COMPRESS_STRATEGY		Z_DEFAULT_STRATEGY
+#define	COMPRESS_STRATEGY       Z_DEFAULT_STRATEGY
 // zlib tuning parameters:
-#define COMPRESS_GOOD_LENGTH		258
-#define	COMPRESS_MAX_LAZY			258	
-#define	COMPRESS_MAX_NICE_LENGTH	258
-#define	COMPRESS_MAX_CHAIN			8192
+#define COMPRESS_GOOD_LENGTH           258
+#define COMPRESS_MAX_LAZY              258
+#define COMPRESS_MAX_NICE_LENGTH       258
+#define COMPRESS_MAX_CHAIN            8192
 
-#define FPGA_INTERLEAVE_SIZE	288 	// (the FPGA's internal config frame size is 288 bits. Interleaving with 288 bytes should give best compression)
-#define FPGA_CONFIG_SIZE		42336	// our current fpga_[lh]f.bit files are 42175 bytes. Rounded up to next multiple of FPGA_INTERLEAVE_SIZE
+#define FPGA_INTERLEAVE_SIZE           288  // (the FPGA's internal config frame size is 288 bits. Interleaving with 288 bytes should give best compression)
+#define FPGA_CONFIG_SIZE             42336  // our current fpga_[lh]f.bit files are 42175 bytes. Rounded up to next multiple of FPGA_INTERLEAVE_SIZE
 
 static void usage(void)
 {
@@ -87,7 +87,7 @@ int zlib_compress(FILE *infile[], uint8_t num_infiles, FILE *outfile)
 	do {
 
 		if (i >= num_infiles * FPGA_CONFIG_SIZE) {
-			fprintf(stderr, "Input files too big (total > %lu bytes). These are probably not PM3 FPGA config files.\n", num_infiles*FPGA_CONFIG_SIZE);
+			fprintf(stderr, "Input files too big (total > %d bytes). These are probably not PM3 FPGA config files.\n", num_infiles*FPGA_CONFIG_SIZE);
 			for(uint16_t j = 0; j < num_infiles; j++) {
 				fclose(infile[j]);
 			}
@@ -139,7 +139,7 @@ int zlib_compress(FILE *infile[], uint8_t num_infiles, FILE *outfile)
 		ret = deflate(&compressed_fpga_stream, Z_FINISH);
 	}
 	
-	fprintf(stderr, "compressed %lu input bytes to %lu output bytes\n", i, compressed_fpga_stream.total_out);
+	fprintf(stderr, "compressed %d input bytes to %lu output bytes\n", i, compressed_fpga_stream.total_out);
 
 	if (ret != Z_STREAM_END) {
 		fprintf(stderr, "Error in deflate(): %d %s\n", ret, compressed_fpga_stream.msg);
