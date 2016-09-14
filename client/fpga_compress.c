@@ -28,7 +28,8 @@
 	Z_HUFFMAN_ONLY (huffman only, no string matching)
 	Z_RLE (distances limited to one)
 	Z_FIXED (prevents the use of dynamic Huffman codes)
-*/	
+*/
+
 #define	COMPRESS_STRATEGY       Z_DEFAULT_STRATEGY
 // zlib tuning parameters:
 #define COMPRESS_GOOD_LENGTH           258
@@ -76,8 +77,8 @@ int zlib_compress(FILE *infile[], uint8_t num_infiles, FILE *outfile)
 {
 	uint8_t *fpga_config;
 	uint32_t i;
-	int ret;
-	uint8_t c;		
+	int32_t ret;
+	uint8_t c;
 	z_stream compressed_fpga_stream;
 
 	fpga_config = malloc(num_infiles * FPGA_CONFIG_SIZE);
@@ -87,7 +88,7 @@ int zlib_compress(FILE *infile[], uint8_t num_infiles, FILE *outfile)
 	do {
 
 		if (i >= num_infiles * FPGA_CONFIG_SIZE) {
-			fprintf(stderr, "Input files too big (total > %d bytes). These are probably not PM3 FPGA config files.\n", num_infiles*FPGA_CONFIG_SIZE);
+			fprintf(stderr, "Input files too big (total > %u bytes). These are probably not PM3 FPGA config files.\n", num_infiles*FPGA_CONFIG_SIZE);
 			for(uint16_t j = 0; j < num_infiles; j++) {
 				fclose(infile[j]);
 			}
@@ -122,11 +123,11 @@ int zlib_compress(FILE *infile[], uint8_t num_infiles, FILE *outfile)
 						COMPRESS_STRATEGY);
 
 	// estimate the size of the compressed output
-	unsigned int outsize_max = deflateBound(&compressed_fpga_stream, compressed_fpga_stream.avail_in);
+	uint32_t outsize_max = deflateBound(&compressed_fpga_stream, compressed_fpga_stream.avail_in);
 	uint8_t *outbuf = malloc(outsize_max);
 	compressed_fpga_stream.next_out = outbuf;
 	compressed_fpga_stream.avail_out = outsize_max;
-					
+        
 	if (ret == Z_OK) {
 		ret = deflateTune(&compressed_fpga_stream,
 							COMPRESS_GOOD_LENGTH,
@@ -139,10 +140,10 @@ int zlib_compress(FILE *infile[], uint8_t num_infiles, FILE *outfile)
 		ret = deflate(&compressed_fpga_stream, Z_FINISH);
 	}
 	
-	fprintf(stderr, "compressed %d input bytes to %lu output bytes\n", i, compressed_fpga_stream.total_out);
+	fprintf(stderr, "compressed %u input bytes to %lu output bytes\n", i, compressed_fpga_stream.total_out);
 
 	if (ret != Z_STREAM_END) {
-		fprintf(stderr, "Error in deflate(): %d %s\n", ret, compressed_fpga_stream.msg);
+		fprintf(stderr, "Error in deflate(): %i %s\n", ret, compressed_fpga_stream.msg);
 		free(outbuf);
 		deflateEnd(&compressed_fpga_stream);
 		for(uint16_t j = 0; j < num_infiles; j++) {
@@ -177,7 +178,7 @@ int zlib_decompress(FILE *infile, FILE *outfile)
 	#define DECOMPRESS_BUF_SIZE 1024
 	uint8_t outbuf[DECOMPRESS_BUF_SIZE];
 	uint8_t inbuf[DECOMPRESS_BUF_SIZE];
-	int ret;
+	int32_t ret;
 	
 	z_stream compressed_fpga_stream;
 
@@ -197,7 +198,7 @@ int zlib_decompress(FILE *infile, FILE *outfile)
 			compressed_fpga_stream.next_in = inbuf;
 			uint16_t i = 0;
 			do {
-				int c = fgetc(infile);
+				int32_t c = fgetc(infile);
 				if (!feof(infile)) {
 					inbuf[i++] = c & 0xFF;
 					compressed_fpga_stream.avail_in++;
@@ -232,7 +233,7 @@ int zlib_decompress(FILE *infile, FILE *outfile)
 		fclose(infile);
 		return(EXIT_SUCCESS);
 	} else {
-		fprintf(stderr, "Error. Inflate() returned error %d, %s", ret, compressed_fpga_stream.msg);
+		fprintf(stderr, "Error. Inflate() returned error %i, %s", ret, compressed_fpga_stream.msg);
 		fclose(outfile);
 		fclose(infile);
 		return(EXIT_FAILURE);
@@ -251,7 +252,7 @@ int main(int argc, char **argv)
 		return(EXIT_FAILURE);
 	}
 	
-	if (!strcmp(argv[1], "-d")) {			// Decompress
+	if (!strcmp(argv[1], "-d")) { // Decompress
 		infiles = calloc(1, sizeof(FILE*));
 		if (argc != 4) {
 			usage();
@@ -269,7 +270,7 @@ int main(int argc, char **argv)
 		}
 		return zlib_decompress(infiles[0], outfile);
 
-	} else {								// Compress
+	} else { // Compress
 
 		infiles = calloc(argc-2, sizeof(FILE*));
 		for (uint16_t i = 0; i < argc-2; i++) { 
