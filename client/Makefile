@@ -12,7 +12,12 @@ CXX=g++
 VPATH = ../common ../zlib
 OBJDIR = obj
 
-LDLIBS = -L/opt/local/lib -L/usr/local/lib -lreadline -lpthread -lm -ltermcap -lncurses
+ifneq (,$(findstring MINGW,$(platform)))
+    LDLIBS = -L/opt/local/lib -L/usr/local/lib -lreadline -lpthread -lm
+else
+    LDLIBS = -L/opt/local/lib -L/usr/local/lib -lreadline -lpthread -lm -ltermcap -lncurses
+endif
+
 LUALIB = ../liblua/liblua.a
 LDFLAGS = $(COMMON_FLAGS)
 CFLAGS = -std=c99 -I. -I../include -I../common -I../zlib -I/opt/local/include -I../liblua -Wall $(COMMON_FLAGS) -g -O4
