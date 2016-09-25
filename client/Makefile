@@ -12,12 +12,7 @@ CXX=g++
 VPATH = ../common ../zlib
 OBJDIR = obj
 
-ifneq (,$(findstring MINGW,$(platform)))
-    LDLIBS = -L/opt/local/lib -L/usr/local/lib -lreadline -lpthread -lm
-else
-    LDLIBS = -L/opt/local/lib -L/usr/local/lib -lreadline -lpthread -lm -ltermcap -lncurses
-endif
-
+LDLIBS = -L/opt/local/lib -L/usr/local/lib -lreadline -lpthread -lm
 LUALIB = ../liblua/liblua.a
 LDFLAGS = $(COMMON_FLAGS)
 CFLAGS = -std=c99 -I. -I../include -I../common -I../zlib -I/opt/local/include -I../liblua -Wall $(COMMON_FLAGS) -g -O4
@@ -39,6 +34,7 @@ else ifeq ($(platform),Darwin)
     MOC = $(shell pkg-config --variable=moc_location QtCore)
     LUAPLATFORM = macosx
 else
+    LDLIBS += -ltermcap -lncurses
     CXXFLAGS = $(shell pkg-config --cflags QtCore QtGui 2>/dev/null) -Wall -O4
     QTLDLIBS = $(shell pkg-config --libs QtCore QtGui 2>/dev/null)
     LUALIB +=  -ldl
