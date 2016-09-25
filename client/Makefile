@@ -12,7 +12,7 @@ CXX=g++
 VPATH = ../common ../zlib
 OBJDIR = obj
 
-LDLIBS = -L/opt/local/lib -L/usr/local/lib -lreadline -lpthread -lm -ltermcap -lncurses
+LDLIBS = -L/opt/local/lib -L/usr/local/lib -lreadline -lpthread -lm
 LUALIB = ../liblua/liblua.a
 LDFLAGS = $(COMMON_FLAGS)
 CFLAGS = -std=c99 -I. -I../include -I../common -I../zlib -I/opt/local/include -I../liblua -Wall $(COMMON_FLAGS) -g -O4
@@ -37,6 +37,7 @@ else
     CXXFLAGS = $(shell pkg-config --cflags QtCore QtGui 2>/dev/null) -Wall -O4
     QTLDLIBS = $(shell pkg-config --libs QtCore QtGui 2>/dev/null)
     LUALIB +=  -ldl
+    LDLIBS +=  -ltermcap -lncurses
     MOC = $(shell pkg-config --variable=moc_location QtCore)
     # Below is a variant you can use if you have problems compiling with QT5 on ubuntu. see http://www.proxmark.org/forum/viewtopic.php?id=1661 for more info. 
     #MOC = /usr/lib/x86_64-linux-gnu/qt4/bin/moc
