@@ -34,10 +34,10 @@ else ifeq ($(platform),Darwin)
     MOC = $(shell pkg-config --variable=moc_location QtCore)
     LUAPLATFORM = macosx
 else
-    LDLIBS += -ltermcap -lncurses
     CXXFLAGS = $(shell pkg-config --cflags QtCore QtGui 2>/dev/null) -Wall -O4
     QTLDLIBS = $(shell pkg-config --libs QtCore QtGui 2>/dev/null)
     LUALIB +=  -ldl
+    LDLIBS +=  -ltermcap -lncurses
     MOC = $(shell pkg-config --variable=moc_location QtCore)
     # Below is a variant you can use if you have problems compiling with QT5 on ubuntu. see http://www.proxmark.org/forum/viewtopic.php?id=1661 for more info. 
     #MOC = /usr/lib/x86_64-linux-gnu/qt4/bin/moc
