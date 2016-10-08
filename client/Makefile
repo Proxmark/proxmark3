@@ -85,7 +85,7 @@ CMDSRCS = 	nonce2key/crapto1.c\
 			cmdhflegic.c \
 			cmdhficlass.c \
 			cmdhfmf.c \
-            cmdhfmfu.c \
+			cmdhfmfu.c \
 			cmdhftopaz.c \
 			cmdhw.c \
 			cmdlf.c \
@@ -109,6 +109,13 @@ CMDSRCS = 	nonce2key/crapto1.c\
 			aes.c\
 			protocols.c\
 			sha1.c\
+			cmdcrc.c\
+			reveng/reveng.c\
+			reveng/cli.c\
+			reveng/bmpbit.c\
+			reveng/model.c\
+			reveng/poly.c\
+			reveng/getopt.c\
 
 ZLIBSRCS = deflate.c adler32.c trees.c zutil.c inflate.c inffast.c inftrees.c
 ZLIB_FLAGS = -DZ_SOLO -DZ_PREFIX -DNO_GZIP -DZLIB_PM3_TUNED 

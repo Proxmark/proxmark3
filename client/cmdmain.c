@@ -25,12 +25,14 @@
 #include "cmdmain.h"
 #include "util.h"
 #include "cmdscript.h"
+#include "cmdcrc.h"
 
 
 unsigned int current_command = CMD_UNKNOWN;
 
 static int CmdHelp(const char *Cmd);
 static int CmdQuit(const char *Cmd);
+static int CmdRev(const char *Cmd);
 
 //For storing command that are received from the device
 #define CMD_BUFFER_SIZE 50
@@ -42,15 +44,16 @@ static int cmd_tail;//Starts as 0
 
 static command_t CommandTable[] = 
 {
-	{"help",	CmdHelp,	1, "This help. Use '<command> help' for details of a particular command."},
-	{"data", 	CmdData,	1, "{ Plot window / data buffer manipulation... }"},
-	{"hf",   	CmdHF,		1, "{ High Frequency commands... }"},
-	{"hw",   	CmdHW,		1, "{ Hardware commands... }"},
-	{"lf",   	CmdLF,		1, "{ Low Frequency commands... }"},
-	{"script",	CmdScript,	1, "{ Scripting commands }"},
-	{"quit", 	CmdQuit,	1, "Exit program"},
-	{"exit", 	CmdQuit,	1, "Exit program"},
-	{NULL, NULL, 0, NULL}
+  {"help",  CmdHelp,  1, "This help. Use '<command> help' for details of a particular command."},
+  {"data",  CmdData,  1, "{ Plot window / data buffer manipulation... }"},
+  {"hf",    CmdHF,    1, "{ High Frequency commands... }"},
+  {"hw",    CmdHW,    1, "{ Hardware commands... }"},
+  {"lf",    CmdLF,    1, "{ Low Frequency commands... }"},
+  {"reveng",CmdRev,   1, "Crc calculations from the software reveng1-30"},
+  {"script",CmdScript,1, "{ Scripting commands }"},
+  {"quit",  CmdQuit,  1, "Exit program"},
+  {"exit",  CmdQuit,  1, "Exit program"},
+  {NULL, NULL, 0, NULL}
 };
 
 command_t* getTopLevelCommandTable()
@@ -67,6 +70,13 @@ int CmdQuit(const char *Cmd)
 {
   return 99;
 }
+
+int CmdRev(const char *Cmd)
+{
+  CmdCrc(Cmd);
+  return 0;
+}
+
 /**
  * @brief This method should be called when sending a new command to the pm3. In case any old
  *  responses from previous commands are stored in the buffer, a call to this method should clear them.
