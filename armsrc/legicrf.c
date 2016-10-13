@@ -391,7 +391,7 @@ int legic_write_byte(int byte, int addr, int addr_sz) {
     uint32_t cmd_sz = addr_sz+1+8+4;          //crc+data+cmd
 
     legic_prng_forward(2); /* we wait anyways */
-    while(timer->TC_CV < 387) ; /* ~ 258us */
+    while(timer->TC_CV < 387) {}; /* ~ 258us */
 	frame_send_rwd(cmd, cmd_sz);
 
 	//== wait for ack ====================================
@@ -418,7 +418,7 @@ int legic_write_byte(int byte, int addr, int addr_sz) {
         }
     }
     timer->TC_CCR = AT91C_TC_SWTRG;
-    while(timer->TC_CV > 1) ; /* Wait till the clock has reset */
+    while(timer->TC_CV > 1) {}; /* Wait till the clock has reset */
 	return -1;
 }
 
