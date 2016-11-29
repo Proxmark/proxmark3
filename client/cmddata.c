@@ -2038,10 +2038,20 @@ int CmdSamples(const char *Cmd)
 
 int CmdTuneSamples(const char *Cmd)
 {
-	int timeout = 0;
+	int timeout = 0, arg = FLAG_TUNE_ALL;
+
+	if(*Cmd == 'l') {
+	  arg = FLAG_TUNE_LF;
+	} else if (*Cmd == 'h') {
+	  arg = FLAG_TUNE_HF;
+	} else if (*Cmd != '\0') {
+	  PrintAndLog("use 'tune' or 'tune l' or 'tune h'");
+	  return 0;
+	}
+
 	printf("\nMeasuring antenna characteristics, please wait...");
 
-	UsbCommand c = {CMD_MEASURE_ANTENNA_TUNING};
+	UsbCommand c = {CMD_MEASURE_ANTENNA_TUNING, {arg, 0, 0}};
 	SendCommand(&c);
 
 	UsbCommand resp;

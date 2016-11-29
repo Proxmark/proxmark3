@@ -18,6 +18,7 @@ void FpgaSetupSsc(void);
 void SetupSpi(int mode);
 bool FpgaSetupSscDma(uint8_t *buf, int len);
 void Fpga_print_status();
+int FpgaGetCurrent();
 #define FpgaDisableSscDma(void)	AT91C_BASE_PDC_SSC->PDC_PTCR = AT91C_PDC_RXTDIS;
 #define FpgaEnableSscDma(void) AT91C_BASE_PDC_SSC->PDC_PTCR = AT91C_PDC_RXTEN;
 void SetAdcMuxFor(uint32_t whichGpio);
