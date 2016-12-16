@@ -1203,6 +1203,7 @@ void ReaderHitag(hitag_function htf, hitag_data* htd) {
 			bQuiet = false;
 			bCrypto = false;
 			bAuthenticating = false;
+			bQuitTraceFull = true;
 		} break;
 		default: {
 			Dbprintf("Error, unknown function: %d",htf);
@@ -1331,6 +1332,8 @@ void ReaderHitag(hitag_function htf, hitag_data* htd) {
 		// we need to wait (T_Wait2 + half_tag_period) when the last was a 'one'.
 		// All timer values are in terms of T0 units
 		while(AT91C_BASE_TC0->TC_CV < T0*(t_wait+(HITAG_T_TAG_HALF_PERIOD*lastbit)));
+			
+			//Dbprintf("DEBUG: Sending reader frame");
 		
 		// Transmit the reader frame
 		hitag_reader_send_frame(tx,txlen);
@@ -1360,7 +1363,9 @@ void ReaderHitag(hitag_function htf, hitag_data* htd) {
 		bSkip = true;
 		tag_sof = reset_sof;
 		response = 0;
-		
+			//Dbprintf("DEBUG: Waiting to receive frame");
+		uint32_t errorCount = 0;
+
 		// Receive frame, watch for at most T0*EOF periods
 		while (AT91C_BASE_TC1->TC_CV < T0*HITAG_T_WAIT_MAX) {
 			// Check if falling edge in tag modulation is detected
@@ -1376,19 +1381,29 @@ void ReaderHitag(hitag_function htf, hitag_data* htd) {
 				// Capture tag frame (manchester decoding using only falling edges)
 				if(ra >= HITAG_T_EOF) {
 					if (rxlen != 0) {
-						//DbpString("wierd1?");
+						//Dbprintf("DEBUG: Wierd1");
 					}
 					// Capture the T0 periods that have passed since last communication or field drop (reset)
 					// We always recieve a 'one' first, which has the falling edge after a half period |-_|
 					response = ra-HITAG_T_TAG_HALF_PERIOD;
 				} else if(ra >= HITAG_T_TAG_CAPTURE_FOUR_HALF) {
 					// Manchester coding example |-_|_-|-_| (101)
+
+					//need to test to verify we don't exceed memory...
+					//if ( ((rxlen+2) / 8) > HITAG_FRAME_LEN) {
+					//	break;
+					//}
 					rx[rxlen / 8] |= 0 << (7-(rxlen%8));
 					rxlen++;
 					rx[rxlen / 8] |= 1 << (7-(rxlen%8));
 					rxlen++;
 				} else if(ra >= HITAG_T_TAG_CAPTURE_THREE_HALF) {
 					// Manchester coding example |_-|...|_-|-_| (0...01)
+					
+					//need to test to verify we don't exceed memory...
+					//if ( ((rxlen+2) / 8) > HITAG_FRAME_LEN) {
+					//	break;
+					//}
 					rx[rxlen / 8] |= 0 << (7-(rxlen%8));
 					rxlen++;
 					// We have to skip this half period at start and add the 'one' the second time 
@@ -1400,6 +1415,11 @@ void ReaderHitag(hitag_function htf, hitag_data* htd) {
 					bSkip = !bSkip;
 				} else if(ra >= HITAG_T_TAG_CAPTURE_TWO_HALF) {
 					// Manchester coding example |_-|_-| (00) or |-_|-_| (11)
+
+					//need to test to verify we don't exceed memory...
+					//if ( ((rxlen+2) / 8) > HITAG_FRAME_LEN) {
+					//	break;
+					//}
 					if (tag_sof) {
 						// Ignore bits that are transmitted during SOF
 						tag_sof--;
@@ -1409,16 +1429,21 @@ void ReaderHitag(hitag_function htf, hitag_data* htd) {
 						rxlen++;
 					}
 				} else {
+						//Dbprintf("DEBUG: Wierd2");
+						errorCount++;
 					// Ignore wierd value, is to small to mean anything
 				}
 			}
-
+			//if we saw over 100 wierd values break it probably isn't hitag...
+			if (errorCount >100) break;
 			// We can break this loop if we received the last bit from a frame
 			if (AT91C_BASE_TC1->TC_CV > T0*HITAG_T_EOF) {
 				if (rxlen>0) break;
 			}
 		}
 	}
+	//Dbprintf("DEBUG: Done waiting for frame");
+	
 	LED_B_OFF();
 	LED_D_OFF();
 	AT91C_BASE_TC1->TC_CCR = AT91C_TC_CLKDIS;

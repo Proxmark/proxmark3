@@ -1180,9 +1180,11 @@ int CmdLFfind(const char *Cmd)
 		return 1;
 	}
 
-	ans=CmdLFHitagReader("26");
-	if (ans==0) {
-		return 1;
+	if (!offline && (cmdp != '1')){
+		ans=CmdLFHitagReader("26");
+		if (ans==0) {
+			return 1;
+		}
 	}
 
 	PrintAndLog("\nNo Known Tags Found!\n");
