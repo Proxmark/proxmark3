@@ -5,6 +5,7 @@ This project uses the changelog in accordance with [keepchangelog](http://keepac
 ## [unreleased][unreleased]
 
 ### Added
+- Added hitag2 read UID only and added that to lf search (marshmellow)
 - Added lf pyramid commands (iceman)
 - Added lf presco commands - some bits not fully understood... (iceman)
 - Added experimental HitagS support (Oguzhan Cicek, Hendrik Schwartke, Ralf Spenneberg)
@@ -34,9 +35,10 @@ This project uses the changelog in accordance with [keepchangelog](http://keepac
 - Added 'hf snoop'. This command take digitalized signal from FPGA and put in BigBuffer. (pwpiwi + enio)
 - Added Topaz (NFC type 1) protocol support ('hf topaz reader', 'hf list topaz', 'hf 14a raw -T', 'hf topaz snoop'). (piwi)
 - Added option c to 'hf list' (mark CRC bytes) (piwi)
-- Added option `l` or `h` to `hw tune` to save time and unnecessary fpga writes if you are only interested in lf or hf.
 
 ### Changed
+- Fixed bug in lf sim and continuous demods not turning off antenna when finished
+- Fixed bug(s) in hf iclass write
 - Fixed bug in lf biphase sim - `lf simask b` (and any tagtype that relies on it - gproxii...) (marshmellow)
 - Fixed bug in lf viking clone/sim (iceman)
 - Fixed broken `data askedgedetect` (marshmellow)

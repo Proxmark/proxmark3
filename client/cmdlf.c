@@ -38,7 +38,7 @@ static int CmdHelp(const char *Cmd);
 
 
 
-int usage_lf_cmdread()
+int usage_lf_cmdread(void)
 {
 	PrintAndLog("Usage: lf cmdread d <delay period> z <zero period> o <one period> c <cmdbytes> [H] ");
 	PrintAndLog("Options:        ");
@@ -430,7 +430,7 @@ int CmdIndalaClone(const char *Cmd)
 	return 0;
 }
 
-int usage_lf_read()
+int usage_lf_read(void)
 {
 	PrintAndLog("Usage: lf read");
 	PrintAndLog("Options:        ");
@@ -440,7 +440,7 @@ int usage_lf_read()
 	PrintAndLog("Use 'lf config' to set parameters.");
 	return 0;
 }
-int usage_lf_snoop()
+int usage_lf_snoop(void)
 {
 	PrintAndLog("Usage: lf snoop");
 	PrintAndLog("Options:        ");
@@ -450,7 +450,7 @@ int usage_lf_snoop()
 	return 0;
 }
 
-int usage_lf_config()
+int usage_lf_config(void)
 {
 	PrintAndLog("Usage: lf config [H|<divisor>] [b <bps>] [d <decim>] [a 0|1]");
 	PrintAndLog("Options:        ");
@@ -685,7 +685,7 @@ int usage_lf_simpsk(void)
 	return 0;
 }
 
-// by marshmellow - sim ask data given clock, fcHigh, fcLow, invert 
+// by marshmellow - sim fsk data given clock, fcHigh, fcLow, invert 
 // - allow pull data from DemodBuffer
 int CmdLFfskSim(const char *Cmd)
 {
@@ -1178,6 +1178,13 @@ int CmdLFfind(const char *Cmd)
 	if (ans>0) {
 		PrintAndLog("\nValid NexWatch ID Found!");
 		return 1;
+	}
+
+	if (!offline && (cmdp != '1')){
+		ans=CmdLFHitagReader("26");
+		if (ans==0) {
+			return 1;
+		}
 	}
 
 	PrintAndLog("\nNo Known Tags Found!\n");

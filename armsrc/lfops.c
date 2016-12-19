@@ -403,6 +403,7 @@ void SimulateTagLowFrequency(int period, int gap, int ledcontrol)
 		//wait until SSC_CLK goes HIGH
 		while(!(AT91C_BASE_PIOA->PIO_PDSR & GPIO_SSC_CLK)) {
 			if(BUTTON_PRESS() || (usb_poll_validate_length() )) {
+				FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
 				DbpString("Stopped");
 				return;
 			}
@@ -420,8 +421,9 @@ void SimulateTagLowFrequency(int period, int gap, int ledcontrol)
 			LED_D_OFF();
 		//wait until SSC_CLK goes LOW
 		while(AT91C_BASE_PIOA->PIO_PDSR & GPIO_SSC_CLK) {
-			if(BUTTON_PRESS()) {
+			if(BUTTON_PRESS() || (usb_poll_validate_length() )) {
 				DbpString("Stopped");
+				FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
 				return;
 			}
 			WDT_HIT();
@@ -436,6 +438,7 @@ void SimulateTagLowFrequency(int period, int gap, int ledcontrol)
 				SpinDelayUs(gap);
 			}
 		}
+
 	}
 }
 
@@ -840,13 +843,15 @@ void CmdHIDdemodFSK(int findone, int *high, int *low, int ledcontrol)
 				if (ledcontrol)	LED_A_OFF();
 				*high = hi;
 				*low = lo;
-				return;
+				break;
 			}
 			// reset
 		}
 		hi2 = hi = lo = idx = 0;
 		WDT_HIT();
 	}
+
+	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
 	DbpString("Stopped");
 	if (ledcontrol) LED_A_OFF();
 }
@@ -931,12 +936,13 @@ void CmdAWIDdemodFSK(int findone, int *high, int *low, int ledcontrol)
 		}
 		if (findone){
 			if (ledcontrol)	LED_A_OFF();
-			return;
+			break;
 		}
 		// reset
 		idx = 0;
 		WDT_HIT();
 	}
+	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
 	DbpString("Stopped");
 	if (ledcontrol) LED_A_OFF();
 }
@@ -991,13 +997,14 @@ void CmdEM410xdemod(int findone, int *high, int *low, int ledcontrol)
 				if (ledcontrol) LED_A_OFF();
 				*high=lo>>32;
 				*low=lo & 0xFFFFFFFF;
-				return;
+				break;
 			}
 		}
 		WDT_HIT();
 		hi = lo = size = idx = 0;
 		clk = invert = errCnt = 0;
 	}
+	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
 	DbpString("Stopped");
 	if (ledcontrol) LED_A_OFF();
 }
@@ -1056,7 +1063,7 @@ void CmdIOdemodFSK(int findone, int *high, int *low, int ledcontrol)
 			//LED_A_OFF();
 			*high=code;
 			*low=code2;
-			return;
+			break;
 		}
 		code=code2=0;
 		version=facilitycode=0;
@@ -1065,6 +1072,7 @@ void CmdIOdemodFSK(int findone, int *high, int *low, int ledcontrol)
 
 		WDT_HIT();
 	}
+	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
 	DbpString("Stopped");
 	if (ledcontrol) LED_A_OFF();
 }

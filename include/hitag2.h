@@ -14,14 +14,15 @@
 #define _HITAG2_H_
 
 typedef enum {
-	RHTSF_CHALLENGE		  = 01,
-	RHTSF_KEY		  = 02,
+	RHTSF_CHALLENGE           = 01,
+	RHTSF_KEY                 = 02,
 	WHTSF_CHALLENGE           = 03,
 	WHTSF_KEY                 = 04,
 	RHT2F_PASSWORD            = 21,
 	RHT2F_AUTHENTICATE        = 22,
 	RHT2F_CRYPTO              = 23,
 	RHT2F_TEST_AUTH_ATTEMPTS  = 25,
+	RHT2F_UID_ONLY            = 26
 } hitag_function;
 
 typedef struct {

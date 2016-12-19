@@ -697,6 +697,42 @@ static bool hitag2_test_auth_attempts(byte_t* rx, const size_t rxlen, byte_t* tx
 	return true;
 }
 
+static bool hitag2_read_uid(byte_t* rx, const size_t rxlen, byte_t* tx, size_t* txlen) {
+	// Reset the transmission frame length
+	*txlen = 0;
+
+	// Try to find out which command was send by selecting on length (in bits)
+	switch (rxlen) {
+		// No answer, try to resurrect
+		case 0: {
+			// Just starting or if there is no answer
+			*txlen = 5;
+			memcpy(tx,"\xc0",nbytes(*txlen));
+		} break;
+		// Received UID
+		case 32: {
+			// Check if we received answer tag (at)
+			if (bAuthenticating) {
+				bAuthenticating = false;
+			} else {
+				// Store the received block
+				memcpy(tag.sectors[blocknr],rx,4);
+				blocknr++;
+			}
+			if (blocknr > 0) {
+				//DbpString("Read successful!");
+				bSuccessful = true;
+				return false;
+			}
+		} break;
+		// Unexpected response
+		default: {
+			Dbprintf("Uknown frame length: %d",rxlen);
+			return false;
+		} break;
+	}
+	return true;
+}
 
 void SnoopHitag(uint32_t type) {
 	int frame_count;
@@ -1123,19 +1159,18 @@ void ReaderHitag(hitag_function htf, hitag_data* htd) {
 	set_tracing(TRUE);
 	clear_trace();
 
-	DbpString("Starting Hitag reader family");
+	//DbpString("Starting Hitag reader family");
 
 	// Check configuration
 	switch(htf) {
 		case RHT2F_PASSWORD: {
 			Dbprintf("List identifier in password mode");
 			memcpy(password,htd->pwd.password,4);
-      		blocknr = 0;
+			blocknr = 0;
 			bQuitTraceFull = false;
 			bQuiet = false;
 			bPwd = false;
 		} break;
-      
 		case RHT2F_AUTHENTICATE: {
 			DbpString("Authenticating using nr,ar pair:");
 			memcpy(NrAr,htd->auth.NrAr,8);
@@ -1145,7 +1180,6 @@ void ReaderHitag(hitag_function htf, hitag_data* htd) {
 			bAuthenticating = false;
 			bQuitTraceFull = true;
 		} break;
-      
 		case RHT2F_CRYPTO: {
 			DbpString("Authenticating using key:");
 			memcpy(key,htd->crypto.key,6);	  //HACK; 4 or 6??  I read both in the code.
@@ -1156,7 +1190,6 @@ void ReaderHitag(hitag_function htf, hitag_data* htd) {
 			bAuthenticating = false;
 			bQuitTraceFull = true;
 		} break;
-
 		case RHT2F_TEST_AUTH_ATTEMPTS: {
 			Dbprintf("Testing %d authentication attempts",(auth_table_len/8));
 			auth_table_pos = 0;
@@ -1165,7 +1198,13 @@ void ReaderHitag(hitag_function htf, hitag_data* htd) {
 			bQuiet = false;
 			bCrypto = false;
 		} break;
-			
+		case RHT2F_UID_ONLY: {
+			blocknr = 0;
+			bQuiet = false;
+			bCrypto = false;
+			bAuthenticating = false;
+			bQuitTraceFull = true;
+		} break;
 		default: {
 			Dbprintf("Error, unknown function: %d",htf);
 			return;
@@ -1222,22 +1261,22 @@ void ReaderHitag(hitag_function htf, hitag_data* htd) {
     // hitagS settings
     reset_sof = 1;
     t_wait = 200;
-    DbpString("Configured for hitagS reader");
+    //DbpString("Configured for hitagS reader");
   } else if (htf < 20) {
     // hitag1 settings
     reset_sof = 1;
     t_wait = 200;
-    DbpString("Configured for hitag1 reader");
+    //DbpString("Configured for hitag1 reader");
   } else if (htf < 30) {
     // hitag2 settings
     reset_sof = 4;
     t_wait = HITAG_T_WAIT_2;
-    DbpString("Configured for hitag2 reader");
+    //DbpString("Configured for hitag2 reader");
 	} else {
     Dbprintf("Error, unknown hitag reader type: %d",htf);
     return;
   }
-		
+	uint8_t attempt_count=0;
 	while(!bStop && !BUTTON_PRESS()) {
 		// Watchdog hit
 		WDT_HIT();
@@ -1272,6 +1311,11 @@ void ReaderHitag(hitag_function htf, hitag_data* htd) {
 			case RHT2F_TEST_AUTH_ATTEMPTS: {
 				bStop = !hitag2_test_auth_attempts(rx,rxlen,tx,&txlen);
 			} break;
+			case RHT2F_UID_ONLY: {
+				bStop = !hitag2_read_uid(rx, rxlen, tx, &txlen);
+				attempt_count++; //attempt 3 times to get uid then quit
+				if (!bStop && attempt_count == 3) bStop = true;
+			} break;
 			default: {
 				Dbprintf("Error, unknown function: %d",htf);
 				return;
@@ -1288,6 +1332,8 @@ void ReaderHitag(hitag_function htf, hitag_data* htd) {
 		// we need to wait (T_Wait2 + half_tag_period) when the last was a 'one'.
 		// All timer values are in terms of T0 units
 		while(AT91C_BASE_TC0->TC_CV < T0*(t_wait+(HITAG_T_TAG_HALF_PERIOD*lastbit)));
+			
+			//Dbprintf("DEBUG: Sending reader frame");
 		
 		// Transmit the reader frame
 		hitag_reader_send_frame(tx,txlen);
@@ -1317,7 +1363,9 @@ void ReaderHitag(hitag_function htf, hitag_data* htd) {
 		bSkip = true;
 		tag_sof = reset_sof;
 		response = 0;
-		
+			//Dbprintf("DEBUG: Waiting to receive frame");
+		uint32_t errorCount = 0;
+
 		// Receive frame, watch for at most T0*EOF periods
 		while (AT91C_BASE_TC1->TC_CV < T0*HITAG_T_WAIT_MAX) {
 			// Check if falling edge in tag modulation is detected
@@ -1333,19 +1381,29 @@ void ReaderHitag(hitag_function htf, hitag_data* htd) {
 				// Capture tag frame (manchester decoding using only falling edges)
 				if(ra >= HITAG_T_EOF) {
 					if (rxlen != 0) {
-						//DbpString("wierd1?");
+						//Dbprintf("DEBUG: Wierd1");
 					}
 					// Capture the T0 periods that have passed since last communication or field drop (reset)
 					// We always recieve a 'one' first, which has the falling edge after a half period |-_|
 					response = ra-HITAG_T_TAG_HALF_PERIOD;
 				} else if(ra >= HITAG_T_TAG_CAPTURE_FOUR_HALF) {
 					// Manchester coding example |-_|_-|-_| (101)
+
+					//need to test to verify we don't exceed memory...
+					//if ( ((rxlen+2) / 8) > HITAG_FRAME_LEN) {
+					//	break;
+					//}
 					rx[rxlen / 8] |= 0 << (7-(rxlen%8));
 					rxlen++;
 					rx[rxlen / 8] |= 1 << (7-(rxlen%8));
 					rxlen++;
 				} else if(ra >= HITAG_T_TAG_CAPTURE_THREE_HALF) {
 					// Manchester coding example |_-|...|_-|-_| (0...01)
+					
+					//need to test to verify we don't exceed memory...
+					//if ( ((rxlen+2) / 8) > HITAG_FRAME_LEN) {
+					//	break;
+					//}
 					rx[rxlen / 8] |= 0 << (7-(rxlen%8));
 					rxlen++;
 					// We have to skip this half period at start and add the 'one' the second time 
@@ -1357,6 +1415,11 @@ void ReaderHitag(hitag_function htf, hitag_data* htd) {
 					bSkip = !bSkip;
 				} else if(ra >= HITAG_T_TAG_CAPTURE_TWO_HALF) {
 					// Manchester coding example |_-|_-| (00) or |-_|-_| (11)
+
+					//need to test to verify we don't exceed memory...
+					//if ( ((rxlen+2) / 8) > HITAG_FRAME_LEN) {
+					//	break;
+					//}
 					if (tag_sof) {
 						// Ignore bits that are transmitted during SOF
 						tag_sof--;
@@ -1366,22 +1429,27 @@ void ReaderHitag(hitag_function htf, hitag_data* htd) {
 						rxlen++;
 					}
 				} else {
+						//Dbprintf("DEBUG: Wierd2");
+						errorCount++;
 					// Ignore wierd value, is to small to mean anything
 				}
 			}
-
+			//if we saw over 100 wierd values break it probably isn't hitag...
+			if (errorCount >100) break;
 			// We can break this loop if we received the last bit from a frame
 			if (AT91C_BASE_TC1->TC_CV > T0*HITAG_T_EOF) {
 				if (rxlen>0) break;
 			}
 		}
 	}
+	//Dbprintf("DEBUG: Done waiting for frame");
+	
 	LED_B_OFF();
 	LED_D_OFF();
 	AT91C_BASE_TC1->TC_CCR = AT91C_TC_CLKDIS;
 	AT91C_BASE_TC0->TC_CCR = AT91C_TC_CLKDIS;
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
-	Dbprintf("frame received: %d",frame_count);
-  DbpString("All done");
+	//Dbprintf("frame received: %d",frame_count);
+  //DbpString("All done");
   cmd_send(CMD_ACK,bSuccessful,0,0,(byte_t*)tag.sectors,48);
 }
