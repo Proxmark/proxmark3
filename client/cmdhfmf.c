@@ -1100,6 +1100,7 @@ int usage_hf14_mf1ksim(void) {
 	PrintAndLog("      x    (Optional) Crack, performs the 'reader attack', nr/ar attack against a legitimate reader, fishes out the key(s)");
 	PrintAndLog("      e    (Optional) set keys found from 'reader attack' to emulator memory (implies x and i)");
 	PrintAndLog("      f    (Optional) get UIDs to use for 'reader attack' from file 'f <filename.txt>' (implies x and i)");
+	PrintAndLog("      r    (Optional) Generate random nonces instead of sequential nonces.");
 	PrintAndLog("samples:");
 	PrintAndLog("           hf mf sim u 0a0a0a0a");
 	PrintAndLog("           hf mf sim u 11223344556677");
@@ -1163,6 +1164,11 @@ int CmdHF14AMf1kSim(const char *Cmd) {
 		case 'N':
 			exitAfterNReads = param_get8(Cmd, pnr+1);
 			cmdp += 2;
+			break;
+		case 'r':
+		case 'R':
+			flags |= FLAG_RANDOM_NONCE;
+			cmdp++;
 			break;
 		case 'u':
 		case 'U':
