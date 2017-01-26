@@ -2329,7 +2329,7 @@ typedef struct {
   * FLAG_7B_UID_IN_DATA - means that there is a 7-byte UID in the data-section, we're expected to use that
   * FLAG_10B_UID_IN_DATA	- use 10-byte UID in the data-section not finished
   *	FLAG_NR_AR_ATTACK  - means we should collect NR_AR responses for bruteforcing later
-  * FLAG_RANDOM_NONCE - means we should generate some pseudo-random nonce data
+  * FLAG_RANDOM_NONCE - means we should generate some pseudo-random nonce data (only allows moebius attack)
   *@param exitAfterNReads, exit simulation after n blocks have been read, 0 is infinite ...
   * (unless reader attack mode enabled then it runs util it gets enough nonces to recover all keys attmpted)
   */
@@ -2543,8 +2543,6 @@ void Mifare1ksim(uint8_t flags, uint8_t exitAfterNReads, uint8_t arg2, uint8_t *
 			cardAUTHKEY = 0xff;
 			if (flags & FLAG_RANDOM_NONCE) {
 				nonce = prand();
-			} else {
-				nonce++;
 			}
 			continue;
 		}
