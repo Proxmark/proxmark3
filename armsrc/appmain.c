@@ -1028,6 +1028,9 @@ void UsbPacketReceived(uint8_t *packet, int len)
 		case CMD_VIKING_CLONE_TAG:
 			CopyVikingtoT55xx(c->arg[0], c->arg[1], c->arg[2]);
 			break;
+		case CMD_SIMULATE_EM4x50: // Simulate EM4x50 tag, args = memory content
+			SimulateEM4x50Tag((bool)c->arg[0], (byte_t*)c->d.asBytes);
+			break;
 #endif
 
 #ifdef WITH_HITAG

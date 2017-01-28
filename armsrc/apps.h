@@ -175,6 +175,9 @@ void iClass_Dump(uint8_t blockno, uint8_t numblks);
 void iClass_Clone(uint8_t startblock, uint8_t endblock, uint8_t *data);
 void iClass_ReadCheck(uint8_t	blockNo, uint8_t keyType);
 
+// em4x50
+void SimulateEM4x50Tag(bool tag_mem_supplied, byte_t* data);
+
 // hitag2.h
 void SnoopHitag(uint32_t type);
 void SimulateHitagTag(bool tag_mem_supplied, byte_t* data);

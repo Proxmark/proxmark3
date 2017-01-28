@@ -498,6 +498,44 @@ int CmdEM4x50Read(const char *Cmd)
 	return EM4x50Read(Cmd, true);
 }
 
+int CmdEM4x50Sim(const char *Cmd)
+{
+	UsbCommand c = { CMD_SIMULATE_EM4x50 };
+	char filename[FILE_PATH_SIZE] = { 0x00 };
+	FILE* pf;
+	bool tag_mem_supplied;
+	int len = strlen(Cmd);
+	if (len > FILE_PATH_SIZE) len = FILE_PATH_SIZE;
+	memcpy(filename, Cmd, len);
+
+	if (strlen(filename) > 0)
+	{
+		if ((pf = fopen(filename, "rb+")) == NULL)
+		{
+			PrintAndLog("Error: Could not open file [%s]", filename);
+			return 1;
+		}
+		tag_mem_supplied = true;
+		if (fread(c.d.asBytes, 136, 1, pf) == 0)
+		{
+			PrintAndLog("Error: File reading error");
+			fclose(pf);
+			return 1;
+		}
+		fclose(pf);
+	}
+	else
+	{
+		tag_mem_supplied = false;
+	}
+
+	// Does the tag comes with memory
+	c.arg[0] = (uint32_t)tag_mem_supplied;
+
+	SendCommand(&c);
+	return 0;
+}
+
 int CmdReadWord(const char *Cmd)
 {
 	int Word = -1; //default to invalid word
@@ -604,6 +642,7 @@ static command_t CommandTable[] =
 	{"em410xspoof", CmdEM410xWatchnSpoof, 0, "['h'] --- Watches for EM410x 125/134 kHz tags, and replays them. (option 'h' for 134)" },
 	{"em410xwrite", CmdEM410xWrite, 0, "<UID> <'0' T5555> <'1' T55x7> [clock rate] -- Write EM410x UID to T5555(Q5) or T55x7 tag, optionally setting clock rate"},
 	{"em4x50read", CmdEM4x50Read, 1, "Extract data from EM4x50 tag"},
+	{"em4x50sim", CmdEM4x50Sim, 0, "Simulates an EM4x50 tag"},
 	{"readword", CmdReadWord, 1, "<Word> -- Read EM4xxx word data"},
 	{"readwordPWD", CmdReadWordPWD, 1, "<Word> <Password> -- Read EM4xxx word data in password mode"},
 	{"writeword", CmdWriteWord, 1, "<Data> <Word> -- Write EM4xxx word data"},
