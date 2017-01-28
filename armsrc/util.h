@@ -54,4 +54,6 @@ uint32_t RAMFUNC GetDeltaCountUS();
 void StartCountSspClk();
 uint32_t RAMFUNC GetCountSspClk();
 
+uint32_t prand();
+
 #endif

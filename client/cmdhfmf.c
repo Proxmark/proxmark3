@@ -1016,7 +1016,7 @@ int CmdHF14AMfChk(const char *Cmd)
 	return 0;
 }
 
-void readerAttack(nonces_t ar_resp[], bool setEmulatorMem) {
+void readerAttack(nonces_t ar_resp[], bool setEmulatorMem, bool doStandardAttack) {
 	#define ATTACK_KEY_COUNT 8 // keep same as define in iso14443a.c -> Mifare1ksim()
 	uint64_t key = 0;
 	typedef struct {
@@ -1034,7 +1034,7 @@ void readerAttack(nonces_t ar_resp[], bool setEmulatorMem) {
 	for (uint8_t i = 0; i<ATTACK_KEY_COUNT; i++) {
 		if (ar_resp[i].ar2 > 0) {
 			//PrintAndLog("DEBUG: Trying sector %d, cuid %08x, nt %08x, ar %08x, nr %08x, ar2 %08x, nr2 %08x",ar_resp[i].sector, ar_resp[i].cuid,ar_resp[i].nonce,ar_resp[i].ar,ar_resp[i].nr,ar_resp[i].ar2,ar_resp[i].nr2);
-			if (mfkey32(ar_resp[i], &key)) {
+			if (doStandardAttack && mfkey32(ar_resp[i], &key)) {
 				PrintAndLog("  Found Key%s for sector %02d: [%04x%08x]", (ar_resp[i].keytype) ? "B" : "A", ar_resp[i].sector, (uint32_t) (key>>32), (uint32_t) (key &0xFFFFFFFF));
 
 				for (uint8_t ii = 0; ii<ATTACK_KEY_COUNT; ii++) {
@@ -1054,6 +1054,34 @@ void readerAttack(nonces_t ar_resp[], bool setEmulatorMem) {
 						}
 					}
 				}
+			} else if (tryMfk32_moebius(ar_resp[i+ATTACK_KEY_COUNT], &key)) {
+				uint8_t sectorNum = ar_resp[i+ATTACK_KEY_COUNT].sector;
+				uint8_t keyType = ar_resp[i+ATTACK_KEY_COUNT].keytype;
+
+				PrintAndLog("M-Found Key%s for sector %02d: [%012"llx"]"
+					, keyType ? "B" : "A"
+					, sectorNum
+					, key
+				);
+
+				for (uint8_t ii = 0; ii<ATTACK_KEY_COUNT; ii++) {
+					if (key_cnt[ii]==0 || stSector[ii]==sectorNum) {
+						if (keyType==0) {
+							//keyA
+							sector_trailer[ii].keyA = key;
+							stSector[ii] = sectorNum;
+							key_cnt[ii]++;
+							break;
+						} else {
+							//keyB
+							sector_trailer[ii].keyB = key;
+							stSector[ii] = sectorNum;
+							key_cnt[ii]++;
+							break;
+						}
+					}
+				}
+				continue;
 			}
 		}
 	}
@@ -1100,6 +1128,7 @@ int usage_hf14_mf1ksim(void) {
 	PrintAndLog("      x    (Optional) Crack, performs the 'reader attack', nr/ar attack against a legitimate reader, fishes out the key(s)");
 	PrintAndLog("      e    (Optional) set keys found from 'reader attack' to emulator memory (implies x and i)");
 	PrintAndLog("      f    (Optional) get UIDs to use for 'reader attack' from file 'f <filename.txt>' (implies x and i)");
+	PrintAndLog("      r    (Optional) Generate random nonces instead of sequential nonces. Standard reader attack won't work with this option, only moebius attack works.");
 	PrintAndLog("samples:");
 	PrintAndLog("           hf mf sim u 0a0a0a0a");
 	PrintAndLog("           hf mf sim u 11223344556677");
@@ -1163,6 +1192,11 @@ int CmdHF14AMf1kSim(const char *Cmd) {
 		case 'N':
 			exitAfterNReads = param_get8(Cmd, pnr+1);
 			cmdp += 2;
+			break;
+		case 'r':
+		case 'R':
+			flags |= FLAG_RANDOM_NONCE;
+			cmdp++;
 			break;
 		case 'u':
 		case 'U':
@@ -1246,7 +1280,8 @@ int CmdHF14AMf1kSim(const char *Cmd) {
 			//got a response
 			nonces_t ar_resp[ATTACK_KEY_COUNT*2];
 			memcpy(ar_resp, resp.d.asBytes, sizeof(ar_resp));
-			readerAttack(ar_resp, setEmulatorMem);
+			// We can skip the standard attack if we have RANDOM_NONCE set.
+			readerAttack(ar_resp, setEmulatorMem, !(flags & FLAG_RANDOM_NONCE));
 			if ((bool)resp.arg[1]) {
 				PrintAndLog("Device button pressed - quitting");
 				fclose(f);
@@ -1278,7 +1313,8 @@ int CmdHF14AMf1kSim(const char *Cmd) {
 			if (flags & FLAG_NR_AR_ATTACK) {
 				nonces_t ar_resp[ATTACK_KEY_COUNT*2];
 				memcpy(ar_resp, resp.d.asBytes, sizeof(ar_resp));
-				readerAttack(ar_resp, setEmulatorMem);
+				// We can skip the standard attack if we have RANDOM_NONCE set.
+				readerAttack(ar_resp, setEmulatorMem, !(flags & FLAG_RANDOM_NONCE));
 			}
 		}
 	}
