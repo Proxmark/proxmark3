@@ -431,3 +431,19 @@ uint32_t RAMFUNC GetCountSspClk(){
 	}
 }
 
+static uint64_t next_random = 1;
+
+/* Generates a (non-cryptographically secure) 32-bit random number.
+ *
+ * We don't have an implementation of the "rand" function or a clock to seed it
+ * with, so we just call GetTickCount the first time to seed ourselves.
+ */
+uint32_t prand() {
+	if (next_random == 1) {
+		next_random = GetTickCount();
+	}
+
+	next_random = next_random * 6364136223846793005 + 1;
+	return (uint32_t)(next_random >> 32) % 0xffffffff;
+}
+
