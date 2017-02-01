@@ -1180,10 +1180,14 @@ int CmdLFfind(const char *Cmd)
 		return 1;
 	}
 
-	if (!offline && (cmdp != '1')){
-		ans=CmdLFHitagReader("26");
-		if (ans==0) {
-			return 1;
+	size_t testLen = (GraphTraceLen < 500) ? GraphTraceLen : 500;
+	// only run if graphbuffer is just noise as it should be for hitag
+	if (graphJustNoise(GraphBuffer, testLen)) { 
+		if (!offline && (cmdp != '1')){
+			ans=CmdLFHitagReader("26");
+			if (ans==0) {
+				return 1;
+			}
 		}
 	}
 
