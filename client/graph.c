@@ -270,7 +270,7 @@ uint8_t fskClocks(uint8_t *fc1, uint8_t *fc2, uint8_t *rf1, bool verbose)
 }
 bool graphJustNoise(int *BitStream, int size)
 {
-	static const uint8_t THRESHOLD = 10; //might not be high enough for noisy environments
+	static const uint8_t THRESHOLD = 15; //might not be high enough for noisy environments
 	//test samples are not just noise
 	bool justNoise1 = 1;
 	for(int idx=0; idx < size && justNoise1 ;idx++){

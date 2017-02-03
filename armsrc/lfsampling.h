@@ -2,6 +2,13 @@
 #define LFSAMPLING_H
 
 /**
+* acquisition of Cotag LF signal. Similar to other LF,  since the Cotag has such long datarate RF/384
+* and is Manchester?,  we directly gather the manchester data into bigbuff
+**/
+void doCotagAcquisition(size_t sample_size);
+uint32_t doCotagAcquisitionManchester(void);
+
+/**
 * acquisition of T55x7 LF signal. Similart to other LF, but adjusted with @marshmellows thresholds
 * the data is collected in BigBuf.
 **/

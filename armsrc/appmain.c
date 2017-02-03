@@ -1028,6 +1028,9 @@ void UsbPacketReceived(uint8_t *packet, int len)
 		case CMD_VIKING_CLONE_TAG:
 			CopyVikingtoT55xx(c->arg[0], c->arg[1], c->arg[2]);
 			break;
+		case CMD_COTAG:
+			Cotag(c->arg[0]);
+			break;
 #endif
 
 #ifdef WITH_HITAG
