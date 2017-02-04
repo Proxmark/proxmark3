@@ -5,6 +5,7 @@ This project uses the changelog in accordance with [keepchangelog](http://keepac
 ## [unreleased][unreleased]
 
 ### Added
+- Added lf cotag read, and added it to lf search (iceman)
 - Added hitag2 read UID only and added that to lf search (marshmellow)
 - Added lf pyramid commands (iceman)
 - Added lf presco commands - some bits not fully understood... (iceman)
