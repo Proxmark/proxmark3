@@ -33,6 +33,8 @@
 #include "cmdlfpcf7931.h"// for pcf7931 menu
 #include "cmdlfpyramid.h"// for pyramid menu
 #include "cmdlfviking.h" // for viking menu
+#include "cmdlfcotag.h"  // for COTAG menu
+
 
 static int CmdHelp(const char *Cmd);
 
@@ -1080,6 +1082,7 @@ int CmdVchDemod(const char *Cmd)
 int CmdLFfind(const char *Cmd)
 {
 	int ans=0;
+	size_t minLength = 1000;
 	char cmdp = param_getchar(Cmd, 0);
 	char testRaw = param_getchar(Cmd, 1);
 	if (strlen(Cmd) > 3 || cmdp == 'h' || cmdp == 'H') {
@@ -1098,7 +1101,7 @@ int CmdLFfind(const char *Cmd)
 	if (!offline && (cmdp != '1')){
 		CmdLFRead("s");
 		getSamples("30000",false);
-	} else if (GraphTraceLen < 1000) {
+	} else if (GraphTraceLen < minLength) {
 		PrintAndLog("Data in Graphbuffer was too small.");
 		return 0;
 	}
@@ -1107,6 +1110,24 @@ int CmdLFfind(const char *Cmd)
 	PrintAndLog("NOTE: some demods output possible binary\n  if it finds something that looks like a tag");
 	PrintAndLog("False Positives ARE possible\n");  
 	PrintAndLog("\nChecking for known tags:\n");
+
+	size_t testLen = minLength;
+	// only run if graphbuffer is just noise as it should be for hitag/cotag
+	if (graphJustNoise(GraphBuffer, testLen)) {
+		// only run these tests if we are in online mode 
+		if (!offline && (cmdp != '1')){
+			ans=CmdLFHitagReader("26");
+			if (ans==0) {
+				return 1;
+			}
+			ans=CmdCOTAGRead("");
+			if (ans>0){
+				PrintAndLog("\nValid COTAG ID Found!");
+				return 1;
+			}
+		}
+		return 0;
+	}
 
 	ans=CmdFSKdemodIO("");
 	if (ans>0) {
@@ -1180,13 +1201,6 @@ int CmdLFfind(const char *Cmd)
 		return 1;
 	}
 
-	if (!offline && (cmdp != '1')){
-		ans=CmdLFHitagReader("26");
-		if (ans==0) {
-			return 1;
-		}
-	}
-
 	PrintAndLog("\nNo Known Tags Found!\n");
 	if (testRaw=='u' || testRaw=='U'){
 		//test unknown tag formats (raw mode)
@@ -1224,6 +1238,7 @@ static command_t CommandTable[] =
 {
 	{"help",        CmdHelp,            1, "This help"},
 	{"awid",        CmdLFAWID,          1, "{ AWID RFIDs...    }"},
+	{"cotag",       CmdLFCOTAG,         1, "{ COTAG RFIDs...   }"},
 	{"em4x",        CmdLFEM4X,          1, "{ EM4X RFIDs...    }"},
 	{"hid",         CmdLFHID,           1, "{ HID RFIDs...     }"},
 	{"hitag",       CmdLFHitag,         1, "{ Hitag tags and transponders... }"},

@@ -1672,3 +1672,62 @@ void EM4xWriteWord(uint32_t Data, uint8_t Address, uint32_t Pwd, uint8_t PwdMode
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF); // field off
 	LED_D_OFF();
 }
+/*
+Reading a COTAG.
+
+COTAG needs the reader to send a startsequence and the card has an extreme slow datarate.
+because of this, we can "sample" the data signal but we interpreate it to Manchester direct.
+
+READER START SEQUENCE:
+burst 800 us,    gap   2.2 msecs
+burst 3.6 msecs  gap   2.2 msecs
+burst 800 us     gap   2.2 msecs
+pulse 3.6 msecs
+
+This triggers a COTAG tag to response
+*/
+void Cotag(uint32_t arg0) {
+
+#define OFF     { FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF); WaitUS(2035); }
+#define ON(x)   { FpgaWriteConfWord(FPGA_MAJOR_MODE_LF_ADC | FPGA_LF_ADC_READER_FIELD); WaitUS((x)); }
+
+	uint8_t rawsignal = arg0 & 0xF;
+
+	LED_A_ON();
+
+	// Switching to LF image on FPGA. This might empty BigBuff
+	FpgaDownloadAndGo(FPGA_BITSTREAM_LF);
+
+	//clear buffer now so it does not interfere with timing later
+	BigBuf_Clear_ext(false);
+
+	// Set up FPGA, 132kHz to power up the tag
+	FpgaSendCommand(FPGA_CMD_SET_DIVISOR, 89);
+	FpgaWriteConfWord(FPGA_MAJOR_MODE_LF_ADC | FPGA_LF_ADC_READER_FIELD);
+
+	// Connect the A/D to the peak-detected low-frequency path.
+	SetAdcMuxFor(GPIO_MUXSEL_LOPKD);
+
+	// Now set up the SSC to get the ADC samples that are now streaming at us.
+	FpgaSetupSsc();
+
+	// start clock - 1.5ticks is 1us
+	StartTicks();
+
+	//send COTAG start pulse
+	ON(740)  OFF
+	ON(3330) OFF
+	ON(740)  OFF
+	ON(1000)
+
+	switch(rawsignal) {
+		case 0: doCotagAcquisition(50000); break;
+		case 1: doCotagAcquisitionManchester(); break;
+		case 2: DoAcquisition_config(TRUE); break;
+	}
+
+	// Turn the field off
+	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF); // field off
+	cmd_send(CMD_ACK,0,0,0,0,0);
+	LED_A_OFF();
+}
