@@ -18,6 +18,7 @@
 #include "cmdparser.h"
 #include "cmddata.h"
 #include "cmdlf.h"
+#include "cmdmain.h"
 #include "cmdlfem4x.h"
 #include "lfdemod.h"
 
@@ -285,7 +286,7 @@ uint32_t OutputEM4x50_Block(uint8_t *BitStream, size_t size, bool verbose, bool 
 	}
 	return code;
 }
-/* Read the transmitted data of an EM4x50 tag
+/* Read the transmitted data of an EM4x50 tag from the graphbuffer
  * Format:
  *
  *  XXXXXXXX [row parity bit (even)] <- 8 bits plus parity
@@ -498,53 +499,122 @@ int CmdEM4x50Read(const char *Cmd)
 	return EM4x50Read(Cmd, true);
 }
 
-int CmdReadWord(const char *Cmd)
-{
-	int Word = -1; //default to invalid word
-	UsbCommand c;
+int usage_lf_em_read(void) {
+	PrintAndLog("Read EM4x05/EM4x69.  Tag must be on antenna. ");
+	PrintAndLog("");
+	PrintAndLog("Usage:  lf em readword [h] <address> <pwd>");
+	PrintAndLog("Options:");
+	PrintAndLog("       h         - this help");
+	PrintAndLog("       address   - memory address to read. (0-15)");
+	PrintAndLog("       pwd       - password (hex) (optional)");
+	PrintAndLog("samples:");
+	PrintAndLog("      lf em readword 1");
+	PrintAndLog("      lf em readword 1 11223344");
+	return 0;
+}
+int CmdReadWord(const char *Cmd) {
+	int addr, pwd;
+	bool usePwd = false;
+	uint8_t ctmp = param_getchar(Cmd, 0);
+	if ( strlen(Cmd) == 0 || ctmp == 'H' || ctmp == 'h' ) return usage_lf_em_read();
+
+	addr = param_get8ex(Cmd, 0, -1, 10);
+	pwd =  param_get32ex(Cmd, 1, -1, 16);
 	
-	sscanf(Cmd, "%d", &Word);
-	
-	if ( (Word > 15) | (Word < 0) ) {
-		PrintAndLog("Word must be between 0 and 15");
+	if ( (addr > 15) || (addr < 0 ) || ( addr == -1) ) {
+		PrintAndLog("Address must be between 0 and 15");
 		return 1;
 	}
+	if ( pwd == -1 )
+		PrintAndLog("Reading address %d", addr);
+	else {
+		usePwd = true;
+		PrintAndLog("Reading address %d | password %08X", addr, pwd);
+	}
 	
-	PrintAndLog("Reading word %d", Word);
-	
-	c.cmd = CMD_EM4X_READ_WORD;
-	c.d.asBytes[0] = 0x0; //Normal mode
-	c.arg[0] = 0;
-	c.arg[1] = Word;
-	c.arg[2] = 0;
+	UsbCommand c = {CMD_EM4X_READ_WORD, {addr, pwd, usePwd}};
+	clearCommandBuffer();
 	SendCommand(&c);
+	UsbCommand resp;	
+	if (!WaitForResponseTimeout(CMD_ACK, &resp, 2500)){
+		PrintAndLog("Command timed out");
+		return -1;
+	}
+	
+	uint8_t got[6000]; // 8 bit preamble + 32 bit word response (max clock (128) * 40bits = 5120 samples)
+	GetFromBigBuf(got, sizeof(got), 0);
+	if ( !WaitForResponseTimeout(CMD_ACK, NULL, 8000) ) {
+		PrintAndLog("command execution time out");
+		return 0;
+	}
+	setGraphBuf(got, sizeof(got));
+	//todo: demodulate read data 
+	return 1;
+}
+
+int usage_lf_em_write(void) {
+	PrintAndLog("Write EM4x05/EM4x69.  Tag must be on antenna. ");
+	PrintAndLog("");
+	PrintAndLog("Usage:  lf em writeword [h] <address> <data> <pwd>");
+	PrintAndLog("Options:");
+	PrintAndLog("       h         - this help");
+	PrintAndLog("       address   - memory address to write to. (0-15)");
+	PrintAndLog("       data      - data to write (hex)");	
+	PrintAndLog("       pwd       - password (hex) (optional)");
+	PrintAndLog("samples:");
+	PrintAndLog("      lf em writeword 1");
+	PrintAndLog("      lf em writeword 1 deadc0de 11223344");
+	return 0;
+}
+int CmdWriteWord(const char *Cmd) {
+	uint8_t ctmp = param_getchar(Cmd, 0);
+	if ( strlen(Cmd) == 0 || ctmp == 'H' || ctmp == 'h' ) return usage_lf_em_write();
+	
+	bool usePwd = false;
+		
+	int addr = 16; // default to invalid address
+	int data = 0xFFFFFFFF; // default to blank data
+	int pwd = 0xFFFFFFFF; // default to blank password
+	
+	addr = param_get8ex(Cmd, 0, -1, 10);
+	data = param_get32ex(Cmd, 1, -1, 16);
+	pwd =  param_get32ex(Cmd, 2, -1, 16);
+	
+	
+	if ( (addr > 15) || (addr < 0 ) || ( addr == -1) ) {
+		PrintAndLog("Address must be between 0 and 15");
+		return 1;
+	}
+	if ( pwd == -1 )
+		PrintAndLog("Writing address %d data %08X", addr, data);	
+	else {
+		usePwd = true;
+		PrintAndLog("Writing address %d data %08X using password %08X", addr, data, pwd);		
+	}
+	
+	uint16_t flag = (addr << 8 ) | usePwd;
+	
+	UsbCommand c = {CMD_EM4X_WRITE_WORD, {flag, data, pwd}};
+	clearCommandBuffer();
+	SendCommand(&c);
+	UsbCommand resp;	
+	if (!WaitForResponseTimeout(CMD_ACK, &resp, 1000)){
+		PrintAndLog("Error occurred, device did not respond during write operation.");
+		return -1;
+	}
+	//get response if there is one
+	uint8_t got[6000]; // 8 bit preamble + 32 bit word response (max clock (128) * 40bits = 5120 samples)
+	GetFromBigBuf(got, sizeof(got), 0);
+	if ( !WaitForResponseTimeout(CMD_ACK, NULL, 8000) ) {
+		PrintAndLog("command execution time out");
+		return 0;
+	}
+	setGraphBuf(got, sizeof(got));
+	//todo: check response for 00001010 then write data for write confirmation!
 	return 0;
 }
 
-int CmdReadWordPWD(const char *Cmd)
-{
-	int Word = -1; //default to invalid word
-	int Password = 0xFFFFFFFF; //default to blank password
-	UsbCommand c;
-	
-	sscanf(Cmd, "%d %x", &Word, &Password);
-	
-	if ( (Word > 15) | (Word < 0) ) {
-		PrintAndLog("Word must be between 0 and 15");
-		return 1;
-	}
-	
-	PrintAndLog("Reading word %d with password %08X", Word, Password);
-	
-	c.cmd = CMD_EM4X_READ_WORD;
-	c.d.asBytes[0] = 0x1; //Password mode
-	c.arg[0] = 0;
-	c.arg[1] = Word;
-	c.arg[2] = Password;
-	SendCommand(&c);
-	return 0;
-}
-
+/*
 int CmdWriteWord(const char *Cmd)
 {
 	int Word = 16; //default to invalid block
@@ -593,7 +663,7 @@ int CmdWriteWordPWD(const char *Cmd)
 	SendCommand(&c);
 	return 0;
 }
-
+*/
 static command_t CommandTable[] =
 {
 	{"help", CmdHelp, 1, "This help"},
@@ -603,11 +673,11 @@ static command_t CommandTable[] =
 	{"em410xwatch", CmdEM410xWatch, 0, "['h'] -- Watches for EM410x 125/134 kHz tags (option 'h' for 134)"},
 	{"em410xspoof", CmdEM410xWatchnSpoof, 0, "['h'] --- Watches for EM410x 125/134 kHz tags, and replays them. (option 'h' for 134)" },
 	{"em410xwrite", CmdEM410xWrite, 0, "<UID> <'0' T5555> <'1' T55x7> [clock rate] -- Write EM410x UID to T5555(Q5) or T55x7 tag, optionally setting clock rate"},
-	{"em4x50read", CmdEM4x50Read, 1, "Extract data from EM4x50 tag"},
-	{"readword", CmdReadWord, 1, "<Word> -- Read EM4xxx word data"},
-	{"readwordPWD", CmdReadWordPWD, 1, "<Word> <Password> -- Read EM4xxx word data in password mode"},
-	{"writeword", CmdWriteWord, 1, "<Data> <Word> -- Write EM4xxx word data"},
-	{"writewordPWD", CmdWriteWordPWD, 1, "<Data> <Word> <Password> -- Write EM4xxx word data in password mode"},
+	{"em4x50read", CmdEM4x50Read, 1, "demod data from EM4x50 tag from the graph buffer"},
+	{"readword", CmdReadWord, 1, "<Word> (pwd) -- Read EM4x05/EM4x69 word data"},
+	//{"readwordPWD", CmdReadWordPWD, 1, "<Word> <Password> -- Read EM4xxx word data in password mode"},
+	{"writeword", CmdWriteWord, 1, "<Word> <data> (pwd) -- Write EM4x05/EM4x69 word data"},
+	//{"writewordPWD", CmdWriteWordPWD, 1, "<Data> <Word> <Password> -- Write EM4xxx word data in password mode"},
 	{NULL, NULL, 0, NULL}
 };
 
