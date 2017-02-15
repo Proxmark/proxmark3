@@ -140,7 +140,7 @@ int CmdAWIDClone(const char *Cmd) {
 	if (sscanf(Cmd, "%u %u", &fc, &cn ) != 2) return usage_lf_awid_clone();
 
 	if (param_getchar(Cmd, 3) == 'Q' || param_getchar(Cmd, 3) == 'q')
-		blocks[0] = T5555_MODULATION_FSK2 | T5555_INVERT_OUTPUT | 50<<T5555_BITRATE_SHIFT | 3<<T5555_MAXBLOCK_SHIFT;
+		blocks[0] = T5555_MODULATION_FSK2 | T5555_INVERT_OUTPUT | ((50-2)>>1)<<T5555_BITRATE_SHIFT | 3<<T5555_MAXBLOCK_SHIFT;
 
 	if ((fc & 0xFF) != fc) {
 		fc &= 0xFF;
