@@ -514,17 +514,17 @@ int usage_lf_em_read(void) {
 }
 
 //search for given preamble in given BitStream and return success=1 or fail=0 and startIndex
-uint8_t EMpreambleSearch(uint8_t *BitStream, uint8_t *preamble, size_t pLen, size_t size, size_t *startIdx)
-{
+uint8_t EMpreambleSearch(uint8_t *BitStream, uint8_t *preamble, size_t pLen, size_t size, size_t *startIdx) {
 	// Sanity check.  If preamble length is bigger than bitstream length.
 	if ( size <= pLen ) return 0;
 	// em only sends preamble once, so look for it once in the first x bits
 	uint8_t foundCnt = 0;
-	for (int idx = 0; idx < size - pLen; idx++){
+	for (size_t idx = 0; idx < size - pLen; idx++){
 		if (memcmp(BitStream+idx, preamble, pLen) == 0){
 			//first index found
 			foundCnt++;
 			if (foundCnt == 1) {
+				if (g_debugMode) PrintAndLog("DEBUG: preamble found at %u", idx);
 				*startIdx = idx;
 				return 1;
 			}
@@ -542,6 +542,7 @@ int demodEM4x05resp(uint8_t bitsNeeded) {
 	DemodBufferLen = 0x00;
 	// skip first two 0 bits as they might have been missed in the demod 
 	uint8_t preamble[6] = {0,0,1,0,1,0};
+	size_t startIdx = 0; 
 
 	// test for FSK wave (easiest to 99% ID)
 	if (GetFskClock("", FALSE, FALSE)) {
@@ -552,11 +553,11 @@ int demodEM4x05resp(uint8_t bitsNeeded) {
 		} else {
 			// set size to 10 to only test first 4 positions for the preamble
 			size_t size = (10 > DemodBufferLen) ? DemodBufferLen : 10;
-			size_t startIdx = 0; 
+			startIdx = 0; 
 
 			if (g_debugMode) PrintAndLog("ANS: %d | %u | %u", ans, startIdx, size);
 
-			uint8_t errChk = !EMpreambleSearch(DemodBuffer, preamble, sizeof(preamble), size, &startIdx);
+			uint8_t errChk = EMpreambleSearch(DemodBuffer, preamble, sizeof(preamble), size, &startIdx);
 			if ( errChk == 0) {
 				if (g_debugMode) PrintAndLog("DEBUG: Error - EM4305 preamble not found :: %d", startIdx);
 			} else {
@@ -577,18 +578,19 @@ int demodEM4x05resp(uint8_t bitsNeeded) {
 	// more common than biphase
 	if (!demodFound) {
 		DemodBufferLen = 0x00;
+		bool stcheck = false;
 		// try manchester - NOTE: ST only applies to T55x7 tags.
-		ans = ASKDemod_ext("0,0,1", false, false, 1, false);
+		ans = ASKDemod_ext("0,0,1", false, false, 1, &stcheck);
 		if (!ans) {
 			if (g_debugMode) PrintAndLog("DEBUG: Error - EM4305: ASK/Manchester Demod failed");
 		} else {
 			// set size to 10 to only test first 4 positions for the preamble
 			size_t size = (10 > DemodBufferLen) ? DemodBufferLen : 10;
-			size_t startIdx = 0; 
+			startIdx = 0; 
 
 			if (g_debugMode) PrintAndLog("ANS: %d | %u | %u", ans, startIdx, size);
 
-			uint8_t errChk = !EMpreambleSearch(DemodBuffer, preamble, sizeof(preamble), size, &startIdx);
+			uint8_t errChk = EMpreambleSearch(DemodBuffer, preamble, sizeof(preamble), size, &startIdx);
 			if ( errChk == 0) {
 				if (g_debugMode) PrintAndLog("DEBUG: Error - EM4305 preamble not found :: %d", startIdx);
 			} else {
@@ -608,11 +610,11 @@ int demodEM4x05resp(uint8_t bitsNeeded) {
 		} else {
 			// set size to 10 to only test first 4 positions for the preamble
 			size_t size = (10 > DemodBufferLen) ? DemodBufferLen : 10;
-			size_t startIdx = 0; 
+			startIdx = 0; 
 
 			if (g_debugMode) PrintAndLog("ANS: %d | %u | %u", ans, startIdx, size);
 
-			uint8_t errChk = !EMpreambleSearch(DemodBuffer, preamble, sizeof(preamble), size, &startIdx);
+			uint8_t errChk = EMpreambleSearch(DemodBuffer, preamble, sizeof(preamble), size, &startIdx);
 			if ( errChk == 0) {
 				if (g_debugMode) PrintAndLog("DEBUG: Error - EM4305 preamble not found :: %d", startIdx);
 			} else {
@@ -632,11 +634,11 @@ int demodEM4x05resp(uint8_t bitsNeeded) {
 		} else {
 			// set size to 10 to only test first 4 positions for the preamble
 			size_t size = (10 > DemodBufferLen) ? DemodBufferLen : 10;
-			size_t startIdx = 0; 
+			startIdx = 0; 
 
 			if (g_debugMode) PrintAndLog("ANS: %d | %u | %u", ans, startIdx, size);
 
-			uint8_t errChk = !EMpreambleSearch(DemodBuffer, preamble, sizeof(preamble), size, &startIdx);
+			uint8_t errChk = EMpreambleSearch(DemodBuffer, preamble, sizeof(preamble), size, &startIdx);
 			if ( errChk == 0) {
 				if (g_debugMode) PrintAndLog("DEBUG: Error - EM4305 preamble not found :: %d", startIdx);
 			} else {
@@ -649,7 +651,7 @@ int demodEM4x05resp(uint8_t bitsNeeded) {
 
 	if (demodFound && bitsNeeded < DemodBufferLen) {
 		if (bitsNeeded > 0) {
-			setDemodBuf(DemodBuffer + ans + sizeof(preamble), bitsNeeded, 0);
+			setDemodBuf(DemodBuffer + startIdx + sizeof(preamble), bitsNeeded, 0);
 			CmdPrintDemodBuff("x");			
 		}
 		return 1;
@@ -701,7 +703,7 @@ int CmdReadWord(const char *Cmd) {
 
 	//attempt demod:
 	//need 32 bits from a read word
-	return demodEM4x05resp(32);
+	return demodEM4x05resp(44);
 }
 
 int usage_lf_em_write(void) {
