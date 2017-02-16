@@ -110,6 +110,23 @@ void print_hex(const uint8_t * data, const size_t len)
 	printf("\n");
 }
 
+void print_hex_break(const uint8_t *data, const size_t len, uint8_t breaks) {
+
+	int rownum = 0;
+	printf("[%02d] | ", rownum);
+	for (int i = 0; i < len; ++i) {
+
+		printf("%02X ", data[i]);
+		
+		// check if a line break is needed
+		if ( breaks > 0 && !((i+1) % breaks) && (i+1 < len) ) {
+			++rownum;
+			printf("\n[%02d] | ", rownum);
+		}
+	}
+	printf("\n");
+}
+
 char *sprint_hex(const uint8_t *data, const size_t len) {
 	
 	int maxLen = ( len > 1024/3) ? 1024/3 : len;
@@ -139,7 +156,7 @@ char *sprint_bin_break(const uint8_t *data, const size_t len, const uint8_t brea
 
 	size_t in_index = 0;
 	// loop through the out_index to make sure we don't go too far
-	for (size_t out_index=0; out_index < max_len; out_index++) {
+	for (size_t out_index=0; out_index < max_len-1; out_index++) {
 		// set character - (should be binary but verify it isn't more than 1 digit)
 		if (data[in_index]<10)
 			sprintf(tmp++, "%u", (unsigned int) data[in_index]);
@@ -158,6 +175,41 @@ char *sprint_bin_break(const uint8_t *data, const size_t len, const uint8_t brea
 char *sprint_bin(const uint8_t *data, const size_t len) {
 	return sprint_bin_break(data, len, 0);
 }
+
+char *sprint_hex_ascii(const uint8_t *data, const size_t len) {
+	static char buf[1024];
+	char *tmp = buf;
+	memset(buf, 0x00, 1024);
+	size_t max_len = (len > 1010) ? 1010 : len;
+
+	sprintf(tmp, "%s| ", sprint_hex(data, max_len) );
+	
+	size_t i = 0;
+	size_t pos = (max_len * 3)+2;
+	while(i < max_len){
+		char c = data[i];
+		if ( (c < 32) || (c == 127))
+			c = '.';
+		sprintf(tmp+pos+i, "%c",  c);
+		++i;
+	}
+	return buf;
+}
+
+char *sprint_ascii(const uint8_t *data, const size_t len) {
+	static char buf[1024];
+	char *tmp = buf;
+	memset(buf, 0x00, 1024);
+	size_t max_len = (len > 1010) ? 1010 : len;
+	size_t i = 0;
+	while(i < max_len){
+		char c = data[i];
+		tmp[i] = ((c < 32) || (c == 127)) ? '.' : c;
+		++i;
+	}
+	return buf;
+}
+
 void num_to_bytes(uint64_t n, size_t len, uint8_t* dest)
 {
 	while (len--) {
@@ -184,6 +236,15 @@ void num_to_bytebits(uint64_t	n, size_t len, uint8_t *dest) {
 	}
 }
 
+//least significant bit first
+void num_to_bytebitsLSBF(uint64_t n, size_t len, uint8_t *dest) {
+	for(int i = 0 ; i < len ; ++i) {
+		dest[i] =  n & 1;
+		n >>= 1;
+	}
+}
+
+
 // aa,bb,cc,dd,ee,ff,gg,hh, ii,jj,kk,ll,mm,nn,oo,pp
 // to
 // hh,gg,ff,ee,dd,cc,bb,aa, pp,oo,nn,mm,ll,kk,jj,ii
@@ -198,6 +259,16 @@ uint8_t *SwapEndian64(const uint8_t *src, const size_t len, const uint8_t blockS
 		}
 	}
 	return tmp;
+}
+
+// takes a uint8_t src array, for len items and reverses the byte order in blocksizes (8,16,32,64), 
+// returns: the dest array contains the reordered src array.
+void SwapEndian64ex(const uint8_t *src, const size_t len, const uint8_t blockSize, uint8_t *dest){
+	for (uint8_t block=0; block < (uint8_t)(len/blockSize); block++){
+		for (size_t i = 0; i < blockSize; i++){
+			dest[i+(blockSize*block)] = src[(blockSize-1-i)+(blockSize*block)];
+		}
+	}
 }
 
 //assumes little endian
@@ -332,8 +403,6 @@ uint64_t param_get64ex(const char *line, int paramnum, int deflt, int base)
 		return strtoull(&line[bg], NULL, base);
 	else
 		return deflt;
-
-	return 0;
 }
 
 int param_gethex(const char *line, int paramnum, uint8_t * data, int hexcnt)
@@ -490,6 +559,7 @@ void wiegand_add_parity(uint8_t *target, uint8_t *source, uint8_t length)
     *(target)= GetParity(source + length / 2, ODD, length / 2);
 }
 
+// xor two arrays together for len items.  The dst array contains the new xored values.
 void xor(unsigned char *dst, unsigned char *src, size_t len) {
    for( ; len > 0; len--,dst++,src++)
        *dst ^= *src;
