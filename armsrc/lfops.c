@@ -1573,12 +1573,12 @@ void SendForward(uint8_t fwd_bit_count) {
 
 	// Set up FPGA, 125kHz
 	LFSetupFPGAForADC(95, true);
-
+	
 	// force 1st mod pulse (start gap must be longer for 4305)
 	fwd_bit_sz--; //prepare next bit modulation
 	fwd_write_ptr++;
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF); // field off
-	SpinDelayUs(56*8); //55 cycles off (8us each)for 4305
+	SpinDelayUs(55*8); //55 cycles off (8us each)for 4305
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_LF_ADC | FPGA_LF_ADC_READER_FIELD);//field on
 	SpinDelayUs(16*8); //16 cycles on (8us each)
 
@@ -1628,7 +1628,7 @@ void EM4xReadWord(uint8_t Address, uint32_t Pwd, uint8_t PwdMode) {
 	SendForward(fwd_bit_count);
 
 	// Now do the acquisition
-	DoAcquisition_config(TRUE);
+	DoAcquisition_default(30,TRUE);
 	
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF); // field off
 	LED_A_OFF();
@@ -1656,10 +1656,10 @@ void EM4xWriteWord(uint32_t flag, uint32_t Data, uint32_t Pwd) {
 	SendForward(fwd_bit_count);
 
 	//Wait for write to complete
-	SpinDelay(20);
+	//SpinDelay(5);
 
 	//Capture response if one exists
-	DoAcquisition_config(TRUE);
+	DoAcquisition_default(30, TRUE);
 
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF); // field off
 	LED_A_OFF();

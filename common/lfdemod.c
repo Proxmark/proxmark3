@@ -62,7 +62,7 @@ uint8_t parityTest(uint32_t bits, uint8_t bitLen, uint8_t pType)
 	for (uint8_t i = 0; i < bitLen; i++){
 		ans ^= ((bits >> i) & 1);
 	}
-	//PrintAndLog("DEBUG: ans: %d, ptype: %d",ans,pType);
+	if (g_debugMode) prnt("DEBUG: ans: %d, ptype: %d, bits: %08X",ans,pType,bits);
 	return (ans == pType);
 }
 
@@ -73,11 +73,13 @@ size_t removeParity(uint8_t *BitStream, size_t startIdx, uint8_t pLen, uint8_t p
 {
 	uint32_t parityWd = 0;
 	size_t j = 0, bitCnt = 0;
-	for (int word = 0; word < (bLen); word+=pLen){
-		for (int bit=0; bit < pLen; bit++){
+	for (int word = 0; word < (bLen); word+=pLen) {
+		for (int bit=0; bit < pLen; bit++) {
 			parityWd = (parityWd << 1) | BitStream[startIdx+word+bit];
 			BitStream[j++] = (BitStream[startIdx+word+bit]);
 		}
+		if (word+pLen >= bLen) break;
+
 		j--; // overwrite parity with next data
 		// if parity fails then return 0
 		switch (pType) {

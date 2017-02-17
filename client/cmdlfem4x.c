@@ -502,21 +502,21 @@ int CmdEM4x50Read(const char *Cmd)
 int usage_lf_em_read(void) {
 	PrintAndLog("Read EM4x05/EM4x69.  Tag must be on antenna. ");
 	PrintAndLog("");
-	PrintAndLog("Usage:  lf em readword [h] <address> <pwd>");
+	PrintAndLog("Usage:  lf em 4x05readword [h] <address> <pwd>");
 	PrintAndLog("Options:");
 	PrintAndLog("       h         - this help");
 	PrintAndLog("       address   - memory address to read. (0-15)");
 	PrintAndLog("       pwd       - password (hex) (optional)");
 	PrintAndLog("samples:");
-	PrintAndLog("      lf em readword 1");
-	PrintAndLog("      lf em readword 1 11223344");
+	PrintAndLog("      lf em 4x05readword 1");
+	PrintAndLog("      lf em 4x05readword 1 11223344");
 	return 0;
 }
 
 //search for given preamble in given BitStream and return success=1 or fail=0 and startIndex
-uint8_t EMpreambleSearch(uint8_t *BitStream, uint8_t *preamble, size_t pLen, size_t size, size_t *startIdx) {
+bool EMpreambleSearch(uint8_t *BitStream, uint8_t *preamble, size_t pLen, size_t size, size_t *startIdx) {
 	// Sanity check.  If preamble length is bigger than bitstream length.
-	if ( size <= pLen ) return 0;
+	if ( size <= pLen ) return false;
 	// em only sends preamble once, so look for it once in the first x bits
 	uint8_t foundCnt = 0;
 	for (size_t idx = 0; idx < size - pLen; idx++){
@@ -526,23 +526,62 @@ uint8_t EMpreambleSearch(uint8_t *BitStream, uint8_t *preamble, size_t pLen, siz
 			if (foundCnt == 1) {
 				if (g_debugMode) PrintAndLog("DEBUG: preamble found at %u", idx);
 				*startIdx = idx;
-				return 1;
+
+				return true;
 			}
 		}
 	}
-	return 0;
+	return false;
+}
+
+bool EM4x05testDemodReadData(uint32_t *word, bool readCmd) {
+	// skip first two 0 bits as they might have been missed in the demod 
+	uint8_t preamble[6] = {0,0,1,0,1,0};
+	size_t startIdx = 0;
+	// set size to 10 to only test first 4 positions for the preamble
+	size_t size = (10 > DemodBufferLen) ? DemodBufferLen : 10;
+	startIdx = 0; 
+
+	//test preamble
+	bool errChk = EMpreambleSearch(DemodBuffer, preamble, sizeof(preamble), size, &startIdx);
+	if ( !errChk ) {
+		if (g_debugMode) PrintAndLog("DEBUG: Error - EM4305 preamble not found :: %d", startIdx);
+		return false;
+	}
+	if (readCmd) {
+		//test for even parity bits.
+		size = removeParity(DemodBuffer, startIdx + sizeof(preamble),9,0,44);
+		if (size == 0) {
+			if (g_debugMode) PrintAndLog("DEBUG: Error - Parity not detected");
+			return false;
+		}
+
+		//todo test last 8 bits for even parity || (xor)
+
+		setDemodBuf(DemodBuffer, 40, 0);
+
+		*word = bytebits_to_byteLSBF(DemodBuffer   , 32);
+
+		uint8_t lo  = (uint8_t) bytebits_to_byteLSBF(DemodBuffer     , 8);
+		uint8_t lo2 = (uint8_t) bytebits_to_byteLSBF(DemodBuffer +  8, 8);
+		uint8_t hi  = (uint8_t) bytebits_to_byteLSBF(DemodBuffer + 16, 8);
+		uint8_t hi2 = (uint8_t) bytebits_to_byteLSBF(DemodBuffer + 24, 8);
+		uint8_t cs  = (uint8_t) bytebits_to_byteLSBF(DemodBuffer + 32, 8);
+		uint8_t cs2 = lo ^ lo2 ^ hi ^ hi2;
+		if (g_debugMode) PrintAndLog("EM4x05/4x69 : %08X CS: %02X %s",*word,cs, (cs2==cs) ? "Passed" : "Failed");
+
+		return (cs2==cs) ? true : false;
+	}
+	return true;
 }
 
 // FSK, PSK, ASK/MANCHESTER, ASK/BIPHASE, ASK/DIPHASE 
 // should cover 90% of known used configs
 // the rest will need to be manually demoded for now...
-int demodEM4x05resp(uint8_t bitsNeeded) {
+int demodEM4x05resp(uint32_t *word, bool readCmd) {
 	int ans = 0;
 	bool demodFound = false;
 	DemodBufferLen = 0x00;
-	// skip first two 0 bits as they might have been missed in the demod 
-	uint8_t preamble[6] = {0,0,1,0,1,0};
-	size_t startIdx = 0; 
 
 	// test for FSK wave (easiest to 99% ID)
 	if (GetFskClock("", FALSE, FALSE)) {
@@ -551,19 +590,8 @@ int demodEM4x05resp(uint8_t bitsNeeded) {
 		if (!ans) {
 			if (g_debugMode) PrintAndLog("DEBUG: Error - EM4305: FSK Demod failed");
 		} else {
-			// set size to 10 to only test first 4 positions for the preamble
-			size_t size = (10 > DemodBufferLen) ? DemodBufferLen : 10;
-			startIdx = 0; 
-
-			if (g_debugMode) PrintAndLog("ANS: %d | %u | %u", ans, startIdx, size);
-
-			uint8_t errChk = EMpreambleSearch(DemodBuffer, preamble, sizeof(preamble), size, &startIdx);
-			if ( errChk == 0) {
-				if (g_debugMode) PrintAndLog("DEBUG: Error - EM4305 preamble not found :: %d", startIdx);
-			} else {
-				//can't test size because the preamble doesn't repeat :(
-				//meaning chances of false positives are high.
-				demodFound = true;
+			if (EM4x05testDemodReadData(word, readCmd)) {
+				return 1;
 			}
 		}
 	}
@@ -584,19 +612,8 @@ int demodEM4x05resp(uint8_t bitsNeeded) {
 		if (!ans) {
 			if (g_debugMode) PrintAndLog("DEBUG: Error - EM4305: ASK/Manchester Demod failed");
 		} else {
-			// set size to 10 to only test first 4 positions for the preamble
-			size_t size = (10 > DemodBufferLen) ? DemodBufferLen : 10;
-			startIdx = 0; 
-
-			if (g_debugMode) PrintAndLog("ANS: %d | %u | %u", ans, startIdx, size);
-
-			uint8_t errChk = EMpreambleSearch(DemodBuffer, preamble, sizeof(preamble), size, &startIdx);
-			if ( errChk == 0) {
-				if (g_debugMode) PrintAndLog("DEBUG: Error - EM4305 preamble not found :: %d", startIdx);
-			} else {
-				//can't test size because the preamble doesn't repeat :(
-				//meaning chances of false positives are high.
-				demodFound = true;
+			if (EM4x05testDemodReadData(word, readCmd)) {
+				return 1;
 			}
 		}
 	}
@@ -608,19 +625,8 @@ int demodEM4x05resp(uint8_t bitsNeeded) {
 		if (!ans) { 
 			if (g_debugMode) PrintAndLog("DEBUG: Error - EM4305: ASK/biphase Demod failed");
 		} else {
-			// set size to 10 to only test first 4 positions for the preamble
-			size_t size = (10 > DemodBufferLen) ? DemodBufferLen : 10;
-			startIdx = 0; 
-
-			if (g_debugMode) PrintAndLog("ANS: %d | %u | %u", ans, startIdx, size);
-
-			uint8_t errChk = EMpreambleSearch(DemodBuffer, preamble, sizeof(preamble), size, &startIdx);
-			if ( errChk == 0) {
-				if (g_debugMode) PrintAndLog("DEBUG: Error - EM4305 preamble not found :: %d", startIdx);
-			} else {
-				//can't test size because the preamble doesn't repeat :(
-				//meaning chances of false positives are high.
-				demodFound = true;
+			if (EM4x05testDemodReadData(word, readCmd)) {
+				return 1;
 			}
 		}
 	}
@@ -632,53 +638,23 @@ int demodEM4x05resp(uint8_t bitsNeeded) {
 		if (!ans) { 
 			if (g_debugMode) PrintAndLog("DEBUG: Error - EM4305: ASK/biphase Demod failed");
 		} else {
-			// set size to 10 to only test first 4 positions for the preamble
-			size_t size = (10 > DemodBufferLen) ? DemodBufferLen : 10;
-			startIdx = 0; 
-
-			if (g_debugMode) PrintAndLog("ANS: %d | %u | %u", ans, startIdx, size);
-
-			uint8_t errChk = EMpreambleSearch(DemodBuffer, preamble, sizeof(preamble), size, &startIdx);
-			if ( errChk == 0) {
-				if (g_debugMode) PrintAndLog("DEBUG: Error - EM4305 preamble not found :: %d", startIdx);
-			} else {
-				//can't test size because the preamble doesn't repeat :(
-				//meaning chances of false positives are high.
-				demodFound = true;
+			if (EM4x05testDemodReadData(word, readCmd)) {
+				return 1;
 			}
 		}
 	}
 
-	if (demodFound && bitsNeeded < DemodBufferLen) {
+	/*if (demodFound && bitsNeeded < DemodBufferLen) {
 		if (bitsNeeded > 0) {
 			setDemodBuf(DemodBuffer + startIdx + sizeof(preamble), bitsNeeded, 0);
 			CmdPrintDemodBuff("x");			
 		}
 		return 1;
-	}
+	}*/
 	return -1;
 }
 
-int CmdReadWord(const char *Cmd) {
-	int addr, pwd;
-	bool usePwd = false;
-	uint8_t ctmp = param_getchar(Cmd, 0);
-	if ( strlen(Cmd) == 0 || ctmp == 'H' || ctmp == 'h' ) return usage_lf_em_read();
-
-	addr = param_get8ex(Cmd, 0, -1, 10);
-	pwd =  param_get32ex(Cmd, 1, -1, 16);
-	
-	if ( (addr > 15) || (addr < 0 ) || ( addr == -1) ) {
-		PrintAndLog("Address must be between 0 and 15");
-		return 1;
-	}
-	if ( pwd == -1 )
-		PrintAndLog("Reading address %d", addr);
-	else {
-		usePwd = true;
-		PrintAndLog("Reading address %d | password %08X", addr, pwd);
-	}
-	
+int EM4x05ReadWord(uint8_t addr, uint32_t pwd, bool usePwd) {
 	UsbCommand c = {CMD_EM4X_READ_WORD, {addr, pwd, usePwd}};
 	clearCommandBuffer();
 	SendCommand(&c);
@@ -700,47 +676,115 @@ int CmdReadWord(const char *Cmd) {
 		PrintAndLog("no tag not found");
 		return -1;
 	}
-
 	//attempt demod:
-	//need 32 bits from a read word
-	return demodEM4x05resp(44);
+	uint32_t wordData = 0;
+	int success = demodEM4x05resp(&wordData, true);
+	if (success == 1) PrintAndLog("Got Address %02d | %08X",addr,wordData);
+	return success;
 }
+
+int CmdEM4x05ReadWord(const char *Cmd) {
+	uint8_t addr;
+	uint32_t pwd;
+	bool usePwd = false;
+	uint8_t ctmp = param_getchar(Cmd, 0);
+	if ( strlen(Cmd) == 0 || ctmp == 'H' || ctmp == 'h' ) return usage_lf_em_read();
+
+	addr = param_get8ex(Cmd, 0, 50, 10);
+	// for now use default input of 1 as invalid (unlikely 1 will be a valid password...)
+	pwd =  param_get32ex(Cmd, 1, 1, 16);
+	
+	if ( (addr > 15) ) {
+		PrintAndLog("Address must be between 0 and 15");
+		return 1;
+	}
+	if ( pwd == 1 )
+		PrintAndLog("Reading address %02u", addr);
+	else {
+		usePwd = true;
+		PrintAndLog("Reading address %02u | password %08X", addr, pwd);
+	}
+	return EM4x05ReadWord(addr, pwd, usePwd);
+}
+
+int usage_lf_em_dump(void) {
+	PrintAndLog("Dump EM4x05/EM4x69.  Tag must be on antenna. ");
+	PrintAndLog("");
+	PrintAndLog("Usage:  lf em 4x05dump [h] <pwd>");
+	PrintAndLog("Options:");
+	PrintAndLog("       h         - this help");
+	PrintAndLog("       pwd       - password (hex) (optional)");
+	PrintAndLog("samples:");
+	PrintAndLog("      lf em 4x05dump");
+	PrintAndLog("      lf em 4x05dump 11223344");
+	return 0;
+}
+
+int CmdEM4x05dump(const char *Cmd) {
+	uint8_t addr = 0;
+	uint32_t pwd;
+	bool usePwd = false;
+	uint8_t ctmp = param_getchar(Cmd, 0);
+	if ( ctmp == 'H' || ctmp == 'h' ) return usage_lf_em_dump();
+
+	// for now use default input of 1 as invalid (unlikely 1 will be a valid password...)
+	pwd = param_get32ex(Cmd, 0, 1, 16);
+	
+	if ( pwd != 1 ) {
+		usePwd = true;
+	}
+	int success = 1;
+	for (; addr < 16; addr++) {
+		if (addr == 2) {
+			if (usePwd) {
+				PrintAndLog("PWD Address %02u | %08X",addr,pwd);
+			} else {
+				PrintAndLog("PWD Address 02 | cannot read");
+			}
+		} else {
+			success &= EM4x05ReadWord(addr, pwd, usePwd);
+		}
+	}
+
+	return success;
+}
+
 
 int usage_lf_em_write(void) {
 	PrintAndLog("Write EM4x05/EM4x69.  Tag must be on antenna. ");
 	PrintAndLog("");
-	PrintAndLog("Usage:  lf em writeword [h] <address> <data> <pwd>");
+	PrintAndLog("Usage:  lf em 4x05writeword [h] <address> <data> <pwd>");
 	PrintAndLog("Options:");
 	PrintAndLog("       h         - this help");
 	PrintAndLog("       address   - memory address to write to. (0-15)");
 	PrintAndLog("       data      - data to write (hex)");	
 	PrintAndLog("       pwd       - password (hex) (optional)");
 	PrintAndLog("samples:");
-	PrintAndLog("      lf em writeword 1");
-	PrintAndLog("      lf em writeword 1 deadc0de 11223344");
+	PrintAndLog("      lf em 4x05writeword 1");
+	PrintAndLog("      lf em 4x05writeword 1 deadc0de 11223344");
 	return 0;
 }
 
-int CmdWriteWord(const char *Cmd) {
+int CmdEM4x05WriteWord(const char *Cmd) {
 	uint8_t ctmp = param_getchar(Cmd, 0);
 	if ( strlen(Cmd) == 0 || ctmp == 'H' || ctmp == 'h' ) return usage_lf_em_write();
 	
 	bool usePwd = false;
 		
-	int addr = 16; // default to invalid address
-	int data = 0xFFFFFFFF; // default to blank data
-	int pwd = 0xFFFFFFFF; // default to blank password
+	uint8_t addr = 16; // default to invalid address
+	uint32_t data = 0xFFFFFFFF; // default to blank data
+	uint32_t pwd = 0xFFFFFFFF; // default to blank password
 	
-	addr = param_get8ex(Cmd, 0, -1, 10);
-	data = param_get32ex(Cmd, 1, -1, 16);
-	pwd =  param_get32ex(Cmd, 2, -1, 16);
+	addr = param_get8ex(Cmd, 0, 16, 10);
+	data = param_get32ex(Cmd, 1, 0, 16);
+	pwd =  param_get32ex(Cmd, 2, 1, 16);
 	
 	
-	if ( (addr > 15) || (addr < 0 ) || ( addr == -1) ) {
+	if ( (addr > 15) ) {
 		PrintAndLog("Address must be between 0 and 15");
 		return 1;
 	}
-	if ( pwd == -1 )
+	if ( pwd == 1 )
 		PrintAndLog("Writing address %d data %08X", addr, data);	
 	else {
 		usePwd = true;
@@ -753,93 +797,41 @@ int CmdWriteWord(const char *Cmd) {
 	clearCommandBuffer();
 	SendCommand(&c);
 	UsbCommand resp;	
-	if (!WaitForResponseTimeout(CMD_ACK, &resp, 1000)){
+	if (!WaitForResponseTimeout(CMD_ACK, &resp, 2000)){
 		PrintAndLog("Error occurred, device did not respond during write operation.");
 		return -1;
 	}
 	//get response if there is one
 	uint8_t got[6000]; // 8 bit preamble + 32 bit word response (max clock (128) * 40bits = 5120 samples)
 	GetFromBigBuf(got, sizeof(got), 0);
-	if ( !WaitForResponseTimeout(CMD_ACK, NULL, 8000) ) {
+	if ( !WaitForResponseTimeout(CMD_ACK, NULL, 4000) ) {
 		PrintAndLog("command execution time out");
 		return 0;
 	}
 	setGraphBuf(got, sizeof(got));
-	//todo: check response for 00001010 then write data for write confirmation!
-	
+	//check response for 00001010 for write confirmation!	
 	//attempt demod:
-	//need 0 bits demoded (after preamble) to verify write cmd
-	int result = demodEM4x05resp(0);
+	uint32_t dummy = 0;
+	int result = demodEM4x05resp(&dummy,false);
 	if (result == 1) {
 		PrintAndLog("Write Verified");
 	}
 	return result;
 }
 
-/*
-int CmdWriteWord(const char *Cmd)
-{
-	int Word = 16; //default to invalid block
-	int Data = 0xFFFFFFFF; //default to blank data
-	UsbCommand c;
-	
-	sscanf(Cmd, "%x %d", &Data, &Word);
-	
-	if (Word > 15) {
-		PrintAndLog("Word must be between 0 and 15");
-		return 1;
-	}
-	
-	PrintAndLog("Writing word %d with data %08X", Word, Data);
-	
-	c.cmd = CMD_EM4X_WRITE_WORD;
-	c.d.asBytes[0] = 0x0; //Normal mode
-	c.arg[0] = Data;
-	c.arg[1] = Word;
-	c.arg[2] = 0;
-	SendCommand(&c);
-	return 0;
-}
-
-int CmdWriteWordPWD(const char *Cmd)
-{
-	int Word = 16; //default to invalid word
-	int Data = 0xFFFFFFFF; //default to blank data
-	int Password = 0xFFFFFFFF; //default to blank password
-	UsbCommand c;
-	
-	sscanf(Cmd, "%x %d %x", &Data, &Word, &Password);
-	
-	if (Word > 15) {
-		PrintAndLog("Word must be between 0 and 15");
-		return 1;
-	}
-	
-	PrintAndLog("Writing word %d with data %08X and password %08X", Word, Data, Password);
-	
-	c.cmd = CMD_EM4X_WRITE_WORD;
-	c.d.asBytes[0] = 0x1; //Password mode
-	c.arg[0] = Data;
-	c.arg[1] = Word;
-	c.arg[2] = Password;
-	SendCommand(&c);
-	return 0;
-}
-*/
 static command_t CommandTable[] =
 {
 	{"help", CmdHelp, 1, "This help"},
-	{"em410xdemod", CmdEMdemodASK, 0, "[findone] -- Extract ID from EM410x tag (option 0 for continuous loop, 1 for only 1 tag)"},  
-	{"em410xread", CmdEM410xRead, 1, "[clock rate] -- Extract ID from EM410x tag in GraphBuffer"},
-	{"em410xsim", CmdEM410xSim, 0, "<UID> [clock rate] -- Simulate EM410x tag"},
-	{"em410xwatch", CmdEM410xWatch, 0, "['h'] -- Watches for EM410x 125/134 kHz tags (option 'h' for 134)"},
-	{"em410xspoof", CmdEM410xWatchnSpoof, 0, "['h'] --- Watches for EM410x 125/134 kHz tags, and replays them. (option 'h' for 134)" },
-	{"em410xwrite", CmdEM410xWrite, 0, "<UID> <'0' T5555> <'1' T55x7> [clock rate] -- Write EM410x UID to T5555(Q5) or T55x7 tag, optionally setting clock rate"},
-	{"em4x50read", CmdEM4x50Read, 1, "demod data from EM4x50 tag from the graph buffer"},
-	{"readword", CmdReadWord, 1, "<Word> (pwd) -- Read EM4x05/EM4x69 word data"},
-	//{"readwordPWD", CmdReadWordPWD, 1, "<Word> <Password> -- Read EM4xxx word data in password mode"},
-	{"writeword", CmdWriteWord, 1, "<Word> <data> (pwd) -- Write EM4x05/EM4x69 word data"},
-	//{"writewordPWD", CmdWriteWordPWD, 1, "<Data> <Word> <Password> -- Write EM4xxx word data in password mode"},
+	{"410xdemod", CmdEMdemodASK, 0, "[findone] -- Extract ID from EM410x tag (option 0 for continuous loop, 1 for only 1 tag)"},  
+	{"410xread", CmdEM410xRead, 1, "[clock rate] -- Extract ID from EM410x tag in GraphBuffer"},
+	{"410xsim", CmdEM410xSim, 0, "<UID> [clock rate] -- Simulate EM410x tag"},
+	{"410xwatch", CmdEM410xWatch, 0, "['h'] -- Watches for EM410x 125/134 kHz tags (option 'h' for 134)"},
+	{"410xspoof", CmdEM410xWatchnSpoof, 0, "['h'] --- Watches for EM410x 125/134 kHz tags, and replays them. (option 'h' for 134)" },
+	{"410xwrite", CmdEM410xWrite, 0, "<UID> <'0' T5555> <'1' T55x7> [clock rate] -- Write EM410x UID to T5555(Q5) or T55x7 tag, optionally setting clock rate"},
+	{"4x05dump", CmdEM4x05dump, 1, "(pwd) -- Read EM4x05/EM4x69 all word data"},
+	{"4x05readword", CmdEM4x05ReadWord, 1, "<Word> (pwd) -- Read EM4x05/EM4x69 word data"},
+	{"4x05writeword", CmdEM4x05WriteWord, 1, "<Word> <data> (pwd) -- Write EM4x05/EM4x69 word data"},
+	{"4x50read", CmdEM4x50Read, 1, "demod data from EM4x50 tag from the graph buffer"},
 	{NULL, NULL, 0, NULL}
 };
 
