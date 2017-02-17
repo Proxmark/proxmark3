@@ -719,7 +719,12 @@ int CmdEM4x05ReadWord(const char *Cmd) {
 		usePwd = true;
 		PrintAndLog("Reading address %02u | password %08X", addr, pwd);
 	}
-	return EM4x05ReadWord(addr, pwd, usePwd);
+
+	int result = EM4x05ReadWord(addr, pwd, usePwd);
+	if (result == -1)
+		PrintAndLog("Read failed");
+	
+	return result;
 }
 
 int usage_lf_em_dump(void) {
