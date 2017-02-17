@@ -493,16 +493,16 @@ size_t fsk_wave_demod(uint8_t * dest, size_t size, uint8_t fchigh, uint8_t fclow
 	// in case you have junk or noise at the beginning of the trace...
 	uint8_t thresholdCnt = 0;
 	size_t waveSizeCnt = 0;
-	bool isAboveThreshold = dest[idx] >= threshold_value;
+	bool isAboveThreshold = dest[idx++] >= threshold_value;
 	for (; idx < size-20; idx++ ) {
 		if(dest[idx] < threshold_value && isAboveThreshold) {
 			thresholdCnt++;
-			if (thresholdCnt > 4 && waveSizeCnt < fchigh+1) break;			
+			if (thresholdCnt > 2 && waveSizeCnt < fchigh+1) break;			
 			isAboveThreshold = false;
 			waveSizeCnt = 0;
 		} else if (dest[idx] >= threshold_value && !isAboveThreshold) {
 			thresholdCnt++;
-			if (thresholdCnt > 4 && waveSizeCnt < fchigh+1) break;			
+			if (thresholdCnt > 2 && waveSizeCnt < fchigh+1) break;			
 			isAboveThreshold = true;
 			waveSizeCnt = 0;
 		} else {
@@ -1491,7 +1491,7 @@ int pskRawDemod(uint8_t dest[], size_t *size, int *clock, int *invert)
 
 	size_t numBits=0;
 	uint8_t curPhase = *invert;
-	size_t i, waveStart=1, waveEnd=0, firstFullWave=0, lastClkBit=0;
+	size_t i=0, waveStart=1, waveEnd=0, firstFullWave=0, lastClkBit=0;
 	uint8_t fc=0, fullWaveLen=0, tol=1;
 	uint16_t errCnt=0, waveLenCnt=0;
 	fc = countFC(dest, *size, 0);
@@ -1499,19 +1499,45 @@ int pskRawDemod(uint8_t dest[], size_t *size, int *clock, int *invert)
 	//PrintAndLog("DEBUG: FC: %d",fc);
 	*clock = DetectPSKClock(dest, *size, *clock);
 	if (*clock == 0) return -1;
+	// jump to modulating data by finding the first 2 threshold crossings (or first 1 waves)
+	// in case you have junk or noise at the beginning of the trace...
+	uint8_t thresholdCnt = 0;
+	size_t waveSizeCnt = 0;
+	uint8_t threshold_value = 123; //-5
+	bool isAboveThreshold = dest[i++] >= threshold_value;
+	for (; i < *size-20; i++ ) {
+		if(dest[i] < threshold_value && isAboveThreshold) {
+			thresholdCnt++;
+			if (thresholdCnt > 2 && waveSizeCnt < fc+1) break;			
+			isAboveThreshold = false;
+			waveSizeCnt = 0;
+		} else if (dest[i] >= threshold_value && !isAboveThreshold) {
+			thresholdCnt++;
+			if (thresholdCnt > 2 && waveSizeCnt < fc+1) break;			
+			isAboveThreshold = true;
+			waveSizeCnt = 0;
+		} else {
+			waveSizeCnt++;
+		}
+		if (thresholdCnt > 10) break;
+	}
+	if (g_debugMode == 2) prnt("DEBUG PSK: threshold Count reached at %u, count: %u",i, thresholdCnt);
+
+
 	int avgWaveVal=0, lastAvgWaveVal=0;
+	waveStart = i+1;
 	//find first phase shift
-	for (i=0; i<loopCnt; i++){
+	for (; i<loopCnt; i++){
 		if (dest[i]+fc < dest[i+1] && dest[i+1] >= dest[i+2]){
 			waveEnd = i+1;
-			//PrintAndLog("DEBUG: waveEnd: %d",waveEnd);
+			if (g_debugMode == 2) prnt("DEBUG PSK: waveEnd: %u, waveStart: %u",waveEnd, waveStart);
 			waveLenCnt = waveEnd-waveStart;
-			if (waveLenCnt > fc && waveStart > fc && !(waveLenCnt > fc+2)){ //not first peak and is a large wave but not out of whack
+			if (waveLenCnt > fc && waveStart > fc && !(waveLenCnt > fc+3)){ //not first peak and is a large wave but not out of whack
 				lastAvgWaveVal = avgWaveVal/(waveLenCnt);
 				firstFullWave = waveStart;
 				fullWaveLen=waveLenCnt;
 				//if average wave value is > graph 0 then it is an up wave or a 1
-				if (lastAvgWaveVal > 123) curPhase ^= 1;  //fudge graph 0 a little 123 vs 128
+				if (lastAvgWaveVal > threshold_value) curPhase ^= 1;  //fudge graph 0 a little 123 vs 128
 				break;
 			} 
 			waveStart = i+1;

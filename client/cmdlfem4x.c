@@ -538,8 +538,8 @@ bool EM4x05testDemodReadData(uint32_t *word, bool readCmd) {
 	// skip first two 0 bits as they might have been missed in the demod 
 	uint8_t preamble[6] = {0,0,1,0,1,0};
 	size_t startIdx = 0;
-	// set size to 10 to only test first 4 positions for the preamble
-	size_t size = (10 > DemodBufferLen) ? DemodBufferLen : 10;
+	// set size to 15 to only test first 9 positions for the preamble
+	size_t size = (15 > DemodBufferLen) ? DemodBufferLen : 15;
 	startIdx = 0; 
 
 	//test preamble
@@ -580,7 +580,6 @@ bool EM4x05testDemodReadData(uint32_t *word, bool readCmd) {
 // the rest will need to be manually demoded for now...
 int demodEM4x05resp(uint32_t *word, bool readCmd) {
 	int ans = 0;
-	bool demodFound = false;
 	DemodBufferLen = 0x00;
 
 	// test for FSK wave (easiest to 99% ID)
@@ -596,61 +595,77 @@ int demodEM4x05resp(uint32_t *word, bool readCmd) {
 		}
 	}
 	// PSK clocks should be easy to detect ( but difficult to demod a non-repeating pattern... )
-	if (!demodFound) {
-		ans = GetPskClock("", FALSE, FALSE);
-		if (ans>0) {
-			PrintAndLog("PSK response possibly found, run `data rawd p1` to attempt to demod");
+	ans = GetPskClock("", FALSE, FALSE);
+	if (ans>0) {
+		//try psk1
+		DemodBufferLen = 0x00;
+		ans = PSKDemod("0 0 6", FALSE);
+		if (!ans) {
+			if (g_debugMode) PrintAndLog("DEBUG: Error - EM4305: PSK1 Demod failed");
+		} else {
+			if (EM4x05testDemodReadData(word, readCmd)) {
+				return 1;
+			} else {
+				//try psk2
+				psk1TOpsk2(DemodBuffer, DemodBufferLen);
+				if (EM4x05testDemodReadData(word, readCmd)) {
+					return 1;
+				}
+			}
+			//try psk1 inverted
+			DemodBufferLen = 0x00;
+			ans = PSKDemod("0 1 6", FALSE);
+			if (!ans) {
+				if (g_debugMode) PrintAndLog("DEBUG: Error - EM4305: PSK1 Demod failed");
+			} else {
+				if (EM4x05testDemodReadData(word, readCmd)) {
+					return 1;
+				} else {
+					//try psk2
+					psk1TOpsk2(DemodBuffer, DemodBufferLen);
+					if (EM4x05testDemodReadData(word, readCmd)) {
+						return 1;
+					}
+				}
+			}
 		}
 	}
 
 	// more common than biphase
-	if (!demodFound) {
-		DemodBufferLen = 0x00;
-		bool stcheck = false;
-		// try manchester - NOTE: ST only applies to T55x7 tags.
-		ans = ASKDemod_ext("0,0,1", false, false, 1, &stcheck);
-		if (!ans) {
-			if (g_debugMode) PrintAndLog("DEBUG: Error - EM4305: ASK/Manchester Demod failed");
-		} else {
-			if (EM4x05testDemodReadData(word, readCmd)) {
-				return 1;
-			}
+	DemodBufferLen = 0x00;
+	bool stcheck = false;
+	// try manchester - NOTE: ST only applies to T55x7 tags.
+	ans = ASKDemod_ext("0,0,1", false, false, 1, &stcheck);
+	if (!ans) {
+		if (g_debugMode) PrintAndLog("DEBUG: Error - EM4305: ASK/Manchester Demod failed");
+	} else {
+		if (EM4x05testDemodReadData(word, readCmd)) {
+			return 1;
 		}
 	}
 
-	if (!demodFound) {
-		DemodBufferLen = 0x00;
-		//try biphase
-		ans = ASKbiphaseDemod("0 0 1", FALSE);
-		if (!ans) { 
-			if (g_debugMode) PrintAndLog("DEBUG: Error - EM4305: ASK/biphase Demod failed");
-		} else {
-			if (EM4x05testDemodReadData(word, readCmd)) {
-				return 1;
-			}
+	DemodBufferLen = 0x00;
+	//try biphase
+	ans = ASKbiphaseDemod("0 0 1", FALSE);
+	if (!ans) { 
+		if (g_debugMode) PrintAndLog("DEBUG: Error - EM4305: ASK/biphase Demod failed");
+	} else {
+		if (EM4x05testDemodReadData(word, readCmd)) {
+			return 1;
 		}
 	}
 
-	if (!demodFound) {
-		DemodBufferLen = 0x00;
-		//try diphase (differential biphase or inverted)
-		ans = ASKbiphaseDemod("0 1 1", FALSE);
-		if (!ans) { 
-			if (g_debugMode) PrintAndLog("DEBUG: Error - EM4305: ASK/biphase Demod failed");
-		} else {
-			if (EM4x05testDemodReadData(word, readCmd)) {
-				return 1;
-			}
+	DemodBufferLen = 0x00;
+	//try diphase (differential biphase or inverted)
+	ans = ASKbiphaseDemod("0 1 1", FALSE);
+	if (!ans) { 
+		if (g_debugMode) PrintAndLog("DEBUG: Error - EM4305: ASK/biphase Demod failed");
+	} else {
+		if (EM4x05testDemodReadData(word, readCmd)) {
+			return 1;
 		}
 	}
 
-	/*if (demodFound && bitsNeeded < DemodBufferLen) {
-		if (bitsNeeded > 0) {
-			setDemodBuf(DemodBuffer + startIdx + sizeof(preamble), bitsNeeded, 0);
-			CmdPrintDemodBuff("x");			
-		}
-		return 1;
-	}*/
 	return -1;
 }
 
