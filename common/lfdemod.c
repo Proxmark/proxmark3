@@ -487,19 +487,42 @@ size_t fsk_wave_demod(uint8_t * dest, size_t size, uint8_t fchigh, uint8_t fclow
 	size_t preLastSample = 0;
 	size_t LastSample = 0;
 	size_t currSample = 0;
-	// sync to first lo-hi transition, and threshold
+	if ( size < 1024 ) return 0; // not enough samples
+
+	// jump to modulating data by finding the first 4 threshold crossings (or first 2 waves)
+	// in case you have junk or noise at the beginning of the trace...
+	uint8_t thresholdCnt = 0;
+	size_t waveSizeCnt = 0;
+	bool isAboveThreshold = dest[idx] >= threshold_value;
+	for (; idx < size-20; idx++ ) {
+		if(dest[idx] < threshold_value && isAboveThreshold) {
+			thresholdCnt++;
+			if (thresholdCnt > 4 && waveSizeCnt < fchigh+1) break;			
+			isAboveThreshold = false;
+			waveSizeCnt = 0;
+		} else if (dest[idx] >= threshold_value && !isAboveThreshold) {
+			thresholdCnt++;
+			if (thresholdCnt > 4 && waveSizeCnt < fchigh+1) break;			
+			isAboveThreshold = true;
+			waveSizeCnt = 0;
+		} else {
+			waveSizeCnt++;
+		}
+		if (thresholdCnt > 10) break;
+	}
+	if (g_debugMode == 2) prnt("threshold Count reached at %u",idx);
 
 	// Need to threshold first sample
-	// skip 160 samples to allow antenna/samples to settle
-	if(dest[160] < threshold_value) dest[0] = 0;
+	if(dest[idx] < threshold_value) dest[0] = 0;
 	else dest[0] = 1;
-
+	idx++;
+	
 	size_t numBits = 0;
 	// count cycles between consecutive lo-hi transitions, there should be either 8 (fc/8)
 	// or 10 (fc/10) cycles but in practice due to noise etc we may end up with anywhere
 	// between 7 to 11 cycles so fuzz it by treat anything <9 as 8 and anything else as 10
 	//  (could also be fc/5 && fc/7 for fsk1 = 4-9)
-	for(idx = 161; idx < size-20; idx++) {
+	for(; idx < size-20; idx++) {
 		// threshold current value
 
 		if (dest[idx] < threshold_value) dest[idx] = 0;
@@ -514,13 +537,14 @@ size_t fsk_wave_demod(uint8_t * dest, size_t size, uint8_t fchigh, uint8_t fclow
 				//do nothing with extra garbage
 			} else if (currSample < (fchigh-1)) {           //6-8 = 8 sample waves  (or 3-6 = 5)
 				//correct previous 9 wave surrounded by 8 waves (or 6 surrounded by 5)
-				if (LastSample > (fchigh-2) && (preLastSample < (fchigh-1) || preLastSample	== 0 )){
+				if (LastSample > (fchigh-2) && (preLastSample < (fchigh-1))){
 					dest[numBits-1]=1;
 				}
 				dest[numBits++]=1;
 
-			} else if (currSample > (fchigh) && !numBits) { //12 + and first bit = unusable garbage 
-				//do nothing with beginning garbage
+			} else if (currSample > (fchigh+1) && numBits < 3) { //12 + and first two bit = unusable garbage
+				//do nothing with beginning garbage and reset..  should be rare..
+				numBits = 0; 
 			} else if (currSample == (fclow+1) && LastSample == (fclow-1)) { // had a 7 then a 9 should be two 8's (or 4 then a 6 should be two 5's)
 				dest[numBits++]=1;
 			} else {                                        //9+ = 10 sample waves (or 6+ = 7)

@@ -1656,10 +1656,10 @@ void EM4xWriteWord(uint32_t flag, uint32_t Data, uint32_t Pwd) {
 	SendForward(fwd_bit_count);
 
 	//Wait for write to complete
-	//SpinDelay(5);
+	SpinDelayUs(8000);
 
 	//Capture response if one exists
-	DoAcquisition_default(30, TRUE);
+	DoAcquisition_default(20, TRUE);
 
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF); // field off
 	LED_A_OFF();
