@@ -1699,7 +1699,7 @@ int ReaderReceive(uint8_t *receivedAnswer, uint8_t *parity)
 /* performs iso14443a anticollision procedure
  * fills the uid pointer unless NULL
  * fills resp_data unless NULL */
-int iso14443a_select_card(byte_t *uid_ptr, iso14a_card_select_t *p_hi14a_card, uint32_t *cuid_ptr) {
+int iso14443a_select_card(byte_t *uid_ptr, iso14a_card_select_t *p_hi14a_card, uint32_t *cuid_ptr, uint8_t no_rats) {
 	uint8_t wupa[]       = { 0x52 };  // 0x26 - REQA  0x52 - WAKE-UP
 	uint8_t sel_all[]    = { 0x93,0x20 };
 	uint8_t sel_uid[]    = { 0x93,0x70,0x00,0x00,0x00,0x00,0x00,0x00,0x00};
@@ -1822,7 +1822,8 @@ int iso14443a_select_card(byte_t *uid_ptr, iso14a_card_select_t *p_hi14a_card, u
 	}
 
 	// non iso14443a compliant tag
-	if( (sak & 0x20) == 0) return 2; 
+	// some Mifare/CPU hybird card won't response to Mifare command any more if send RATS command.
+	if( no_rats || (sak & 0x20) == 0) return 2; 
 
 	// Request for answer to select
 	AppendCrc14443a(rats, 2);
@@ -1927,7 +1928,7 @@ void ReaderIso14443a(UsbCommand *c)
 		iso14443a_setup(FPGA_HF_ISO14443A_READER_LISTEN);
 		if(!(param & ISO14A_NO_SELECT)) {
 			iso14a_card_select_t *card = (iso14a_card_select_t*)buf;
-			arg0 = iso14443a_select_card(NULL,card,NULL);
+			arg0 = iso14443a_select_card(NULL,card,NULL,0);
 			cmd_send(CMD_ACK,arg0,card->uidlen,0,buf,sizeof(iso14a_card_select_t));
 		}
 	}
@@ -2023,15 +2024,17 @@ int32_t dist_nt(uint32_t nt1, uint32_t nt2) {
 // Cloning MiFare Classic Rail and Building Passes, Anywhere, Anytime"
 // (article by Nicolas T. Courtois, 2009)
 //-----------------------------------------------------------------------------
-void ReaderMifare(bool first_try)
+void ReaderMifare(bool first_try, uint8_t blockNo, uint8_t keyType)
 {
 	// Mifare AUTH
-	uint8_t mf_auth[]    = { 0x60,0x00,0xf5,0x7b };
+	uint8_t mf_auth[]    = { 0x60 + (keyType & 0x01), blockNo ,0x00,0x00 };
 	uint8_t mf_nr_ar[]   = { 0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00 };
 	static uint8_t mf_nr_ar3;
 
 	uint8_t receivedAnswer[MAX_MIFARE_FRAME_SIZE];
 	uint8_t receivedAnswerPar[MAX_MIFARE_PARITY_SIZE];
+
+	AppendCrc14443a(mf_auth, 2);
 
 	if (first_try) { 
 		iso14443a_setup(FPGA_HF_ISO14443A_READER_MOD);
@@ -2124,7 +2127,7 @@ void ReaderMifare(bool first_try)
 			SpinDelay(100);
 		}
 		
-		if(!iso14443a_select_card(uid, NULL, &cuid)) {
+		if(!iso14443a_select_card(uid, NULL, &cuid, 1)) {
 			if (MF_DBGLEVEL >= 1)	Dbprintf("Mifare: Can't select card");
 			continue;
 		}

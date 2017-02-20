@@ -49,6 +49,7 @@ typedef struct {
  
 extern char logHexFileName[FILE_PATH_SIZE];
 
+int magic_nonce2key(uint32_t uid, uint32_t nt, uint32_t nr, uint64_t par_info, uint64_t ks_info, uint64_t * key, uint32_t blockNo, uint8_t keyType);
 int mfnested(uint8_t blockNo, uint8_t keyType, uint8_t * key, uint8_t trgBlockNo, uint8_t trgKeyType, uint8_t * ResultKeys, bool calibrate);
 int mfCheckKeys (uint8_t blockNo, uint8_t keyType, bool clear_trace, uint8_t keycnt, uint8_t * keyBlock, uint64_t * key);
 
