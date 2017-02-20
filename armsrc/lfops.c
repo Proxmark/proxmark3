@@ -1573,14 +1573,14 @@ void SendForward(uint8_t fwd_bit_count) {
 
 	// Set up FPGA, 125kHz
 	LFSetupFPGAForADC(95, true);
-	
+
 	// force 1st mod pulse (start gap must be longer for 4305)
 	fwd_bit_sz--; //prepare next bit modulation
 	fwd_write_ptr++;
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF); // field off
-	SpinDelayUs(55*8); //55 cycles off (8us each)for 4305
+	SpinDelayUs(56*8); //55 cycles off (8us each)for 4305  /another reader has 37 here...
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_LF_ADC | FPGA_LF_ADC_READER_FIELD);//field on
-	SpinDelayUs(16*8); //16 cycles on (8us each)
+	SpinDelayUs(18*8); //16 cycles on (8us each)  // another reader has 18 here
 
 	// now start writting
 	while(fwd_bit_sz-- > 0) { //prepare next bit modulation
@@ -1589,9 +1589,9 @@ void SendForward(uint8_t fwd_bit_count) {
 		else {
 			//These timings work for 4469/4269/4305 (with the 55*8 above)
 			FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF); // field off
-			SpinDelayUs(20*8); //16-4 cycles off (8us each) //23
+			SpinDelayUs(23*8); //16-4 cycles off (8us each) //23  //one reader goes as high as 25 here
 			FpgaWriteConfWord(FPGA_MAJOR_MODE_LF_ADC | FPGA_LF_ADC_READER_FIELD);//field on
-			SpinDelayUs(12*8); //16 cycles on (8us each) //9
+			SpinDelayUs(16*8); //16 cycles on (8us each) //9  // another reader goes to 17 here
 		}
 	}
 }

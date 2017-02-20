@@ -648,7 +648,7 @@ int demodEM4x05resp(uint32_t *word, bool readCmd) {
 	return -1;
 }
 
-int EM4x05ReadWord(uint8_t addr, uint32_t pwd, bool usePwd) {
+int EM4x05ReadWord_ext(uint8_t addr, uint32_t pwd, bool usePwd, uint32_t *wordData) {
 	UsbCommand c = {CMD_EM4X_READ_WORD, {addr, pwd, usePwd}};
 	clearCommandBuffer();
 	SendCommand(&c);
@@ -666,12 +666,16 @@ int EM4x05ReadWord(uint8_t addr, uint32_t pwd, bool usePwd) {
 		return -1;
 	}
 	//attempt demod:
+	return demodEM4x05resp(wordData, true);
+}
+
+int EM4x05ReadWord(uint8_t addr, uint32_t pwd, bool usePwd) {
 	uint32_t wordData = 0;
-	int success = demodEM4x05resp(&wordData, true);
+	int success = EM4x05ReadWord_ext(addr, pwd, usePwd, &wordData);
 	if (success == 1)
 		PrintAndLog(" Got Address %02d | %08X",addr,wordData);
 	else
-		PrintAndLog("RSead Address %02d | failed",addr);
+		PrintAndLog("Read Address %02d | failed",addr);
 
 	return success;
 }
@@ -808,6 +812,74 @@ int CmdEM4x05WriteWord(const char *Cmd) {
 	return result;
 }
 
+void printEM4x05info(uint8_t chipType, uint8_t cap, uint16_t custCode, uint32_t serial) {
+	switch (chipType) {
+		case 9: PrintAndLog("\nChip Type:   %u | EM4305", chipType); break;
+		case 4: PrintAndLog("Chip Type:   %u | Unknown", chipType); break;
+		case 2: PrintAndLog("Chip Type:   %u | EM4469", chipType); break;
+		//add more here when known
+		default: PrintAndLog("Chip Type:   %u Unknown", chipType); break;
+	}
+
+	switch (cap) {
+		case 3: PrintAndLog(" Cap Type:   %u | 330pF",cap); break;
+		case 2: PrintAndLog(" Cap Type:   %u | 210pF",cap); break;
+		case 1: PrintAndLog(" Cap Type:   %u | 250pF",cap); break;
+		default: PrintAndLog(" Cap Type:   %u | unknown",cap); break;
+	}
+
+	PrintAndLog("Cust Code: %03u | %s", custCode, (custCode == 0x200) ? "Default": "Unknown");
+	if (serial != 0) {
+		PrintAndLog("\n Serial #: %08X\n", serial);
+	}
+}
+
+//quick test for EM4x05/EM4x69 tag
+bool EM4x05Block0Test(uint32_t *wordData) {
+	if (EM4x05ReadWord_ext(0,0,false,wordData) == 1) {
+		return true;
+	}
+	return false;
+}
+
+int CmdEM4x05info(const char *Cmd) {
+	//uint8_t addr = 0;
+	//uint32_t pwd;
+	uint32_t wordData = 0;
+  //	bool usePwd = false;
+	uint8_t ctmp = param_getchar(Cmd, 0);
+	if ( ctmp == 'H' || ctmp == 'h' ) return usage_lf_em_dump();
+
+	// for now use default input of 1 as invalid (unlikely 1 will be a valid password...)
+	//pwd = param_get32ex(Cmd, 0, 1, 16);
+	
+	//if ( pwd != 1 ) {
+	//	usePwd = true;
+	//}
+	int success = 1;
+	// read blk 0
+
+	//block 0 can be read even without a password.
+	if ( !EM4x05Block0Test(&wordData) ) 
+		return -1;
+	
+	uint8_t chipType = (wordData >> 1) & 0xF;
+	uint8_t cap = (wordData >> 5) & 3;
+	uint16_t custCode = (wordData >> 9) & 0x3FF;
+	
+	wordData = 0;
+	if (EM4x05ReadWord_ext(1, 0, false, &wordData) != 1) {
+		//failed, but continue anyway...
+	}
+	printEM4x05info(chipType, cap, custCode, wordData);
+
+	// add read block 4 and read out config if successful
+	// needs password if one is set
+
+	return success;
+}
+
+
 static command_t CommandTable[] =
 {
 	{"help", CmdHelp, 1, "This help"},
@@ -817,9 +889,10 @@ static command_t CommandTable[] =
 	{"410xwatch", CmdEM410xWatch, 0, "['h'] -- Watches for EM410x 125/134 kHz tags (option 'h' for 134)"},
 	{"410xspoof", CmdEM410xWatchnSpoof, 0, "['h'] --- Watches for EM410x 125/134 kHz tags, and replays them. (option 'h' for 134)" },
 	{"410xwrite", CmdEM410xWrite, 0, "<UID> <'0' T5555> <'1' T55x7> [clock rate] -- Write EM410x UID to T5555(Q5) or T55x7 tag, optionally setting clock rate"},
-	{"4x05dump", CmdEM4x05dump, 1, "(pwd) -- Read EM4x05/EM4x69 all word data"},
-	{"4x05readword", CmdEM4x05ReadWord, 1, "<Word> (pwd) -- Read EM4x05/EM4x69 word data"},
-	{"4x05writeword", CmdEM4x05WriteWord, 1, "<Word> <data> (pwd) -- Write EM4x05/EM4x69 word data"},
+	{"4x05dump", CmdEM4x05dump, 0, "(pwd) -- Read EM4x05/EM4x69 all word data"},
+	{"4x05info", CmdEM4x05info, 0, "(pwd) -- Get info from EM4x05/EM4x69 tag"},
+	{"4x05readword", CmdEM4x05ReadWord, 0, "<Word> (pwd) -- Read EM4x05/EM4x69 word data"},
+	{"4x05writeword", CmdEM4x05WriteWord, 0, "<Word> <data> (pwd) -- Write EM4x05/EM4x69 word data"},
 	{"4x50read", CmdEM4x50Read, 1, "demod data from EM4x50 tag from the graph buffer"},
 	{NULL, NULL, 0, NULL}
 };
