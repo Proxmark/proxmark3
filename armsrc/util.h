@@ -36,13 +36,19 @@ void rol(uint8_t *data, const size_t len);
 void lsl (uint8_t *data, size_t len);
 int32_t le24toh (uint8_t data[3]);
 
-void SpinDelay(int ms);
-void SpinDelayUs(int us);
 void LED(int led, int ms);
 void LEDsoff();
 int BUTTON_CLICKED(int ms);
 int BUTTON_HELD(int ms);
 void FormatVersionInformation(char *dst, int len, const char *prefix, void *version_information);
+
+//iceman's ticks.h
+#ifndef GET_TICKS
+# define GET_TICKS   (uint32_t)((AT91C_BASE_TC1->TC_CV << 16) | AT91C_BASE_TC0->TC_CV)
+#endif
+
+void SpinDelay(int ms);
+void SpinDelayUs(int us);
 
 void StartTickCount();
 uint32_t RAMFUNC GetTickCount();
@@ -52,6 +58,18 @@ uint32_t RAMFUNC GetCountUS();
 uint32_t RAMFUNC GetDeltaCountUS();
 
 void StartCountSspClk();
+void ResetSspClk(void);
 uint32_t RAMFUNC GetCountSspClk();
+
+extern void StartTicks(void);
+extern void WaitTicks(uint32_t ticks);
+extern void WaitUS(uint16_t us);
+extern void WaitMS(uint16_t ms);
+extern void ResetTicks();
+extern void ResetTimer(AT91PS_TC timer);
+extern void StopTicks(void);
+// end iceman's ticks.h
+
+uint32_t prand();
 
 #endif

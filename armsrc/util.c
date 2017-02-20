@@ -345,7 +345,7 @@ void StartCountUS()
 	}
 
 uint32_t RAMFUNC GetCountUS(){
-	return (AT91C_BASE_TC1->TC_CV * 0x8000) + ((AT91C_BASE_TC0->TC_CV / 15) * 10);
+	return (AT91C_BASE_TC1->TC_CV * 0x8000) + ((AT91C_BASE_TC0->TC_CV * 2) / 3); //was  /15) * 10);
 }
 
 static uint32_t GlobalUsCounter = 0;
@@ -418,8 +418,13 @@ void StartCountSspClk()
 	// we can use the counter.
 	while (AT91C_BASE_TC0->TC_CV < 0xFFF0);
 }
-
-
+void ResetSspClk(void) {
+	//enable clock of timer and software trigger
+	AT91C_BASE_TC0->TC_CCR = AT91C_TC_CLKEN | AT91C_TC_SWTRG;
+	AT91C_BASE_TC1->TC_CCR = AT91C_TC_CLKEN | AT91C_TC_SWTRG;
+	AT91C_BASE_TC2->TC_CCR = AT91C_TC_CLKEN | AT91C_TC_SWTRG;
+	while (AT91C_BASE_TC2->TC_CV > 0);
+}
 uint32_t RAMFUNC GetCountSspClk(){
 	uint32_t tmp_count;
 	tmp_count = (AT91C_BASE_TC2->TC_CV << 16) | AT91C_BASE_TC0->TC_CV;
@@ -429,5 +434,82 @@ uint32_t RAMFUNC GetCountSspClk(){
 	else {
 		return tmp_count;
 	}
+}
+
+//  -------------------------------------------------------------------------
+//  Timer for bitbanging,  or LF stuff when you need a very precis timer
+//  1us = 1.5ticks
+//  -------------------------------------------------------------------------
+void StartTicks(void){
+	//initialization of the timer
+	// tc1 is higher 0xFFFF0000
+	// tc0 is lower 0x0000FFFF
+	AT91C_BASE_PMC->PMC_PCER |= (1 << AT91C_ID_TC0) | (1 << AT91C_ID_TC1);
+	AT91C_BASE_TCB->TCB_BMR = AT91C_TCB_TC0XC0S_NONE | AT91C_TCB_TC1XC1S_TIOA0 | AT91C_TCB_TC2XC2S_NONE;
+	AT91C_BASE_TC0->TC_CCR = AT91C_TC_CLKDIS;
+	AT91C_BASE_TC0->TC_CMR = AT91C_TC_CLKS_TIMER_DIV3_CLOCK | // MCK(48MHz) / 32 
+								AT91C_TC_WAVE | AT91C_TC_WAVESEL_UP_AUTO | AT91C_TC_ACPA_CLEAR |
+								AT91C_TC_ACPC_SET | AT91C_TC_ASWTRG_SET;
+	AT91C_BASE_TC0->TC_RA = 1;
+	AT91C_BASE_TC0->TC_RC = 0; 
+
+	AT91C_BASE_TC1->TC_CCR = AT91C_TC_CLKDIS;	// timer disable  
+	AT91C_BASE_TC1->TC_CMR = AT91C_TC_CLKS_XC1; // from TC0
+	
+	AT91C_BASE_TC0->TC_CCR = AT91C_TC_CLKEN | AT91C_TC_SWTRG;
+	AT91C_BASE_TC1->TC_CCR = AT91C_TC_CLKEN | AT91C_TC_SWTRG;
+	AT91C_BASE_TCB->TCB_BCR = 1;
+	
+	// wait until timer becomes zero.
+	while (AT91C_BASE_TC1->TC_CV > 0);
+}
+
+// Wait - Spindelay in ticks.
+// if called with a high number, this will trigger the WDT...
+void WaitTicks(uint32_t ticks){
+	if ( ticks == 0 ) return;
+	ticks += GET_TICKS;	
+	while (GET_TICKS < ticks);
+}
+// Wait / Spindelay in us (microseconds) 
+// 1us = 1.5ticks.
+void WaitUS(uint16_t us){
+	if ( us == 0 ) return;
+	WaitTicks(  (uint32_t)(us * 1.5) );
+}
+void WaitMS(uint16_t ms){
+	if (ms == 0) return;
+	WaitTicks( (uint32_t)(ms * 1500) );
+}
+// Starts Clock and waits until its reset
+void ResetTicks(void){
+	AT91C_BASE_TC0->TC_CCR = AT91C_TC_CLKEN | AT91C_TC_SWTRG;
+	AT91C_BASE_TC1->TC_CCR = AT91C_TC_CLKEN | AT91C_TC_SWTRG;
+	while (AT91C_BASE_TC1->TC_CV > 0);
+}
+void ResetTimer(AT91PS_TC timer){
+	timer->TC_CCR = AT91C_TC_CLKEN | AT91C_TC_SWTRG;
+	while(timer->TC_CV > 0) ;
+}
+// stop clock
+void StopTicks(void){
+	AT91C_BASE_TC0->TC_CCR = AT91C_TC_CLKDIS;
+	AT91C_BASE_TC1->TC_CCR = AT91C_TC_CLKDIS;	
+}
+
+static uint64_t next_random = 1;
+
+/* Generates a (non-cryptographically secure) 32-bit random number.
+ *
+ * We don't have an implementation of the "rand" function or a clock to seed it
+ * with, so we just call GetTickCount the first time to seed ourselves.
+ */
+uint32_t prand() {
+	if (next_random == 1) {
+		next_random = GetTickCount();
+	}
+
+	next_random = next_random * 6364136223846793005 + 1;
+	return (uint32_t)(next_random >> 32) % 0xffffffff;
 }
 

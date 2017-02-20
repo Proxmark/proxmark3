@@ -317,7 +317,7 @@ int ASKDemod_ext(const char *Cmd, bool verbose, bool emSearch, uint8_t askType, 
 	int clk=0;
 	int maxErr=100;
 	int maxLen=0;
-	uint8_t askAmp = 0;
+	uint8_t askamp = 0;
 	char amp = param_getchar(Cmd, 0);
 	uint8_t BitStream[MAX_GRAPH_TRACE_LEN]={0};
 	sscanf(Cmd, "%i %i %i %i %c", &clk, &invert, &maxErr, &maxLen, &amp);
@@ -330,12 +330,15 @@ int ASKDemod_ext(const char *Cmd, bool verbose, bool emSearch, uint8_t askType, 
 		invert=1;
 		clk=0;
 	}
-	if (amp == 'a' || amp == 'A') askAmp=1; 
 	size_t BitLen = getFromGraphBuf(BitStream);
 	if (g_debugMode) PrintAndLog("DEBUG: Bitlen from grphbuff: %d",BitLen);
 	if (BitLen < 255) return 0;
 	if (maxLen < BitLen && maxLen != 0) BitLen = maxLen;
 	int foundclk = 0;
+	//amp before ST check
+	if (amp == 'a' || amp == 'A') {
+		askAmp(BitStream, BitLen); 
+	}
 	bool st = false;
 	if (*stCheck) st = DetectST(BitStream, &BitLen, &foundclk);
 	if (st) {
@@ -343,7 +346,7 @@ int ASKDemod_ext(const char *Cmd, bool verbose, bool emSearch, uint8_t askType, 
 		clk = (clk == 0) ? foundclk : clk;
 		if (verbose || g_debugMode) PrintAndLog("\nFound Sequence Terminator");
 	}
-	int errCnt = askdemod(BitStream, &BitLen, &clk, &invert, maxErr, askAmp, askType);
+	int errCnt = askdemod(BitStream, &BitLen, &clk, &invert, maxErr, askamp, askType);
 	if (errCnt<0 || BitLen<16){  //if fatal error (or -1)
 		if (g_debugMode) PrintAndLog("DEBUG: no data found %d, errors:%d, bitlen:%d, clock:%d",errCnt,invert,BitLen,clk);
 		return 0;
@@ -383,7 +386,7 @@ int ASKDemod(const char *Cmd, bool verbose, bool emSearch, uint8_t askType) {
 int Cmdaskmandemod(const char *Cmd)
 {
 	char cmdp = param_getchar(Cmd, 0);
-	if (strlen(Cmd) > 25 || cmdp == 'h' || cmdp == 'H') {
+	if (strlen(Cmd) > 45 || cmdp == 'h' || cmdp == 'H') {
 		PrintAndLog("Usage:  data rawdemod am <s> [clock] <invert> [maxError] [maxLen] [amplify]");
 		PrintAndLog("     ['s'] optional, check for Sequence Terminator");
 		PrintAndLog("     [set clock as integer] optional, if not set, autodetect");
@@ -678,7 +681,7 @@ int CmdVikingDemod(const char *Cmd)
 int Cmdaskrawdemod(const char *Cmd)
 {
 	char cmdp = param_getchar(Cmd, 0);
-	if (strlen(Cmd) > 25 || cmdp == 'h' || cmdp == 'H') {
+	if (strlen(Cmd) > 35 || cmdp == 'h' || cmdp == 'H') {
 		PrintAndLog("Usage:  data rawdemod ar [clock] <invert> [maxError] [maxLen] [amplify]");
 		PrintAndLog("     [set clock as integer] optional, if not set, autodetect");
 		PrintAndLog("     <invert>, 1 to invert output");
@@ -1012,7 +1015,7 @@ int FSKrawDemod(const char *Cmd, bool verbose)
 int CmdFSKrawdemod(const char *Cmd)
 {
 	char cmdp = param_getchar(Cmd, 0);
-	if (strlen(Cmd) > 10 || cmdp == 'h' || cmdp == 'H') {
+	if (strlen(Cmd) > 20 || cmdp == 'h' || cmdp == 'H') {
 		PrintAndLog("Usage:  data rawdemod fs [clock] <invert> [fchigh] [fclow]");
 		PrintAndLog("     [set clock as integer] optional, omit for autodetect.");
 		PrintAndLog("     <invert>, 1 for invert output, can be used even if the clock is omitted");
@@ -1769,7 +1772,7 @@ int NRZrawDemod(const char *Cmd, bool verbose)
 int CmdNRZrawDemod(const char *Cmd)
 {
 	char cmdp = param_getchar(Cmd, 0);
-	if (strlen(Cmd) > 10 || cmdp == 'h' || cmdp == 'H') {
+	if (strlen(Cmd) > 16 || cmdp == 'h' || cmdp == 'H') {
 		PrintAndLog("Usage:  data rawdemod nr [clock] <0|1> [maxError]");
 		PrintAndLog("     [set clock as integer] optional, if not set, autodetect.");
 		PrintAndLog("     <invert>, 1 for invert output");
@@ -1793,7 +1796,7 @@ int CmdPSK1rawDemod(const char *Cmd)
 {
 	int ans;
 	char cmdp = param_getchar(Cmd, 0);
-	if (strlen(Cmd) > 10 || cmdp == 'h' || cmdp == 'H') {
+	if (strlen(Cmd) > 16 || cmdp == 'h' || cmdp == 'H') {
 		PrintAndLog("Usage:  data rawdemod p1 [clock] <0|1> [maxError]");
 		PrintAndLog("     [set clock as integer] optional, if not set, autodetect.");
 		PrintAndLog("     <invert>, 1 for invert output");
@@ -1825,7 +1828,7 @@ int CmdPSK2rawDemod(const char *Cmd)
 {
 	int ans=0;
 	char cmdp = param_getchar(Cmd, 0);
-	if (strlen(Cmd) > 10 || cmdp == 'h' || cmdp == 'H') {
+	if (strlen(Cmd) > 16 || cmdp == 'h' || cmdp == 'H') {
 		PrintAndLog("Usage:  data rawdemod p2 [clock] <0|1> [maxError]");
 		PrintAndLog("     [set clock as integer] optional, if not set, autodetect.");
 		PrintAndLog("     <invert>, 1 for invert output");
@@ -1855,7 +1858,7 @@ int CmdRawDemod(const char *Cmd)
 {
 	char cmdp = Cmd[0]; //param_getchar(Cmd, 0);
 
-	if (strlen(Cmd) > 20 || cmdp == 'h' || cmdp == 'H' || strlen(Cmd)<2) {
+	if (strlen(Cmd) > 35 || cmdp == 'h' || cmdp == 'H' || strlen(Cmd)<2) {
 		PrintAndLog("Usage:  data rawdemod [modulation] <help>|<options>");
 		PrintAndLog("   [modulation] as 2 char, 'ab' for ask/biphase, 'am' for ask/manchester, 'ar' for ask/raw, 'fs' for fsk, ...");		
 		PrintAndLog("         'nr' for nrz/direct, 'p1' for psk1, 'p2' for psk2");

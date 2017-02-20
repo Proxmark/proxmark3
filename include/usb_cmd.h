@@ -101,6 +101,7 @@ typedef struct{
 #define CMD_AWID_DEMOD_FSK                                                0x0221
 #define CMD_VIKING_CLONE_TAG                                              0x0223
 #define CMD_T55XX_WAKEUP                                                  0x0224
+#define CMD_COTAG                                                         0x0225
 
 
 /* CMD_SET_ADC_MUX: ext1 is 0 for lopkd, 1 for loraw, 2 for hipkd, 3 for hiraw */
@@ -217,6 +218,7 @@ typedef struct{
 #define FLAG_7B_UID_IN_DATA   0x04
 #define FLAG_10B_UID_IN_DATA  0x08
 #define FLAG_NR_AR_ATTACK     0x10
+#define FLAG_RANDOM_NONCE     0x20
 
 
 //Iclass reader flags
