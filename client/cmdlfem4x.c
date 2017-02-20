@@ -567,7 +567,7 @@ int demodEM4x05resp(uint32_t *word, bool readCmd) {
 	int ans = 0;
 
 	// test for FSK wave (easiest to 99% ID)
-	if (GetFskClock("", FALSE, FALSE)) {
+	if (GetFskClock("", false, false)) {
 		//valid fsk clocks found
 		ans = FSKrawDemod("0 0", false);
 		if (!ans) {
@@ -579,10 +579,10 @@ int demodEM4x05resp(uint32_t *word, bool readCmd) {
 		}
 	}
 	// PSK clocks should be easy to detect ( but difficult to demod a non-repeating pattern... )
-	ans = GetPskClock("", FALSE, FALSE);
+	ans = GetPskClock("", false, false);
 	if (ans>0) {
 		//try psk1
-		ans = PSKDemod("0 0 6", FALSE);
+		ans = PSKDemod("0 0 6", false);
 		if (!ans) {
 			if (g_debugMode) PrintAndLog("DEBUG: Error - EM4305: PSK1 Demod failed, ans: %d", ans);
 		} else {
@@ -596,7 +596,7 @@ int demodEM4x05resp(uint32_t *word, bool readCmd) {
 				}
 			}
 			//try psk1 inverted
-			ans = PSKDemod("0 1 6", FALSE);
+			ans = PSKDemod("0 1 6", false);
 			if (!ans) {
 				if (g_debugMode) PrintAndLog("DEBUG: Error - EM4305: PSK1 Demod failed, ans: %d", ans);
 			} else {
@@ -626,7 +626,7 @@ int demodEM4x05resp(uint32_t *word, bool readCmd) {
 	}
 
 	//try biphase
-	ans = ASKbiphaseDemod("0 0 1", FALSE);
+	ans = ASKbiphaseDemod("0 0 1", false);
 	if (!ans) { 
 		if (g_debugMode) PrintAndLog("DEBUG: Error - EM4305: ASK/biphase Demod failed, ans: %d", ans);
 	} else {
@@ -636,7 +636,7 @@ int demodEM4x05resp(uint32_t *word, bool readCmd) {
 	}
 
 	//try diphase (differential biphase or inverted)
-	ans = ASKbiphaseDemod("0 1 1", FALSE);
+	ans = ASKbiphaseDemod("0 1 1", false);
 	if (!ans) { 
 		if (g_debugMode) PrintAndLog("DEBUG: Error - EM4305: ASK/biphase Demod failed, ans: %d", ans);
 	} else {
@@ -731,9 +731,9 @@ int CmdEM4x05dump(const char *Cmd) {
 	for (; addr < 16; addr++) {
 		if (addr == 2) {
 			if (usePwd) {
-				PrintAndLog("PWD Address %02u | %08X",addr,pwd);
+				PrintAndLog(" PWD Address %02u | %08X",addr,pwd);
 			} else {
-				PrintAndLog("PWD Address 02 | cannot read");
+				PrintAndLog(" PWD Address 02 | cannot read");
 			}
 		} else {
 			success &= EM4x05ReadWord(addr, pwd, usePwd);
