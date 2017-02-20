@@ -150,7 +150,7 @@ local function read15693()
 	end
 
 	local count,cmd,recvLen,arg1,arg2 = bin.unpack('LLLL',result)
-	data = string.sub(result,recvlen)
+	data = string.sub(result,recvLen)
 	info, err = parse15693(data)
 	
 	if err then 
