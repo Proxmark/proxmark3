@@ -534,8 +534,8 @@ bool EM4x05testDemodReadData(uint32_t *word, bool readCmd) {
 	// skip first two 0 bits as they might have been missed in the demod
 	uint8_t preamble[] = {0,0,1,0,1,0};
 	size_t startIdx = 0;
-	// set size to 15 to only test first 9 positions for the preamble
-	size_t size = (15 > DemodBufferLen) ? DemodBufferLen : 15;
+	// set size to 20 to only test first 14 positions for the preamble
+	size_t size = (20 > DemodBufferLen) ? DemodBufferLen : 20;
 
 	//test preamble
 	if ( !onePreambleSearch(DemodBuffer, preamble, sizeof(preamble), size, &startIdx) ) {

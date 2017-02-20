@@ -1628,7 +1628,7 @@ void EM4xReadWord(uint8_t Address, uint32_t Pwd, uint8_t PwdMode) {
 	SendForward(fwd_bit_count);
 
 	// Now do the acquisition
-	DoAcquisition_default(0,TRUE);
+	doT55x7Acquisition(6000);
 	
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF); // field off
 	LED_A_OFF();
