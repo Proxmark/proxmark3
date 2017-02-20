@@ -170,6 +170,23 @@ uint8_t preambleSearch(uint8_t *BitStream, uint8_t *preamble, size_t pLen, size_
 	return 0;
 }
 
+// search for given preamble in given BitStream and return success=1 or fail=0 and startIndex (where it was found)
+// does not look for a repeating preamble
+// em4x05/4x69 only sends preamble once, so look for it once in the first pLen bits
+// leave it generic so it could be reused later...
+bool onePreambleSearch(uint8_t *BitStream, uint8_t *preamble, size_t pLen, size_t size, size_t *startIdx) {
+	// Sanity check.  If preamble length is bigger than bitstream length.
+	if ( size <= pLen ) return false;
+	for (size_t idx = 0; idx < size - pLen; idx++) {
+		if (memcmp(BitStream+idx, preamble, pLen) == 0) {
+			if (g_debugMode) prnt("DEBUG: preamble found at %u", idx);
+			*startIdx = idx;
+			return true;
+		}
+	}
+	return false;
+}
+
 //by marshmellow
 //takes 1s and 0s and searches for EM410x format - output EM ID
 uint8_t Em410xDecode(uint8_t *BitStream, size_t *size, size_t *startIdx, uint32_t *hi, uint64_t *lo)
