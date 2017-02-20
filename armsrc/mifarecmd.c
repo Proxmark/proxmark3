@@ -53,7 +53,7 @@ void MifareReadBlock(uint8_t arg0, uint8_t arg1, uint8_t arg2, uint8_t *datain)
 	LED_C_OFF();
 
 	while (true) {
-		if(!iso14443a_select_card(uid, NULL, &cuid)) {
+		if(!iso14443a_select_card(uid, NULL, &cuid, 1)) {
 			if (MF_DBGLEVEL >= 1)	Dbprintf("Can't select card");
 			break;
 		};
@@ -100,7 +100,7 @@ void MifareUC_Auth(uint8_t arg0, uint8_t *keybytes){
 
 	clear_trace();
 
-	if(!iso14443a_select_card(NULL, NULL, NULL)) {
+	if(!iso14443a_select_card(NULL, NULL, NULL, 1)) {
 		if (MF_DBGLEVEL >= MF_DBG_ERROR) Dbprintf("Can't select card");
 		OnError(0);
 		return;
@@ -135,7 +135,7 @@ void MifareUReadBlock(uint8_t arg0, uint8_t arg1, uint8_t *datain)
 
 	clear_trace();
 
-	int len = iso14443a_select_card(NULL, NULL, NULL);
+	int len = iso14443a_select_card(NULL, NULL, NULL, 1);
 	if(!len) {
 		if (MF_DBGLEVEL >= MF_DBG_ERROR) Dbprintf("Can't select card (RC:%02X)",len);
 		OnError(1);
@@ -211,7 +211,7 @@ void MifareReadSector(uint8_t arg0, uint8_t arg1, uint8_t arg2, uint8_t *datain)
 	LED_C_OFF();
 
 	isOK = 1;
-	if(!iso14443a_select_card(uid, NULL, &cuid)) {
+	if(!iso14443a_select_card(uid, NULL, &cuid, 1)) {
 		isOK = 0;
 		if (MF_DBGLEVEL >= 1)	Dbprintf("Can't select card");
 	}
@@ -275,7 +275,7 @@ void MifareUReadCard(uint8_t arg0, uint16_t arg1, uint8_t arg2, uint8_t *datain)
 		return;
 	}
 
-	int len = iso14443a_select_card(NULL, NULL, NULL);
+	int len = iso14443a_select_card(NULL, NULL, NULL, 1);
 	if (!len) {
 		if (MF_DBGLEVEL >= MF_DBG_ERROR) Dbprintf("Can't select card (RC:%d)",len);
 		OnError(1);
@@ -377,7 +377,7 @@ void MifareWriteBlock(uint8_t arg0, uint8_t arg1, uint8_t arg2, uint8_t *datain)
 	LED_C_OFF();
 
 	while (true) {
-			if(!iso14443a_select_card(uid, NULL, &cuid)) {
+			if(!iso14443a_select_card(uid, NULL, &cuid, 1)) {
 			if (MF_DBGLEVEL >= 1)	Dbprintf("Can't select card");
 			break;
 		};
@@ -431,7 +431,7 @@ void MifareUWriteBlockCompat(uint8_t arg0, uint8_t *datain)
 	clear_trace();
 	iso14443a_setup(FPGA_HF_ISO14443A_READER_LISTEN);
 
-	if(!iso14443a_select_card(uid, NULL, NULL)) {
+	if(!iso14443a_select_card(uid, NULL, NULL, 1)) {
 		if (MF_DBGLEVEL >= 1)   Dbprintf("Can't select card");
 		OnError(0);
 		return;
@@ -477,7 +477,7 @@ void MifareUWriteBlock(uint8_t arg0, uint8_t arg1, uint8_t *datain)
 
 	clear_trace();
 
-	if(!iso14443a_select_card(NULL, NULL, NULL)) {
+	if(!iso14443a_select_card(NULL, NULL, NULL, 1)) {
 		if (MF_DBGLEVEL >= 1) Dbprintf("Can't select card");
 		OnError(0);
 		return;
@@ -536,7 +536,7 @@ void MifareUSetPwd(uint8_t arg0, uint8_t *datain){
 
 	clear_trace();
 
-	if(!iso14443a_select_card(NULL, NULL, NULL)) {
+	if(!iso14443a_select_card(NULL, NULL, NULL, 1)) {
 		if (MF_DBGLEVEL >= 1) Dbprintf("Can't select card");
 		OnError(0);
 		return;
@@ -672,7 +672,7 @@ void MifareNested(uint32_t arg0, uint32_t arg1, uint32_t calibrate, uint8_t *dat
 				continue;
 			}
 
-			if(!iso14443a_select_card(uid, NULL, &cuid)) {
+			if(!iso14443a_select_card(uid, NULL, &cuid, 1)) {
 				if (MF_DBGLEVEL >= 1)	Dbprintf("Nested: Can't select card");
 				rtr--;
 				continue;
@@ -746,7 +746,7 @@ void MifareNested(uint32_t arg0, uint32_t arg1, uint32_t calibrate, uint8_t *dat
 				continue;
 			}
 
-			if(!iso14443a_select_card(uid, NULL, &cuid)) {
+			if(!iso14443a_select_card(uid, NULL, &cuid, 1)) {
 				if (MF_DBGLEVEL >= 1)	Dbprintf("Nested: Can't select card");
 				continue;
 			};
@@ -861,7 +861,7 @@ void MifareChkKeys(uint16_t arg0, uint8_t arg1, uint8_t arg2, uint8_t *datain)
 			if (MF_DBGLEVEL >= 1)	Dbprintf("ChkKeys: Halt error");
 		}
 
-		if(!iso14443a_select_card(uid, NULL, &cuid)) {
+		if(!iso14443a_select_card(uid, NULL, &cuid, 1)) {
 			if (OLD_MF_DBGLEVEL >= 1)	Dbprintf("ChkKeys: Can't select card");
 			break;
 		};
@@ -954,7 +954,7 @@ void MifareECardLoad(uint32_t arg0, uint32_t arg1, uint32_t arg2, uint8_t *datai
 	
 	bool isOK = true;
 
-	if(!iso14443a_select_card(uid, NULL, &cuid)) {
+	if(!iso14443a_select_card(uid, NULL, &cuid, 1)) {
 		isOK = false;
 		if (MF_DBGLEVEL >= 1)	Dbprintf("Can't select card");
 	}
@@ -1054,15 +1054,12 @@ void MifareCSetBlock(uint32_t arg0, uint32_t arg1, uint32_t arg2, uint8_t *datai
 
 		// get UID from chip
 		if (workFlags & 0x01) {
-			if(!iso14443a_select_card(uid, NULL, &cuid)) {
+			if(!iso14443a_select_card(uid, NULL, &cuid, 1)) {
 				if (MF_DBGLEVEL >= 1)	Dbprintf("Can't select card");
 				break;
 			};
 
-			if(mifare_classic_halt(NULL, cuid)) {
-				if (MF_DBGLEVEL >= 1)	Dbprintf("Halt error");
-				break;
-			};
+			mifare_classic_halt(NULL, cuid);
 		};
 	
 		// reset chip
@@ -1079,10 +1076,7 @@ void MifareCSetBlock(uint32_t arg0, uint32_t arg1, uint32_t arg2, uint8_t *datai
 				break;
 			};
 
-			if(mifare_classic_halt(NULL, cuid)) {
-				if (MF_DBGLEVEL >= 1)	Dbprintf("Halt error");
-				break;
-			};
+			mifare_classic_halt(NULL, cuid);
 		};	
 
 		// write block
@@ -1115,10 +1109,7 @@ void MifareCSetBlock(uint32_t arg0, uint32_t arg1, uint32_t arg2, uint8_t *datai
 		};	
 	
 		if (workFlags & 0x04) {
-			if (mifare_classic_halt(NULL, cuid)) {
-				if (MF_DBGLEVEL >= 1)	Dbprintf("Halt error");
-				break;
-			};
+			mifare_classic_halt(NULL, cuid);
 		}
 		
 		isOK = 1;
@@ -1192,10 +1183,7 @@ void MifareCGetBlock(uint32_t arg0, uint32_t arg1, uint32_t arg2, uint8_t *datai
 		memcpy(data, receivedAnswer, 18);
 		
 		if (workFlags & 0x04) {
-			if (mifare_classic_halt(NULL, cuid)) {
-				if (MF_DBGLEVEL >= 1)	Dbprintf("Halt error");
-				break;
-			};
+			mifare_classic_halt(NULL, cuid);
 		}
 		
 		isOK = 1;
@@ -1222,6 +1210,7 @@ void MifareCIdent(){
 	// card commands
 	uint8_t wupC1[]       = { 0x40 }; 
 	uint8_t wupC2[]       = { 0x43 }; 
+	uint8_t halt_ret	  = 0;
 	
 	// variables
 	byte_t isOK = 1;
@@ -1239,7 +1228,8 @@ void MifareCIdent(){
 		isOK = 0;
 	};
 
-	if (mifare_classic_halt(NULL, 0)) {
+	halt_ret = mifare_classic_halt(NULL, 0);
+	if (halt_ret && halt_ret != 4) {
 		isOK = 0;
 	};
 
@@ -1259,7 +1249,7 @@ void Mifare_DES_Auth1(uint8_t arg0, uint8_t *datain){
 	iso14443a_setup(FPGA_HF_ISO14443A_READER_LISTEN);
 	clear_trace();
 
-	int len = iso14443a_select_card(uid, NULL, &cuid);
+	int len = iso14443a_select_card(uid, NULL, &cuid, 0);
 	if(!len) {
 		if (MF_DBGLEVEL >= MF_DBG_ERROR) Dbprintf("Can't select card");
 		OnError(1);
