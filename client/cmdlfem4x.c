@@ -823,8 +823,9 @@ void printEM4x05info(uint8_t chipType, uint8_t cap, uint16_t custCode, uint32_t 
 
 	switch (cap) {
 		case 3: PrintAndLog(" Cap Type:   %u | 330pF",cap); break;
-		case 2: PrintAndLog(" Cap Type:   %u | 210pF",cap); break;
+		case 2: PrintAndLog(" Cap Type:   %u | %spF",cap, (chipType==2)? "75":"210"); break;
 		case 1: PrintAndLog(" Cap Type:   %u | 250pF",cap); break;
+		case 0: PrintAndLog(" Cap Type:   %u | no resonant capacitor",cap); break;
 		default: PrintAndLog(" Cap Type:   %u | unknown",cap); break;
 	}
 

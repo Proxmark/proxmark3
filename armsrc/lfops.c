@@ -1628,7 +1628,7 @@ void EM4xReadWord(uint8_t Address, uint32_t Pwd, uint8_t PwdMode) {
 	SendForward(fwd_bit_count);
 
 	// Now do the acquisition
-	doT55x7Acquisition(6000);
+	DoPartialAcquisition(20, true, 5500);
 	
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF); // field off
 	LED_A_OFF();
@@ -1656,10 +1656,10 @@ void EM4xWriteWord(uint32_t flag, uint32_t Data, uint32_t Pwd) {
 	SendForward(fwd_bit_count);
 
 	//Wait for write to complete
-	SpinDelay(10);
+	//SpinDelay(10);
 
 	//Capture response if one exists
-	DoAcquisition_default(20, TRUE);
+	DoPartialAcquisition(20, true, 5500);
 
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF); // field off
 	LED_A_OFF();

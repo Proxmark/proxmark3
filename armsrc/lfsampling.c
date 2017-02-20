@@ -119,11 +119,11 @@ void LFSetupFPGAForADC(int divisor, bool lf_field)
  * @param silent - is true, now outputs are made. If false, dbprints the status
  * @return the number of bits occupied by the samples.
  */
-uint32_t DoAcquisition(uint8_t decimation, uint32_t bits_per_sample, bool averaging, int trigger_threshold, bool silent)
+uint32_t DoAcquisition(uint8_t decimation, uint32_t bits_per_sample, bool averaging, int trigger_threshold, bool silent, int bufsize)
 {
 	//.
 	uint8_t *dest = BigBuf_get_addr();
-    int bufsize = BigBuf_max_traceLen();
+	bufsize = (bufsize > 0 && bufsize < BigBuf_max_traceLen()) ? bufsize : BigBuf_max_traceLen();
 
 	//memset(dest, 0, bufsize); //creates issues with cmdread (marshmellow)
 
@@ -213,7 +213,7 @@ uint32_t DoAcquisition(uint8_t decimation, uint32_t bits_per_sample, bool averag
  */
 uint32_t DoAcquisition_default(int trigger_threshold, bool silent)
 {
-	return DoAcquisition(1,8,0,trigger_threshold,silent);
+	return DoAcquisition(1,8,0,trigger_threshold,silent,0);
 }
 uint32_t DoAcquisition_config( bool silent)
 {
@@ -221,7 +221,12 @@ uint32_t DoAcquisition_config( bool silent)
 				  ,config.bits_per_sample
 				  ,config.averaging
 				  ,config.trigger_threshold
-				  ,silent);
+				  ,silent
+				  ,0);
+}
+
+uint32_t DoPartialAcquisition(int trigger_threshold, bool silent, int sample_size) {
+	return DoAcquisition(1,8,0,trigger_threshold,silent,sample_size);
 }
 
 uint32_t ReadLF(bool activeField, bool silent)
