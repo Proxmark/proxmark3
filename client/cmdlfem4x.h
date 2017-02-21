@@ -18,11 +18,14 @@ int CmdEM410xWatch(const char *Cmd);
 int CmdEM410xWatchnSpoof(const char *Cmd);
 int CmdEM410xWrite(const char *Cmd);
 int CmdEM4x50Read(const char *Cmd);
-int CmdLFEM4X(const char *Cmd);
-int CmdReadWord(const char *Cmd);
-int CmdReadWordPWD(const char *Cmd);
-int CmdWriteWord(const char *Cmd);
-int CmdWriteWordPWD(const char *Cmd);
 int EM4x50Read(const char *Cmd, bool verbose);
+int CmdLFEM4X(const char *Cmd);
+bool EM4x05Block0Test(uint32_t *wordData);
+int CmdEM4x05info(const char *Cmd);
+int CmdEM4x05WriteWord(const char *Cmd);
+int CmdEM4x05dump(const char *Cmd);
+int CmdEM4x05ReadWord(const char *Cmd);
+int EM4x05ReadWord_ext(uint8_t addr, uint32_t pwd, bool usePwd, uint32_t *wordData);
+
 
 #endif
