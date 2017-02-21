@@ -1265,7 +1265,7 @@ static command_t CommandTable[] =
 	{"help",        CmdHelp,            1, "This help"},
 	{"awid",        CmdLFAWID,          1, "{ AWID RFIDs...    }"},
 	{"cotag",       CmdLFCOTAG,         1, "{ COTAG RFIDs...   }"},
-	{"em4x",        CmdLFEM4X,          1, "{ EM4X RFIDs...    }"},
+	{"em",          CmdLFEM4X,          1, "{ EM4X RFIDs...    }"},
 	{"hid",         CmdLFHID,           1, "{ HID RFIDs...     }"},
 	{"hitag",       CmdLFHitag,         1, "{ Hitag tags and transponders... }"},
 	{"io",          CmdLFIO,            1, "{ ioProx tags...   }"},
