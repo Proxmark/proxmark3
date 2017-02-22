@@ -1343,7 +1343,10 @@ uint8_t detectFSKClk(uint8_t *BitStream, size_t size, uint8_t fcHigh, uint8_t fc
 			continue;		
 		// else new peak 
 		// if we got less than the small fc + tolerance then set it to the small fc
-		if (fcCounter < fcLow+fcTol) 
+		// if it is inbetween set it to the last counter
+		if (fcCounter < fcHigh && fcCounter > fcLow)
+			fcCounter = lastFCcnt;
+		else if (fcCounter < fcLow+fcTol) 
 			fcCounter = fcLow;
 		else //set it to the large fc
 			fcCounter = fcHigh;
@@ -1409,7 +1412,7 @@ uint8_t detectFSKClk(uint8_t *BitStream, size_t size, uint8_t fcHigh, uint8_t fc
 		}
 	}
 
-	if (ii<0) return 0; // oops we went too far
+	if (ii<2) return 0; // oops we went too far
 
 	return clk[ii];
 }

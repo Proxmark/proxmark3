@@ -675,7 +675,7 @@ int EM4x05ReadWord(uint8_t addr, uint32_t pwd, bool usePwd) {
 	uint32_t wordData = 0;
 	int success = EM4x05ReadWord_ext(addr, pwd, usePwd, &wordData);
 	if (success == 1)
-		PrintAndLog(" Got Address %02d | %08X",addr,wordData);
+		PrintAndLog("%s Address %02d | %08X", (addr>13) ? "Lock":" Got",addr,wordData);
 	else
 		PrintAndLog("Read Address %02d | failed",addr);
 
@@ -859,11 +859,11 @@ void printEM4x05config(uint32_t wordData) {
 	}
 	PrintAndLog("ConfigWord: %08X (Word 4)\n", wordData);
 	PrintAndLog("Config Breakdown:", wordData);
-	PrintAndLog(" Data Rate:  %02X | RF/%u", wordData & 0x3F, datarate);
+	PrintAndLog(" Data Rate:  %02u | RF/%u", wordData & 0x3F, datarate);
 	PrintAndLog("   Encoder:   %u | %s", encoder, enc);
 	PrintAndLog("    PSK CF:   %u | %s", PSKcf, cf);
 	PrintAndLog("     Delay:   %u | %s", delay, cdelay);
-	PrintAndLog(" LastWordR:  %02u | Address of last default word read", LWR);
+	PrintAndLog(" LastWordR:  %02u | Address of last word for default read", LWR);
 	PrintAndLog(" ReadLogin:   %u | Read Login is %s", (wordData & 0x40000)>>18, (wordData & 0x40000) ? "Required" : "Not Required");	
 	PrintAndLog("   ReadHKL:   %u | Read Housekeeping Words Login is %s", (wordData & 0x80000)>>19, (wordData & 0x80000) ? "Required" : "Not Required");	
 	PrintAndLog("WriteLogin:   %u | Write Login is %s", (wordData & 0x100000)>>20, (wordData & 0x100000) ? "Required" : "Not Required");	
@@ -898,8 +898,11 @@ void printEM4x05info(uint8_t chipType, uint8_t cap, uint16_t custCode, uint32_t 
 }
 
 void printEM4x05ProtectionBits(uint32_t wordData) {
-	for (uint8_t i = 0; i < 14; i++) {
-		PrintAndLog("      Word:  %02u | %s", i, (((1 << i) & wordData ) || i < 2) ? "Is Locked" : "Is Not Locked");
+	for (uint8_t i = 0; i < 15; i++) {
+		PrintAndLog("      Word:  %02u | %s", i, (((1 << i) & wordData ) || i < 2) ? "Is Write Locked" : "Is Not Write Locked");
+		if (i==14) {
+			PrintAndLog("      Word:  %02u | %s", i+1, (((1 << i) & wordData ) || i < 2) ? "Is Write Locked" : "Is Not Write Locked");
+		}
 	}
 }
 
