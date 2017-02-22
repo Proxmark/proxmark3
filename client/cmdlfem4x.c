@@ -530,14 +530,16 @@ bool downloadSamplesEM() {
 }
 
 bool EM4x05testDemodReadData(uint32_t *word, bool readCmd) {
-	// em4x05/em4x69 preamble is 00001010
+	// em4x05/em4x69 command response preamble is 00001010
 	// skip first two 0 bits as they might have been missed in the demod
 	uint8_t preamble[] = {0,0,1,0,1,0};
 	size_t startIdx = 0;
-	// set size to 20 to only test first 14 positions for the preamble
-	size_t size = (20 > DemodBufferLen) ? DemodBufferLen : 20;
 
-	//test preamble
+	// set size to 20 to only test first 14 positions for the preamble or less if not a read command
+	size_t size = (readCmd) ? 20 : 11;
+	// sanity check
+	size = (size > DemodBufferLen) ? DemodBufferLen : size;
+	// test preamble
 	if ( !onePreambleSearch(DemodBuffer, preamble, sizeof(preamble), size, &startIdx) ) {
 		if (g_debugMode) PrintAndLog("DEBUG: Error - EM4305 preamble not found :: %d", startIdx);
 		return false;
@@ -548,7 +550,7 @@ bool EM4x05testDemodReadData(uint32_t *word, bool readCmd) {
 			if (g_debugMode) PrintAndLog("DEBUG: Error - End Parity check failed");
 			return false;
 		}
-		//test for even parity bits.
+		// test for even parity bits.
 		if ( removeParity(DemodBuffer, startIdx + sizeof(preamble),9,0,44) == 0 ) {		
 			if (g_debugMode) PrintAndLog("DEBUG: Error - Parity not detected");
 			return false;
@@ -808,6 +810,8 @@ int CmdEM4x05WriteWord(const char *Cmd) {
 	int result = demodEM4x05resp(&dummy,false);
 	if (result == 1) {
 		PrintAndLog("Write Verified");
+	} else {
+		PrintAndLog("Write could not be verified");
 	}
 	return result;
 }
@@ -893,6 +897,12 @@ void printEM4x05info(uint8_t chipType, uint8_t cap, uint16_t custCode, uint32_t 
 	}
 }
 
+void printEM4x05ProtectionBits(uint32_t wordData) {
+	for (uint8_t i = 0; i < 14; i++) {
+		PrintAndLog("      Word:  %02u | %s", i, (((1 << i) & wordData ) || i < 2) ? "Is Locked" : "Is Not Locked");
+	}
+}
+
 //quick test for EM4x05/EM4x69 tag
 bool EM4x05Block0Test(uint32_t *wordData) {
 	if (EM4x05ReadWord_ext(0,0,false,wordData) == 1) {
@@ -940,6 +950,26 @@ int CmdEM4x05info(const char *Cmd) {
 		return 0;
 	}
 	printEM4x05config(wordData);
+
+	// read word 14 and 15 to see which is being used for the protection bits
+	wordData = 0;
+	if ( EM4x05ReadWord_ext(14, pwd, usePwd, &wordData) != 1 ) {
+		//failed
+		return 0;
+	}
+	// if status bit says this is not the used protection word
+	if (!(wordData & 0x8000)) {
+		if ( EM4x05ReadWord_ext(15, pwd, usePwd, &wordData) != 1 ) {
+			//failed
+			return 0;
+		}
+	}
+	if (!(wordData & 0x8000)) {
+		//something went wrong
+		return 0;
+	}
+	printEM4x05ProtectionBits(wordData);
+
 	return 1;
 }
 
