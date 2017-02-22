@@ -88,7 +88,7 @@ void T55xxWakeUp(uint32_t Pwd);
 void TurnReadLFOn();
 //void T55xxReadTrace(void);
 void EM4xReadWord(uint8_t Address, uint32_t Pwd, uint8_t PwdMode);
-void EM4xWriteWord(uint32_t Data, uint8_t Address, uint32_t Pwd, uint8_t PwdMode);
+void EM4xWriteWord(uint32_t flag, uint32_t Data, uint32_t Pwd);
 void Cotag(uint32_t arg0);
 
 /// iso14443.h

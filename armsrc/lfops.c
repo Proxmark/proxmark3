@@ -684,7 +684,7 @@ void CmdASKsimTag(uint16_t arg1, uint16_t arg2, size_t size, uint8_t *BitStream)
 		for (i=0; i<size; i++){
 			askSimBit(BitStream[i]^invert, &n, clk, encoding);
 		}
-		if (encoding==0 && BitStream[0]==BitStream[size-1]){ //run a second set inverted (for biphase phase)
+		if (encoding==0 && BitStream[0]==BitStream[size-1]){ //run a second set inverted (for ask/raw || biphase phase)
 			for (i=0; i<size; i++){
 				askSimBit(BitStream[i]^invert^1, &n, clk, encoding);
 			}
@@ -1358,7 +1358,7 @@ void CopyIndala224toT55x7(uint32_t uid1, uint32_t uid2, uint32_t uid3, uint32_t 
 	//Config for Indala (RF/32;PSK1 with RF/2;Maxblock=7)
 	data[0] = T55x7_BITRATE_RF_32 | T55x7_MODULATION_PSK1 | (7 << T55x7_MAXBLOCK_SHIFT);
 	//TODO add selection of chip for Q5 or T55x7
-	// data[0] = (((32-2)/2)<<T5555_BITRATE_SHIFT) | T5555_MODULATION_PSK1 | 7 << T5555_MAXBLOCK_SHIFT;
+	// data[0] = (((32-2)>>1)<<T5555_BITRATE_SHIFT) | T5555_MODULATION_PSK1 | 7 << T5555_MAXBLOCK_SHIFT;
 	WriteT55xx(data, 0, 8);
 	//Alternative config for Indala (Extended mode;RF/32;PSK1 with RF/2;Maxblock=7;Inverse data)
 	//	T5567WriteBlock(0x603E10E2,0);
@@ -1367,7 +1367,7 @@ void CopyIndala224toT55x7(uint32_t uid1, uint32_t uid2, uint32_t uid3, uint32_t 
 // clone viking tag to T55xx
 void CopyVikingtoT55xx(uint32_t block1, uint32_t block2, uint8_t Q5) {
 	uint32_t data[] = {T55x7_BITRATE_RF_32 | T55x7_MODULATION_MANCHESTER | (2 << T55x7_MAXBLOCK_SHIFT), block1, block2};
-	if (Q5) data[0] = (32 << T5555_BITRATE_SHIFT) | T5555_MODULATION_MANCHESTER | 2 << T5555_MAXBLOCK_SHIFT;
+	if (Q5) data[0] = ( ((32-2)>>1) << T5555_BITRATE_SHIFT) | T5555_MODULATION_MANCHESTER | 2 << T5555_MAXBLOCK_SHIFT;
 	// Program the data blocks for supplied ID and the block 0 config
 	WriteT55xx(data, 0, 3);
 	LED_D_OFF();
@@ -1571,8 +1571,6 @@ void SendForward(uint8_t fwd_bit_count) {
 	fwd_write_ptr = forwardLink_data;
 	fwd_bit_sz = fwd_bit_count;
 
-	LED_D_ON();
-
 	// Set up FPGA, 125kHz
 	LFSetupFPGAForADC(95, true);
 
@@ -1580,9 +1578,9 @@ void SendForward(uint8_t fwd_bit_count) {
 	fwd_bit_sz--; //prepare next bit modulation
 	fwd_write_ptr++;
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF); // field off
-	SpinDelayUs(55*8); //55 cycles off (8us each)for 4305
+	SpinDelayUs(56*8); //55 cycles off (8us each)for 4305  /another reader has 37 here...
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_LF_ADC | FPGA_LF_ADC_READER_FIELD);//field on
-	SpinDelayUs(16*8); //16 cycles on (8us each)
+	SpinDelayUs(18*8); //16 cycles on (8us each)  // another reader has 18 here
 
 	// now start writting
 	while(fwd_bit_sz-- > 0) { //prepare next bit modulation
@@ -1591,9 +1589,9 @@ void SendForward(uint8_t fwd_bit_count) {
 		else {
 			//These timings work for 4469/4269/4305 (with the 55*8 above)
 			FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF); // field off
-			SpinDelayUs(23*8); //16-4 cycles off (8us each)
+			SpinDelayUs(23*8); //16-4 cycles off (8us each) //23  //one reader goes as high as 25 here
 			FpgaWriteConfWord(FPGA_MAJOR_MODE_LF_ADC | FPGA_LF_ADC_READER_FIELD);//field on
-			SpinDelayUs(9*8); //16 cycles on (8us each)
+			SpinDelayUs(16*8); //16 cycles on (8us each) //9  // another reader goes to 17 here
 		}
 	}
 }
@@ -1615,13 +1613,11 @@ void EM4xLogin(uint32_t Password) {
 void EM4xReadWord(uint8_t Address, uint32_t Pwd, uint8_t PwdMode) {
 
 	uint8_t fwd_bit_count;
-	uint8_t *dest = BigBuf_get_addr();
-	uint16_t bufferlength = BigBuf_max_traceLen();
-	uint32_t i = 0;
 
 	// Clear destination buffer before sending the command
 	BigBuf_Clear_ext(false);
 
+	LED_A_ON();
 	//If password mode do login
 	if (PwdMode == 1) EM4xLogin(Pwd);
 
@@ -1629,36 +1625,28 @@ void EM4xReadWord(uint8_t Address, uint32_t Pwd, uint8_t PwdMode) {
 	fwd_bit_count = Prepare_Cmd( FWD_CMD_READ );
 	fwd_bit_count += Prepare_Addr( Address );
 
-	// Connect the A/D to the peak-detected low-frequency path.
-	SetAdcMuxFor(GPIO_MUXSEL_LOPKD);
-	// Now set up the SSC to get the ADC samples that are now streaming at us.
-	FpgaSetupSsc();
-
 	SendForward(fwd_bit_count);
-
+	SpinDelayUs(400);
 	// Now do the acquisition
-	i = 0;
-	for(;;) {
-		if (AT91C_BASE_SSC->SSC_SR & AT91C_SSC_TXRDY) {
-			AT91C_BASE_SSC->SSC_THR = 0x43;
-		}
-		if (AT91C_BASE_SSC->SSC_SR & AT91C_SSC_RXRDY) {
-			dest[i] = (uint8_t)AT91C_BASE_SSC->SSC_RHR;
-			i++;
-			if (i >= bufferlength) break;
-		}
-	}
+	DoPartialAcquisition(20, true, 6000);
+	
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF); // field off
+	LED_A_OFF();
 	cmd_send(CMD_ACK,0,0,0,0,0);
-	LED_D_OFF();
 }
 
-void EM4xWriteWord(uint32_t Data, uint8_t Address, uint32_t Pwd, uint8_t PwdMode) {
-
+void EM4xWriteWord(uint32_t flag, uint32_t Data, uint32_t Pwd) {
+	
+	bool PwdMode = (flag & 0xF);
+	uint8_t Address = (flag >> 8) & 0xFF;
 	uint8_t fwd_bit_count;
 
+	//clear buffer now so it does not interfere with timing later
+	BigBuf_Clear_ext(false);
+
+	LED_A_ON();
 	//If password mode do login
-	if (PwdMode == 1) EM4xLogin(Pwd);
+	if (PwdMode) EM4xLogin(Pwd);
 
 	forward_ptr = forwardLink_data;
 	fwd_bit_count = Prepare_Cmd( FWD_CMD_WRITE );
@@ -1668,9 +1656,15 @@ void EM4xWriteWord(uint32_t Data, uint8_t Address, uint32_t Pwd, uint8_t PwdMode
 	SendForward(fwd_bit_count);
 
 	//Wait for write to complete
-	SpinDelay(20);
+	//SpinDelay(10);
+
+	SpinDelayUs(6500);
+	//Capture response if one exists
+	DoPartialAcquisition(20, true, 6000);
+
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF); // field off
-	LED_D_OFF();
+	LED_A_OFF();
+	cmd_send(CMD_ACK,0,0,0,0,0);
 }
 /*
 Reading a COTAG.

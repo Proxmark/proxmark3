@@ -13,7 +13,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
-#include <time.h>
+#include <time.h>    //time, gmtime
 #include "data.h"    //for FILE_PATH_SIZE
 
 #ifndef ROTR
@@ -42,12 +42,16 @@ void print_hex(const uint8_t * data, const size_t len);
 char * sprint_hex(const uint8_t * data, const size_t len);
 char * sprint_bin(const uint8_t * data, const size_t len);
 char * sprint_bin_break(const uint8_t *data, const size_t len, const uint8_t breaks);
+char * sprint_hex_ascii(const uint8_t *data, const size_t len);
+char * sprint_ascii(const uint8_t *data, const size_t len);
 
 void num_to_bytes(uint64_t n, size_t len, uint8_t* dest);
 uint64_t bytes_to_num(uint8_t* src, size_t len);
 void num_to_bytebits(uint64_t	n, size_t len, uint8_t *dest);
+void num_to_bytebitsLSBF(uint64_t n, size_t len, uint8_t *dest);
 char * printBits(size_t const size, void const * const ptr);
 uint8_t *SwapEndian64(const uint8_t *src, const size_t len, const uint8_t blockSize);
+void SwapEndian64ex(const uint8_t *src, const size_t len, const uint8_t blockSize, uint8_t *dest);
 
 char param_getchar(const char *line, int paramnum);
 int param_getptr(const char *line, int *bg, int *en, int paramnum);

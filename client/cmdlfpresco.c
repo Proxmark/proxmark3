@@ -178,7 +178,7 @@ int CmdPrescoClone(const char *Cmd) {
 	if (GetWiegandFromPresco(Cmd, &sitecode, &usercode, &fullcode, &Q5) == -1) return usage_lf_presco_clone();
 
 	if (Q5)
-		blocks[0] = T5555_MODULATION_MANCHESTER | 32<<T5555_BITRATE_SHIFT | 4<<T5555_MAXBLOCK_SHIFT | T5555_ST_TERMINATOR;
+		blocks[0] = T5555_MODULATION_MANCHESTER | ((32-2)>>1)<<T5555_BITRATE_SHIFT | 4<<T5555_MAXBLOCK_SHIFT | T5555_ST_TERMINATOR;
 
 	if ((sitecode & 0xFF) != sitecode) {
 		sitecode &= 0xFF;

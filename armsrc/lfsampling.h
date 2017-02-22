@@ -24,8 +24,10 @@ uint32_t SampleLF(bool silent);
 * Initializes the FPGA for snoop-mode (field off), and acquires the samples.
 * @return number of bits sampled
 **/
-
 uint32_t SnoopLF();
+
+// adds sample size to default options
+uint32_t DoPartialAcquisition(int trigger_threshold, bool silent, int sample_size);
 
 /**
  * @brief Does sample acquisition, ignoring the config values set in the sample_config.

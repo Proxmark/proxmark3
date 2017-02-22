@@ -62,7 +62,7 @@ uint8_t parityTest(uint32_t bits, uint8_t bitLen, uint8_t pType)
 	for (uint8_t i = 0; i < bitLen; i++){
 		ans ^= ((bits >> i) & 1);
 	}
-	//PrintAndLog("DEBUG: ans: %d, ptype: %d",ans,pType);
+	if (g_debugMode) prnt("DEBUG: ans: %d, ptype: %d, bits: %08X",ans,pType,bits);
 	return (ans == pType);
 }
 
@@ -73,11 +73,13 @@ size_t removeParity(uint8_t *BitStream, size_t startIdx, uint8_t pLen, uint8_t p
 {
 	uint32_t parityWd = 0;
 	size_t j = 0, bitCnt = 0;
-	for (int word = 0; word < (bLen); word+=pLen){
-		for (int bit=0; bit < pLen; bit++){
+	for (int word = 0; word < (bLen); word+=pLen) {
+		for (int bit=0; bit < pLen; bit++) {
 			parityWd = (parityWd << 1) | BitStream[startIdx+word+bit];
 			BitStream[j++] = (BitStream[startIdx+word+bit]);
 		}
+		if (word+pLen >= bLen) break;
+
 		j--; // overwrite parity with next data
 		// if parity fails then return 0
 		switch (pType) {
@@ -148,6 +150,9 @@ uint32_t bytebits_to_byteLSBF(uint8_t *src, size_t numbits)
 //search for given preamble in given BitStream and return success=1 or fail=0 and startIndex and length
 uint8_t preambleSearch(uint8_t *BitStream, uint8_t *preamble, size_t pLen, size_t *size, size_t *startIdx)
 {
+	// Sanity check.  If preamble length is bigger than bitstream length.
+	if ( *size <= pLen ) return 0;
+
 	uint8_t foundCnt=0;
 	for (int idx=0; idx < *size - pLen; idx++){
 		if (memcmp(BitStream+idx, preamble, pLen) == 0){
@@ -163,6 +168,49 @@ uint8_t preambleSearch(uint8_t *BitStream, uint8_t *preamble, size_t pLen, size_
 		}
 	}
 	return 0;
+}
+
+// search for given preamble in given BitStream and return success=1 or fail=0 and startIndex (where it was found)
+// does not look for a repeating preamble
+// em4x05/4x69 only sends preamble once, so look for it once in the first pLen bits
+// leave it generic so it could be reused later...
+bool onePreambleSearch(uint8_t *BitStream, uint8_t *preamble, size_t pLen, size_t size, size_t *startIdx) {
+	// Sanity check.  If preamble length is bigger than bitstream length.
+	if ( size <= pLen ) return false;
+	for (size_t idx = 0; idx < size - pLen; idx++) {
+		if (memcmp(BitStream+idx, preamble, pLen) == 0) {
+			if (g_debugMode) prnt("DEBUG: preamble found at %u", idx);
+			*startIdx = idx;
+			return true;
+		}
+	}
+	return false;
+}
+
+// find start of modulating data (for fsk and psk) in case of beginning noise or slow chip startup.
+size_t findModStart(uint8_t dest[], size_t size, uint8_t threshold_value, uint8_t expWaveSize) {
+	size_t i = 0;
+	size_t waveSizeCnt = 0;
+	uint8_t thresholdCnt = 0;
+	bool isAboveThreshold = dest[i++] >= threshold_value;
+	for (; i < size-20; i++ ) {
+		if(dest[i] < threshold_value && isAboveThreshold) {
+			thresholdCnt++;
+			if (thresholdCnt > 2 && waveSizeCnt < expWaveSize+1) break;			
+			isAboveThreshold = false;
+			waveSizeCnt = 0;
+		} else if (dest[i] >= threshold_value && !isAboveThreshold) {
+			thresholdCnt++;
+			if (thresholdCnt > 2 && waveSizeCnt < expWaveSize+1) break;			
+			isAboveThreshold = true;
+			waveSizeCnt = 0;
+		} else {
+			waveSizeCnt++;
+		}
+		if (thresholdCnt > 10) break;
+	}
+	if (g_debugMode == 2) prnt("DEBUG: threshold Count reached at %u, count: %u",i, thresholdCnt);
+	return i;
 }
 
 //by marshmellow
@@ -474,7 +522,6 @@ size_t fsk_wave_demod(uint8_t * dest, size_t size, uint8_t fchigh, uint8_t fclow
 {
 	size_t last_transition = 0;
 	size_t idx = 1;
-	//uint32_t maxVal=0;
 	if (fchigh==0) fchigh=10;
 	if (fclow==0) fclow=8;
 	//set the threshold close to 0 (graph) or 128 std to avoid static
@@ -482,19 +529,22 @@ size_t fsk_wave_demod(uint8_t * dest, size_t size, uint8_t fchigh, uint8_t fclow
 	size_t preLastSample = 0;
 	size_t LastSample = 0;
 	size_t currSample = 0;
-	// sync to first lo-hi transition, and threshold
+	if ( size < 1024 ) return 0; // not enough samples
+
+	//find start of modulating data in trace 
+	idx = findModStart(dest, size, threshold_value, fchigh);
 
 	// Need to threshold first sample
-	// skip 160 samples to allow antenna/samples to settle
-	if(dest[160] < threshold_value) dest[0] = 0;
+	if(dest[idx] < threshold_value) dest[0] = 0;
 	else dest[0] = 1;
-
+	idx++;
+	
 	size_t numBits = 0;
 	// count cycles between consecutive lo-hi transitions, there should be either 8 (fc/8)
 	// or 10 (fc/10) cycles but in practice due to noise etc we may end up with anywhere
 	// between 7 to 11 cycles so fuzz it by treat anything <9 as 8 and anything else as 10
 	//  (could also be fc/5 && fc/7 for fsk1 = 4-9)
-	for(idx = 161; idx < size-20; idx++) {
+	for(; idx < size-20; idx++) {
 		// threshold current value
 
 		if (dest[idx] < threshold_value) dest[idx] = 0;
@@ -509,13 +559,14 @@ size_t fsk_wave_demod(uint8_t * dest, size_t size, uint8_t fchigh, uint8_t fclow
 				//do nothing with extra garbage
 			} else if (currSample < (fchigh-1)) {           //6-8 = 8 sample waves  (or 3-6 = 5)
 				//correct previous 9 wave surrounded by 8 waves (or 6 surrounded by 5)
-				if (LastSample > (fchigh-2) && (preLastSample < (fchigh-1) || preLastSample	== 0 )){
+				if (LastSample > (fchigh-2) && (preLastSample < (fchigh-1))){
 					dest[numBits-1]=1;
 				}
 				dest[numBits++]=1;
 
-			} else if (currSample > (fchigh) && !numBits) { //12 + and first bit = unusable garbage 
-				//do nothing with beginning garbage
+			} else if (currSample > (fchigh+1) && numBits < 3) { //12 + and first two bit = unusable garbage
+				//do nothing with beginning garbage and reset..  should be rare..
+				numBits = 0; 
 			} else if (currSample == (fclow+1) && LastSample == (fclow-1)) { // had a 7 then a 9 should be two 8's (or 4 then a 6 should be two 5's)
 				dest[numBits++]=1;
 			} else {                                        //9+ = 10 sample waves (or 6+ = 7)
@@ -1292,7 +1343,10 @@ uint8_t detectFSKClk(uint8_t *BitStream, size_t size, uint8_t fcHigh, uint8_t fc
 			continue;		
 		// else new peak 
 		// if we got less than the small fc + tolerance then set it to the small fc
-		if (fcCounter < fcLow+fcTol) 
+		// if it is inbetween set it to the last counter
+		if (fcCounter < fcHigh && fcCounter > fcLow)
+			fcCounter = lastFCcnt;
+		else if (fcCounter < fcLow+fcTol) 
 			fcCounter = fcLow;
 		else //set it to the large fc
 			fcCounter = fcHigh;
@@ -1358,7 +1412,7 @@ uint8_t detectFSKClk(uint8_t *BitStream, size_t size, uint8_t fcHigh, uint8_t fc
 		}
 	}
 
-	if (ii<0) return 0; // oops we went too far
+	if (ii<2) return 0; // oops we went too far
 
 	return clk[ii];
 }
@@ -1372,10 +1426,10 @@ uint16_t countFC(uint8_t *BitStream, size_t size, uint8_t fskAdj)
 	uint8_t fcLens[] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
 	uint16_t fcCnts[] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
 	uint8_t fcLensFnd = 0;
-	uint8_t lastFCcnt=0;
+	uint8_t lastFCcnt = 0;
 	uint8_t fcCounter = 0;
 	size_t i;
-	if (size == 0) return 0;
+	if (size < 180) return 0;
 
 	// prime i to first up transition
 	for (i = 160; i < size-20; i++)
@@ -1462,27 +1516,37 @@ int pskRawDemod(uint8_t dest[], size_t *size, int *clock, int *invert)
 
 	size_t numBits=0;
 	uint8_t curPhase = *invert;
-	size_t i, waveStart=1, waveEnd=0, firstFullWave=0, lastClkBit=0;
-	uint8_t fc=0, fullWaveLen=0, tol=1;
-	uint16_t errCnt=0, waveLenCnt=0;
-	fc = countFC(dest, *size, 0);
+	size_t i=0, waveStart=1, waveEnd=0, firstFullWave=0, lastClkBit=0;
+	uint16_t fc=0, fullWaveLen=0, tol=1;
+	uint16_t errCnt=0, waveLenCnt=0, errCnt2=0;
+	fc = countFC(dest, *size, 1);
+	uint8_t fc2 = fc >> 8;
+	if (fc2 == 10) return -1; //fsk found - quit
+	fc = fc & 0xFF;
 	if (fc!=2 && fc!=4 && fc!=8) return -1;
 	//PrintAndLog("DEBUG: FC: %d",fc);
 	*clock = DetectPSKClock(dest, *size, *clock);
 	if (*clock == 0) return -1;
-	int avgWaveVal=0, lastAvgWaveVal=0;
+
+	//find start of modulating data in trace 
+	uint8_t threshold_value = 123; //-5
+	i = findModStart(dest, *size, threshold_value, fc);
+
 	//find first phase shift
-	for (i=0; i<loopCnt; i++){
+	int avgWaveVal=0, lastAvgWaveVal=0;
+	waveStart = i;
+	for (; i<loopCnt; i++) {
+		// find peak 
 		if (dest[i]+fc < dest[i+1] && dest[i+1] >= dest[i+2]){
 			waveEnd = i+1;
-			//PrintAndLog("DEBUG: waveEnd: %d",waveEnd);
+			if (g_debugMode == 2) prnt("DEBUG PSK: waveEnd: %u, waveStart: %u",waveEnd, waveStart);
 			waveLenCnt = waveEnd-waveStart;
-			if (waveLenCnt > fc && waveStart > fc && !(waveLenCnt > fc+2)){ //not first peak and is a large wave but not out of whack
+			if (waveLenCnt > fc && waveStart > fc && !(waveLenCnt > fc+3)){ //not first peak and is a large wave but not out of whack
 				lastAvgWaveVal = avgWaveVal/(waveLenCnt);
 				firstFullWave = waveStart;
 				fullWaveLen=waveLenCnt;
-				//if average wave value is > graph 0 then it is an up wave or a 1
-				if (lastAvgWaveVal > 123) curPhase ^= 1;  //fudge graph 0 a little 123 vs 128
+				//if average wave value is > graph 0 then it is an up wave or a 1 (could cause inverting)
+				if (lastAvgWaveVal > threshold_value) curPhase ^= 1;
 				break;
 			} 
 			waveStart = i+1;
@@ -1503,7 +1567,7 @@ int pskRawDemod(uint8_t dest[], size_t *size, int *clock, int *invert)
 	//set start of wave as clock align
 	lastClkBit = firstFullWave;
 	if (g_debugMode==2) prnt("DEBUG PSK: firstFullWave: %u, waveLen: %u",firstFullWave,fullWaveLen);  
-	if (g_debugMode==2) prnt("DEBUG: clk: %d, lastClkBit: %u, fc: %u", *clock, lastClkBit,(unsigned int) fc);
+	if (g_debugMode==2) prnt("DEBUG PSK: clk: %d, lastClkBit: %u, fc: %u", *clock, lastClkBit,(unsigned int) fc);
 	waveStart = 0;
 	dest[numBits++] = curPhase; //set first read bit
 	for (i = firstFullWave + fullWaveLen - 1; i < *size-3; i++){
@@ -1534,6 +1598,9 @@ int pskRawDemod(uint8_t dest[], size_t *size, int *clock, int *invert)
 				} else if (i+1 > lastClkBit + *clock + tol + fc){
 					lastClkBit += *clock; //no phase shift but clock bit
 					dest[numBits++] = curPhase;
+				} else if (waveLenCnt < fc - 1) { //wave is smaller than field clock (shouldn't happen often)
+					errCnt2++;
+					if(errCnt2 > 101) return errCnt2;
 				}
 				avgWaveVal = 0;
 				waveStart = i+1;

@@ -1078,9 +1078,29 @@ int CmdVchDemod(const char *Cmd)
 	return 0;
 }
 
+
+//by marshmellow
+int CheckChipType(char cmdp) {
+	uint32_t wordData = 0;
+
+	//check for em4x05/em4x69 chips first
+	save_restoreGB(1);
+	if ((!offline && (cmdp != '1')) && EM4x05Block0Test(&wordData)) {
+		PrintAndLog("\nValid EM4x05/EM4x69 Chip Found\nTry lf em 4x05... commands\n");
+		save_restoreGB(0);
+		return 1;
+	}
+
+	//TODO check for t55xx chip...
+
+	save_restoreGB(0);
+	return 1;
+}
+
 //by marshmellow
 int CmdLFfind(const char *Cmd)
 {
+	uint32_t wordData = 0;
 	int ans=0;
 	size_t minLength = 1000;
 	char cmdp = param_getchar(Cmd, 0);
@@ -1115,7 +1135,12 @@ int CmdLFfind(const char *Cmd)
 	// only run if graphbuffer is just noise as it should be for hitag/cotag
 	if (graphJustNoise(GraphBuffer, testLen)) {
 		// only run these tests if we are in online mode 
-		if (!offline && (cmdp != '1')){
+		if (!offline && (cmdp != '1')) {
+			// test for em4x05 in reader talk first mode.
+			if (EM4x05Block0Test(&wordData)) {
+				PrintAndLog("\nValid EM4x05/EM4x69 Chip Found\nUse lf em 4x05readword/dump commands to read\n");
+				return 1;
+			}
 			ans=CmdLFHitagReader("26");
 			if (ans==0) {
 				return 1;
@@ -1132,49 +1157,49 @@ int CmdLFfind(const char *Cmd)
 	ans=CmdFSKdemodIO("");
 	if (ans>0) {
 		PrintAndLog("\nValid IO Prox ID Found!");
-		return 1;
+		return CheckChipType(cmdp);
 	}
 
 	ans=CmdFSKdemodPyramid("");
 	if (ans>0) {
 		PrintAndLog("\nValid Pyramid ID Found!");
-		return 1;
+		return CheckChipType(cmdp);
 	}
 
 	ans=CmdFSKdemodParadox("");
 	if (ans>0) {
 		PrintAndLog("\nValid Paradox ID Found!");
-		return 1;
+		return CheckChipType(cmdp);
 	}
 
 	ans=CmdFSKdemodAWID("");
 	if (ans>0) {
 		PrintAndLog("\nValid AWID ID Found!");
-		return 1;
+		return CheckChipType(cmdp);
 	}
 
 	ans=CmdFSKdemodHID("");
 	if (ans>0) {
 		PrintAndLog("\nValid HID Prox ID Found!");
-		return 1;
+		return CheckChipType(cmdp);
 	}
 
 	ans=CmdAskEM410xDemod("");
 	if (ans>0) {
 		PrintAndLog("\nValid EM410x ID Found!");
-		return 1;
+		return CheckChipType(cmdp);
 	}
 
 	ans=CmdG_Prox_II_Demod("");
 	if (ans>0) {
 		PrintAndLog("\nValid G Prox II ID Found!");
-		return 1;
+		return CheckChipType(cmdp);
 	}
 
 	ans=CmdFDXBdemodBI("");
 	if (ans>0) {
 		PrintAndLog("\nValid FDX-B ID Found!");
-		return 1;
+		return CheckChipType(cmdp);
 	}
 
 	ans=EM4x50Read("", false);
@@ -1186,24 +1211,25 @@ int CmdLFfind(const char *Cmd)
 	ans=CmdVikingDemod("");
 	if (ans>0) {
 		PrintAndLog("\nValid Viking ID Found!");
-		return 1;
+		return CheckChipType(cmdp);
 	}	
 
 	ans=CmdIndalaDecode("");
 	if (ans>0) {
 		PrintAndLog("\nValid Indala ID Found!");
-		return 1;
+		return CheckChipType(cmdp);
 	}
 
 	ans=CmdPSKNexWatch("");
 	if (ans>0) {
 		PrintAndLog("\nValid NexWatch ID Found!");
-		return 1;
+		return CheckChipType(cmdp);
 	}
 
 	PrintAndLog("\nNo Known Tags Found!\n");
 	if (testRaw=='u' || testRaw=='U'){
-		//test unknown tag formats (raw mode)
+		ans=CheckChipType(cmdp);
+		//test unknown tag formats (raw mode)0
 		PrintAndLog("\nChecking for Unknown tags:\n");
 		ans=AutoCorrelate(4000, FALSE, FALSE);
 		if (ans > 0) PrintAndLog("Possible Auto Correlation of %d repeating samples",ans);
@@ -1239,7 +1265,7 @@ static command_t CommandTable[] =
 	{"help",        CmdHelp,            1, "This help"},
 	{"awid",        CmdLFAWID,          1, "{ AWID RFIDs...    }"},
 	{"cotag",       CmdLFCOTAG,         1, "{ COTAG RFIDs...   }"},
-	{"em4x",        CmdLFEM4X,          1, "{ EM4X RFIDs...    }"},
+	{"em",          CmdLFEM4X,          1, "{ EM4X RFIDs...    }"},
 	{"hid",         CmdLFHID,           1, "{ HID RFIDs...     }"},
 	{"hitag",       CmdLFHitag,         1, "{ Hitag tags and transponders... }"},
 	{"io",          CmdLFIO,            1, "{ ioProx tags...   }"},
