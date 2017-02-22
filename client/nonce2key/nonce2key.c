@@ -12,7 +12,6 @@
 
 #define __STDC_FORMAT_MACROS
 #include <inttypes.h>
-#define llx PRIx64
 
 #include "nonce2key.h"
 #include "mifarehost.h"
@@ -48,7 +47,7 @@ int nonce2key(uint32_t uid, uint32_t nt, uint32_t nr, uint64_t par_info, uint64_
   // Reset the last three significant bits of the reader nonce
   nr &= 0xffffff1f;
   
-  PrintAndLog("\nuid(%08x) nt(%08x) par(%016"llx") ks(%016"llx") nr(%08"llx")\n\n",uid,nt,par_info,ks_info,nr);
+  PrintAndLog("\nuid(%08x) nt(%08x) par(%016" PRIx64") ks(%016" PRIx64") nr(%08" PRIx32")\n\n",uid,nt,par_info,ks_info,nr);
 
   for (pos=0; pos<8; pos++)
   {
@@ -86,7 +85,7 @@ int nonce2key(uint32_t uid, uint32_t nt, uint32_t nr, uint64_t par_info, uint64_
 		lfsr_rollback_word(state+i, uid^nt, 0);
 		crypto1_get_lfsr(state + i, &key_recovered);
 		*(state_s + i) = key_recovered;
-		//fprintf(fp, "%012llx\n",key_recovered);
+		//fprintf(fp, "%012" PRIx64 "\n",key_recovered);
 	}
 	//fclose(fp);
 	
@@ -105,7 +104,7 @@ int nonce2key(uint32_t uid, uint32_t nt, uint32_t nr, uint64_t par_info, uint64_
 			p2 = state_s;
 			while ( *p1 != -1 && *p2 != -1 ) {
 				if (compar_state(p1, p2) == 0) {
-					printf("p1:%"llx" p2:%"llx" p3:%"llx" key:%012"llx"\n",(uint64_t)(p1-last_keylist),(uint64_t)(p2-state_s),(uint64_t)(p3-last_keylist),*p1);
+					printf("p1:%" PRIx64" p2:%" PRIx64 " p3:%" PRIx64" key:%012" PRIx64 "\n",(uint64_t)(p1-last_keylist),(uint64_t)(p2-state_s),(uint64_t)(p3-last_keylist),*p1);
 					*p3++ = *p1++;
 					p2++;
 				}
@@ -175,7 +174,7 @@ bool mfkey32(nonces_t data, uint64_t *outputkey) {
 		crypto1_word(t, uid ^ nt, 0);
 		crypto1_word(t, nr1_enc, 1);
 		if (ar1_enc == (crypto1_word(t, 0, 0) ^ prng_successor(nt, 64))) {
-			//PrintAndLog("Found Key: [%012"llx"]",key);
+			//PrintAndLog("Found Key: [%012" PRIx64 "]",key);
 			outkey = key;
 			counter++;
 			if (counter==20) break;
@@ -226,7 +225,7 @@ bool tryMfk32_moebius(nonces_t data, uint64_t *outputkey) {
 		crypto1_word(t, uid ^ nt1, 0);
 		crypto1_word(t, nr1_enc, 1);
 		if (ar1_enc == (crypto1_word(t, 0, 0) ^ prng_successor(nt1, 64))) {
-			//PrintAndLog("Found Key: [%012"llx"]",key);
+			//PrintAndLog("Found Key: [%012" PRIx64 "]",key);
 			outkey=key;
 			++counter;
 			if (counter==20)
@@ -277,7 +276,7 @@ int tryMfk64(uint32_t uid, uint32_t nt, uint32_t nr_enc, uint32_t ar_enc, uint32
 	lfsr_rollback_word(revstate, nr_enc, 1);
 	lfsr_rollback_word(revstate, uid ^ nt, 0);
 	crypto1_get_lfsr(revstate, &key);
-	PrintAndLog("Found Key: [%012"llx"]", key);
+	PrintAndLog("Found Key: [%012" PRIx64 "]", key);
 	crypto1_destroy(revstate);
 	*outputkey = key;
 	

@@ -12,13 +12,6 @@
 #ifndef PROXMARK3_H__
 #define PROXMARK3_H__
 
-#define __STDC_FORMAT_MACROS
-#include <inttypes.h>
-#define llx PRIx64
-#define lli PRIi64
-#define llu PRIu64
-#define hhu PRIu8
-
 #include "usb_cmd.h"
 
 #define PROXPROMPT "proxmark3> "

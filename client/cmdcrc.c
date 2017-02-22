@@ -44,9 +44,10 @@ int split(char *str, char *arr[MAX_ARGS]){
 		while(isspace(str[beginIndex])){
 			++beginIndex;
 		}
-		if(str[beginIndex] == '\0')
+		if(str[beginIndex] == '\0') {
 			break;
-			endIndex = beginIndex;
+		}
+		endIndex = beginIndex;
 		while (str[endIndex] && !isspace(str[endIndex])){
 			++endIndex;
 		}
