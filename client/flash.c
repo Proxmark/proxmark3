@@ -11,6 +11,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <inttypes.h>
 #include "proxmark3.h"
 #include "sleep.h"
 #include "flash.h"
@@ -295,7 +296,7 @@ static int get_proxmark_state(uint32_t *state)
 			*state = resp.arg[0];
 			break;
 		default:
-			fprintf(stderr, "Error: Couldn't get proxmark state, bad response type: 0x%04"llx"\n", resp.cmd);
+			fprintf(stderr, "Error: Couldn't get proxmark state, bad response type: 0x%04" PRIx64 "\n", resp.cmd);
 			return -1;
 			break;
 	}
@@ -357,7 +358,7 @@ static int wait_for_ack(void)
   UsbCommand ack;
 	ReceiveCommand(&ack);
 	if (ack.cmd != CMD_ACK) {
-		printf("Error: Unexpected reply 0x%04"llx" (expected ACK)\n", ack.cmd);
+		printf("Error: Unexpected reply 0x%04" PRIx64 " (expected ACK)\n", ack.cmd);
 		return -1;
 	}
 	return 0;

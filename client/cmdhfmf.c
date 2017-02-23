@@ -8,6 +8,7 @@
 // High frequency MIFARE commands
 //-----------------------------------------------------------------------------
 
+#include <inttypes.h>
 #include "cmdhfmf.h"
 #include "./nonce2key/nonce2key.h"
 
@@ -82,7 +83,7 @@ int CmdHF14AMifare(const char *Cmd)
 	} else {
 		isOK = 0;
 		printf("------------------------------------------------------------------\n");
-		PrintAndLog("Found valid key:%012"llx" \n", r_key);
+		PrintAndLog("Found valid key:%012" PRIx64 " \n", r_key);
 	}
 	
 	PrintAndLog("");
@@ -632,7 +633,7 @@ int CmdHF14AMfNested(const char *Cmd)
 		}
 		key64 = bytes_to_num(keyBlock, 6);
 		if (key64) {
-			PrintAndLog("Found valid key:%012"llx, key64);
+			PrintAndLog("Found valid key:%012" PRIx64, key64);
 
 			// transfer key to the emulator
 			if (transferToEml) {
@@ -718,7 +719,7 @@ int CmdHF14AMfNested(const char *Cmd)
 
 					key64 = bytes_to_num(keyBlock, 6);
 					if (key64) {
-						PrintAndLog("Found valid key:%012"llx, key64);
+						PrintAndLog("Found valid key:%012" PRIx64, key64);
 						e_sector[sectorNo].foundKey[trgKeyType] = 1;
 						e_sector[sectorNo].Key[trgKeyType] = key64;
 					}
@@ -734,7 +735,7 @@ int CmdHF14AMfNested(const char *Cmd)
 		PrintAndLog("|sec|key A           |res|key B           |res|");
 		PrintAndLog("|---|----------------|---|----------------|---|");
 		for (i = 0; i < SectorsCnt; i++) {
-			PrintAndLog("|%03d|  %012"llx"  | %d |  %012"llx"  | %d |", i,
+			PrintAndLog("|%03d|  %012" PRIx64 "  | %d |  %012" PRIx64 "  | %d |", i,
 				e_sector[i].Key[0], e_sector[i].foundKey[0], e_sector[i].Key[1], e_sector[i].foundKey[1]);
 		}
 		PrintAndLog("|---|----------------|---|----------------|---|");
@@ -925,7 +926,7 @@ int CmdHF14AMfChk(const char *Cmd)
 					}
 					memset(keyBlock + 6 * keycnt, 0, 6);
 					num_to_bytes(strtoll(buf, NULL, 16), 6, keyBlock + 6*keycnt);
-					PrintAndLog("chk custom key[%2d] %012"llx, keycnt, bytes_to_num(keyBlock + 6*keycnt, 6));
+					PrintAndLog("chk custom key[%2d] %012" PRIx64 , keycnt, bytes_to_num(keyBlock + 6*keycnt, 6));
 					keycnt++;
 					memset(buf, 0, sizeof(buf));
 				}
@@ -969,7 +970,7 @@ int CmdHF14AMfChk(const char *Cmd)
 				res = mfCheckKeys(b, t, true, size, &keyBlock[6*c], &key64);
 				if (res != 1) {
 					if (!res) {
-						PrintAndLog("Found valid key:[%012"llx"]",key64);
+						PrintAndLog("Found valid key:[%012" PRIx64 "]",key64);
 						num_to_bytes(key64, 6, foundKey[t][i]);
 						validKey[t][i] = true;
 					} 
@@ -1058,7 +1059,7 @@ void readerAttack(nonces_t ar_resp[], bool setEmulatorMem, bool doStandardAttack
 				uint8_t sectorNum = ar_resp[i+ATTACK_KEY_COUNT].sector;
 				uint8_t keyType = ar_resp[i+ATTACK_KEY_COUNT].keytype;
 
-				PrintAndLog("M-Found Key%s for sector %02d: [%012"llx"]"
+				PrintAndLog("M-Found Key%s for sector %02d: [%012" PRIx64 "]"
 					, keyType ? "B" : "A"
 					, sectorNum
 					, key
@@ -1670,7 +1671,7 @@ int CmdHF14AMfEKeyPrn(const char *Cmd)
 		}
 		keyA = bytes_to_num(data, 6);
 		keyB = bytes_to_num(data + 10, 6);
-		PrintAndLog("|%03d|  %012"llx"  |  %012"llx"  |", i, keyA, keyB);
+		PrintAndLog("|%03d|  %012" PRIx64 "  |  %012" PRIx64 "  |", i, keyA, keyB);
 	}
 	PrintAndLog("|---|----------------|----------------|");
 	

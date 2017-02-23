@@ -10,6 +10,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <inttypes.h>
 #include "crc16.h"
 #include "proxmark3.h"
 #include "data.h"
@@ -273,7 +274,7 @@ int CmdTIWrite(const char *Cmd)
   UsbCommand c = {CMD_WRITE_TI_TYPE};
   int res = 0;
 
-  res = sscanf(Cmd, "%012"llx" %012"llx" %012"llx"", &c.arg[0], &c.arg[1], &c.arg[2]);
+  res = sscanf(Cmd, "%012" PRIx64 " %012" PRIx64 " %012" PRIx64 "", &c.arg[0], &c.arg[1], &c.arg[2]);
   
   if (res == 2) c.arg[2]=0;
   if (res < 2)
