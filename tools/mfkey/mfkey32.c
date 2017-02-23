@@ -1,9 +1,4 @@
-#define __STDC_FORMAT_MACROS
 #include <inttypes.h>
-#define llx PRIx64
-#define lli PRIi64
-
-// Test-file: test2.c
 #include "crapto1.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -62,7 +57,7 @@ int main (int argc, char *argv[]) {
 		crypto1_word(t, uid ^ nt, 0);
 		crypto1_word(t, nr1_enc, 1);
 		if (ar1_enc == (crypto1_word(t, 0, 0) ^ prng_successor(nt, 64))) {
-      printf("\nFound Key: [%012"llx"]\n\n",key);
+			printf("\nFound Key: [%012" PRIx64 "]\n\n",key);
 			break;
 		}
 	}
