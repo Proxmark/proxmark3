@@ -540,7 +540,7 @@ bool EM4x05testDemodReadData(uint32_t *word, bool readCmd) {
 	// sanity check
 	size = (size > DemodBufferLen) ? DemodBufferLen : size;
 	// test preamble
-	if ( !onePreambleSearch(DemodBuffer, preamble, sizeof(preamble), size, &startIdx) ) {
+	if ( !preambleSearchEx(DemodBuffer, preamble, sizeof(preamble), &size, &startIdx, true) ) {
 		if (g_debugMode) PrintAndLog("DEBUG: Error - EM4305 preamble not found :: %d", startIdx);
 		return false;
 	}
@@ -550,13 +550,13 @@ bool EM4x05testDemodReadData(uint32_t *word, bool readCmd) {
 			if (g_debugMode) PrintAndLog("DEBUG: Error - End Parity check failed");
 			return false;
 		}
-		// test for even parity bits.
-		if ( removeParity(DemodBuffer, startIdx + sizeof(preamble),9,0,44) == 0 ) {		
+		// test for even parity bits and remove them. (leave out the end row of parities so 36 bits)
+		if ( removeParity(DemodBuffer, startIdx + sizeof(preamble),9,0,36) == 0 ) {		
 			if (g_debugMode) PrintAndLog("DEBUG: Error - Parity not detected");
 			return false;
 		}
 
-		setDemodBuf(DemodBuffer, 40, 0);
+		setDemodBuf(DemodBuffer, 32, 0);
 		*word = bytebits_to_byteLSBF(DemodBuffer, 32);
 	}
 	return true;

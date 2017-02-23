@@ -78,7 +78,7 @@ size_t removeParity(uint8_t *BitStream, size_t startIdx, uint8_t pLen, uint8_t p
 			parityWd = (parityWd << 1) | BitStream[startIdx+word+bit];
 			BitStream[j++] = (BitStream[startIdx+word+bit]);
 		}
-		if (word+pLen >= bLen) break;
+		if (word+pLen > bLen) break;
 
 		j--; // overwrite parity with next data
 		// if parity fails then return 0
@@ -150,38 +150,28 @@ uint32_t bytebits_to_byteLSBF(uint8_t *src, size_t numbits)
 //search for given preamble in given BitStream and return success=1 or fail=0 and startIndex and length
 uint8_t preambleSearch(uint8_t *BitStream, uint8_t *preamble, size_t pLen, size_t *size, size_t *startIdx)
 {
-	// Sanity check.  If preamble length is bigger than bitstream length.
-	if ( *size <= pLen ) return 0;
-
-	uint8_t foundCnt=0;
-	for (int idx=0; idx < *size - pLen; idx++){
-		if (memcmp(BitStream+idx, preamble, pLen) == 0){
-			//first index found
-			foundCnt++;
-			if (foundCnt == 1){
-				*startIdx = idx;
-			}
-			if (foundCnt == 2){
-				*size = idx - *startIdx;
-				return 1;
-			}
-		}
-	}
-	return 0;
+	return (preambleSearchEx(BitStream, preamble, pLen, size, startIdx, false)) ? 1 : 0;
 }
 
-// search for given preamble in given BitStream and return success=1 or fail=0 and startIndex (where it was found)
-// does not look for a repeating preamble
-// em4x05/4x69 only sends preamble once, so look for it once in the first pLen bits
-// leave it generic so it could be reused later...
-bool onePreambleSearch(uint8_t *BitStream, uint8_t *preamble, size_t pLen, size_t size, size_t *startIdx) {
+// search for given preamble in given BitStream and return success=1 or fail=0 and startIndex (where it was found) and length if not fineone 
+// fineone does not look for a repeating preamble for em4x05/4x69 sends preamble once, so look for it once in the first pLen bits
+bool preambleSearchEx(uint8_t *BitStream, uint8_t *preamble, size_t pLen, size_t *size, size_t *startIdx, bool findone) {
 	// Sanity check.  If preamble length is bigger than bitstream length.
-	if ( size <= pLen ) return false;
-	for (size_t idx = 0; idx < size - pLen; idx++) {
+	if ( *size <= pLen ) return false;
+
+	uint8_t foundCnt = 0;
+	for (size_t idx = 0; idx < *size - pLen; idx++) {
 		if (memcmp(BitStream+idx, preamble, pLen) == 0) {
-			if (g_debugMode) prnt("DEBUG: preamble found at %u", idx);
-			*startIdx = idx;
-			return true;
+			//first index found
+			foundCnt++;
+			if (foundCnt == 1) {
+				if (g_debugMode) prnt("DEBUG: preamble found at %u", idx);
+				*startIdx = idx;
+				if (findone) return true;
+			} else if (foundCnt == 2) {
+				*size = idx - *startIdx;
+				return true;
+			}
 		}
 	}
 	return false;
@@ -217,39 +207,32 @@ size_t findModStart(uint8_t dest[], size_t size, uint8_t threshold_value, uint8_
 //takes 1s and 0s and searches for EM410x format - output EM ID
 uint8_t Em410xDecode(uint8_t *BitStream, size_t *size, size_t *startIdx, uint32_t *hi, uint64_t *lo)
 {
-	//no arguments needed - built this way in case we want this to be a direct call from "data " cmds in the future
-	//  otherwise could be a void with no arguments
-	//set defaults
-	uint32_t i = 0;
+	//sanity checks
+	if (*size < 64) return 0;
 	if (BitStream[1]>1) return 0;  //allow only 1s and 0s
 
 	// 111111111 bit pattern represent start of frame
 	//  include 0 in front to help get start pos
 	uint8_t preamble[] = {0,1,1,1,1,1,1,1,1,1};
-	uint32_t idx = 0;
-	uint32_t parityBits = 0;
 	uint8_t errChk = 0;
-	uint8_t FmtLen = 10;
+	uint8_t FmtLen = 10; // sets of 4 bits = end data 
 	*startIdx = 0;
 	errChk = preambleSearch(BitStream, preamble, sizeof(preamble), size, startIdx);
 	if (errChk == 0 || *size < 64) return 0;
-	if (*size > 64) FmtLen = 22;
-	*startIdx += 1; //get rid of 0 from preamble
-	idx = *startIdx + 9;
-	for (i=0; i<FmtLen; i++){ //loop through 10 or 22 sets of 5 bits (50-10p = 40 bits or 88 bits)
-		parityBits = bytebits_to_byte(BitStream+(i*5)+idx,5);
-		//check even parity - quit if failed
-		if (parityTest(parityBits, 5, 0) == 0) return 0;
-		//set uint64 with ID from BitStream
-		for (uint8_t ii=0; ii<4; ii++){
-			*hi = (*hi << 1) | (*lo >> 63);
-			*lo = (*lo << 1) | (BitStream[(i*5)+ii+idx]);
-		}
+	if (*size == 110) FmtLen = 22; // 22 sets of 4 bits
+
+	//skip last 4bit parity row for simplicity
+	*size = removeParity(BitStream, *startIdx + sizeof(preamble), 5, 0, FmtLen * 5);
+	if (*size == 40) { // std em410x format
+		*hi = 0;
+		*lo = ((uint64_t)(bytebits_to_byte(BitStream, 8)) << 32) | (bytebits_to_byte(BitStream + 8, 32));
+	} else if (*size == 88) { // long em format
+		*hi = (bytebits_to_byte(BitStream, 24)); 
+		*lo = ((uint64_t)(bytebits_to_byte(BitStream + 24, 32)) << 32) | (bytebits_to_byte(BitStream + 24 + 32, 32));
+	} else {
+		return 0;
 	}
-	if (errChk != 0) return 1;
-	//skip last 5 bit parity test for simplicity.
-	// *size = 64 | 128;
-	return 0;
+	return 1;
 }
 
 //by marshmellow
