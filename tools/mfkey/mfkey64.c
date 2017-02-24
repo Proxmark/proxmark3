@@ -1,9 +1,4 @@
-#define __STDC_FORMAT_MACROS
 #include <inttypes.h>
-#define llx PRIx64
-#define lli PRIi64
-
-// Test-file: test2.c
 #include "crapto1.h"
 #include <stdio.h>
 #include <string.h>
@@ -103,7 +98,7 @@ int main (int argc, char *argv[]) {
   lfsr_rollback_word(revstate, nr_enc, 1);
   lfsr_rollback_word(revstate, uid ^ nt, 0);
   crypto1_get_lfsr(revstate, &key);
-  printf("\nFound Key: [%012"llx"]\n\n",key);
+  printf("\nFound Key: [%012" PRIx64"]\n\n",key);
   crypto1_destroy(revstate);
 
   return 0;

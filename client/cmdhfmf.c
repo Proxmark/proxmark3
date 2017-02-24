@@ -35,8 +35,10 @@ int CmdHF14AMifare(const char *Cmd)
     SendCommand(&c);
 	
 	//flush queue
-	while (ukbhit())	getchar();
-
+	while (ukbhit()) {
+		int c = getchar(); (void) c;
+	}
+	
 	// wait cycle
 	while (true) {
         printf(".");
@@ -303,7 +305,8 @@ int CmdHF14AMfDump(const char *Cmd)
 	
 	// Read keys A from file
 	for (sectorNo=0; sectorNo<numSectors; sectorNo++) {
-		if (fread( keyA[sectorNo], 1, 6, fin ) == 0) {
+		size_t bytes_read = fread(keyA[sectorNo], 1, 6, fin);
+		if (bytes_read != 6) {
 			PrintAndLog("File reading error.");
 			fclose(fin);
 			return 2;
@@ -312,7 +315,8 @@ int CmdHF14AMfDump(const char *Cmd)
 	
 	// Read keys B from file
 	for (sectorNo=0; sectorNo<numSectors; sectorNo++) {
-		if (fread( keyB[sectorNo], 1, 6, fin ) == 0) {
+		size_t bytes_read = fread(keyB[sectorNo], 1, 6, fin);
+		if (bytes_read != 6) {
 			PrintAndLog("File reading error.");
 			fclose(fin);
 			return 2;
@@ -467,16 +471,17 @@ int CmdHF14AMfRestore(const char *Cmd)
 	}
 	
 	for (sectorNo = 0; sectorNo < numSectors; sectorNo++) {
-		if (fread(keyA[sectorNo], 1, 6, fkeys) == 0) {
+		size_t bytes_read = fread(keyA[sectorNo], 1, 6, fkeys);
+		if (bytes_read != 6) {
 			PrintAndLog("File reading error (dumpkeys.bin).");
-
 			fclose(fkeys);
 			return 2;
 		}
 	}
 
 	for (sectorNo = 0; sectorNo < numSectors; sectorNo++) {
-		if (fread(keyB[sectorNo], 1, 6, fkeys) == 0) {
+		size_t bytes_read = fread(keyB[sectorNo], 1, 6, fkeys);
+		if (bytes_read != 6) {
 			PrintAndLog("File reading error (dumpkeys.bin).");
 			fclose(fkeys);
 			return 2;
@@ -496,7 +501,8 @@ int CmdHF14AMfRestore(const char *Cmd)
 			UsbCommand c = {CMD_MIFARE_WRITEBL, {FirstBlockOfSector(sectorNo) + blockNo, keyType, 0}};
 			memcpy(c.d.asBytes, key, 6);
 			
-			if (fread(bldata, 1, 16, fdump) == 0) {
+			size_t bytes_read = fread(bldata, 1, 16, fdump);
+			if (bytes_read != 16) {
 				PrintAndLog("File reading error (dumpdata.bin).");
 				fclose(fdump);
 				return 2;
@@ -920,6 +926,7 @@ int CmdHF14AMfChk(const char *Cmd)
 						if (!p) {
 							PrintAndLog("Cannot allocate memory for defKeys");
 							free(keyBlock);
+							fclose(f);
 							return 2;
 						}
 						keyBlock = p;
@@ -1448,7 +1455,7 @@ int CmdHF14AMfELoad(const char *Cmd)
 
 	len = param_getstr(Cmd,nameParamNo,filename);
 	
-	if (len > FILE_PATH_SIZE - 4) len = FILE_PATH_SIZE - 4;
+	if (len > FILE_PATH_SIZE - 5) len = FILE_PATH_SIZE - 5;
 
 	fnameptr += len;
 
@@ -1547,7 +1554,7 @@ int CmdHF14AMfESave(const char *Cmd)
 
 	len = param_getstr(Cmd,nameParamNo,filename);
 	
-	if (len > FILE_PATH_SIZE - 4) len = FILE_PATH_SIZE - 4;
+	if (len > FILE_PATH_SIZE - 5) len = FILE_PATH_SIZE - 5;
 	
 	// user supplied filename?
 	if (len < 1) {
@@ -1823,7 +1830,7 @@ int CmdHF14AMfCLoad(const char *Cmd)
 		return 0;
 	} else {
 		len = strlen(Cmd);
-		if (len > FILE_PATH_SIZE - 4) len = FILE_PATH_SIZE - 4;
+		if (len > FILE_PATH_SIZE - 5) len = FILE_PATH_SIZE - 5;
 
 		memcpy(filename, Cmd, len);
 		fnameptr += len;
@@ -1864,6 +1871,7 @@ int CmdHF14AMfCLoad(const char *Cmd)
 
 			if (mfCSetBlock(blockNum, buf8, NULL, 0, flags)) {
 				PrintAndLog("Can't set magic card block: %d", blockNum);
+				fclose(f);
 				return 3;
 			}
 			blockNum++;
@@ -1992,7 +2000,7 @@ int CmdHF14AMfCSave(const char *Cmd) {
 		return 0;
 	} else {
 		len = strlen(Cmd);
-		if (len > FILE_PATH_SIZE - 4) len = FILE_PATH_SIZE - 4;
+		if (len > FILE_PATH_SIZE - 5) len = FILE_PATH_SIZE - 5;
 	
 		if (len < 1) {
 			// get filename
@@ -2112,11 +2120,14 @@ int CmdHF14AMfSniff(const char *Cmd){
 			uint16_t traceLen = resp.arg[1];
 			len = resp.arg[2];
 
-			if (res == 0) return 0;						// we are done
+			if (res == 0) {								// we are done
+				free(buf);
+				return 0;
+			}
 
 			if (res == 1) {								// there is (more) data to be transferred
 				if (pckNum == 0) {						// first packet, (re)allocate necessary buffer
-					if (traceLen > bufsize) {
+					if (traceLen > bufsize || buf == NULL) {
 						uint8_t *p;
 						if (buf == NULL) {				// not yet allocated
 							p = malloc(traceLen);
