@@ -569,11 +569,11 @@ int CmdLFRead(const char *Cmd)
 	UsbCommand c = {CMD_ACQUIRE_RAW_ADC_SAMPLES_125K, {arg1,0,0}};
 	clearCommandBuffer();
 	SendCommand(&c);
-	//WaitForResponse(CMD_ACK,NULL);	
-	if ( !WaitForResponseTimeout(CMD_ACK,NULL,2500) ) {
-		PrintAndLog("command execution time out");
-		return 1;
-	}
+	WaitForResponse(CMD_ACK,NULL);	
+	//if ( !WaitForResponseTimeout(CMD_ACK,NULL,2500) ) {
+	//	PrintAndLog("command execution time out");
+	//	return 1;
+	//}
 
 	return 0;
 }

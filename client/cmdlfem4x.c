@@ -63,6 +63,20 @@ int CmdEM410xRead(const char *Cmd)
 	return 1;
 }
 
+int usage_lf_em410x_sim(void) {
+	PrintAndLog("Simulating EM410x tag");
+	PrintAndLog("");
+	PrintAndLog("Usage:  lf em 410xsim [h] <uid> <clock>");
+	PrintAndLog("Options:");
+	PrintAndLog("       h         - this help");
+	PrintAndLog("       uid       - uid (10 HEX symbols)");
+	PrintAndLog("       clock     - clock (32|64) (optional)");
+	PrintAndLog("samples:");
+	PrintAndLog("      lf em 410xsim 0F0368568B");
+	PrintAndLog("      lf em 410xsim 0F0368568B 32");
+	return 0;
+}
+
 // emulate an EM410X tag
 int CmdEM410xSim(const char *Cmd)
 {
@@ -71,12 +85,7 @@ int CmdEM410xSim(const char *Cmd)
 	char cmdp = param_getchar(Cmd, 0);
 	uint8_t uid[5] = {0x00};
 
-	if (cmdp == 'h' || cmdp == 'H') {
-		PrintAndLog("Usage:  lf em 410xsim <UID> <clock>");
-		PrintAndLog("");
-		PrintAndLog("     sample: lf em 410xsim 0F0368568B");
-		return 0;
-	}
+	if (cmdp == 'h' || cmdp == 'H') return usage_lf_em410x_sim();
 	/* clock is 64 in EM410x tags */
 	uint8_t clock = 64;
 
