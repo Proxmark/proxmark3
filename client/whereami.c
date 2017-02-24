@@ -51,7 +51,7 @@ extern "C" {
 #pragma warning(push, 3)
 #endif
 #include <windows.h>
-#include <intrin.h>
+//#include <intrin.h>			// not required and doesn't exist in old mingw environments
 #if defined(_MSC_VER)
 #pragma warning(pop)
 #endif
@@ -136,7 +136,9 @@ int WAI_PREFIX(getExecutablePath)(char* out, int capacity, int* dirname_length)
   return WAI_PREFIX(getModulePath_)(NULL, out, capacity, dirname_length);
 }
 
-WAI_NOINLINE
+// GetModuleHandleEx() is not available on old mingw environments. We don't need getModulePath() yet. 
+// Sacrifice it for the time being to improve backwards compatibility
+/* WAI_NOINLINE
 WAI_FUNCSPEC
 int WAI_PREFIX(getModulePath)(char* out, int capacity, int* dirname_length)
 {
@@ -157,13 +159,15 @@ int WAI_PREFIX(getModulePath)(char* out, int capacity, int* dirname_length)
 
   return length;
 }
+ */
 
 #elif defined(__linux__)
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <limits.h>
+// #include <limits.h>     // not all linux distributions define PATH_MAX in limits.h because it depends on the filesystem. Therefore use...
+#include <linux/limits.h>
 #ifndef __STDC_FORMAT_MACROS
 #define __STDC_FORMAT_MACROS
 #endif
