@@ -183,7 +183,7 @@ int CmdEM410xWrite(const char *Cmd)
 	int card = 0xFF; // invalid card value
 	unsigned int clock = 0; // invalid clock value
 
-	sscanf(Cmd, "%" PRIx64 " %d %d", &id, &card, &clock);
+	sscanf(Cmd, "%" SCNx64 " %d %d", &id, &card, &clock);
 
 	// Check ID
 	if (id == 0xFFFFFFFFFFFFFFFF) {
