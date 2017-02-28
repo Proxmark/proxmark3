@@ -5,6 +5,9 @@ This project uses the changelog in accordance with [keepchangelog](http://keepac
 ## [unreleased][unreleased]
 
 ### Added
+- Added markers in the graph around found Sequence Terminator after askmandemod.
+- Added data mtrim <start> <stop> command to trim out samples between start and stop
+- Added data setgraphmarkers <orange> <blue> command to set two extra markers on the graph (marshmellow)
 - Added EM4x05/EM4x69 chip detection to lf search (marshmellow) 
 - Added lf em 4x05dump command to read and output all the blocks of the chip (marshmellow)
 - Added lf em 4x05info command to read and display information about the chip (marshmellow)
@@ -41,6 +44,7 @@ This project uses the changelog in accordance with [keepchangelog](http://keepac
 - Added option c to 'hf list' (mark CRC bytes) (piwi)
 
 ### Changed
+- hf mf dump - added retry loops to try each read attempt up to 3 times.  makes getting a complete dump easier with many antennas. 
 - small changes to lf psk and fsk demods to improve results when the trace begins with noise or the chip isn't broadcasting yet (marshmellow)
 - NOTE CHANGED ALL `lf em4x em*` cmds to simpler `lf em ` - example: `lf em4x em410xdemod` is now `lf em 410xdemod`
 - Renamed and rebuilt `lf em readword` && readwordpwd to `lf em 4x05readword` - it now demods and outputs the read block (marshmellow/iceman)
