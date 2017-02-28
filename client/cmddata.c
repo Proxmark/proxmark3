@@ -1907,6 +1907,12 @@ int CmdGrid(const char *Cmd)
 	return 0;
 }
 
+int CmdSetGraphMarkers(const char *Cmd) {
+	sscanf(Cmd, "%i %i", &CursorCPos, &CursorDPos);
+	RepaintGraphWindow();
+	return 0;
+}
+
 int CmdHexsamples(const char *Cmd)
 {
 	int i, j;
@@ -2419,6 +2425,7 @@ static command_t CommandTable[] =
 	{"rawdemod",        CmdRawDemod,        1, "[modulation] ... <options> -see help (h option) -- Demodulate the data in the GraphBuffer and output binary"},  
 	{"samples",         CmdSamples,         0, "[512 - 40000] -- Get raw samples for graph window (GraphBuffer)"},
 	{"save",            CmdSave,            1, "<filename> -- Save trace (from graph window)"},
+	{"setgraphmarkers", CmdSetGraphMarkers, 1, "[orange_marker] [blue_marker] (in graph window)"},
 	{"scale",           CmdScale,           1, "<int> -- Set cursor display scale"},
 	{"setdebugmode",    CmdSetDebugMode,    1, "<0|1|2> -- Turn on or off Debugging Level for lf demods"},
 	{"shiftgraphzero",  CmdGraphShiftZero,  1, "<shift> -- Shift 0 for Graphed wave + or - shift value"},
