@@ -1578,9 +1578,9 @@ void SendForward(uint8_t fwd_bit_count) {
 	fwd_bit_sz--; //prepare next bit modulation
 	fwd_write_ptr++;
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF); // field off
-	WaitUS(55*8); //55 cycles off (8us each)for 4305  /another reader has 37 here...
+	WaitUS(55*8); //55 cycles off (8us each)for 4305  //another reader has 37 here...
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_LF_ADC | FPGA_LF_ADC_READER_FIELD);//field on
-	WaitUS(18*8); //16 cycles on (8us each)  // another reader has 18 here
+	WaitUS(18*8); //18 cycles on (8us each)
 
 	// now start writting
 	while(fwd_bit_sz-- > 0) { //prepare next bit modulation
@@ -1589,9 +1589,9 @@ void SendForward(uint8_t fwd_bit_count) {
 		else {
 			//These timings work for 4469/4269/4305 (with the 55*8 above)
 			FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF); // field off
-			WaitUS(23*8); //16-4 cycles off (8us each) //23  //one reader goes as high as 25 here
+			WaitUS(23*8); //23 cycles off (8us each)
 			FpgaWriteConfWord(FPGA_MAJOR_MODE_LF_ADC | FPGA_LF_ADC_READER_FIELD);//field on
-			WaitUS(16*8); //16 cycles on (8us each) //9  // another reader goes to 17 here
+			WaitUS(18*8); //18 cycles on (8us each)
 		}
 	}
 }
