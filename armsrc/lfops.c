@@ -1571,27 +1571,27 @@ void SendForward(uint8_t fwd_bit_count) {
 	fwd_write_ptr = forwardLink_data;
 	fwd_bit_sz = fwd_bit_count;
 
-	// Set up FPGA, 125kHz
+	// Set up FPGA, 125kHz or 95 divisor
 	LFSetupFPGAForADC(95, true);
 
 	// force 1st mod pulse (start gap must be longer for 4305)
 	fwd_bit_sz--; //prepare next bit modulation
 	fwd_write_ptr++;
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF); // field off
-	SpinDelayUs(56*8); //55 cycles off (8us each)for 4305  /another reader has 37 here...
+	WaitUS(55*8); //55 cycles off (8us each)for 4305  /another reader has 37 here...
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_LF_ADC | FPGA_LF_ADC_READER_FIELD);//field on
-	SpinDelayUs(18*8); //16 cycles on (8us each)  // another reader has 18 here
+	WaitUS(18*8); //16 cycles on (8us each)  // another reader has 18 here
 
 	// now start writting
 	while(fwd_bit_sz-- > 0) { //prepare next bit modulation
 		if(((*fwd_write_ptr++) & 1) == 1)
-			SpinDelayUs(32*8); //32 cycles at 125Khz (8us each)
+			WaitUS(32*8); //32 cycles at 125Khz (8us each)
 		else {
 			//These timings work for 4469/4269/4305 (with the 55*8 above)
 			FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF); // field off
-			SpinDelayUs(23*8); //16-4 cycles off (8us each) //23  //one reader goes as high as 25 here
+			WaitUS(23*8); //16-4 cycles off (8us each) //23  //one reader goes as high as 25 here
 			FpgaWriteConfWord(FPGA_MAJOR_MODE_LF_ADC | FPGA_LF_ADC_READER_FIELD);//field on
-			SpinDelayUs(16*8); //16 cycles on (8us each) //9  // another reader goes to 17 here
+			WaitUS(16*8); //16 cycles on (8us each) //9  // another reader goes to 17 here
 		}
 	}
 }
@@ -1618,6 +1618,7 @@ void EM4xReadWord(uint8_t Address, uint32_t Pwd, uint8_t PwdMode) {
 	BigBuf_Clear_ext(false);
 
 	LED_A_ON();
+	StartTicks();
 	//If password mode do login
 	if (PwdMode == 1) EM4xLogin(Pwd);
 
@@ -1626,7 +1627,7 @@ void EM4xReadWord(uint8_t Address, uint32_t Pwd, uint8_t PwdMode) {
 	fwd_bit_count += Prepare_Addr( Address );
 
 	SendForward(fwd_bit_count);
-	SpinDelayUs(400);
+	WaitUS(400);
 	// Now do the acquisition
 	DoPartialAcquisition(20, true, 6000);
 	
@@ -1645,6 +1646,7 @@ void EM4xWriteWord(uint32_t flag, uint32_t Data, uint32_t Pwd) {
 	BigBuf_Clear_ext(false);
 
 	LED_A_ON();
+	StartTicks();
 	//If password mode do login
 	if (PwdMode) EM4xLogin(Pwd);
 
@@ -1658,7 +1660,7 @@ void EM4xWriteWord(uint32_t flag, uint32_t Data, uint32_t Pwd) {
 	//Wait for write to complete
 	//SpinDelay(10);
 
-	SpinDelayUs(6500);
+	WaitUS(6500);
 	//Capture response if one exists
 	DoPartialAcquisition(20, true, 6000);
 
