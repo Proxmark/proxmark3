@@ -1770,8 +1770,8 @@ bool DetectST_ext(uint8_t buffer[], size_t *size, int *foundclock, size_t *ststa
 			buffer[dataloc+1] = buffer[dataloc+2];
 		}
 		if (firstrun) {
-			*ststart = dataloc;
-			*stend = dataloc+(clk*4);
+			*stend = dataloc;
+			*ststart = dataloc-(clk*4);
 			firstrun=false;
 		}
 		for (i=0; i<datalen; ++i) {

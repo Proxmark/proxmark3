@@ -348,7 +348,7 @@ int ASKDemod_ext(const char *Cmd, bool verbose, bool emSearch, uint8_t askType, 
 		clk = (clk == 0) ? foundclk : clk;
 		CursorCPos = ststart;
 		CursorDPos = stend;
-		if (verbose || g_debugMode) PrintAndLog("\nFound Sequence Terminator - Second one is shown by orange and blue graph markers");
+		if (verbose || g_debugMode) PrintAndLog("\nFound Sequence Terminator - First one is shown by orange and blue graph markers");
 	}
 	int errCnt = askdemod(BitStream, &BitLen, &clk, &invert, maxErr, askamp, askType);
 	if (errCnt<0 || BitLen<16){  //if fatal error (or -1)
@@ -2169,6 +2169,22 @@ int CmdRtrim(const char *Cmd)
 	return 0;
 }
 
+// trim graph (middle) piece
+int CmdMtrim(const char *Cmd) {
+	int start = 0, stop = 0;
+	sscanf(Cmd, "%i %i", &start, &stop);
+
+	if (start > GraphTraceLen	|| stop > GraphTraceLen || start > stop) return 0;
+	start++; //leave start position sample
+
+	GraphTraceLen -= stop - start;
+	for (int i = 0; i < GraphTraceLen; i++) {
+		GraphBuffer[start+i] = GraphBuffer[stop+i];
+	}
+	return 0;
+}
+
+
 int CmdNorm(const char *Cmd)
 {
 	int i;
@@ -2419,6 +2435,7 @@ static command_t CommandTable[] =
 	{"load",            CmdLoad,            1, "<filename> -- Load trace (to graph window"},
 	{"ltrim",           CmdLtrim,           1, "<samples> -- Trim samples from left of trace"},
 	{"rtrim",           CmdRtrim,           1, "<location to end trace> -- Trim samples from right of trace"},
+	{"mtrim",           CmdMtrim,           1, "<start> <stop> -- Trim out samples from the specified start to the specified stop"},
 	{"manrawdecode",    Cmdmandecoderaw,    1, "[invert] [maxErr] -- Manchester decode binary stream in DemodBuffer"},
 	{"norm",            CmdNorm,            1, "Normalize max/min to +/-128"},
 	{"plot",            CmdPlot,            1, "Show graph window (hit 'h' in window for keystroke help)"},
