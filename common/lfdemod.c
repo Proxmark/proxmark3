@@ -218,8 +218,8 @@ uint8_t Em410xDecode(uint8_t *BitStream, size_t *size, size_t *startIdx, uint32_
 	uint8_t FmtLen = 10; // sets of 4 bits = end data 
 	*startIdx = 0;
 	errChk = preambleSearch(BitStream, preamble, sizeof(preamble), size, startIdx);
-	if (errChk == 0 || *size < 64) return 0;
-	if (*size == 110) FmtLen = 22; // 22 sets of 4 bits
+	if ( errChk == 0 || (*size != 64 && *size != 128) ) return 0;
+	if (*size == 128) FmtLen = 22; // 22 sets of 4 bits
 
 	//skip last 4bit parity row for simplicity
 	*size = removeParity(BitStream, *startIdx + sizeof(preamble), 5, 0, FmtLen * 5);
