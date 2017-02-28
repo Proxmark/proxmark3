@@ -341,11 +341,14 @@ int ASKDemod_ext(const char *Cmd, bool verbose, bool emSearch, uint8_t askType, 
 		askAmp(BitStream, BitLen); 
 	}
 	bool st = false;
-	if (*stCheck) st = DetectST(BitStream, &BitLen, &foundclk);
+	size_t ststart = 0, stend = 0;
+	if (*stCheck) st = DetectST_ext(BitStream, &BitLen, &foundclk, &ststart, &stend);
 	if (st) {
 		*stCheck = st;
 		clk = (clk == 0) ? foundclk : clk;
-		if (verbose || g_debugMode) PrintAndLog("\nFound Sequence Terminator");
+		CursorCPos = ststart;
+		CursorDPos = stend;
+		if (verbose || g_debugMode) PrintAndLog("\nFound Sequence Terminator - Second one is shown by orange and blue graph markers");
 	}
 	int errCnt = askdemod(BitStream, &BitLen, &clk, &invert, maxErr, askamp, askType);
 	if (errCnt<0 || BitLen<16){  //if fatal error (or -1)

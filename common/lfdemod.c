@@ -1596,9 +1596,14 @@ int pskRawDemod(uint8_t dest[], size_t *size, int *clock, int *invert)
 	return errCnt;
 }
 
+bool DetectST(uint8_t	buffer[], size_t *size, int *foundclock) {
+	size_t ststart = 0, stend = 0;
+	return DetectST_ext(buffer, size, foundclock, &ststart, &stend);
+}
+
 //by marshmellow
 //attempt to identify a Sequence Terminator in ASK modulated raw wave
-bool DetectST(uint8_t buffer[], size_t *size, int *foundclock) {
+bool DetectST_ext(uint8_t buffer[], size_t *size, int *foundclock, size_t *ststart, size_t *stend) {
 	size_t bufsize = *size;
 	//need to loop through all samples and identify our clock, look for the ST pattern
 	uint8_t fndClk[] = {8,16,32,40,50,64,128};
@@ -1751,7 +1756,7 @@ bool DetectST(uint8_t buffer[], size_t *size, int *foundclock) {
 	size_t newloc = 0;
 	i=0;
 	if (g_debugMode==2) prnt("DEBUG STT: Starting STT trim - start: %d, datalen: %d ",dataloc, datalen);		
-
+	bool firstrun = true;
 	// warning - overwriting buffer given with raw wave data with ST removed...
 	while ( dataloc < bufsize-(clk/2) ) {
 		//compensate for long high at end of ST not being high due to signal loss... (and we cut out the start of wave high part)
@@ -1763,6 +1768,11 @@ bool DetectST(uint8_t buffer[], size_t *size, int *foundclock) {
 		if (buffer[dataloc] >= high && buffer[dataloc+2] <= low) {
 			buffer[dataloc] = buffer[dataloc+2];
 			buffer[dataloc+1] = buffer[dataloc+2];
+		}
+		if (firstrun) {
+			*ststart = dataloc;
+			*stend = dataloc+(clk*4);
+			firstrun=false;
 		}
 		for (i=0; i<datalen; ++i) {
 			if (i+newloc < bufsize) {
