@@ -288,6 +288,7 @@ int cleanAskRawDemod(uint8_t *BinStream, size_t *size, int clk, int invert, int 
 }
 
 //by marshmellow
+//amplify based on ask edge detection
 void askAmp(uint8_t *BitStream, size_t size)
 {
 	uint8_t Last = 128;

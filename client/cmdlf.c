@@ -35,7 +35,7 @@
 #include "cmdlfviking.h" // for viking menu
 #include "cmdlfcotag.h"  // for COTAG menu
 
-bool threshold_set = false;
+bool g_lf_threshold_set = false;
 static int CmdHelp(const char *Cmd);
 
 
@@ -512,7 +512,7 @@ int CmdLFSetConfig(const char *Cmd)
 			cmdp+=2;
 			if(!errors) {
 				trigger_threshold = unsigned_trigg;
-				if (trigger_threshold > 0) threshold_set = true;
+				if (trigger_threshold > 0) g_lf_threshold_set = true;
 			}
 			break;
 		case 'b':
@@ -572,7 +572,7 @@ int CmdLFRead(const char *Cmd)
 	UsbCommand c = {CMD_ACQUIRE_RAW_ADC_SAMPLES_125K, {arg1,0,0}};
 	clearCommandBuffer();
 	SendCommand(&c);
-	if (threshold_set) {
+	if (g_lf_threshold_set) {
 		WaitForResponse(CMD_ACK,NULL);
 	} else {
 		if ( !WaitForResponseTimeout(CMD_ACK,NULL,2500) ) {
