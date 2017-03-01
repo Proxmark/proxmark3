@@ -218,8 +218,8 @@ uint8_t Em410xDecode(uint8_t *BitStream, size_t *size, size_t *startIdx, uint32_
 	uint8_t FmtLen = 10; // sets of 4 bits = end data 
 	*startIdx = 0;
 	errChk = preambleSearch(BitStream, preamble, sizeof(preamble), size, startIdx);
-	if (errChk == 0 || *size < 64) return 0;
-	if (*size == 110) FmtLen = 22; // 22 sets of 4 bits
+	if ( errChk == 0 || (*size != 64 && *size != 128) ) return 0;
+	if (*size == 128) FmtLen = 22; // 22 sets of 4 bits
 
 	//skip last 4bit parity row for simplicity
 	*size = removeParity(BitStream, *startIdx + sizeof(preamble), 5, 0, FmtLen * 5);
@@ -1596,9 +1596,14 @@ int pskRawDemod(uint8_t dest[], size_t *size, int *clock, int *invert)
 	return errCnt;
 }
 
+bool DetectST(uint8_t	buffer[], size_t *size, int *foundclock) {
+	size_t ststart = 0, stend = 0;
+	return DetectST_ext(buffer, size, foundclock, &ststart, &stend);
+}
+
 //by marshmellow
 //attempt to identify a Sequence Terminator in ASK modulated raw wave
-bool DetectST(uint8_t buffer[], size_t *size, int *foundclock) {
+bool DetectST_ext(uint8_t buffer[], size_t *size, int *foundclock, size_t *ststart, size_t *stend) {
 	size_t bufsize = *size;
 	//need to loop through all samples and identify our clock, look for the ST pattern
 	uint8_t fndClk[] = {8,16,32,40,50,64,128};
@@ -1751,7 +1756,7 @@ bool DetectST(uint8_t buffer[], size_t *size, int *foundclock) {
 	size_t newloc = 0;
 	i=0;
 	if (g_debugMode==2) prnt("DEBUG STT: Starting STT trim - start: %d, datalen: %d ",dataloc, datalen);		
-
+	bool firstrun = true;
 	// warning - overwriting buffer given with raw wave data with ST removed...
 	while ( dataloc < bufsize-(clk/2) ) {
 		//compensate for long high at end of ST not being high due to signal loss... (and we cut out the start of wave high part)
@@ -1759,6 +1764,15 @@ bool DetectST(uint8_t buffer[], size_t *size, int *foundclock) {
 			for(i=0; i < clk/2-tol; ++i) {
 				buffer[dataloc+i] = high+5;
 			}
+		} //test for single sample outlier (high between two lows) in the case of very strong waves
+		if (buffer[dataloc] >= high && buffer[dataloc+2] <= low) {
+			buffer[dataloc] = buffer[dataloc+2];
+			buffer[dataloc+1] = buffer[dataloc+2];
+		}
+		if (firstrun) {
+			*stend = dataloc;
+			*ststart = dataloc-(clk*4);
+			firstrun=false;
 		}
 		for (i=0; i<datalen; ++i) {
 			if (i+newloc < bufsize) {
