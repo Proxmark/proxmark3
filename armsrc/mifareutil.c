@@ -511,7 +511,9 @@ int mifare_classic_halt(struct Crypto1State *pcs, uint32_t uid)
 	len = mifare_sendcmd_short(pcs, pcs == NULL ? false:true, 0x50, 0x00, receivedAnswer, receivedAnswerPar, NULL);
 	if (len != 0) {
 		if (MF_DBGLEVEL >= MF_DBG_ERROR)
-			Dbprintf("halt error. response len: %x", len);  
+			Dbprintf("halt error. response len: %x data:%02X %02X %02X %02X", len, receivedAnswer[0],receivedAnswer[1],receivedAnswer[2],receivedAnswer[3]);  
+		if (len == 1 && receivedAnswer[0]==0x04)
+			return 4;
 		return 1;
 	}
 

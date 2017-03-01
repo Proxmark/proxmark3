@@ -21,7 +21,24 @@ int CmdHF14AMifare(const char *Cmd)
 	uint64_t par_list = 0, ks_list = 0, r_key = 0;
 	int16_t isOK = 0;
 
-	UsbCommand c = {CMD_READER_MIFARE, {true, 0, 0}};
+	uint8_t blockNo = 0, keyType = 0;
+	char cmdp	= 0x00;
+
+	if (strlen(Cmd)<3) {
+		PrintAndLog("Usage:  hf mf mifare <block number> <key A/B>");
+		PrintAndLog("        sample: hf mf mi 0 A");
+		return 0;
+	}	
+
+	blockNo = param_get8(Cmd, 0);
+	cmdp = param_getchar(Cmd, 1);
+	if (cmdp == 0x00) {
+		PrintAndLog("Key type must be A or B");
+		return 1;
+	}
+	if (cmdp != 'A' && cmdp != 'a') keyType = 1;
+
+	UsbCommand c = {CMD_READER_MIFARE, {true, blockNo, keyType}};
 
 	// message
 	printf("-------------------------------------------------------------------------\n");
