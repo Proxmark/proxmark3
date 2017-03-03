@@ -1231,7 +1231,7 @@ int CmdHF14AMfUDump(const char *Cmd){
 	bool manualPages = false;
 	uint8_t startPage = 0;
 	char tempStr[50];
-	char cleanASCII[4];
+	unsigned char cleanASCII[4];
 
 	while(param_getchar(Cmd, cmdp) != 0x00)
 	{
@@ -1424,12 +1424,7 @@ int CmdHF14AMfUDump(const char *Cmd){
 
 		// convert unprintable characters and line breaks to dots
 		memcpy(cleanASCII, data+i*4, 4);
-
-		for (size_t clean_i = 0; clean_i < 4; clean_i++) {
-			if (!isprint(cleanASCII[clean_i])) {
-				cleanASCII[clean_i] = '.';
-			}
-		}
+		clean_ascii(cleanASCII, 4);
 
 		PrintAndLog("%3d/0x%02X | %s| %d | %.4s", i+startPage, i+startPage, sprint_hex(data + i * 4, 4), tmplockbit, cleanASCII);
 	}
