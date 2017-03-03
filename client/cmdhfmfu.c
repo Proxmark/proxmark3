@@ -7,6 +7,7 @@
 //-----------------------------------------------------------------------------
 // High frequency MIFARE ULTRALIGHT (C) commands
 //-----------------------------------------------------------------------------
+#include <ctype.h>
 #include "loclass/des.h"
 #include "cmdhfmfu.h"
 #include "cmdhfmf.h"
@@ -1230,6 +1231,7 @@ int CmdHF14AMfUDump(const char *Cmd){
 	bool manualPages = false;
 	uint8_t startPage = 0;
 	char tempStr[50];
+	char cleanASCII[4];
 
 	while(param_getchar(Cmd, cmdp) != 0x00)
 	{
@@ -1372,7 +1374,7 @@ int CmdHF14AMfUDump(const char *Cmd){
 	PrintAndLog("---------------------------------");
 	for (i = 0; i < Pages; ++i) {
 		if ( i < 3 ) {
-			PrintAndLog("%02d/0x%02X | %s|   | ", i+startPage, i+startPage, sprint_hex(data + i * 4, 4));
+			PrintAndLog("%3d/0x%02X | %s|   | ", i+startPage, i+startPage, sprint_hex(data + i * 4, 4));
 			continue;
 		}
 		switch(i){
@@ -1419,7 +1421,17 @@ int CmdHF14AMfUDump(const char *Cmd){
 			case 43: tmplockbit = bit2[9]; break;  //auth1
 			default: break;
 		}
-		PrintAndLog("%02d/0x%02X | %s| %d | %.4s", i+startPage, i+startPage, sprint_hex(data + i * 4, 4), tmplockbit, data+i*4);
+
+		// convert unprintable characters and line breaks to dots
+		memcpy(cleanASCII, data+i*4, 4);
+
+		for (size_t clean_i = 0; clean_i < 4; clean_i++) {
+			if (!isprint(cleanASCII[clean_i])) {
+				cleanASCII[clean_i] = '.';
+			}
+		}
+
+		PrintAndLog("%3d/0x%02X | %s| %d | %.4s", i+startPage, i+startPage, sprint_hex(data + i * 4, 4), tmplockbit, cleanASCII);
 	}
 	PrintAndLog("---------------------------------");
 
