@@ -8,6 +8,7 @@
 // utilities
 //-----------------------------------------------------------------------------
 
+#include <ctype.h>
 #include "util.h"
 #define MAX_BIN_BREAK_LENGTH   (3072+384+1)
 
@@ -580,4 +581,13 @@ void rol(uint8_t *data, const size_t len){
         data[i] = data[i+1];
     }
     data[len-1] = first;
+}
+
+
+// Replace unprintable characters with a dot in char buffer
+void clean_ascii(unsigned char *buf, size_t len) {
+  for (size_t i = 0; i < len; i++) {
+    if (!isprint(buf[i]))
+      buf[i] = '.';
+  }
 }

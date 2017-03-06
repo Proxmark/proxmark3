@@ -76,3 +76,5 @@ void xor(unsigned char *dst, unsigned char *src, size_t len);
 int32_t le24toh(uint8_t data[3]);
 uint32_t le32toh (uint8_t *data);
 void rol(uint8_t *data, const size_t len);
+
+void clean_ascii(unsigned char *buf, size_t len);
