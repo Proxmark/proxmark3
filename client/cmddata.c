@@ -277,8 +277,8 @@ int AskEm410xDecode(bool verbose, uint32_t *hi, uint64_t *lo )
 
 int AskEm410xDemod(const char *Cmd, uint32_t *hi, uint64_t *lo, bool verbose)
 {
-	bool st = TRUE;
-	if (!ASKDemod_ext(Cmd, FALSE, FALSE, 1, &st)) return 0;
+	bool st = true;
+	if (!ASKDemod_ext(Cmd, false, false, 1, &st)) return 0;
 	return AskEm410xDecode(verbose, hi, lo);
 }
 
@@ -406,13 +406,13 @@ int Cmdaskmandemod(const char *Cmd)
 		PrintAndLog("          : data rawdemod am 64 1 0 = demod an ask/manchester tag from GraphBuffer using a clock of RF/64, inverting data and allowing 0 demod errors");
 		return 0;
 	}
-	bool st = TRUE;
+	bool st = true;
 	if (Cmd[0]=='s') 
-		return ASKDemod_ext(Cmd++, TRUE, TRUE, 1, &st);
+		return ASKDemod_ext(Cmd++, true, true, 1, &st);
 	else if (Cmd[1] == 's')
-		return ASKDemod_ext(Cmd+=2, TRUE, TRUE, 1, &st);
+		return ASKDemod_ext(Cmd+=2, true, true, 1, &st);
 	else
-		return ASKDemod(Cmd, TRUE, TRUE, 1);
+		return ASKDemod(Cmd, true, true, 1);
 }
 
 //by marshmellow
@@ -587,7 +587,7 @@ int Cmdaskbiphdemod(const char *Cmd)
 		PrintAndLog("          : data rawdemod ab 0 64 1 0 0 a = demod an ask/biph tag from GraphBuffer using a clock of RF/64, inverting data and allowing 0 demod errors, and amp");
 		return 0;
 	}
-	return ASKbiphaseDemod(Cmd, TRUE);
+	return ASKbiphaseDemod(Cmd, true);
 }
 
 //by marshmellow
@@ -597,7 +597,7 @@ int Cmdaskbiphdemod(const char *Cmd)
 //if successful it will push askraw data back to demod buffer ready for emulation
 int CmdG_Prox_II_Demod(const char *Cmd)
 {
-	if (!ASKbiphaseDemod(Cmd, FALSE)){
+	if (!ASKbiphaseDemod(Cmd, false)){
 		if (g_debugMode) PrintAndLog("Error gProxII: ASKbiphaseDemod failed 1st try");
 		return 0;
 	}
@@ -702,7 +702,7 @@ int Cmdaskrawdemod(const char *Cmd)
 		PrintAndLog("          : data rawdemod ar 64 1 0 0 a = demod an ask tag from GraphBuffer using a clock of RF/64, inverting data and allowing 0 demod errors, and amp");
 		return 0;
 	}
-	return ASKDemod(Cmd, TRUE, FALSE, 0);
+	return ASKDemod(Cmd, true, false, 0);
 }
 
 int AutoCorrelate(int window, bool SaveGrph, bool verbose)
@@ -767,7 +767,7 @@ int CmdAutoCorr(const char *Cmd)
 		return usage_data_autocorr();
 	int window = 4000; //set default
 	char grph=0;
-	bool updateGrph = FALSE;
+	bool updateGrph = false;
 	sscanf(Cmd, "%i %c", &window, &grph);
 
 	if (window >= GraphTraceLen) {
@@ -775,8 +775,8 @@ int CmdAutoCorr(const char *Cmd)
 			GraphTraceLen);
 		return 0;
 	}
-	if (grph == 'g') updateGrph=TRUE;
-	return AutoCorrelate(window, updateGrph, TRUE);
+	if (grph == 'g') updateGrph=true;
+	return AutoCorrelate(window, updateGrph, true);
 }
 
 int CmdBitsamples(const char *Cmd)
@@ -1035,7 +1035,7 @@ int CmdFSKrawdemod(const char *Cmd)
 		PrintAndLog("          : data rawdemod fs 50 1 10 8 = demod an fsk2a RF/50 tag from GraphBuffer");
 		return 0;
 	}
-	return FSKrawDemod(Cmd, TRUE);
+	return FSKrawDemod(Cmd, true);
 }
 
 //by marshmellow (based on existing demod + holiman's refactor)
@@ -1789,7 +1789,7 @@ int CmdNRZrawDemod(const char *Cmd)
 		PrintAndLog("          : data rawdemod nr 64 1 0 = demod a nrz/direct tag from GraphBuffer using a clock of RF/64, inverting data and allowing 0 demod errors");
 		return 0;
 	}
-	return NRZrawDemod(Cmd, TRUE);
+	return NRZrawDemod(Cmd, true);
 }
 
 // by marshmellow
@@ -1813,7 +1813,7 @@ int CmdPSK1rawDemod(const char *Cmd)
 		PrintAndLog("          : data rawdemod p1 64 1 0 = demod a psk1 tag from GraphBuffer using a clock of RF/64, inverting data and allowing 0 demod errors");
 		return 0;
 	}
-	ans = PSKDemod(Cmd, TRUE);
+	ans = PSKDemod(Cmd, true);
 	//output
 	if (!ans){
 		if (g_debugMode) PrintAndLog("Error demoding: %d",ans); 
@@ -1845,7 +1845,7 @@ int CmdPSK2rawDemod(const char *Cmd)
 		PrintAndLog("          : data rawdemod p2 64 1 0  = demod a psk2 tag from GraphBuffer using a clock of RF/64, inverting output and allowing 0 demod errors");
 		return 0;
 	}
-	ans=PSKDemod(Cmd, TRUE);
+	ans=PSKDemod(Cmd, true);
 	if (!ans){
 		if (g_debugMode) PrintAndLog("Error demoding: %d",ans);  
 		return 0;

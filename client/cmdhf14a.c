@@ -570,14 +570,14 @@ int CmdHF14ASnoop(const char *Cmd) {
 int CmdHF14ACmdRaw(const char *cmd) {
     UsbCommand c = {CMD_READER_ISO_14443a, {0, 0, 0}};
     bool reply=1;
-    bool crc = FALSE;
-    bool power = FALSE;
-    bool active = FALSE;
-    bool active_select = FALSE;
+    bool crc = false;
+    bool power = false;
+    bool active = false;
+    bool active_select = false;
     uint16_t numbits = 0;
-	bool bTimeout = FALSE;
+	bool bTimeout = false;
 	uint32_t timeout = 0;
-	bool topazmode = FALSE;
+	bool topazmode = false;
     char buf[5]="";
     int i = 0;
     uint8_t data[USB_CMD_DATA_SIZE];
@@ -606,19 +606,19 @@ int CmdHF14ACmdRaw(const char *cmd) {
         if (cmd[i]=='-') {
             switch (cmd[i+1]) {
                 case 'r': 
-                    reply = FALSE;
+                    reply = false;
                     break;
                 case 'c':
-                    crc = TRUE;
+                    crc = true;
                     break;
                 case 'p':
-                    power = TRUE;
+                    power = true;
                     break;
                 case 'a':
-                    active = TRUE;
+                    active = true;
                     break;
                 case 's':
-                    active_select = TRUE;
+                    active_select = true;
                     break;
                 case 'b': 
                     sscanf(cmd+i+2,"%d",&temp);
@@ -628,7 +628,7 @@ int CmdHF14ACmdRaw(const char *cmd) {
                     i-=2;
                     break;
 				case 't':
-					bTimeout = TRUE;
+					bTimeout = true;
 					sscanf(cmd+i+2,"%d",&temp);
 					timeout = temp;
 					i+=3;
@@ -636,7 +636,7 @@ int CmdHF14ACmdRaw(const char *cmd) {
 					i-=2;
 					break;
                 case 'T':
-					topazmode = TRUE;
+					topazmode = true;
 					break;
                 default:
                     PrintAndLog("Invalid option");

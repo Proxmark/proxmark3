@@ -8,63 +8,36 @@
 // High frequency ISO14443A commands
 //-----------------------------------------------------------------------------
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include "common.h"
-#include "cmdmain.h"
-#include "ui.h"
+#include <stdint.h>
+#include <stdbool.h>
 #include "data.h"
-#include "util.h"
-#include "nonce2key/nonce2key.h"
-#include "nonce2key/crapto1.h"
-#include "iso14443crc.h"
-
-#define MEM_CHUNK               1000000
-#define NESTED_SECTOR_RETRY     10
 
 // mfCSetBlock work flags
 #define CSETBLOCK_UID 					0x01
 #define CSETBLOCK_WUPC					0x02
 #define CSETBLOCK_HALT					0x04
-#define CSETBLOCK_INIT_FIELD		0x08
-#define CSETBLOCK_RESET_FIELD		0x10
-#define CSETBLOCK_SINGLE_OPER		0x1F
+#define CSETBLOCK_INIT_FIELD			0x08
+#define CSETBLOCK_RESET_FIELD			0x10
+#define CSETBLOCK_SINGLE_OPER			0x1F
 
-// mifare tracer flags
-#define TRACE_IDLE		 					0x00
-#define TRACE_AUTH1		 					0x01
-#define TRACE_AUTH2		 					0x02
-#define TRACE_AUTH_OK	 					0x03
-#define TRACE_READ_DATA 				0x04
-#define TRACE_WRITE_OK					0x05
-#define TRACE_WRITE_DATA				0x06
-
-#define TRACE_ERROR		 					0xFF
-
-typedef struct {
-	uint64_t Key[2];
-	int foundKey[2];
-} sector;
- 
 extern char logHexFileName[FILE_PATH_SIZE];
 
-int mfnested(uint8_t blockNo, uint8_t keyType, uint8_t * key, uint8_t trgBlockNo, uint8_t trgKeyType, uint8_t * ResultKeys, bool calibrate);
-int mfCheckKeys (uint8_t blockNo, uint8_t keyType, bool clear_trace, uint8_t keycnt, uint8_t * keyBlock, uint64_t * key);
+extern int mfnested(uint8_t blockNo, uint8_t keyType, uint8_t * key, uint8_t trgBlockNo, uint8_t trgKeyType, uint8_t * ResultKeys, bool calibrate);
+extern int mfCheckKeys (uint8_t blockNo, uint8_t keyType, bool clear_trace, uint8_t keycnt, uint8_t * keyBlock, uint64_t * key);
 
-int mfEmlGetMem(uint8_t *data, int blockNum, int blocksCount);
-int mfEmlSetMem(uint8_t *data, int blockNum, int blocksCount);
+extern int mfEmlGetMem(uint8_t *data, int blockNum, int blocksCount);
+extern int mfEmlSetMem(uint8_t *data, int blockNum, int blocksCount);
 
-int mfCSetUID(uint8_t *uid, uint8_t *atqa, uint8_t *sak, uint8_t *oldUID, bool wantWipe);
-int mfCSetBlock(uint8_t blockNo, uint8_t *data, uint8_t *uid, bool wantWipe, uint8_t params);
-int mfCGetBlock(uint8_t blockNo, uint8_t *data, uint8_t params);
+extern int mfCSetUID(uint8_t *uid, uint8_t *atqa, uint8_t *sak, uint8_t *oldUID, bool wantWipe);
+extern int mfCSetBlock(uint8_t blockNo, uint8_t *data, uint8_t *uid, bool wantWipe, uint8_t params);
+extern int mfCGetBlock(uint8_t blockNo, uint8_t *data, uint8_t params);
 
-int mfTraceInit(uint8_t *tuid, uint8_t *atqa, uint8_t sak, bool wantSaveToEmlFile);
-int mfTraceDecode(uint8_t *data_src, int len, bool wantSaveToEmlFile);
+extern int mfTraceInit(uint8_t *tuid, uint8_t *atqa, uint8_t sak, bool wantSaveToEmlFile);
+extern int mfTraceDecode(uint8_t *data_src, int len, bool wantSaveToEmlFile);
 
-int isTraceCardEmpty(void);
-int isBlockEmpty(int blockN);
-int isBlockTrailer(int blockN);
-int loadTraceCard(uint8_t *tuid);
-int saveTraceCard(void);
-int tryDecryptWord(uint32_t nt, uint32_t ar_enc, uint32_t at_enc, uint8_t *data, int len);
+extern int isTraceCardEmpty(void);
+extern int isBlockEmpty(int blockN);
+extern int isBlockTrailer(int blockN);
+extern int loadTraceCard(uint8_t *tuid);
+extern int saveTraceCard(void);
+extern int tryDecryptWord(uint32_t nt, uint32_t ar_enc, uint32_t at_enc, uint8_t *data, int len);

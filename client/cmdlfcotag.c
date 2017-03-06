@@ -7,7 +7,17 @@
 //-----------------------------------------------------------------------------
 // Low frequency COTAG commands
 //-----------------------------------------------------------------------------
-#include "cmdlfcotag.h"  // COTAG function declarations
+#include <stdio.h>
+#include <string.h>
+#include <stdint.h>
+#include "proxmark3.h"
+#include "ui.h"
+#include "cmddata.h"
+#include "data.h"
+#include "cmdlfcotag.h"
+#include "lfdemod.h"
+#include "usb_cmd.h"
+#include "cmdmain.h"
 
 static int CmdHelp(const char *Cmd);
 

@@ -25,8 +25,6 @@
 #ifndef MAX
 # define MAX(a, b) (((a) > (b)) ? (a) : (b))
 #endif
-#define TRUE                        1
-#define FALSE                       0
 #define EVEN                        0
 #define ODD                         1
 
