@@ -13,7 +13,7 @@
 #ifndef __ISO14443A_H
 #define __ISO14443A_H
 #include "common.h"
-#include "mifaresniff.h"
+#include "mifare.h"
 
 typedef struct {
 	enum {

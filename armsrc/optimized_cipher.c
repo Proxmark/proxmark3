@@ -61,8 +61,7 @@
 **/
 
 #include "optimized_cipher.h"
-#include <stdlib.h>
-#include <string.h>
+#include <stddef.h>
 #include <stdbool.h>
 #include <stdint.h>
 

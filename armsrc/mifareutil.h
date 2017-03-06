@@ -8,10 +8,11 @@
 //-----------------------------------------------------------------------------
 // code for work with mifare cards.
 //-----------------------------------------------------------------------------
-#include "crapto1.h"
 
 #ifndef __MIFAREUTIL_H
 #define __MIFAREUTIL_H
+
+#include "crapto1/crapto1.h"
 
 // mifare authentication
 #define CRYPT_NONE    0
