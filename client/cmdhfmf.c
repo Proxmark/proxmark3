@@ -9,8 +9,18 @@
 //-----------------------------------------------------------------------------
 
 #include <inttypes.h>
-#include "cmdhfmf.h"
-#include "./nonce2key/nonce2key.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include "proxmark3.h"
+#include "cmdmain.h"
+#include "util.h"
+#include "ui.h"
+#include "mifarehost.h"
+#include "mifare.h"
+#include "nonce2key/nonce2key.h"
+
+#define NESTED_SECTOR_RETRY     10			// how often we try mfested() until we give up
+
 
 static int CmdHelp(const char *Cmd);
 
@@ -551,10 +561,17 @@ int CmdHF14AMfRestore(const char *Cmd)
 	return 0;
 }
 
+
+typedef struct {
+	uint64_t Key[2];
+	int foundKey[2];
+} sector_t;
+
+
 int CmdHF14AMfNested(const char *Cmd)
 {
 	int i, j, res, iterations;
-	sector *e_sector = NULL;
+	sector_t *e_sector = NULL;
 	uint8_t blockNo = 0;
 	uint8_t keyType = 0;
 	uint8_t trgBlockNo = 0;
@@ -674,7 +691,7 @@ int CmdHF14AMfNested(const char *Cmd)
 		clock_t time1;
 		time1 = clock();
 
-		e_sector = calloc(SectorsCnt, sizeof(sector));
+		e_sector = calloc(SectorsCnt, sizeof(sector_t));
 		if (e_sector == NULL) return 1;
 		
 		//test current key and additional standard keys first
@@ -1768,7 +1785,7 @@ int CmdHF14AMfCSetBlk(const char *Cmd)
 {
 	uint8_t memBlock[16] = {0x00};
 	uint8_t blockNo = 0;
-	bool wipeCard = FALSE;
+	bool wipeCard = false;
 	int res;
 
 	if (strlen(Cmd) < 1 || param_getchar(Cmd, 0) == 'h') {

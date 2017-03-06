@@ -12,10 +12,43 @@
 #include <stdlib.h> 
 #include <string.h>
 #include <pthread.h>
-#include "mifarehost.h"
+
+#include "nonce2key/crapto1.h"
 #include "proxmark3.h"
+#include "usb_cmd.h"
+#include "cmdmain.h"
+#include "ui.h"
+#include "util.h"
+#include "iso14443crc.h"
+#include "mifarehost.h"
+
+// mifare tracer flags used in mfTraceDecode()
+#define TRACE_IDLE		 				0x00
+#define TRACE_AUTH1		 				0x01
+#define TRACE_AUTH2		 				0x02
+#define TRACE_AUTH_OK	 				0x03
+#define TRACE_READ_DATA 				0x04
+#define TRACE_WRITE_OK					0x05
+#define TRACE_WRITE_DATA				0x06
+#define TRACE_ERROR		 				0xFF
+
 
 // MIFARE
+int mfCheckKeys (uint8_t blockNo, uint8_t keyType, bool clear_trace, uint8_t keycnt, uint8_t * keyBlock, uint64_t * key){
+
+	*key = 0;
+
+	UsbCommand c = {CMD_MIFARE_CHKKEYS, {((blockNo & 0xff) | ((keyType&0xff)<<8)), clear_trace, keycnt}};
+	memcpy(c.d.asBytes, keyBlock, 6 * keycnt);
+	SendCommand(&c);
+
+	UsbCommand resp;
+	if (!WaitForResponseTimeout(CMD_ACK,&resp,3000)) return 1;
+	if ((resp.arg[0] & 0xff) != 0x01) return 2;
+	*key = bytes_to_num(resp.d.asBytes, 6);
+	return 0;
+}
+
 int compar_int(const void * a, const void * b) {
 	// didn't work: (the result is truncated to 32 bits)
 	//return (*(uint64_t*)b - *(uint64_t*)a);
@@ -193,21 +226,6 @@ int mfnested(uint8_t blockNo, uint8_t keyType, uint8_t * key, uint8_t trgBlockNo
 	return 0;
 }
 
-int mfCheckKeys (uint8_t blockNo, uint8_t keyType, bool clear_trace, uint8_t keycnt, uint8_t * keyBlock, uint64_t * key){
-
-	*key = 0;
-
-	UsbCommand c = {CMD_MIFARE_CHKKEYS, {((blockNo & 0xff) | ((keyType&0xff)<<8)), clear_trace, keycnt}};
-	memcpy(c.d.asBytes, keyBlock, 6 * keycnt);
-	SendCommand(&c);
-
-	UsbCommand resp;
-	if (!WaitForResponseTimeout(CMD_ACK,&resp,3000)) return 1;
-	if ((resp.arg[0] & 0xff) != 0x01) return 2;
-	*key = bytes_to_num(resp.d.asBytes, 6);
-	return 0;
-}
-
 // EMULATOR
 
 int mfEmlGetMem(uint8_t *data, int blockNum, int blocksCount) {
@@ -228,6 +246,45 @@ int mfEmlSetMem(uint8_t *data, int blockNum, int blocksCount) {
 }
 
 // "MAGIC" CARD
+
+int mfCGetBlock(uint8_t blockNo, uint8_t *data, uint8_t params) {
+	uint8_t isOK = 0;
+
+	UsbCommand c = {CMD_MIFARE_CGETBLOCK, {params, 0, blockNo}};
+	SendCommand(&c);
+
+  UsbCommand resp;
+	if (WaitForResponseTimeout(CMD_ACK,&resp,1500)) {
+		isOK  = resp.arg[0] & 0xff;
+		memcpy(data, resp.d.asBytes, 16);
+		if (!isOK) return 2;
+	} else {
+		PrintAndLog("Command execute timeout");
+		return 1;
+	}
+	return 0;
+}
+
+int mfCSetBlock(uint8_t blockNo, uint8_t *data, uint8_t *uid, bool wantWipe, uint8_t params) {
+
+	uint8_t isOK = 0;
+	UsbCommand c = {CMD_MIFARE_CSETBLOCK, {wantWipe, params & (0xFE | (uid == NULL ? 0:1)), blockNo}};
+	memcpy(c.d.asBytes, data, 16); 
+	SendCommand(&c);
+
+  UsbCommand resp;
+	if (WaitForResponseTimeout(CMD_ACK,&resp,1500)) {
+		isOK  = resp.arg[0] & 0xff;
+		if (uid != NULL) 
+			memcpy(uid, resp.d.asBytes, 4);
+		if (!isOK) 
+			return 2;
+	} else {
+		PrintAndLog("Command execute timeout");
+		return 1;
+	}
+	return 0;
+}
 
 int mfCSetUID(uint8_t *uid, uint8_t *atqa, uint8_t *sak, uint8_t *oldUID, bool wantWipe) {
 	uint8_t oldblock0[16] = {0x00};
@@ -255,45 +312,6 @@ int mfCSetUID(uint8_t *uid, uint8_t *atqa, uint8_t *sak, uint8_t *oldUID, bool w
 	}
 	PrintAndLog("new block 0:  %s", sprint_hex(block0,16));
 	return mfCSetBlock(0, block0, oldUID, wantWipe, CSETBLOCK_SINGLE_OPER);
-}
-
-int mfCSetBlock(uint8_t blockNo, uint8_t *data, uint8_t *uid, bool wantWipe, uint8_t params) {
-
-	uint8_t isOK = 0;
-	UsbCommand c = {CMD_MIFARE_CSETBLOCK, {wantWipe, params & (0xFE | (uid == NULL ? 0:1)), blockNo}};
-	memcpy(c.d.asBytes, data, 16); 
-	SendCommand(&c);
-
-  UsbCommand resp;
-	if (WaitForResponseTimeout(CMD_ACK,&resp,1500)) {
-		isOK  = resp.arg[0] & 0xff;
-		if (uid != NULL) 
-			memcpy(uid, resp.d.asBytes, 4);
-		if (!isOK) 
-			return 2;
-	} else {
-		PrintAndLog("Command execute timeout");
-		return 1;
-	}
-	return 0;
-}
-
-int mfCGetBlock(uint8_t blockNo, uint8_t *data, uint8_t params) {
-	uint8_t isOK = 0;
-
-	UsbCommand c = {CMD_MIFARE_CGETBLOCK, {params, 0, blockNo}};
-	SendCommand(&c);
-
-  UsbCommand resp;
-	if (WaitForResponseTimeout(CMD_ACK,&resp,1500)) {
-		isOK  = resp.arg[0] & 0xff;
-		memcpy(data, resp.d.asBytes, 16);
-		if (!isOK) return 2;
-	} else {
-		PrintAndLog("Command execute timeout");
-		return 1;
-	}
-	return 0;
 }
 
 // SNIFFER
@@ -335,6 +353,23 @@ int isBlockEmpty(int blockN) {
 
 int isBlockTrailer(int blockN) {
  return ((blockN & 0x03) == 0x03);
+}
+
+int saveTraceCard(void) {
+	FILE * f;
+	
+	if ((!strlen(traceFileName)) || (isTraceCardEmpty())) return 0;
+	
+	f = fopen(traceFileName, "w+");
+	if ( !f ) return 1;
+	
+	for (int i = 0; i < 64; i++) {  // blocks
+		for (int j = 0; j < 16; j++)  // bytes
+			fprintf(f, "%02x", *(traceCard + i * 16 + j)); 
+		fprintf(f,"\n");
+	}
+	fclose(f);
+	return 0;
 }
 
 int loadTraceCard(uint8_t *tuid) {
@@ -380,23 +415,6 @@ int loadTraceCard(uint8_t *tuid) {
 	}
 	fclose(f);
 
-	return 0;
-}
-
-int saveTraceCard(void) {
-	FILE * f;
-	
-	if ((!strlen(traceFileName)) || (isTraceCardEmpty())) return 0;
-	
-	f = fopen(traceFileName, "w+");
-	if ( !f ) return 1;
-	
-	for (int i = 0; i < 64; i++) {  // blocks
-		for (int j = 0; j < 16; j++)  // bytes
-			fprintf(f, "%02x", *(traceCard + i * 16 + j)); 
-		fprintf(f,"\n");
-	}
-	fclose(f);
 	return 0;
 }
 

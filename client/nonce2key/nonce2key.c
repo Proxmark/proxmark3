@@ -10,12 +10,13 @@
 // MIFARE Darkside hack
 //-----------------------------------------------------------------------------
 
-#define __STDC_FORMAT_MACROS
 #include <inttypes.h>
+#include <time.h>
 
 #include "nonce2key.h"
 #include "mifarehost.h"
 #include "ui.h"
+#include "util.h"
 
 int compar_state(const void * a, const void * b) {
 	// didn't work: (the result is truncated to 32 bits)
@@ -161,7 +162,7 @@ bool mfkey32(nonces_t data, uint64_t *outputkey) {
 	uint32_t nr1_enc = data.nr2; // second encrypted reader challenge
 	uint32_t ar1_enc = data.ar2; // second encrypted reader response
 	clock_t t1 = clock();
-	bool isSuccess = FALSE;
+	bool isSuccess = false;
 	uint8_t counter=0;
 
 	s = lfsr_recovery32(ar0_enc ^ prng_successor(nt, 64), 0);
@@ -208,7 +209,7 @@ bool tryMfk32_moebius(nonces_t data, uint64_t *outputkey) {
 	uint32_t nt1     = data.nonce2; // second tag challenge (nonce)
 	uint32_t nr1_enc = data.nr2; // second encrypted reader challenge
 	uint32_t ar1_enc = data.ar2; // second encrypted reader response	
-	bool isSuccess = FALSE;
+	bool isSuccess = false;
 	int counter = 0;
 	
 	//PrintAndLog("Enter mfkey32_moebius");
