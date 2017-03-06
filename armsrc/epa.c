@@ -11,10 +11,14 @@
 // functions, You need to do the setup before calling them!
 //-----------------------------------------------------------------------------
 
+#include "apps.h"
 #include "iso14443a.h"
 #include "iso14443b.h"
 #include "epa.h"
 #include "cmd.h"
+#include "fpgaloader.h"
+#include "string.h"
+#include "util.h"
 
 // Protocol and Parameter Selection Request for ISO 14443 type A cards
 // use regular (1x) speed in both directions
