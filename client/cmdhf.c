@@ -11,8 +11,10 @@
 #include <stdio.h>
 #include <string.h>
 #include "proxmark3.h"
-#include "graph.h"
+#include "util.h"
 #include "ui.h"
+#include "iso14443crc.h"
+#include "cmdmain.h"
 #include "cmdparser.h"
 #include "cmdhf.h"
 #include "cmdhf14a.h"

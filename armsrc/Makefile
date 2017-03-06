@@ -19,7 +19,7 @@ SRC_LF = lfops.c hitag2.c hitagS.c lfsampling.c pcf7931.c lfdemod.c protocols.c
 SRC_ISO15693 = iso15693.c iso15693tools.c
 SRC_ISO14443a = epa.c iso14443a.c mifareutil.c mifarecmd.c mifaresniff.c
 SRC_ISO14443b = iso14443b.c
-SRC_CRAPTO1 = crapto1.c crypto1.c des.c aes.c
+SRC_CRAPTO1 = crypto1.c des.c aes.c
 SRC_CRC = iso14443crc.c crc.c crc16.c crc32.c
 
 #the FPGA bitstream files. Note: order matters!
@@ -32,9 +32,6 @@ ZLIB_CFLAGS = -DZ_SOLO -DZ_PREFIX -DNO_GZIP -DZLIB_PM3_TUNED
 APP_CFLAGS += $(ZLIB_CFLAGS)
 # zlib includes:
 APP_CFLAGS += -I../zlib
-
-# stdint.h provided locally until GCC 4.5 becomes C99 compliant
-APP_CFLAGS += -I.
 
 # Compile these in thumb mode (small size)
 THUMBSRC = start.c \

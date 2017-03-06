@@ -2,6 +2,7 @@
 #include "apps.h"
 #include "lfsampling.h"
 #include "pcf7931.h"
+#include "util.h"
 #include "string.h"
 
 #define T0_PCF 8 //period for the pcf7931 in us

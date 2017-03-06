@@ -40,9 +40,6 @@
 #include "util.h"
 #include "string.h"
 
-typedef uint32_t uintmax_t;
-typedef int32_t intmax_t;
-
 typedef unsigned char u_char;
 typedef unsigned int u_int;
 typedef unsigned long u_long;

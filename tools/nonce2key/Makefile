@@ -1,6 +1,7 @@
+VPATH = ../../common/crapto1
 CC = gcc
 LD = gcc
-CFLAGS = -Wall -O4 -c
+CFLAGS = -I../../common -DSTANDALONE_TOOL -Wall -O4
 LDFLAGS =
 
 OBJS = crypto1.o crapto1.o
@@ -10,13 +11,10 @@ EXES = nonce2key
 all: $(OBJS) $(EXES)
 
 %.o : %.c
-	$(CC) $(CFLAGS) -o $@ $<
+	$(CC) $(CFLAGS) -c -o $@ $<
 
 % : %.c
-	$(LD) $(LDFLAGS) -o $@ $(OBJS) $<
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(OBJS) $<
 
-crypto1test: libnfc $(OBJS)
-	$(LD) $(LDFLAGS) -o crypto1test crypto1test.c $(OBJS)
- 
 clean: 
 	rm -f $(OBJS) $(EXES)

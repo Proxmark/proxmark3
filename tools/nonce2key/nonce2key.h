@@ -1,24 +1,20 @@
 //-----------------------------------------------------------------------------
-// Copyright (C) 2010 iZsh <izsh at fail0verflow.com>
+// Merlok - June 2011
+// Roel - Dec 2009
+// Unknown author
 //
 // This code is licensed to you under the terms of the GNU GPL, version 2 or,
 // at your option, any later version. See the LICENSE.txt file for the text of
 // the license.
 //-----------------------------------------------------------------------------
-// platform-independant sleep macros
+// MIFARE Darkside hack
 //-----------------------------------------------------------------------------
 
-#ifndef SLEEP_H__
-#define SLEEP_H__
+#ifndef __NONCE2KEY_H
+#define __NONCE2KEY_H
 
-#ifdef _WIN32
-#include <windows.h>
-#define sleep(n) Sleep(1000 * n)
-#define msleep(n) Sleep(n)
-#else
-#include <unistd.h>
-#define msleep(n) usleep(1000 * n)
-#endif
+#include <inttypes.h>
+
+int nonce2key(uint32_t uid, uint32_t nt, uint32_t nr, uint64_t par_info, uint64_t ks_info, uint64_t * key); 
 
 #endif
-

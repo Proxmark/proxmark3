@@ -63,7 +63,7 @@ endif
 
 
 # Also search prerequisites in the common directory (for usb.c), the fpga directory (for fpga.bit), and the zlib directory
-VPATH = . ../common ../fpga ../zlib
+VPATH = . ../common ../common/crapto1 ../fpga ../zlib
 
 INCLUDES = ../include/proxmark3.h ../include/at91sam7s512.h ../include/config_gpio.h ../include/usb_cmd.h $(APP_INCLUDES)
 

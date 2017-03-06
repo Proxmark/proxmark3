@@ -1,17 +1,19 @@
+VPATH = ../../common/crapto1
 CC = gcc
 LD = gcc
-CFLAGS = -Wall -Winline -O4
+CFLAGS = -I../../common -DSTANDALONE_TOOL -Wall -O4
 LDFLAGS =
 
-OBJS = crapto1.o crypto1.o
-HEADERS = 
-EXES = mfkey64 mfkey32
-LIBS =
-	
-all: $(OBJS) $(EXES) $(LIBS)
+OBJS = crypto1.o crapto1.o
+EXES = mfkey32 mfkey64
 
-% : %.c $(OBJS)
-	$(LD) $(CFLAGS) -o $@ $< $(OBJS) $(LDFLAGS)
+all: $(OBJS) $(EXES)
+
+%.o : %.c
+	$(CC) $(CFLAGS) -c -o $@ $<
+
+% : %.c
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(OBJS) $<
 
 clean: 
-	rm -f $(OBJS) $(EXES) $(LIBS) 
+	rm -f $(OBJS) $(EXES)

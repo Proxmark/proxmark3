@@ -13,6 +13,12 @@
 #ifndef _HITAG2_H_
 #define _HITAG2_H_
 
+#ifdef _MSC_VER
+#define PACKED
+#else
+#define PACKED __attribute__((packed))
+#endif
+
 typedef enum {
 	RHTSF_CHALLENGE           = 01,
 	RHTSF_KEY                 = 02,

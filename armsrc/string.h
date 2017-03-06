@@ -13,7 +13,7 @@
 #define __STRING_H
 
 #include <stdint.h>
-#include <util.h>
+#include "util.h"
 
 int strlen(const char *str);
 RAMFUNC void *memcpy(void *dest, const void *src, int len);

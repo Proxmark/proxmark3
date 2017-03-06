@@ -8,8 +8,31 @@
 // Routines to support mifare classic sniffer.
 //-----------------------------------------------------------------------------
 
-#include "mifaresniff.h"
 #include "apps.h"
+#include "proxmark3.h"
+#include "util.h"
+#include "string.h"
+
+#include "iso14443crc.h"
+#include "iso14443a.h"
+#include "crapto1/crapto1.h"
+#include "mifareutil.h"
+#include "common.h"
+
+#define SNF_INIT				0
+#define SNF_NO_FIELD			1
+#define SNF_WUPREQ				2
+#define SNF_ATQA				3
+#define SNF_ANTICOL1			4
+#define SNF_UID1				5
+#define SNF_ANTICOL2			6
+#define SNF_UID2				7
+#define SNF_SAK					8
+#define SNF_CARD_IDLE			9
+#define SNF_CARD_CMD			10
+#define SNF_CARD_RESP			11
+#define SNF_UID_4				0
+#define SNF_UID_7				0
 
 static int sniffState = SNF_INIT;
 static uint8_t sniffUIDType;
@@ -26,7 +49,7 @@ bool MfSniffInit(void){
 	sniffSAK = 0;
 	sniffUIDType = SNF_UID_4;
 
-	return FALSE;
+	return false;
 }
 
 bool MfSniffEnd(void){
@@ -34,7 +57,7 @@ bool MfSniffEnd(void){
 	cmd_send(CMD_ACK,0,0,0,0,0);
 	LED_B_OFF();
 
-	return FALSE;
+	return false;
 }
 
 bool RAMFUNC MfSniffLogic(const uint8_t *data, uint16_t len, uint8_t *parity, uint16_t bitCnt, bool reader) {
@@ -114,16 +137,16 @@ bool RAMFUNC MfSniffLogic(const uint8_t *data, uint16_t len, uint8_t *parity, ui
 			sniffBuf[11] = sniffSAK;
 			sniffBuf[12] = 0xFF;
 			sniffBuf[13] = 0xFF;
-			LogTrace(sniffBuf, 14, 0, 0, NULL, TRUE);
+			LogTrace(sniffBuf, 14, 0, 0, NULL, true);
 		}	// intentionally no break;
 		case SNF_CARD_CMD:{		
-			LogTrace(data, len, 0, 0, NULL, TRUE);
+			LogTrace(data, len, 0, 0, NULL, true);
 			sniffState = SNF_CARD_RESP;
 			timerData = GetTickCount();
 			break;
 		}
 		case SNF_CARD_RESP:{
-			LogTrace(data, len, 0, 0, NULL, FALSE);
+			LogTrace(data, len, 0, 0, NULL, false);
 			sniffState = SNF_CARD_CMD;
 			timerData = GetTickCount();
 			break;
@@ -135,14 +158,7 @@ bool RAMFUNC MfSniffLogic(const uint8_t *data, uint16_t len, uint8_t *parity, ui
 	}
 
 
-	return FALSE;
-}
-
-bool RAMFUNC MfSniffSend(uint16_t maxTimeoutMs) {
-	if (BigBuf_get_traceLen() && (GetTickCount() > timerData + maxTimeoutMs)) {
-		return intMfSniffSend();
-	}
-	return FALSE;
+	return false;
 }
 
 // internal sending function. not a RAMFUNC.
@@ -170,5 +186,13 @@ bool intMfSniffSend() {
 
 	clear_trace();
 	
-	return TRUE;
+	return true;
 }
+
+bool RAMFUNC MfSniffSend(uint16_t maxTimeoutMs) {
+	if (BigBuf_get_traceLen() && (GetTickCount() > timerData + maxTimeoutMs)) {
+		return intMfSniffSend();
+	}
+	return false;
+}
+
