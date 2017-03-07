@@ -13,7 +13,7 @@
 #include <string.h>
 #include <pthread.h>
 
-#include "nonce2key/crapto1.h"
+#include "crapto1/crapto1.h"
 #include "proxmark3.h"
 #include "usb_cmd.h"
 #include "cmdmain.h"

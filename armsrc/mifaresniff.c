@@ -10,6 +10,15 @@
 
 #include "mifaresniff.h"
 #include "apps.h"
+#include "proxmark3.h"
+#include "util.h"
+#include "string.h"
+#include "iso14443crc.h"
+#include "iso14443a.h"
+#include "crapto1/crapto1.h"
+#include "mifareutil.h"
+#include "common.h"
+
 
 static int sniffState = SNF_INIT;
 static uint8_t sniffUIDType;
