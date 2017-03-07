@@ -34,6 +34,7 @@
 #include "cmdlfpyramid.h"// for pyramid menu
 #include "cmdlfviking.h" // for viking menu
 #include "cmdlfcotag.h"  // for COTAG menu
+#include "cmdlfvisa2000.h"  // for VISA2000 menu
 
 bool g_lf_threshold_set = false;
 static int CmdHelp(const char *Cmd);
@@ -1195,6 +1196,12 @@ int CmdLFfind(const char *Cmd)
 		return CheckChipType(cmdp);
 	}
 
+	ans=CmdVisa2kDemod("");
+	if (ans>0) {
+		PrintAndLog("\nValid Visa2000 ID Found!");
+		return CheckChipType(cmdp);		
+	}
+	
 	ans=CmdG_Prox_II_Demod("");
 	if (ans>0) {
 		PrintAndLog("\nValid G Prox II ID Found!");
@@ -1274,12 +1281,13 @@ static command_t CommandTable[] =
 	{"hid",         CmdLFHID,           1, "{ HID RFIDs...     }"},
 	{"hitag",       CmdLFHitag,         1, "{ Hitag tags and transponders... }"},
 	{"io",          CmdLFIO,            1, "{ ioProx tags...   }"},
-	{"presco",      CmdLFPresco,        1, "{ Presco RFIDs... }"},
+	{"presco",      CmdLFPresco,        1, "{ Presco RFIDs...  }"},
 	{"pcf7931",     CmdLFPCF7931,       1, "{ PCF7931 RFIDs... }"},
 	{"pyramid",     CmdLFPyramid,       1, "{ Farpointe/Pyramid RFIDs... }"},
 	{"t55xx",       CmdLFT55XX,         1, "{ T55xx RFIDs...   }"},
 	{"ti",          CmdLFTI,            1, "{ TI RFIDs...      }"},
 	{"viking",      CmdLFViking,        1, "{ Viking tags...   }"},
+	{"visa2000",    CmdLFVisa2k,        1, "{ Visa2000 RFIDs...}"},
 	{"cmdread",     CmdLFCommandRead,   0, "<d period> <z period> <o period> <c command> ['H'] -- Modulate LF reader field to send command before read (all periods in microseconds) (option 'H' for 134)"},
 	{"config",      CmdLFSetConfig,     0, "Set config for LF sampling, bit/sample, decimation, frequency"},
 	{"flexdemod",   CmdFlexdemod,       1, "Demodulate samples for FlexPass"},

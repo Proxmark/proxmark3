@@ -5,6 +5,7 @@ This project uses the changelog in accordance with [keepchangelog](http://keepac
 ## [unreleased][unreleased]
 
 ### Added
+- Added lf visa2000 demod, read, clone, sim commands (iceman)
 - Added markers in the graph around found Sequence Terminator after askmandemod.
 - Added data mtrim <start> <stop> command to trim out samples between start and stop
 - Added data setgraphmarkers <orange> <blue> command to set two extra markers on the graph (marshmellow)

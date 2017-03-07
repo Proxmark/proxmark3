@@ -90,23 +90,24 @@ CMDSRCS = 	nonce2key/crapto1.c\
 			cmdhftopaz.c \
 			cmdhw.c \
 			cmdlf.c \
-			cmdlfio.c \
-			cmdlfhid.c \
 			cmdlfawid.c \
+			cmdlfcotag.c\
 			cmdlfem4x.c \
+			cmdlfhid.c \
 			cmdlfhitag.c \
-			cmdlfti.c \
-			cmdparser.c \
-			cmdmain.c \
-			cmdlft55xx.c \
+			cmdlfio.c \
 			cmdlfpcf7931.c\
-			cmdlfviking.c\
 			cmdlfpresco.c\
 			cmdlfpyramid.c\
-			cmdlfcotag.c\
-			pm3_binlib.c\
+			cmdlft55xx.c \
+			cmdlfti.c \
+			cmdlfviking.c\
+			cmdlfvisa2000.c\
+			cmdparser.c \
+			cmdmain.c \
 			scripting.c\
 			cmdscript.c\
+			pm3_binlib.c\
 			pm3_bitlib.c\
 			aes.c\
 			protocols.c\

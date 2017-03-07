@@ -268,6 +268,8 @@ void getMemConfig(uint8_t mem_cfg, uint8_t chip_cfg, uint8_t *max_blk, uint8_t *
 #define T5555_FAST_WRITE            0x00004000
 #define T5555_PAGE_SELECT           0x00008000
 
+#define T55XX_WRITE_TIMEOUT 1500
+
 uint32_t GetT55xxClockBit(uint32_t clock);
 
 #endif 
