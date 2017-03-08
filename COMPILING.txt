@@ -81,6 +81,29 @@ Download the ProxSpace environment archive and extract it to C:\
 = Mac OS X =
 ============
 
+Installing from HomeBrew tap
+---------------------------
+This method is recommended and tested on macOS Sierra 10.12.3
+
+1. Install homebrew if you haven't yet already done so: http://brew.sh/
+
+2. Tap proxmark repo:
+    brew tap proxmark/proxmark3 
+
+3. Install Proxmark3:
+
+Stable release
+    brew install proxmark3
+
+Latest non-stable from GitHub (use this if previous command fails)
+    brew install --HEAD proxmark3
+
+For more information go to https://github.com/Proxmark/homebrew-proxmark3
+
+
+Compilling from source manually (Legacy)
+---------------------------
+
 Tested on OSX 10.10 Yosemite
 
 1 - Install Xcode and Xcode Command Line Tools
