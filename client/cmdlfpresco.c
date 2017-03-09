@@ -8,6 +8,7 @@
 //-----------------------------------------------------------------------------
 #include <string.h>
 #include <inttypes.h>
+#include <stdio.h>
 #include "cmdlfpresco.h"
 #include "proxmark3.h"
 #include "ui.h"

@@ -431,7 +431,7 @@ int CmdHF14ACUIDs(const char *Cmd)
 	n = n > 0 ? n : 1;
 
 	PrintAndLog("Collecting %d UIDs", n);
-	PrintAndLog("Start: %u", time(NULL));
+	PrintAndLog("Start: %" PRIu64, msclock()/1000);
 	// repeat n times
 	for (int i = 0; i < n; i++) {
 		// execute anticollision procedure
@@ -454,7 +454,7 @@ int CmdHF14ACUIDs(const char *Cmd)
 			PrintAndLog("%s", uid_string);
 		}
 	}
-	PrintAndLog("End: %u", time(NULL));
+	PrintAndLog("End: %" PRIu64, msclock()/1000);
 
 	return 1;
 }

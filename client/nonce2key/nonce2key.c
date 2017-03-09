@@ -10,10 +10,9 @@
 // MIFARE Darkside hack
 //-----------------------------------------------------------------------------
 
-#include <inttypes.h>
-#include <time.h>
-
 #include "nonce2key.h"
+
+#include <inttypes.h>
 #include "mifarehost.h"
 #include "ui.h"
 #include "util.h"
@@ -161,7 +160,7 @@ bool mfkey32(nonces_t data, uint64_t *outputkey) {
 	uint32_t ar0_enc = data.ar;  // first encrypted reader response
 	uint32_t nr1_enc = data.nr2; // second encrypted reader challenge
 	uint32_t ar1_enc = data.ar2; // second encrypted reader response
-	clock_t t1 = clock();
+	uint64_t t1 = msclock();
 	bool isSuccess = false;
 	uint8_t counter=0;
 
@@ -182,8 +181,8 @@ bool mfkey32(nonces_t data, uint64_t *outputkey) {
 		}
 	}
 	isSuccess = (counter == 1);
-	t1 = clock() - t1;
-	//if ( t1 > 0 ) PrintAndLog("Time in mfkey32: %.0f ticks \nFound %d possible keys", (float)t1, counter);
+	t1 = msclock() - t1;
+	//if ( t1 > 0 ) PrintAndLog("Time in mfkey32: %.1f seconds \nFound %d possible keys", (float)t1/1000.0, counter);
 	*outputkey = ( isSuccess ) ? outkey : 0;
 	crypto1_destroy(s);
 	/* //un-comment to save all keys to a stats.txt file 
@@ -213,7 +212,7 @@ bool tryMfk32_moebius(nonces_t data, uint64_t *outputkey) {
 	int counter = 0;
 	
 	//PrintAndLog("Enter mfkey32_moebius");
-	clock_t t1 = clock();
+	uint64_t t1 = msclock();
 
 	s = lfsr_recovery32(ar0_enc ^ prng_successor(nt0, 64), 0);
   
@@ -234,8 +233,8 @@ bool tryMfk32_moebius(nonces_t data, uint64_t *outputkey) {
 		}
 	}
 	isSuccess	= (counter == 1);
-	t1 = clock() - t1;
-	//if ( t1 > 0 ) PrintAndLog("Time in mfkey32_moebius: %.0f ticks \nFound %d possible keys", (float)t1,counter);
+	t1 = msclock() - t1;
+	//if ( t1 > 0 ) PrintAndLog("Time in mfkey32_moebius: %.1f seconds \nFound %d possible keys", (float)t1/1000.0, counter);
 	*outputkey = ( isSuccess ) ? outkey : 0;
 	crypto1_destroy(s);
 	/* // un-comment to output all keys to stats.txt
@@ -266,7 +265,7 @@ int tryMfk64(uint32_t uid, uint32_t nt, uint32_t nr_enc, uint32_t ar_enc, uint32
 	struct Crypto1State *revstate;
 	
 	PrintAndLog("Enter mfkey64");
-	clock_t t1 = clock();
+	uint64_t t1 = msclock();
 	
 	// Extract the keystream from the messages
 	ks2 = ar_enc ^ prng_successor(nt, 64);
@@ -281,8 +280,8 @@ int tryMfk64(uint32_t uid, uint32_t nt, uint32_t nr_enc, uint32_t ar_enc, uint32
 	crypto1_destroy(revstate);
 	*outputkey = key;
 	
-	t1 = clock() - t1;
-	if ( t1 > 0 ) PrintAndLog("Time in mfkey64: %.0f ticks \n", (float)t1);
+	t1 = msclock() - t1;
+	if ( t1 > 0 ) PrintAndLog("Time in mfkey64: %.1f seconds \n", (float)t1/1000.0);
 	return 0;
 }
 

@@ -12,7 +12,6 @@
 #include <stdarg.h>
 #include <stdlib.h>
 #include <stdio.h>
-#include <time.h>
 #include <readline/readline.h>
 #include <pthread.h>
 
@@ -34,7 +33,7 @@ void PrintAndLog(char *fmt, ...)
 	static FILE *logfile = NULL;
 	static int logging=1;
 
-	// lock this section to avoid interlacing prints from different threats
+	// lock this section to avoid interlacing prints from different threads
 	pthread_mutex_lock(&print_lock);
   
 	if (logging && !logfile) {

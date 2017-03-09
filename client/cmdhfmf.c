@@ -9,8 +9,10 @@
 //-----------------------------------------------------------------------------
 
 #include <inttypes.h>
+#include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <ctype.h>
 #include "proxmark3.h"
 #include "cmdmain.h"
 #include "util.h"
@@ -688,8 +690,8 @@ int CmdHF14AMfNested(const char *Cmd)
 		}
 	}
 	else { // ------------------------------------  multiple sectors working
-		clock_t time1;
-		time1 = clock();
+		uint64_t msclock1;
+		msclock1 = msclock();
 
 		e_sector = calloc(SectorsCnt, sizeof(sector_t));
 		if (e_sector == NULL) return 1;
@@ -759,7 +761,7 @@ int CmdHF14AMfNested(const char *Cmd)
 			}
 		}
 
-		printf("Time in nested: %1.3f (%1.3f sec per key)\n\n", ((float)clock() - time1)/CLOCKS_PER_SEC, ((float)clock() - time1)/iterations/CLOCKS_PER_SEC);
+		printf("Time in nested: %1.3f (%1.3f sec per key)\n\n", ((float)(msclock() - msclock1))/1000.0, ((float)(msclock() - msclock1))/iterations/1000.0);
 		
 		PrintAndLog("-----------------------------------------------\nIterations count: %d\n\n", iterations);
 		//print them

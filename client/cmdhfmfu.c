@@ -8,12 +8,15 @@
 // High frequency MIFARE ULTRALIGHT (C) commands
 //-----------------------------------------------------------------------------
 
+#include "cmdhfmfu.h"
+
+#include <stdint.h>
+#include <stdio.h>
 #include "proxmark3.h"
 #include "usb_cmd.h"
 #include "cmdmain.h"
 #include "ui.h"
 #include "loclass/des.h"
-#include "cmdhfmfu.h"
 #include "cmdhfmf.h"
 #include "cmdhf14a.h"
 #include "mifare.h"

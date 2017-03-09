@@ -22,7 +22,6 @@
 #include "cmdmain.h"
 #include "uart.h"
 #include "ui.h"
-#include "sleep.h"
 #include "cmdparser.h"
 #include "cmdhw.h"
 #include "whereami.h"

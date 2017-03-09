@@ -54,7 +54,6 @@ endif
 
 CORESRCS = 	uart.c \
 		util.c \
-		sleep.c
 
 
 CMDSRCS = 	nonce2key/crapto1.c\

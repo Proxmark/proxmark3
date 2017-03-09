@@ -8,7 +8,6 @@
 // Snooper binary
 //-----------------------------------------------------------------------------
 
-#include "sleep.h"
 #include "ui.h"
 #include "proxusb.h"
 #include "cmdmain.h"
