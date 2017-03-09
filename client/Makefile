@@ -9,13 +9,13 @@ include ../common/Makefile.common
 CC=gcc
 CXX=g++
 #COMMON_FLAGS = -m32
-VPATH = ../common ../zlib
+VPATH = ../common ../zlib ../tools
 OBJDIR = obj
 
 LDLIBS = -L/opt/local/lib -L/usr/local/lib -lreadline -lpthread -lm
 LUALIB = ../liblua/liblua.a
 LDFLAGS = $(COMMON_FLAGS)
-CFLAGS = -std=c99 -D_ISOC99_SOURCE -I. -I../include -I../common -I../zlib -I/opt/local/include -I../liblua -Wall $(COMMON_FLAGS) -g -O4
+CFLAGS = -std=c99 -D_ISOC99_SOURCE -I. -I../include -I../common -I../tools -I../zlib -I/opt/local/include -I../liblua -Wall $(COMMON_FLAGS) -g -O4
 LUAPLATFORM = generic
 
 ifneq (,$(findstring MINGW,$(platform)))
@@ -57,8 +57,8 @@ CORESRCS = 	uart.c \
 		sleep.c
 
 
-CMDSRCS = 	nonce2key/crapto1.c\
-			nonce2key/crypto1.c\
+CMDSRCS = 	crapto1/crapto1.c\
+			crapto1/crypto1.c\
 			nonce2key/nonce2key.c\
 			loclass/cipher.c \
 			loclass/cipherutils.c \

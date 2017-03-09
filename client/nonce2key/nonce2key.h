@@ -13,11 +13,8 @@
 #ifndef __NONCE2KEY_H
 #define __NONCE2KEY_H
 
-#include <stdio.h>
-#include <stdlib.h>
-#include "crapto1.h"
-#include "common.h"
-//#include <stdbool.h> //for bool
+#include <stdint.h>
+#include <stdbool.h>
 
 typedef struct {
 			  uint32_t cuid;

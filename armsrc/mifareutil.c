@@ -9,6 +9,7 @@
 // Work with mifare cards.
 //-----------------------------------------------------------------------------
 
+#include "mifareutil.h"
 #include "proxmark3.h"
 #include "apps.h"
 #include "util.h"
@@ -16,8 +17,7 @@
 
 #include "iso14443crc.h"
 #include "iso14443a.h"
-#include "crapto1.h"
-#include "mifareutil.h"
+#include "crapto1/crapto1.h"
 #include "des.h"
 
 int MF_DBGLEVEL = MF_DBG_ALL;

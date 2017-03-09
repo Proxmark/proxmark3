@@ -17,6 +17,7 @@
 #include "mifarehost.h"
 #include "ui.h"
 #include "util.h"
+#include "crapto1/crapto1.h"
 
 int compar_state(const void * a, const void * b) {
 	// didn't work: (the result is truncated to 32 bits)
@@ -31,7 +32,7 @@ int compar_state(const void * a, const void * b) {
 int nonce2key(uint32_t uid, uint32_t nt, uint32_t nr, uint64_t par_info, uint64_t ks_info, uint64_t * key) {
   struct Crypto1State *state;
   uint32_t i, pos, rr, nr_diff, key_count;//, ks1, ks2;
-  byte_t bt, ks3x[8], par[8][8];
+  uint8_t bt, ks3x[8], par[8][8];
   uint64_t key_recovered;
   int64_t *state_s;
   static uint32_t last_uid;
@@ -74,7 +75,7 @@ int nonce2key(uint32_t uid, uint32_t nt, uint32_t nr, uint64_t par_info, uint64_
 	if (par_info==0)
 		PrintAndLog("parity is all zero,try special attack!just wait for few more seconds...");
   
-	state = lfsr_common_prefix(nr, rr, ks3x, par, par_info==0);
+	state = lfsr_common_prefix(nr, rr, ks3x, par);
 	state_s = (int64_t*)state;
 	
 	//char filename[50] ;
