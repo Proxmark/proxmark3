@@ -72,8 +72,8 @@ int nonce2key(uint32_t uid, uint32_t nt, uint32_t nr, uint64_t par_info, uint64_
     printf("%01x|\n", par[i][7]);
   }
   
-	if (par_info==0)
-		PrintAndLog("parity is all zero,try special attack!just wait for few more seconds...");
+	if (par_info == 0)
+		PrintAndLog("Parity is all zero, trying special attack! Just wait for few more seconds...");
   
 	state = lfsr_common_prefix(nr, rr, ks3x, par);
 	state_s = (int64_t*)state;
@@ -82,7 +82,7 @@ int nonce2key(uint32_t uid, uint32_t nt, uint32_t nr, uint64_t par_info, uint64_
     //sprintf(filename, "nt_%08x_%d.txt", nt, nr);
     //printf("name %s\n", filename);
 	//FILE* fp = fopen(filename,"w");
-	for (i = 0; (state) && ((state + i)->odd != -1); i++)
+	for (i = 0; (state) && *(state_s + i); i++)
 	{
 		lfsr_rollback_word(state+i, uid^nt, 0);
 		crypto1_get_lfsr(state + i, &key_recovered);
@@ -98,9 +98,8 @@ int nonce2key(uint32_t uid, uint32_t nt, uint32_t nr, uint64_t par_info, uint64_
 	*(state_s + i) = -1;
 	
 	//Create the intersection:
-	if (par_info == 0 )
-		if ( last_keylist != NULL)
-		{
+	if (par_info == 0 ) {
+		if (last_keylist != NULL) {
 			int64_t *p1, *p2, *p3;
 			p1 = p3 = last_keylist; 
 			p2 = state_s;
@@ -115,12 +114,11 @@ int nonce2key(uint32_t uid, uint32_t nt, uint32_t nr, uint64_t par_info, uint64_
 					while (compar_state(p1, p2) == 1) ++p2;
 				}
 			}
-			key_count = p3 - last_keylist;;
-		}
-		else
+			key_count = p3 - last_keylist;
+		} else {
 			key_count = 0;
-	else
-	{
+		}
+	} else {
 		last_keylist = state_s;
 		key_count = i;
 	}
@@ -138,7 +136,7 @@ int nonce2key(uint32_t uid, uint32_t nt, uint32_t nr, uint64_t par_info, uint64_
 			*key = key64;
 			free(last_keylist);
 			last_keylist = NULL;
-			if (par_info ==0)
+			if (par_info == 0)
 				free(state);
 			return 0;
 		}
