@@ -14,6 +14,7 @@
 
 #include <inttypes.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include "mifarehost.h"
 #include "ui.h"
 #include "util.h"
