@@ -9,7 +9,7 @@ include ../common/Makefile.common
 CC=gcc
 CXX=g++
 #COMMON_FLAGS = -m32
-VPATH = ../common ../zlib ../tools
+VPATH = ../common ../zlib
 OBJDIR = obj
 
 LDLIBS = -L/opt/local/lib -L/usr/local/lib -lreadline -lpthread -lm

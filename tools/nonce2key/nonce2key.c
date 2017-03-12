@@ -1,13 +1,13 @@
-#include "crapto1.h"
+#include "crapto1/crapto1.h"
 #include <inttypes.h>
 #include <stdio.h>
 typedef unsigned char byte_t;
 
 int main(const int argc, const char* argv[]) {
   struct Crypto1State *state;
-  uint32_t pos, uid, nt, nr, rr, nr_diff, ks1, ks2;
+  uint32_t pos, uid, nt, nr, rr, nr_diff;
   byte_t bt, i, ks3x[8], par[8][8];
-  uint64_t key, key_recovered;
+  uint64_t key_recovered;
   uint64_t par_info;
   uint64_t ks_info;
   nr = rr = 0;
