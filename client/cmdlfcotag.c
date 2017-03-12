@@ -43,7 +43,8 @@ int CmdCOTAGDemod(const char *Cmd) {
 	size_t bitlen = COTAG_BITS;
 	memcpy(bits, DemodBuffer, COTAG_BITS);
 	
-	int err = manrawdecode(bits, &bitlen, 1);
+	uint8_t alignPos = 0;
+	int err = manrawdecode(bits, &bitlen, 1, &alignPos);
 	if (err){
 		if (g_debugMode) PrintAndLog("DEBUG: Error - COTAG too many errors: %d", err);
 		return -1;

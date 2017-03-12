@@ -237,11 +237,12 @@ uint8_t Em410xDecode(uint8_t *BitStream, size_t *size, size_t *startIdx, uint32_
 
 //by marshmellow
 //demodulates strong heavily clipped samples
-int cleanAskRawDemod(uint8_t *BinStream, size_t *size, int clk, int invert, int high, int low)
+int cleanAskRawDemod(uint8_t *BinStream, size_t *size, int clk, int invert, int high, int low, int *startIdx)
 {
-	size_t bitCnt=0, smplCnt=0, errCnt=0;
-	uint8_t waveHigh = 0;
-	for (size_t i=0; i < *size; i++){
+	*startIdx=0;
+	size_t bitCnt=0, smplCnt=1, errCnt=0;
+	bool waveHigh = (BinStream[0] >= high);
+	for (size_t i=1; i < *size; i++){
 		if (BinStream[i] >= high && waveHigh){
 			smplCnt++;
 		} else if (BinStream[i] <= low && !waveHigh){
@@ -252,7 +253,7 @@ int cleanAskRawDemod(uint8_t *BinStream, size_t *size, int clk, int invert, int 
 					if (smplCnt > clk + (clk/4)+1) { //too many samples
 						errCnt++;
 						if (g_debugMode==2) prnt("DEBUG ASK: Modulation Error at: %u", i);
-						BinStream[bitCnt++]=7;
+						BinStream[bitCnt++] = 7;
 					} else if (waveHigh) {
 						BinStream[bitCnt++] = invert;
 						BinStream[bitCnt++] = invert;
@@ -260,20 +261,18 @@ int cleanAskRawDemod(uint8_t *BinStream, size_t *size, int clk, int invert, int 
 						BinStream[bitCnt++] = invert ^ 1;
 						BinStream[bitCnt++] = invert ^ 1;
 					}
-					waveHigh ^= 1;  
+					if (*startIdx==0) *startIdx = i-clk;
+					waveHigh = !waveHigh;  
 					smplCnt = 0;
-				} else if (smplCnt > (clk/2) - (clk/4)-1) {
+				} else if (smplCnt > (clk/2) - (clk/4)-1) { //half clock
 					if (waveHigh) {
 						BinStream[bitCnt++] = invert;
 					} else if (!waveHigh) {
 						BinStream[bitCnt++] = invert ^ 1;
 					}
-					waveHigh ^= 1;  
+					if (*startIdx==0) *startIdx = i-(clk/2);
+					waveHigh = !waveHigh;  
 					smplCnt = 0;
-				} else if (!bitCnt) {
-					//first bit
-					waveHigh = (BinStream[i] >= high);
-					smplCnt = 1;
 				} else {
 					smplCnt++;
 					//transition bit oops
@@ -305,8 +304,7 @@ void askAmp(uint8_t *BitStream, size_t size)
  
 //by marshmellow
 //attempts to demodulate ask modulations, askType == 0 for ask/raw, askType==1 for ask/manchester
-int askdemod(uint8_t *BinStream, size_t *size, int *clk, int *invert, int maxErr, uint8_t amp, uint8_t askType)
-{
+int askdemod_ext(uint8_t *BinStream, size_t *size, int *clk, int *invert, int maxErr, uint8_t amp, uint8_t askType, int *startIdx) {
 	if (*size==0) return -1;
 	int start = DetectASKClock(BinStream, *size, clk, maxErr); //clock default
 	if (*clk==0 || start < 0) return -3;
@@ -314,6 +312,9 @@ int askdemod(uint8_t *BinStream, size_t *size, int *clk, int *invert, int maxErr
 	if (amp==1) askAmp(BinStream, *size);
 	if (g_debugMode==2) prnt("DEBUG ASK: clk %d, beststart %d, amp %d", *clk, start, amp);
 
+	//start pos from detect ask clock is 1/2 clock offset
+	// NOTE: can be negative (demod assumes rest of wave was there)
+	*startIdx = start - (*clk/2); 
 	uint8_t initLoopMax = 255;
 	if (initLoopMax > *size) initLoopMax = *size;
 	// Detect high and lows
@@ -326,12 +327,18 @@ int askdemod(uint8_t *BinStream, size_t *size, int *clk, int *invert, int maxErr
 	// if clean clipped waves detected run alternate demod
 	if (DetectCleanAskWave(BinStream, *size, high, low)) {
 		if (g_debugMode==2) prnt("DEBUG ASK: Clean Wave Detected - using clean wave demod");
-		errCnt = cleanAskRawDemod(BinStream, size, *clk, *invert, high, low);
-		if (askType) //askman
-			return manrawdecode(BinStream, size, 0);	
-		else //askraw
+		errCnt = cleanAskRawDemod(BinStream, size, *clk, *invert, high, low, startIdx);
+		if (askType) { //askman
+			uint8_t alignPos = 0;
+			errCnt = manrawdecode(BinStream, size, 0, &alignPos);
+			*startIdx += *clk/2 * alignPos;
+			if (g_debugMode) prnt("DEBUG ASK CLEAN: startIdx %i, alignPos %u", *startIdx, alignPos);
 			return errCnt;
+		} else { //askraw
+			return errCnt;
+		}
 	}
+	if (g_debugMode) prnt("DEBUG ASK WEAK: startIdx %i", *startIdx);
 	if (g_debugMode==2) prnt("DEBUG ASK: Weak Wave Detected - using weak wave demod");
 
 	int lastBit;              //set first clock check - can go negative
@@ -378,10 +385,14 @@ int askdemod(uint8_t *BinStream, size_t *size, int *clk, int *invert, int maxErr
 	return errCnt;
 }
 
+int askdemod(uint8_t *BinStream, size_t *size, int *clk, int *invert, int maxErr, uint8_t amp, uint8_t askType) {
+	int start = 0;
+	return askdemod_ext(BinStream, size, clk, invert, maxErr, amp, askType, &start);
+}
 //by marshmellow
 //take 10 and 01 and manchester decode
 //run through 2 times and take least errCnt
-int manrawdecode(uint8_t * BitStream, size_t *size, uint8_t invert)
+int manrawdecode(uint8_t * BitStream, size_t *size, uint8_t invert, uint8_t *alignPos)
 {
 	uint16_t bitnum=0, MaxBits = 512, errCnt = 0;
 	size_t i, ii;
@@ -399,6 +410,7 @@ int manrawdecode(uint8_t * BitStream, size_t *size, uint8_t invert)
 		}
 		errCnt=0;
 	}
+	*alignPos=bestRun;
 	//decode
 	for (i=bestRun; i < *size-3; i+=2){
 		if(BitStream[i] == 1 && (BitStream[i+1] == 0)){
@@ -502,7 +514,7 @@ int gProxII_Demod(uint8_t BitStream[], size_t *size)
 }
 
 //translate wave to 11111100000 (1 for each short wave [higher freq] 0 for each long wave [lower freq])
-size_t fsk_wave_demod(uint8_t * dest, size_t size, uint8_t fchigh, uint8_t fclow)
+size_t fsk_wave_demod(uint8_t * dest, size_t size, uint8_t fchigh, uint8_t fclow, int *startIdx)
 {
 	size_t last_transition = 0;
 	size_t idx = 1;
@@ -517,20 +529,19 @@ size_t fsk_wave_demod(uint8_t * dest, size_t size, uint8_t fchigh, uint8_t fclow
 
 	//find start of modulating data in trace 
 	idx = findModStart(dest, size, threshold_value, fchigh);
-
 	// Need to threshold first sample
 	if(dest[idx] < threshold_value) dest[0] = 0;
 	else dest[0] = 1;
-	idx++;
 	
+	last_transition = idx;
+	idx++;
 	size_t numBits = 0;
 	// count cycles between consecutive lo-hi transitions, there should be either 8 (fc/8)
 	// or 10 (fc/10) cycles but in practice due to noise etc we may end up with anywhere
 	// between 7 to 11 cycles so fuzz it by treat anything <9 as 8 and anything else as 10
 	//  (could also be fc/5 && fc/7 for fsk1 = 4-9)
-	for(; idx < size-20; idx++) {
+	for(; idx < size; idx++) {
 		// threshold current value
-
 		if (dest[idx] < threshold_value) dest[idx] = 0;
 		else dest[idx] = 1;
 
@@ -543,18 +554,20 @@ size_t fsk_wave_demod(uint8_t * dest, size_t size, uint8_t fchigh, uint8_t fclow
 				//do nothing with extra garbage
 			} else if (currSample < (fchigh-1)) {           //6-8 = 8 sample waves  (or 3-6 = 5)
 				//correct previous 9 wave surrounded by 8 waves (or 6 surrounded by 5)
-				if (LastSample > (fchigh-2) && (preLastSample < (fchigh-1))){
+				if (numBits > 1 && LastSample > (fchigh-2) && (preLastSample < (fchigh-1))){
 					dest[numBits-1]=1;
 				}
 				dest[numBits++]=1;
-
+			if (numBits > 0 && *startIdx==0) *startIdx = idx - fclow;
 			} else if (currSample > (fchigh+1) && numBits < 3) { //12 + and first two bit = unusable garbage
 				//do nothing with beginning garbage and reset..  should be rare..
 				numBits = 0; 
 			} else if (currSample == (fclow+1) && LastSample == (fclow-1)) { // had a 7 then a 9 should be two 8's (or 4 then a 6 should be two 5's)
 				dest[numBits++]=1;
+			if (numBits > 0 && *startIdx==0) *startIdx = idx - fclow;
 			} else {                                        //9+ = 10 sample waves (or 6+ = 7)
 				dest[numBits++]=0;
+			if (numBits > 0 && *startIdx==0) *startIdx = idx - fchigh;
 			}
 			last_transition = idx;
 		}
@@ -565,7 +578,7 @@ size_t fsk_wave_demod(uint8_t * dest, size_t size, uint8_t fchigh, uint8_t fclow
 //translate 11111100000 to 10
 //rfLen = clock, fchigh = larger field clock, fclow = smaller field clock
 size_t aggregate_bits(uint8_t *dest, size_t size, uint8_t rfLen,
-		uint8_t invert, uint8_t fchigh, uint8_t fclow)
+		uint8_t invert, uint8_t fchigh, uint8_t fclow, int *startIdx)
 {
 	uint8_t lastval=dest[0];
 	size_t idx=0;
@@ -575,7 +588,7 @@ size_t aggregate_bits(uint8_t *dest, size_t size, uint8_t rfLen,
 		n++;
 		if (dest[idx]==lastval) continue; //skip until we hit a transition
 		
-		//find out how many bits (n) we collected
+		//find out how many bits (n) we collected (use 1/2 clk tolerance)
 		//if lastval was 1, we have a 1->0 crossing
 		if (dest[idx-1]==1) {
 			n = (n * fclow + rfLen/2) / rfLen;
@@ -583,6 +596,17 @@ size_t aggregate_bits(uint8_t *dest, size_t size, uint8_t rfLen,
 			n = (n * fchigh + rfLen/2) / rfLen; 
 		}
 		if (n == 0) n = 1;
+		
+		//first transition - save startidx
+		if (numBits == 0) {
+			if (lastval == 1) {  //high to low
+				*startIdx += (fclow * idx) - (n*rfLen);
+				if (g_debugMode==2) prnt("DEBUG FSK: startIdx %i, fclow*idx %i, n*rflen %u", *startIdx, fclow*(idx), n*rfLen);
+			} else {
+				*startIdx += (fchigh * idx) - (n*rfLen);
+				if (g_debugMode==2) prnt("DEBUG FSK: startIdx %i, fchigh*idx %i, n*rflen %u", *startIdx, fchigh*(idx), n*rfLen);
+			}
+		}
 
 		//add to our destination the bits we collected		
 		memset(dest+numBits, dest[idx-1]^invert , n);
@@ -605,12 +629,16 @@ size_t aggregate_bits(uint8_t *dest, size_t size, uint8_t rfLen,
 
 //by marshmellow  (from holiman's base)
 // full fsk demod from GraphBuffer wave to decoded 1s and 0s (no mandemod)
-int fskdemod(uint8_t *dest, size_t size, uint8_t rfLen, uint8_t invert, uint8_t fchigh, uint8_t fclow)
-{
+int fskdemod_ext(uint8_t *dest, size_t size, uint8_t rfLen, uint8_t invert, uint8_t fchigh, uint8_t fclow, int *startIdx) {
 	// FSK demodulator
-	size = fsk_wave_demod(dest, size, fchigh, fclow);
-	size = aggregate_bits(dest, size, rfLen, invert, fchigh, fclow);
+	size = fsk_wave_demod(dest, size, fchigh, fclow, startIdx);
+	size = aggregate_bits(dest, size, rfLen, invert, fchigh, fclow, startIdx);
 	return size;
+}
+
+int fskdemod(uint8_t *dest, size_t size, uint8_t rfLen, uint8_t invert, uint8_t fchigh, uint8_t fclow) {
+	int startIdx=0;
+	return fskdemod_ext(dest, size, rfLen, invert, fchigh, fclow, &startIdx);
 }
 
 // loop to get raw HID waveform then FSK demodulate the TAG ID from it
@@ -959,12 +987,6 @@ int DetectASKClock(uint8_t dest[], size_t size, int *clock, int maxErr)
 	return bestStart[best];
 }
 
-
-int DetectPSKClock(uint8_t dest[], size_t size, int clock) {
-	int firstPhaseShift = 0;
-	return DetectPSKClock_ext(dest, size, clock, &firstPhaseShift);
-}
-
 //by marshmellow
 //detect psk clock by reading each phase shift
 // a phase shift is determined by measuring the sample length of each wave
@@ -1062,6 +1084,11 @@ int DetectPSKClock_ext(uint8_t dest[], size_t size, int clock, int *firstPhaseSh
 	return clk[best];
 }
 
+int DetectPSKClock(uint8_t dest[], size_t size, int clock) {
+	int firstPhaseShift = 0;
+	return DetectPSKClock_ext(dest, size, clock, &firstPhaseShift);
+}
+
 int DetectStrongNRZClk(uint8_t *dest, size_t size, int peak, int low){
 	//find shortest transition from high to low
 	size_t i = 0;
@@ -1090,12 +1117,6 @@ int DetectStrongNRZClk(uint8_t *dest, size_t size, int peak, int low){
 	if (g_debugMode==2) prnt("DEBUG NRZ: detectstrongNRZclk smallest wave: %d",lowestTransition);
 	return lowestTransition;
 }
-
-int DetectNRZClock(uint8_t dest[], size_t size, int clock) {
-	size_t bestStart=0;
-	return DetectNRZClock_ext(dest, size, clock, &bestStart);
-}
-
 
 //by marshmellow
 //detect nrz clock by reading #peaks vs no peaks(or errors)
@@ -1215,6 +1236,11 @@ int DetectNRZClock_ext(uint8_t dest[], size_t size, int clock, size_t *clockStar
 	return clk[best];
 }
 
+int DetectNRZClock(uint8_t dest[], size_t size, int clock) {
+	size_t bestStart=0;
+	return DetectNRZClock_ext(dest, size, clock, &bestStart);
+}
+
 // by marshmellow
 // convert psk1 demod to psk2 demod
 // only transition waves are 1s
@@ -1273,7 +1299,7 @@ int indala26decode(uint8_t *bitStream, size_t *size, uint8_t *invert)
 
 // by marshmellow - demodulate NRZ wave - requires a read with strong signal
 // peaks invert bit (high=1 low=0) each clock cycle = 1 bit determined by last peak
-int nrzRawDemod(uint8_t *dest, size_t *size, int *clk, int *invert){
+int nrzRawDemod_ext(uint8_t *dest, size_t *size, int *clk, int *invert, int *startIdx) {
 	if (justNoise(dest, *size)) return -1;
 	*clk = DetectNRZClock(dest, *size, *clk);
 	if (*clk==0) return -2;
@@ -1297,16 +1323,19 @@ int nrzRawDemod(uint8_t *dest, size_t *size, int *clk, int *invert){
 		if (dest[i] != dest[i-1] || (i-lastBit) == (10 * *clk)) {
 			memset(dest+numBits, dest[i-1] ^ *invert, (i - lastBit + (*clk/4)) / *clk);
 			numBits += (i - lastBit + (*clk/4)) / *clk;
+			if (lastBit == 0) {
+				*startIdx = i - (numBits * *clk);
+				if (g_debugMode==2) prnt("DEBUG NRZ: startIdx %i", *startIdx);
+			}
 			lastBit = i-1;
 		}
 	}
 	*size = numBits;
 	return 0;
 }
-
-uint8_t	detectFSKClk(uint8_t *BitStream, size_t size, uint8_t fcHigh, uint8_t fcLow) {
-	int firstClockEdge = 0;
-	return detectFSKClk_ext(BitStream, size, fcHigh, fcLow, &firstClockEdge);
+int nrzRawDemod(uint8_t *dest, size_t *size, int *clk, int *invert) {
+	int startIdx = 0;
+	return nrzRawDemod_ext(dest, size, clk, invert, &startIdx);
 }
 
 //by marshmellow
@@ -1417,6 +1446,11 @@ uint8_t detectFSKClk_ext(uint8_t *BitStream, size_t size, uint8_t fcHigh, uint8_
 	return clk[ii];
 }
 
+uint8_t	detectFSKClk(uint8_t *BitStream, size_t size, uint8_t fcHigh, uint8_t fcLow) {
+	int firstClockEdge = 0;
+	return detectFSKClk_ext(BitStream, size, fcHigh, fcLow, &firstClockEdge);
+}
+
 //by marshmellow
 //countFC is to detect the field clock lengths.
 //counts and returns the 2 most common wave lengths
@@ -1508,8 +1542,7 @@ uint16_t countFC(uint8_t *BitStream, size_t size, uint8_t fskAdj)
 
 //by marshmellow - demodulate PSK1 wave 
 //uses wave lengths (# Samples) 
-int pskRawDemod(uint8_t dest[], size_t *size, int *clock, int *invert)
-{
+int pskRawDemod_ext(uint8_t dest[], size_t *size, int *clock, int *invert, int *startIdx) {
 	if (size == 0) return -1;
 	uint16_t loopCnt = 4096;  //don't need to loop through entire array...
 	if (*size<loopCnt) loopCnt = *size;
@@ -1548,7 +1581,8 @@ int pskRawDemod(uint8_t dest[], size_t *size, int *clock, int *invert)
 				//if average wave value is > graph 0 then it is an up wave or a 1 (could cause inverting)
 				if (lastAvgWaveVal > threshold_value) curPhase ^= 1;
 				break;
-			} 
+			}
+
 			waveStart = i+1;
 			avgWaveVal = 0;
 		}
@@ -1564,9 +1598,10 @@ int pskRawDemod(uint8_t dest[], size_t *size, int *clock, int *invert)
 	}
 	//advance bits
 	numBits += (firstFullWave / *clock);
+	*startIdx = firstFullWave - (*clock * numBits)+2;
 	//set start of wave as clock align
 	lastClkBit = firstFullWave;
-	if (g_debugMode==2) prnt("DEBUG PSK: firstFullWave: %u, waveLen: %u",firstFullWave,fullWaveLen);  
+	if (g_debugMode==2) prnt("DEBUG PSK: firstFullWave: %u, waveLen: %u, startIdx %i",firstFullWave,fullWaveLen, *startIdx);
 	if (g_debugMode==2) prnt("DEBUG PSK: clk: %d, lastClkBit: %u, fc: %u", *clock, lastClkBit,(unsigned int) fc);
 	waveStart = 0;
 	dest[numBits++] = curPhase; //set first read bit
@@ -1581,7 +1616,7 @@ int pskRawDemod(uint8_t dest[], size_t *size, int *clock, int *invert)
 				waveEnd = i+1;
 				waveLenCnt = waveEnd-waveStart;
 				lastAvgWaveVal = avgWaveVal/waveLenCnt;
-				if (waveLenCnt > fc){  
+				if (waveLenCnt > fc){
 					//PrintAndLog("DEBUG: avgWaveVal: %d, waveSum: %d",lastAvgWaveVal,avgWaveVal);
 					//this wave is a phase shift
 					//PrintAndLog("DEBUG: phase shift at: %d, len: %d, nextClk: %d, i: %d, fc: %d",waveStart,waveLenCnt,lastClkBit+*clock-tol,i+1,fc);
@@ -1612,9 +1647,9 @@ int pskRawDemod(uint8_t dest[], size_t *size, int *clock, int *invert)
 	return errCnt;
 }
 
-bool DetectST(uint8_t	buffer[], size_t *size, int *foundclock) {
-	size_t ststart = 0, stend = 0;
-	return DetectST_ext(buffer, size, foundclock, &ststart, &stend);
+int pskRawDemod(uint8_t dest[], size_t *size, int *clock, int *invert) {
+	int startIdx = 0;
+	return pskRawDemod_ext(dest, size, clock, invert, &startIdx);
 }
 
 //by marshmellow
@@ -1805,6 +1840,11 @@ bool DetectST_ext(uint8_t buffer[], size_t *size, int *foundclock, size_t *ststa
 	}
 	*size = newloc;
 	return true;
+}
+
+bool DetectST(uint8_t	buffer[], size_t *size, int *foundclock) {
+	size_t ststart = 0, stend = 0;
+	return DetectST_ext(buffer, size, foundclock, &ststart, &stend);
 }
 
 // by iceman
