@@ -13,6 +13,7 @@
 #include "nonce2key.h"
 
 #include <inttypes.h>
+#include <stdio.h>
 #include "mifarehost.h"
 #include "ui.h"
 #include "util.h"
