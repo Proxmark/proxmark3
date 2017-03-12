@@ -8,10 +8,12 @@
 // High frequency commands
 //-----------------------------------------------------------------------------
 
+#include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 #include "proxmark3.h"
 #include "util.h"
+#include "data.h"
 #include "ui.h"
 #include "iso14443crc.h"
 #include "cmdmain.h"

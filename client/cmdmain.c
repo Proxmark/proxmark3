@@ -12,7 +12,6 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
-#include "sleep.h"
 #include "cmdparser.h"
 #include "proxmark3.h"
 #include "data.h"

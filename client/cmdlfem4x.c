@@ -14,6 +14,7 @@
 #include "proxmark3.h"
 #include "ui.h"
 #include "util.h"
+#include "data.h"
 #include "graph.h"
 #include "cmdparser.h"
 #include "cmddata.h"

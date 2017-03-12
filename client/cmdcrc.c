@@ -8,7 +8,6 @@
 // CRC Calculations from the software reveng commands
 //-----------------------------------------------------------------------------
 
-#include <stdlib.h>
 #ifdef _WIN32
 #  include <io.h>
 #  include <fcntl.h>
@@ -19,8 +18,8 @@
 
 #include <stdio.h>
 #include <string.h>
-//#include <stdlib.h>
-//#include <ctype.h>
+#include <stdlib.h>
+#include <ctype.h>
 #include "cmdmain.h"
 #include "cmdcrc.h"
 #include "reveng/reveng.h"

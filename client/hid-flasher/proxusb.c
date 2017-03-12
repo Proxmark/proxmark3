@@ -18,7 +18,6 @@
 #include <strings.h>
 #include <errno.h>
 
-#include "sleep.h"
 #include "proxusb.h"
 #include "proxmark3.h"
 #include "usb_cmd.h"

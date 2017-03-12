@@ -19,7 +19,6 @@
 #include "util.h"
 #include "hitag2.h"
 #include "hitagS.h"
-#include "sleep.h"
 #include "cmdmain.h"
 
 static int CmdHelp(const char *Cmd);

@@ -10,6 +10,7 @@
 // Low frequency AWID26 commands
 //-----------------------------------------------------------------------------
 
+#include <string.h>
 #include <stdio.h>      // sscanf
 #include "proxmark3.h"  // Definitions, USB controls, etc
 #include "ui.h"         // PrintAndLog

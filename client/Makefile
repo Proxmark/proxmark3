@@ -54,7 +54,6 @@ endif
 
 CORESRCS = 	uart.c \
 		util.c \
-		sleep.c
 
 
 CMDSRCS = 	crapto1/crapto1.c\
