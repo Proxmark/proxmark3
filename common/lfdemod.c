@@ -888,14 +888,14 @@ uint8_t	detectFSKClk(uint8_t *BitStream, size_t size, uint8_t fcHigh, uint8_t fc
 //**********************************************************************************************
 
 // look for Sequence Terminator - should be pulses of clk*(1 or 2), clk*2, clk*(1.5 or 2), by idx we mean graph position index...
-bool findST(int *stStopLoc, int *stStartIdx, int lowToLowWaveLen[], int highToLowWaveLen[], int clk, int tol, int buffSize, int i) {
-	for (; i < buffSize - 4; ++i) {
-		*stStartIdx += lowToLowWaveLen[i]; //caution part of this wave may be data and part may be ST....  to be accounted for in main function for now...
-		if (lowToLowWaveLen[i] >= clk*1-tol && lowToLowWaveLen[i] <= (clk*2)+tol && highToLowWaveLen[i] < clk+tol) {           //1 to 2 clocks depending on 2 bits prior
-			if (lowToLowWaveLen[i+1] >= clk*2-tol && lowToLowWaveLen[i+1] <= clk*2+tol && highToLowWaveLen[i+1] > clk*3/2-tol) {       //2 clocks and wave size is 1 1/2
-				if (lowToLowWaveLen[i+2] >= (clk*3)/2-tol && lowToLowWaveLen[i+2] <= clk*2+tol && highToLowWaveLen[i+2] > clk-tol) { //1 1/2 to 2 clocks and at least one full clock wave
-					if (lowToLowWaveLen[i+3] >= clk*1-tol && lowToLowWaveLen[i+3] <= clk*2+tol) { //1 to 2 clocks for end of ST + first bit
-						*stStopLoc = i + 3;
+bool findST(int *stStopLoc, int *stStartIdx, int lowToLowWaveLen[], int highToLowWaveLen[], int clk, int tol, int buffSize, int *i) {
+	for (; *i < buffSize - 4; *i+=1) {
+		*stStartIdx += lowToLowWaveLen[*i]; //caution part of this wave may be data and part may be ST....  to be accounted for in main function for now...
+		if (lowToLowWaveLen[*i] >= clk*1-tol && lowToLowWaveLen[*i] <= (clk*2)+tol && highToLowWaveLen[*i] < clk+tol) {           //1 to 2 clocks depending on 2 bits prior
+			if (lowToLowWaveLen[*i+1] >= clk*2-tol && lowToLowWaveLen[*i+1] <= clk*2+tol && highToLowWaveLen[*i+1] > clk*3/2-tol) {       //2 clocks and wave size is 1 1/2
+				if (lowToLowWaveLen[*i+2] >= (clk*3)/2-tol && lowToLowWaveLen[*i+2] <= clk*2+tol && highToLowWaveLen[*i+2] > clk-tol) { //1 1/2 to 2 clocks and at least one full clock wave
+					if (lowToLowWaveLen[*i+3] >= clk*1-tol && lowToLowWaveLen[*i+3] <= clk*2+tol) { //1 to 2 clocks for end of ST + first bit
+						*stStopLoc = *i + 3;
 						return true;
 					}
 				}
@@ -920,6 +920,7 @@ bool DetectST_ext(uint8_t buffer[], size_t *size, int *foundclock, size_t *ststa
 	int phaseoff = 0;
 	high = low = 128;
 	memset(tmpbuff, 0, sizeof(tmpbuff));
+	memset(waveLen, 0, sizeof(waveLen));
 
 	if ( getHiLo(buffer, testsize, &high, &low, 80, 80) == -1 ) {
 		if (g_debugMode==2) prnt("DEBUG STT: just noise detected - quitting");
@@ -974,12 +975,12 @@ bool DetectST_ext(uint8_t buffer[], size_t *size, int *foundclock, size_t *ststa
 
 	*foundclock = clk;
 	i=0;
-	if (!findST(&start, &skip, tmpbuff, waveLen, clk, tol, j, i)) {
+	if (!findST(&start, &skip, tmpbuff, waveLen, clk, tol, j, &i)) {
 		// first ST not found - ERROR
 		if (g_debugMode==2) prnt("DEBUG STT: first STT not found - quitting");
 		return false;
 	} else {
-		if (g_debugMode==2) prnt("DEBUG STT: first STT found at: %d, j=%d",start, j);
+		if (g_debugMode==2) prnt("DEBUG STT: first STT found at wave: %i, skip: %i, j=%i", start, skip, j);
 	}
 	if (waveLen[i+2] > clk*1+tol)
 		phaseoff = 0;
@@ -992,7 +993,8 @@ bool DetectST_ext(uint8_t buffer[], size_t *size, int *foundclock, size_t *ststa
 	// now do it again to find the end
 	int dummy1 = 0;
 	end = skip;
-	if (!findST(&dummy1, &end, tmpbuff, waveLen, clk, tol, j, i+3)) {
+	i+=3;
+	if (!findST(&dummy1, &end, tmpbuff, waveLen, clk, tol, j, &i)) {
 		//didn't find second ST - ERROR
 		if (g_debugMode==2) prnt("DEBUG STT: second STT not found - quitting");
 		return false;
@@ -1070,6 +1072,30 @@ bool DetectST(uint8_t	buffer[], size_t *size, int *foundclock) {
 	size_t ststart = 0, stend = 0;
 	return DetectST_ext(buffer, size, foundclock, &ststart, &stend);
 }
+
+//by marshmellow
+//take 11 10 01 11 00 and make 01100 ... miller decoding
+//check for phase errors - should never have half a 1 or 0 by itself and should never exceed 1111 or 0000 in a row
+//decodes miller encoded binary
+//NOTE  askrawdemod will NOT demod miller encoded ask unless the clock is manually set to 1/2 what it is detected as!
+/*int millerRawDecode(uint8_t *BitStream, size_t *size, int invert) {
+	if (*size < 16) return -1;
+	uint16_t MaxBits = 512, errCnt = 0, bestErr = 1000, bestRun = 0;
+	size_t i, ii, bitCnt=0;
+	uint8_t alignCnt = 0, curBit = BitStream[0];
+	//find alignment, needs 4 1s or 0s to properly align
+	for (i=1; i < *size; i++) {
+		alignCnt = (BitStream[i] == curBit) ? alignCnt+1 : 0;
+		curBit = BitStream[i];
+		if (alignCnt == 4) break;
+	}
+	// for now error if alignment not found.  later add option to run it with multiple offsets...
+	if (alignCnt != 4) {
+		if (g_debugMode) prnt("ERROR MillerDecode: alignment not found so either your bitstream is not miller or your data does not have a 101 in it");
+		return -1;
+	}
+
+}*/
 
 //by marshmellow
 //take 01 or 10 = 1 and 11 or 00 = 0
