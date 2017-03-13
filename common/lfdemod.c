@@ -5,7 +5,8 @@
 // at your option, any later version. See the LICENSE.txt file for the text of
 // the license.
 //-----------------------------------------------------------------------------
-// Low frequency demod/decode commands
+// Low frequency demod/decode commands   - by marshmellow, holiman, iceman and
+//                                         many others who came before
 //
 // NOTES: 
 // LF Demod functions are placed here to allow the flexability to use client or
@@ -14,6 +15,9 @@
 //
 // There are likely many improvements to the code that could be made, please
 // make suggestions...
+//
+// we tried to include author comments so any questions could be directed to 
+// the source.
 //
 // There are 4 main sections of code below:
 // Utilities Section: 
@@ -32,9 +36,10 @@
 #include "lfdemod.h"
 #include <string.h>
 
+//---------------------------------Utilities Section--------------------------------------------------
+
 //to allow debug print calls when used not on device
 void dummy(char *fmt, ...){}
-
 #ifndef ON_DEVICE
 #include "ui.h"
 #include "cmdparser.h"
@@ -45,10 +50,7 @@ void dummy(char *fmt, ...){}
 #define prnt dummy
 #endif
 
-//---------------------------------Utilities Section--------------------------------------------------
-
-uint8_t justNoise(uint8_t *BitStream, size_t size)
-{
+uint8_t justNoise(uint8_t *BitStream, size_t size) {
 	static const uint8_t THRESHOLD = 123;
 	//test samples are not just noise
 	uint8_t justNoise1 = 1;
@@ -60,8 +62,7 @@ uint8_t justNoise(uint8_t *BitStream, size_t size)
 
 //by marshmellow
 //get high and low values of a wave with passed in fuzz factor. also return noise test = 1 for passed or 0 for only noise
-int getHiLo(uint8_t *BitStream, size_t size, int *high, int *low, uint8_t fuzzHi, uint8_t fuzzLo)
-{
+int getHiLo(uint8_t *BitStream, size_t size, int *high, int *low, uint8_t fuzzHi, uint8_t fuzzLo) {
 	*high=0;
 	*low=255;
 	// get high and low thresholds 
@@ -78,8 +79,7 @@ int getHiLo(uint8_t *BitStream, size_t size, int *high, int *low, uint8_t fuzzHi
 // by marshmellow
 // pass bits to be tested in bits, length bits passed in bitLen, and parity type (even=0 | odd=1) in pType
 // returns 1 if passed
-uint8_t parityTest(uint32_t bits, uint8_t bitLen, uint8_t pType)
-{
+uint8_t parityTest(uint32_t bits, uint8_t bitLen, uint8_t pType) {
 	uint8_t ans = 0;
 	for (uint8_t i = 0; i < bitLen; i++){
 		ans ^= ((bits >> i) & 1);
@@ -91,8 +91,7 @@ uint8_t parityTest(uint32_t bits, uint8_t bitLen, uint8_t pType)
 // by marshmellow
 // takes a array of binary values, start position, length of bits per parity (includes parity bit),
 //   Parity Type (1 for odd; 0 for even; 2 for Always 1's; 3 for Always 0's), and binary Length (length to run) 
-size_t removeParity(uint8_t *BitStream, size_t startIdx, uint8_t pLen, uint8_t pType, size_t bLen)
-{
+size_t removeParity(uint8_t *BitStream, size_t startIdx, uint8_t pLen, uint8_t pType, size_t bLen) {
 	uint32_t parityWd = 0;
 	size_t j = 0, bitCnt = 0;
 	for (int word = 0; word < (bLen); word+=pLen) {
@@ -121,8 +120,7 @@ size_t removeParity(uint8_t *BitStream, size_t startIdx, uint8_t pLen, uint8_t p
 // takes a array of binary values, length of bits per parity (includes parity bit),
 //   Parity Type (1 for odd; 0 for even; 2 Always 1's; 3 Always 0's), and binary Length (length to run)
 //   Make sure *dest is long enough to store original sourceLen + #_of_parities_to_be_added
-size_t addParity(uint8_t *BitSource, uint8_t *dest, uint8_t sourceLen, uint8_t pLen, uint8_t pType)
-{
+size_t addParity(uint8_t *BitSource, uint8_t *dest, uint8_t sourceLen, uint8_t pLen, uint8_t pType) {
 	uint32_t parityWd = 0;
 	size_t j = 0, bitCnt = 0;
 	for (int word = 0; word < sourceLen; word+=pLen-1) {
@@ -146,8 +144,7 @@ size_t addParity(uint8_t *BitSource, uint8_t *dest, uint8_t sourceLen, uint8_t p
 	return bitCnt;
 }
 
-uint32_t bytebits_to_byte(uint8_t *src, size_t numbits)
-{
+uint32_t bytebits_to_byte(uint8_t *src, size_t numbits) {
 	uint32_t num = 0;
 	for(int i = 0 ; i < numbits ; i++)
 	{
@@ -158,21 +155,13 @@ uint32_t bytebits_to_byte(uint8_t *src, size_t numbits)
 }
 
 //least significant bit first
-uint32_t bytebits_to_byteLSBF(uint8_t *src, size_t numbits)
-{
+uint32_t bytebits_to_byteLSBF(uint8_t *src, size_t numbits) {
 	uint32_t num = 0;
 	for(int i = 0 ; i < numbits ; i++)
 	{
 		num = (num << 1) | *(src + (numbits-(i+1)));
 	}
 	return num;
-}
-
-//by marshmellow
-//search for given preamble in given BitStream and return success=1 or fail=0 and startIndex and length
-uint8_t preambleSearch(uint8_t *BitStream, uint8_t *preamble, size_t pLen, size_t *size, size_t *startIdx)
-{
-	return (preambleSearchEx(BitStream, preamble, pLen, size, startIdx, false)) ? 1 : 0;
 }
 
 // search for given preamble in given BitStream and return success=1 or fail=0 and startIndex (where it was found) and length if not fineone 
@@ -197,6 +186,12 @@ bool preambleSearchEx(uint8_t *BitStream, uint8_t *preamble, size_t pLen, size_t
 		}
 	}
 	return false;
+}
+
+//by marshmellow
+//search for given preamble in given BitStream and return success=1 or fail=0 and startIndex and length
+uint8_t preambleSearch(uint8_t *BitStream, uint8_t *preamble, size_t pLen, size_t *size, size_t *startIdx) {
+	return (preambleSearchEx(BitStream, preamble, pLen, size, startIdx, false)) ? 1 : 0;
 }
 
 // find start of modulating data (for fsk and psk) in case of beginning noise or slow chip startup.
@@ -268,6 +263,23 @@ int ManchesterEncode(uint8_t *BitStream, size_t size) {
 
 //------------------------------Modulation Demods &/or Decoding Section------------------------------------------------------
 
+// look for Sequence Terminator - should be pulses of clk*(1 or 2), clk*2, clk*(1.5 or 2), by idx we mean graph position index...
+bool findST(int *stStopLoc, int *stStartIdx, int lowToLowWaveLen[], int highToLowWaveLen[], int clk, int tol, int buffSize, int i) {
+	for (; i < buffSize - 4; ++i) {
+		*stStartIdx += lowToLowWaveLen[i]; //caution part of this wave may be data and part may be ST....  to be accounted for in main function for now...
+		if (lowToLowWaveLen[i] >= clk*1-tol && lowToLowWaveLen[i] <= (clk*2)+tol && highToLowWaveLen[i] < clk+tol) {           //1 to 2 clocks depending on 2 bits prior
+			if (lowToLowWaveLen[i+1] >= clk*2-tol && lowToLowWaveLen[i+1] <= clk*2+tol && highToLowWaveLen[i+1] > clk*3/2-tol) {       //2 clocks and wave size is 1 1/2
+				if (lowToLowWaveLen[i+2] >= (clk*3)/2-tol && lowToLowWaveLen[i+2] <= clk*2+tol && highToLowWaveLen[i+2] > clk-tol) { //1 1/2 to 2 clocks and at least one full clock wave
+					if (lowToLowWaveLen[i+3] >= clk*1-tol && lowToLowWaveLen[i+3] <= clk*2+tol) { //1 to 2 clocks for end of ST + first bit
+						*stStopLoc = i + 3;
+						return true;
+					}
+				}
+			}
+		}
+	}
+	return false;
+}
 //by marshmellow
 //attempt to identify a Sequence Terminator in ASK modulated raw wave
 bool DetectST_ext(uint8_t buffer[], size_t *size, int *foundclock, size_t *ststart, size_t *stend) {
@@ -277,9 +289,9 @@ bool DetectST_ext(uint8_t buffer[], size_t *size, int *foundclock, size_t *ststa
 	int clk = 0; 
 	int tol = 0;
 	int i, j, skip, start, end, low, high, minClk, waveStart;
-	bool complete = false;
-	int tmpbuff[bufsize / 32]; //guess rf/32 clock, if click is smaller we will only have room for a fraction of the samples captured
-	int waveLen[bufsize / 32]; //  if clock is larger then we waste memory in array size that is not needed...
+	//probably should malloc... || test if memory is available ... handle device side? memory danger!!! [marshmellow]
+	int tmpbuff[bufsize / 32]; // low to low wave count //guess rf/32 clock, if click is smaller we will only have room for a fraction of the samples captured
+	int waveLen[bufsize / 32]; // high to low wave count //if clock is larger then we waste memory in array size that is not needed...
 	size_t testsize = (bufsize < 512) ? bufsize : 512;
 	int phaseoff = 0;
 	high = low = 128;
@@ -337,24 +349,9 @@ bool DetectST_ext(uint8_t buffer[], size_t *size, int *foundclock, size_t *ststa
 	} else tol = clk/8;
 
 	*foundclock = clk;
-
-	// look for Sequence Terminator - should be pulses of clk*(1 or 1.5), clk*2, clk*(1.5 or 2)
-	start = -1;
-	for (i = 0; i < j - 4; ++i) {
-		skip += tmpbuff[i];
-		if (tmpbuff[i] >= clk*1-tol && tmpbuff[i] <= (clk*2)+tol && waveLen[i] < clk+tol) {           //1 to 2 clocks depending on 2 bits prior
-			if (tmpbuff[i+1] >= clk*2-tol && tmpbuff[i+1] <= clk*2+tol && waveLen[i+1] > clk*3/2-tol) {       //2 clocks and wave size is 1 1/2
-				if (tmpbuff[i+2] >= (clk*3)/2-tol && tmpbuff[i+2] <= clk*2+tol && waveLen[i+2] > clk-tol) { //1 1/2 to 2 clocks and at least one full clock wave
-					if (tmpbuff[i+3] >= clk*1-tol && tmpbuff[i+3] <= clk*2+tol) { //1 to 2 clocks for end of ST + first bit
-						start = i + 3;
-						break;
-					}
-				}
-			}
-		}
-	}
-	// first ST not found - ERROR
-	if (start < 0) {
+	i=0;
+	if (!findST(&start, &skip, tmpbuff, waveLen, clk, tol, j, i)) {
+		// first ST not found - ERROR
 		if (g_debugMode==2) prnt("DEBUG STT: first STT not found - quitting");
 		return false;
 	} else {
@@ -369,26 +366,14 @@ bool DetectST_ext(uint8_t buffer[], size_t *size, int *foundclock, size_t *ststa
 	skip += clk*7/2; //3.5 clocks from tmpbuff[i] = end of st - also aligns for ending point
 
 	// now do it again to find the end
+	int dummy1 = 0;
 	end = skip;
-	for (i += 3; i < j - 4; ++i) {
-		end += tmpbuff[i];
-		if (tmpbuff[i] >= clk*1-tol && tmpbuff[i] <= (clk*2)+tol && waveLen[i] < clk+tol) {           //1 to 2 clocks depending on 2 bits prior
-			if (tmpbuff[i+1] >= clk*2-tol && tmpbuff[i+1] <= clk*2+tol && waveLen[i+1] > clk*3/2-tol) {       //2 clocks and wave size is 1 1/2
-				if (tmpbuff[i+2] >= (clk*3)/2-tol && tmpbuff[i+2] <= clk*2+tol && waveLen[i+2] > clk-tol) { //1 1/2 to 2 clocks and at least one full clock wave
-					if (tmpbuff[i+3] >= clk*1-tol && tmpbuff[i+3] <= clk*2+tol) { //1 to 2 clocks for end of ST + first bit
-						complete = true;
-						break;
-					}
-				}
-			}
-		}
-	}
-	end -= phaseoff;
-	//didn't find second ST - ERROR
-	if (!complete) {
+	if (!findST(&dummy1, &end, tmpbuff, waveLen, clk, tol, j, i+3)) {
+		//didn't find second ST - ERROR
 		if (g_debugMode==2) prnt("DEBUG STT: second STT not found - quitting");
 		return false;
 	}
+	end -= phaseoff;
 	if (g_debugMode==2) prnt("DEBUG STT: start of data: %d end of data: %d, datalen: %d, clk: %d, bits: %d, phaseoff: %d", skip, end, end-skip, clk, (end-skip)/clk, phaseoff);
 	//now begin to trim out ST so we can use normal demod cmds
 	start = skip;
