@@ -29,8 +29,8 @@
 uint8_t DemodBuffer[MAX_DEMOD_BUF_LEN];
 uint8_t g_debugMode=0;
 size_t DemodBufferLen=0;
-size_t g_demodStartIdx=0;
-uint8_t g_demodClock=0;
+//size_t g_demodStartIdx=0;
+//uint8_t g_demodClock=0;
 
 static int CmdHelp(const char *Cmd);
 
