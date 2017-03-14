@@ -33,7 +33,7 @@ extern int      DetectNRZClock(uint8_t dest[], size_t size, int clock);
 extern int      DetectNRZClock_ext(uint8_t dest[], size_t size, int clock, size_t *clockStartIdx);
 extern int      DetectPSKClock(uint8_t dest[], size_t size, int clock);
 extern int      DetectPSKClock_ext(uint8_t dest[], size_t size, int clock, int *firstPhaseShift);
-extern int      DetectStrongAskClock(uint8_t dest[], size_t size, uint8_t high, uint8_t low, int *clock);
+extern int      DetectStrongAskClock(uint8_t dest[], size_t size, int high, int low, int *clock);
 extern bool     DetectST(uint8_t buffer[], size_t *size, int *foundclock);
 extern bool     DetectST_ext(uint8_t buffer[], size_t *size, int *foundclock, size_t *ststart, size_t *stend);
 extern int      fskdemod(uint8_t *dest, size_t size, uint8_t rfLen, uint8_t invert, uint8_t fchigh, uint8_t fclow);

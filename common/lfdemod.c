@@ -39,7 +39,7 @@
 //**********************************************************************************************
 //---------------------------------Utilities Section--------------------------------------------
 //**********************************************************************************************
-
+#define LOWEST_DEFAULT_CLOCK 32
 //to allow debug print calls when used not on device
 void dummy(char *fmt, ...){}
 #ifndef ON_DEVICE
@@ -222,19 +222,29 @@ size_t findModStart(uint8_t dest[], size_t size, uint8_t threshold_value, uint8_
 	return i;
 }
 
-void getNextLow(uint8_t samples[], size_t size, int low, int *i) {
+int getClosestClock(int testclk) {
+	uint8_t fndClk[] = {8,16,32,40,50,64,128};
+
+	for (uint8_t clkCnt = 0; clkCnt<7; clkCnt++)
+		if (testclk >= fndClk[clkCnt]-(fndClk[clkCnt]/8) && testclk <= fndClk[clkCnt]+1)
+			return fndClk[clkCnt];
+
+	return 0;
+}
+
+void getNextLow(uint8_t samples[], size_t size, int low, size_t *i) {
 	while ((samples[*i] > low) && (*i < size))
 		*i+=1;
 }
 
-void getNextHigh(uint8_t samples[], size_t size, int high, int *i) {
+void getNextHigh(uint8_t samples[], size_t size, int high, size_t *i) {
 	while ((samples[*i] < high) && (*i < size))
 		*i+=1;
 }
 
 // load wave counters
 bool loadWaveCounters(uint8_t samples[], size_t size, int lowToLowWaveLen[], int highToLowWaveLen[], int *waveCnt, int *skip, int *minClk, int *high, int *low) {
-	int i=0, start, waveStart;
+	size_t i=0, firstLow, firstHigh;
 	size_t testsize = (size < 512) ? size : 512;
 
 	if ( getHiLo(samples, testsize, high, low, 80, 80) == -1 ) {
@@ -250,23 +260,21 @@ bool loadWaveCounters(uint8_t samples[], size_t size, int lowToLowWaveLen[], int
 	// populate tmpbuff buffer with pulse lengths
 	while (i < size) {
 		// measure from low to low
-		getNextLow(samples, size, *low, &i);
-		start = i;
-
+		firstLow = i;
 		//find first high point for this wave
 		getNextHigh(samples, size, *high, &i);
-		waveStart = i;
+		firstHigh = i;
 
 		getNextLow(samples, size, *low, &i);
 
-		if (*waveCnt >= (size/32))
+		if (*waveCnt >= (size/LOWEST_DEFAULT_CLOCK))
 			break;
 
-		highToLowWaveLen[*waveCnt] = i - waveStart; //first high to first low
-		lowToLowWaveLen[*waveCnt] = i - start;
+		highToLowWaveLen[*waveCnt] = i - firstHigh; //first high to first low
+		lowToLowWaveLen[*waveCnt] = i - firstLow;
 		*waveCnt += 1;
-		if (i-start < *minClk && i < size) {
-			*minClk = i - start;
+		if (i-firstLow < *minClk && i < size) {
+			*minClk = i - firstLow;
 		}
 	}
 	return true;
@@ -339,28 +347,22 @@ uint8_t DetectCleanAskWave(uint8_t dest[], size_t size, uint8_t high, uint8_t lo
 // by marshmellow
 // to help detect clocks on heavily clipped samples
 // based on count of low to low
-int DetectStrongAskClock(uint8_t dest[], size_t size, uint8_t high, uint8_t low, int *clock) {
-	uint8_t fndClk[] = {8,16,32,40,50,64,128};
+int DetectStrongAskClock(uint8_t dest[], size_t size, int high, int low, int *clock) {
 	size_t startwave;
 	size_t i = 100;
 	size_t minClk = 255;
 	int shortestWaveIdx = 0;
 		// get to first full low to prime loop and skip incomplete first pulse
-	while ((dest[i] < high) && (i < size))
-		++i;
-	while ((dest[i] > low) && (i < size))
-		++i;
+	getNextHigh(dest, size, high, &i);
+	getNextLow(dest, size, low, &i);
 
 	// loop through all samples
 	while (i < size) {
 		// measure from low to low
-		while ((dest[i] > low) && (i < size))
-			++i;
 		startwave = i;
-		while ((dest[i] < high) && (i < size))
-			++i;
-		while ((dest[i] > low) && (i < size))
-			++i;
+
+		getNextHigh(dest, size, high, &i);
+		getNextLow(dest, size, low, &i);
 		//get minimum measured distance
 		if (i-startwave < minClk && i < size) {
 			minClk = i - startwave;
@@ -368,14 +370,12 @@ int DetectStrongAskClock(uint8_t dest[], size_t size, uint8_t high, uint8_t low,
 		}
 	}
 	// set clock
-	if (g_debugMode==2) prnt("DEBUG ASK: detectstrongASKclk smallest wave: %d",minClk);
-	for (uint8_t clkCnt = 0; clkCnt<7; clkCnt++) {
-		if (minClk >= fndClk[clkCnt]-(fndClk[clkCnt]/8) && minClk <= fndClk[clkCnt]+1) {
-			*clock = fndClk[clkCnt];
-			return shortestWaveIdx;
-		}
-	}
-	return 0;
+	if (g_debugMode==2) prnt("DEBUG ASK: DetectStrongAskClock smallest wave: %d",minClk);
+	*clock = getClosestClock(minClk);
+	if (*clock == 0) 
+		return 0;
+	
+	return shortestWaveIdx;
 }
 
 // by marshmellow
@@ -938,7 +938,7 @@ uint8_t	detectFSKClk(uint8_t *BitStream, size_t size, uint8_t fcHigh, uint8_t fc
 //**********************************************************************************************
 
 // look for Sequence Terminator - should be pulses of clk*(1 or 2), clk*2, clk*(1.5 or 2), by idx we mean graph position index...
-bool findST(int *stStopLoc, int *stStartIdx, int lowToLowWaveLen[], int highToLowWaveLen[], int clk, int tol, int buffSize, int *i) {
+bool findST(int *stStopLoc, int *stStartIdx, int lowToLowWaveLen[], int highToLowWaveLen[], int clk, int tol, int buffSize, size_t *i) {
 	for (; *i < buffSize - 4; *i+=1) {
 		*stStartIdx += lowToLowWaveLen[*i]; //caution part of this wave may be data and part may be ST....  to be accounted for in main function for now...
 		if (lowToLowWaveLen[*i] >= clk*1-tol && lowToLowWaveLen[*i] <= (clk*2)+tol && highToLowWaveLen[*i] < clk+tol) {           //1 to 2 clocks depending on 2 bits prior
@@ -959,13 +959,13 @@ bool findST(int *stStopLoc, int *stStartIdx, int lowToLowWaveLen[], int highToLo
 bool DetectST_ext(uint8_t buffer[], size_t *size, int *foundclock, size_t *ststart, size_t *stend) {
 	size_t bufsize = *size;
 	//need to loop through all samples and identify our clock, look for the ST pattern
-	uint8_t fndClk[] = {8,16,32,40,50,64,128};
 	int clk = 0; 
 	int tol = 0;
-	int i=0, j, skip, start, end, low, high, minClk=255;
+	int j, high, low, skip, start, end, minClk=255;
+	size_t i = 0;
 	//probably should malloc... || test if memory is available ... handle device side? memory danger!!! [marshmellow]
-	int tmpbuff[bufsize / 32]; // low to low wave count //guess rf/32 clock, if click is smaller we will only have room for a fraction of the samples captured
-	int waveLen[bufsize / 32]; // high to low wave count //if clock is larger then we waste memory in array size that is not needed...
+	int tmpbuff[bufsize / LOWEST_DEFAULT_CLOCK]; // low to low wave count //guess rf/32 clock, if click is smaller we will only have room for a fraction of the samples captured
+	int waveLen[bufsize / LOWEST_DEFAULT_CLOCK]; // high to low wave count //if clock is larger then we waste memory in array size that is not needed...
 	//size_t testsize = (bufsize < 512) ? bufsize : 512;
 	int phaseoff = 0;
 	high = low = 128;
@@ -974,22 +974,15 @@ bool DetectST_ext(uint8_t buffer[], size_t *size, int *foundclock, size_t *ststa
 
 	if (!loadWaveCounters(buffer, bufsize, tmpbuff, waveLen, &j, &skip, &minClk, &high, &low)) return false;
 	// set clock  - might be able to get this externally and remove this work...
-	if (!clk) {
-		for (uint8_t clkCnt = 0; clkCnt<7; clkCnt++) {
-			tol = fndClk[clkCnt]/8;
-			if (minClk >= fndClk[clkCnt]-tol && minClk <= fndClk[clkCnt]+1) { 
-				clk=fndClk[clkCnt];
-				break;
-			}
-		}
-		// clock not found - ERROR
-		if (!clk) {
-			if (g_debugMode==2) prnt("DEBUG STT: clock not found - quitting");
-			return false;
-		}
-	} else tol = clk/8;
-
+	clk = getClosestClock(minClk);
+	// clock not found - ERROR
+	if (clk == 0) {
+		if (g_debugMode==2) prnt("DEBUG STT: clock not found - quitting");
+		return false;
+	}
 	*foundclock = clk;
+
+	tol = clk/8;
 	if (!findST(&start, &skip, tmpbuff, waveLen, clk, tol, j, &i)) {
 		// first ST not found - ERROR
 		if (g_debugMode==2) prnt("DEBUG STT: first STT not found - quitting");
