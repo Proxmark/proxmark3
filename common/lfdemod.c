@@ -1074,17 +1074,18 @@ bool DetectST(uint8_t	buffer[], size_t *size, int *foundclock) {
 }
 
 //by marshmellow
-//take 11 10 01 11 00 and make 01100 ... miller decoding
+//take 11 10 01 11 00 and make 01100 ... miller decoding 
 //check for phase errors - should never have half a 1 or 0 by itself and should never exceed 1111 or 0000 in a row
 //decodes miller encoded binary
 //NOTE  askrawdemod will NOT demod miller encoded ask unless the clock is manually set to 1/2 what it is detected as!
-/*int millerRawDecode(uint8_t *BitStream, size_t *size, int invert) {
+int millerRawDecode(uint8_t *BitStream, size_t *size, int invert) {
 	if (*size < 16) return -1;
-	uint16_t MaxBits = 512, errCnt = 0, bestErr = 1000, bestRun = 0;
-	size_t i, ii, bitCnt=0;
-	uint8_t alignCnt = 0, curBit = BitStream[0];
+	uint16_t MaxBits = 512, errCnt = 0;
+	size_t i, bitCnt=0;
+	uint8_t alignCnt = 0, curBit = BitStream[0], alignedIdx = 0;
+	uint8_t halfClkErr = 0;
 	//find alignment, needs 4 1s or 0s to properly align
-	for (i=1; i < *size; i++) {
+	for (i=1; i < *size-1; i++) {
 		alignCnt = (BitStream[i] == curBit) ? alignCnt+1 : 0;
 		curBit = BitStream[i];
 		if (alignCnt == 4) break;
@@ -1094,8 +1095,21 @@ bool DetectST(uint8_t	buffer[], size_t *size, int *foundclock) {
 		if (g_debugMode) prnt("ERROR MillerDecode: alignment not found so either your bitstream is not miller or your data does not have a 101 in it");
 		return -1;
 	}
+	alignedIdx = (i-1) % 2;
+	for (i=alignedIdx; i < *size-3; i+=2) {
+		halfClkErr = (uint8_t)((halfClkErr << 1 | BitStream[i]) & 0xFF);
+		if ( (halfClkErr & 0x7) == 5 || (halfClkErr & 0x7) == 2 || (i > 2 && (halfClkErr & 0x7) == 0) || (halfClkErr & 0x1F) == 0x1F) {
+			errCnt++;
+			BitStream[bitCnt++] = 7;
+			continue;
+		}
+		BitStream[bitCnt++] = BitStream[i] ^ BitStream[i+1] ^ invert;
 
-}*/
+		if (bitCnt > MaxBits) break;
+	}
+	*size = bitCnt;
+	return errCnt;
+}
 
 //by marshmellow
 //take 01 or 10 = 1 and 11 or 00 = 0
@@ -1875,7 +1889,6 @@ int VikingDemod_AM(uint8_t *dest, size_t *size) {
 	//return start position
 	return (int) startIdx;
 }
-
 
 // by iceman
 // find Visa2000 preamble in already demoded data
