@@ -222,6 +222,56 @@ size_t findModStart(uint8_t dest[], size_t size, uint8_t threshold_value, uint8_
 	return i;
 }
 
+void getNextLow(uint8_t samples[], size_t size, int low, int *i) {
+	while ((samples[*i] > low) && (*i < size))
+		*i+=1;
+}
+
+void getNextHigh(uint8_t samples[], size_t size, int high, int *i) {
+	while ((samples[*i] < high) && (*i < size))
+		*i+=1;
+}
+
+// load wave counters
+bool loadWaveCounters(uint8_t samples[], size_t size, int lowToLowWaveLen[], int highToLowWaveLen[], int *waveCnt, int *skip, int *minClk, int *high, int *low) {
+	int i=0, start, waveStart;
+	size_t testsize = (size < 512) ? size : 512;
+
+	if ( getHiLo(samples, testsize, high, low, 80, 80) == -1 ) {
+		if (g_debugMode==2) prnt("DEBUG STT: just noise detected - quitting");
+		return false; //just noise
+	}
+
+	// get to first full low to prime loop and skip incomplete first pulse
+	getNextHigh(samples, size, *high, &i);
+	getNextLow(samples, size, *low, &i);
+	*skip = i;
+
+	// populate tmpbuff buffer with pulse lengths
+	while (i < size) {
+		// measure from low to low
+		getNextLow(samples, size, *low, &i);
+		start = i;
+
+		//find first high point for this wave
+		getNextHigh(samples, size, *high, &i);
+		waveStart = i;
+
+		getNextLow(samples, size, *low, &i);
+
+		if (*waveCnt >= (size/32))
+			break;
+
+		highToLowWaveLen[*waveCnt] = i - waveStart; //first high to first low
+		lowToLowWaveLen[*waveCnt] = i - start;
+		*waveCnt += 1;
+		if (i-start < *minClk && i < size) {
+			*minClk = i - start;
+		}
+	}
+	return true;
+}
+
 //by marshmellow
 //amplify based on ask edge detection  -  not accurate enough to use all the time
 void askAmp(uint8_t *BitStream, size_t size) {
@@ -886,55 +936,6 @@ uint8_t	detectFSKClk(uint8_t *BitStream, size_t size, uint8_t fcHigh, uint8_t fc
 //**********************************************************************************************
 //--------------------Modulation Demods &/or Decoding Section-----------------------------------
 //**********************************************************************************************
-
-void getNextLow(uint8_t samples[], size_t size, int low, int *i) {
-	while ((samples[*i] > low) && (*i < size))
-		*i+=1;
-}
-void getNextHigh(uint8_t samples[], size_t size, int high, int *i) {
-	while ((samples[*i] < high) && (*i < size))
-		*i+=1;
-}
-
-// load wave counters
-bool loadWaveCounters(uint8_t samples[], size_t size, int lowToLowWaveLen[], int highToLowWaveLen[], int *waveCnt, int *skip, int *minClk, int *high, int *low) {
-	int i=0, start, waveStart;
-	size_t testsize = (size < 512) ? size : 512;
-
-	if ( getHiLo(samples, testsize, high, low, 80, 80) == -1 ) {
-		if (g_debugMode==2) prnt("DEBUG STT: just noise detected - quitting");
-		return false; //just noise
-	}
-
-	// get to first full low to prime loop and skip incomplete first pulse
-	getNextHigh(samples, size, *high, &i);
-	getNextLow(samples, size, *low, &i);
-	*skip = i;
-
-	// populate tmpbuff buffer with pulse lengths
-	while (i < size) {
-		// measure from low to low
-		getNextLow(samples, size, *low, &i);
-		start = i;
-
-		//find first high point for this wave
-		getNextHigh(samples, size, *high, &i);
-		waveStart = i;
-
-		getNextLow(samples, size, *low, &i);
-
-		if (*waveCnt >= (size/32))
-			break;
-
-		highToLowWaveLen[*waveCnt] = i - waveStart; //first high to first low
-		lowToLowWaveLen[*waveCnt] = i - start;
-		*waveCnt += 1;
-		if (i-start < *minClk && i < size) {
-			*minClk = i - start;
-		}
-	}
-	return true;
-}
 
 // look for Sequence Terminator - should be pulses of clk*(1 or 2), clk*2, clk*(1.5 or 2), by idx we mean graph position index...
 bool findST(int *stStopLoc, int *stStartIdx, int lowToLowWaveLen[], int highToLowWaveLen[], int clk, int tol, int buffSize, int *i) {
