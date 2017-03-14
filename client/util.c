@@ -245,6 +245,15 @@ void num_to_bytebitsLSBF(uint64_t n, size_t len, uint8_t *dest) {
 	}
 }
 
+// Swap bit order on a uint32_t value.  Can be limited by nrbits just use say 8bits reversal
+// And clears the rest of the bits.
+uint32_t SwapBits(uint32_t value, int nrbits) {
+	uint32_t newvalue = 0;
+	for(int i = 0; i < nrbits; i++) {
+		newvalue ^= ((value >> i) & 1) << (nrbits - 1 - i);
+	}
+	return newvalue;
+}
 
 // aa,bb,cc,dd,ee,ff,gg,hh, ii,jj,kk,ll,mm,nn,oo,pp
 // to
