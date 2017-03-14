@@ -10,13 +10,15 @@
 // MIFARE Darkside hack
 //-----------------------------------------------------------------------------
 
-#include <inttypes.h>
-#include <time.h>
-
 #include "nonce2key.h"
+
+#include <inttypes.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include "mifarehost.h"
 #include "ui.h"
 #include "util.h"
+#include "crapto1/crapto1.h"
 
 int compar_state(const void * a, const void * b) {
 	// didn't work: (the result is truncated to 32 bits)
@@ -31,7 +33,7 @@ int compar_state(const void * a, const void * b) {
 int nonce2key(uint32_t uid, uint32_t nt, uint32_t nr, uint64_t par_info, uint64_t ks_info, uint64_t * key) {
   struct Crypto1State *state;
   uint32_t i, pos, rr, nr_diff, key_count;//, ks1, ks2;
-  byte_t bt, ks3x[8], par[8][8];
+  uint8_t bt, ks3x[8], par[8][8];
   uint64_t key_recovered;
   int64_t *state_s;
   static uint32_t last_uid;
@@ -71,17 +73,17 @@ int nonce2key(uint32_t uid, uint32_t nt, uint32_t nr, uint64_t par_info, uint64_
     printf("%01x|\n", par[i][7]);
   }
   
-	if (par_info==0)
-		PrintAndLog("parity is all zero,try special attack!just wait for few more seconds...");
+	if (par_info == 0)
+		PrintAndLog("Parity is all zero, trying special attack! Just wait for few more seconds...");
   
-	state = lfsr_common_prefix(nr, rr, ks3x, par, par_info==0);
+	state = lfsr_common_prefix(nr, rr, ks3x, par);
 	state_s = (int64_t*)state;
 	
 	//char filename[50] ;
     //sprintf(filename, "nt_%08x_%d.txt", nt, nr);
     //printf("name %s\n", filename);
 	//FILE* fp = fopen(filename,"w");
-	for (i = 0; (state) && ((state + i)->odd != -1); i++)
+	for (i = 0; (state) && *(state_s + i); i++)
 	{
 		lfsr_rollback_word(state+i, uid^nt, 0);
 		crypto1_get_lfsr(state + i, &key_recovered);
@@ -97,9 +99,8 @@ int nonce2key(uint32_t uid, uint32_t nt, uint32_t nr, uint64_t par_info, uint64_
 	*(state_s + i) = -1;
 	
 	//Create the intersection:
-	if (par_info == 0 )
-		if ( last_keylist != NULL)
-		{
+	if (par_info == 0 ) {
+		if (last_keylist != NULL) {
 			int64_t *p1, *p2, *p3;
 			p1 = p3 = last_keylist; 
 			p2 = state_s;
@@ -114,12 +115,11 @@ int nonce2key(uint32_t uid, uint32_t nt, uint32_t nr, uint64_t par_info, uint64_
 					while (compar_state(p1, p2) == 1) ++p2;
 				}
 			}
-			key_count = p3 - last_keylist;;
-		}
-		else
+			key_count = p3 - last_keylist;
+		} else {
 			key_count = 0;
-	else
-	{
+		}
+	} else {
 		last_keylist = state_s;
 		key_count = i;
 	}
@@ -137,7 +137,7 @@ int nonce2key(uint32_t uid, uint32_t nt, uint32_t nr, uint64_t par_info, uint64_
 			*key = key64;
 			free(last_keylist);
 			last_keylist = NULL;
-			if (par_info ==0)
+			if (par_info == 0)
 				free(state);
 			return 0;
 		}
@@ -161,7 +161,7 @@ bool mfkey32(nonces_t data, uint64_t *outputkey) {
 	uint32_t ar0_enc = data.ar;  // first encrypted reader response
 	uint32_t nr1_enc = data.nr2; // second encrypted reader challenge
 	uint32_t ar1_enc = data.ar2; // second encrypted reader response
-	clock_t t1 = clock();
+	uint64_t t1 = msclock();
 	bool isSuccess = false;
 	uint8_t counter=0;
 
@@ -182,8 +182,8 @@ bool mfkey32(nonces_t data, uint64_t *outputkey) {
 		}
 	}
 	isSuccess = (counter == 1);
-	t1 = clock() - t1;
-	//if ( t1 > 0 ) PrintAndLog("Time in mfkey32: %.0f ticks \nFound %d possible keys", (float)t1, counter);
+	t1 = msclock() - t1;
+	//if ( t1 > 0 ) PrintAndLog("Time in mfkey32: %.1f seconds \nFound %d possible keys", (float)t1/1000.0, counter);
 	*outputkey = ( isSuccess ) ? outkey : 0;
 	crypto1_destroy(s);
 	/* //un-comment to save all keys to a stats.txt file 
@@ -213,7 +213,7 @@ bool tryMfk32_moebius(nonces_t data, uint64_t *outputkey) {
 	int counter = 0;
 	
 	//PrintAndLog("Enter mfkey32_moebius");
-	clock_t t1 = clock();
+	uint64_t t1 = msclock();
 
 	s = lfsr_recovery32(ar0_enc ^ prng_successor(nt0, 64), 0);
   
@@ -234,8 +234,8 @@ bool tryMfk32_moebius(nonces_t data, uint64_t *outputkey) {
 		}
 	}
 	isSuccess	= (counter == 1);
-	t1 = clock() - t1;
-	//if ( t1 > 0 ) PrintAndLog("Time in mfkey32_moebius: %.0f ticks \nFound %d possible keys", (float)t1,counter);
+	t1 = msclock() - t1;
+	//if ( t1 > 0 ) PrintAndLog("Time in mfkey32_moebius: %.1f seconds \nFound %d possible keys", (float)t1/1000.0, counter);
 	*outputkey = ( isSuccess ) ? outkey : 0;
 	crypto1_destroy(s);
 	/* // un-comment to output all keys to stats.txt
@@ -266,7 +266,7 @@ int tryMfk64(uint32_t uid, uint32_t nt, uint32_t nr_enc, uint32_t ar_enc, uint32
 	struct Crypto1State *revstate;
 	
 	PrintAndLog("Enter mfkey64");
-	clock_t t1 = clock();
+	uint64_t t1 = msclock();
 	
 	// Extract the keystream from the messages
 	ks2 = ar_enc ^ prng_successor(nt, 64);
@@ -281,8 +281,8 @@ int tryMfk64(uint32_t uid, uint32_t nt, uint32_t nr_enc, uint32_t ar_enc, uint32
 	crypto1_destroy(revstate);
 	*outputkey = key;
 	
-	t1 = clock() - t1;
-	if ( t1 > 0 ) PrintAndLog("Time in mfkey64: %.0f ticks \n", (float)t1);
+	t1 = msclock() - t1;
+	if ( t1 > 0 ) PrintAndLog("Time in mfkey64: %.1f seconds \n", (float)t1/1000.0);
 	return 0;
 }
 

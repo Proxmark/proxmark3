@@ -10,8 +10,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <inttypes.h>
-#include "sleep.h"
 #include "proxmark3.h"
+#include "util.h"
 #include "flash.h"
 #include "uart.h"
 #include "usb_cmd.h"

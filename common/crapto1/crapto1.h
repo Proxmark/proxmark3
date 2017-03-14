@@ -15,7 +15,7 @@
     Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
     MA  02110-1301, US$
 
-    Copyright (C) 2008-2008 bla <blapost@gmail.com>
+    Copyright (C) 2008-2014 bla <blapost@gmail.com>
 */
 #ifndef CRAPTO1_INCLUDED
 #define CRAPTO1_INCLUDED
@@ -25,7 +25,11 @@ extern "C" {
 #endif
 
 struct Crypto1State {uint32_t odd, even;};
-struct Crypto1State* crypto1_create(uint64_t);
+#if defined(__arm__)
+void crypto1_create(struct Crypto1State *s, uint64_t key);
+#else
+struct Crypto1State *crypto1_create(uint64_t key);
+#endif
 void crypto1_destroy(struct Crypto1State*);
 void crypto1_get_lfsr(struct Crypto1State*, uint64_t*);
 uint8_t crypto1_bit(struct Crypto1State*, uint8_t, int);
@@ -38,6 +42,7 @@ struct Crypto1State* lfsr_recovery64(uint32_t ks2, uint32_t ks3);
 uint32_t *lfsr_prefix_ks(uint8_t ks[8], int isodd);
 struct Crypto1State*
 lfsr_common_prefix(uint32_t pfx, uint32_t rr, uint8_t ks[8], uint8_t par[8][8]);
+
 
 uint8_t lfsr_rollback_bit(struct Crypto1State* s, uint32_t in, int fb);
 uint8_t lfsr_rollback_byte(struct Crypto1State* s, uint32_t in, int fb);
@@ -66,7 +71,7 @@ static inline int parity(uint32_t x)
 	x ^= x >> 4;
 	return BIT(0x6996, x & 0xf);
 #else
-        asm(    "movl %1, %%eax\n"
+        __asm(    "movl %1, %%eax\n"
 		"mov %%ax, %%cx\n"
 		"shrl $0x10, %%eax\n"
 		"xor %%ax, %%cx\n"

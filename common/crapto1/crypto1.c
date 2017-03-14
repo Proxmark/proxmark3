@@ -23,6 +23,23 @@
 #define SWAPENDIAN(x)\
 	(x = (x >> 8 & 0xff00ff) | (x & 0xff00ff) << 8, x = x >> 16 | x << 16)
 
+#if defined(__arm__) && !defined(__linux__) && !defined(_WIN32)			// bare metal ARM lacks malloc()/free()
+void crypto1_create(struct Crypto1State *s, uint64_t key)
+{
+	int i;
+
+	for(i = 47;s && i > 0; i -= 2) {
+		s->odd  = s->odd  << 1 | BIT(key, (i - 1) ^ 7);
+		s->even = s->even << 1 | BIT(key, i ^ 7);
+	}
+	return;
+}
+void crypto1_destroy(struct Crypto1State *state)
+{
+	state->odd = 0;
+	state->even = 0;
+}
+#else
 struct Crypto1State * crypto1_create(uint64_t key)
 {
 	struct Crypto1State *s = malloc(sizeof(*s));
@@ -38,6 +55,7 @@ void crypto1_destroy(struct Crypto1State *state)
 {
 	free(state);
 }
+#endif
 void crypto1_get_lfsr(struct Crypto1State *state, uint64_t *lfsr)
 {
 	int i;
@@ -48,8 +66,7 @@ void crypto1_get_lfsr(struct Crypto1State *state, uint64_t *lfsr)
 }
 uint8_t crypto1_bit(struct Crypto1State *s, uint8_t in, int is_encrypted)
 {
-	uint32_t feedin;
-	uint32_t tmp;
+	uint32_t feedin, t;
 	uint8_t ret = filter(s->odd);
 
 	feedin  = ret & !!is_encrypted;
@@ -58,9 +75,7 @@ uint8_t crypto1_bit(struct Crypto1State *s, uint8_t in, int is_encrypted)
 	feedin ^= LF_POLY_EVEN & s->even;
 	s->even = s->even << 1 | parity(feedin);
 
-	tmp = s->odd;
-	s->odd = s->even;
-	s->even = tmp;
+	t = s->odd, s->odd = s->even, s->even = t;
 
 	return ret;
 }
@@ -77,8 +92,8 @@ uint32_t crypto1_word(struct Crypto1State *s, uint32_t in, int is_encrypted)
 {
 	uint32_t i, ret = 0;
 
-	for (i = 0; i < 4; ++i, in <<= 8)
-		ret = ret << 8 | crypto1_byte(s, in >> 24, is_encrypted);
+	for (i = 0; i < 32; ++i)
+		ret |= crypto1_bit(s, BEBIT(in, i), is_encrypted) << (i ^ 24);
 
 	return ret;
 }

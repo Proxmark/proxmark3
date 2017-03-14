@@ -8,15 +8,19 @@
 // Commands related to the German electronic Identification Card
 //-----------------------------------------------------------------------------
 
-#include "util.h"
+#include "cmdhfepa.h"
 
+#include <inttypes.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <stdio.h>
+#include "util.h"
 #include "proxmark3.h"
 #include "ui.h"
 #include "cmdparser.h"
 #include "common.h"
 #include "cmdmain.h"
-#include "sleep.h"
-#include "cmdhfepa.h"
 
 static int CmdHelp(const char *Cmd);
 
@@ -37,7 +41,7 @@ int CmdHFEPACollectPACENonces(const char *Cmd)
 	n = n > 0 ? n : 1;
 
 	PrintAndLog("Collecting %u %u-byte nonces", n, m);
-	PrintAndLog("Start: %u", time(NULL));
+	PrintAndLog("Start: %" PRIu64 , msclock()/1000);
 	// repeat n times
 	for (unsigned int i = 0; i < n; i++) {
 		// execute PACE
@@ -64,7 +68,7 @@ int CmdHFEPACollectPACENonces(const char *Cmd)
 			sleep(d);
 		}
 	}
-	PrintAndLog("End: %u", time(NULL));
+	PrintAndLog("End: %" PRIu64, msclock()/1000);
 
 	return 1;
 }

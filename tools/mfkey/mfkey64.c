@@ -1,5 +1,5 @@
 #include <inttypes.h>
-#include "crapto1.h"
+#include "crapto1/crapto1.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -34,7 +34,7 @@ int main (int argc, char *argv[]) {
   for (int i = 0; i < encc; i++) {
     enclen[i] = strlen(argv[i + 6]) / 2;
     for (int i2 = 0; i2 < enclen[i]; i2++) {
-      sscanf(argv[i+6] + i2*2,"%2x", (uint8_t*)&enc[i][i2]);
+      sscanf(argv[i+6] + i2*2,"%2x", (unsigned int *)&enc[i][i2]);
     }
   }
   printf("Recovering key for:\n");

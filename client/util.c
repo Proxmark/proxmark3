@@ -8,14 +8,25 @@
 // utilities
 //-----------------------------------------------------------------------------
 
-#include <ctype.h>
+#if !defined(_WIN32)
+#define _POSIX_C_SOURCE	199309L			// need nanosleep()
+#endif
+
 #include "util.h"
+
+#include <stdint.h>
+#include <string.h>
+#include <ctype.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <time.h>
+#include "data.h"
+
 #define MAX_BIN_BREAK_LENGTH   (3072+384+1)
 
 #ifndef _WIN32
 #include <termios.h>
 #include <sys/ioctl.h> 
-
 
 int ukbhit(void)
 {
@@ -42,6 +53,7 @@ int ukbhit(void)
 }
 
 #else
+
 #include <conio.h>
 int ukbhit(void) {
 	return kbhit();
@@ -599,4 +611,39 @@ void clean_ascii(unsigned char *buf, size_t len) {
     if (!isprint(buf[i]))
       buf[i] = '.';
   }
+}
+
+
+// Timer functions
+#if !defined (_WIN32)
+#include <errno.h>
+
+static void nsleep(uint64_t n) {
+  struct timespec timeout;
+  timeout.tv_sec = n/1000000000;
+  timeout.tv_nsec = n%1000000000;
+  while (nanosleep(&timeout, &timeout) && errno == EINTR);
+}
+
+void msleep(uint32_t n) {
+	nsleep(1000000 * n);
+}
+
+#endif // _WIN32
+
+// a milliseconds timer for performance measurement
+uint64_t msclock() {
+#if defined(_WIN32)
+#include <sys/types.h>
+	struct _timeb t;
+	if (_ftime_s(&t)) {
+		return 0;
+	} else {
+		return 1000 * t.time + t.millitm;
+	}
+#else
+	struct timespec t;
+	clock_gettime(CLOCK_MONOTONIC, &t);
+	return (t.tv_sec * 1000 + t.tv_nsec / 1000000);
+#endif
 }

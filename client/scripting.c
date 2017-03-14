@@ -8,6 +8,7 @@
 // Some lua scripting glue to proxmark core.
 //-----------------------------------------------------------------------------
 
+#include <stdlib.h>
 #include <lua.h>
 #include <lualib.h>
 #include <lauxlib.h>

@@ -11,7 +11,6 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
-#include "sleep.h"
 #include "proxusb.h"
 #include "flash.h"
 #include "elf.h"
