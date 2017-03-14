@@ -887,6 +887,55 @@ uint8_t	detectFSKClk(uint8_t *BitStream, size_t size, uint8_t fcHigh, uint8_t fc
 //--------------------Modulation Demods &/or Decoding Section-----------------------------------
 //**********************************************************************************************
 
+void getNextLow(uint8_t samples[], size_t size, int low, int *i) {
+	while ((samples[*i] > low) && (*i < size))
+		*i+=1;
+}
+void getNextHigh(uint8_t samples[], size_t size, int high, int *i) {
+	while ((samples[*i] < high) && (*i < size))
+		*i+=1;
+}
+
+// load wave counters
+bool loadWaveCounters(uint8_t samples[], size_t size, int lowToLowWaveLen[], int highToLowWaveLen[], int *waveCnt, int *skip, int *minClk, int *high, int *low) {
+	int i=0, start, waveStart;
+	size_t testsize = (size < 512) ? size : 512;
+
+	if ( getHiLo(samples, testsize, high, low, 80, 80) == -1 ) {
+		if (g_debugMode==2) prnt("DEBUG STT: just noise detected - quitting");
+		return false; //just noise
+	}
+
+	// get to first full low to prime loop and skip incomplete first pulse
+	getNextHigh(samples, size, *high, &i);
+	getNextLow(samples, size, *low, &i);
+	*skip = i;
+
+	// populate tmpbuff buffer with pulse lengths
+	while (i < size) {
+		// measure from low to low
+		getNextLow(samples, size, *low, &i);
+		start = i;
+
+		//find first high point for this wave
+		getNextHigh(samples, size, *high, &i);
+		waveStart = i;
+
+		getNextLow(samples, size, *low, &i);
+
+		if (*waveCnt >= (size/32))
+			break;
+
+		highToLowWaveLen[*waveCnt] = i - waveStart; //first high to first low
+		lowToLowWaveLen[*waveCnt] = i - start;
+		*waveCnt += 1;
+		if (i-start < *minClk && i < size) {
+			*minClk = i - start;
+		}
+	}
+	return true;
+}
+
 // look for Sequence Terminator - should be pulses of clk*(1 or 2), clk*2, clk*(1.5 or 2), by idx we mean graph position index...
 bool findST(int *stStopLoc, int *stStartIdx, int lowToLowWaveLen[], int highToLowWaveLen[], int clk, int tol, int buffSize, int *i) {
 	for (; *i < buffSize - 4; *i+=1) {
@@ -912,51 +961,17 @@ bool DetectST_ext(uint8_t buffer[], size_t *size, int *foundclock, size_t *ststa
 	uint8_t fndClk[] = {8,16,32,40,50,64,128};
 	int clk = 0; 
 	int tol = 0;
-	int i, j, skip, start, end, low, high, minClk, waveStart;
+	int i=0, j, skip, start, end, low, high, minClk=255;
 	//probably should malloc... || test if memory is available ... handle device side? memory danger!!! [marshmellow]
 	int tmpbuff[bufsize / 32]; // low to low wave count //guess rf/32 clock, if click is smaller we will only have room for a fraction of the samples captured
 	int waveLen[bufsize / 32]; // high to low wave count //if clock is larger then we waste memory in array size that is not needed...
-	size_t testsize = (bufsize < 512) ? bufsize : 512;
+	//size_t testsize = (bufsize < 512) ? bufsize : 512;
 	int phaseoff = 0;
 	high = low = 128;
 	memset(tmpbuff, 0, sizeof(tmpbuff));
 	memset(waveLen, 0, sizeof(waveLen));
 
-	if ( getHiLo(buffer, testsize, &high, &low, 80, 80) == -1 ) {
-		if (g_debugMode==2) prnt("DEBUG STT: just noise detected - quitting");
-		return false; //just noise
-	}
-	i = 0;
-	j = 0;
-	minClk = 255;
-	// get to first full low to prime loop and skip incomplete first pulse
-	while ((buffer[i] < high) && (i < bufsize))
-		++i;
-	while ((buffer[i] > low) && (i < bufsize))
-		++i;
-	skip = i;
-
-	// populate tmpbuff buffer with pulse lengths
-	while (i < bufsize) {
-		// measure from low to low
-		while ((buffer[i] > low) && (i < bufsize))
-			++i;
-		start= i;
-		while ((buffer[i] < high) && (i < bufsize))
-			++i;
-		//first high point for this wave
-		waveStart = i;
-		while ((buffer[i] > low) && (i < bufsize))
-			++i;
-		if (j >= (bufsize/32)) {
-			break;
-		}
-		waveLen[j] = i - waveStart; //first high to first low
-		tmpbuff[j++] = i - start;
-		if (i-start < minClk && i < bufsize) {
-			minClk = i - start;
-		}
-	}
+	if (!loadWaveCounters(buffer, bufsize, tmpbuff, waveLen, &j, &skip, &minClk, &high, &low)) return false;
 	// set clock  - might be able to get this externally and remove this work...
 	if (!clk) {
 		for (uint8_t clkCnt = 0; clkCnt<7; clkCnt++) {
@@ -974,7 +989,6 @@ bool DetectST_ext(uint8_t buffer[], size_t *size, int *foundclock, size_t *ststa
 	} else tol = clk/8;
 
 	*foundclock = clk;
-	i=0;
 	if (!findST(&start, &skip, tmpbuff, waveLen, clk, tol, j, &i)) {
 		// first ST not found - ERROR
 		if (g_debugMode==2) prnt("DEBUG STT: first STT not found - quitting");
