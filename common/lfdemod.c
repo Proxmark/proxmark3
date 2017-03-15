@@ -41,6 +41,7 @@
 //**********************************************************************************************
 #define LOWEST_DEFAULT_CLOCK 32
 #define FSK_PSK_THRESHOLD   123
+
 //to allow debug print calls when used not on device
 void dummy(char *fmt, ...){}
 #ifndef ON_DEVICE
