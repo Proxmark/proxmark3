@@ -31,6 +31,8 @@ ifneq (,$(findstring MINGW,$(platform)))
 else ifeq ($(platform),Darwin)
     CXXFLAGS = $(shell pkg-config --cflags QtCore QtGui 2>/dev/null) -Wall -O4
     QTLDLIBS = $(shell pkg-config --libs QtCore QtGui 2>/dev/null)
+    LDLIBS = -L/usr/local/opt/readline/lib -L/usr/local/opt/qt5/lib -L/usr/local/lib -lreadline -lpthread -lm
+    CFLAGS = -std=c99 -I/usr/local/opt/qt5/include -I/usr/local/opt/readline/include -I. -I../include -I../common -I../zlib -I/opt/local/include -I../liblua -Wall $(COMMON_FLAGS) -g -O4
     MOC = $(shell pkg-config --variable=moc_location QtCore)
     LUAPLATFORM = macosx
 else
