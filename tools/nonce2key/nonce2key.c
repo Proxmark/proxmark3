@@ -47,7 +47,7 @@ int main(const int argc, const char* argv[]) {
     printf("%01x|\n",par[i][7]);
   }
   
-  state = lfsr_common_prefix(nr,rr,ks3x,par);
+  state = lfsr_common_prefix(nr,rr,ks3x,par,0);
   lfsr_rollback_word(state,uid^nt,0);
   crypto1_get_lfsr(state,&key_recovered);
   printf("\nkey recovered: %012" PRIx64 "\n\n",key_recovered);

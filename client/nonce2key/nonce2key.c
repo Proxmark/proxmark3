@@ -76,7 +76,7 @@ int nonce2key(uint32_t uid, uint32_t nt, uint32_t nr, uint64_t par_info, uint64_
 	if (par_info == 0)
 		PrintAndLog("Parity is all zero, trying special attack! Just wait for few more seconds...");
   
-	state = lfsr_common_prefix(nr, rr, ks3x, par);
+	state = lfsr_common_prefix(nr, rr, ks3x, par, (par_info == 0));
 	state_s = (int64_t*)state;
 	
 	//char filename[50] ;

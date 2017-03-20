@@ -14,7 +14,7 @@ all: $(OBJS) $(EXES)
 %.o : %.c
 	$(CC) $(CFLAGS) -c -o $@ $<
 
-% : %.c
+% : %.c $(OBJS)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(OBJS) $<
 
 clean: 
