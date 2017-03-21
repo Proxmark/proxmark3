@@ -763,9 +763,10 @@ int CmdEM4x05dump(const char *Cmd) {
 int usage_lf_em_write(void) {
 	PrintAndLog("Write EM4x05/EM4x69.  Tag must be on antenna. ");
 	PrintAndLog("");
-	PrintAndLog("Usage:  lf em 4x05writeword [h] <address> <data> <pwd>");
+	PrintAndLog("Usage:  lf em 4x05writeword [h] [s] <address> <data> <pwd>");
 	PrintAndLog("Options:");
 	PrintAndLog("       h         - this help");
+	PrintAndLog("       s         - swap data bit order before write");
 	PrintAndLog("       address   - memory address to write to. (0-15)");
 	PrintAndLog("       data      - data to write (hex)");	
 	PrintAndLog("       pwd       - password (hex) (optional)");
@@ -778,18 +779,23 @@ int usage_lf_em_write(void) {
 int CmdEM4x05WriteWord(const char *Cmd) {
 	uint8_t ctmp = param_getchar(Cmd, 0);
 	if ( strlen(Cmd) == 0 || ctmp == 'H' || ctmp == 'h' ) return usage_lf_em_write();
-	
+
 	bool usePwd = false;
-		
+
 	uint8_t addr = 16; // default to invalid address
 	uint32_t data = 0xFFFFFFFF; // default to blank data
 	uint32_t pwd = 0xFFFFFFFF; // default to blank password
-	
-	addr = param_get8ex(Cmd, 0, 16, 10);
-	data = param_get32ex(Cmd, 1, 0, 16);
-	pwd =  param_get32ex(Cmd, 2, 1, 16);
-	
-	
+	char swap = 0;
+
+	int p = 0;
+	swap = param_getchar(Cmd, 0);
+	if (swap == 's' || swap=='S') p++;
+	addr = param_get8ex(Cmd, p++, 16, 10);
+	data = param_get32ex(Cmd, p++, 0, 16);
+	pwd  = param_get32ex(Cmd, p++, 1, 16);
+
+	if (swap == 's' || swap=='S') data = SwapBits(data, 32);
+
 	if ( (addr > 15) ) {
 		PrintAndLog("Address must be between 0 and 15");
 		return 1;
@@ -798,15 +804,15 @@ int CmdEM4x05WriteWord(const char *Cmd) {
 		PrintAndLog("Writing address %d data %08X", addr, data);	
 	else {
 		usePwd = true;
-		PrintAndLog("Writing address %d data %08X using password %08X", addr, data, pwd);		
+		PrintAndLog("Writing address %d data %08X using password %08X", addr, data, pwd);
 	}
-	
+
 	uint16_t flag = (addr << 8 ) | usePwd;
-	
+
 	UsbCommand c = {CMD_EM4X_WRITE_WORD, {flag, data, pwd}};
 	clearCommandBuffer();
 	SendCommand(&c);
-	UsbCommand resp;	
+	UsbCommand resp;
 	if (!WaitForResponseTimeout(CMD_ACK, &resp, 2000)){
 		PrintAndLog("Error occurred, device did not respond during write operation.");
 		return -1;
@@ -814,7 +820,7 @@ int CmdEM4x05WriteWord(const char *Cmd) {
 	if ( !downloadSamplesEM() ) {
 		return -1;
 	}
-	//check response for 00001010 for write confirmation!	
+	//check response for 00001010 for write confirmation!
 	//attempt demod:
 	uint32_t dummy = 0;
 	int result = demodEM4x05resp(&dummy,false);

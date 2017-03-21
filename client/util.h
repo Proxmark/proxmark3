@@ -47,6 +47,7 @@ extern uint64_t bytes_to_num(uint8_t* src, size_t len);
 extern void num_to_bytebits(uint64_t	n, size_t len, uint8_t *dest);
 extern void num_to_bytebitsLSBF(uint64_t n, size_t len, uint8_t *dest);
 extern char *printBits(size_t const size, void const * const ptr);
+extern uint32_t SwapBits(uint32_t value, int nrbits);
 extern uint8_t *SwapEndian64(const uint8_t *src, const size_t len, const uint8_t blockSize);
 extern void SwapEndian64ex(const uint8_t *src, const size_t len, const uint8_t blockSize, uint8_t *dest);
 
