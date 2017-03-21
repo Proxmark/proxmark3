@@ -19,90 +19,34 @@
 #include "ui.h"
 #include "mifarehost.h"
 #include "mifare.h"
-#include "nonce2key/nonce2key.h"
+#include "nonce2key.h"
 
 #define NESTED_SECTOR_RETRY     10			// how often we try mfested() until we give up
 
 
 static int CmdHelp(const char *Cmd);
 
+
 int CmdHF14AMifare(const char *Cmd)
 {
-	uint32_t uid = 0;
-	uint32_t nt = 0, nr = 0;
-	uint64_t par_list = 0, ks_list = 0, r_key = 0;
-	int16_t isOK = 0;
+	int isOK = 0;
+	uint64_t key = 0;
 
-	UsbCommand c = {CMD_READER_MIFARE, {true, 0, 0}};
-
-	// message
-	printf("-------------------------------------------------------------------------\n");
-	printf("Executing command. Expected execution time: 25sec on average  :-)\n");
-	printf("Press button on the proxmark3 device to abort both proxmark3 and client.\n");
-	printf("-------------------------------------------------------------------------\n");
-
-	
- start:
-    clearCommandBuffer();
-    SendCommand(&c);
-	
-	//flush queue
-	while (ukbhit()) {
-		int c = getchar(); (void) c;
-	}
-	
-	// wait cycle
-	while (true) {
-        printf(".");
-		fflush(stdout);
-		if (ukbhit()) {
-			getchar();
-			printf("\naborted via keyboard!\n");
-			break;
-		}
-		
-		UsbCommand resp;
-		if (WaitForResponseTimeout(CMD_ACK, &resp, 1000)) {
-			isOK  = resp.arg[0];
-			uid = (uint32_t)bytes_to_num(resp.d.asBytes +  0, 4);
-			nt =  (uint32_t)bytes_to_num(resp.d.asBytes +  4, 4);
-			par_list = bytes_to_num(resp.d.asBytes +  8, 8);
-			ks_list = bytes_to_num(resp.d.asBytes +  16, 8);
-			nr = bytes_to_num(resp.d.asBytes + 24, 4);
-			printf("\n\n");
-			switch (isOK) {
-				case -1 : PrintAndLog("Button pressed. Aborted.\n"); break;
-				case -2 : PrintAndLog("Card is not vulnerable to Darkside attack (doesn't send NACK on authentication requests).\n"); break;
-				case -3 : PrintAndLog("Card is not vulnerable to Darkside attack (its random number generator is not predictable).\n"); break;
-				case -4 : PrintAndLog("Card is not vulnerable to Darkside attack (its random number generator seems to be based on the wellknown");
-							PrintAndLog("generating polynomial with 16 effective bits only, but shows unexpected behaviour.\n"); break;
-				default: ;
-			}
-			break;
-		}
-	}	
-
-	printf("\n");
-	
-	// error
-	if (isOK != 1) return 1;
-	
-	// execute original function from util nonce2key
-	if (nonce2key(uid, nt, nr, par_list, ks_list, &r_key)) {
-		isOK = 2;
-		PrintAndLog("Key not found (lfsr_common_prefix list is null). Nt=%08x", nt);	
-		PrintAndLog("Failing is expected to happen in 25%% of all cases. Trying again with a different reader nonce...");
-		c.arg[0] = false;
-		goto start;
-	} else {
-		isOK = 0;
-		printf("------------------------------------------------------------------\n");
-		PrintAndLog("Found valid key:%012" PRIx64 " \n", r_key);
+	isOK = mfDarkside(&key);
+	switch (isOK) {
+		case -1 : PrintAndLog("Button pressed. Aborted."); return 1;
+		case -2 : PrintAndLog("Card is not vulnerable to Darkside attack (doesn't send NACK on authentication requests)."); return 1;
+		case -3 : PrintAndLog("Card is not vulnerable to Darkside attack (its random number generator is not predictable)."); return 1;
+		case -4 : PrintAndLog("Card is not vulnerable to Darkside attack (its random number generator seems to be based on the wellknown");
+					PrintAndLog("generating polynomial with 16 effective bits only, but shows unexpected behaviour."); return 1;
+		case -5 : PrintAndLog("Aborted via keyboard.");  return 1;
+		default : PrintAndLog("Found valid key:%012" PRIx64 "\n", key);
 	}
 	
 	PrintAndLog("");
 	return 0;
 }
+
 
 int CmdHF14AMfWrBl(const char *Cmd)
 {
@@ -1090,7 +1034,7 @@ void readerAttack(nonces_t ar_resp[], bool setEmulatorMem, bool doStandardAttack
 						}
 					}
 				}
-			} else if (tryMfk32_moebius(ar_resp[i+ATTACK_KEY_COUNT], &key)) {
+			} else if (mfkey32_moebius(ar_resp[i+ATTACK_KEY_COUNT], &key)) {
 				uint8_t sectorNum = ar_resp[i+ATTACK_KEY_COUNT].sector;
 				uint8_t keyType = ar_resp[i+ATTACK_KEY_COUNT].keytype;
 

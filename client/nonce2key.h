@@ -23,17 +23,14 @@ typedef struct {
 			  uint32_t nonce;
 			  uint32_t ar;
 			  uint32_t nr;
+			  uint32_t at;
 			  uint32_t nonce2;
 			  uint32_t ar2;
 			  uint32_t nr2;
 			} nonces_t;
 
-int nonce2key(uint32_t uid, uint32_t nt, uint32_t nr, uint64_t par_info, uint64_t ks_info, uint64_t * key); 
 bool mfkey32(nonces_t data, uint64_t *outputkey);
-bool tryMfk32_moebius(nonces_t data, uint64_t *outputkey);
-int tryMfk64_ex(uint8_t *data, uint64_t *outputkey);
-int tryMfk64(uint32_t uid, uint32_t nt, uint32_t nr_enc, uint32_t ar_enc, uint32_t at_enc, uint64_t *outputkey);
-
-//uint64_t mfkey32(uint32_t uid, uint32_t nt, uint32_t nr0_enc, uint32_t ar0_enc, uint32_t nr1_enc, uint32_t ar1_enc);
+bool mfkey32_moebius(nonces_t data, uint64_t *outputkey);
+int mfkey64(nonces_t data, uint64_t *outputkey);
 
 #endif
