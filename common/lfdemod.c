@@ -308,15 +308,17 @@ uint32_t manchesterEncode2Bytes(uint16_t datain) {
 
 //by marshmellow
 //encode binary data into binary manchester 
-//NOTE: BitStream must have double the size available in memory to do the swap
+//NOTE: BitStream must have triple the size of "size" available in memory to do the swap
 int ManchesterEncode(uint8_t *BitStream, size_t size) {
-	size_t modIdx=size, i=0;
-	if (size>modIdx) return -1;
+	//allow up to 4K out (means BitStream must be at least 2048+4096 to handle the swap)
+	size = (size>2048) ? 2048 : size;
+	size_t modIdx = size;
+	size_t i;
 	for (size_t idx=0; idx < size; idx++){
 		BitStream[idx+modIdx++] = BitStream[idx];
 		BitStream[idx+modIdx++] = BitStream[idx]^1;
 	}
-	for (; i<(size*2); i++){
+	for (i=0; i<(size*2); i++){
 		BitStream[i] = BitStream[i+size];
 	}
 	return i;
