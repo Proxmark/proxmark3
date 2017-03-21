@@ -465,18 +465,9 @@ uint32_t *lfsr_prefix_ks(uint8_t ks[8], int isodd)
  */
 static struct Crypto1State*
 check_pfx_parity(uint32_t prefix, uint32_t rresp, uint8_t parities[8][8],
-          	uint32_t odd, uint32_t even, struct Crypto1State* sl)
+          	uint32_t odd, uint32_t even, struct Crypto1State* sl, uint32_t no_par)
 {
-	uint32_t ks1, nr, ks2, rr, ks3, c, good = 1, no_par = 1;
-
-	for (int i = 0; i < 8; i++) {
-		for (int j = 0; j < 8; j++) {
-			if (parities[i][j] != 0) {
-				no_par = 0;
-				break;
-			}
-		}
-	}
+	uint32_t ks1, nr, ks2, rr, ks3, c, good = 1;
 
 	for(c = 0; good && c < 8; ++c) {
 		sl->odd = odd ^ fastfwd[1][c];
@@ -510,7 +501,7 @@ check_pfx_parity(uint32_t prefix, uint32_t rresp, uint8_t parities[8][8],
  * Implentation of the common prefix attack.
  */
 struct Crypto1State*
-lfsr_common_prefix(uint32_t pfx, uint32_t rr, uint8_t ks[8], uint8_t par[8][8])
+lfsr_common_prefix(uint32_t pfx, uint32_t rr, uint8_t ks[8], uint8_t par[8][8], uint32_t no_par)
 {
 	struct Crypto1State *statelist, *s;
 	uint32_t *odd, *even, *o, *e, top;
@@ -518,7 +509,7 @@ lfsr_common_prefix(uint32_t pfx, uint32_t rr, uint8_t ks[8], uint8_t par[8][8])
 	odd = lfsr_prefix_ks(ks, 1);
 	even = lfsr_prefix_ks(ks, 0);
 
-	s = statelist = malloc((sizeof *statelist) << 20);
+	s = statelist = malloc((sizeof *statelist) << 22); // was << 20. Need more for no_par special attack. Enough???
 	if(!s || !odd || !even) {
 		free(statelist);
 		statelist = 0;
@@ -530,7 +521,7 @@ lfsr_common_prefix(uint32_t pfx, uint32_t rr, uint8_t ks[8], uint8_t par[8][8])
 			for(top = 0; top < 64; ++top) {
 				*o += 1 << 21;
 				*e += (!(top & 7) + 1) << 21;
-				s = check_pfx_parity(pfx, rr, par, *o, *e, s);
+				s = check_pfx_parity(pfx, rr, par, *o, *e, s, no_par);
 			}
 
 	s->odd = s->even = 0;

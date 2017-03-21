@@ -218,7 +218,8 @@ uint8_t GetNrzClock(const char str[], bool printAns, bool verbose)
 			PrintAndLog("Failed to copy from graphbuffer");
 		return -1;
 	}
-	clock = DetectNRZClock(grph, size, 0);
+	size_t clkStartIdx = 0;
+	clock = DetectNRZClock(grph, size, 0, &clkStartIdx);
 	// Only print this message if we're not looping something
 	if (printAns){
 		PrintAndLog("Auto-detected clock rate: %d", clock);

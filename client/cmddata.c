@@ -29,6 +29,9 @@
 uint8_t DemodBuffer[MAX_DEMOD_BUF_LEN];
 uint8_t g_debugMode=0;
 size_t DemodBufferLen=0;
+//size_t g_demodStartIdx=0;
+//uint8_t g_demodClock=0;
+
 static int CmdHelp(const char *Cmd);
 
 //set the demod buffer with given array of binary (one bit per byte)
@@ -253,6 +256,7 @@ void printEM410x(uint32_t hi, uint64_t id)
 	return;
 }
 
+//should be moved to cmdlfem4x.c
 int AskEm410xDecode(bool verbose, uint32_t *hi, uint64_t *lo )
 {
 	size_t idx = 0;
@@ -274,7 +278,7 @@ int AskEm410xDecode(bool verbose, uint32_t *hi, uint64_t *lo )
 	}
 	return 0;
 }
-
+//should be moved to cmdlfem4x.c
 int AskEm410xDemod(const char *Cmd, uint32_t *hi, uint64_t *lo, bool verbose)
 {
 	bool st = true;
@@ -282,6 +286,7 @@ int AskEm410xDemod(const char *Cmd, uint32_t *hi, uint64_t *lo, bool verbose)
 	return AskEm410xDecode(verbose, hi, lo);
 }
 
+//should be moved to cmdlfem4x.c
 //by marshmellow
 //takes 3 arguments - clock, invert and maxErr as integers
 //attempts to demodulate ask while decoding manchester
@@ -451,7 +456,8 @@ int Cmdmandecoderaw(const char *Cmd)
 
 	sscanf(Cmd, "%i %i", &invert, &maxErr);
 	size=i;
-	errCnt=manrawdecode(BitStream, &size, invert);
+	uint8_t alignPos = 0;
+	errCnt=manrawdecode(BitStream, &size, invert, &alignPos);
 	if (errCnt>=maxErr){
 		PrintAndLog("Too many errors: %d",errCnt);
 		return 0;
@@ -590,6 +596,7 @@ int Cmdaskbiphdemod(const char *Cmd)
 	return ASKbiphaseDemod(Cmd, true);
 }
 
+//could be split to a gProxII file
 //by marshmellow
 //attempts to demodulate and identify a G_Prox_II verex/chubb card
 //WARNING: if it fails during some points it will destroy the DemodBuffer data
@@ -655,6 +662,7 @@ int CmdG_Prox_II_Demod(const char *Cmd)
 	return 1;
 }
 
+//could be moved to a viking file
 //by marshmellow
 //see ASKDemod for what args are accepted
 int CmdVikingDemod(const char *Cmd)
@@ -1038,6 +1046,7 @@ int CmdFSKrawdemod(const char *Cmd)
 	return FSKrawDemod(Cmd, true);
 }
 
+//move to cmdlfhid.c
 //by marshmellow (based on existing demod + holiman's refactor)
 //HID Prox demod - FSK RF/50 with preamble of 00011101 (then manchester encoded)
 //print full HID Prox ID and some bit format details if found
@@ -1123,6 +1132,7 @@ int CmdFSKdemodHID(const char *Cmd)
 	}
 	return 1;
 }
+
 
 //by marshmellow
 //Paradox Prox demod - FSK RF/50 with preamble of 00001111 (then manchester encoded)
@@ -1751,7 +1761,8 @@ int NRZrawDemod(const char *Cmd, bool verbose)
 	size_t BitLen = getFromGraphBuf(BitStream);
 	if (BitLen==0) return 0;
 	int errCnt=0;
-	errCnt = nrzRawDemod(BitStream, &BitLen, &clk, &invert);
+	int clkStartIdx = 0;
+	errCnt = nrzRawDemod(BitStream, &BitLen, &clk, &invert, &clkStartIdx);
 	if (errCnt > maxErr){
 		if (g_debugMode) PrintAndLog("Too many errors found, clk: %d, invert: %d, numbits: %d, errCnt: %d",clk,invert,BitLen,errCnt);
 		return 0;
@@ -2264,13 +2275,13 @@ int CmdDirectionalThreshold(const char *Cmd)
 		if (GraphBuffer[i] >= upThres && GraphBuffer[i] > lastValue)
 		{
 			lastValue = GraphBuffer[i]; // Buffer last value as we overwrite it.
-			GraphBuffer[i] = 1;
+			GraphBuffer[i] = 127;
 		}
 		// Apply second threshold to samples heading down
 		else if (GraphBuffer[i] <= downThres && GraphBuffer[i] < lastValue)
 		{
 			lastValue = GraphBuffer[i]; // Buffer last value as we overwrite it.
-			GraphBuffer[i] = -1;
+			GraphBuffer[i] = -127;
 		}
 		else
 		{

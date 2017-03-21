@@ -8,6 +8,8 @@
 // Some lua scripting glue to proxmark core.
 //-----------------------------------------------------------------------------
 
+#include "scripting.h"
+
 #include <stdlib.h>
 #include <lua.h>
 #include <lualib.h>
@@ -15,9 +17,8 @@
 #include "proxmark3.h"
 #include "usb_cmd.h"
 #include "cmdmain.h"
-#include "scripting.h"
 #include "util.h"
-#include "nonce2key/nonce2key.h"
+#include "mifarehost.h"
 #include "../common/iso15693tools.h"
 #include "iso14443crc.h"
 #include "../common/crc16.h"
@@ -125,49 +126,27 @@ static int returnToLuaWithError(lua_State *L, const char* fmt, ...)
 	return 2;
 }
 
-static int l_nonce2key(lua_State *L){
+static int l_mfDarkside(lua_State *L){
 
-	size_t size;
-	const char *p_uid = luaL_checklstring(L, 1, &size);
-	if(size != 4)  return returnToLuaWithError(L,"Wrong size of uid, got %d bytes, expected 4", (int) size);
-
-	const char *p_nt = luaL_checklstring(L, 2, &size);
-	if(size != 4)  return returnToLuaWithError(L,"Wrong size of nt, got %d bytes, expected 4", (int) size);
-
-	const char *p_nr = luaL_checklstring(L, 3, &size);
-	if(size != 4)  return returnToLuaWithError(L,"Wrong size of nr, got %d bytes, expected 4", (int) size);
-
-	const char *p_par_info = luaL_checklstring(L, 4, &size);
-	if(size != 8)  return returnToLuaWithError(L,"Wrong size of par_info, got %d bytes, expected 8", (int) size);
-
-	const char *p_pks_info = luaL_checklstring(L, 5, &size);
-	if(size != 8)  return returnToLuaWithError(L,"Wrong size of ks_info, got %d bytes, expected 8", (int) size);
-
-
-	uint32_t uid = bytes_to_num(( uint8_t *)p_uid,4);
-	uint32_t nt = bytes_to_num(( uint8_t *)p_nt,4);
-
-	uint32_t nr = bytes_to_num(( uint8_t*)p_nr,4);
-	uint64_t par_info = bytes_to_num(( uint8_t *)p_par_info,8);
-	uint64_t ks_info = bytes_to_num(( uint8_t *)p_pks_info,8);
-
-	uint64_t key = 0;
-
-	int retval = nonce2key(uid,nt, nr, par_info,ks_info, &key);
-
+	uint64_t key;
+	
+	int retval = mfDarkside(&key);
+	
 	//Push the retval on the stack
-	lua_pushinteger(L,retval);
+	lua_pushinteger(L, retval);
 
 	//Push the key onto the stack
 	uint8_t dest_key[8];
-	num_to_bytes(key,sizeof(dest_key),dest_key);
+	num_to_bytes(key, sizeof(dest_key), dest_key);
 
 	//printf("Pushing to lua stack: %012" PRIx64 "\n",key);
-	lua_pushlstring(L,(const char *) dest_key,sizeof(dest_key));
+	lua_pushlstring(L,(const char *)dest_key, sizeof(dest_key));
 
 	return 2; //Two return values
 }
+
 //static int l_PrintAndLog(lua_State *L){ return CmdHF14AMfDump(luaL_checkstring(L, 1));}
+
 static int l_clearCommandBuffer(lua_State *L){
 	clearCommandBuffer();
 	return 0;
@@ -499,7 +478,7 @@ int set_pm3_libraries(lua_State *L)
 	static const luaL_Reg libs[] = {
 		{"SendCommand",                 l_SendCommand},
 		{"WaitForResponseTimeout",      l_WaitForResponseTimeout},
-		{"nonce2key",                   l_nonce2key},
+		{"mfDarkside",                  l_mfDarkside},
 		//{"PrintAndLog",                 l_PrintAndLog},
 		{"foobar",                      l_foobar},
 		{"ukbhit",                      l_ukbhit},
