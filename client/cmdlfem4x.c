@@ -20,10 +20,9 @@
 #include "cmddata.h"
 #include "cmdlf.h"
 #include "cmdmain.h"
-#include "cmdlfem4x.h"
 #include "lfdemod.h"
 
-char *global_em410xId;
+uint64_t g_em410xId=0;
 
 static int CmdHelp(const char *Cmd);
 
@@ -37,6 +36,103 @@ int CmdEMdemodASK(const char *Cmd)
 	return 0;
 }
 
+//by marshmellow
+//print 64 bit EM410x ID in multiple formats
+void printEM410x(uint32_t hi, uint64_t id)
+{
+	if (id || hi){
+		uint64_t iii=1;
+		uint64_t id2lo=0;
+		uint32_t ii=0;
+		uint32_t i=0;
+		for (ii=5; ii>0;ii--){
+			for (i=0;i<8;i++){
+				id2lo=(id2lo<<1LL) | ((id & (iii << (i+((ii-1)*8)))) >> (i+((ii-1)*8)));
+			}
+		}
+		if (hi){
+			//output 88 bit em id
+			PrintAndLog("\nEM TAG ID      : %06X%016" PRIX64, hi, id);
+		} else{
+			//output 40 bit em id
+			PrintAndLog("\nEM TAG ID      : %010" PRIX64, id);
+			PrintAndLog("\nPossible de-scramble patterns");
+			PrintAndLog("Unique TAG ID  : %010" PRIX64,  id2lo);
+			PrintAndLog("HoneyWell IdentKey {");
+			PrintAndLog("DEZ 8          : %08" PRIu64,id & 0xFFFFFF);
+			PrintAndLog("DEZ 10         : %010" PRIu64,id & 0xFFFFFFFF);
+			PrintAndLog("DEZ 5.5        : %05lld.%05" PRIu64,(id>>16LL) & 0xFFFF,(id & 0xFFFF));
+			PrintAndLog("DEZ 3.5A       : %03lld.%05" PRIu64,(id>>32ll),(id & 0xFFFF));
+			PrintAndLog("DEZ 3.5B       : %03lld.%05" PRIu64,(id & 0xFF000000) >> 24,(id & 0xFFFF));
+			PrintAndLog("DEZ 3.5C       : %03lld.%05" PRIu64,(id & 0xFF0000) >> 16,(id & 0xFFFF));
+			PrintAndLog("DEZ 14/IK2     : %014" PRIu64,id);
+			PrintAndLog("DEZ 15/IK3     : %015" PRIu64,id2lo);
+			PrintAndLog("DEZ 20/ZK      : %02" PRIu64 "%02" PRIu64 "%02" PRIu64 "%02" PRIu64 "%02" PRIu64 "%02" PRIu64 "%02" PRIu64 "%02" PRIu64 "%02" PRIu64 "%02" PRIu64,
+			    (id2lo & 0xf000000000) >> 36,
+			    (id2lo & 0x0f00000000) >> 32,
+			    (id2lo & 0x00f0000000) >> 28,
+			    (id2lo & 0x000f000000) >> 24,
+			    (id2lo & 0x0000f00000) >> 20,
+			    (id2lo & 0x00000f0000) >> 16,
+			    (id2lo & 0x000000f000) >> 12,
+			    (id2lo & 0x0000000f00) >> 8,
+			    (id2lo & 0x00000000f0) >> 4,
+			    (id2lo & 0x000000000f)
+			);
+			uint64_t paxton = (((id>>32) << 24) | (id & 0xffffff))  + 0x143e00;
+			PrintAndLog("}\nOther          : %05" PRIu64 "_%03" PRIu64 "_%08" PRIu64 "",(id&0xFFFF),((id>>16LL) & 0xFF),(id & 0xFFFFFF));  
+			PrintAndLog("Pattern Paxton : %" PRIu64 " [0x%" PRIX64 "]", paxton, paxton);
+
+			uint32_t p1id = (id & 0xFFFFFF);
+			uint8_t arr[32] = {0x00};
+			int i =0; 
+			int j = 23;
+			for (; i < 24; ++i, --j	){
+				arr[i] = (p1id >> i) & 1;
+			}
+
+			uint32_t p1  = 0;
+
+			p1 |= arr[23] << 21;
+			p1 |= arr[22] << 23;
+			p1 |= arr[21] << 20;
+			p1 |= arr[20] << 22;
+				
+			p1 |= arr[19] << 18;
+			p1 |= arr[18] << 16;
+			p1 |= arr[17] << 19;
+			p1 |= arr[16] << 17;
+				
+			p1 |= arr[15] << 13;
+			p1 |= arr[14] << 15;
+			p1 |= arr[13] << 12;
+			p1 |= arr[12] << 14;
+
+			p1 |= arr[11] << 6;
+			p1 |= arr[10] << 2;
+			p1 |= arr[9]  << 7;
+			p1 |= arr[8]  << 1;
+
+			p1 |= arr[7]  << 0;
+			p1 |= arr[6]  << 8;
+			p1 |= arr[5]  << 11;
+			p1 |= arr[4]  << 3;
+
+			p1 |= arr[3]  << 10;
+			p1 |= arr[2]  << 4;
+			p1 |= arr[1]  << 5;
+			p1 |= arr[0]  << 9;
+			PrintAndLog("Pattern 1      : %d [0x%X]", p1, p1);
+
+			uint16_t sebury1 = id & 0xFFFF;
+			uint8_t  sebury2 = (id >> 16) & 0x7F;
+			uint32_t sebury3 = id & 0x7FFFFF;
+			PrintAndLog("Pattern Sebury : %d %d %d  [0x%X 0x%X 0x%X]", sebury1, sebury2, sebury3, sebury1, sebury2, sebury3);
+		}
+	}
+	return;
+}
+
 /* Read the ID of an EM410x tag.
  * Format:
  *   1111 1111 1           <-- standard non-repeatable header
@@ -45,23 +141,60 @@ int CmdEMdemodASK(const char *Cmd)
  *   CCCC                  <-- each bit here is parity for the 10 bits above in corresponding column
  *   0                     <-- stop bit, end of tag
  */
-int CmdEM410xRead(const char *Cmd)
+int AskEm410xDecode(bool verbose, uint32_t *hi, uint64_t *lo )
 {
-	uint32_t hi=0;
-	uint64_t lo=0;
+	size_t idx = 0;
+	size_t BitLen = DemodBufferLen;
+	uint8_t BitStream[MAX_GRAPH_TRACE_LEN]={0};
+	memcpy(BitStream, DemodBuffer, BitLen); 
+	if (Em410xDecode(BitStream, &BitLen, &idx, hi, lo)){
+		//set GraphBuffer for clone or sim command
+		setDemodBuf(BitStream, BitLen, idx);
+		if (g_debugMode){
+			PrintAndLog("DEBUG: idx: %d, Len: %d, Printing Demod Buffer:", idx, BitLen);
+			printDemodBuff();
+		}
+		if (verbose){
+			PrintAndLog("EM410x pattern found: ");
+			printEM410x(*hi, *lo);
+			g_em410xId = *lo;
+		}
+		return 1;
+	}
+	return 0;
+}
 
-	if(!AskEm410xDemod("", &hi, &lo, false)) return 0;
-	PrintAndLog("EM410x pattern found: ");
-	printEM410x(hi, lo);
-	if (hi){
-		PrintAndLog ("EM410x XL pattern found");
+//askdemod then call Em410xdecode
+int AskEm410xDemod(const char *Cmd, uint32_t *hi, uint64_t *lo, bool verbose)
+{
+	bool st = true;
+	if (!ASKDemod_ext(Cmd, false, false, 1, &st)) return 0;
+	return AskEm410xDecode(verbose, hi, lo);
+}
+
+//by marshmellow
+//takes 3 arguments - clock, invert and maxErr as integers
+//attempts to demodulate ask while decoding manchester
+//prints binary found and saves in graphbuffer for further commands
+int CmdAskEM410xDemod(const char *Cmd)
+{
+	char cmdp = param_getchar(Cmd, 0);
+	if (strlen(Cmd) > 10 || cmdp == 'h' || cmdp == 'H') {
+		PrintAndLog("Usage:  lf em 410xdemod [clock] <0|1> [maxError]");
+		PrintAndLog("     [set clock as integer] optional, if not set, autodetect.");
+		PrintAndLog("     <invert>, 1 for invert output");
+		PrintAndLog("     [set maximum allowed errors], default = 100.");
+		PrintAndLog("");
+		PrintAndLog("    sample: lf em 410xdemod        = demod an EM410x Tag ID from GraphBuffer");
+		PrintAndLog("          : lf em 410xdemod 32     = demod an EM410x Tag ID from GraphBuffer using a clock of RF/32");
+		PrintAndLog("          : lf em 410xdemod 32 1   = demod an EM410x Tag ID from GraphBuffer using a clock of RF/32 and inverting data");
+		PrintAndLog("          : lf em 410xdemod 1      = demod an EM410x Tag ID from GraphBuffer while inverting data");
+		PrintAndLog("          : lf em 410xdemod 64 1 0 = demod an EM410x Tag ID from GraphBuffer using a clock of RF/64 and inverting data and allowing 0 demod errors");
 		return 0;
 	}
-	char id[12] = {0x00};
-	sprintf(id, "%010"PRIx64,lo);
-	
-	global_em410xId = id;
-	return 1;
+	uint64_t lo = 0;
+	uint32_t hi = 0;
+	return AskEm410xDemod(Cmd, &hi, &lo, true);
 }
 
 int usage_lf_em410x_sim(void) {
@@ -153,6 +286,8 @@ int CmdEM410xSim(const char *Cmd)
  *       rate gets lower, then grow the number of samples
  *  Changed by martin, 4000 x 4 = 16000, 
  *  see http://www.proxmark.org/forum/viewtopic.php?pid=7235#p7235
+ *
+ *  EDIT -- capture enough to get 2 complete preambles at the slowest data rate known to be used (rf/64) (64*64*2+9 = 8201)	marshmellow
 */
 int CmdEM410xWatch(const char *Cmd)
 {
@@ -163,8 +298,8 @@ int CmdEM410xWatch(const char *Cmd)
 		}
 		
 		CmdLFRead("s");
-		getSamples("8201",true); //capture enough to get 2 complete preambles (4096*2+9)	
-	} while (!CmdEM410xRead(""));
+		getSamples("8201",true); 
+	} while (!CmdAskEM410xDemod(""));
 
 	return 0;
 }
@@ -173,7 +308,7 @@ int CmdEM410xWatch(const char *Cmd)
 int CmdEM410xWatchnSpoof(const char *Cmd)
 {
 	CmdEM410xWatch(Cmd);
-	PrintAndLog("# Replaying captured ID: %s",global_em410xId);
+	PrintAndLog("# Replaying captured ID: %010"PRIx64, g_em410xId);
 	CmdLFaskSim("");
 	return 0;
 }
@@ -995,18 +1130,18 @@ int CmdEM4x05info(const char *Cmd) {
 
 static command_t CommandTable[] =
 {
-	{"help", CmdHelp, 1, "This help"},
-	{"410xdemod", CmdEMdemodASK, 0, "[findone] -- Extract ID from EM410x tag (option 0 for continuous loop, 1 for only 1 tag)"},  
-	{"410xread", CmdEM410xRead, 1, "[clock rate] -- Extract ID from EM410x tag in GraphBuffer"},
-	{"410xsim", CmdEM410xSim, 0, "<UID> [clock rate] -- Simulate EM410x tag"},
+	{"help",      CmdHelp, 1, "This help"},
+	{"410xread",  CmdEMdemodASK, 0, "[findone] -- Extract ID from EM410x tag (option 0 for continuous loop, 1 for only 1 tag)"},  
+	{"410xdemod", CmdAskEM410xDemod,  1, "[clock] [invert<0|1>] [maxErr] -- Demodulate an EM410x tag from GraphBuffer (args optional)"},
+	{"410xsim",   CmdEM410xSim, 0, "<UID> [clock rate] -- Simulate EM410x tag"},
 	{"410xwatch", CmdEM410xWatch, 0, "['h'] -- Watches for EM410x 125/134 kHz tags (option 'h' for 134)"},
 	{"410xspoof", CmdEM410xWatchnSpoof, 0, "['h'] --- Watches for EM410x 125/134 kHz tags, and replays them. (option 'h' for 134)" },
 	{"410xwrite", CmdEM410xWrite, 0, "<UID> <'0' T5555> <'1' T55x7> [clock rate] -- Write EM410x UID to T5555(Q5) or T55x7 tag, optionally setting clock rate"},
-	{"4x05dump", CmdEM4x05dump, 0, "(pwd) -- Read EM4x05/EM4x69 all word data"},
-	{"4x05info", CmdEM4x05info, 0, "(pwd) -- Get info from EM4x05/EM4x69 tag"},
-	{"4x05readword", CmdEM4x05ReadWord, 0, "<Word> (pwd) -- Read EM4x05/EM4x69 word data"},
+	{"4x05dump",  CmdEM4x05dump, 0, "(pwd) -- Read EM4x05/EM4x69 all word data"},
+	{"4x05info",  CmdEM4x05info, 0, "(pwd) -- Get info from EM4x05/EM4x69 tag"},
+	{"4x05readword",  CmdEM4x05ReadWord, 0, "<Word> (pwd) -- Read EM4x05/EM4x69 word data"},
 	{"4x05writeword", CmdEM4x05WriteWord, 0, "<Word> <data> (pwd) -- Write EM4x05/EM4x69 word data"},
-	{"4x50read", CmdEM4x50Read, 1, "demod data from EM4x50 tag from the graph buffer"},
+	{"4x50read",  CmdEM4x50Read, 1, "demod data from EM4x50 tag from the graph buffer"},
 	{NULL, NULL, 0, NULL}
 };
 

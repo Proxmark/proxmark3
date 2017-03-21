@@ -23,7 +23,6 @@ int CmdData(const char *Cmd);
 void printDemodBuff(void);
 void setDemodBuf(uint8_t *buff, size_t size, size_t startIdx);
 int CmdPrintDemodBuff(const char *Cmd);
-int CmdAskEM410xDemod(const char *Cmd);
 int CmdVikingDemod(const char *Cmd);
 int CmdG_Prox_II_Demod(const char *Cmd);
 int Cmdaskrawdemod(const char *Cmd);
@@ -66,15 +65,12 @@ int CmdScale(const char *Cmd);
 int CmdDirectionalThreshold(const char *Cmd);
 int CmdZerocrossings(const char *Cmd);
 int CmdIndalaDecode(const char *Cmd);
-int AskEm410xDecode(bool verbose, uint32_t *hi, uint64_t *lo );
-int AskEm410xDemod(const char *Cmd, uint32_t *hi, uint64_t *lo, bool verbose);
 int ASKbiphaseDemod(const char *Cmd, bool verbose);
 int ASKDemod(const char *Cmd, bool verbose, bool emSearch, uint8_t askType);
 int ASKDemod_ext(const char *Cmd, bool verbose, bool emSearch, uint8_t askType, bool *stCheck);
 int FSKrawDemod(const char *Cmd, bool verbose);
 int PSKDemod(const char *Cmd, bool verbose);
 int NRZrawDemod(const char *Cmd, bool verbose);
-void printEM410x(uint32_t hi, uint64_t id);
 int getSamples(const char *Cmd, bool silent);
 
 
