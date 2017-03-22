@@ -14,7 +14,6 @@
 #include "ui.h"
 #include "graph.h"
 #include "cmdparser.h"
-//#include "cmdlfhid.h"
 #include "cmddata.h"  //for g_debugMode, demodbuff cmds
 #include "lfdemod.h" // for HIDdemodFSK
 
