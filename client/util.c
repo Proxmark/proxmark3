@@ -27,6 +27,7 @@
 #ifndef _WIN32
 #include <termios.h>
 #include <sys/ioctl.h> 
+#include <unistd.h>
 
 int ukbhit(void)
 {
@@ -34,19 +35,18 @@ int ukbhit(void)
   int error;
   static struct termios Otty, Ntty;
 
-
-  if ( tcgetattr( 0, &Otty) == -1 ) return -1;
+  if ( tcgetattr(STDIN_FILENO, &Otty) == -1 ) return -1;
   Ntty = Otty;
 
-  Ntty.c_iflag          = 0;       /* input mode                */
-  Ntty.c_oflag          = 0;       /* output mode               */
-  Ntty.c_lflag         &= ~ICANON; /* raw mode */
-  Ntty.c_cc[VMIN]       = CMIN;    /* minimum time to wait      */
-  Ntty.c_cc[VTIME]      = CTIME;   /* minimum characters to wait for */
-
-  if (0 == (error = tcsetattr(0, TCSANOW, &Ntty))) {
-    error += ioctl(0, FIONREAD, &cnt);
-    error += tcsetattr(0, TCSANOW, &Otty);
+  Ntty.c_iflag          = 0x0000;   // input mode
+  Ntty.c_oflag          = 0x0000;   // output mode
+  Ntty.c_lflag         &= ~ICANON;  // control mode = raw
+  Ntty.c_cc[VMIN]       = 1;        // return if at least 1 character is in the queue
+  Ntty.c_cc[VTIME]      = 0;   	    // no timeout. Wait forever
+  
+  if (0 == (error = tcsetattr(STDIN_FILENO, TCSANOW, &Ntty))) {   // set new attributes
+    error += ioctl(STDIN_FILENO, FIONREAD, &cnt);                 // get number of characters availabe
+    error += tcsetattr(STDIN_FILENO, TCSANOW, &Otty);             // reset attributes
   }
 
   return ( error == 0 ? cnt : -1 );
