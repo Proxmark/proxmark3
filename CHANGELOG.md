@@ -45,6 +45,10 @@ This project uses the changelog in accordance with [keepchangelog](http://keepac
 - Added option c to 'hf list' (mark CRC bytes) (piwi)
 
 ### Changed
+- `data fskawiddemod` has been moved to `lf awid demod` (reads from graphbuffer)
+- `lf awid fskdemod` has been renamed to `lf awid read` (reads from antenna)
+- `data fskhiddemod` has been moved to `lf hid demod` (reads from graphbuffer)
+- `lf hid demod` has been renamed to `lf hid read` (reads from antenna)
 - all em410x demod and print functions moved to cmdlfem4x.c
 - `data askem410xdemod` has been moved to `lf em 410xdemod` (reads from graphbuffer)
 - `lf em 410xdemod` has been renamed to `lf em 410xread` (reads from antenna)
