@@ -45,6 +45,9 @@ This project uses the changelog in accordance with [keepchangelog](http://keepac
 - Added option c to 'hf list' (mark CRC bytes) (piwi)
 
 ### Changed
+- `data fskpyramiddemod` has been moved to `lf pyramid demod` (reads from graphbuffer)
+- `data fskiodemod` has been moved to `lf io demod` (reads from graphbuffer)
+- `lf io fskdemod` has been renamed to `lf io read` (reads from antenna)
 - `data fskawiddemod` has been moved to `lf awid demod` (reads from graphbuffer)
 - `lf awid fskdemod` has been renamed to `lf awid read` (reads from antenna)
 - `data fskhiddemod` has been moved to `lf hid demod` (reads from graphbuffer)

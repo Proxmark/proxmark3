@@ -9,11 +9,10 @@
 #ifndef CMDLFPYRAMID_H__
 #define CMDLFPYRAMID_H__
 
-int CmdLFPyramid(const char *Cmd);
-int CmdPyramidClone(const char *Cmd);
-int CmdPyramidSim(const char *Cmd);
-
-int usage_lf_pyramid_clone(void);
-int usage_lf_pyramid_sim(void);
+extern int CmdLFPyramid(const char *Cmd);
+extern int CmdPyramidClone(const char *Cmd);
+extern int CmdPyramidSim(const char *Cmd);
+extern int CmdFSKdemodPyramid(const char *Cmd);
+extern int CmdPyramidRead(const char *Cmd);
 #endif
 
