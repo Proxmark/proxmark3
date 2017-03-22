@@ -25,6 +25,7 @@
 #include "crc.h"      // for pyramid checksum maxim
 #include "crc16.h"    // for FDXB demod checksum
 #include "loclass/cipherutils.h" // for decimating samples in getsamples
+#include "cmdlfem4x.h"// for em410x demod
 
 uint8_t DemodBuffer[MAX_DEMOD_BUF_LEN];
 uint8_t g_debugMode=0;
@@ -157,159 +158,6 @@ int CmdGetBitStream(const char *Cmd)
 	}
 	RepaintGraphWindow();
 	return 0;
-}
-
-//by marshmellow
-//print 64 bit EM410x ID in multiple formats
-void printEM410x(uint32_t hi, uint64_t id)
-{
-	if (id || hi){
-		uint64_t iii=1;
-		uint64_t id2lo=0;
-		uint32_t ii=0;
-		uint32_t i=0;
-		for (ii=5; ii>0;ii--){
-			for (i=0;i<8;i++){
-				id2lo=(id2lo<<1LL) | ((id & (iii << (i+((ii-1)*8)))) >> (i+((ii-1)*8)));
-			}
-		}
-		if (hi){
-			//output 88 bit em id
-			PrintAndLog("\nEM TAG ID      : %06X%016" PRIX64, hi, id);
-		} else{
-			//output 40 bit em id
-			PrintAndLog("\nEM TAG ID      : %010" PRIX64, id);
-			PrintAndLog("\nPossible de-scramble patterns");
-			PrintAndLog("Unique TAG ID  : %010" PRIX64,  id2lo);
-			PrintAndLog("HoneyWell IdentKey {");
-			PrintAndLog("DEZ 8          : %08" PRIu64,id & 0xFFFFFF);
-			PrintAndLog("DEZ 10         : %010" PRIu64,id & 0xFFFFFFFF);
-			PrintAndLog("DEZ 5.5        : %05lld.%05" PRIu64,(id>>16LL) & 0xFFFF,(id & 0xFFFF));
-			PrintAndLog("DEZ 3.5A       : %03lld.%05" PRIu64,(id>>32ll),(id & 0xFFFF));
-			PrintAndLog("DEZ 3.5B       : %03lld.%05" PRIu64,(id & 0xFF000000) >> 24,(id & 0xFFFF));
-			PrintAndLog("DEZ 3.5C       : %03lld.%05" PRIu64,(id & 0xFF0000) >> 16,(id & 0xFFFF));
-			PrintAndLog("DEZ 14/IK2     : %014" PRIu64,id);
-			PrintAndLog("DEZ 15/IK3     : %015" PRIu64,id2lo);
-			PrintAndLog("DEZ 20/ZK      : %02" PRIu64 "%02" PRIu64 "%02" PRIu64 "%02" PRIu64 "%02" PRIu64 "%02" PRIu64 "%02" PRIu64 "%02" PRIu64 "%02" PRIu64 "%02" PRIu64,
-			    (id2lo & 0xf000000000) >> 36,
-			    (id2lo & 0x0f00000000) >> 32,
-			    (id2lo & 0x00f0000000) >> 28,
-			    (id2lo & 0x000f000000) >> 24,
-			    (id2lo & 0x0000f00000) >> 20,
-			    (id2lo & 0x00000f0000) >> 16,
-			    (id2lo & 0x000000f000) >> 12,
-			    (id2lo & 0x0000000f00) >> 8,
-			    (id2lo & 0x00000000f0) >> 4,
-			    (id2lo & 0x000000000f)
-			);
-			uint64_t paxton = (((id>>32) << 24) | (id & 0xffffff))  + 0x143e00;
-			PrintAndLog("}\nOther          : %05" PRIu64 "_%03" PRIu64 "_%08" PRIu64 "",(id&0xFFFF),((id>>16LL) & 0xFF),(id & 0xFFFFFF));  
-			PrintAndLog("Pattern Paxton : %" PRIu64 " [0x%" PRIX64 "]", paxton, paxton);
-
-			uint32_t p1id = (id & 0xFFFFFF);
-			uint8_t arr[32] = {0x00};
-			int i =0; 
-			int j = 23;
-			for (; i < 24; ++i, --j	){
-				arr[i] = (p1id >> i) & 1;
-			}
-
-			uint32_t p1  = 0;
-
-			p1 |= arr[23] << 21;
-			p1 |= arr[22] << 23;
-			p1 |= arr[21] << 20;
-			p1 |= arr[20] << 22;
-				
-			p1 |= arr[19] << 18;
-			p1 |= arr[18] << 16;
-			p1 |= arr[17] << 19;
-			p1 |= arr[16] << 17;
-				
-			p1 |= arr[15] << 13;
-			p1 |= arr[14] << 15;
-			p1 |= arr[13] << 12;
-			p1 |= arr[12] << 14;
-
-			p1 |= arr[11] << 6;
-			p1 |= arr[10] << 2;
-			p1 |= arr[9]  << 7;
-			p1 |= arr[8]  << 1;
-
-			p1 |= arr[7]  << 0;
-			p1 |= arr[6]  << 8;
-			p1 |= arr[5]  << 11;
-			p1 |= arr[4]  << 3;
-
-			p1 |= arr[3]  << 10;
-			p1 |= arr[2]  << 4;
-			p1 |= arr[1]  << 5;
-			p1 |= arr[0]  << 9;
-			PrintAndLog("Pattern 1      : %d [0x%X]", p1, p1);
-
-			uint16_t sebury1 = id & 0xFFFF;
-			uint8_t  sebury2 = (id >> 16) & 0x7F;
-			uint32_t sebury3 = id & 0x7FFFFF;
-			PrintAndLog("Pattern Sebury : %d %d %d  [0x%X 0x%X 0x%X]", sebury1, sebury2, sebury3, sebury1, sebury2, sebury3);
-		}
-	}
-	return;
-}
-
-//should be moved to cmdlfem4x.c
-int AskEm410xDecode(bool verbose, uint32_t *hi, uint64_t *lo )
-{
-	size_t idx = 0;
-	size_t BitLen = DemodBufferLen;
-	uint8_t BitStream[MAX_GRAPH_TRACE_LEN]={0};
-	memcpy(BitStream, DemodBuffer, BitLen); 
-	if (Em410xDecode(BitStream, &BitLen, &idx, hi, lo)){
-		//set GraphBuffer for clone or sim command
-		setDemodBuf(BitStream, BitLen, idx);
-		if (g_debugMode){
-			PrintAndLog("DEBUG: idx: %d, Len: %d, Printing Demod Buffer:", idx, BitLen);
-			printDemodBuff();
-		}
-		if (verbose){
-			PrintAndLog("EM410x pattern found: ");
-			printEM410x(*hi, *lo);
-		}
-		return 1;
-	}
-	return 0;
-}
-//should be moved to cmdlfem4x.c
-int AskEm410xDemod(const char *Cmd, uint32_t *hi, uint64_t *lo, bool verbose)
-{
-	bool st = true;
-	if (!ASKDemod_ext(Cmd, false, false, 1, &st)) return 0;
-	return AskEm410xDecode(verbose, hi, lo);
-}
-
-//should be moved to cmdlfem4x.c
-//by marshmellow
-//takes 3 arguments - clock, invert and maxErr as integers
-//attempts to demodulate ask while decoding manchester
-//prints binary found and saves in graphbuffer for further commands
-int CmdAskEM410xDemod(const char *Cmd)
-{
-	char cmdp = param_getchar(Cmd, 0);
-	if (strlen(Cmd) > 10 || cmdp == 'h' || cmdp == 'H') {
-		PrintAndLog("Usage:  data askem410xdemod [clock] <0|1> [maxError]");
-		PrintAndLog("     [set clock as integer] optional, if not set, autodetect.");
-		PrintAndLog("     <invert>, 1 for invert output");
-		PrintAndLog("     [set maximum allowed errors], default = 100.");
-		PrintAndLog("");
-		PrintAndLog("    sample: data askem410xdemod        = demod an EM410x Tag ID from GraphBuffer");
-		PrintAndLog("          : data askem410xdemod 32     = demod an EM410x Tag ID from GraphBuffer using a clock of RF/32");
-		PrintAndLog("          : data askem410xdemod 32 1   = demod an EM410x Tag ID from GraphBuffer using a clock of RF/32 and inverting data");
-		PrintAndLog("          : data askem410xdemod 1      = demod an EM410x Tag ID from GraphBuffer while inverting data");
-		PrintAndLog("          : data askem410xdemod 64 1 0 = demod an EM410x Tag ID from GraphBuffer using a clock of RF/64 and inverting data and allowing 0 demod errors");
-		return 0;
-	}
-	uint64_t lo = 0;
-	uint32_t hi = 0;
-	return AskEm410xDemod(Cmd, &hi, &lo, true);
 }
 
 //by marshmellow
@@ -2420,7 +2268,6 @@ static command_t CommandTable[] =
 {
 	{"help",            CmdHelp,            1, "This help"},
 	{"askedgedetect",   CmdAskEdgeDetect,   1, "[threshold] Adjust Graph for manual ask demod using the length of sample differences to detect the edge of a wave (use 20-45, def:25)"},
-	{"askem410xdemod",  CmdAskEM410xDemod,  1, "[clock] [invert<0|1>] [maxErr] -- Demodulate an EM410x tag from GraphBuffer (args optional)"},
 	{"askgproxiidemod", CmdG_Prox_II_Demod, 1, "Demodulate a G Prox II tag from GraphBuffer"},
 	{"askvikingdemod",  CmdVikingDemod,     1, "Demodulate a Viking tag from GraphBuffer"},
 	{"autocorr",        CmdAutoCorr,        1, "[window length] [g] -- Autocorrelation over window - g to save back to GraphBuffer (overwrite)"},

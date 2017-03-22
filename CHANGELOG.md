@@ -45,6 +45,9 @@ This project uses the changelog in accordance with [keepchangelog](http://keepac
 - Added option c to 'hf list' (mark CRC bytes) (piwi)
 
 ### Changed
+- all em410x demod and print functions moved to cmdlfem4x.c
+- `data askem410xdemod` has been moved to `lf em 410xdemod` (reads from graphbuffer)
+- `lf em 410xdemod` has been renamed to `lf em 410xread` (reads from antenna)
 - hf mf dump - added retry loops to try each read attempt up to 3 times.  makes getting a complete dump easier with many antennas. 
 - small changes to lf psk and fsk demods to improve results when the trace begins with noise or the chip isn't broadcasting yet (marshmellow)
 - NOTE CHANGED ALL `lf em4x em*` cmds to simpler `lf em ` - example: `lf em4x em410xdemod` is now `lf em 410xdemod`
