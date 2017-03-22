@@ -36,7 +36,6 @@ int CmdDec(const char *Cmd);
 int CmdDetectClockRate(const char *Cmd);
 int CmdFDXBdemodBI(const char *Cmd);
 int CmdFSKdemodAWID(const char *Cmd);
-int CmdFSKdemodHID(const char *Cmd);
 int CmdFSKdemodIO(const char *Cmd);
 int CmdFSKdemodParadox(const char *Cmd);
 int CmdFSKdemodPyramid(const char *Cmd);

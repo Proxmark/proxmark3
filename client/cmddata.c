@@ -894,94 +894,6 @@ int CmdFSKrawdemod(const char *Cmd)
 	return FSKrawDemod(Cmd, true);
 }
 
-//move to cmdlfhid.c
-//by marshmellow (based on existing demod + holiman's refactor)
-//HID Prox demod - FSK RF/50 with preamble of 00011101 (then manchester encoded)
-//print full HID Prox ID and some bit format details if found
-int CmdFSKdemodHID(const char *Cmd)
-{
-	//raw fsk demod no manchester decoding no start bit finding just get binary from wave
-	uint32_t hi2=0, hi=0, lo=0;
-
-	uint8_t BitStream[MAX_GRAPH_TRACE_LEN]={0};
-	size_t BitLen = getFromGraphBuf(BitStream);
-	if (BitLen==0) return 0;
-	//get binary from fsk wave
-	int idx = HIDdemodFSK(BitStream,&BitLen,&hi2,&hi,&lo);
-	if (idx<0){
-		if (g_debugMode){
-			if (idx==-1){
-				PrintAndLog("DEBUG: Just Noise Detected");
-			} else if (idx == -2) {
-				PrintAndLog("DEBUG: Error demoding fsk");
-			} else if (idx == -3) {
-				PrintAndLog("DEBUG: Preamble not found");
-			} else if (idx == -4) {
-				PrintAndLog("DEBUG: Error in Manchester data, SIZE: %d", BitLen);
-			} else {
-				PrintAndLog("DEBUG: Error demoding fsk %d", idx);
-			}   
-		}
-		return 0;
-	}
-	if (hi2==0 && hi==0 && lo==0) {
-		if (g_debugMode) PrintAndLog("DEBUG: Error - no values found");
-		return 0;
-	}
-	if (hi2 != 0){ //extra large HID tags
-		PrintAndLog("HID Prox TAG ID: %x%08x%08x (%d)",
-			 (unsigned int) hi2, (unsigned int) hi, (unsigned int) lo, (unsigned int) (lo>>1) & 0xFFFF);
-	}
-	else {  //standard HID tags <38 bits
-		uint8_t fmtLen = 0;
-		uint32_t fc = 0;
-		uint32_t cardnum = 0;
-		if (((hi>>5)&1)==1){//if bit 38 is set then < 37 bit format is used
-			uint32_t lo2=0;
-			lo2=(((hi & 31) << 12) | (lo>>20)); //get bits 21-37 to check for format len bit
-			uint8_t idx3 = 1;
-			while(lo2>1){ //find last bit set to 1 (format len bit)
-				lo2=lo2>>1;
-				idx3++;
-			}
-			fmtLen =idx3+19;
-			fc =0;
-			cardnum=0;
-			if(fmtLen==26){
-				cardnum = (lo>>1)&0xFFFF;
-				fc = (lo>>17)&0xFF;
-			}
-			if(fmtLen==34){
-				cardnum = (lo>>1)&0xFFFF;
-				fc= ((hi&1)<<15)|(lo>>17);
-			}
-			if(fmtLen==35){
-				cardnum = (lo>>1)&0xFFFFF;
-				fc = ((hi&1)<<11)|(lo>>21);
-			}
-		}
-		else { //if bit 38 is not set then 37 bit format is used
-			fmtLen = 37;
-			fc = 0;
-			cardnum = 0;
-			if(fmtLen == 37){
-				cardnum = (lo>>1)&0x7FFFF;
-				fc = ((hi&0xF)<<12)|(lo>>20);
-			}
-		}
-		PrintAndLog("HID Prox TAG ID: %x%08x (%d) - Format Len: %dbit - FC: %d - Card: %d",
-			(unsigned int) hi, (unsigned int) lo, (unsigned int) (lo>>1) & 0xFFFF,
-			(unsigned int) fmtLen, (unsigned int) fc, (unsigned int) cardnum);
-	}
-	setDemodBuf(BitStream,BitLen,idx);
-	if (g_debugMode){ 
-		PrintAndLog("DEBUG: idx: %d, Len: %d, Printing Demod Buffer:", idx, BitLen);
-		printDemodBuff();
-	}
-	return 1;
-}
-
-
 //by marshmellow
 //Paradox Prox demod - FSK RF/50 with preamble of 00001111 (then manchester encoded)
 //print full Paradox Prox ID and some bit format details if found
@@ -1116,103 +1028,6 @@ int CmdFSKdemodIO(const char *Cmd)
 		PrintAndLog("DEBUG: idx: %d, Len: %d, Printing demod buffer:",idx,64);
 		printDemodBuff();
 	}
-	return 1;
-}
-
-//by marshmellow
-//AWID Prox demod - FSK RF/50 with preamble of 00000001  (always a 96 bit data stream)
-//print full AWID Prox ID and some bit format details if found
-int CmdFSKdemodAWID(const char *Cmd)
-{
-	uint8_t BitStream[MAX_GRAPH_TRACE_LEN]={0};
-	size_t size = getFromGraphBuf(BitStream);
-	if (size==0) return 0;
-
-	//get binary from fsk wave
-	int idx = AWIDdemodFSK(BitStream, &size);
-	if (idx<=0){
-		if (g_debugMode){
-			if (idx == -1)
-				PrintAndLog("DEBUG: Error - not enough samples");
-			else if (idx == -2)
-				PrintAndLog("DEBUG: Error - only noise found");
-			else if (idx == -3)
-				PrintAndLog("DEBUG: Error - problem during FSK demod");
-			else if (idx == -4)
-				PrintAndLog("DEBUG: Error - AWID preamble not found");
-			else if (idx == -5)
-				PrintAndLog("DEBUG: Error - Size not correct: %d", size);
-			else
-				PrintAndLog("DEBUG: Error %d",idx);
-		}
-		return 0;
-	}
-
-	// Index map
-	// 0            10            20            30              40            50              60
-	// |            |             |             |               |             |               |
-	// 01234567 890 1 234 5 678 9 012 3 456 7 890 1 234 5 678 9 012 3 456 7 890 1 234 5 678 9 012 3 - to 96
-	// -----------------------------------------------------------------------------
-	// 00000001 000 1 110 1 101 1 011 1 101 1 010 0 000 1 000 1 010 0 001 0 110 1 100 0 000 1 000 1
-	// premable bbb o bbb o bbw o fff o fff o ffc o ccc o ccc o ccc o ccc o ccc o wxx o xxx o xxx o - to 96
-	//          |---26 bit---|    |-----117----||-------------142-------------|
-	// b = format bit len, o = odd parity of last 3 bits
-	// f = facility code, c = card number
-	// w = wiegand parity
-	// (26 bit format shown)
- 
-	//get raw ID before removing parities
-	uint32_t rawLo = bytebits_to_byte(BitStream+idx+64,32);
-	uint32_t rawHi = bytebits_to_byte(BitStream+idx+32,32);
-	uint32_t rawHi2 = bytebits_to_byte(BitStream+idx,32);
-	setDemodBuf(BitStream,96,idx);
-
-	size = removeParity(BitStream, idx+8, 4, 1, 88);
-	if (size != 66){
-		if (g_debugMode) PrintAndLog("DEBUG: Error - at parity check-tag size does not match AWID format");
-		return 0;
-	}
-	// ok valid card found!
-
-	// Index map
-	// 0           10         20        30          40        50        60
-	// |           |          |         |           |         |         |
-	// 01234567 8 90123456 7890123456789012 3 456789012345678901234567890123456
-	// -----------------------------------------------------------------------------
-	// 00011010 1 01110101 0000000010001110 1 000000000000000000000000000000000
-	// bbbbbbbb w ffffffff cccccccccccccccc w xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-	// |26 bit|   |-117--| |-----142------|
-	// b = format bit len, o = odd parity of last 3 bits
-	// f = facility code, c = card number
-	// w = wiegand parity
-	// (26 bit format shown)
-
-	uint32_t fc = 0;
-	uint32_t cardnum = 0;
-	uint32_t code1 = 0;
-	uint32_t code2 = 0;
-	uint8_t fmtLen = bytebits_to_byte(BitStream,8);
-	if (fmtLen==26){
-		fc = bytebits_to_byte(BitStream+9, 8);
-		cardnum = bytebits_to_byte(BitStream+17, 16);
-		code1 = bytebits_to_byte(BitStream+8,fmtLen);
-		PrintAndLog("AWID Found - BitLength: %d, FC: %d, Card: %d - Wiegand: %x, Raw: %08x%08x%08x", fmtLen, fc, cardnum, code1, rawHi2, rawHi, rawLo);
-	} else {
-		cardnum = bytebits_to_byte(BitStream+8+(fmtLen-17), 16);
-		if (fmtLen>32){
-			code1 = bytebits_to_byte(BitStream+8,fmtLen-32);
-			code2 = bytebits_to_byte(BitStream+8+(fmtLen-32),32);
-			PrintAndLog("AWID Found - BitLength: %d -unknown BitLength- (%d) - Wiegand: %x%08x, Raw: %08x%08x%08x", fmtLen, cardnum, code1, code2, rawHi2, rawHi, rawLo);
-		} else{
-			code1 = bytebits_to_byte(BitStream+8,fmtLen);
-			PrintAndLog("AWID Found - BitLength: %d -unknown BitLength- (%d) - Wiegand: %x, Raw: %08x%08x%08x", fmtLen, cardnum, code1, rawHi2, rawHi, rawLo);
-		}
-	}
-	if (g_debugMode){
-		PrintAndLog("DEBUG: idx: %d, Len: %d Printing Demod Buffer:", idx, 96);
-		printDemodBuff();
-	}
-	//todo - convert hi2, hi, lo to demodbuffer for future sim/clone commands
 	return 1;
 }
 
@@ -2278,9 +2093,7 @@ static command_t CommandTable[] =
 	{"dec",             CmdDec,             1, "Decimate samples"},
 	{"detectclock",     CmdDetectClockRate, 1, "[modulation] Detect clock rate of wave in GraphBuffer (options: 'a','f','n','p' for ask, fsk, nrz, psk respectively)"},
 	{"fdxbdemod",       CmdFDXBdemodBI    , 1, "Demodulate a FDX-B ISO11784/85 Biphase tag from GraphBuffer"},
-	{"fskawiddemod",    CmdFSKdemodAWID,    1, "Demodulate an AWID FSK tag from GraphBuffer"},
 	//{"fskfcdetect",   CmdFSKfcDetect,     1, "Try to detect the Field Clock of an FSK wave"},
-	{"fskhiddemod",     CmdFSKdemodHID,     1, "Demodulate a HID FSK tag from GraphBuffer"},
 	{"fskiodemod",      CmdFSKdemodIO,      1, "Demodulate an IO Prox FSK tag from GraphBuffer"},
 	{"fskpyramiddemod", CmdFSKdemodPyramid, 1, "Demodulate a Pyramid FSK tag from GraphBuffer"},
 	{"fskparadoxdemod", CmdFSKdemodParadox, 1, "Demodulate a Paradox FSK tag from GraphBuffer"},

@@ -12,8 +12,8 @@
 #define CMDLFHID_H__
 
 int CmdLFHID(const char *Cmd);
-//int CmdHIDDemod(const char *Cmd);
-int CmdHIDDemodFSK(const char *Cmd);
+int CmdFSKdemodHID(const char *Cmd);
+int CmdHIDReadDemod(const char *Cmd);
 int CmdHIDSim(const char *Cmd);
 int CmdHIDClone(const char *Cmd);
 
