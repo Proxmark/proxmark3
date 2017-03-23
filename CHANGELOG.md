@@ -26,7 +26,7 @@ This project uses the changelog in accordance with [keepchangelog](http://keepac
 - `lf viking read` - read viking tag and output ID
 - `lf t55xx wipe`  - sets t55xx back to factory defaults
 - Added viking demod to `lf search` (marshmellow)
-- `data askvikingdemod` demod viking id tag from graphbuffer (marshmellow)
+- `lf viking demod` demod viking id tag from graphbuffer (marshmellow)
 - `lf t55xx resetread` added reset then read command - should allow determining start of stream transmissions (marshmellow)
 - `lf t55xx wakeup` added wake with password (AOR) to allow lf search or standard lf read after (iceman, marshmellow)
 - `hf iclass managekeys` to save, load and manage iclass keys.  (adjusted most commands to accept a loaded key in memory) (marshmellow)
@@ -45,6 +45,7 @@ This project uses the changelog in accordance with [keepchangelog](http://keepac
 - Added option c to 'hf list' (mark CRC bytes) (piwi)
 
 ### Changed
+- `data askvikingdemod` has been moved to `lf viking demod` (reads from graphbuffer)
 - `data fskpyramiddemod` has been moved to `lf pyramid demod` (reads from graphbuffer)
 - `data fskiodemod` has been moved to `lf io demod` (reads from graphbuffer)
 - `lf io fskdemod` has been renamed to `lf io read` (reads from antenna)
