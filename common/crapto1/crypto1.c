@@ -23,7 +23,7 @@
 #define SWAPENDIAN(x)\
 	(x = (x >> 8 & 0xff00ff) | (x & 0xff00ff) << 8, x = x >> 16 | x << 16)
 
-#if defined(__arm__) && !defined(__linux__) && !defined(_WIN32)			// bare metal ARM lacks malloc()/free()
+#if defined(__arm__) && !defined(__linux__) && !defined(_WIN32) && !defined(__APPLE__)		// bare metal ARM Proxmark lacks malloc()/free()
 void crypto1_create(struct Crypto1State *s, uint64_t key)
 {
 	int i;
