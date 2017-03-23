@@ -17,7 +17,6 @@
 #include "cmddata.h"
 #include "cmdmain.h"
 #include "cmdlf.h"
-#include "cmdlfviking.h"
 #include "lfdemod.h"
 static int CmdHelp(const char *Cmd);
 
@@ -50,13 +49,40 @@ uint64_t getVikingBits(uint32_t id) {
 	uint8_t checksum = ((id>>24) & 0xFF) ^ ((id>>16) & 0xFF) ^ ((id>>8) & 0xFF) ^ (id & 0xFF) ^ 0xF2 ^ 0xA8;
 	return ((uint64_t)0xF2 << 56) | ((uint64_t)id << 8) | checksum;
 }
+
+//could be moved to a viking file
+//by marshmellow
+//see ASKDemod for what args are accepted
+int CmdVikingDemod(const char *Cmd) {
+	if (!ASKDemod(Cmd, false, false, 1)) {
+		if (g_debugMode) PrintAndLog("ASKDemod failed");
+		return 0;
+	}
+	size_t size = DemodBufferLen;
+	//call lfdemod.c demod for Viking
+	int ans = VikingDemod_AM(DemodBuffer, &size);
+	if (ans < 0) {
+		if (g_debugMode) PrintAndLog("Error Viking_Demod %d", ans);
+		return 0;
+	}
+	//got a good demod
+	uint32_t raw1 = bytebits_to_byte(DemodBuffer+ans, 32);
+	uint32_t raw2 = bytebits_to_byte(DemodBuffer+ans+32, 32);
+	uint32_t cardid = bytebits_to_byte(DemodBuffer+ans+24, 32);
+	uint8_t  checksum = bytebits_to_byte(DemodBuffer+ans+32+24, 8);
+	PrintAndLog("Viking Tag Found: Card ID %08X, Checksum: %02X", cardid, (unsigned int) checksum);
+	PrintAndLog("Raw: %08X%08X", raw1,raw2);
+	setDemodBuf(DemodBuffer+ans, 64, 0);
+	return 1;
+}
+
 //by marshmellow
 //see ASKDemod for what args are accepted
 int CmdVikingRead(const char *Cmd) {
 	// read lf silently
 	CmdLFRead("s");
 	// get samples silently
-	getSamples("30000",false);
+	getSamples("10000",false);
 	// demod and output viking ID	
 	return CmdVikingDemod(Cmd);
 }
@@ -110,7 +136,8 @@ int CmdVikingSim(const char *Cmd) {
 
 static command_t CommandTable[] = {
 	{"help",  CmdHelp,        1, "This help"},
-	{"read",  CmdVikingRead,  0, "Attempt to read and Extract tag data"},
+	{"demod", CmdVikingDemod, 1, "Demodulate a Viking tag from the GraphBuffer"},
+	{"read",  CmdVikingRead,  0, "Attempt to read and Extract tag data from the antenna"},
 	{"clone", CmdVikingClone, 0, "<8 digit ID number> clone viking tag"},
 	{"sim",   CmdVikingSim,   0, "<8 digit ID number> simulate viking tag"},
 	{NULL, NULL, 0, NULL}
