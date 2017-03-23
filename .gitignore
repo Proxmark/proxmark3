@@ -14,14 +14,16 @@
 *.dll
 *.moc.cpp
 *.z
+version.c
+
 *.exe
-proxmark
 proxmark3
 flasher
-version.c
 lua
 luac
 fpga_compress
+mfkey32
+mfkey64
 
 fpga/*
 !fpga/tests
@@ -34,5 +36,3 @@ fpga/*
 !fpga/xst_hf.scr
 !fpga/go.bat
 !fpga/sim.tcl
-
-

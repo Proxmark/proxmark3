@@ -19,7 +19,7 @@
 #include "ui.h"
 #include "mifarehost.h"
 #include "mifare.h"
-#include "nonce2key.h"
+#include "mfkey.h"
 
 #define NESTED_SECTOR_RETRY     10			// how often we try mfested() until we give up
 
