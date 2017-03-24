@@ -3,6 +3,7 @@
 #include <string.h>
 #include <inttypes.h>
 #include <limits.h>
+#include "cmdlfio.h"
 #include "proxmark3.h"
 #include "data.h"
 #include "graph.h"

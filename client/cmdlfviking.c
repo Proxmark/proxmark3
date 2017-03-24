@@ -10,6 +10,7 @@
 #include <string.h>
 #include <inttypes.h>
 #include "proxmark3.h"
+#include "cmdlfviking.h"
 #include "ui.h"
 #include "util.h"
 #include "graph.h"

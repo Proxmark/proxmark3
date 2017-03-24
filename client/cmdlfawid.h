@@ -11,6 +11,8 @@
 #ifndef CMDLFAWID_H__
 #define CMDLFAWID_H__
 
+#include <stdint.h>  // for uint_32+
+
 int CmdLFAWID(const char *Cmd);
 int CmdAWIDReadFSK(const char *Cmd);
 int CmdAWIDSim(const char *Cmd);

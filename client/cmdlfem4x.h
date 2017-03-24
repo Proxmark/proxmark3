@@ -11,6 +11,8 @@
 #ifndef CMDLFEM4X_H__
 #define CMDLFEM4X_H__
 
+#include <stdbool.h>    // for bool
+
 extern int CmdLFEM4X(const char *Cmd);
 extern void printEM410x(uint32_t hi, uint64_t id);
 extern int CmdEMdemodASK(const char *Cmd);

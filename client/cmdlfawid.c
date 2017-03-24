@@ -13,6 +13,7 @@
 #include <string.h>
 #include <stdio.h>      // sscanf
 #include "proxmark3.h"  // Definitions, USB controls, etc
+#include "cmdlfawid.h"
 #include "ui.h"         // PrintAndLog
 #include "cmdparser.h"  // CmdsParse, CmdsHelp
 #include "lfdemod.h"    // parityTest +
