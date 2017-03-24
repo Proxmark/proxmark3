@@ -1056,59 +1056,6 @@ int PSKDemod(const char *Cmd, bool verbose)
 	return 1;
 }
 
-// Indala 26 bit decode
-// by marshmellow
-// optional arguments - same as CmdpskNRZrawDemod (clock & invert)
-int CmdIndalaDecode(const char *Cmd)
-{
-	int ans;
-	if (strlen(Cmd)>0){
-		ans = PSKDemod(Cmd, 0);
-	} else{ //default to RF/32
-		ans = PSKDemod("32", 0);
-	}
-
-	if (!ans){
-		if (g_debugMode) 
-			PrintAndLog("Error1: %d",ans);
-		return 0;
-	}
-	uint8_t invert=0;
-	size_t size = DemodBufferLen;
-	int startIdx = indala26decode(DemodBuffer, &size, &invert);
-	if (startIdx < 0 || size > 224) {
-		if (g_debugMode)
-			PrintAndLog("Error2: %d",ans);
-		return -1;
-	}
-	setDemodBuf(DemodBuffer, size, (size_t)startIdx);
-	if (invert)
-		if (g_debugMode)
-			PrintAndLog("Had to invert bits");
-
-	PrintAndLog("BitLen: %d",DemodBufferLen);
-	//convert UID to HEX
-	uint32_t uid1, uid2, uid3, uid4, uid5, uid6, uid7;
-	uid1=bytebits_to_byte(DemodBuffer,32);
-	uid2=bytebits_to_byte(DemodBuffer+32,32);
-	if (DemodBufferLen==64) {
-		PrintAndLog("Indala UID=%s (%x%08x)", sprint_bin_break(DemodBuffer,DemodBufferLen,16), uid1, uid2);
-	} else {
-		uid3=bytebits_to_byte(DemodBuffer+64,32);
-		uid4=bytebits_to_byte(DemodBuffer+96,32);
-		uid5=bytebits_to_byte(DemodBuffer+128,32);
-		uid6=bytebits_to_byte(DemodBuffer+160,32);
-		uid7=bytebits_to_byte(DemodBuffer+192,32);
-		PrintAndLog("Indala UID=%s (%x%08x%08x%08x%08x%08x%08x)", 
-		    sprint_bin_break(DemodBuffer,DemodBufferLen,16), uid1, uid2, uid3, uid4, uid5, uid6, uid7);
-	}
-	if (g_debugMode){
-		PrintAndLog("DEBUG: printing demodbuffer:");
-		printDemodBuff();
-	}
-	return 1;
-}
-
 int CmdPSKNexWatch(const char *Cmd)
 {
 	if (!PSKDemod("", false)) return 0;
@@ -1854,7 +1801,6 @@ static command_t CommandTable[] =
 	{"norm",            CmdNorm,            1, "Normalize max/min to +/-128"},
 	{"plot",            CmdPlot,            1, "Show graph window (hit 'h' in window for keystroke help)"},
 	{"printdemodbuffer",CmdPrintDemodBuff,  1, "[x] [o] <offset> [l] <length> -- print the data in the DemodBuffer - 'x' for hex output"},
-	{"pskindalademod",  CmdIndalaDecode,    1, "[clock] [invert<0|1>] -- Demodulate an indala tag (PSK1) from GraphBuffer (args optional)"},
 	{"psknexwatchdemod",CmdPSKNexWatch,     1, "Demodulate a NexWatch tag (nexkey, quadrakey) (PSK1) from GraphBuffer"},
 	{"rawdemod",        CmdRawDemod,        1, "[modulation] ... <options> -see help (h option) -- Demodulate the data in the GraphBuffer and output binary"},  
 	{"samples",         CmdSamples,         0, "[512 - 40000] -- Get raw samples for graph window (GraphBuffer)"},

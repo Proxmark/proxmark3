@@ -95,6 +95,7 @@ CMDSRCS = 	crapto1/crapto1.c\
 			cmdlfhid.c \
 			cmdlfhitag.c \
 			cmdlfio.c \
+			cmdlfindala.c \
 			cmdlfpcf7931.c\
 			cmdlfpresco.c\
 			cmdlfpyramid.c\

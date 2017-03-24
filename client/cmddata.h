@@ -59,7 +59,6 @@ int CmdSave(const char *Cmd);
 int CmdScale(const char *Cmd);
 int CmdDirectionalThreshold(const char *Cmd);
 int CmdZerocrossings(const char *Cmd);
-int CmdIndalaDecode(const char *Cmd);
 int ASKbiphaseDemod(const char *Cmd, bool verbose);
 int ASKDemod(const char *Cmd, bool verbose, bool emSearch, uint8_t askType);
 int ASKDemod_ext(const char *Cmd, bool verbose, bool emSearch, uint8_t askType, bool *stCheck);
