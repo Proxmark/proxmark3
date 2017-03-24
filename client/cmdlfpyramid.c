@@ -9,6 +9,7 @@
 #include <string.h>
 #include <inttypes.h>
 #include <stdio.h>
+#include "cmdlfpyramid.h"
 #include "proxmark3.h"
 #include "ui.h"
 #include "util.h"
