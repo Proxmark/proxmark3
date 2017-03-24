@@ -10,8 +10,8 @@
 // MIFARE Darkside hack
 //-----------------------------------------------------------------------------
 
-#ifndef __NONCE2KEY_H
-#define __NONCE2KEY_H
+#ifndef MFKEY_H
+#define MFKEY_H
 
 #include <stdint.h>
 #include <stdbool.h>
@@ -29,8 +29,8 @@ typedef struct {
 			  uint32_t nr2;
 			} nonces_t;
 
-bool mfkey32(nonces_t data, uint64_t *outputkey);
-bool mfkey32_moebius(nonces_t data, uint64_t *outputkey);
-int mfkey64(nonces_t data, uint64_t *outputkey);
+extern bool mfkey32(nonces_t data, uint64_t *outputkey);
+extern bool mfkey32_moebius(nonces_t data, uint64_t *outputkey);
+extern int mfkey64(nonces_t data, uint64_t *outputkey);
 
 #endif

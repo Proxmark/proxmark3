@@ -58,7 +58,7 @@ CORESRCS = 	uart.c \
 
 CMDSRCS = 	crapto1/crapto1.c\
 			crapto1/crypto1.c\
-			nonce2key.c\
+			mfkey.c\
 			loclass/cipher.c \
 			loclass/cipherutils.c \
 			loclass/des.c \

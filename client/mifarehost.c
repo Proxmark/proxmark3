@@ -8,6 +8,8 @@
 // mifare commands
 //-----------------------------------------------------------------------------
 
+#include "mifarehost.h"
+
 #include <stdio.h>
 #include <stdlib.h> 
 #include <string.h>
@@ -20,7 +22,6 @@
 #include "ui.h"
 #include "util.h"
 #include "iso14443crc.h"
-#include "mifarehost.h"
 
 // mifare tracer flags used in mfTraceDecode()
 #define TRACE_IDLE		 				0x00

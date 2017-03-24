@@ -8,6 +8,9 @@
 // High frequency ISO14443A commands
 //-----------------------------------------------------------------------------
 
+#ifndef MIFAREHOST_H
+#define MIFAREHOST_H
+
 #include <stdint.h>
 #include <stdbool.h>
 #include "data.h"
@@ -42,3 +45,5 @@ extern int isBlockTrailer(int blockN);
 extern int loadTraceCard(uint8_t *tuid);
 extern int saveTraceCard(void);
 extern int tryDecryptWord(uint32_t nt, uint32_t ar_enc, uint32_t at_enc, uint8_t *data, int len);
+
+#endif

@@ -10,14 +10,10 @@
 // MIFARE Darkside hack
 //-----------------------------------------------------------------------------
 
-#include "nonce2key.h"
+#include "mfkey.h"
 
-#include <inttypes.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include "mifarehost.h"
-#include "util.h"
 #include "crapto1/crapto1.h"
+
 
 // recover key from 2 different reader responses on same tag challenge
 bool mfkey32(nonces_t data, uint64_t *outputkey) {
@@ -26,8 +22,6 @@ bool mfkey32(nonces_t data, uint64_t *outputkey) {
 	uint64_t key = 0;     // recovered key
 	bool isSuccess = false;
 	uint8_t counter = 0;
-
-	uint64_t t1 = msclock();
 
 	s = lfsr_recovery32(data.ar ^ prng_successor(data.nonce, 64), 0);
 
@@ -46,8 +40,6 @@ bool mfkey32(nonces_t data, uint64_t *outputkey) {
 		}
 	}
 	isSuccess = (counter == 1);
-	t1 = msclock() - t1;
-	//if ( t1 > 0 ) PrintAndLog("Time in mfkey32: %.1f seconds \nFound %d possible keys", (float)t1/1000.0, counter);
 	*outputkey = ( isSuccess ) ? outkey : 0;
 	crypto1_destroy(s);
 	/* //un-comment to save all keys to a stats.txt file 
@@ -70,9 +62,6 @@ bool mfkey32_moebius(nonces_t data, uint64_t *outputkey) {
 	bool isSuccess = false;
 	int counter = 0;
 	
-	//PrintAndLog("Enter mfkey32_moebius");
-	uint64_t t1 = msclock();
-
 	s = lfsr_recovery32(data.ar ^ prng_successor(data.nonce, 64), 0);
   
 	for(t = s; t->odd | t->even; ++t) {
@@ -92,8 +81,6 @@ bool mfkey32_moebius(nonces_t data, uint64_t *outputkey) {
 		}
 	}
 	isSuccess	= (counter == 1);
-	t1 = msclock() - t1;
-	// PrintAndLog("Time in mfkey32_moebius: %.1f seconds \nFound %d possible keys", (float)t1/1000.0, counter);
 	*outputkey = ( isSuccess ) ? outkey : 0;
 	crypto1_destroy(s);
 	/* // un-comment to output all keys to stats.txt
@@ -115,9 +102,6 @@ int mfkey64(nonces_t data, uint64_t *outputkey){
 	uint32_t ks3;     					// keystream used to encrypt tag response
 	struct Crypto1State *revstate;
 	
-	// PrintAndLog("Enter mfkey64");
-	uint64_t t1 = msclock();
-	
 	// Extract the keystream from the messages
 	ks2 = data.ar ^ prng_successor(data.nonce, 64);
 	ks3 = data.at ^ prng_successor(data.nonce, 96);
@@ -131,7 +115,7 @@ int mfkey64(nonces_t data, uint64_t *outputkey){
 	crypto1_destroy(revstate);
 	*outputkey = key;
 	
-	t1 = msclock() - t1;
-	// PrintAndLog("Time in mfkey64: %.1f seconds \n", (float)t1/1000.0);
 	return 0;
 }
+
+
