@@ -21,6 +21,8 @@
 #include "mifareutil.h"
 #include "BigBuf.h"
 #include "protocols.h"
+#include "parity.h"
+
 
 static uint32_t iso14a_timeout;
 int rsamples = 0;
@@ -123,25 +125,6 @@ static uint32_t LastProxToAirDuration;
 #define	SEC_Y 0x00
 #define	SEC_Z 0xc0
 
-const uint8_t OddByteParity[256] = {
-  1, 0, 0, 1, 0, 1, 1, 0, 0, 1, 1, 0, 1, 0, 0, 1,
-  0, 1, 1, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 1, 1, 0,
-  0, 1, 1, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 1, 1, 0,
-  1, 0, 0, 1, 0, 1, 1, 0, 0, 1, 1, 0, 1, 0, 0, 1,
-  0, 1, 1, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 1, 1, 0,
-  1, 0, 0, 1, 0, 1, 1, 0, 0, 1, 1, 0, 1, 0, 0, 1,
-  1, 0, 0, 1, 0, 1, 1, 0, 0, 1, 1, 0, 1, 0, 0, 1,
-  0, 1, 1, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 1, 1, 0,
-  0, 1, 1, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 1, 1, 0,
-  1, 0, 0, 1, 0, 1, 1, 0, 0, 1, 1, 0, 1, 0, 0, 1,
-  1, 0, 0, 1, 0, 1, 1, 0, 0, 1, 1, 0, 1, 0, 0, 1,
-  0, 1, 1, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 1, 1, 0,
-  1, 0, 0, 1, 0, 1, 1, 0, 0, 1, 1, 0, 1, 0, 0, 1,
-  0, 1, 1, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 1, 1, 0,
-  0, 1, 1, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 1, 1, 0,
-  1, 0, 0, 1, 0, 1, 1, 0, 0, 1, 1, 0, 1, 0, 0, 1
-};
-
 
 void iso14a_set_trigger(bool enable) {
 	trigger = enable;
@@ -180,11 +163,6 @@ void iso14a_set_ATS_timeout(uint8_t *ats) {
 // Generate the parity value for a byte sequence
 //
 //-----------------------------------------------------------------------------
-byte_t oddparity (const byte_t bt)
-{
-	return OddByteParity[bt];
-}
-
 void GetParity(const uint8_t *pbtCmd, uint16_t iLen, uint8_t *par)
 {
 	uint16_t paritybit_cnt = 0;
@@ -193,7 +171,7 @@ void GetParity(const uint8_t *pbtCmd, uint16_t iLen, uint8_t *par)
 
 	for (uint16_t i = 0; i < iLen; i++) {
 		// Generate the parity bits
-		parityBits |= ((OddByteParity[pbtCmd[i]]) << (7-paritybit_cnt));
+		parityBits |= ((oddparity8(pbtCmd[i])) << (7-paritybit_cnt));
 		if (paritybit_cnt == 7) {
 			par[paritybyte_cnt] = parityBits;	// save 8 Bits parity
 			parityBits = 0;						// and advance to next Parity Byte

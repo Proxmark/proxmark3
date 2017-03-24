@@ -53,7 +53,7 @@ int nonce_distance(uint32_t from, uint32_t to);
 	int __i;\
 	for(; __n < 1 << 16; N = prng_successor(__M = ++__n, 16))\
 		for(__i = FSIZE - 1; __i >= 0; __i--)\
-			if(BIT(FILTER, __i) ^ parity(__M & 0xFF01))\
+			if(BIT(FILTER, __i) ^ evenparity32(__M & 0xFF01))\
 				break;\
 			else if(__i)\
 				__M = prng_successor(__M, (__i == 7) ? 48 : 8);\
@@ -63,24 +63,6 @@ int nonce_distance(uint32_t from, uint32_t to);
 #define LF_POLY_EVEN (0x870804)
 #define BIT(x, n) ((x) >> (n) & 1)
 #define BEBIT(x, n) BIT(x, (n) ^ 24)
-static inline int parity(uint32_t x)
-{
-#if !defined __i386__ || !defined __GNUC__
-	x ^= x >> 16;
-	x ^= x >> 8;
-	x ^= x >> 4;
-	return BIT(0x6996, x & 0xf);
-#else
-        __asm(    "movl %1, %%eax\n"
-		"mov %%ax, %%cx\n"
-		"shrl $0x10, %%eax\n"
-		"xor %%ax, %%cx\n"
-                "xor %%ch, %%cl\n"
-                "setpo %%al\n"
-                "movzx %%al, %0\n": "=r"(x) : "r"(x): "eax","ecx");
-	return x;
-#endif
-}
 static inline int filter(uint32_t const x)
 {
 	uint32_t f;

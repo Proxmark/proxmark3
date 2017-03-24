@@ -18,7 +18,9 @@
 	Copyright (C) 2008-2008 bla <blapost@gmail.com>
 */
 #include "crapto1.h"
+
 #include <stdlib.h>
+#include "parity.h"
 
 #define SWAPENDIAN(x)\
 	(x = (x >> 8 & 0xff00ff) | (x & 0xff00ff) << 8, x = x >> 16 | x << 16)
@@ -73,7 +75,7 @@ uint8_t crypto1_bit(struct Crypto1State *s, uint8_t in, int is_encrypted)
 	feedin ^= !!in;
 	feedin ^= LF_POLY_ODD & s->odd;
 	feedin ^= LF_POLY_EVEN & s->even;
-	s->even = s->even << 1 | parity(feedin);
+	s->even = s->even << 1 | evenparity32(feedin);
 
 	t = s->odd, s->odd = s->even, s->even = t;
 
