@@ -7,7 +7,6 @@
 #include "util.h"
 
 // 32 bit recover key from 2 nonces
-#include <stdio.h>
 int main (int argc, char *argv[]) {
 
   nonces_t data;
