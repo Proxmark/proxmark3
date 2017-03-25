@@ -5,6 +5,7 @@ This project uses the changelog in accordance with [keepchangelog](http://keepac
 ## [unreleased][unreleased]
 
 ### Added
+- Added lf indala read - reads an indala tag from the antenna
 - Added lf visa2000 demod, read, clone, sim commands (iceman)
 - Added markers in the graph around found Sequence Terminator after askmandemod.
 - Added data mtrim <start> <stop> command to trim out samples between start and stop
@@ -45,6 +46,9 @@ This project uses the changelog in accordance with [keepchangelog](http://keepac
 - Added option c to 'hf list' (mark CRC bytes) (piwi)
 
 ### Changed
+- `lf indalaclone` has been moved to `lf indala clone`
+- `lf indalademod` has been moved to `lf indala altdemod` (reads from graphbuffer)
+- `data pskindalademod` has been moved to `lf indala demod` (reads from graphbuffer)
 - `data askvikingdemod` has been moved to `lf viking demod` (reads from graphbuffer)
 - `data fskpyramiddemod` has been moved to `lf pyramid demod` (reads from graphbuffer)
 - `data fskiodemod` has been moved to `lf io demod` (reads from graphbuffer)
