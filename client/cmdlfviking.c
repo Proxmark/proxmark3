@@ -51,7 +51,6 @@ uint64_t getVikingBits(uint32_t id) {
 	return ((uint64_t)0xF2 << 56) | ((uint64_t)id << 8) | checksum;
 }
 
-//could be moved to a viking file
 //by marshmellow
 //see ASKDemod for what args are accepted
 int CmdVikingDemod(const char *Cmd) {

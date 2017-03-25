@@ -4,15 +4,11 @@
 // at your option, any later version. See the LICENSE.txt file for the text of
 // the license.
 //-----------------------------------------------------------------------------
-// Low frequency Farpoint / Pyramid commands
+// Low frequency G Prox II tag commands
 //-----------------------------------------------------------------------------
-#ifndef CMDLFPYRAMID_H__
-#define CMDLFPYRAMID_H__
-
-extern int CmdLFPyramid(const char *Cmd);
-extern int CmdPyramidClone(const char *Cmd);
-extern int CmdPyramidSim(const char *Cmd);
-extern int CmdFSKdemodPyramid(const char *Cmd);
-extern int CmdPyramidRead(const char *Cmd);
+#ifndef CMDLFGPROXII_H__
+#define CMDLFGPROXII_H__
+extern int CmdLF_G_Prox_II(const char *Cmd);
+extern int CmdG_Prox_II_Demod(const char *Cmd);
+extern int CmdG_Prox_II_Read(const char *Cmd);
 #endif
-

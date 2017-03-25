@@ -36,6 +36,7 @@
 #include "cmdlfcotag.h"  // for COTAG menu
 #include "cmdlfvisa2000.h"  // for VISA2000 menu
 #include "cmdlfindala.h" // for indala menu
+#include "cmdlfgproxii.h"// for gproxii menu
 
 bool g_lf_threshold_set = false;
 static int CmdHelp(const char *Cmd);
@@ -1043,6 +1044,7 @@ static command_t CommandTable[] =
 	{"awid",        CmdLFAWID,          1, "{ AWID RFIDs...    }"},
 	{"cotag",       CmdLFCOTAG,         1, "{ COTAG RFIDs...   }"},
 	{"em",          CmdLFEM4X,          1, "{ EM4X RFIDs...    }"},
+	{"gproxii",     CmdLF_G_Prox_II,    1, "{ G Prox II tags...    }"},
 	{"hid",         CmdLFHID,           1, "{ HID RFIDs...     }"},
 	{"hitag",       CmdLFHitag,         1, "{ Hitag tags and transponders... }"},
 	{"io",          CmdLFIO,            1, "{ ioProx tags...   }"},

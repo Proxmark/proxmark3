@@ -5,6 +5,7 @@ This project uses the changelog in accordance with [keepchangelog](http://keepac
 ## [unreleased][unreleased]
 
 ### Added
+- Added lf gproxii read - reads a gproxii tag from the antenna
 - Added lf indala read - reads an indala tag from the antenna
 - Added lf visa2000 demod, read, clone, sim commands (iceman)
 - Added markers in the graph around found Sequence Terminator after askmandemod.
@@ -46,6 +47,7 @@ This project uses the changelog in accordance with [keepchangelog](http://keepac
 - Added option c to 'hf list' (mark CRC bytes) (piwi)
 
 ### Changed
+- `data askgproxiidemod has been moved to `lf gproxii demod` (reads from graphbuffer)
 - `lf indalaclone` has been moved to `lf indala clone`
 - `lf indalademod` has been moved to `lf indala altdemod` (reads from graphbuffer)
 - `data pskindalademod` has been moved to `lf indala demod` (reads from graphbuffer)

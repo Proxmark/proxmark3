@@ -4,7 +4,7 @@
 // at your option, any later version. See the LICENSE.txt file for the text of
 // the license.
 //-----------------------------------------------------------------------------
-// Low frequency T55xx commands
+// Low frequency visa 2000 commands
 //-----------------------------------------------------------------------------
 #ifndef CMDLFVISA2000_H__
 #define CMDLFVISA2000_H__
