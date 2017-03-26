@@ -9,7 +9,9 @@
 
 #include "cmdlffdx.h"
 
+#include <stdio.h>
 #include <inttypes.h>
+#include <string.h>
 #include "proxmark3.h"
 #include "ui.h"         // for PrintAndLog
 #include "util.h"
@@ -134,7 +136,7 @@ int CmdFdxDemod(const char *Cmd){
 
 	//Differential Biphase / di-phase (inverted biphase)
 	//get binary from ask wave
-	if (!ASKbiphaseDemod("0 32 1 0", FALSE)) {
+	if (!ASKbiphaseDemod("0 32 1 0", false)) {
 		if (g_debugMode) PrintAndLog("DEBUG: Error - FDX-B ASKbiphaseDemod failed");
 		return 0;
 	}
@@ -202,7 +204,7 @@ int CmdFdxDemod(const char *Cmd){
 
 int CmdFdxRead(const char *Cmd) {
 	CmdLFRead("s");
-	getSamples("10000", TRUE);
+	getSamples("10000", true);
 	return CmdFdxDemod(Cmd);
 }
 
