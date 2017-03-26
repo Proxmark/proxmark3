@@ -1,5 +1,5 @@
 #include <stdio.h>
-#include <strings.h>
+#include <string.h>
 #include <inttypes.h>
 #include "crapto1/crapto1.h"
 #include "util.h"
