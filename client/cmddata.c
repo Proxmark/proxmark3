@@ -850,98 +850,6 @@ int CmdFSKdemodParadox(const char *Cmd)
 	return 1;
 }
 
-// FDX-B ISO11784/85 demod  (aka animal tag)  BIPHASE, inverted, rf/32,  with preamble of 00000000001 (128bits)
-// 8 databits + 1 parity (1)
-// CIITT 16 chksum
-// NATIONAL CODE, ICAR database
-// COUNTRY CODE (ISO3166) or http://cms.abvma.ca/uploads/ManufacturersISOsandCountryCodes.pdf
-// FLAG (animal/non-animal)
-/*
-38 IDbits   
-10 country code 
-1 extra app bit
-14 reserved bits
-1 animal bit
-16 ccitt CRC chksum over 64bit ID CODE.
-24 appli bits.
-
--- sample: 985121004515220  [ 37FF65B88EF94 ]
-*/
-int CmdFDXBdemodBI(const char *Cmd){
-
-	int invert = 1;
-	int clk = 32;		
-	int errCnt = 0;
-	int maxErr = 0;
-	uint8_t BitStream[MAX_DEMOD_BUF_LEN];	
-	size_t size = getFromGraphBuf(BitStream);	
-	
-	errCnt = askdemod(BitStream, &size, &clk, &invert, maxErr, 0, 0);
-	if ( errCnt < 0 || errCnt > maxErr ) { 
-		if (g_debugMode) PrintAndLog("DEBUG: no data or error found %d, clock: %d", errCnt, clk);
-		return 0;
-	}
-
-	errCnt = BiphaseRawDecode(BitStream, &size, maxErr, 1);
-	if (errCnt < 0 || errCnt > maxErr ) {
-		if (g_debugMode) PrintAndLog("Error BiphaseRawDecode: %d", errCnt);
-		return 0;
-	} 
-
-	int preambleIndex = FDXBdemodBI(BitStream, &size);
-	if (preambleIndex < 0){
-		if (g_debugMode) PrintAndLog("Error FDXBDemod , no startmarker found :: %d",preambleIndex);
-		return 0;
-	}
-	if (size != 128) {
-		if (g_debugMode) PrintAndLog("Error incorrect data length found");
-		return 0;
-	}
-
-	setDemodBuf(BitStream, 128, preambleIndex);
-
-	// remove marker bits (1's every 9th digit after preamble) (pType = 2)
-	size = removeParity(BitStream, preambleIndex + 11, 9, 2, 117);
-	if ( size != 104 ) {
-		if (g_debugMode) PrintAndLog("Error removeParity:: %d", size);
-		return 0;
-	}
-	if (g_debugMode) {
-		char *bin = sprint_bin_break(BitStream,size,16);
-		PrintAndLog("DEBUG BinStream:\n%s",bin);
-	}
-	PrintAndLog("\nFDX-B / ISO 11784/5 Animal Tag ID Found:");
-	if (g_debugMode) PrintAndLog("Start marker %d;   Size %d", preambleIndex, size);
-
-	//got a good demod
-	uint64_t NationalCode = ((uint64_t)(bytebits_to_byteLSBF(BitStream+32,6)) << 32) | bytebits_to_byteLSBF(BitStream,32);
-	uint32_t countryCode = bytebits_to_byteLSBF(BitStream+38,10);
-	uint8_t dataBlockBit = BitStream[48];
-	uint32_t reservedCode = bytebits_to_byteLSBF(BitStream+49,14);
-	uint8_t animalBit = BitStream[63];
-	uint32_t crc16 = bytebits_to_byteLSBF(BitStream+64,16);
-	uint32_t extended = bytebits_to_byteLSBF(BitStream+80,24);
-
-	uint64_t rawid = ((uint64_t)bytebits_to_byte(BitStream,32)<<32) | bytebits_to_byte(BitStream+32,32);
-	uint8_t raw[8];
-	num_to_bytes(rawid, 8, raw);
-
-	if (g_debugMode) PrintAndLog("Raw ID Hex: %s", sprint_hex(raw,8));
-
-	uint16_t calcCrc = crc16_ccitt_kermit(raw, 8);
-	PrintAndLog("Animal ID:     %04u-%012" PRIu64, countryCode, NationalCode);
-	PrintAndLog("National Code: %012" PRIu64, NationalCode);
-	PrintAndLog("CountryCode:   %04u", countryCode);
-	PrintAndLog("Extended Data: %s", dataBlockBit ? "True" : "False");
-	PrintAndLog("reserved Code: %u", reservedCode);
-	PrintAndLog("Animal Tag:    %s", animalBit ? "True" : "False");
-	PrintAndLog("CRC:           0x%04X - [%04X] - %s", crc16, calcCrc, (calcCrc == crc16) ? "Passed" : "Failed");
-	PrintAndLog("Extended:      0x%X\n", extended);
-	
-	return 1;
-}
-
-
 //by marshmellow
 //attempt to psk1 demod graph buffer
 int PSKDemod(const char *Cmd, bool verbose)
@@ -1717,7 +1625,6 @@ static command_t CommandTable[] =
 	{"buffclear",       CmdBuffClear,       1, "Clear sample buffer and graph window"},
 	{"dec",             CmdDec,             1, "Decimate samples"},
 	{"detectclock",     CmdDetectClockRate, 1, "[modulation] Detect clock rate of wave in GraphBuffer (options: 'a','f','n','p' for ask, fsk, nrz, psk respectively)"},
-	{"fdxbdemod",       CmdFDXBdemodBI    , 1, "Demodulate a FDX-B ISO11784/85 Biphase tag from GraphBuffer"},
 	//{"fskfcdetect",   CmdFSKfcDetect,     1, "Try to detect the Field Clock of an FSK wave"},
 	{"fskparadoxdemod", CmdFSKdemodParadox, 1, "Demodulate a Paradox FSK tag from GraphBuffer"},
 	{"getbitstream",    CmdGetBitStream,    1, "Convert GraphBuffer's >=1 values to 1 and <1 to 0"},
