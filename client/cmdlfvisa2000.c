@@ -4,7 +4,7 @@
 // at your option, any later version. See the LICENSE.txt file for the text of
 // the license.
 //-----------------------------------------------------------------------------
-// Low frequency visa 200 tag commands
+// Low frequency visa 2000 tag commands
 // by iceman
 //-----------------------------------------------------------------------------
 
