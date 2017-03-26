@@ -37,6 +37,7 @@
 #include "cmdlfvisa2000.h"  // for VISA2000 menu
 #include "cmdlfindala.h" // for indala menu
 #include "cmdlfgproxii.h"// for gproxii menu
+#include "cmdlffdx.h"    // for fdx-b menu
 
 bool g_lf_threshold_set = false;
 static int CmdHelp(const char *Cmd);
@@ -974,7 +975,7 @@ int CmdLFfind(const char *Cmd)
 		return CheckChipType(cmdp);
 	}
 
-	ans=CmdFDXBdemodBI("");
+	ans=CmdFdxDemod("");
 	if (ans>0) {
 		PrintAndLog("\nValid FDX-B ID Found!");
 		return CheckChipType(cmdp);
@@ -1044,6 +1045,7 @@ static command_t CommandTable[] =
 	{"awid",        CmdLFAWID,          1, "{ AWID RFIDs...    }"},
 	{"cotag",       CmdLFCOTAG,         1, "{ COTAG RFIDs...   }"},
 	{"em",          CmdLFEM4X,          1, "{ EM4X RFIDs...    }"},
+	{"fdx",         CmdLFFdx,           1, "{ FDX-B tags...    }"},
 	{"gproxii",     CmdLF_G_Prox_II,    1, "{ G Prox II tags...    }"},
 	{"hid",         CmdLFHID,           1, "{ HID RFIDs...     }"},
 	{"hitag",       CmdLFHitag,         1, "{ Hitag tags and transponders... }"},

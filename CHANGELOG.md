@@ -5,8 +5,11 @@ This project uses the changelog in accordance with [keepchangelog](http://keepac
 ## [unreleased][unreleased]
 
 ### Added
-- Added lf gproxii read - reads a gproxii tag from the antenna
-- Added lf indala read - reads an indala tag from the antenna
+- Added lf fdx sim (iceman)
+- Added lf fdx clone - clones an fdx-b animal tag to t55x7 or q5 (iceman)
+- Added lf fdx read - reads a fdx-b tag from the antenna (iceman)
+- Added lf gproxii read - reads a gproxii tag from the antenna (marshmellow)
+- Added lf indala read - reads an indala tag from the antenna (marshmellow)
 - Added lf visa2000 demod, read, clone, sim commands (iceman)
 - Added markers in the graph around found Sequence Terminator after askmandemod.
 - Added data mtrim <start> <stop> command to trim out samples between start and stop
@@ -47,6 +50,7 @@ This project uses the changelog in accordance with [keepchangelog](http://keepac
 - Added option c to 'hf list' (mark CRC bytes) (piwi)
 
 ### Changed
+- `data fdxdemod` has been moved to `lf fdx demod` (reads from graphbuffer)
 - `data askgproxiidemod has been moved to `lf gproxii demod` (reads from graphbuffer)
 - `lf indalaclone` has been moved to `lf indala clone`
 - `lf indalademod` has been moved to `lf indala altdemod` (reads from graphbuffer)

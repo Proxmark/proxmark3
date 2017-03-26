@@ -1703,6 +1703,8 @@ int FDXBdemodBI(uint8_t *dest, size_t *size) {
 
 	uint8_t errChk = preambleSearch(dest, preamble, sizeof(preamble), size, &startIdx);
 	if (errChk == 0) return -2; //preamble not found
+	if (*size != 128) return -3; //wrong size for fdxb
+	//return start position
 	return (int)startIdx;
 }
 
