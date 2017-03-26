@@ -34,16 +34,14 @@ int CmdIndalaDecode(const char *Cmd) {
 	}
 
 	if (!ans) {
-	if (g_debugMode) 
-		PrintAndLog("Error1: %i",ans);
+		if (g_debugMode) PrintAndLog("Error1: %i",ans);
 		return 0;
 	}
 	uint8_t invert=0;
 	size_t size = DemodBufferLen;
 	int startIdx = indala26decode(DemodBuffer, &size, &invert);
 	if (startIdx < 0 || size > 224) {
-		if (g_debugMode)
-		PrintAndLog("Error2: %i",startIdx);
+		if (g_debugMode) PrintAndLog("Error2: %i",startIdx);
 		return -1;
 	}
 	setDemodBuf(DemodBuffer, size, (size_t)startIdx);
