@@ -67,6 +67,7 @@ CMDSRCS = 	crapto1/crapto1.c\
 			loclass/fileutils.c\
 			whereami.c\
 			mifarehost.c\
+			parity.c\
 			crc.c \
 			crc16.c \
 			crc64.c \

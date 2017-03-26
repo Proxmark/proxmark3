@@ -17,6 +17,7 @@
 #include "cmdparser.h"
 #include "common.h"
 #include "util.h"
+#include "parity.h"
 #include "hitag2.h"
 #include "hitagS.h"
 #include "cmdmain.h"
@@ -107,15 +108,9 @@ int CmdLFHitagList(const char *Cmd)
 		char line[1000] = "";
 		int j;
 		for (j = 0; j < len; j++) {
-		  int oddparity = 0x01;
-		  int k;
-
-		  for (k=0;k<8;k++) {
-			oddparity ^= (((frame[j] & 0xFF) >> k) & 0x01);
-		  }
 
 		  //if((parityBits >> (len - j - 1)) & 0x01) {
-		  if (isResponse && (oddparity != ((parityBits >> (len - j - 1)) & 0x01))) {
+		  if (isResponse && (oddparity8(frame[j]) != ((parityBits >> (len - j - 1)) & 0x01))) {
 			sprintf(line+(j*4), "%02x!  ", frame[j]);
 		  }
 		  else {
