@@ -32,8 +32,6 @@ int CmdBitsamples(const char *Cmd);
 int CmdBuffClear(const char *Cmd);
 int CmdDec(const char *Cmd);
 int CmdDetectClockRate(const char *Cmd);
-int CmdFDXBdemodBI(const char *Cmd);
-int CmdFSKdemodParadox(const char *Cmd);
 int CmdFSKrawdemod(const char *Cmd);
 int CmdPSK1rawDemod(const char *Cmd);
 int CmdPSK2rawDemod(const char *Cmd);

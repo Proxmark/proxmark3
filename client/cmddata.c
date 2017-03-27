@@ -802,55 +802,6 @@ int CmdFSKrawdemod(const char *Cmd)
 }
 
 //by marshmellow
-//Paradox Prox demod - FSK RF/50 with preamble of 00001111 (then manchester encoded)
-//print full Paradox Prox ID and some bit format details if found
-int CmdFSKdemodParadox(const char *Cmd)
-{
-	//raw fsk demod no manchester decoding no start bit finding just get binary from wave
-	uint32_t hi2=0, hi=0, lo=0;
-
-	uint8_t BitStream[MAX_GRAPH_TRACE_LEN]={0};
-	size_t BitLen = getFromGraphBuf(BitStream);
-	if (BitLen==0) return 0;
-	//get binary from fsk wave
-	int idx = ParadoxdemodFSK(BitStream,&BitLen,&hi2,&hi,&lo);
-	if (idx<0){
-		if (g_debugMode){
-			if (idx==-1){
-				PrintAndLog("DEBUG: Just Noise Detected");     
-			} else if (idx == -2) {
-				PrintAndLog("DEBUG: Error demoding fsk");
-			} else if (idx == -3) {
-				PrintAndLog("DEBUG: Preamble not found");
-			} else if (idx == -4) {
-				PrintAndLog("DEBUG: Error in Manchester data");
-			} else {
-				PrintAndLog("DEBUG: Error demoding fsk %d", idx);
-			}
-		}
-		return 0;
-	}
-	if (hi2==0 && hi==0 && lo==0){
-		if (g_debugMode) PrintAndLog("DEBUG: Error - no value found");
-		return 0;
-	}
-	uint32_t fc = ((hi & 0x3)<<6) | (lo>>26);
-	uint32_t cardnum = (lo>>10)&0xFFFF;
-	uint32_t rawLo = bytebits_to_byte(BitStream+idx+64,32);
-	uint32_t rawHi = bytebits_to_byte(BitStream+idx+32,32);
-	uint32_t rawHi2 = bytebits_to_byte(BitStream+idx,32);
-
-	PrintAndLog("Paradox TAG ID: %x%08x - FC: %d - Card: %d - Checksum: %02x - RAW: %08x%08x%08x",
-		hi>>10, (hi & 0x3)<<26 | (lo>>10), fc, cardnum, (lo>>2) & 0xFF, rawHi2, rawHi, rawLo);
-	setDemodBuf(BitStream,BitLen,idx);
-	if (g_debugMode){ 
-		PrintAndLog("DEBUG: idx: %d, len: %d, Printing Demod Buffer:", idx, BitLen);
-		printDemodBuff();
-	}
-	return 1;
-}
-
-//by marshmellow
 //attempt to psk1 demod graph buffer
 int PSKDemod(const char *Cmd, bool verbose)
 {
@@ -895,45 +846,6 @@ int PSKDemod(const char *Cmd, bool verbose)
 	}
 	//prime demod buffer for output
 	setDemodBuf(BitStream,BitLen,0);
-	return 1;
-}
-
-int CmdPSKNexWatch(const char *Cmd)
-{
-	if (!PSKDemod("", false)) return 0;
-	uint8_t preamble[28] = {0,0,0,0,0,1,0,1,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
-	size_t startIdx = 0, size = DemodBufferLen; 
-	bool invert = false;
-	if (!preambleSearch(DemodBuffer, preamble, sizeof(preamble), &size, &startIdx)){
-		// if didn't find preamble try again inverting
-		if (!PSKDemod("1", false)) return 0; 
-		size = DemodBufferLen;
-		if (!preambleSearch(DemodBuffer, preamble, sizeof(preamble), &size, &startIdx)) return 0;
-		invert = true;
-	} 
-	if (size != 128) return 0;
-	setDemodBuf(DemodBuffer, size, startIdx+4);
-	startIdx = 8+32; //4 = extra i added, 8 = preamble, 32 = reserved bits (always 0)
-	//get ID
-	uint32_t ID = 0;
-	for (uint8_t wordIdx=0; wordIdx<4; wordIdx++){
-		for (uint8_t idx=0; idx<8; idx++){
-			ID = (ID << 1) | DemodBuffer[startIdx+wordIdx+(idx*4)];
-		}	
-	}
-	//parity check (TBD)
-
-	//checksum check (TBD)
-
-	//output
-	PrintAndLog("NexWatch ID: %d", ID);
-	if (invert){
-		PrintAndLog("Had to Invert - probably NexKey");
-		for (uint8_t idx=0; idx<size; idx++)
-			DemodBuffer[idx] ^= 1;
-	} 
-
-	CmdPrintDemodBuff("x");
 	return 1;
 }
 
@@ -1626,7 +1538,6 @@ static command_t CommandTable[] =
 	{"dec",             CmdDec,             1, "Decimate samples"},
 	{"detectclock",     CmdDetectClockRate, 1, "[modulation] Detect clock rate of wave in GraphBuffer (options: 'a','f','n','p' for ask, fsk, nrz, psk respectively)"},
 	//{"fskfcdetect",   CmdFSKfcDetect,     1, "Try to detect the Field Clock of an FSK wave"},
-	{"fskparadoxdemod", CmdFSKdemodParadox, 1, "Demodulate a Paradox FSK tag from GraphBuffer"},
 	{"getbitstream",    CmdGetBitStream,    1, "Convert GraphBuffer's >=1 values to 1 and <1 to 0"},
 	{"grid",            CmdGrid,            1, "<x> <y> -- overlay grid on graph window, use zero value to turn off either"},
 	{"hexsamples",      CmdHexsamples,      0, "<bytes> [<offset>] -- Dump big buffer as hex bytes"},
@@ -1641,7 +1552,6 @@ static command_t CommandTable[] =
 	{"norm",            CmdNorm,            1, "Normalize max/min to +/-128"},
 	{"plot",            CmdPlot,            1, "Show graph window (hit 'h' in window for keystroke help)"},
 	{"printdemodbuffer",CmdPrintDemodBuff,  1, "[x] [o] <offset> [l] <length> -- print the data in the DemodBuffer - 'x' for hex output"},
-	{"psknexwatchdemod",CmdPSKNexWatch,     1, "Demodulate a NexWatch tag (nexkey, quadrakey) (PSK1) from GraphBuffer"},
 	{"rawdemod",        CmdRawDemod,        1, "[modulation] ... <options> -see help (h option) -- Demodulate the data in the GraphBuffer and output binary"},  
 	{"samples",         CmdSamples,         0, "[512 - 40000] -- Get raw samples for graph window (GraphBuffer)"},
 	{"save",            CmdSave,            1, "<filename> -- Save trace (from graph window)"},
