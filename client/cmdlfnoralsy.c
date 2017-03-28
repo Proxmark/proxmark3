@@ -118,7 +118,7 @@ int CmdNoralsyDemod(const char *Cmd) {
 	bool st = DetectST_ext(DemodBuffer, &DemodBufferLen, &foundclk, &ststart, &stend);
 	if (!st) return 0;
 
-	if (!ASKDemod_ext("32 0 0", FALSE, FALSE, 1, &st)) {
+	if (!ASKDemod_ext("32 0 0", false, false, 1, &st)) {
 		if (g_debugMode) PrintAndLog("DEBUG: Error - Noralsy: ASK/Manchester Demod failed");
 		return 0;
 	}
@@ -176,7 +176,7 @@ int CmdNoralsyDemod(const char *Cmd) {
 
 int CmdNoralsyRead(const char *Cmd) {
 	CmdLFRead("s");
-	getSamples("8000",TRUE);
+	getSamples("8000",true);
 	return CmdNoralsyDemod(Cmd);
 }
 
