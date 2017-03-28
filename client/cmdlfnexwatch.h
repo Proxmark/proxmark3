@@ -9,6 +9,6 @@
 #ifndef CMDLFNEXWATCH_H__
 #define CMDLFNEXWATCH_H__
 extern int CmdLFNexWatch(const char *Cmd);
-extern int CmdFSKdemodParadox(const char *Cmd);
-extern int CmdParadoxRead(const char *Cmd);
+extern int CmdPSKNexWatch(const char *Cmd);
+extern int CmdNexWatchRead(const char *Cmd);
 #endif
