@@ -38,6 +38,8 @@
 #include "cmdlfindala.h" // for indala menu
 #include "cmdlfgproxii.h"// for gproxii menu
 #include "cmdlffdx.h"    // for fdx-b menu
+#include "cmdlfparadox.h"// for paradox menu
+#include "cmdlfnexwatch.h"//for nexwatch menu
 
 bool g_lf_threshold_set = false;
 static int CmdHelp(const char *Cmd);
@@ -1051,6 +1053,8 @@ static command_t CommandTable[] =
 	{"hitag",       CmdLFHitag,         1, "{ Hitag CHIPs...             }"},
 	{"io",          CmdLFIO,            1, "{ ioProx RFIDs...            }"},
 	{"indala",      CmdLFINDALA,        1, "{ Indala RFIDs...            }"},
+	{"nexwatch",    CmdLFNexWatch,      1, "{ NexWatch RFIDs...          }"},
+	{"paradox",     CmdLFParadox,       1, "{ Paradox RFIDs...           }"},
 	{"presco",      CmdLFPresco,        1, "{ Presco RFIDs...            }"},
 	{"pcf7931",     CmdLFPCF7931,       1, "{ PCF7931 CHIPs...           }"},
 	{"pyramid",     CmdLFPyramid,       1, "{ Farpointe/Pyramid RFIDs... }"},

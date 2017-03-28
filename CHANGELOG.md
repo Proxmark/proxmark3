@@ -5,6 +5,8 @@ This project uses the changelog in accordance with [keepchangelog](http://keepac
 ## [unreleased][unreleased]
 
 ### Added
+- Added lf nexwatch read - reads a nexwatch tag from the antenna
+- Added lf paradox read - reads a paradox tag from the antenna
 - Added lf fdx sim (iceman)
 - Added lf fdx clone - clones an fdx-b animal tag to t55x7 or q5 (iceman)
 - Added lf fdx read - reads a fdx-b tag from the antenna (iceman)
@@ -50,6 +52,8 @@ This project uses the changelog in accordance with [keepchangelog](http://keepac
 - Added option c to 'hf list' (mark CRC bytes) (piwi)
 
 ### Changed
+- `data psknexwatchdemod` has been moved to `lf nexwatch demod` (reads from graphbuffer)
+- `data fskparadoxdemod` has been moved to `lf paradox demod` (reads from graphbuffer)
 - `data fdxdemod` has been moved to `lf fdx demod` (reads from graphbuffer)
 - `data askgproxiidemod has been moved to `lf gproxii demod` (reads from graphbuffer)
 - `lf indalaclone` has been moved to `lf indala clone`
