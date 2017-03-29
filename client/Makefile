@@ -103,9 +103,10 @@ CMDSRCS = 	crapto1/crapto1.c\
 			cmdlfnexwatch.c \
 			cmdlfnoralsy.c \
 			cmdlfparadox.c \
-			cmdlfpcf7931.c\
-			cmdlfpresco.c\
-			cmdlfpyramid.c\
+			cmdlfpcf7931.c \
+			cmdlfpresco.c \
+			cmdlfpyramid.c \
+			cmdlfsecurakey.c \
 			cmdlft55xx.c \
 			cmdlfti.c \
 			cmdlfviking.c\

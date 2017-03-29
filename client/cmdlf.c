@@ -42,6 +42,7 @@
 #include "cmdlfnexwatch.h"//for nexwatch menu
 #include "cmdlfjablotron.h" //for jablotron menu
 #include "cmdlfnoralsy.h"// for noralsy menu
+#include "cmdlfsecurakey.h"//for securakey menu
 
 bool g_lf_threshold_set = false;
 static int CmdHelp(const char *Cmd);
@@ -1003,6 +1004,12 @@ int CmdLFfind(const char *Cmd)
 		return CheckChipType(cmdp);
 	}
 
+	ans=CmdSecurakeyDemod("");
+	if (ans>0) {
+		PrintAndLog("\nValid Securakey ID Found!");
+		return CheckChipType(cmdp);
+	}
+
 	ans=CmdVikingDemod("");
 	if (ans>0) {
 		PrintAndLog("\nValid Viking ID Found!");
@@ -1074,6 +1081,7 @@ static command_t CommandTable[] =
 	{"presco",      CmdLFPresco,        1, "{ Presco RFIDs...            }"},
 	{"pcf7931",     CmdLFPCF7931,       1, "{ PCF7931 CHIPs...           }"},
 	{"pyramid",     CmdLFPyramid,       1, "{ Farpointe/Pyramid RFIDs... }"},
+	{"securakey",   CmdLFSecurakey,     1, "{ Securakey RFIDs...         }"},
 	{"t55xx",       CmdLFT55XX,         1, "{ T55xx CHIPs...             }"},
 	{"ti",          CmdLFTI,            1, "{ TI CHIPs...                }"},
 	{"viking",      CmdLFViking,        1, "{ Viking RFIDs...            }"},

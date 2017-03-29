@@ -111,17 +111,13 @@ int NoralsyDemod_AM(uint8_t *dest, size_t *size) {
 int CmdNoralsyDemod(const char *Cmd) {
 
 	//ASK / Manchester
-	DemodBufferLen = getFromGraphBuf(DemodBuffer);
-	if (DemodBufferLen < 255) return 0;
-	int foundclk = 0;
-	size_t ststart = 0, stend = 0;
-	bool st = DetectST_ext(DemodBuffer, &DemodBufferLen, &foundclk, &ststart, &stend);
-	if (!st) return 0;
-
+	bool st = false;
 	if (!ASKDemod_ext("32 0 0", false, false, 1, &st)) {
 		if (g_debugMode) PrintAndLog("DEBUG: Error - Noralsy: ASK/Manchester Demod failed");
 		return 0;
 	}
+	if (!st) return 0;
+
 	size_t size = DemodBufferLen;
 	int ans = NoralsyDemod_AM(DemodBuffer, &size);
 	if (ans < 0){
