@@ -5,13 +5,15 @@ This project uses the changelog in accordance with [keepchangelog](http://keepac
 ## [unreleased][unreleased]
 
 ### Added
-- Added lf nexwatch read - reads a nexwatch tag from the antenna
-- Added lf paradox read - reads a paradox tag from the antenna
+- Added lf noralsy demod, read, clone, sim commands (iceman)
+- Added lf jablotron demod, read, clone, sim commands (iceman)
+- Added lf nexwatch read   - reads a nexwatch tag from the antenna
+- Added lf paradox read    - reads a paradox tag from the antenna
 - Added lf fdx sim (iceman)
-- Added lf fdx clone - clones an fdx-b animal tag to t55x7 or q5 (iceman)
-- Added lf fdx read - reads a fdx-b tag from the antenna (iceman)
-- Added lf gproxii read - reads a gproxii tag from the antenna (marshmellow)
-- Added lf indala read - reads an indala tag from the antenna (marshmellow)
+- Added lf fdx clone       - clones an fdx-b animal tag to t55x7 or q5 (iceman)
+- Added lf fdx read        - reads a fdx-b tag from the antenna (iceman)
+- Added lf gproxii read    - reads a gproxii tag from the antenna (marshmellow)
+- Added lf indala read     - reads an indala tag from the antenna (marshmellow)
 - Added lf visa2000 demod, read, clone, sim commands (iceman)
 - Added markers in the graph around found Sequence Terminator after askmandemod.
 - Added data mtrim <start> <stop> command to trim out samples between start and stop

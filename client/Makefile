@@ -99,11 +99,14 @@ CMDSRCS = 	crapto1/crapto1.c\
 			cmdlfhitag.c \
 			cmdlfio.c \
 			cmdlfindala.c \
+			cmdlfjablotron.c \
 			cmdlfnexwatch.c \
+			cmdlfnoralsy.c \
 			cmdlfparadox.c \
-			cmdlfpcf7931.c\
-			cmdlfpresco.c\
-			cmdlfpyramid.c\
+			cmdlfpcf7931.c \
+			cmdlfpresco.c \
+			cmdlfpyramid.c \
+			cmdlfsecurakey.c \
 			cmdlft55xx.c \
 			cmdlfti.c \
 			cmdlfviking.c\

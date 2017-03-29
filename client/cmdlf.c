@@ -40,6 +40,9 @@
 #include "cmdlffdx.h"    // for fdx-b menu
 #include "cmdlfparadox.h"// for paradox menu
 #include "cmdlfnexwatch.h"//for nexwatch menu
+#include "cmdlfjablotron.h" //for jablotron menu
+#include "cmdlfnoralsy.h"// for noralsy menu
+#include "cmdlfsecurakey.h"//for securakey menu
 
 bool g_lf_threshold_set = false;
 static int CmdHelp(const char *Cmd);
@@ -987,13 +990,31 @@ int CmdLFfind(const char *Cmd)
 	if (ans>0) {
 		PrintAndLog("\nValid EM4x50 ID Found!");
 		return 1;
-	}	
+	}
+
+	ans=CmdJablotronDemod("");
+	if (ans>0) {
+		PrintAndLog("\nValid Jablotron ID Found!");
+		return CheckChipType(cmdp);
+	}
+
+	ans=CmdNoralsyDemod("");
+	if (ans>0) {
+		PrintAndLog("\nValid Noralsy ID Found!");
+		return CheckChipType(cmdp);
+	}
+
+	ans=CmdSecurakeyDemod("");
+	if (ans>0) {
+		PrintAndLog("\nValid Securakey ID Found!");
+		return CheckChipType(cmdp);
+	}
 
 	ans=CmdVikingDemod("");
 	if (ans>0) {
 		PrintAndLog("\nValid Viking ID Found!");
 		return CheckChipType(cmdp);
-	}	
+	}
 
 	ans=CmdIndalaDecode("");
 	if (ans>0) {
@@ -1053,11 +1074,14 @@ static command_t CommandTable[] =
 	{"hitag",       CmdLFHitag,         1, "{ Hitag CHIPs...             }"},
 	{"io",          CmdLFIO,            1, "{ ioProx RFIDs...            }"},
 	{"indala",      CmdLFINDALA,        1, "{ Indala RFIDs...            }"},
+	{"jablotron",   CmdLFJablotron,     1, "{ Jablotron RFIDs...         }"},
 	{"nexwatch",    CmdLFNexWatch,      1, "{ NexWatch RFIDs...          }"},
+	{"noralsy",     CmdLFNoralsy,       1, "{ Noralsy RFIDs...           }"},
 	{"paradox",     CmdLFParadox,       1, "{ Paradox RFIDs...           }"},
 	{"presco",      CmdLFPresco,        1, "{ Presco RFIDs...            }"},
 	{"pcf7931",     CmdLFPCF7931,       1, "{ PCF7931 CHIPs...           }"},
 	{"pyramid",     CmdLFPyramid,       1, "{ Farpointe/Pyramid RFIDs... }"},
+	{"securakey",   CmdLFSecurakey,     1, "{ Securakey RFIDs...         }"},
 	{"t55xx",       CmdLFT55XX,         1, "{ T55xx CHIPs...             }"},
 	{"ti",          CmdLFTI,            1, "{ TI CHIPs...                }"},
 	{"viking",      CmdLFViking,        1, "{ Viking RFIDs...            }"},
