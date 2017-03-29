@@ -83,33 +83,37 @@ int CmdSecurakeyDemod(const char *Cmd) {
 	// y = card #
 	// standard wiegand parities.
 	// unknown checksum 11 bits? at the end
-	uint8_t bits_no_spacer[86];
-	memcpy(bits_no_spacer, DemodBuffer + 10, 86);
+	uint8_t bits_no_spacer[85];
+	memcpy(bits_no_spacer, DemodBuffer + 11, 85);
 
 	// remove marker bits (0's every 9th digit after preamble) (pType = 3 (always 0s))
-	size = removeParity(bits_no_spacer, 0, 9, 3, 86);
-	if ( size != 86-10 ) {
+	size = removeParity(bits_no_spacer, 0, 9, 3, 85);
+	if ( size != 85-9 ) {
 		if (g_debugMode) PrintAndLog("DEBUG: Error removeParity: %d", size);
 		return 0;
 	}
 
-	uint8_t bitLen = (uint8_t)bytebits_to_byte(DemodBuffer+2, 6);
+	uint8_t bitLen = (uint8_t)bytebits_to_byte(bits_no_spacer+2, 6);
 	uint32_t fc=0, lWiegand=0, rWiegand=0;
-	// get FC
+	if (bitLen > 40) { //securakey's max bitlen is 40 bits...
+		if (g_debugMode) PrintAndLog("DEBUG: Error bitLen too long: %u", bitLen);
+		return 0;
+	}
 	// get left 1/2 wiegand & right 1/2 wiegand (for parity test and wiegand print)
-	lWiegand = bytebits_to_byte(DemodBuffer + 48 - bitLen, bitLen/2);
-	rWiegand = bytebits_to_byte(DemodBuffer + 48 - bitLen + bitLen/2, bitLen/2);
-	fc = bytebits_to_byte(DemodBuffer+49-bitLen, bitLen-2-16);
+	lWiegand = bytebits_to_byte(bits_no_spacer + 48 - bitLen, bitLen/2);
+	rWiegand = bytebits_to_byte(bits_no_spacer + 48 - bitLen + bitLen/2, bitLen/2);
+	// get FC
+	fc = bytebits_to_byte(bits_no_spacer+49-bitLen, bitLen-2-16);
 
 	// test bitLen
 	if (bitLen != 26 && bitLen != 32)
 		PrintAndLog("***unknown securakey bitLen - share with forum***");
 
-	uint32_t cardid = bytebits_to_byte(DemodBuffer+8+23, 16);
-	// test parities
-	bool parity = evenparity32(lWiegand) && oddparity32(rWiegand);
+	uint32_t cardid = bytebits_to_byte(bits_no_spacer+8+23, 16);
+	// test parities - evenparity32 looks to add an even parity returns 0 if already even...
+	bool parity = !evenparity32(lWiegand) && !oddparity32(rWiegand);
 
-	PrintAndLog("Securakey Tag Found--BitLen: %u, Card ID: %u, FC: %X, Raw: %08X%08X%08X", bitLen, cardid, fc, raw1 ,raw2, raw3);
+	PrintAndLog("Securakey Tag Found--BitLen: %u, Card ID: %u, FC: 0x%X, Raw: %08X%08X%08X", bitLen, cardid, fc, raw1 ,raw2, raw3);
 	if (bitLen <= 32)
 		PrintAndLog("Wiegand: %08X, Parity: %s", (lWiegand<<(bitLen/2)) | rWiegand, parity ? "Passed" : "Failed");
 	PrintAndLog("\nHow the FC translates to printed FC is unknown");

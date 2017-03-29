@@ -35,6 +35,7 @@
 #include <string.h>  // for memset, memcmp and size_t
 #include <stdint.h>  // for uint_32+
 #include <stdbool.h> // for bool
+#include "parity.h"  // for parity test
 
 //**********************************************************************************************
 //---------------------------------Utilities Section--------------------------------------------
@@ -82,40 +83,35 @@ int getHiLo(uint8_t *BitStream, size_t size, int *high, int *low, uint8_t fuzzHi
 // by marshmellow
 // pass bits to be tested in bits, length bits passed in bitLen, and parity type (even=0 | odd=1) in pType
 // returns 1 if passed
-uint8_t parityTest(uint32_t bits, uint8_t bitLen, uint8_t pType) {
-	uint8_t ans = 0;
-	for (uint8_t i = 0; i < bitLen; i++){
-		ans ^= ((bits >> i) & 1);
-	}
-	if (g_debugMode) prnt("DEBUG: ans: %d, ptype: %d, bits: %08X",ans,pType,bits);
-	return (ans == pType);
+bool parityTest(uint32_t bits, uint8_t bitLen, uint8_t pType) {
+	return oddparity32(bits) ^ pType;
 }
 
 // by marshmellow
-// takes a array of binary values, start position, length of bits per parity (includes parity bit),
-//   Parity Type (1 for odd; 0 for even; 2 for Always 1's; 3 for Always 0's), and binary Length (length to run) 
+// takes a array of binary values, start position, length of bits per parity (includes parity bit - MAX 32),
+//   Parity Type (1 for odd; 0 for even; 2 for Always 1's; 3 for Always 0's), and binary Length (length to run)
 size_t removeParity(uint8_t *BitStream, size_t startIdx, uint8_t pLen, uint8_t pType, size_t bLen) {
 	uint32_t parityWd = 0;
-	size_t j = 0, bitCnt = 0;
+	size_t bitCnt = 0;
 	for (int word = 0; word < (bLen); word+=pLen) {
 		for (int bit=0; bit < pLen; bit++) {
+			if (word+bit >= bLen) break;
 			parityWd = (parityWd << 1) | BitStream[startIdx+word+bit];
-			BitStream[j++] = (BitStream[startIdx+word+bit]);
+			BitStream[bitCnt++] = (BitStream[startIdx+word+bit]);
 		}
 		if (word+pLen > bLen) break;
 
-		j--; // overwrite parity with next data
+		bitCnt--; // overwrite parity with next data
 		// if parity fails then return 0
 		switch (pType) {
-			case 3: if (BitStream[j]==1) {return 0;} break; //should be 0 spacer bit
-			case 2: if (BitStream[j]==0) {return 0;} break; //should be 1 spacer bit
+			case 3: if (BitStream[bitCnt]==1) {return 0;} break; //should be 0 spacer bit
+			case 2: if (BitStream[bitCnt]==0) {return 0;} break; //should be 1 spacer bit
 			default: if (parityTest(parityWd, pLen, pType) == 0) {return 0;} break; //test parity
 		}
-		bitCnt+=(pLen-1);
 		parityWd = 0;
 	}
 	// if we got here then all the parities passed
-	//return ID start index and size
+	//return size
 	return bitCnt;
 }
 
@@ -1687,6 +1683,7 @@ uint8_t Em410xDecode(uint8_t *BitStream, size_t *size, size_t *startIdx, uint32_
 		*hi = (bytebits_to_byte(BitStream, 24)); 
 		*lo = ((uint64_t)(bytebits_to_byte(BitStream + 24, 32)) << 32) | (bytebits_to_byte(BitStream + 24 + 32, 32));
 	} else {
+		if (g_debugMode) prnt("Error removing parity: %u", *size);
 		return 0;
 	}
 	return 1;
