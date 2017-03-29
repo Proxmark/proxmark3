@@ -10,7 +10,7 @@
 
 #include <stdio.h>
 
-void ShowGraphWindow(void)
+extern "C" void ShowGraphWindow(void)
 {
 	static int warned = 0;
 
@@ -20,8 +20,8 @@ void ShowGraphWindow(void)
 	}
 }
 
-void HideGraphWindow(void) {}
-void RepaintGraphWindow(void) {}
-void MainGraphics() {}
-void InitGraphics(int argc, char **argv) {}
-void ExitGraphics(void) {}
+extern "C" void HideGraphWindow(void) {}
+extern "C" void RepaintGraphWindow(void) {}
+extern "C" void MainGraphics() {}
+extern "C" void InitGraphics(int argc, char **argv) {}
+extern "C" void ExitGraphics(void) {}

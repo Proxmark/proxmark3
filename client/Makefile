@@ -3,11 +3,15 @@
 # at your option, any later version. See the LICENSE.txt file for the text of
 # the license.
 #-----------------------------------------------------------------------------
-include ../common/Makefile.common
 
+CC = gcc
+CXX = g++
+LD = g++
+TAR = tar
+TARFLAGS = -C .. --ignore-failed-read -rvf
+RM = rm -f
+MV = mv
 
-CC=gcc
-CXX=g++
 #COMMON_FLAGS = -m32
 VPATH = ../common ../zlib
 OBJDIR = obj
@@ -15,46 +19,52 @@ OBJDIR = obj
 LDLIBS = -L/opt/local/lib -L/usr/local/lib -lreadline -lpthread -lm
 LUALIB = ../liblua/liblua.a
 LDFLAGS = $(COMMON_FLAGS)
-CFLAGS = -std=c99 -D_ISOC99_SOURCE -I. -I../include -I../common -I../tools -I../zlib -I/opt/local/include -I../liblua -Wall $(COMMON_FLAGS) -g -O4
+CFLAGS = -std=c99 -D_ISOC99_SOURCE -I. -I../include -I../common -I../zlib -I/opt/local/include -I../liblua -Wall $(COMMON_FLAGS) -g -O4
 LUAPLATFORM = generic
 
+platform = $(shell uname)
 ifneq (,$(findstring MINGW,$(platform)))
     CXXFLAGS = -I$(QTDIR)/include -I$(QTDIR)/include/QtCore -I$(QTDIR)/include/QtGui
-    MOC = $(QTDIR)/bin/moc
-    LUAPLATFORM = mingw
     ifneq ($(wildcard $(QTDIR)/include/QtWidgets),)
         CXXFLAGS += -I$(QTDIR)/include/QtWidgets
         QTLDLIBS = -L$(QTDIR)/lib -lQt5Core -lQt5Gui -lQt5Widgets
     else
         QTLDLIBS = -L$(QTDIR)/lib -lQtCore4 -lQtGui4
     endif
-else ifeq ($(platform),Darwin)
-    CXXFLAGS = $(shell pkg-config --cflags QtCore QtGui 2>/dev/null) -Wall -O4
-    QTLDLIBS = $(shell pkg-config --libs QtCore QtGui 2>/dev/null)
-    MOC = $(shell pkg-config --variable=moc_location QtCore)
-    LUAPLATFORM = macosx
+    MOC = $(QTDIR)/bin/moc
+    LUAPLATFORM = mingw
 else
-    CXXFLAGS = $(shell pkg-config --cflags QtCore QtGui 2>/dev/null) -Wall -O4
-    QTLDLIBS = $(shell pkg-config --libs QtCore QtGui 2>/dev/null)
-    LUALIB +=  -ldl
-    LDLIBS +=  -ltermcap -lncurses
-    MOC = $(shell pkg-config --variable=moc_location QtCore)
-    # Below is a variant you can use if you have problems compiling with QT5 on ubuntu. see http://www.proxmark.org/forum/viewtopic.php?id=1661 for more info. 
-    #MOC = /usr/lib/x86_64-linux-gnu/qt4/bin/moc
-    LUAPLATFORM = linux
+	CXXFLAGS = $(shell pkg-config --cflags Qt5Core Qt5Widgets 2>/dev/null) -Wall -O4
+	QTLDLIBS = $(shell pkg-config --libs Qt5Core Qt5Widgets 2>/dev/null)
+	MOC = $(shell pkg-config --variable=host_bins Qt5Core)/moc
+	ifeq ($(QTLDLIBS), )
+		CXXFLAGS = $(shell pkg-config --cflags QtCore QtGui 2>/dev/null) -Wall -O4
+		QTLDLIBS = $(shell pkg-config --libs QtCore QtGui 2>/dev/null)
+		MOC = $(shell pkg-config --variable=moc_location QtCore)
+	endif
+	ifeq ($(platform),Darwin)
+		LUAPLATFORM = macosx
+	else
+		LUALIB +=  -ldl
+		LDLIBS +=  -ltermcap -lncurses
+		LUAPLATFORM = linux
+	endif
 endif
 
 ifneq ($(QTLDLIBS),)
-    QTGUI = $(OBJDIR)/proxgui.o $(OBJDIR)/proxguiqt.o $(OBJDIR)/proxguiqt.moc.o
+    QTGUIOBJS = $(OBJDIR)/proxgui.o $(OBJDIR)/proxguiqt.o $(OBJDIR)/proxguiqt.moc.o
     CFLAGS += -DHAVE_GUI
-    LINK.o = $(LINK.cpp)
 else
-    QTGUI = guidummy.o
+    QTGUIOBJS = $(OBJDIR)/guidummy.o
 endif
 
-CORESRCS = 	uart.c \
-		util.c \
+# Flags to generate temporary dependency files
+DEPFLAGS = -MT $@ -MMD -MP -MF $(OBJDIR)/$*.Td
+# make temporary to final dependeny files after successful compilation
+POSTCOMPILE = $(MV) -f $(OBJDIR)/$*.Td $(OBJDIR)/$*.d
 
+CORESRCS = 	uart.c \
+			util.c
 
 CMDSRCS = 	crapto1/crapto1.c\
 			crapto1/crypto1.c\
@@ -124,57 +134,82 @@ CMDSRCS = 	crapto1/crapto1.c\
 			reveng/getopt.c\
 
 ZLIBSRCS = deflate.c adler32.c trees.c zutil.c inflate.c inffast.c inftrees.c
-ZLIB_FLAGS = -DZ_SOLO -DZ_PREFIX -DNO_GZIP -DZLIB_PM3_TUNED 
+ZLIBFLAGS = -DZ_SOLO -DZ_PREFIX -DNO_GZIP -DZLIB_PM3_TUNED 
 #-DDEBUG -Dverbose=1
 
+QTGUISRCS = proxgui.cpp proxguiqt.cpp proxguiqt.moc.cpp guidummy.cpp
 
 COREOBJS = $(CORESRCS:%.c=$(OBJDIR)/%.o)
 CMDOBJS = $(CMDSRCS:%.c=$(OBJDIR)/%.o)
 ZLIBOBJS = $(ZLIBSRCS:%.c=$(OBJDIR)/%.o)
 
-RM = rm -f
-BINS = proxmark3 flasher fpga_compress #snooper cli
-CLEAN = cli cli.exe flasher flasher.exe proxmark3 proxmark3.exe fpga_compress fpga_compress.exe snooper snooper.exe $(CMDOBJS) $(OBJDIR)/*.o *.o *.moc.cpp
+BINS = proxmark3 flasher fpga_compress
+WINBINS = $(patsubst %, %.exe, $(BINS))
+CLEAN = $(BINS) $(WINBINS) $(COREOBJS) $(CMDOBJS) $(ZLIBOBJS) $(QTGUIOBJS) $(OBJDIR)/*.o *.moc.cpp
 
-all: lua_build $(BINS) 
+all: lua_build $(BINS)
 
 all-static: LDLIBS:=-static $(LDLIBS)
-all-static: snooper cli flasher fpga_compress
+all-static: proxmark3 flasher fpga_compress
 
 proxmark3: LDLIBS+=$(LUALIB) $(QTLDLIBS)
-proxmark3: $(OBJDIR)/proxmark3.o $(COREOBJS) $(CMDOBJS) $(QTGUI)
-	$(CXX) $(CXXFLAGS) $^ $(LDLIBS) -o $@
-
-snooper: $(OBJDIR)/snooper.o $(COREOBJS) $(CMDOBJS) $(OBJDIR)/guidummy.o
-	$(CXX) $(CXXFLAGS) $^ $(LDLIBS) -o $@
-
-cli: $(OBJDIR)/cli.o $(COREOBJS) $(CMDOBJS) $(OBJDIR)/guidummy.o
-	$(CXX) $(CXXFLAGS) $^ $(LDLIBS) -o $@
+proxmark3: $(OBJDIR)/proxmark3.o $(COREOBJS) $(CMDOBJS) $(QTGUIOBJS) lualibs/usb_cmd.lua
+	$(LD) $(LDFLAGS) $(OBJDIR)/proxmark3.o $(COREOBJS) $(CMDOBJS) $(QTGUIOBJS) $(LDLIBS) -o $@
 
 flasher: $(OBJDIR)/flash.o $(OBJDIR)/flasher.o $(COREOBJS)
-	$(CXX) $(CXXFLAGS) $^ $(LDLIBS) -o $@
+	$(LD) $(LDFLAGS) $^ $(LDLIBS) -o $@
 
 fpga_compress: $(OBJDIR)/fpga_compress.o $(ZLIBOBJS)
-	$(CXX) $(CXXFLAGS) $(ZLIB_FLAGS) $^ $(LDLIBS) -o $@
-
-$(OBJDIR)/%.o: %.c
-	$(CC) $(CFLAGS) $(ZLIB_FLAGS) -c -o $@ $<
-
-$(OBJDIR)/%.o: %.cpp
-	$(CXX) $(CXXFLAGS) -c -o $@ $<
+	$(LD) $(LDFLAGS) $(ZLIBFLAGS) $^ $(LDLIBS) -o $@
 
 proxguiqt.moc.cpp: proxguiqt.h
 	$(MOC) -o$@ $^
 
+lualibs/usb_cmd.lua: ../include/usb_cmd.h
+	awk -f usb_cmd_h2lua.awk $^ > $@
+	
 clean:
 	$(RM) $(CLEAN)
 	cd ../liblua && make clean
 
 tarbin: $(BINS)
-	$(TAR) $(TARFLAGS) ../proxmark3-$(platform)-bin.tar $(BINS:%=client/%)
+	$(TAR) $(TARFLAGS) ../proxmark3-$(platform)-bin.tar $(BINS:%=client/%) $(WINBINS:%=client/%)
 
 lua_build:
 	@echo Compiling liblua, using platform $(LUAPLATFORM)
 	cd ../liblua && make $(LUAPLATFORM)
 
 .PHONY: all clean
+
+%.o: %.c
+$(OBJDIR)/%.o : %.c $(OBJDIR)/%.d
+	$(CC) $(DEPFLAGS) $(CFLAGS) $(ZLIBFLAGS) -c -o $@ $<
+	$(POSTCOMPILE)
+
+%.o: %.cpp
+$(OBJDIR)/%.o : %.cpp $(OBJDIR)/%.d
+	$(CXX) $(DEPFLAGS) $(CXXFLAGS) -c -o $@ $<
+	$(POSTCOMPILE)
+
+
+#$(CMDOBJS) $(COREOBJS): $(notdir $(%.c)) %.d
+#	$(CC) $(DEPFLAGS) $(CFLAGS) -c -o $@ $<
+#	$(POSTCOMPILE)
+
+#$(ZLIBOBJS): $(notdir $(%.c)) %.d
+#	$(CC) $(DEPFLAGS) $(CFLAGS) $(ZLIBFLAGS) -c -o $@ $<
+#	$(POSTCOMPILE)
+
+#$(QTGUIOBJS): $(notdir $(%.cpp)) %.d
+#	$(CXX) $(DEPFLAGS) $(CXXFLAGS) -c -o $@ $<
+#	$(POSTCOMPILE)
+
+DEPENDENCY_FILES = $(patsubst %.c, $(OBJDIR)/%.d, $(CORESRCS) $(CMDSRCS) $(ZLIBSRCS)) \
+	$(patsubst %.cpp, $(OBJDIR)/%.d, $(QTGUISRCS)) \
+	$(OBJDIR)/proxmark3.d $(OBJDIR)/flash.d $(OBJDIR)/flasher.d $(OBJDIR)/fpga_compress.d
+
+$(DEPENDENCY_FILES): ;
+.PRECIOUS: $(DEPENDENCY_FILES)
+
+-include $(DEPENDENCY_FILES)
+
