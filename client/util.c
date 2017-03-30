@@ -639,9 +639,8 @@ uint64_t msclock() {
     // WORKAROUND FOR MinGW (some versions - use if normal code does not compile)
     // It has no _ftime_s and needs explicit inclusion of timeb.h
     #include <sys/timeb.h>
-    #define _ftime_s _ftime
     struct _timeb t;
-    _ftime_s(&t);
+    _ftime(&t);
     return 1000 * t.time + t.millitm;
     
     // NORMAL CODE (use _ftime_s)
