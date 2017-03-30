@@ -22,8 +22,6 @@
 #include "cmdparser.h"// already included in cmdmain.h
 #include "usb_cmd.h"  // already included in cmdmain.h and proxmark3.h
 #include "lfdemod.h"  // for demod code
-#include "crc.h"      // for pyramid checksum maxim
-#include "crc16.h"    // for FDXB demod checksum
 #include "loclass/cipherutils.h" // for decimating samples in getsamples
 #include "cmdlfem4x.h"// for em410x demod
 
@@ -1298,9 +1296,9 @@ int CmdMtrim(const char *Cmd) {
 	if (start > GraphTraceLen	|| stop > GraphTraceLen || start > stop) return 0;
 	start++; //leave start position sample
 
-	GraphTraceLen -= stop - start;
+	GraphTraceLen = stop - start;
 	for (int i = 0; i < GraphTraceLen; i++) {
-		GraphBuffer[start+i] = GraphBuffer[stop+i];
+		GraphBuffer[i] = GraphBuffer[start+i];
 	}
 	return 0;
 }
