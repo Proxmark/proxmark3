@@ -634,13 +634,22 @@ void msleep(uint32_t n) {
 // a milliseconds timer for performance measurement
 uint64_t msclock() {
 #if defined(_WIN32)
-#include <sys/types.h>
-	struct _timeb t;
-	if (_ftime_s(&t)) {
-		return 0;
-	} else {
-		return 1000 * t.time + t.millitm;
-	}
+    #include <sys/types.h>
+    
+    // WORKAROUND FOR MinGW (some versions - use if normal code does not compile)
+    // It has no _ftime_s and needs explicit inclusion of timeb.h
+    #include <sys/timeb.h>
+    struct _timeb t;
+    _ftime(&t);
+    return 1000 * t.time + t.millitm;
+    
+    // NORMAL CODE (use _ftime_s)
+	//struct _timeb t;
+    //if (_ftime_s(&t)) {
+	//	return 0;
+	//} else {
+	//	return 1000 * t.time + t.millitm;
+	//}
 #else
 	struct timespec t;
 	clock_gettime(CLOCK_MONOTONIC, &t);
