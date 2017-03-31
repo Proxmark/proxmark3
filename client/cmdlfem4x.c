@@ -22,6 +22,7 @@
 #include "cmdlf.h"
 #include "cmdmain.h"
 #include "lfdemod.h"
+#include "protocols.h"
 
 uint64_t g_em410xId=0;
 
@@ -899,47 +900,32 @@ int CmdEM4x05dump(const char *Cmd) {
 int usage_lf_em_write(void) {
 	PrintAndLog("Write EM4x05/EM4x69.  Tag must be on antenna. ");
 	PrintAndLog("");
-	PrintAndLog("Usage:  lf em 4x05writeword [h] [s] <address> <data> <pwd>");
+	PrintAndLog("Usage:  lf em 4x05writeword [h] a <address> d <data> p <pwd> [s] [i]");
 	PrintAndLog("Options:");
-	PrintAndLog("       h         - this help");
-	PrintAndLog("       s         - swap data bit order before write");
-	PrintAndLog("       address   - memory address to write to. (0-15)");
-	PrintAndLog("       data      - data to write (hex)");	
-	PrintAndLog("       pwd       - password (hex) (optional)");
+	PrintAndLog("       h           - this help");
+	PrintAndLog("       a <address> - memory address to write to. (0-15)");
+	PrintAndLog("       d <data>    - data to write (hex)");	
+	PrintAndLog("       p <pwd>     - password (hex) (optional)");
+	PrintAndLog("       s           - swap the data bit order before write");
+	PrintAndLog("       i           - invert the data bits before write");
 	PrintAndLog("samples:");
-	PrintAndLog("      lf em 4x05writeword 1");
-	PrintAndLog("      lf em 4x05writeword 1 deadc0de 11223344");
+	PrintAndLog("      lf em 4x05writeword a 5 d 11223344");
+	PrintAndLog("      lf em 4x05writeword a 5 p deadc0de d 11223344 s i");
 	return 0;
 }
 
-int CmdEM4x05WriteWord(const char *Cmd) {
-	uint8_t ctmp = param_getchar(Cmd, 0);
-	if ( strlen(Cmd) == 0 || ctmp == 'H' || ctmp == 'h' ) return usage_lf_em_write();
+int EM4x05WriteWord(uint8_t addr, uint32_t data, uint32_t pwd, bool usePwd, bool swap, bool invert) {
+	if (swap) data = SwapBits(data, 32);
 
-	bool usePwd = false;
-
-	uint8_t addr = 16; // default to invalid address
-	uint32_t data = 0xFFFFFFFF; // default to blank data
-	uint32_t pwd = 0xFFFFFFFF; // default to blank password
-	char swap = 0;
-
-	int p = 0;
-	swap = param_getchar(Cmd, 0);
-	if (swap == 's' || swap=='S') p++;
-	addr = param_get8ex(Cmd, p++, 16, 10);
-	data = param_get32ex(Cmd, p++, 0, 16);
-	pwd  = param_get32ex(Cmd, p++, 1, 16);
-
-	if (swap == 's' || swap=='S') data = SwapBits(data, 32);
+	if (invert) data ^= 0xFFFFFFFF;
 
 	if ( (addr > 15) ) {
 		PrintAndLog("Address must be between 0 and 15");
 		return 1;
 	}
-	if ( pwd == 1 )
-		PrintAndLog("Writing address %d data %08X", addr, data);	
-	else {
-		usePwd = true;
+	if ( !usePwd ) {
+		PrintAndLog("Writing address %d data %08X", addr, data);
+	} else {
 		PrintAndLog("Writing address %d data %08X using password %08X", addr, data, pwd);
 	}
 
@@ -968,8 +954,70 @@ int CmdEM4x05WriteWord(const char *Cmd) {
 	return result;
 }
 
+int CmdEM4x05WriteWord(const char *Cmd) {
+	bool errors = false;
+	bool usePwd = false;
+	uint32_t data = 0xFFFFFFFF;
+	uint32_t pwd = 0xFFFFFFFF;
+	bool swap = false;
+	bool invert = false;
+	uint8_t addr = 16; // default to invalid address
+
+	char cmdp = 0;
+	while(param_getchar(Cmd, cmdp) != 0x00)
+	{
+		switch(param_getchar(Cmd, cmdp))
+		{
+		case 'h':
+		case 'H':
+			return usage_lf_em_write();
+		case 'a':
+		case 'A':
+			addr = param_get8ex(Cmd, cmdp+1, 16, 10);
+			cmdp += 2;
+			break;
+		case 'd':
+		case 'D':
+			data = param_get32ex(Cmd, cmdp+1, 0, 16);
+			cmdp += 2;
+			break;
+		case 'i':
+		case 'I':
+			invert = true;
+			cmdp++;
+			break;
+		case 'p':
+		case 'P':
+			pwd = param_get32ex(Cmd, cmdp+1, 1, 16);
+			if (pwd == 1) {
+				PrintAndLog("invalid pwd");
+				errors = true;
+			}
+			usePwd = true;
+			cmdp += 2;
+			break;
+		case 's':
+		case 'S':
+			swap = true;
+			cmdp++;
+			break;
+		default:
+			PrintAndLog("Unknown parameter '%c'", param_getchar(Cmd, cmdp));
+			errors = true;
+			break;
+		}
+		if(errors) break;
+	}
+	//Validations
+	if(errors) return usage_lf_em_write();
+
+	if ( strlen(Cmd) == 0 ) return usage_lf_em_write();
+
+	return EM4x05WriteWord(addr, data, pwd, usePwd, swap, invert);
+}
+
 void printEM4x05config(uint32_t wordData) {
-	uint16_t datarate = (((wordData & 0x3F)+1)*2);
+	uint16_t datarate = EM4x05_GET_BITRATE(wordData);
 	uint8_t encoder = ((wordData >> 6) & 0xF);
 	char enc[14];
 	memset(enc,0,sizeof(enc));
@@ -980,8 +1028,8 @@ void printEM4x05config(uint32_t wordData) {
 	uint8_t delay = (wordData >> 12) & 0x3;
 	char cdelay[33];
 	memset(cdelay,0,sizeof(cdelay));
-	uint8_t LWR = (wordData >> 14) & 0xF; //last word read
-
+	uint8_t numblks = EM4x05_GET_NUM_BLOCKS(wordData);
+	uint8_t LWR = numblks+5-1; //last word read
 	switch (encoder) {
 		case 0: snprintf(enc,sizeof(enc),"NRZ"); break;
 		case 1: snprintf(enc,sizeof(enc),"Manchester"); break;
@@ -1009,21 +1057,29 @@ void printEM4x05config(uint32_t wordData) {
 		case 2: snprintf(cdelay, sizeof(cdelay),"BP/4 or 1/4th bit period delay"); break;
 		case 3: snprintf(cdelay, sizeof(cdelay),"no delay"); break;
 	}
+	uint8_t readLogin = (wordData & EM4x05_READ_LOGIN_REQ)>>18;
+	uint8_t readHKL = (wordData & EM4x05_READ_HK_LOGIN_REQ)>>19;
+	uint8_t writeLogin = (wordData & EM4x05_WRITE_LOGIN_REQ)>>20;
+	uint8_t writeHKL = (wordData & EM4x05_WRITE_HK_LOGIN_REQ)>>21;
+	uint8_t raw = (wordData & EM4x05_READ_AFTER_WRITE)>>22;
+	uint8_t disable = (wordData & EM4x05_DISABLE_ALLOWED)>>23;
+	uint8_t rtf = (wordData & EM4x05_READER_TALK_FIRST)>>24;
+	uint8_t pigeon = (wordData & (1<<26))>>26;
 	PrintAndLog("ConfigWord: %08X (Word 4)\n", wordData);
-	PrintAndLog("Config Breakdown:", wordData);
+	PrintAndLog("Config Breakdown:");
 	PrintAndLog(" Data Rate:  %02u | RF/%u", wordData & 0x3F, datarate);
 	PrintAndLog("   Encoder:   %u | %s", encoder, enc);
 	PrintAndLog("    PSK CF:   %u | %s", PSKcf, cf);
 	PrintAndLog("     Delay:   %u | %s", delay, cdelay);
-	PrintAndLog(" LastWordR:  %02u | Address of last word for default read", LWR);
-	PrintAndLog(" ReadLogin:   %u | Read Login is %s", (wordData & 0x40000)>>18, (wordData & 0x40000) ? "Required" : "Not Required");	
-	PrintAndLog("   ReadHKL:   %u | Read Housekeeping Words Login is %s", (wordData & 0x80000)>>19, (wordData & 0x80000) ? "Required" : "Not Required");	
-	PrintAndLog("WriteLogin:   %u | Write Login is %s", (wordData & 0x100000)>>20, (wordData & 0x100000) ? "Required" : "Not Required");	
-	PrintAndLog("  WriteHKL:   %u | Write Housekeeping Words Login is %s", (wordData & 0x200000)>>21, (wordData & 0x200000) ? "Required" : "Not Required");	
-	PrintAndLog("    R.A.W.:   %u | Read After Write is %s", (wordData & 0x400000)>>22, (wordData & 0x400000) ? "On" : "Off");
-	PrintAndLog("   Disable:   %u | Disable Command is %s", (wordData & 0x800000)>>23, (wordData & 0x800000) ? "Accepted" : "Not Accepted");
-	PrintAndLog("    R.T.F.:   %u | Reader Talk First is %s", (wordData & 0x1000000)>>24, (wordData & 0x1000000) ? "Enabled" : "Disabled");
-	PrintAndLog("    Pigeon:   %u | Pigeon Mode is %s\n", (wordData & 0x4000000)>>26, (wordData & 0x4000000) ? "Enabled" : "Disabled");
+	PrintAndLog(" LastWordR:  %02u | Address of last word for default read - meaning %u blocks are output", LWR, numblks);
+	PrintAndLog(" ReadLogin:   %u | Read Login is %s", readLogin, readLogin ? "Required" : "Not Required");	
+	PrintAndLog("   ReadHKL:   %u | Read Housekeeping Words Login is %s", readHKL, readHKL ? "Required" : "Not Required");	
+	PrintAndLog("WriteLogin:   %u | Write Login is %s", writeLogin, writeLogin ? "Required" : "Not Required");	
+	PrintAndLog("  WriteHKL:   %u | Write Housekeeping Words Login is %s", writeHKL, writeHKL ? "Required" : "Not Required");	
+	PrintAndLog("    R.A.W.:   %u | Read After Write is %s", raw, raw ? "On" : "Off");
+	PrintAndLog("   Disable:   %u | Disable Command is %s", disable, disable ? "Accepted" : "Not Accepted");
+	PrintAndLog("    R.T.F.:   %u | Reader Talk First is %s", rtf, rtf ? "Enabled" : "Disabled");
+	PrintAndLog("    Pigeon:   %u | Pigeon Mode is %s\n", pigeon, pigeon ? "Enabled" : "Disabled");
 }
 
 void printEM4x05info(uint8_t chipType, uint8_t cap, uint16_t custCode, uint32_t serial) {
@@ -1102,6 +1158,7 @@ int CmdEM4x05info(const char *Cmd) {
 	wordData = 0;
 	if ( EM4x05ReadWord_ext(4, pwd, usePwd, &wordData) != 1 ) {
 		//failed
+		PrintAndLog("Config block read failed - might be password protected.");
 		return 0;
 	}
 	printEM4x05config(wordData);
