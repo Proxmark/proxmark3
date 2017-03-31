@@ -921,7 +921,7 @@ int EM4x05WriteWord(uint8_t addr, uint32_t data, uint32_t pwd, bool usePwd, bool
 
 	if ( (addr > 15) ) {
 		PrintAndLog("Address must be between 0 and 15");
-		return 1;
+		return -1;
 	}
 	if ( !usePwd ) {
 		PrintAndLog("Writing address %d data %08X", addr, data);
