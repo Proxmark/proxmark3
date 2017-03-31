@@ -914,6 +914,9 @@ int usage_lf_em_write(void) {
 	return 0;
 }
 
+// note: em4x05 doesn't have a way to invert data output so we must invert the data prior to writing
+//         it if invertion is needed. (example FSK2a vs FSK)
+//       also em4x05 requires swapping word data when compared to the data used for t55xx chips.
 int EM4x05WriteWord(uint8_t addr, uint32_t data, uint32_t pwd, bool usePwd, bool swap, bool invert) {
 	if (swap) data = SwapBits(data, 32);
 
@@ -962,7 +965,7 @@ int CmdEM4x05WriteWord(const char *Cmd) {
 	bool swap = false;
 	bool invert = false;
 	uint8_t addr = 16; // default to invalid address
-
+	bool gotData = false;
 	char cmdp = 0;
 	while(param_getchar(Cmd, cmdp) != 0x00)
 	{
@@ -979,6 +982,7 @@ int CmdEM4x05WriteWord(const char *Cmd) {
 		case 'd':
 		case 'D':
 			data = param_get32ex(Cmd, cmdp+1, 0, 16);
+			gotData = true;
 			cmdp += 2;
 			break;
 		case 'i':
@@ -1013,6 +1017,10 @@ int CmdEM4x05WriteWord(const char *Cmd) {
 
 	if ( strlen(Cmd) == 0 ) return usage_lf_em_write();
 
+	if (!gotData) {
+		PrintAndLog("You must enter the data you want to write");
+		return usage_lf_em_write();
+	}
 	return EM4x05WriteWord(addr, data, pwd, usePwd, swap, invert);
 }
 
