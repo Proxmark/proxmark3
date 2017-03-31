@@ -30,6 +30,9 @@ RESOURCES:
        irc.freenode.org #proxmark3
        -or-
        http://webchat.freenode.net/?channels=#proxmark3
+       
+   * The Homebrew formula repository
+      https://github.com/Proxmark/homebrew-proxmark3
    
 DEVELOPMENT:
 
