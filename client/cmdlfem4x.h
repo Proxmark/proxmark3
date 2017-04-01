@@ -12,6 +12,7 @@
 #define CMDLFEM4X_H__
 
 #include <stdbool.h>    // for bool
+#include <inttypes.h>
 
 extern int CmdLFEM4X(const char *Cmd);
 extern void printEM410x(uint32_t hi, uint64_t id);
@@ -25,6 +26,7 @@ extern int CmdEM410xWatchnSpoof(const char *Cmd);
 extern int CmdEM410xWrite(const char *Cmd);
 extern bool EM4x05Block0Test(uint32_t *wordData);
 extern int CmdEM4x05info(const char *Cmd);
+extern int EM4x05WriteWord(uint8_t addr, uint32_t data, uint32_t pwd, bool usePwd, bool swap, bool invert);
 extern int CmdEM4x05WriteWord(const char *Cmd);
 extern int CmdEM4x05dump(const char *Cmd);
 extern int CmdEM4x05ReadWord(const char *Cmd);
