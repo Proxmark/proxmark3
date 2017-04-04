@@ -5,6 +5,9 @@ This project uses the changelog in accordance with [keepchangelog](http://keepac
 ## [unreleased][unreleased]
 
 ### Added
+- Added experimental testmode write option for t55xx (danger) (marshmellow)
+- Added t55xx p1detect to `lf search` chip detections (marshmellow)
+- Added lf t55xx p1detect, detect page 1 of a t55xx tag based on E015 mfg code (marshmellow)
 - Added lf noralsy demod, read, clone, sim commands (iceman)
 - Added lf jablotron demod, read, clone, sim commands (iceman)
 - Added lf nexwatch read   - reads a nexwatch tag from the antenna
@@ -54,6 +57,8 @@ This project uses the changelog in accordance with [keepchangelog](http://keepac
 - Added option c to 'hf list' (mark CRC bytes) (piwi)
 
 ### Changed
+- adjusted lf t5 chip timings to use WaitUS. and adjusted the readblock timings
+    appears to have more consistent results with more antennas.
 - `lf t5 wakeup` has been adjusted to not need the p in front of the pwd arg.
 - `data psknexwatchdemod` has been moved to `lf nexwatch demod` (reads from graphbuffer)
 - `data fskparadoxdemod` has been moved to `lf paradox demod` (reads from graphbuffer)

@@ -141,15 +141,16 @@ int usage_t55xx_detect(){
 	return 0;
 }
 int usage_t55xx_detectP1(){
-	PrintAndLog("Usage:  lf t55xx page1detect [1] [p <password>]");
+	PrintAndLog("Command: Detect Page 1 of a t55xx chip");
+	PrintAndLog("Usage:  lf t55xx p1detect [1] [p <password>]");
 	PrintAndLog("Options:");
 	PrintAndLog("     1             - if set, use Graphbuffer otherwise read data from tag.");
 	PrintAndLog("     p <password>  - OPTIONAL password (8 hex characters)");
 	PrintAndLog("");
 	PrintAndLog("Examples:");
-	PrintAndLog("      lf t55xx page1detect");
-	PrintAndLog("      lf t55xx page1detect 1");
-	PrintAndLog("      lf t55xx page1detect p 11223344");
+	PrintAndLog("      lf t55xx p1detect");
+	PrintAndLog("      lf t55xx p1detect 1");
+	PrintAndLog("      lf t55xx p1detect p 11223344");
 	PrintAndLog("");
 	return 0;
 }
