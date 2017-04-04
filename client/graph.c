@@ -150,7 +150,7 @@ int GetAskClock(const char str[], bool printAns, bool verbose)
 		start = DetectASKClock(grph, size, &clock, 20);
 	}
 	// Only print this message if we're not looping something
-	if (printAns) {
+	if (printAns || g_debugMode) {
 		PrintAndLog("Auto-detected clock rate: %d, Best Starting Position: %d", clock, start);
 	}
 	return clock;

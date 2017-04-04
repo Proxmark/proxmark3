@@ -570,7 +570,7 @@ bool tryDetectModulation(){
 			}
 		}
 		clk = GetNrzClock("", false, false);
-		if (clk>0) {
+		if (clk>8) { //clock of rf/8 is likely a false positive, so don't use it.
 			if ( NRZrawDemod("0 0 1", false)  && test(DEMOD_NRZ, &tests[hits].offset, &bitRate, clk, &tests[hits].Q5)) {
 				tests[hits].modulation = DEMOD_NRZ;
 				tests[hits].bitrate = bitRate;

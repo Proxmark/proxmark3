@@ -1222,7 +1222,7 @@ void T55xxReadBlock(uint16_t arg0, uint8_t Block, uint32_t Pwd) {
 	bool PwdMode = arg0 & 0x1;
 	uint8_t Page = (arg0 & 0x2) >> 1;
 	uint32_t i = 0;
-	bool RegReadMode = (Block == 0xFF);
+	bool RegReadMode = (Block == 0xFF);//regular read mode
 
 	//clear buffer now so it does not interfere with timing later
 	BigBuf_Clear_ext(false);
@@ -1257,7 +1257,9 @@ void T55xxReadBlock(uint16_t arg0, uint8_t Block, uint32_t Pwd) {
 			T55xxWriteBit(Block & i);		
 
 	// Turn field on to read the response
-	TurnReadLFOn(135*8);
+	// 137*8 seems to get to the start of data pretty well... 
+	//  but we want to go past the start and let the repeating data settle in...
+	TurnReadLFOn(210*8); 
 
 	// Acquisition
 	// Now do the acquisition

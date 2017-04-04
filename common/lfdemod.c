@@ -548,7 +548,7 @@ int DetectNRZClock(uint8_t dest[], size_t size, int clock, size_t *clockStartIdx
 
 	//get high and low peak
 	int peak, low;
-	if (getHiLo(dest, loopCnt, &peak, &low, 85, 85) < 1) return 0;
+	if (getHiLo(dest, loopCnt, &peak, &low, 90, 90) < 1) return 0;
 
 	int lowestTransition = DetectStrongNRZClk(dest, size-20, peak, low);
 	size_t ii;
@@ -958,6 +958,8 @@ uint8_t	detectFSKClk(uint8_t *BitStream, size_t size, uint8_t fcHigh, uint8_t fc
 
 // look for Sequence Terminator - should be pulses of clk*(1 or 2), clk*2, clk*(1.5 or 2), by idx we mean graph position index...
 bool findST(int *stStopLoc, int *stStartIdx, int lowToLowWaveLen[], int highToLowWaveLen[], int clk, int tol, int buffSize, size_t *i) {
+	if (buffSize < *i+4) return false;
+
 	for (; *i < buffSize - 4; *i+=1) {
 		*stStartIdx += lowToLowWaveLen[*i]; //caution part of this wave may be data and part may be ST....  to be accounted for in main function for now...
 		if (lowToLowWaveLen[*i] >= clk*1-tol && lowToLowWaveLen[*i] <= (clk*2)+tol && highToLowWaveLen[*i] < clk+tol) {           //1 to 2 clocks depending on 2 bits prior
