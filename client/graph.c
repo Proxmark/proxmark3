@@ -166,11 +166,12 @@ uint8_t GetPskCarrier(const char str[], bool printAns, bool verbose)
 			PrintAndLog("Failed to copy from graphbuffer");
 		return 0;
 	}
-	//uint8_t countPSK_FC(uint8_t *BitStream, size_t size)
-
-	carrier = countFC(grph,size,0);
+	uint16_t fc = countFC(grph,size,0);
+	carrier = fc & 0xFF;
+	if (carrier != 2 && carrier != 4 && carrier != 8) return 0;
+	if ((fc>>8) == 10 && carrier == 8) return 0;
 	// Only print this message if we're not looping something
-	if (printAns){
+	if (printAns) {
 		PrintAndLog("Auto-detected PSK carrier rate: %d", carrier);
 	}
 	return carrier;
@@ -193,7 +194,9 @@ int GetPskClock(const char str[], bool printAns, bool verbose)
 			PrintAndLog("Failed to copy from graphbuffer");
 		return -1;
 	}
-	clock = DetectPSKClock(grph,size,0);
+	size_t firstPhaseShiftLoc = 0;
+	uint8_t curPhase = 0, fc = 0;
+	clock = DetectPSKClock(grph, size, 0, &firstPhaseShiftLoc, &curPhase, &fc);
 	// Only print this message if we're not looping something
 	if (printAns){
 		PrintAndLog("Auto-detected clock rate: %d", clock);

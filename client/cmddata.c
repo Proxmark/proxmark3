@@ -51,6 +51,24 @@ void setDemodBuf(uint8_t *buff, size_t size, size_t startIdx)
 	return;
 }
 
+// option '1' to save DemodBuffer any other to restore
+void save_restoreDB(uint8_t saveOpt)
+{
+	static uint8_t SavedDB[MAX_GRAPH_TRACE_LEN];
+	static size_t SavedDBlen;
+	static bool DB_Saved = false;
+
+	if (saveOpt==1) { //save
+		memcpy(SavedDB, DemodBuffer, sizeof(DemodBuffer));
+		SavedDBlen = DemodBufferLen;
+		DB_Saved=true;
+	} else if (DB_Saved){ //restore
+		memcpy(DemodBuffer, SavedDB, sizeof(DemodBuffer));
+		DemodBufferLen = SavedDBlen;
+	}
+	return;
+}
+
 int CmdSetDebugMode(const char *Cmd)
 {
 	int demod=0;
@@ -200,6 +218,11 @@ int ASKDemod_ext(const char *Cmd, bool verbose, bool emSearch, uint8_t askType, 
 		CursorCPos = ststart;
 		CursorDPos = stend;
 		if (verbose || g_debugMode) PrintAndLog("\nFound Sequence Terminator - First one is shown by orange and blue graph markers");
+		//Graph ST trim (for testing)
+		//for (int i = 0; i < BitLen; i++) {
+		//	GraphBuffer[i] = BitStream[i]-128;
+		//}
+		//RepaintGraphWindow();
 	}
 	int errCnt = askdemod(BitStream, &BitLen, &clk, &invert, maxErr, askamp, askType);
 	if (errCnt<0 || BitLen<16){  //if fatal error (or -1)
@@ -818,14 +841,6 @@ int PSKDemod(const char *Cmd, bool verbose)
 	uint8_t BitStream[MAX_GRAPH_TRACE_LEN]={0};
 	size_t BitLen = getFromGraphBuf(BitStream);
 	if (BitLen==0) return 0;
-	uint8_t carrier=countFC(BitStream, BitLen, 0);
-	if (carrier!=2 && carrier!=4 && carrier!=8){
-		//invalid carrier
-		return 0;
-	}
-	if (g_debugMode){
-		PrintAndLog("Carrier: rf/%d",carrier);
-	}
 	int errCnt=0;
 	errCnt = pskRawDemod(BitStream, &BitLen, &clk, &invert);
 	if (errCnt > maxErr){

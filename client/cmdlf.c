@@ -863,16 +863,25 @@ int CheckChipType(char cmdp) {
 
 	//check for em4x05/em4x69 chips first
 	save_restoreGB(1);
+	save_restoreDB(1);
 	if ((!offline && (cmdp != '1')) && EM4x05Block0Test(&wordData)) {
 		PrintAndLog("\nValid EM4x05/EM4x69 Chip Found\nTry lf em 4x05... commands\n");
 		save_restoreGB(0);
+		save_restoreDB(0);
 		return 1;
 	}
 
 	//TODO check for t55xx chip...
 
+	if ((!offline && (cmdp != '1')) && tryDetectP1(true)) {
+		PrintAndLog("\nValid T55xx Chip Found\nTry lf t55xx ... commands\n");
+		save_restoreGB(0);
+		save_restoreDB(0);
+		return 1;		
+	}
 	save_restoreGB(0);
-	return 1;
+	save_restoreDB(0);
+	return 0;
 }
 
 //by marshmellow
@@ -924,13 +933,15 @@ int CmdLFfind(const char *Cmd)
 				return 1;
 			}
 			ans=CmdCOTAGRead("");
-			if (ans>0){
+			if (ans>0) {
 				PrintAndLog("\nValid COTAG ID Found!");
 				return 1;
 			}
 		}
 		return 0;
 	}
+
+	// TODO test for modulation then only test formats that use that modulation
 
 	ans=CmdFSKdemodIO("");
 	if (ans>0) {
@@ -980,13 +991,13 @@ int CmdLFfind(const char *Cmd)
 		return CheckChipType(cmdp);
 	}
 
-	ans=CmdFdxDemod("");
+	ans=CmdFdxDemod(""); //biphase
 	if (ans>0) {
 		PrintAndLog("\nValid FDX-B ID Found!");
 		return CheckChipType(cmdp);
 	}
 
-	ans=EM4x50Read("", false);
+	ans=EM4x50Read("", false); //ask
 	if (ans>0) {
 		PrintAndLog("\nValid EM4x50 ID Found!");
 		return 1;
@@ -1016,7 +1027,7 @@ int CmdLFfind(const char *Cmd)
 		return CheckChipType(cmdp);
 	}
 
-	ans=CmdIndalaDecode("");
+	ans=CmdIndalaDecode(""); //psk
 	if (ans>0) {
 		PrintAndLog("\nValid Indala ID Found!");
 		return CheckChipType(cmdp);
@@ -1029,14 +1040,14 @@ int CmdLFfind(const char *Cmd)
 	}
 
 	PrintAndLog("\nNo Known Tags Found!\n");
-	if (testRaw=='u' || testRaw=='U'){
+	if (testRaw=='u' || testRaw=='U') {
 		ans=CheckChipType(cmdp);
 		//test unknown tag formats (raw mode)0
 		PrintAndLog("\nChecking for Unknown tags:\n");
 		ans=AutoCorrelate(4000, false, false);
 		if (ans > 0) PrintAndLog("Possible Auto Correlation of %d repeating samples",ans);
 		ans=GetFskClock("",false,false); 
-		if (ans != 0){ //fsk
+		if (ans != 0) { //fsk
 			ans=FSKrawDemod("",true);
 			if (ans>0) {
 				PrintAndLog("\nUnknown FSK Modulated Tag Found!");

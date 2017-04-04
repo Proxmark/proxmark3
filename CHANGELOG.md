@@ -54,6 +54,7 @@ This project uses the changelog in accordance with [keepchangelog](http://keepac
 - Added option c to 'hf list' (mark CRC bytes) (piwi)
 
 ### Changed
+- `lf t5 wakeup` has been adjusted to not need the p in front of the pwd arg.
 - `data psknexwatchdemod` has been moved to `lf nexwatch demod` (reads from graphbuffer)
 - `data fskparadoxdemod` has been moved to `lf paradox demod` (reads from graphbuffer)
 - `data fdxdemod` has been moved to `lf fdx demod` (reads from graphbuffer)

@@ -238,6 +238,7 @@ void getMemConfig(uint8_t mem_cfg, uint8_t chip_cfg, uint8_t *max_blk, uint8_t *
 #define T55x7_MODULATION_MANCHESTER 0x00008000
 #define T55x7_MODULATION_BIPHASE    0x00010000
 #define T55x7_MODULATION_DIPHASE    0x00018000
+#define T55x7_X_MODE                0x00020000
 #define T55x7_BITRATE_RF_8          0
 #define T55x7_BITRATE_RF_16         0x00040000
 #define T55x7_BITRATE_RF_32         0x00080000
