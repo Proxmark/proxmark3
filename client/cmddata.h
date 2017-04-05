@@ -22,6 +22,7 @@ command_t * CmdDataCommands();
 int CmdData(const char *Cmd);
 void printDemodBuff(void);
 void setDemodBuf(uint8_t *buff, size_t size, size_t startIdx);
+void save_restoreDB(uint8_t saveOpt);// option '1' to save DemodBuffer any other to restore
 int CmdPrintDemodBuff(const char *Cmd);
 int Cmdaskrawdemod(const char *Cmd);
 int Cmdaskmandemod(const char *Cmd);
@@ -68,6 +69,8 @@ int getSamples(const char *Cmd, bool silent);
 extern uint8_t DemodBuffer[MAX_DEMOD_BUF_LEN];
 extern size_t DemodBufferLen;
 extern uint8_t g_debugMode;
+//extern size_t g_demodStartIdx;
+//extern uint8_t g_demodClock;
 #define BIGBUF_SIZE 40000
 
 #endif

@@ -169,7 +169,7 @@ char *sprint_bin_break(const uint8_t *data, const size_t len, const uint8_t brea
 
 	size_t in_index = 0;
 	// loop through the out_index to make sure we don't go too far
-	for (size_t out_index=0; out_index < max_len-1; out_index++) {
+	for (size_t out_index=0; out_index < max_len; out_index++) {
 		// set character - (should be binary but verify it isn't more than 1 digit)
 		if (data[in_index]<10)
 			sprintf(tmp++, "%u", (unsigned int) data[in_index]);

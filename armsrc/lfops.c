@@ -1096,7 +1096,7 @@ void CmdIOdemodFSK(int findone, int *high, int *low, int ledcontrol)
 void TurnReadLFOn(int delay) {
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_LF_ADC | FPGA_LF_ADC_READER_FIELD);
 	// Give it a bit of time for the resonant antenna to settle.
-	SpinDelayUs(delay); //155*8 //50*8
+	WaitUS(delay); //155*8 //50*8
 }
 
 // Write one bit to card
@@ -1106,7 +1106,7 @@ void T55xxWriteBit(int bit) {
 	else
 		TurnReadLFOn(WRITE_1);
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
-	SpinDelayUs(WRITE_GAP);
+	WaitUS(WRITE_GAP);
 }
 
 // Send T5577 reset command then read stream (see if we can identify the start of the stream)
@@ -1117,16 +1117,18 @@ void T55xxResetRead(void) {
 
 	// Set up FPGA, 125kHz
 	LFSetupFPGAForADC(95, true);
-
+	StartTicks();
+	// make sure tag is fully powered up...
+	WaitMS(5);
+	
 	// Trigger T55x7 in mode.
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
-	SpinDelayUs(START_GAP);
+	WaitUS(START_GAP);
 
 	// reset tag - op code 00
 	T55xxWriteBit(0);
 	T55xxWriteBit(0);
 
-	// Turn field on to read the response
 	TurnReadLFOn(READ_GAP);
 
 	// Acquisition
@@ -1143,18 +1145,22 @@ void T55xxWriteBlockExt(uint32_t Data, uint32_t Block, uint32_t Pwd, uint8_t arg
 	LED_A_ON();
 	bool PwdMode = arg & 0x1;
 	uint8_t Page = (arg & 0x2)>>1;
+	bool testMode = arg & 0x4;
 	uint32_t i = 0;
 
 	// Set up FPGA, 125kHz
 	LFSetupFPGAForADC(95, true);
-
+	StartTicks();
+	// make sure tag is fully powered up...
+	WaitMS(5);
 	// Trigger T55x7 in mode.
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
-	SpinDelayUs(START_GAP);
+	WaitUS(START_GAP);
 
-	// Opcode 10
-	T55xxWriteBit(1);
-	T55xxWriteBit(Page); //Page 0
+	if (testMode) Dbprintf("TestMODE");
+	// Std Opcode 10
+	T55xxWriteBit(testMode ? 0 : 1);
+	T55xxWriteBit(testMode ? 1 : Page); //Page 0
 	if (PwdMode){
 		// Send Pwd
 		for (i = 0x80000000; i != 0; i >>= 1)
@@ -1173,11 +1179,31 @@ void T55xxWriteBlockExt(uint32_t Data, uint32_t Block, uint32_t Pwd, uint8_t arg
 
 	// Perform write (nominal is 5.6 ms for T55x7 and 18ms for E5550,
 	// so wait a little more)
-	TurnReadLFOn(20 * 1000);
+
+	// "there is a clock delay before programming" 
+	//  - programming takes ~5.6ms for t5577 ~18ms for E5550
+	//  so we should wait 1 clock + 5.6ms then read response? 
+	//  but we need to know we are dealing with t55x7 vs e5550 (or q5) marshmellow...
+	if (testMode) {
+		// Turn field on to read the response
+		TurnReadLFOn(READ_GAP);
+
+		// Acquisition
+		// Now do the acquisition
+		// Now do the acquisition
+		DoPartialAcquisition(20, true, 12000);
+
+		//doT55x7Acquisition(12000);
+	} else {
+		TurnReadLFOn(20 * 1000);
+	}
 		//could attempt to do a read to confirm write took
 		// as the tag should repeat back the new block 
 		// until it is reset, but to confirm it we would 
-		// need to know the current block 0 config mode
+		// need to know the current block 0 config mode for
+		// modulation clock an other details to demod the response...
+		// response should be (for t55x7) a 0 bit then (ST if on) 
+		// block data written in on repeat until reset. 
 
 	// turn field off
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
@@ -1196,7 +1222,7 @@ void T55xxReadBlock(uint16_t arg0, uint8_t Block, uint32_t Pwd) {
 	bool PwdMode = arg0 & 0x1;
 	uint8_t Page = (arg0 & 0x2) >> 1;
 	uint32_t i = 0;
-	bool RegReadMode = (Block == 0xFF);
+	bool RegReadMode = (Block == 0xFF);//regular read mode
 
 	//clear buffer now so it does not interfere with timing later
 	BigBuf_Clear_ext(false);
@@ -1206,10 +1232,12 @@ void T55xxReadBlock(uint16_t arg0, uint8_t Block, uint32_t Pwd) {
 
 	// Set up FPGA, 125kHz to power up the tag
 	LFSetupFPGAForADC(95, true);
-
+	StartTicks();
+	// make sure tag is fully powered up...
+	WaitMS(5);
 	// Trigger T55x7 Direct Access Mode with start gap
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
-	SpinDelayUs(START_GAP);
+	WaitUS(START_GAP);
 
 	// Opcode 1[page]
 	T55xxWriteBit(1);
@@ -1229,10 +1257,15 @@ void T55xxReadBlock(uint16_t arg0, uint8_t Block, uint32_t Pwd) {
 			T55xxWriteBit(Block & i);		
 
 	// Turn field on to read the response
-	TurnReadLFOn(READ_GAP);
+	// 137*8 seems to get to the start of data pretty well... 
+	//  but we want to go past the start and let the repeating data settle in...
+	TurnReadLFOn(210*8); 
 
 	// Acquisition
-	doT55x7Acquisition(12000);
+	// Now do the acquisition
+	DoPartialAcquisition(0, true, 12000);
+
+	//	doT55x7Acquisition(12000);
 
 	// Turn the field off
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF); // field off
@@ -1246,10 +1279,13 @@ void T55xxWakeUp(uint32_t Pwd){
 	
 	// Set up FPGA, 125kHz
 	LFSetupFPGAForADC(95, true);
+	StartTicks();
+	// make sure tag is fully powered up...
+	WaitMS(5);
 	
 	// Trigger T55x7 Direct Access Mode
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
-	SpinDelayUs(START_GAP);
+	WaitUS(START_GAP);
 	
 	// Opcode 10
 	T55xxWriteBit(1);
@@ -1367,7 +1403,7 @@ void CopyIndala224toT55x7(uint32_t uid1, uint32_t uid2, uint32_t uid3, uint32_t 
 // clone viking tag to T55xx
 void CopyVikingtoT55xx(uint32_t block1, uint32_t block2, uint8_t Q5) {
 	uint32_t data[] = {T55x7_BITRATE_RF_32 | T55x7_MODULATION_MANCHESTER | (2 << T55x7_MAXBLOCK_SHIFT), block1, block2};
-	if (Q5) data[0] = ( ((32-2)>>1) << T5555_BITRATE_SHIFT) | T5555_MODULATION_MANCHESTER | 2 << T5555_MAXBLOCK_SHIFT;
+	if (Q5) data[0] = T5555_SET_BITRATE(32) | T5555_MODULATION_MANCHESTER | 2 << T5555_MAXBLOCK_SHIFT;
 	// Program the data blocks for supplied ID and the block 0 config
 	WriteT55xx(data, 0, 3);
 	LED_D_OFF();
@@ -1451,8 +1487,7 @@ void WriteEM410x(uint32_t card, uint32_t id_hi, uint32_t id_lo) {
 		}
 		data[0] = clock | T55x7_MODULATION_MANCHESTER | (2 << T55x7_MAXBLOCK_SHIFT);
 	} else { //t5555 (Q5)
-		clock = (clock-2)>>1;  //n = (RF-2)/2
-		data[0] = (clock << T5555_BITRATE_SHIFT) | T5555_MODULATION_MANCHESTER | (2 << T5555_MAXBLOCK_SHIFT);
+		data[0] = T5555_SET_BITRATE(clock) | T5555_MODULATION_MANCHESTER | (2 << T5555_MAXBLOCK_SHIFT);
 	}
 
 	WriteT55xx(data, 0, 3);

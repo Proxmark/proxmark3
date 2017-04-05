@@ -111,7 +111,7 @@ int NoralsyDemod_AM(uint8_t *dest, size_t *size) {
 int CmdNoralsyDemod(const char *Cmd) {
 
 	//ASK / Manchester
-	bool st = false;
+	bool st = true;
 	if (!ASKDemod_ext("32 0 0", false, false, 1, &st)) {
 		if (g_debugMode) PrintAndLog("DEBUG: Error - Noralsy: ASK/Manchester Demod failed");
 		return 0;

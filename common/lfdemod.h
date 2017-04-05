@@ -30,8 +30,7 @@ extern uint8_t  DetectCleanAskWave(uint8_t dest[], size_t size, uint8_t high, ui
 extern uint8_t  detectFSKClk(uint8_t *BitStream, size_t size, uint8_t fcHigh, uint8_t fcLow);
 extern uint8_t  detectFSKClk_ext(uint8_t *BitStream, size_t size, uint8_t fcHigh, uint8_t fcLow, int *firstClockEdge);
 extern int      DetectNRZClock(uint8_t dest[], size_t size, int clock, size_t *clockStartIdx);
-extern int      DetectPSKClock(uint8_t dest[], size_t size, int clock);
-extern int      DetectPSKClock_ext(uint8_t dest[], size_t size, int clock, int *firstPhaseShift);
+extern int      DetectPSKClock(uint8_t dest[], size_t size, int clock, size_t *firstPhaseShift, uint8_t *curPhase, uint8_t *fc);
 extern int      DetectStrongAskClock(uint8_t dest[], size_t size, int high, int low, int *clock);
 extern bool     DetectST(uint8_t buffer[], size_t *size, int *foundclock);
 extern bool     DetectST_ext(uint8_t buffer[], size_t *size, int *foundclock, size_t *ststart, size_t *stend);
@@ -42,7 +41,7 @@ extern uint32_t manchesterEncode2Bytes(uint16_t datain);
 extern int      ManchesterEncode(uint8_t *BitStream, size_t size);
 extern int      manrawdecode(uint8_t *BitStream, size_t *size, uint8_t invert, uint8_t *alignPos);
 extern int      nrzRawDemod(uint8_t *dest, size_t *size, int *clk, int *invert, int *startIdx);
-extern uint8_t  parityTest(uint32_t bits, uint8_t bitLen, uint8_t pType);
+extern bool     parityTest(uint32_t bits, uint8_t bitLen, uint8_t pType);
 extern uint8_t  preambleSearch(uint8_t *BitStream, uint8_t *preamble, size_t pLen, size_t *size, size_t *startIdx);
 extern bool     preambleSearchEx(uint8_t *BitStream, uint8_t *preamble, size_t pLen, size_t *size, size_t *startIdx, bool findone);
 extern int      pskRawDemod(uint8_t dest[], size_t *size, int *clock, int *invert);
