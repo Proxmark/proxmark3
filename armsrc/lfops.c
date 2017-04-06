@@ -1132,7 +1132,7 @@ void T55xxResetRead(void) {
 	TurnReadLFOn(READ_GAP);
 
 	// Acquisition
-	doT55x7Acquisition(BigBuf_max_traceLen());
+	DoPartialAcquisition(0, true, BigBuf_max_traceLen());
 
 	// Turn the field off
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF); // field off
@@ -1265,8 +1265,6 @@ void T55xxReadBlock(uint16_t arg0, uint8_t Block, uint32_t Pwd) {
 	// Acquisition
 	// Now do the acquisition
 	DoPartialAcquisition(0, true, 12000);
-
-	//	doT55x7Acquisition(12000);
 
 	// Turn the field off
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF); // field off
