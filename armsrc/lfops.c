@@ -1161,7 +1161,8 @@ void T55xxWriteBlockExt(uint32_t Data, uint32_t Block, uint32_t Pwd, uint8_t arg
 	// Std Opcode 10
 	T55xxWriteBit(testMode ? 0 : 1);
 	T55xxWriteBit(testMode ? 1 : Page); //Page 0
-	if (PwdMode){
+
+	if (PwdMode) {
 		// Send Pwd
 		for (i = 0x80000000; i != 0; i >>= 1)
 			T55xxWriteBit(Pwd & i);
@@ -1181,22 +1182,19 @@ void T55xxWriteBlockExt(uint32_t Data, uint32_t Block, uint32_t Pwd, uint8_t arg
 	// so wait a little more)
 
 	// "there is a clock delay before programming" 
-	//  - programming takes ~5.6ms for t5577 ~18ms for E5550
+	//  - programming takes ~5.6ms for t5577 ~18ms for E5550 or t5567
 	//  so we should wait 1 clock + 5.6ms then read response? 
-	//  but we need to know we are dealing with t55x7 vs e5550 (or q5) marshmellow...
+	//  but we need to know we are dealing with t5577 vs t5567 vs e5550 (or q5) marshmellow...
 	if (testMode) {
-		// Turn field on to read the response
-		TurnReadLFOn(READ_GAP);
+		//TESTMODE TIMING TESTS: 
+		// <566us does nothing 
+		// 566-568 switches between wiping to 0s and doing nothing
+		// 5184 wipes and allows 1 block to be programmed.
+		// indefinite power on wipes and then programs all blocks with bitshifted data sent.
+		TurnReadLFOn(5184); 
 
-		// Acquisition
-		// Now do the acquisition
-		// Now do the acquisition
-		DoPartialAcquisition(20, true, 12000);
-
-		//doT55x7Acquisition(12000);
 	} else {
 		TurnReadLFOn(20 * 1000);
-	}
 		//could attempt to do a read to confirm write took
 		// as the tag should repeat back the new block 
 		// until it is reset, but to confirm it we would 
@@ -1204,6 +1202,9 @@ void T55xxWriteBlockExt(uint32_t Data, uint32_t Block, uint32_t Pwd, uint8_t arg
 		// modulation clock an other details to demod the response...
 		// response should be (for t55x7) a 0 bit then (ST if on) 
 		// block data written in on repeat until reset. 
+
+		//DoPartialAcquisition(20, true, 12000);
+	}
 
 	// turn field off
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
