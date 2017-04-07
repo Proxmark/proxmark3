@@ -1161,7 +1161,7 @@ int getSamples(int n, bool silent)
 	if(response.arg[0] > 0)
 	{
 		sample_config *sc = (sample_config *) response.d.asBytes;
-		PrintAndLog("Samples @ %d bits/smpl, decimation 1:%d ", sc->bits_per_sample
+		if (!silent) PrintAndLog("Samples @ %d bits/smpl, decimation 1:%d ", sc->bits_per_sample
 		    , sc->decimation);
 		bits_per_sample = sc->bits_per_sample;
 	}
