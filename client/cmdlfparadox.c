@@ -5,6 +5,7 @@
 // the license.
 //-----------------------------------------------------------------------------
 // Low frequency Paradox tag commands
+// FSK2a, rf/50, 96 bits (completely known)
 //-----------------------------------------------------------------------------
 #include <stdio.h>
 #include <string.h>
@@ -72,9 +73,7 @@ int CmdFSKdemodParadox(const char *Cmd)
 //see ASKDemod for what args are accepted
 int CmdParadoxRead(const char *Cmd) {
 	// read lf silently
-	CmdLFRead("s");
-	// get samples silently
-	getSamples("10000",false);
+	lf_read(true, 10000);
 	// demod and output viking ID	
 	return CmdFSKdemodParadox(Cmd);
 }

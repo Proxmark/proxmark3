@@ -810,6 +810,7 @@ bool test(uint8_t mode, uint8_t *offset, int *fndBitRate, uint8_t clk, bool *Q5)
 			if (!testBitRate(bitRate, clk)) continue;
 		} else { //extended mode bitrate = same function to calc bitrate as em4x05
 			if (EM4x05_GET_BITRATE(bitRate) != clk) continue;
+
 		}
 		//test modulation
 		if (!testModulation(mode, modread)) continue;
@@ -869,7 +870,7 @@ int special(const char *Cmd) {
 int printConfiguration( t55xx_conf_block_t b){
 	PrintAndLog("Chip Type  : %s", (b.Q5) ? "T5555(Q5)" : "T55x7");
 	PrintAndLog("Modulation : %s", GetSelectedModulationStr(b.modulation) );
-	PrintAndLog("Bit Rate   : %s", GetBitRateStr(b.bitrate, (b.block0 & T55x7_X_MODE)) );
+	PrintAndLog("Bit Rate   : %s", GetBitRateStr(b.bitrate, (b.block0 & T55x7_X_MODE && (b.block0>>28==6 || b.block0>>28==9))) );
 	PrintAndLog("Inverted   : %s", (b.inverted) ? "Yes" : "No" );
 	PrintAndLog("Offset     : %d", b.offset);
 	PrintAndLog("Seq. Term. : %s", (b.ST) ? "Yes" : "No" );
@@ -1233,11 +1234,7 @@ int AquireData( uint8_t page, uint8_t block, bool pwdmode, uint32_t password ){
 		PrintAndLog("command execution time out");
 		return 0;
 	}
-
-	uint8_t got[12000];
-	GetFromBigBuf(got,sizeof(got),0);
-	WaitForResponse(CMD_ACK,NULL);
-	setGraphBuf(got, sizeof(got));
+	getSamples(12000,true);
 	return 1;
 }
 

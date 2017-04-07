@@ -5,7 +5,7 @@
 // the license.
 //-----------------------------------------------------------------------------
 // Low frequency jablotron tag commands
-// Differential Biphase, RF/64, 64 bits long
+// Differential Biphase, RF/64, 64 bits long (complete)
 //-----------------------------------------------------------------------------
 
 #include "cmdlfjablotron.h"
@@ -141,8 +141,7 @@ int CmdJablotronDemod(const char *Cmd) {
 }
 
 int CmdJablotronRead(const char *Cmd) {
-	CmdLFRead("s");
-	getSamples("10000", true);
+	lf_read(true, 10000);
 	return CmdJablotronDemod(Cmd);
 }
 

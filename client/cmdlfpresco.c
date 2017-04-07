@@ -5,6 +5,7 @@
 // the license.
 //-----------------------------------------------------------------------------
 // Low frequency Presco tag commands
+// ASK/Manchester, rf/32, 128 bits (complete)
 //-----------------------------------------------------------------------------
 #include <string.h>
 #include <inttypes.h>
@@ -129,7 +130,7 @@ int CmdPrescoDemod(const char *Cmd) {
 		return 0;
 	}
 	size_t size = DemodBufferLen;
-	//call lfdemod.c demod for Viking
+	//call lfdemod.c demod for presco
 	int ans = PrescoDemod(DemodBuffer, &size);
 	if (ans < 0) {
 		if (g_debugMode) PrintAndLog("Error Presco_Demod %d", ans);
@@ -160,9 +161,7 @@ int CmdPrescoRead(const char *Cmd) {
 	// Presco Number: 123456789 --> Sitecode 30 | usercode 8665
 
 	// read lf silently
-	CmdLFRead("s");
-	// get samples silently
-	getSamples("30000",false);
+	lf_read(true, 10000);
 	// demod and output Presco ID	
 	return CmdPrescoDemod(Cmd);
 }

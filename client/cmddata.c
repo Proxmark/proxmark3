@@ -51,6 +51,17 @@ void setDemodBuf(uint8_t *buff, size_t size, size_t startIdx)
 	return;
 }
 
+bool getDemodBuf(uint8_t *buff, size_t *size) {
+	if (buff == NULL) return false;
+	if (size == NULL) return false;
+	if (*size == 0) return false;
+
+	*size = (*size > DemodBufferLen) ? DemodBufferLen : *size;
+
+	memcpy(buff, DemodBuffer, *size);
+	return true;
+}
+
 // option '1' to save DemodBuffer any other to restore
 void save_restoreDB(uint8_t saveOpt)
 {
@@ -62,7 +73,7 @@ void save_restoreDB(uint8_t saveOpt)
 		memcpy(SavedDB, DemodBuffer, sizeof(DemodBuffer));
 		SavedDBlen = DemodBufferLen;
 		DB_Saved=true;
-	} else if (DB_Saved){ //restore
+	} else if (DB_Saved) { //restore
 		memcpy(DemodBuffer, SavedDB, sizeof(DemodBuffer));
 		DemodBufferLen = SavedDBlen;
 	}
@@ -212,8 +223,8 @@ int ASKDemod_ext(const char *Cmd, bool verbose, bool emSearch, uint8_t askType, 
 	bool st = false;
 	size_t ststart = 0, stend = 0;
 	if (*stCheck) st = DetectST_ext(BitStream, &BitLen, &foundclk, &ststart, &stend);
+	*stCheck = st;
 	if (st) {
-		*stCheck = st;
 		clk = (clk == 0) ? foundclk : clk;
 		CursorCPos = ststart;
 		CursorDPos = stend;
@@ -373,13 +384,13 @@ int CmdBiphaseDecodeRaw(const char *Cmd)
 		return 0;
 	}
 	sscanf(Cmd, "%i %i %i", &offset, &invert, &maxErr);
-	if (DemodBufferLen==0){
+	if (DemodBufferLen==0) {
 		PrintAndLog("DemodBuffer Empty - run 'data rawdemod ar' first");
 		return 0;
 	}
 	uint8_t BitStream[MAX_GRAPH_TRACE_LEN]={0};
-	memcpy(BitStream, DemodBuffer, DemodBufferLen); 
-	size = DemodBufferLen;
+	size = sizeof(BitStream);
+	if ( !getDemodBuf(BitStream, &size) ) return 0;
 	errCnt=BiphaseRawDecode(BitStream, &size, offset, invert);
 	if (errCnt<0){
 		PrintAndLog("Error during decode:%d", errCnt);
@@ -1126,7 +1137,7 @@ uint8_t getByte(uint8_t bits_per_sample, BitstreamIn* b)
 	return val;
 }
 
-int getSamples(const char *Cmd, bool silent)
+int getSamples(int n, bool silent)
 {
 	//If we get all but the last byte in bigbuf,
 	// we don't have to worry about remaining trash
@@ -1135,14 +1146,12 @@ int getSamples(const char *Cmd, bool silent)
 
 	uint8_t got[BIGBUF_SIZE-1] = { 0 };
 
-	int n = strtol(Cmd, NULL, 0);
-
 	if (n == 0 || n > sizeof(got))
 		n = sizeof(got);
 
-	PrintAndLog("Reading %d bytes from device memory\n", n);
+	if (!silent) PrintAndLog("Reading %d bytes from device memory\n", n);
 	GetFromBigBuf(got,n,0);
-	PrintAndLog("Data fetched");
+	if (!silent) PrintAndLog("Data fetched");
 	UsbCommand response;
 	WaitForResponse(CMD_ACK, &response);
 	uint8_t bits_per_sample = 8;
@@ -1157,7 +1166,7 @@ int getSamples(const char *Cmd, bool silent)
 	}
 	if(bits_per_sample < 8)
 	{
-		PrintAndLog("Unpacking...");
+		if (!silent) PrintAndLog("Unpacking...");
 		BitstreamIn bout = { got, bits_per_sample * n,  0};
 		int j =0;
 		for (j = 0; j * bits_per_sample < n * 8 && j < n; j++) {
@@ -1180,7 +1189,8 @@ int getSamples(const char *Cmd, bool silent)
 
 int CmdSamples(const char *Cmd)
 {
-	return getSamples(Cmd, false);
+	int n = strtol(Cmd, NULL, 0);
+	return getSamples(n, false);
 }
 
 int CmdTuneSamples(const char *Cmd)

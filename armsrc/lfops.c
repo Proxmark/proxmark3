@@ -72,7 +72,7 @@ void ModThenAcquireRawAdcSamples125k(uint32_t delay_off, uint32_t period_0, uint
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_LF_ADC | FPGA_LF_ADC_READER_FIELD);
 
 	// now do the read
-	DoAcquisition_config(false);
+	DoAcquisition_config(false, 0);
 }
 
 /* blank r/w tag data stream
@@ -1753,7 +1753,7 @@ void Cotag(uint32_t arg0) {
 	switch(rawsignal) {
 		case 0: doCotagAcquisition(50000); break;
 		case 1: doCotagAcquisitionManchester(); break;
-		case 2: DoAcquisition_config(TRUE); break;
+		case 2: DoAcquisition_config(true, 0); break;
 	}
 
 	// Turn the field off

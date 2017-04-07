@@ -5,7 +5,7 @@
 // the license.
 //-----------------------------------------------------------------------------
 // Low frequency Honeywell NexWatch tag commands
-// PSK1 RF/16, RF/2, 128 bits long
+// PSK1 RF/16, RF/2, 128 bits long (known)
 //-----------------------------------------------------------------------------
 #include <stdio.h>
 #include <string.h>
@@ -66,9 +66,7 @@ int CmdPSKNexWatch(const char *Cmd)
 //see ASKDemod for what args are accepted
 int CmdNexWatchRead(const char *Cmd) {
 	// read lf silently
-	CmdLFRead("s");
-	// get samples silently
-	getSamples("10000",false);
+	lf_read(true, 10000);
 	// demod and output viking ID	
 	return CmdPSKNexWatch(Cmd);
 }

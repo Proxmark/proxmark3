@@ -5,6 +5,7 @@
 // the license.
 //-----------------------------------------------------------------------------
 // Low frequency Indala commands
+// PSK1, rf/32, 64 or 224 bits (known)
 //-----------------------------------------------------------------------------
 
 #include <stdio.h>
@@ -73,8 +74,7 @@ int CmdIndalaDecode(const char *Cmd) {
 }
 
 int CmdIndalaRead(const char *Cmd) {
-	CmdLFRead("s");
-	getSamples("30000",false);
+	lf_read(true, 30000);
 	return CmdIndalaDecode("");
 }
 

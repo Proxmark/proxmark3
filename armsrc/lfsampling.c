@@ -215,35 +215,35 @@ uint32_t DoAcquisition_default(int trigger_threshold, bool silent)
 {
 	return DoAcquisition(1,8,0,trigger_threshold,silent,0);
 }
-uint32_t DoAcquisition_config( bool silent)
+uint32_t DoAcquisition_config(bool silent, int sample_size)
 {
 	return DoAcquisition(config.decimation
 				  ,config.bits_per_sample
 				  ,config.averaging
 				  ,config.trigger_threshold
 				  ,silent
-				  ,0);
+				  ,sample_size);
 }
 
 uint32_t DoPartialAcquisition(int trigger_threshold, bool silent, int sample_size) {
 	return DoAcquisition(1,8,0,trigger_threshold,silent,sample_size);
 }
 
-uint32_t ReadLF(bool activeField, bool silent)
+uint32_t ReadLF(bool activeField, bool silent, int sample_size)
 {
 	if (!silent) printConfig();
 	LFSetupFPGAForADC(config.divisor, activeField);
 	// Now call the acquisition routine
-	return DoAcquisition_config(silent);
+	return DoAcquisition_config(silent, sample_size);
 }
 
 /**
 * Initializes the FPGA for reader-mode (field on), and acquires the samples.
 * @return number of bits sampled
 **/
-uint32_t SampleLF(bool printCfg)
+uint32_t SampleLF(bool printCfg, int sample_size)
 {
-	uint32_t ret = ReadLF(true, printCfg);
+	uint32_t ret = ReadLF(true, printCfg, sample_size);
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
 	return ret;
 }
@@ -254,7 +254,7 @@ uint32_t SampleLF(bool printCfg)
 
 uint32_t SnoopLF()
 {
-	uint32_t ret = ReadLF(false, true);
+	uint32_t ret = ReadLF(false, true, 0);
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
 	return ret;
 }
