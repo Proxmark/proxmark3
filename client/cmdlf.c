@@ -1066,7 +1066,7 @@ int CmdLFfind(const char *Cmd)
 			ans=FSKrawDemod("",true);
 			if (ans>0) {
 				PrintAndLog("\nUnknown FSK Modulated Tag Found!");
-				return 1;
+				return CheckChipType(cmdp);;
 			}
 		}
 		bool st = true;
@@ -1074,15 +1074,16 @@ int CmdLFfind(const char *Cmd)
 		if (ans>0) {
 			PrintAndLog("\nUnknown ASK Modulated and Manchester encoded Tag Found!");
 			PrintAndLog("\nif it does not look right it could instead be ASK/Biphase - try 'data rawdemod ab'");
-			return 1;
+			return CheckChipType(cmdp);;
 		}
 		ans=CmdPSK1rawDemod("");
 		if (ans>0) {
 			PrintAndLog("Possible unknown PSK1 Modulated Tag Found above!\n\nCould also be PSK2 - try 'data rawdemod p2'");
 			PrintAndLog("\nCould also be PSK3 - [currently not supported]");
 			PrintAndLog("\nCould also be NRZ - try 'data nrzrawdemod'");
-			return 1;
+			return CheckChipType(cmdp);;
 		}
+		ans = CheckChipType(cmdp);
 		PrintAndLog("\nNo Data Found!\n");
 	}
 	return 0;

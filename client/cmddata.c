@@ -40,7 +40,7 @@ void setDemodBuf(uint8_t *buff, size_t size, size_t startIdx)
 	if (buff == NULL) 
 		return;
 
-	if ( size >= MAX_DEMOD_BUF_LEN)
+	if ( size + startIdx >= MAX_DEMOD_BUF_LEN)
 		size = MAX_DEMOD_BUF_LEN;
 
 	size_t i = 0;
@@ -65,11 +65,12 @@ bool getDemodBuf(uint8_t *buff, size_t *size) {
 // option '1' to save DemodBuffer any other to restore
 void save_restoreDB(uint8_t saveOpt)
 {
-	static uint8_t SavedDB[MAX_GRAPH_TRACE_LEN];
+	static uint8_t SavedDB[MAX_DEMOD_BUF_LEN];
 	static size_t SavedDBlen;
 	static bool DB_Saved = false;
 
 	if (saveOpt==1) { //save
+
 		memcpy(SavedDB, DemodBuffer, sizeof(DemodBuffer));
 		SavedDBlen = DemodBufferLen;
 		DB_Saved=true;
@@ -322,7 +323,7 @@ int Cmdmandecoderaw(const char *Cmd)
 		return 0;
 	}
 	if (DemodBufferLen==0) return 0;
-	uint8_t BitStream[MAX_GRAPH_TRACE_LEN]={0};
+	uint8_t BitStream[MAX_DEMOD_BUF_LEN]={0};
 	int high=0,low=0;
 	for (;i<DemodBufferLen;++i){
 		if (DemodBuffer[i]>high) high=DemodBuffer[i];
@@ -388,7 +389,7 @@ int CmdBiphaseDecodeRaw(const char *Cmd)
 		PrintAndLog("DemodBuffer Empty - run 'data rawdemod ar' first");
 		return 0;
 	}
-	uint8_t BitStream[MAX_GRAPH_TRACE_LEN]={0};
+	uint8_t BitStream[MAX_DEMOD_BUF_LEN]={0};
 	size = sizeof(BitStream);
 	if ( !getDemodBuf(BitStream, &size) ) return 0;
 	errCnt=BiphaseRawDecode(BitStream, &size, offset, invert);
@@ -419,7 +420,7 @@ int ASKbiphaseDemod(const char *Cmd, bool verbose)
 	int offset=0, clk=0, invert=0, maxErr=0;
 	sscanf(Cmd, "%i %i %i %i", &offset, &clk, &invert, &maxErr);
 
-	uint8_t BitStream[MAX_DEMOD_BUF_LEN];	  
+	uint8_t BitStream[MAX_GRAPH_TRACE_LEN];	  
 	size_t size = getFromGraphBuf(BitStream);	  
 	//invert here inverts the ask raw demoded bits which has no effect on the demod, but we need the pointer
 	int errCnt = askdemod(BitStream, &size, &clk, &invert, maxErr, 0, 0);  
