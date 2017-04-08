@@ -20,28 +20,13 @@ LDLIBS = -L/opt/local/lib -L/usr/local/lib -lreadline -lpthread -lm
 LUALIB = ../liblua/liblua.a
 LDFLAGS = $(COMMON_FLAGS)
 CFLAGS = -std=c99 -D_ISOC99_SOURCE -I. -I../include -I../common -I../zlib -I/opt/local/include -I../liblua -Wall $(COMMON_FLAGS) -g -O4
-LUAPLATFORM = generic
+CXXFLAGS = -std=c++11 -fPIC -Wall -O3
 
+LUAPLATFORM = generic
 platform = $(shell uname)
 ifneq (,$(findstring MINGW,$(platform)))
-    CXXFLAGS = -I$(QTDIR)/include -I$(QTDIR)/include/QtCore -I$(QTDIR)/include/QtGui
-    ifneq ($(wildcard $(QTDIR)/include/QtWidgets),)
-        CXXFLAGS += -I$(QTDIR)/include/QtWidgets
-        QTLDLIBS = -L$(QTDIR)/lib -lQt5Core -lQt5Gui -lQt5Widgets
-    else
-        QTLDLIBS = -L$(QTDIR)/lib -lQtCore4 -lQtGui4
-    endif
-    MOC = $(QTDIR)/bin/moc
     LUAPLATFORM = mingw
 else
-	CXXFLAGS = $(shell pkg-config --cflags Qt5Core Qt5Widgets 2>/dev/null) -Wall -O4
-	QTLDLIBS = $(shell pkg-config --libs Qt5Core Qt5Widgets 2>/dev/null)
-	MOC = $(shell pkg-config --variable=host_bins Qt5Core)/moc
-	ifeq ($(QTLDLIBS), )
-		CXXFLAGS = $(shell pkg-config --cflags QtCore QtGui 2>/dev/null) -Wall -O4
-		QTLDLIBS = $(shell pkg-config --libs QtCore QtGui 2>/dev/null)
-		MOC = $(shell pkg-config --variable=moc_location QtCore)
-	endif
 	ifeq ($(platform),Darwin)
 		LUAPLATFORM = macosx
 	else
@@ -51,7 +36,31 @@ else
 	endif
 endif
 
-ifneq ($(QTLDLIBS),)
+# Check for correctly configured Qt5
+QTINCLUDES = $(shell pkg-config --cflags Qt5Core Qt5Widgets 2>/dev/null)
+QTLDLIBS = $(shell pkg-config --libs Qt5Core Qt5Widgets 2>/dev/null)
+MOC = $(shell pkg-config --variable=host_bins Qt5Core)/moc
+ifeq ($(QTINCLUDES), )
+# if Qt5 not found Check for correctly configured Qt4	
+	QTINCLUDES = $(shell pkg-config --cflags QtCore QtGui 2>/dev/null)
+	QTLDLIBS = $(shell pkg-config --libs QtCore QtGui 2>/dev/null)
+	MOC = $(shell pkg-config --variable=moc_location QtCore)
+endif
+ifeq ($(QTINCLUDES), )
+# if both pkg-config commands failed, search in common places
+	ifneq ($(QTDIR), )
+		QTINCLUDES = -I$(QTDIR)/include -I$(QTDIR)/include/QtCore -I$(QTDIR)/include/QtGui
+		QTLDLIBS = -L$(QTDIR)/lib -lQtCore4 -lQtGui4
+		ifneq ($(wildcard $(QTDIR)/include/QtWidgets),)
+			QTINCLUDES += -I$(QTDIR)/include/QtWidgets
+			QTLDLIBS += -lQt5Widgets
+		endif
+		MOC = $(QTDIR)/bin/moc
+	endif
+endif
+
+
+ifneq ($(QTLDLIBS), )
     QTGUIOBJS = $(OBJDIR)/proxgui.o $(OBJDIR)/proxguiqt.o $(OBJDIR)/proxguiqt.moc.o
     CFLAGS += -DHAVE_GUI
 else
@@ -193,7 +202,7 @@ $(OBJDIR)/%.o : %.c $(OBJDIR)/%.d
 
 %.o: %.cpp
 $(OBJDIR)/%.o : %.cpp $(OBJDIR)/%.d
-	$(CXX) $(DEPFLAGS) $(CXXFLAGS) -c -o $@ $<
+	$(CXX) $(DEPFLAGS) $(CXXFLAGS) $(QTINCLUDES) -c -o $@ $<
 	$(POSTCOMPILE)
 
 

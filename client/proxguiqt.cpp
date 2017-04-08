@@ -7,6 +7,7 @@
 //-----------------------------------------------------------------------------
 // GUI (QT)
 //-----------------------------------------------------------------------------
+#include "proxguiqt.h"
 
 #include <iostream>
 #include <QPainterPath>
@@ -19,7 +20,6 @@
 #include <math.h>
 #include <limits.h>
 #include <stdio.h>
-#include "proxguiqt.h"
 #include "proxgui.h"
 
 int GridOffset= 0;
