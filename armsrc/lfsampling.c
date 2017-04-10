@@ -215,35 +215,35 @@ uint32_t DoAcquisition_default(int trigger_threshold, bool silent)
 {
 	return DoAcquisition(1,8,0,trigger_threshold,silent,0);
 }
-uint32_t DoAcquisition_config( bool silent)
+uint32_t DoAcquisition_config(bool silent, int sample_size)
 {
 	return DoAcquisition(config.decimation
 				  ,config.bits_per_sample
 				  ,config.averaging
 				  ,config.trigger_threshold
 				  ,silent
-				  ,0);
+				  ,sample_size);
 }
 
 uint32_t DoPartialAcquisition(int trigger_threshold, bool silent, int sample_size) {
 	return DoAcquisition(1,8,0,trigger_threshold,silent,sample_size);
 }
 
-uint32_t ReadLF(bool activeField, bool silent)
+uint32_t ReadLF(bool activeField, bool silent, int sample_size)
 {
 	if (!silent) printConfig();
 	LFSetupFPGAForADC(config.divisor, activeField);
 	// Now call the acquisition routine
-	return DoAcquisition_config(silent);
+	return DoAcquisition_config(silent, sample_size);
 }
 
 /**
 * Initializes the FPGA for reader-mode (field on), and acquires the samples.
 * @return number of bits sampled
 **/
-uint32_t SampleLF(bool printCfg)
+uint32_t SampleLF(bool printCfg, int sample_size)
 {
-	uint32_t ret = ReadLF(true, printCfg);
+	uint32_t ret = ReadLF(true, printCfg, sample_size);
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
 	return ret;
 }
@@ -254,76 +254,9 @@ uint32_t SampleLF(bool printCfg)
 
 uint32_t SnoopLF()
 {
-	uint32_t ret = ReadLF(false, true);
+	uint32_t ret = ReadLF(false, true, 0);
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
 	return ret;
-}
-
-/**
-* acquisition of T55x7 LF signal. Similart to other LF, but adjusted with @marshmellows thresholds
-* the data is collected in BigBuf.
-**/
-void doT55x7Acquisition(size_t sample_size) {
-
-	#define T55xx_READ_UPPER_THRESHOLD 128+60  // 60 grph
-	#define T55xx_READ_LOWER_THRESHOLD 128-60  // -60 grph
-	#define T55xx_READ_TOL   5
-
-	uint8_t *dest = BigBuf_get_addr();
-	uint16_t bufsize = BigBuf_max_traceLen();
-	
-	if ( bufsize > sample_size )
-		bufsize = sample_size;
-
-	uint16_t i = 0;
-	bool startFound = false;
-	bool highFound = false;
-	bool lowFound = false;
-	uint8_t curSample = 0;
-	uint8_t lastSample = 0;
-	uint16_t skipCnt = 0;
-	while(!BUTTON_PRESS() && !usb_poll_validate_length() && skipCnt<1000 && i<bufsize ) {
-		WDT_HIT();
-		if (AT91C_BASE_SSC->SSC_SR & AT91C_SSC_TXRDY) {
-			AT91C_BASE_SSC->SSC_THR = 0x43;
-			LED_D_ON();
-		}
-		if (AT91C_BASE_SSC->SSC_SR & AT91C_SSC_RXRDY) {
-			curSample = (uint8_t)AT91C_BASE_SSC->SSC_RHR;
-			LED_D_OFF();
-
-			// skip until the first high sample above threshold
-			if (!startFound && curSample > T55xx_READ_UPPER_THRESHOLD) {
-				//if (curSample > lastSample) 
-				//	lastSample = curSample;
-				highFound = true;
-			} else if (!highFound) {
-				skipCnt++;
-				continue;
-			}
-			// skip until the first Low sample below threshold
-			if (!startFound && curSample < T55xx_READ_LOWER_THRESHOLD) {
-				//if (curSample > lastSample) 
-				lastSample = curSample;
-				lowFound = true;
-			} else if (!lowFound) {
-				skipCnt++;
-				continue;
-			}
-
-
-			// skip until first high samples begin to change
-			if (startFound || curSample > T55xx_READ_LOWER_THRESHOLD+T55xx_READ_TOL){
-				// if just found start - recover last sample
-				if (!startFound) {
-					dest[i++] = lastSample;
-					startFound = true;
-				}
-				// collect samples
-				dest[i++] = curSample;
-			}
-		}
-	}
 }
 
 /**

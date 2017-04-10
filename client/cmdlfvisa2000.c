@@ -6,6 +6,7 @@
 //-----------------------------------------------------------------------------
 // Low frequency visa 2000 tag commands
 // by iceman
+// ASK/Manchester, RF/64, STT, 96 bits (complete)
 //-----------------------------------------------------------------------------
 
 #include "cmdlfvisa2000.h"
@@ -83,12 +84,12 @@ static uint8_t visa_parity( uint32_t id) {
 /**
 *
 * 56495332 00096ebd 00000077 —> tag id 618173
-* aaaaaaaa iiiiiiii -----..c
+* aaaaaaaa iiiiiiii -----ppc
 *
 * a = fixed value  ascii 'VIS2'
 * i = card id
+* p = even parity bit for each nibble in card id.
 * c = checksum  (xor of card id)
-* . = unknown 
 * 
 **/
 //see ASKDemod for what args are accepted
@@ -146,9 +147,8 @@ int CmdVisa2kDemod(const char *Cmd) {
 }
 
 int CmdVisa2kRead(const char *Cmd) {
-	CmdLFRead("s");
 	//64*96*2=12288 samples just in case we just missed the first preamble we can still catch 2 of them
-	getSamples("12500",true); 
+	lf_read(true, 12500);
 	return CmdVisa2kDemod(Cmd);
 }
 

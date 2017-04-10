@@ -4,7 +4,8 @@
 // at your option, any later version. See the LICENSE.txt file for the text of
 // the license.
 //-----------------------------------------------------------------------------
-// Low frequency Viking tag commands
+// Low frequency Viking tag commands (AKA FDI Matalec Transit)
+// ASK/Manchester, RF/32, 64 bits (complete)
 //-----------------------------------------------------------------------------
 #include <stdio.h>
 #include <string.h>
@@ -80,9 +81,7 @@ int CmdVikingDemod(const char *Cmd) {
 //see ASKDemod for what args are accepted
 int CmdVikingRead(const char *Cmd) {
 	// read lf silently
-	CmdLFRead("s");
-	// get samples silently
-	getSamples("10000",false);
+	lf_read(true, 10000);
 	// demod and output viking ID	
 	return CmdVikingDemod(Cmd);
 }

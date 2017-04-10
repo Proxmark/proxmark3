@@ -57,6 +57,8 @@ This project uses the changelog in accordance with [keepchangelog](http://keepac
 - Added option c to 'hf list' (mark CRC bytes) (piwi)
 
 ### Changed
+- `lf snoop` now automatically gets samples from the device
+- `lf read` now accepts [#samples] as arg. && now automatically gets samples from the device
 - adjusted lf t5 chip timings to use WaitUS. and adjusted the readblock timings
     appears to have more consistent results with more antennas.
 - `lf t5 wakeup` has been adjusted to not need the p in front of the pwd arg.

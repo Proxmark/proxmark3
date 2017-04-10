@@ -5,6 +5,7 @@
 // the license.
 //-----------------------------------------------------------------------------
 // Low frequency Farpoint / Pyramid tag commands
+// FSK2a, rf/50, 128 bits (complete)
 //-----------------------------------------------------------------------------
 #include <string.h>
 #include <inttypes.h>
@@ -225,8 +226,7 @@ int CmdFSKdemodPyramid(const char *Cmd)
 }
 
 int CmdPyramidRead(const char *Cmd) {
-	CmdLFRead("s");
-	getSamples("30000",false);
+	lf_read(true, 15000);
 	return CmdFSKdemodPyramid("");
 }
 

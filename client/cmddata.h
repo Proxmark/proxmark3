@@ -22,6 +22,7 @@ command_t * CmdDataCommands();
 int CmdData(const char *Cmd);
 void printDemodBuff(void);
 void setDemodBuf(uint8_t *buff, size_t size, size_t startIdx);
+bool getDemodBuf(uint8_t *buff, size_t *size);
 void save_restoreDB(uint8_t saveOpt);// option '1' to save DemodBuffer any other to restore
 int CmdPrintDemodBuff(const char *Cmd);
 int Cmdaskrawdemod(const char *Cmd);
@@ -62,7 +63,7 @@ int ASKDemod_ext(const char *Cmd, bool verbose, bool emSearch, uint8_t askType, 
 int FSKrawDemod(const char *Cmd, bool verbose);
 int PSKDemod(const char *Cmd, bool verbose);
 int NRZrawDemod(const char *Cmd, bool verbose);
-int getSamples(const char *Cmd, bool silent);
+int getSamples(int n, bool silent);
 
 
 #define MAX_DEMOD_BUF_LEN (1024*128)

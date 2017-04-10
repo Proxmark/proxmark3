@@ -146,17 +146,18 @@ void printEM410x(uint32_t hi, uint64_t id)
 int AskEm410xDecode(bool verbose, uint32_t *hi, uint64_t *lo )
 {
 	size_t idx = 0;
-	size_t BitLen = DemodBufferLen;
-	uint8_t BitStream[MAX_GRAPH_TRACE_LEN]={0};
-	memcpy(BitStream, DemodBuffer, BitLen); 
-	if (Em410xDecode(BitStream, &BitLen, &idx, hi, lo)){
+	uint8_t BitStream[512]={0};
+	size_t BitLen = sizeof(BitStream);
+	if ( !getDemodBuf(BitStream, &BitLen) ) return 0;
+
+	if (Em410xDecode(BitStream, &BitLen, &idx, hi, lo)) {
 		//set GraphBuffer for clone or sim command
 		setDemodBuf(BitStream, BitLen, idx);
-		if (g_debugMode){
+		if (g_debugMode) {
 			PrintAndLog("DEBUG: idx: %d, Len: %d, Printing Demod Buffer:", idx, BitLen);
 			printDemodBuff();
 		}
-		if (verbose){
+		if (verbose) {
 			PrintAndLog("EM410x pattern found: ");
 			printEM410x(*hi, *lo);
 			g_em410xId = *lo;
@@ -298,9 +299,7 @@ int CmdEM410xWatch(const char *Cmd)
 			printf("\naborted via keyboard!\n");
 			break;
 		}
-		
-		CmdLFRead("s");
-		getSamples("8201",true); 
+		lf_read(true, 8201);
 	} while (!CmdAskEM410xDemod(""));
 
 	return 0;

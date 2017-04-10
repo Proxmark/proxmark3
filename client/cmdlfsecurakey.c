@@ -5,7 +5,7 @@
 // the license.
 //-----------------------------------------------------------------------------
 // Low frequency Securakey tag commands
-// ASK/Manchester, RF/40, 96 bits long
+// ASK/Manchester, RF/40, 96 bits long (unknown cs)
 //-----------------------------------------------------------------------------
 #include "cmdlfsecurakey.h"
 #include <string.h>
@@ -123,8 +123,7 @@ int CmdSecurakeyDemod(const char *Cmd) {
 }
 
 int CmdSecurakeyRead(const char *Cmd) {
-	CmdLFRead("s");
-	getSamples("8000",true);
+	lf_read(true, 8000);
 	return CmdSecurakeyDemod(Cmd);
 }
 

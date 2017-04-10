@@ -12,6 +12,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <limits.h>
+#include <stdbool.h>
+#include <stdint.h>
 #include "proxmark3.h"
 #include "cmdlf.h"
 #include "lfdemod.h"     // for psk2TOpsk1
@@ -211,7 +213,7 @@ int usage_lf_read(void)
 	PrintAndLog("Options:        ");
 	PrintAndLog("       h            This help");
 	PrintAndLog("       s            silent run no printout");
-	PrintAndLog("This function takes no arguments. ");
+	PrintAndLog("       [# samples]  # samples to collect (optional)");	
 	PrintAndLog("Use 'lf config' to set parameters.");
 	return 0;
 }
@@ -331,29 +333,41 @@ int CmdLFSetConfig(const char *Cmd)
 	return 0;
 }
 
+bool lf_read(bool silent, uint32_t samples) {
+	if (offline) return false;
+	UsbCommand c = {CMD_ACQUIRE_RAW_ADC_SAMPLES_125K, {silent,samples,0}};
+	clearCommandBuffer();
+	//And ship it to device
+	SendCommand(&c);
+
+	UsbCommand resp;
+	if (g_lf_threshold_set) {
+		WaitForResponse(CMD_ACK,&resp);
+	} else {
+		if ( !WaitForResponseTimeout(CMD_ACK,&resp,2500) ) {
+			PrintAndLog("command execution time out");
+			return false;
+		}
+	}
+	getSamples(resp.arg[0], silent);
+
+	return true;
+}
+
 int CmdLFRead(const char *Cmd)
 {
-	if (offline) return 0;
 	uint8_t cmdp = 0;
-	bool arg1 = false;
+	bool silent = false;
 	if (param_getchar(Cmd, cmdp) == 'h')
 	{
 		return usage_lf_read();
 	}
-	if (param_getchar(Cmd, cmdp) == 's') arg1 = true; //suppress print
-	//And ship it to device
-	UsbCommand c = {CMD_ACQUIRE_RAW_ADC_SAMPLES_125K, {arg1,0,0}};
-	clearCommandBuffer();
-	SendCommand(&c);
-	if (g_lf_threshold_set) {
-		WaitForResponse(CMD_ACK,NULL);
-	} else {
-		if ( !WaitForResponseTimeout(CMD_ACK,NULL,2500) ) {
-			PrintAndLog("command execution time out");
-			return 1;
-		}
+	if (param_getchar(Cmd, cmdp) == 's') {
+		silent = true; //suppress print
+		cmdp++;
 	}
-	return 0;
+	uint32_t samples = param_get32ex(Cmd, cmdp, 0, 10);
+	return lf_read(silent, samples);
 }
 
 int CmdLFSnoop(const char *Cmd)
@@ -368,6 +382,8 @@ int CmdLFSnoop(const char *Cmd)
 	clearCommandBuffer();
 	SendCommand(&c);
 	WaitForResponse(CMD_ACK,NULL);
+	getSamples(0, true);
+
 	return 0;
 }
 
@@ -905,9 +921,8 @@ int CmdLFfind(const char *Cmd)
 		return 0;
 	}
 
-	if (!offline && (cmdp != '1')){
-		CmdLFRead("s");
-		getSamples("30000",false);
+	if (!offline && (cmdp != '1')) {
+		lf_read(true, 30000);
 	} else if (GraphTraceLen < minLength) {
 		PrintAndLog("Data in Graphbuffer was too small.");
 		return 0;
@@ -1051,7 +1066,7 @@ int CmdLFfind(const char *Cmd)
 			ans=FSKrawDemod("",true);
 			if (ans>0) {
 				PrintAndLog("\nUnknown FSK Modulated Tag Found!");
-				return 1;
+				return CheckChipType(cmdp);;
 			}
 		}
 		bool st = true;
@@ -1059,15 +1074,16 @@ int CmdLFfind(const char *Cmd)
 		if (ans>0) {
 			PrintAndLog("\nUnknown ASK Modulated and Manchester encoded Tag Found!");
 			PrintAndLog("\nif it does not look right it could instead be ASK/Biphase - try 'data rawdemod ab'");
-			return 1;
+			return CheckChipType(cmdp);;
 		}
 		ans=CmdPSK1rawDemod("");
 		if (ans>0) {
 			PrintAndLog("Possible unknown PSK1 Modulated Tag Found above!\n\nCould also be PSK2 - try 'data rawdemod p2'");
 			PrintAndLog("\nCould also be PSK3 - [currently not supported]");
-			PrintAndLog("\nCould also be NRZ - try 'data nrzrawdemod");
-			return 1;
+			PrintAndLog("\nCould also be NRZ - try 'data nrzrawdemod'");
+			return CheckChipType(cmdp);;
 		}
+		ans = CheckChipType(cmdp);
 		PrintAndLog("\nNo Data Found!\n");
 	}
 	return 0;
