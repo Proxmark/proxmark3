@@ -5,7 +5,7 @@
 // at your option, any later version. See the LICENSE.txt file for the text of
 // the license.
 //-----------------------------------------------------------------------------
-// Low frequency HID commands
+// Low frequency HID commands (known)
 //-----------------------------------------------------------------------------
 
 #include <stdio.h>

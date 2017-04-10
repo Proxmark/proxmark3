@@ -751,8 +751,8 @@ int DetectPSKClock(uint8_t dest[], size_t size, int clock, size_t *firstPhaseShi
 	uint16_t fcs = countFC(dest, size, 0);
 	*fc = fcs & 0xFF;
 	if (g_debugMode==2) prnt("DEBUG PSK: FC: %d, FC2: %d",*fc, fcs>>8);
-	if ((fcs>>8) == 10 && *fc == 8) return -1;
-	if (*fc!=2 && *fc!=4 && *fc!=8) return -1;
+	if ((fcs>>8) == 10 && *fc == 8) return 0;
+	if (*fc!=2 && *fc!=4 && *fc!=8) return 0;
 
 	//if we already have a valid clock quit
 	size_t i=1;
@@ -1561,7 +1561,7 @@ int pskRawDemod_ext(uint8_t dest[], size_t *size, int *clock, int *invert, int *
 	uint16_t errCnt=0, errCnt2=0;
 	
 	*clock = DetectPSKClock(dest, *size, *clock, &firstFullWave, &curPhase, &fc);
-	if (*clock == 0) return -1;
+	if (*clock <= 0) return -1;
 	//if clock detect found firstfullwave...
 	uint16_t tol = fc/2;
 	if (firstFullWave == 0) {

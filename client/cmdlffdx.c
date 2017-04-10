@@ -5,6 +5,7 @@
 // the license.
 //-----------------------------------------------------------------------------
 // Low frequency fdx-b tag commands
+// Differential Biphase, rf/32, 128 bits (known)
 //-----------------------------------------------------------------------------
 
 #include "cmdlffdx.h"
@@ -203,8 +204,7 @@ int CmdFdxDemod(const char *Cmd){
 }
 
 int CmdFdxRead(const char *Cmd) {
-	CmdLFRead("s");
-	getSamples("10000", true);
+	lf_read(true, 10000);
 	return CmdFdxDemod(Cmd);
 }
 

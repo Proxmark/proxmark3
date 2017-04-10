@@ -72,7 +72,7 @@ void ModThenAcquireRawAdcSamples125k(uint32_t delay_off, uint32_t period_0, uint
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_LF_ADC | FPGA_LF_ADC_READER_FIELD);
 
 	// now do the read
-	DoAcquisition_config(false);
+	DoAcquisition_config(false, 0);
 }
 
 /* blank r/w tag data stream
@@ -1132,7 +1132,7 @@ void T55xxResetRead(void) {
 	TurnReadLFOn(READ_GAP);
 
 	// Acquisition
-	doT55x7Acquisition(BigBuf_max_traceLen());
+	DoPartialAcquisition(0, true, BigBuf_max_traceLen());
 
 	// Turn the field off
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF); // field off
@@ -1161,7 +1161,8 @@ void T55xxWriteBlockExt(uint32_t Data, uint32_t Block, uint32_t Pwd, uint8_t arg
 	// Std Opcode 10
 	T55xxWriteBit(testMode ? 0 : 1);
 	T55xxWriteBit(testMode ? 1 : Page); //Page 0
-	if (PwdMode){
+
+	if (PwdMode) {
 		// Send Pwd
 		for (i = 0x80000000; i != 0; i >>= 1)
 			T55xxWriteBit(Pwd & i);
@@ -1181,22 +1182,19 @@ void T55xxWriteBlockExt(uint32_t Data, uint32_t Block, uint32_t Pwd, uint8_t arg
 	// so wait a little more)
 
 	// "there is a clock delay before programming" 
-	//  - programming takes ~5.6ms for t5577 ~18ms for E5550
+	//  - programming takes ~5.6ms for t5577 ~18ms for E5550 or t5567
 	//  so we should wait 1 clock + 5.6ms then read response? 
-	//  but we need to know we are dealing with t55x7 vs e5550 (or q5) marshmellow...
+	//  but we need to know we are dealing with t5577 vs t5567 vs e5550 (or q5) marshmellow...
 	if (testMode) {
-		// Turn field on to read the response
-		TurnReadLFOn(READ_GAP);
+		//TESTMODE TIMING TESTS: 
+		// <566us does nothing 
+		// 566-568 switches between wiping to 0s and doing nothing
+		// 5184 wipes and allows 1 block to be programmed.
+		// indefinite power on wipes and then programs all blocks with bitshifted data sent.
+		TurnReadLFOn(5184); 
 
-		// Acquisition
-		// Now do the acquisition
-		// Now do the acquisition
-		DoPartialAcquisition(20, true, 12000);
-
-		//doT55x7Acquisition(12000);
 	} else {
 		TurnReadLFOn(20 * 1000);
-	}
 		//could attempt to do a read to confirm write took
 		// as the tag should repeat back the new block 
 		// until it is reset, but to confirm it we would 
@@ -1204,6 +1202,9 @@ void T55xxWriteBlockExt(uint32_t Data, uint32_t Block, uint32_t Pwd, uint8_t arg
 		// modulation clock an other details to demod the response...
 		// response should be (for t55x7) a 0 bit then (ST if on) 
 		// block data written in on repeat until reset. 
+
+		//DoPartialAcquisition(20, true, 12000);
+	}
 
 	// turn field off
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
@@ -1264,8 +1265,6 @@ void T55xxReadBlock(uint16_t arg0, uint8_t Block, uint32_t Pwd) {
 	// Acquisition
 	// Now do the acquisition
 	DoPartialAcquisition(0, true, 12000);
-
-	//	doT55x7Acquisition(12000);
 
 	// Turn the field off
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF); // field off
@@ -1754,7 +1753,7 @@ void Cotag(uint32_t arg0) {
 	switch(rawsignal) {
 		case 0: doCotagAcquisition(50000); break;
 		case 1: doCotagAcquisitionManchester(); break;
-		case 2: DoAcquisition_config(TRUE); break;
+		case 2: DoAcquisition_config(true, 0); break;
 	}
 
 	// Turn the field off

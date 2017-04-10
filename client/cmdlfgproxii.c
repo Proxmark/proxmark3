@@ -5,6 +5,7 @@
 // the license.
 //-----------------------------------------------------------------------------
 // Low frequency G Prox II tag commands
+// Biphase, rf/ , 96 bits  (unknown key calc + some bits)
 //-----------------------------------------------------------------------------
 #include <stdio.h>
 #include <string.h>
@@ -89,9 +90,7 @@ int CmdG_Prox_II_Demod(const char *Cmd)
 //see ASKDemod for what args are accepted
 int CmdG_Prox_II_Read(const char *Cmd) {
 	// read lf silently
-	CmdLFRead("s");
-	// get samples silently
-	getSamples("10000",false);
+	lf_read(true, 10000);
 	// demod and output viking ID	
 	return CmdG_Prox_II_Demod(Cmd);
 }

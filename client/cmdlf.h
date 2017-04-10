@@ -11,20 +11,24 @@
 #ifndef CMDLF_H__
 #define CMDLF_H__
 
-int CmdLF(const char *Cmd);
+#include <stdbool.h>
+#include <stdint.h>
 
-int CmdLFCommandRead(const char *Cmd);
-int CmdFlexdemod(const char *Cmd);
-int CmdIndalaDemod(const char *Cmd);
-int CmdIndalaClone(const char *Cmd);
-int CmdLFRead(const char *Cmd);
-int CmdLFSim(const char *Cmd);
-int CmdLFaskSim(const char *Cmd);
-int CmdLFfskSim(const char *Cmd);
-int CmdLFpskSim(const char *Cmd);
-int CmdLFSimBidir(const char *Cmd);
-int CmdLFSnoop(const char *Cmd);
-int CmdVchDemod(const char *Cmd);
-int CmdLFfind(const char *Cmd);
+extern int CmdLF(const char *Cmd);
+
+extern int CmdLFCommandRead(const char *Cmd);
+extern int CmdFlexdemod(const char *Cmd);
+extern int CmdIndalaDemod(const char *Cmd);
+extern int CmdIndalaClone(const char *Cmd);
+extern int CmdLFRead(const char *Cmd);
+extern int CmdLFSim(const char *Cmd);
+extern int CmdLFaskSim(const char *Cmd);
+extern int CmdLFfskSim(const char *Cmd);
+extern int CmdLFpskSim(const char *Cmd);
+extern int CmdLFSimBidir(const char *Cmd);
+extern int CmdLFSnoop(const char *Cmd);
+extern int CmdVchDemod(const char *Cmd);
+extern int CmdLFfind(const char *Cmd);
+extern bool lf_read(bool silent, uint32_t samples);
 
 #endif
