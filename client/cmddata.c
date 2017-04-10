@@ -40,8 +40,8 @@ void setDemodBuf(uint8_t *buff, size_t size, size_t startIdx)
 	if (buff == NULL) 
 		return;
 
-	if ( size + startIdx >= MAX_DEMOD_BUF_LEN)
-		size = MAX_DEMOD_BUF_LEN;
+	if ( size > MAX_DEMOD_BUF_LEN - startIdx)
+		size = MAX_DEMOD_BUF_LEN - startIdx;
 
 	size_t i = 0;
 	for (; i < size; i++){
