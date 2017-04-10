@@ -17,7 +17,7 @@
 #define PROXPROMPT "proxmark3> "
 
 void SendCommand(UsbCommand *c);
-const char const *get_my_executable_path(void);
-const char const *get_my_executable_directory(void);
+const char *get_my_executable_path(void);
+const char *get_my_executable_directory(void);
 
 #endif

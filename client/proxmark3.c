@@ -199,12 +199,12 @@ static void dumpAllHelp(int markdown)
 static char *my_executable_path = NULL;
 static char *my_executable_directory = NULL;
 
-const char const *get_my_executable_path(void)
+const char *get_my_executable_path(void)
 {
 	return my_executable_path;
 }
 
-const char const *get_my_executable_directory(void)
+const char *get_my_executable_directory(void)
 {
 	return my_executable_directory;
 }
@@ -219,6 +219,7 @@ static void set_my_executable_path(void)
 			my_executable_path[path_length] = '\0';
 			my_executable_directory = (char *)malloc(dirname_length + 2);
 			strncpy(my_executable_directory, my_executable_path, dirname_length+1);
+			my_executable_directory[dirname_length+1] = '\0';
 		}
 	}
 }
