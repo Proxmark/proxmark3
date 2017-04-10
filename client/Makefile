@@ -53,7 +53,7 @@ ifeq ($(QTINCLUDES), )
 		QTLDLIBS = -L$(QTDIR)/lib -lQtCore4 -lQtGui4
 		ifneq ($(wildcard $(QTDIR)/include/QtWidgets),)
 			QTINCLUDES += -I$(QTDIR)/include/QtWidgets
-			QTLDLIBS += -lQt5Widgets
+			QTLDLIBS = -L$(QTDIR) -lQt5Widgets -lQt5Gui -lQt5Core
 		endif
 		MOC = $(QTDIR)/bin/moc
 	endif
