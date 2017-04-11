@@ -507,8 +507,8 @@ bool tryDetectModulation(){
 	t55xx_conf_block_t tests[15];
 	int bitRate=0;
 	uint8_t fc1 = 0, fc2 = 0, ans = 0;
-	int clk=0;
-	ans = fskClocks(&fc1, &fc2, (uint8_t *)&clk, false);
+	int clk = 0, firstClockEdge = 0;
+	ans = fskClocks(&fc1, &fc2, (uint8_t *)&clk, false, &firstClockEdge);
 	if (ans && ((fc1==10 && fc2==8) || (fc1==8 && fc2==5))) {
 		if ( FSKrawDemod("0 0", false) && test(DEMOD_FSK, &tests[hits].offset, &bitRate, clk, &tests[hits].Q5)) {
 			tests[hits].modulation = DEMOD_FSK;
@@ -1555,7 +1555,7 @@ bool tryDetectP1(bool getData) {
 	uint8_t preamble[] = {1,1,1,0,0,0,0,0,0,0,0,1,0,1,0,1};
 	size_t startIdx = 0;
 	uint8_t fc1 = 0, fc2 = 0, ans = 0;
-	int clk = 0;
+	int clk = 0, firstClockEdge = 0;
 	bool st = true;
 
 	if ( getData ) {
@@ -1564,7 +1564,7 @@ bool tryDetectP1(bool getData) {
 	}
 
 	// try fsk clock detect. if successful it cannot be any other type of modulation...  (in theory...)
-	ans = fskClocks(&fc1, &fc2, (uint8_t *)&clk, false);
+	ans = fskClocks(&fc1, &fc2, (uint8_t *)&clk, false, &firstClockEdge);
 	if (ans && ((fc1==10 && fc2==8) || (fc1==8 && fc2==5))) {
 		if ( FSKrawDemod("0 0", false) && 
 			  preambleSearchEx(DemodBuffer,preamble,sizeof(preamble),&DemodBufferLen,&startIdx,false) && 

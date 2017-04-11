@@ -64,14 +64,12 @@ int FSKrawDemod(const char *Cmd, bool verbose);
 int PSKDemod(const char *Cmd, bool verbose);
 int NRZrawDemod(const char *Cmd, bool verbose);
 int getSamples(int n, bool silent);
-
+void setClockGrid(int clk, int offset);
 
 #define MAX_DEMOD_BUF_LEN (1024*128)
 extern uint8_t DemodBuffer[MAX_DEMOD_BUF_LEN];
 extern size_t DemodBufferLen;
 extern uint8_t g_debugMode;
-//extern size_t g_demodStartIdx;
-//extern uint8_t g_demodClock;
 #define BIGBUF_SIZE 40000
 
 #endif

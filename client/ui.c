@@ -12,6 +12,7 @@
 #include <stdarg.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <stdbool.h>
 #include <readline/readline.h>
 #include <pthread.h>
 
@@ -21,6 +22,9 @@ double CursorScaleFactor;
 int PlotGridX, PlotGridY, PlotGridXdefault= 64, PlotGridYdefault= 64, CursorCPos= 0, CursorDPos= 0;
 int offline;
 int flushAfterWrite = 0;  //buzzy
+int GridOffset = 0;
+bool GridLocked = 0;
+
 extern pthread_mutex_t print_lock;
 
 static char *logfilename = "proxmark3.log";

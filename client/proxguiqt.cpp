@@ -22,8 +22,6 @@
 #include "proxguiqt.h"
 #include "proxgui.h"
 
-int GridOffset= 0;
-bool GridLocked= 0;
 int startMax;
 int PageWidth;
 
