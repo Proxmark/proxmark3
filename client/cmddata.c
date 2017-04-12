@@ -28,6 +28,8 @@
 uint8_t DemodBuffer[MAX_DEMOD_BUF_LEN];
 uint8_t g_debugMode=0;
 size_t DemodBufferLen=0;
+int g_DemodStartIdx=0;
+int g_DemodClock=0;
 
 static int CmdHelp(const char *Cmd);
 
@@ -245,7 +247,6 @@ int ASKDemod_ext(const char *Cmd, bool verbose, bool emSearch, uint8_t askType, 
 		return 0;
 	}
 	if (verbose || g_debugMode) PrintAndLog("\nUsing Clock:%d, Invert:%d, Bits Found:%d",clk,invert,BitLen);
-
 	//output
 	setDemodBuf(BitStream,BitLen,0);
 	setClockGrid(clk, startIdx);
@@ -295,11 +296,11 @@ int Cmdaskmandemod(const char *Cmd)
 	}
 	bool st = true;
 	if (Cmd[0]=='s') 
-		return ASKDemod_ext(Cmd++, true, true, 1, &st);
+		return ASKDemod_ext(Cmd++, true, false, 1, &st);
 	else if (Cmd[1] == 's')
-		return ASKDemod_ext(Cmd+=2, true, true, 1, &st);
+		return ASKDemod_ext(Cmd+=2, true, false, 1, &st);
 	else
-		return ASKDemod(Cmd, true, true, 1);
+		return ASKDemod(Cmd, true, false, 1);
 }
 
 //by marshmellow
@@ -797,7 +798,7 @@ int FSKrawDemod(const char *Cmd, bool verbose)
 	if (size > 0) {
 		setDemodBuf(BitStream,size,0);
 		setClockGrid(rfLen, startIdx);
-
+	
 		// Now output the bitstream to the scrollback by line of 16 bits
 		if (verbose || g_debugMode) {
 			PrintAndLog("\nUsing Clock:%u, invert:%u, fchigh:%u, fclow:%u", (unsigned int)rfLen, (unsigned int)invert, (unsigned int)fchigh, (unsigned int)fclow);
@@ -1057,6 +1058,9 @@ int CmdRawDemod(const char *Cmd)
 }
 
 void setClockGrid(int clk, int offset) {
+	g_DemodStartIdx = offset;
+	g_DemodClock = clk;
+	PrintAndLog("demodoffset %d, clk %d",offset,clk);
 	if (offset > clk) offset %= clk;
 	if (offset < 0) offset += clk;
 
@@ -1213,6 +1217,7 @@ int getSamples(int n, bool silent)
 		GraphTraceLen = n;
 	}
 
+	setClockGrid(0,0);
 	RepaintGraphWindow();
 	return 0;
 }
@@ -1316,6 +1321,7 @@ int CmdLoad(const char *Cmd)
 	}
 	fclose(f);
 	PrintAndLog("loaded %d samples", GraphTraceLen);
+	setClockGrid(0,0);
 	RepaintGraphWindow();
 	return 0;
 }

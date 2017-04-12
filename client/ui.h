@@ -25,5 +25,6 @@ extern int PlotGridX, PlotGridY, PlotGridXdefault, PlotGridYdefault, CursorCPos,
 extern int offline;
 extern int flushAfterWrite;   //buzzy
 extern bool GridLocked;
+extern bool showDemod;
 
 #endif

@@ -69,6 +69,8 @@ void setClockGrid(int clk, int offset);
 #define MAX_DEMOD_BUF_LEN (1024*128)
 extern uint8_t DemodBuffer[MAX_DEMOD_BUF_LEN];
 extern size_t DemodBufferLen;
+extern int g_DemodStartIdx;
+extern int g_DemodClock;
 extern uint8_t g_debugMode;
 #define BIGBUF_SIZE 40000
 

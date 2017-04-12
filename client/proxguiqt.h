@@ -13,26 +13,66 @@
 #include <QObject>
 #include <QWidget>
 #include <QPainter>
+#include <QtGui>
 
+#include "ui/ui_overlays.h"
+/**
+ * @brief The actual plot, black area were we paint the graph
+ */
+class Plot: public QWidget
+{
+private:
+	int GraphStart;
+	double GraphPixelsPerPoint;
+	int CursorAPos;
+	int CursorBPos;
+	void PlotGraph(int *buffer, int len, QRect r,QRect r2, QPainter* painter, int graphNum);
+	void PlotDemod(uint8_t *buffer, size_t len, QRect r,QRect r2, QPainter* painter, int graphNum, int plotOffset);
+	void plotGridLines(QPainter* painter,QRect r);
+	int xCoordOf(int i, QRect r );
+	int yCoordOf(int v, QRect r, int maxVal);
+	int valueOf_yCoord(int y, QRect r, int maxVal);
+	QColor getColor(int graphNum);
+public:
+	Plot(QWidget *parent = 0);
+
+protected:
+	void paintEvent(QPaintEvent *event);
+	void closeEvent(QCloseEvent *event);
+	void mouseMoveEvent(QMouseEvent *event);
+	void mousePressEvent(QMouseEvent *event) { mouseMoveEvent(event); }
+	void keyPressEvent(QKeyEvent *event);
+
+};
+class ProxGuiQT;
+
+/**
+ * The window with plot and controls
+ */
 class ProxWidget : public QWidget
 {
 	Q_OBJECT;
 
 	private:
-		int GraphStart;
-		double GraphPixelsPerPoint;
-		int CursorAPos;
-		int CursorBPos;
-
+		Plot *plot;
+		Ui::Form *opsController;
+		ProxGuiQT *master;
+	
 	public:
-		ProxWidget(QWidget *parent = 0);
+		ProxWidget(QWidget *parent = 0, ProxGuiQT *master = NULL);
 
-	protected:
-		void paintEvent(QPaintEvent *event);
-		void closeEvent(QCloseEvent *event);
-		void mouseMoveEvent(QMouseEvent *event);
-		void mousePressEvent(QMouseEvent *event) { mouseMoveEvent(event); }
-		void keyPressEvent(QKeyEvent *event);
+	//protected:
+	//	void paintEvent(QPaintEvent *event);
+	//	void closeEvent(QCloseEvent *event);
+	//	void mouseMoveEvent(QMouseEvent *event);
+	//	void mousePressEvent(QMouseEvent *event) { mouseMoveEvent(event); }
+	//	void keyPressEvent(QKeyEvent *event);
+	public slots:
+		void applyOperation();
+		void stickOperation();
+		void vchange_autocorr(int v);
+		void vchange_dthr_up(int v);
+		void vchange_dthr_down(int v);
 };
 
 class ProxGuiQT : public QObject
