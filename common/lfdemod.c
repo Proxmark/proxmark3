@@ -833,15 +833,9 @@ int DetectPSKClock(uint8_t dest[], size_t size, int clock, size_t *firstPhaseShi
 	return clk[best];
 }
 
-//int DetectPSKClock(uint8_t dest[], size_t size, int clock) {
-//	size_t firstPhaseShift = 0;
-//	uint8_t curPhase = 0;
-//	return DetectPSKClock_ext(dest, size, clock, &firstPhaseShift, &curPhase);
-//}
-
 //by marshmellow
 //detects the bit clock for FSK given the high and low Field Clocks
-uint8_t detectFSKClk_ext(uint8_t *BitStream, size_t size, uint8_t fcHigh, uint8_t fcLow, int *firstClockEdge) {
+uint8_t detectFSKClk(uint8_t *BitStream, size_t size, uint8_t fcHigh, uint8_t fcLow, int *firstClockEdge) {
 	uint8_t clk[] = {8,16,32,40,50,64,100,128,0};
 	uint16_t rfLens[] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
 	uint8_t rfCnts[] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
@@ -947,11 +941,6 @@ uint8_t detectFSKClk_ext(uint8_t *BitStream, size_t size, uint8_t fcHigh, uint8_
 	return clk[ii];
 }
 
-uint8_t	detectFSKClk(uint8_t *BitStream, size_t size, uint8_t fcHigh, uint8_t fcLow) {
-	int firstClockEdge = 0;
-	return detectFSKClk_ext(BitStream, size, fcHigh, fcLow, &firstClockEdge);
-}
-
 //**********************************************************************************************
 //--------------------Modulation Demods &/or Decoding Section-----------------------------------
 //**********************************************************************************************
@@ -977,7 +966,7 @@ bool findST(int *stStopLoc, int *stStartIdx, int lowToLowWaveLen[], int highToLo
 }
 //by marshmellow
 //attempt to identify a Sequence Terminator in ASK modulated raw wave
-bool DetectST_ext(uint8_t buffer[], size_t *size, int *foundclock, size_t *ststart, size_t *stend) {
+bool DetectST(uint8_t buffer[], size_t *size, int *foundclock, size_t *ststart, size_t *stend) {
 	size_t bufsize = *size;
 	//need to loop through all samples and identify our clock, look for the ST pattern
 	int clk = 0; 
@@ -1097,10 +1086,6 @@ bool DetectST_ext(uint8_t buffer[], size_t *size, int *foundclock, size_t *ststa
 	}
 	*size = newloc;
 	return true;
-}
-bool DetectST(uint8_t	buffer[], size_t *size, int *foundclock) {
-	size_t ststart = 0, stend = 0;
-	return DetectST_ext(buffer, size, foundclock, &ststart, &stend);
 }
 
 //by marshmellow

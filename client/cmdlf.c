@@ -548,10 +548,10 @@ int CmdLFfskSim(const char *Cmd)
 	{
 		return usage_lf_simfsk();
 	}
-
+	int firstClockEdge = 0;
 	if (dataLen == 0){ //using DemodBuffer 
 		if (clk==0 || fcHigh==0 || fcLow==0){ //manual settings must set them all
-			uint8_t ans = fskClocks(&fcHigh, &fcLow, &clk, 0);
+			uint8_t ans = fskClocks(&fcHigh, &fcLow, &clk, 0, &firstClockEdge);
 			if (ans==0){
 				if (!fcHigh) fcHigh=10;
 				if (!fcLow) fcLow=8;

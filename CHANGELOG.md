@@ -57,6 +57,7 @@ This project uses the changelog in accordance with [keepchangelog](http://keepac
 - Added option c to 'hf list' (mark CRC bytes) (piwi)
 
 ### Changed
+- Adjusted the lf demods to auto align and set the grid for the graph plot. 
 - `lf snoop` now automatically gets samples from the device
 - `lf read` now accepts [#samples] as arg. && now automatically gets samples from the device
 - adjusted lf t5 chip timings to use WaitUS. and adjusted the readblock timings

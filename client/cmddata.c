@@ -28,8 +28,6 @@
 uint8_t DemodBuffer[MAX_DEMOD_BUF_LEN];
 uint8_t g_debugMode=0;
 size_t DemodBufferLen=0;
-//size_t g_demodStartIdx=0;
-//uint8_t g_demodClock=0;
 
 static int CmdHelp(const char *Cmd);
 
@@ -223,7 +221,7 @@ int ASKDemod_ext(const char *Cmd, bool verbose, bool emSearch, uint8_t askType, 
 	}
 	bool st = false;
 	size_t ststart = 0, stend = 0;
-	if (*stCheck) st = DetectST_ext(BitStream, &BitLen, &foundclk, &ststart, &stend);
+	if (*stCheck) st = DetectST(BitStream, &BitLen, &foundclk, &ststart, &stend);
 	*stCheck = st;
 	if (st) {
 		clk = (clk == 0) ? foundclk : clk;
@@ -236,7 +234,8 @@ int ASKDemod_ext(const char *Cmd, bool verbose, bool emSearch, uint8_t askType, 
 		//}
 		//RepaintGraphWindow();
 	}
-	int errCnt = askdemod(BitStream, &BitLen, &clk, &invert, maxErr, askamp, askType);
+	int startIdx = 0;
+	int errCnt = askdemod_ext(BitStream, &BitLen, &clk, &invert, maxErr, askamp, askType, &startIdx);
 	if (errCnt<0 || BitLen<16){  //if fatal error (or -1)
 		if (g_debugMode) PrintAndLog("DEBUG: no data found %d, errors:%d, bitlen:%d, clock:%d",errCnt,invert,BitLen,clk);
 		return 0;
@@ -249,6 +248,8 @@ int ASKDemod_ext(const char *Cmd, bool verbose, bool emSearch, uint8_t askType, 
 
 	//output
 	setDemodBuf(BitStream,BitLen,0);
+	setClockGrid(clk, startIdx);
+
 	if (verbose || g_debugMode){
 		if (errCnt>0) PrintAndLog("# Errors during Demoding (shown as 7 in bit stream): %d",errCnt);
 		if (askType) PrintAndLog("ASK/Manchester - Clock: %d - Decoded bitstream:",clk);
@@ -787,12 +788,15 @@ int FSKrawDemod(const char *Cmd, bool verbose)
 	}
 	//get bit clock length
 	if (!rfLen) {
-		rfLen = detectFSKClk(BitStream, BitLen, fchigh, fclow);
+		int firstClockEdge = 0; //todo - align grid on graph with this...
+		rfLen = detectFSKClk(BitStream, BitLen, fchigh, fclow, &firstClockEdge);
 		if (!rfLen) rfLen = 50;
 	}
-	int size = fskdemod(BitStream, BitLen, rfLen, invert, fchigh, fclow);
+	int startIdx = 0;
+	int size = fskdemod_ext(BitStream, BitLen, rfLen, invert, fchigh, fclow, &startIdx);
 	if (size > 0) {
 		setDemodBuf(BitStream,size,0);
+		setClockGrid(rfLen, startIdx);
 
 		// Now output the bitstream to the scrollback by line of 16 bits
 		if (verbose || g_debugMode) {
@@ -854,7 +858,8 @@ int PSKDemod(const char *Cmd, bool verbose)
 	size_t BitLen = getFromGraphBuf(BitStream);
 	if (BitLen==0) return 0;
 	int errCnt=0;
-	errCnt = pskRawDemod(BitStream, &BitLen, &clk, &invert);
+	int startIdx = 0;
+	errCnt = pskRawDemod_ext(BitStream, &BitLen, &clk, &invert, &startIdx);
 	if (errCnt > maxErr){
 		if (g_debugMode || verbose) PrintAndLog("Too many errors found, clk: %d, invert: %d, numbits: %d, errCnt: %d",clk,invert,BitLen,errCnt);
 		return 0;
@@ -871,6 +876,8 @@ int PSKDemod(const char *Cmd, bool verbose)
 	}
 	//prime demod buffer for output
 	setDemodBuf(BitStream,BitLen,0);
+	setClockGrid(clk, startIdx);
+
 	return 1;
 }
 
@@ -909,6 +916,8 @@ int NRZrawDemod(const char *Cmd, bool verbose)
 	if (verbose || g_debugMode) PrintAndLog("Tried NRZ Demod using Clock: %d - invert: %d - Bits Found: %d",clk,invert,BitLen);
 	//prime demod buffer for output
 	setDemodBuf(BitStream,BitLen,0);
+	setClockGrid(clk, clkStartIdx);
+
 
 	if (errCnt>0 && (verbose || g_debugMode)) PrintAndLog("# Errors during Demoding (shown as 7 in bit stream): %d",errCnt);
 	if (verbose || g_debugMode) {
@@ -1045,6 +1054,26 @@ int CmdRawDemod(const char *Cmd)
 		PrintAndLog("unknown modulation entered - see help ('h') for parameter structure");
 	}
 	return ans;
+}
+
+void setClockGrid(int clk, int offset) {
+	if (offset > clk) offset %= clk;
+	if (offset < 0) offset += clk;
+
+	if (offset > GraphTraceLen || offset < 0) return;
+	if (clk < 8 || clk > GraphTraceLen) {
+		GridLocked = false;
+		GridOffset = 0;
+		PlotGridX = 0;
+		PlotGridXdefault = 0;
+		RepaintGraphWindow();
+	} else {
+		GridLocked = true;
+		GridOffset = offset;
+		PlotGridX = clk;
+		PlotGridXdefault = clk;
+		RepaintGraphWindow();
+	}
 }
 
 int CmdGrid(const char *Cmd)
@@ -1561,7 +1590,6 @@ static command_t CommandTable[] =
 	{"buffclear",       CmdBuffClear,       1, "Clear sample buffer and graph window"},
 	{"dec",             CmdDec,             1, "Decimate samples"},
 	{"detectclock",     CmdDetectClockRate, 1, "[modulation] Detect clock rate of wave in GraphBuffer (options: 'a','f','n','p' for ask, fsk, nrz, psk respectively)"},
-	//{"fskfcdetect",   CmdFSKfcDetect,     1, "Try to detect the Field Clock of an FSK wave"},
 	{"getbitstream",    CmdGetBitStream,    1, "Convert GraphBuffer's >=1 values to 1 and <1 to 0"},
 	{"grid",            CmdGrid,            1, "<x> <y> -- overlay grid on graph window, use zero value to turn off either"},
 	{"hexsamples",      CmdHexsamples,      0, "<bytes> [<offset>] -- Dump big buffer as hex bytes"},
