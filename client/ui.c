@@ -18,12 +18,12 @@
 
 #include "ui.h"
 
-double CursorScaleFactor;
+double CursorScaleFactor = 1;
 int PlotGridX, PlotGridY, PlotGridXdefault= 64, PlotGridYdefault= 64, CursorCPos= 0, CursorDPos= 0;
 int offline;
 int flushAfterWrite = 0;  //buzzy
 int GridOffset = 0;
-bool GridLocked = 0;
+bool GridLocked = false;
 
 extern pthread_mutex_t print_lock;
 
