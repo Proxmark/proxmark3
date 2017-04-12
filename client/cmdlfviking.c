@@ -73,7 +73,8 @@ int CmdVikingDemod(const char *Cmd) {
 	uint8_t  checksum = bytebits_to_byte(DemodBuffer+ans+32+24, 8);
 	PrintAndLog("Viking Tag Found: Card ID %08X, Checksum: %02X", cardid, (unsigned int) checksum);
 	PrintAndLog("Raw: %08X%08X", raw1,raw2);
-	setDemodBuf(DemodBuffer+ans, 64, 0);
+	setDemodBuf(DemodBuffer, 64, ans);
+	setClockGrid(g_DemodClock, g_DemodStartIdx + (ans*g_DemodClock));
 	return 1;
 }
 

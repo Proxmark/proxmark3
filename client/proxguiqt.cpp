@@ -19,6 +19,7 @@
 #include <math.h>
 #include <limits.h>
 #include <stdio.h>
+#include <QSlider>
 #include <QHBoxLayout>
 #include <string.h>
 #include "proxguiqt.h"
@@ -431,11 +432,11 @@ void Plot::paintEvent(QPaintEvent *event)
 	plotGridLines(&painter, plotRect);
 
 	//Start painting graph
-	PlotGraph(GraphBuffer, GraphTraceLen,plotRect,infoRect,&painter,0);
-	PlotGraph(s_Buff, GraphTraceLen,plotRect,infoRect,&painter,1);
 	if (showDemod && DemodBufferLen	> 8) {
 		PlotDemod(DemodBuffer, DemodBufferLen,plotRect,infoRect,&painter,2,g_DemodStartIdx);
 	}
+	PlotGraph(s_Buff, GraphTraceLen,plotRect,infoRect,&painter,1);
+	PlotGraph(GraphBuffer, GraphTraceLen,plotRect,infoRect,&painter,0);
 	// End graph drawing
 
 	//Draw the cursors
@@ -472,6 +473,7 @@ void Plot::paintEvent(QPaintEvent *event)
 
 Plot::Plot(QWidget *parent) : QWidget(parent), GraphStart(0), GraphPixelsPerPoint(1)
 {
+	//Need to set this, otherwise we don't receive keypress events
 	setFocusPolicy( Qt::StrongFocus);
 	resize(600, 300);
 

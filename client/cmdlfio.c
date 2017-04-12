@@ -119,6 +119,8 @@ int CmdFSKdemodIO(const char *Cmd)
 
   PrintAndLog("IO Prox XSF(%02d)%02x:%05d (%08x%08x) [%02x %s]",version,facilitycode,number,code,code2, crc, crcStr);
   setDemodBuf(BitStream,64,idx);
+  setClockGrid(g_DemodClock, g_DemodStartIdx + (idx*g_DemodClock));
+
   if (g_debugMode){
     PrintAndLog("DEBUG: idx: %d, Len: %d, Printing demod buffer:",idx,64);
     printDemodBuff();

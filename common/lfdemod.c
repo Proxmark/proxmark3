@@ -1130,10 +1130,10 @@ int millerRawDecode(uint8_t *BitStream, size_t *size, int invert) {
 //take 01 or 10 = 1 and 11 or 00 = 0
 //check for phase errors - should never have 111 or 000 should be 01001011 or 10110100 for 1010
 //decodes biphase or if inverted it is AKA conditional dephase encoding AKA differential manchester encoding
-int BiphaseRawDecode(uint8_t *BitStream, size_t *size, int offset, int invert) {
+int BiphaseRawDecode(uint8_t *BitStream, size_t *size, int *offset, int invert) {
 	uint16_t bitnum = 0;
 	uint16_t errCnt = 0;
-	size_t i = offset;
+	size_t i = *offset;
 	uint16_t MaxBits=512;
 	//if not enough samples - error
 	if (*size < 51) return -1;
@@ -1143,8 +1143,8 @@ int BiphaseRawDecode(uint8_t *BitStream, size_t *size, int offset, int invert) {
 		if (BitStream[i+1]==BitStream[i+2]) offsetA=0; 
 		if (BitStream[i+2]==BitStream[i+3]) offsetB=0;					
 	}
-	if (!offsetA && offsetB) offset++;
-	for (i=offset; i<*size-3; i+=2){
+	if (!offsetA && offsetB) *offset+=1;
+	for (i=*offset; i<*size-3; i+=2){
 		//check for phase error
 		if (BitStream[i+1]==BitStream[i+2]) {
 			BitStream[bitnum++]=7;
@@ -1490,6 +1490,7 @@ size_t aggregate_bits(uint8_t *dest, size_t size, uint8_t rfLen, uint8_t invert,
 //by marshmellow  (from holiman's base)
 // full fsk demod from GraphBuffer wave to decoded 1s and 0s (no mandemod)
 int fskdemod_ext(uint8_t *dest, size_t size, uint8_t rfLen, uint8_t invert, uint8_t fchigh, uint8_t fclow, int *startIdx) {
+	if (justNoise(dest, *size)) return 0;
 	// FSK demodulator
 	size = fsk_wave_demod(dest, size, fchigh, fclow, startIdx);
 	size = aggregate_bits(dest, size, rfLen, invert, fchigh, fclow, startIdx);
@@ -1631,8 +1632,6 @@ int AWIDdemodFSK(uint8_t *dest, size_t *size) {
 	//make sure buffer has enough data
 	if (*size < 96*50) return -1;
 
-	if (justNoise(dest, *size)) return -2;
-
 	// FSK demodulator
 	*size = fskdemod(dest, *size, 50, 1, 10, 8);  // fsk2a RF/50 
 	if (*size < 96) return -3;  //did we get a good demod?
@@ -1717,8 +1716,6 @@ int gProxII_Demod(uint8_t BitStream[], size_t *size) {
 
 // loop to get raw HID waveform then FSK demodulate the TAG ID from it
 int HIDdemodFSK(uint8_t *dest, size_t *size, uint32_t *hi2, uint32_t *hi, uint32_t *lo) {
-	if (justNoise(dest, *size)) return -1;
-
 	size_t numStart=0, size2=*size, startIdx=0; 
 	// FSK demodulator
 	*size = fskdemod(dest, size2,50,1,10,8); //fsk2a
@@ -1747,7 +1744,6 @@ int HIDdemodFSK(uint8_t *dest, size_t *size, uint32_t *hi2, uint32_t *hi, uint32
 }
 
 int IOdemodFSK(uint8_t *dest, size_t size) {
-	if (justNoise(dest, size)) return -1;
 	//make sure buffer has data
 	if (size < 66*64) return -2;
 	// FSK demodulator
@@ -1797,8 +1793,6 @@ int indala26decode(uint8_t *bitStream, size_t *size, uint8_t *invert) {
 
 // loop to get raw paradox waveform then FSK demodulate the TAG ID from it
 int ParadoxdemodFSK(uint8_t *dest, size_t *size, uint32_t *hi2, uint32_t *hi, uint32_t *lo) {
-	if (justNoise(dest, *size)) return -1;
-	
 	size_t numStart=0, size2=*size, startIdx=0;
 	// FSK demodulator
 	*size = fskdemod(dest, size2,50,1,10,8); //fsk2a
@@ -1844,9 +1838,6 @@ int PrescoDemod(uint8_t *dest, size_t *size) {
 int PyramiddemodFSK(uint8_t *dest, size_t *size) {
 	//make sure buffer has data
 	if (*size < 128*50) return -5;
-
-	//test samples are not just noise
-	if (justNoise(dest, *size)) return -1;
 
 	// FSK demodulator
 	*size = fskdemod(dest, *size, 50, 1, 10, 8);  // fsk2a RF/50 

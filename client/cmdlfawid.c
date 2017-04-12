@@ -126,6 +126,7 @@ int CmdFSKdemodAWID(const char *Cmd)
 	uint32_t rawHi = bytebits_to_byte(BitStream+idx+32,32);
 	uint32_t rawHi2 = bytebits_to_byte(BitStream+idx,32);
 	setDemodBuf(BitStream,96,idx);
+	setClockGrid(g_DemodClock, g_DemodStartIdx + (idx*g_DemodClock));
 
 	size = removeParity(BitStream, idx+8, 4, 1, 88);
 	if (size != 66){

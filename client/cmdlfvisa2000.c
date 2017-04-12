@@ -119,7 +119,7 @@ int CmdVisa2kDemod(const char *Cmd) {
 		return 0;
 	}
 	setDemodBuf(DemodBuffer, 96, ans);
-	//setGrid_Clock(64);
+	setClockGrid(g_DemodClock, g_DemodStartIdx + (ans*g_DemodClock));
 
 	//got a good demod
 	uint32_t raw1 = bytebits_to_byte(DemodBuffer, 32);

@@ -394,7 +394,7 @@ int CmdBiphaseDecodeRaw(const char *Cmd)
 	uint8_t BitStream[MAX_DEMOD_BUF_LEN]={0};
 	size = sizeof(BitStream);
 	if ( !getDemodBuf(BitStream, &size) ) return 0;
-	errCnt=BiphaseRawDecode(BitStream, &size, offset, invert);
+	errCnt=BiphaseRawDecode(BitStream, &size, &offset, invert);
 	if (errCnt<0){
 		PrintAndLog("Error during decode:%d", errCnt);
 		return 0;
@@ -407,10 +407,12 @@ int CmdBiphaseDecodeRaw(const char *Cmd)
 	if (errCnt>0){
 		PrintAndLog("# Errors found during Demod (shown as 7 in bit stream): %d",errCnt);
 	}
+
 	PrintAndLog("Biphase Decoded using offset: %d - # invert:%d - data:",offset,invert);
 	PrintAndLog("%s", sprint_bin_break(BitStream, size, 16));
 	
 	if (offset) setDemodBuf(DemodBuffer,DemodBufferLen-offset, offset);  //remove first bit from raw demod
+	setClockGrid(g_DemodClock, g_DemodStartIdx + g_DemodClock*offset/2);
 	return 1;
 }
 
@@ -423,26 +425,28 @@ int ASKbiphaseDemod(const char *Cmd, bool verbose)
 	sscanf(Cmd, "%i %i %i %i", &offset, &clk, &invert, &maxErr);
 
 	uint8_t BitStream[MAX_GRAPH_TRACE_LEN];	  
-	size_t size = getFromGraphBuf(BitStream);	  
+	size_t size = getFromGraphBuf(BitStream);
+	int startIdx = 0;
 	//invert here inverts the ask raw demoded bits which has no effect on the demod, but we need the pointer
-	int errCnt = askdemod(BitStream, &size, &clk, &invert, maxErr, 0, 0);  
+	int errCnt = askdemod_ext(BitStream, &size, &clk, &invert, maxErr, 0, 0, &startIdx);  
 	if ( errCnt < 0 || errCnt > maxErr ) {   
 		if (g_debugMode) PrintAndLog("DEBUG: no data or error found %d, clock: %d", errCnt, clk);  
 			return 0;  
-	} 
+	}
 
 	//attempt to Biphase decode BitStream
-	errCnt = BiphaseRawDecode(BitStream, &size, offset, invert);
+	errCnt = BiphaseRawDecode(BitStream, &size, &offset, invert);
 	if (errCnt < 0){
 		if (g_debugMode || verbose) PrintAndLog("Error BiphaseRawDecode: %d", errCnt);
 		return 0;
-	} 
+	}
 	if (errCnt > maxErr) {
 		if (g_debugMode || verbose) PrintAndLog("Error BiphaseRawDecode too many errors: %d", errCnt);
 		return 0;
 	}
 	//success set DemodBuffer and return
 	setDemodBuf(BitStream, size, 0);
+	setClockGrid(clk, startIdx + clk*offset/2);
 	if (g_debugMode || verbose){
 		PrintAndLog("Biphase Decoded using offset: %d - clock: %d - # errors:%d - data:",offset,clk,errCnt);
 		printDemodBuff();
