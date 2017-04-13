@@ -1059,7 +1059,7 @@ int CmdLFfind(const char *Cmd)
 		ans=CheckChipType(cmdp);
 		//test unknown tag formats (raw mode)0
 		PrintAndLog("\nChecking for Unknown tags:\n");
-		ans=AutoCorrelate(4000, false, false);
+		ans=AutoCorrelate(GraphBuffer, GraphBuffer, GraphTraceLen, 4000, false, false);
 		if (ans > 0) PrintAndLog("Possible Auto Correlation of %d repeating samples",ans);
 		ans=GetFskClock("",false,false); 
 		if (ans != 0) { //fsk

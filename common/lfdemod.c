@@ -1490,7 +1490,7 @@ size_t aggregate_bits(uint8_t *dest, size_t size, uint8_t rfLen, uint8_t invert,
 //by marshmellow  (from holiman's base)
 // full fsk demod from GraphBuffer wave to decoded 1s and 0s (no mandemod)
 int fskdemod_ext(uint8_t *dest, size_t size, uint8_t rfLen, uint8_t invert, uint8_t fchigh, uint8_t fclow, int *startIdx) {
-	if (justNoise(dest, *size)) return 0;
+	if (justNoise(dest, size)) return 0;
 	// FSK demodulator
 	size = fsk_wave_demod(dest, size, fchigh, fclow, startIdx);
 	size = aggregate_bits(dest, size, rfLen, invert, fchigh, fclow, startIdx);

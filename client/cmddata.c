@@ -507,45 +507,44 @@ int Cmdaskrawdemod(const char *Cmd)
 	return ASKDemod(Cmd, true, false, 0);
 }
 
-int AutoCorrelate(int window, bool SaveGrph, bool verbose)
+int AutoCorrelate(const int *in, int *out, size_t len, int window, bool SaveGrph, bool verbose)
 {
 	static int CorrelBuffer[MAX_GRAPH_TRACE_LEN];
 	size_t Correlation = 0;
 	int maxSum = 0;
 	int lastMax = 0;
 	if (verbose) PrintAndLog("performing %d correlations", GraphTraceLen - window);
-	for (int i = 0; i < GraphTraceLen - window; ++i) {
+	for (int i = 0; i < len - window; ++i) {
 		int sum = 0;
 		for (int j = 0; j < window; ++j) {
-			sum += (GraphBuffer[j]*GraphBuffer[i + j]) / 256;
+			sum += (in[j]*in[i + j]) / 256;
 		}
 		CorrelBuffer[i] = sum;
-		if (sum >= maxSum-100 && sum <= maxSum+100){
+		if (sum >= maxSum-100 && sum <= maxSum+100) {
 			//another max
 			Correlation = i-lastMax;
 			lastMax = i;
 			if (sum > maxSum) maxSum = sum;
-		} else if (sum > maxSum){
+		} else if (sum > maxSum) {
 			maxSum=sum;
 			lastMax = i;
 		}
 	}
-	if (Correlation==0){
+	if (Correlation==0) {
 		//try again with wider margin
-		for (int i = 0; i < GraphTraceLen - window; i++){
-			if (CorrelBuffer[i] >= maxSum-(maxSum*0.05) && CorrelBuffer[i] <= maxSum+(maxSum*0.05)){
+		for (int i = 0; i < len - window; i++) {
+			if (CorrelBuffer[i] >= maxSum-(maxSum*0.05) && CorrelBuffer[i] <= maxSum+(maxSum*0.05)) {
 				//another max
 				Correlation = i-lastMax;
 				lastMax = i;
-				//if (CorrelBuffer[i] > maxSum) maxSum = sum;
 			}
 		}
 	}
 	if (verbose && Correlation > 0) PrintAndLog("Possible Correlation: %d samples",Correlation);
 
-	if (SaveGrph){
-		GraphTraceLen = GraphTraceLen - window;
-		memcpy(GraphBuffer, CorrelBuffer, GraphTraceLen * sizeof (int));
+	if (SaveGrph) {
+		//GraphTraceLen = GraphTraceLen - window;
+		memcpy(out, CorrelBuffer, len * sizeof(int));
 		RepaintGraphWindow();  
 	}
 	return Correlation;
@@ -578,7 +577,7 @@ int CmdAutoCorr(const char *Cmd)
 		return 0;
 	}
 	if (grph == 'g') updateGrph=true;
-	return AutoCorrelate(window, updateGrph, true);
+	return AutoCorrelate(GraphBuffer, GraphBuffer, GraphTraceLen, window, updateGrph, true);
 }
 
 int CmdBitsamples(const char *Cmd)
@@ -681,6 +680,18 @@ int CmdGraphShiftZero(const char *Cmd)
 	return 0;
 }
 
+int AskEdgeDetect(const int *in, int *out, int len, int threshold) {
+	int Last = 0;
+	for(int i = 1; i<len; i++) {
+		if (in[i]-in[i-1] >= threshold) //large jump up
+			Last = 127;
+		else if(in[i]-in[i-1] <= -1 * threshold) //large jump down
+			Last = -127;
+		out[i-1] = Last;
+	}
+	return 0;
+}
+
 //by marshmellow
 //use large jumps in read samples to identify edges of waves and then amplify that wave to max
 //similar to dirtheshold, threshold commands 
@@ -688,18 +699,12 @@ int CmdGraphShiftZero(const char *Cmd)
 int CmdAskEdgeDetect(const char *Cmd)
 {
 	int thresLen = 25;
-	int Last = 0;
+	int ans = 0;
 	sscanf(Cmd, "%i", &thresLen); 
 
-	for(int i = 1; i<GraphTraceLen; i++){
-		if (GraphBuffer[i]-GraphBuffer[i-1]>=thresLen) //large jump up
-			Last = 127;
-		else if(GraphBuffer[i]-GraphBuffer[i-1]<=-1*thresLen) //large jump down
-			Last = -127;
-		GraphBuffer[i-1] = Last;
-	}
+	ans = AskEdgeDetect(GraphBuffer, GraphBuffer, GraphTraceLen, thresLen);
 	RepaintGraphWindow();
-	return 0;
+	return ans;
 }
 
 /* Print our clock rate */
@@ -1433,6 +1438,34 @@ int CmdScale(const char *Cmd)
 	return 0;
 }
 
+int directionalThreshold(const int* in, int *out, size_t len, int8_t up, int8_t down)
+{
+	int lastValue = in[0];
+	out[0] = 0; // Will be changed at the end, but init 0 as we adjust to last samples value if no threshold kicks in.
+
+	for (int i = 1; i < len; ++i) {
+		// Apply first threshold to samples heading up
+		if (in[i] >= up && in[i] > lastValue)
+		{
+			lastValue = out[i]; // Buffer last value as we overwrite it.
+			out[i] = 1;
+		}
+		// Apply second threshold to samples heading down
+		else if (in[i] <= down && in[i] < lastValue)
+		{
+			lastValue = out[i]; // Buffer last value as we overwrite it.
+			out[i] = -1;
+		}
+		else
+		{
+			lastValue = out[i]; // Buffer last value as we overwrite it.
+			out[i] = out[i-1];
+		}
+	}
+	out[0] = out[1]; // Align with first edited sample.
+	return 0;
+}
+
 int CmdDirectionalThreshold(const char *Cmd)
 {
 	int8_t upThres = param_get8(Cmd, 0);
@@ -1440,30 +1473,7 @@ int CmdDirectionalThreshold(const char *Cmd)
 
 	printf("Applying Up Threshold: %d, Down Threshold: %d\n", upThres, downThres);
 
-	int lastValue = GraphBuffer[0];
-	GraphBuffer[0] = 0; // Will be changed at the end, but init 0 as we adjust to last samples value if no threshold kicks in.
-
-	for (int i = 1; i < GraphTraceLen; ++i) {
-		// Apply first threshold to samples heading up
-		if (GraphBuffer[i] >= upThres && GraphBuffer[i] > lastValue)
-		{
-			lastValue = GraphBuffer[i]; // Buffer last value as we overwrite it.
-			GraphBuffer[i] = 127;
-		}
-		// Apply second threshold to samples heading down
-		else if (GraphBuffer[i] <= downThres && GraphBuffer[i] < lastValue)
-		{
-			lastValue = GraphBuffer[i]; // Buffer last value as we overwrite it.
-			GraphBuffer[i] = -127;
-		}
-		else
-		{
-			lastValue = GraphBuffer[i]; // Buffer last value as we overwrite it.
-			GraphBuffer[i] = GraphBuffer[i-1];
-
-		}
-	}
-	GraphBuffer[0] = GraphBuffer[1]; // Aline with first edited sample.
+	directionalThreshold(GraphBuffer, GraphBuffer,GraphTraceLen, upThres, downThres);
 	RepaintGraphWindow();
 	return 0;
 }

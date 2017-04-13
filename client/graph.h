@@ -37,7 +37,4 @@ extern int GraphBuffer[MAX_GRAPH_TRACE_LEN];
 extern int GraphTraceLen;
 extern int s_Buff[MAX_GRAPH_TRACE_LEN];
 
-int autoCorr(const int* in, int *out, size_t len, int window);
-int directionalThreshold(const int* in, int *out, size_t len, int8_t up, int8_t down);
-
 #endif

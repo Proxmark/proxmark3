@@ -71,6 +71,7 @@ class ProxWidget : public QWidget
 		void applyOperation();
 		void stickOperation();
 		void vchange_autocorr(int v);
+		void vchange_askedge(int v);
 		void vchange_dthr_up(int v);
 		void vchange_dthr_down(int v);
 };

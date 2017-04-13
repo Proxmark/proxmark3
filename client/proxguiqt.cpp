@@ -109,7 +109,7 @@ void ProxWidget::applyOperation()
 {
 	printf("ApplyOperation()");
 	save_restoreGB(1);
-	memcpy(GraphBuffer,s_Buff, sizeof(int) * GraphTraceLen);
+	memcpy(GraphBuffer, s_Buff, sizeof(int) * GraphTraceLen);
 	RepaintGraphWindow();
 
 }
@@ -120,14 +120,23 @@ void ProxWidget::stickOperation()
 }
 void ProxWidget::vchange_autocorr(int v)
 {
-	autoCorr(GraphBuffer,s_Buff, GraphTraceLen, v);
-	printf("vchange_autocorr(%d)\n", v);
+	int ans;
+	ans = AutoCorrelate(GraphBuffer, s_Buff, GraphTraceLen, v, true, false);
+	printf("vchange_autocorr(w:%d): %d\n", v, ans);
+	RepaintGraphWindow();
+}
+void ProxWidget::vchange_askedge(int v)
+{
+	int ans;
+	//extern int AskEdgeDetect(const int *in, int *out, int len, int threshold);
+	ans = AskEdgeDetect(GraphBuffer, s_Buff, GraphTraceLen, v);
+	printf("vchange_askedge(w:%d)\n", v);
 	RepaintGraphWindow();
 }
 void ProxWidget::vchange_dthr_up(int v)
 {
 	int down = opsController->horizontalSlider_dirthr_down->value();
-	directionalThreshold(GraphBuffer,s_Buff, GraphTraceLen, v, down);
+	directionalThreshold(GraphBuffer, s_Buff, GraphTraceLen, v, down);
 	printf("vchange_dthr_up(%d)", v);
 	RepaintGraphWindow();
 
@@ -161,6 +170,7 @@ ProxWidget::ProxWidget(QWidget *parent, ProxGuiQT *master) : QWidget(parent)
 	QObject::connect(opsController->horizontalSlider_window, SIGNAL(valueChanged(int)), this, SLOT(vchange_autocorr(int)));
 	QObject::connect(opsController->horizontalSlider_dirthr_up, SIGNAL(valueChanged(int)), this, SLOT(vchange_dthr_up(int)));
 	QObject::connect(opsController->horizontalSlider_dirthr_down, SIGNAL(valueChanged(int)), this, SLOT(vchange_dthr_down(int)));
+	QObject::connect(opsController->horizontalSlider_askedge, SIGNAL(valueChanged(int)), this, SLOT(vchange_askedge(int)));
 
 	controlWidget->show();
 
@@ -178,7 +188,7 @@ ProxWidget::ProxWidget(QWidget *parent, ProxGuiQT *master) : QWidget(parent)
 	//layout->addWidget(slider);
 	layout->addWidget(plot);
 	setLayout(layout);
-	//printf("Proxwidget Constructor just set layout\r\n");
+	printf("Proxwidget Constructor just set layout\r\n");
 }
 
 
