@@ -35,4 +35,6 @@ void DetectHighLowInGraph(int *high, int *low, bool addFuzz);
 
 extern int GraphBuffer[MAX_GRAPH_TRACE_LEN];
 extern int GraphTraceLen;
+extern int s_Buff[MAX_GRAPH_TRACE_LEN];
+
 #endif

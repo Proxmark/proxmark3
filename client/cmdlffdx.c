@@ -159,6 +159,8 @@ int CmdFdxDemod(const char *Cmd){
 
 	// set and leave DemodBuffer intact
 	setDemodBuf(DemodBuffer, 128, preambleIndex);
+	setClockGrid(g_DemodClock, g_DemodStartIdx + (preambleIndex*g_DemodClock));
+
 	uint8_t bits_no_spacer[117];
 	memcpy(bits_no_spacer, DemodBuffer + 11, 117);
 

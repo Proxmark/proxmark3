@@ -152,7 +152,9 @@ int AskEm410xDecode(bool verbose, uint32_t *hi, uint64_t *lo )
 
 	if (Em410xDecode(BitStream, &BitLen, &idx, hi, lo)) {
 		//set GraphBuffer for clone or sim command
-		setDemodBuf(BitStream, BitLen, idx);
+		setDemodBuf(DemodBuffer, (BitLen==40) ? 64 : 128, idx+1);
+		setClockGrid(g_DemodClock, g_DemodStartIdx + ((idx+1)*g_DemodClock));
+
 		if (g_debugMode) {
 			PrintAndLog("DEBUG: idx: %d, Len: %d, Printing Demod Buffer:", idx, BitLen);
 			printDemodBuff();
@@ -703,6 +705,8 @@ bool EM4x05testDemodReadData(uint32_t *word, bool readCmd) {
 		}
 
 		setDemodBuf(DemodBuffer, 32, 0);
+		//setClockGrid(0,0);
+
 		*word = bytebits_to_byteLSBF(DemodBuffer, 32);
 	}
 	return true;

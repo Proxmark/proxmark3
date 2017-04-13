@@ -46,6 +46,7 @@ int CmdIndalaDecode(const char *Cmd) {
 		return -1;
 	}
 	setDemodBuf(DemodBuffer, size, (size_t)startIdx);
+	setClockGrid(g_DemodClock, g_DemodStartIdx + (startIdx*g_DemodClock));
 	if (invert)
 		if (g_debugMode)
 			PrintAndLog("Had to invert bits");

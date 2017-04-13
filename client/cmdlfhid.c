@@ -99,6 +99,7 @@ int CmdFSKdemodHID(const char *Cmd)
       (unsigned int) fmtLen, (unsigned int) fc, (unsigned int) cardnum);
   }
   setDemodBuf(BitStream,BitLen,idx);
+  setClockGrid(g_DemodClock, g_DemodStartIdx + (idx*g_DemodClock));
   if (g_debugMode){ 
     PrintAndLog("DEBUG: idx: %d, Len: %d, Printing Demod Buffer:", idx, BitLen);
     printDemodBuff();

@@ -152,6 +152,7 @@ int CmdFSKdemodPyramid(const char *Cmd)
 	uint32_t rawHi2 = bytebits_to_byte(BitStream+idx+32,32);
 	uint32_t rawHi3 = bytebits_to_byte(BitStream+idx,32);
 	setDemodBuf(BitStream,128,idx);
+	setClockGrid(g_DemodClock, g_DemodStartIdx + (idx*g_DemodClock));
 
 	size = removeParity(BitStream, idx+8, 8, 1, 120);
 	if (size != 105){

@@ -18,6 +18,9 @@
 
 int GraphBuffer[MAX_GRAPH_TRACE_LEN];
 int GraphTraceLen;
+
+int s_Buff[MAX_GRAPH_TRACE_LEN];
+
 /* write a manchester bit to the graph */
 void AppendGraph(int redraw, int clock, int bit)
 {
