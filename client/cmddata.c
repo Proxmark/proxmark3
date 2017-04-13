@@ -807,8 +807,8 @@ int FSKrawDemod(const char *Cmd, bool verbose)
 	if (size > 0) {
 		setDemodBuf(BitStream,size,0);
 		setClockGrid(rfLen, startIdx);
-	
-		// Now output the bitstream to the scrollback by line of 16 bits
+
+    // Now output the bitstream to the scrollback by line of 16 bits
 		if (verbose || g_debugMode) {
 			PrintAndLog("\nUsing Clock:%u, invert:%u, fchigh:%u, fclow:%u", (unsigned int)rfLen, (unsigned int)invert, (unsigned int)fchigh, (unsigned int)fclow);
 			PrintAndLog("%s decoded bitstream:",GetFSKType(fchigh,fclow,invert));
@@ -1070,7 +1070,8 @@ void setClockGrid(int clk, int offset) {
 	g_DemodStartIdx = offset;
 	g_DemodClock = clk;
 	if (g_debugMode) PrintAndLog("demodoffset %d, clk %d",offset,clk);
-	if (offset > clk) offset %= clk;
+
+  if (offset > clk) offset %= clk;
 	if (offset < 0) offset += clk;
 
 	if (offset > GraphTraceLen || offset < 0) return;
