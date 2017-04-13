@@ -1069,7 +1069,7 @@ int CmdRawDemod(const char *Cmd)
 void setClockGrid(int clk, int offset) {
 	g_DemodStartIdx = offset;
 	g_DemodClock = clk;
-	PrintAndLog("demodoffset %d, clk %d",offset,clk);
+	if (g_debugMode) PrintAndLog("demodoffset %d, clk %d",offset,clk);
 	if (offset > clk) offset %= clk;
 	if (offset < 0) offset += clk;
 

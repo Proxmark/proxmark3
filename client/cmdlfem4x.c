@@ -705,7 +705,7 @@ bool EM4x05testDemodReadData(uint32_t *word, bool readCmd) {
 		}
 
 		setDemodBuf(DemodBuffer, 32, 0);
-		setClockGrid(0,0);
+		//setClockGrid(0,0);
 
 		*word = bytebits_to_byteLSBF(DemodBuffer, 32);
 	}
