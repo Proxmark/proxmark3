@@ -12,6 +12,7 @@
 #define UI_H__
 
 #include <stdbool.h>
+#include <stdint.h>
 
 void ShowGui(void);
 void HideGraphWindow(void);

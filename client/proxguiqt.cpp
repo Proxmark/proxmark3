@@ -23,7 +23,6 @@
 #include <QSlider>
 #include <QHBoxLayout>
 #include <string.h>
-#include "proxguiqt.h"
 #include "proxgui.h"
 #include <QtGui>
 //#include <ctime>
@@ -45,6 +44,11 @@ void ProxGuiQT::RepaintGraphWindow(void)
 void ProxGuiQT::HideGraphWindow(void)
 {
 	emit HideGraphWindowSignal();
+}
+
+void ProxGuiQT::Exit(void)
+{
+	emit ExitSignal();
 }
 
 void ProxGuiQT::_ShowGraphWindow(void)
@@ -74,6 +78,9 @@ void ProxGuiQT::_HideGraphWindow(void)
 	plotwidget->hide();
 }
 
+void ProxGuiQT::_Exit(void) {
+	delete this;
+}
 void ProxGuiQT::MainLoop()
 {
 	plotapp = new QApplication(argc, argv);
@@ -81,6 +88,7 @@ void ProxGuiQT::MainLoop()
 	connect(this, SIGNAL(ShowGraphWindowSignal()), this, SLOT(_ShowGraphWindow()));
 	connect(this, SIGNAL(RepaintGraphWindowSignal()), this, SLOT(_RepaintGraphWindow()));
 	connect(this, SIGNAL(HideGraphWindowSignal()), this, SLOT(_HideGraphWindow()));
+	connect(this, SIGNAL(ExitSignal()), this, SLOT(_Exit()));
 
 	plotapp->exec();
 }
@@ -92,12 +100,11 @@ ProxGuiQT::ProxGuiQT(int argc, char **argv) : plotapp(NULL), plotwidget(NULL),
 
 ProxGuiQT::~ProxGuiQT(void)
 {
-	if (plotwidget) {
-		//plotwidget->close();
-		delete plotwidget;
-		plotwidget = NULL;
-	}
-
+	//if (plotwidget) {
+		//plotwidget->destroy(true,true);
+	//	delete plotwidget;
+	//	plotwidget = NULL;
+	//}
 	if (plotapp) {
 		plotapp->quit();
 		delete plotapp;
@@ -108,22 +115,21 @@ ProxGuiQT::~ProxGuiQT(void)
 //--------------------
 void ProxWidget::applyOperation()
 {
-	printf("ApplyOperation()");
+	//printf("ApplyOperation()");
 	save_restoreGB(1);
 	memcpy(GraphBuffer, s_Buff, sizeof(int) * GraphTraceLen);
 	RepaintGraphWindow();
-
 }
 void ProxWidget::stickOperation()
 {
 	save_restoreGB(0);
-	printf("stickOperation()");
+	//printf("stickOperation()");
 }
 void ProxWidget::vchange_autocorr(int v)
 {
 	int ans;
 	ans = AutoCorrelate(GraphBuffer, s_Buff, GraphTraceLen, v, true, false);
-	printf("vchange_autocorr(w:%d): %d\n", v, ans);
+	if (g_debugMode) printf("vchange_autocorr(w:%d): %d\n", v, ans);
 	RepaintGraphWindow();
 }
 void ProxWidget::vchange_askedge(int v)
@@ -131,20 +137,20 @@ void ProxWidget::vchange_askedge(int v)
 	int ans;
 	//extern int AskEdgeDetect(const int *in, int *out, int len, int threshold);
 	ans = AskEdgeDetect(GraphBuffer, s_Buff, GraphTraceLen, v);
-	printf("vchange_askedge(w:%d)\n", v);
+	if (g_debugMode) printf("vchange_askedge(w:%d)%d\n", v, ans);
 	RepaintGraphWindow();
 }
 void ProxWidget::vchange_dthr_up(int v)
 {
 	int down = opsController->horizontalSlider_dirthr_down->value();
 	directionalThreshold(GraphBuffer, s_Buff, GraphTraceLen, v, down);
-	printf("vchange_dthr_up(%d)", v);
+	//printf("vchange_dthr_up(%d)", v);
 	RepaintGraphWindow();
 
 }
 void ProxWidget::vchange_dthr_down(int v)
 {
-	printf("vchange_dthr_down(%d)", v);
+	//printf("vchange_dthr_down(%d)", v);
 	int up = opsController->horizontalSlider_dirthr_up->value();
 	directionalThreshold(GraphBuffer,s_Buff, GraphTraceLen, v, up);
 	RepaintGraphWindow();
@@ -157,7 +163,7 @@ ProxWidget::ProxWidget(QWidget *parent, ProxGuiQT *master) : QWidget(parent)
 
 	/** Setup the controller widget **/
 
-	QWidget* controlWidget = new QWidget();
+	controlWidget = new QWidget();
 	opsController = new Ui::Form();
 	opsController->setupUi(controlWidget);
 	//Due to quirks in QT Designer, we need to fiddle a bit
@@ -189,9 +195,43 @@ ProxWidget::ProxWidget(QWidget *parent, ProxGuiQT *master) : QWidget(parent)
 	//layout->addWidget(slider);
 	layout->addWidget(plot);
 	setLayout(layout);
-	printf("Proxwidget Constructor just set layout\r\n");
+	//printf("Proxwidget Constructor just set layout\r\n");
 }
 
+// not 100% sure what i need in this block
+// feel free to fix - marshmellow...
+ProxWidget::~ProxWidget(void)
+{
+	if (controlWidget) {
+		controlWidget->close();
+		delete controlWidget;
+		controlWidget = NULL;
+	}
+
+	if (opsController) {
+		delete opsController;
+		opsController = NULL;
+	}
+
+	if (plot) {
+		plot->close();
+		delete plot;
+		plot = NULL;
+	}
+}
+void ProxWidget::closeEvent(QCloseEvent *event)
+{
+	event->ignore();
+	this->hide();
+}
+void ProxWidget::hideEvent(QHideEvent *event) {
+	controlWidget->hide();
+	plot->hide();
+}
+void ProxWidget::showEvent(QShowEvent *event) {
+	controlWidget->show();
+	plot->show();
+}
 
 //----------- Plotting
 
@@ -242,7 +282,7 @@ void Plot::PlotDemod(uint8_t *buffer, size_t len, QRect plotRect, QRect annotati
 	// round down
 	if (DemodStart-plotOffset > 0) BitStart = (int)(((DemodStart-plotOffset)+(PlotGridX-1))/PlotGridX)-1;
 	first_delta_x += BitStart * PlotGridX;
-	if (BitStart > len) return;
+	if (BitStart > (int)len) return;
 	int delta_x = 0;
 	int v = 0;
 	//printf("first_delta_x %i, grid_delta_x %i, DemodStart %i, BitStart %i\n",first_delta_x,grid_delta_x,DemodStart, BitStart);
@@ -255,8 +295,8 @@ void Plot::PlotDemod(uint8_t *buffer, size_t len, QRect plotRect, QRect annotati
 	penPath.moveTo(x, y);
 	delta_x = 0;
 	int clk = first_delta_x;
-	for(int i = BitStart; i < len && xCoordOf(delta_x+DemodStart, plotRect) < plotRect.right(); i++) {
-		for (int ii = 0; ii < (clk) && i < len && xCoordOf(DemodStart+delta_x+ii, plotRect) < plotRect.right() ; ii++ ) {
+	for(int i = BitStart; i < (int)len && xCoordOf(delta_x+DemodStart, plotRect) < plotRect.right(); i++) {
+		for (int ii = 0; ii < (clk) && i < (int)len && xCoordOf(DemodStart+delta_x+ii, plotRect) < plotRect.right() ; ii++ ) {
 			x = xCoordOf(DemodStart+delta_x+ii, plotRect);
 			v = buffer[i]*200-100;
 
@@ -407,8 +447,6 @@ void Plot::plotGridLines(QPainter* painter,QRect r)
 void Plot::paintEvent(QPaintEvent *event)
 {
 	QPainter painter(this);
-	//QPainterPath penPath, whitePath, greyPath, lightgreyPath, cursorAPath, cursorBPath, cursorCPath, cursorDPath;
-	//QRect r;
 	QBrush brush(QColor(100, 255, 100));
 	QPen pen(QColor(100, 255, 100));
 

@@ -8,6 +8,9 @@
 // GUI (QT)
 //-----------------------------------------------------------------------------
 
+#ifndef PROXGUI_QT
+#define PROXGUI_QT
+
 #include <QApplication>
 #include <QPushButton>
 #include <QObject>
@@ -51,19 +54,24 @@ class ProxGuiQT;
  */
 class ProxWidget : public QWidget
 {
-	Q_OBJECT;
+	Q_OBJECT; //needed for slot/signal classes
 
 	private:
+		ProxGuiQT *master;
 		Plot *plot;
 		Ui::Form *opsController;
-		ProxGuiQT *master;
-	
+		QWidget* controlWidget;
+
 	public:
 		ProxWidget(QWidget *parent = 0, ProxGuiQT *master = NULL);
+		~ProxWidget(void);
+		//OpsShow(void);
 
-	//protected:
+	protected:
 	//	void paintEvent(QPaintEvent *event);
-	//	void closeEvent(QCloseEvent *event);
+		void closeEvent(QCloseEvent *event);
+		void showEvent(QShowEvent *event);
+		void hideEvent(QHideEvent *event);
 	//	void mouseMoveEvent(QMouseEvent *event);
 	//	void mousePressEvent(QMouseEvent *event) { mouseMoveEvent(event); }
 	//	void keyPressEvent(QKeyEvent *event);
@@ -94,14 +102,16 @@ class ProxGuiQT : public QObject
 		void RepaintGraphWindow(void);
 		void HideGraphWindow(void);
 		void MainLoop(void);
-	
+		void Exit(void);
 	private slots:
 		void _ShowGraphWindow(void);
 		void _RepaintGraphWindow(void);
 		void _HideGraphWindow(void);
-
+		void _Exit(void);
 	signals:
 		void ShowGraphWindowSignal(void);
 		void RepaintGraphWindowSignal(void);
 		void HideGraphWindowSignal(void);
+		void ExitSignal(void);
 };
+#endif // PROXGUI_QT
