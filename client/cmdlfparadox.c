@@ -32,8 +32,9 @@ int CmdFSKdemodParadox(const char *Cmd)
 	uint8_t BitStream[MAX_GRAPH_TRACE_LEN]={0};
 	size_t BitLen = getFromGraphBuf(BitStream);
 	if (BitLen==0) return 0;
+	int waveIdx=0;
 	//get binary from fsk wave
-	int idx = ParadoxdemodFSK(BitStream,&BitLen,&hi2,&hi,&lo);
+	int idx = ParadoxdemodFSK(BitStream,&BitLen,&hi2,&hi,&lo,&waveIdx);
 	if (idx<0){
 		if (g_debugMode){
 			if (idx==-1){
@@ -63,7 +64,7 @@ int CmdFSKdemodParadox(const char *Cmd)
 	PrintAndLog("Paradox TAG ID: %x%08x - FC: %d - Card: %d - Checksum: %02x - RAW: %08x%08x%08x",
 		hi>>10, (hi & 0x3)<<26 | (lo>>10), fc, cardnum, (lo>>2) & 0xFF, rawHi2, rawHi, rawLo);
 	setDemodBuf(BitStream,BitLen,idx);
-	setClockGrid(g_DemodClock, g_DemodStartIdx + (idx*g_DemodClock));
+	setClockGrid(50, waveIdx + (idx*50));
 	if (g_debugMode){ 
 		PrintAndLog("DEBUG: idx: %d, len: %d, Printing Demod Buffer:", idx, BitLen);
 		printDemodBuff();

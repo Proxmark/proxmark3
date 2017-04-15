@@ -68,15 +68,21 @@ void save_restoreDB(uint8_t saveOpt)
 	static uint8_t SavedDB[MAX_DEMOD_BUF_LEN];
 	static size_t SavedDBlen;
 	static bool DB_Saved = false;
+	static int savedDemodStartIdx = 0;
+	static int savedDemodClock = 0;
 
 	if (saveOpt==1) { //save
 
 		memcpy(SavedDB, DemodBuffer, sizeof(DemodBuffer));
 		SavedDBlen = DemodBufferLen;
 		DB_Saved=true;
+		savedDemodStartIdx = g_DemodStartIdx;
+		savedDemodClock = g_DemodClock;
 	} else if (DB_Saved) { //restore
 		memcpy(DemodBuffer, SavedDB, sizeof(DemodBuffer));
 		DemodBufferLen = SavedDBlen;
+		g_DemodClock = savedDemodClock;
+		g_DemodStartIdx = savedDemodStartIdx;
 	}
 	return;
 }
@@ -803,7 +809,7 @@ int FSKrawDemod(const char *Cmd, bool verbose)
 		if (!rfLen) rfLen = 50;
 	}
 	int startIdx = 0;
-	int size = fskdemod_ext(BitStream, BitLen, rfLen, invert, fchigh, fclow, &startIdx);
+	int size = fskdemod(BitStream, BitLen, rfLen, invert, fchigh, fclow, &startIdx);
 	if (size > 0) {
 		setDemodBuf(BitStream,size,0);
 		setClockGrid(rfLen, startIdx);

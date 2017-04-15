@@ -88,8 +88,9 @@ int CmdFSKdemodAWID(const char *Cmd)
 	size_t size = getFromGraphBuf(BitStream);
 	if (size==0) return 0;
 
+	int waveIdx = 0;
 	//get binary from fsk wave
-	int idx = AWIDdemodFSK(BitStream, &size);
+	int idx = AWIDdemodFSK(BitStream, &size, &waveIdx);
 	if (idx<=0){
 		if (g_debugMode){
 			if (idx == -1)
@@ -126,7 +127,7 @@ int CmdFSKdemodAWID(const char *Cmd)
 	uint32_t rawHi = bytebits_to_byte(BitStream+idx+32,32);
 	uint32_t rawHi2 = bytebits_to_byte(BitStream+idx,32);
 	setDemodBuf(BitStream,96,idx);
-	setClockGrid(g_DemodClock, g_DemodStartIdx + (idx*g_DemodClock));
+	setClockGrid(50, waveIdx + (idx*50));
 
 	size = removeParity(BitStream, idx+8, 4, 1, 88);
 	if (size != 66){

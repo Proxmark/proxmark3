@@ -1489,17 +1489,12 @@ size_t aggregate_bits(uint8_t *dest, size_t size, uint8_t rfLen, uint8_t invert,
 
 //by marshmellow  (from holiman's base)
 // full fsk demod from GraphBuffer wave to decoded 1s and 0s (no mandemod)
-int fskdemod_ext(uint8_t *dest, size_t size, uint8_t rfLen, uint8_t invert, uint8_t fchigh, uint8_t fclow, int *startIdx) {
+int fskdemod(uint8_t *dest, size_t size, uint8_t rfLen, uint8_t invert, uint8_t fchigh, uint8_t fclow, int *startIdx) {
 	if (justNoise(dest, size)) return 0;
 	// FSK demodulator
 	size = fsk_wave_demod(dest, size, fchigh, fclow, startIdx);
 	size = aggregate_bits(dest, size, rfLen, invert, fchigh, fclow, startIdx);
 	return size;
-}
-
-int fskdemod(uint8_t *dest, size_t size, uint8_t rfLen, uint8_t invert, uint8_t fchigh, uint8_t fclow) {
-	int startIdx=0;
-	return fskdemod_ext(dest, size, rfLen, invert, fchigh, fclow, &startIdx);
 }
 
 // by marshmellow
@@ -1628,12 +1623,12 @@ int pskRawDemod(uint8_t dest[], size_t *size, int *clock, int *invert) {
 
 // by marshmellow
 // FSK Demod then try to locate an AWID ID
-int AWIDdemodFSK(uint8_t *dest, size_t *size) {
+int AWIDdemodFSK(uint8_t *dest, size_t *size, int *waveStartIdx) {
 	//make sure buffer has enough data
 	if (*size < 96*50) return -1;
 
 	// FSK demodulator
-	*size = fskdemod(dest, *size, 50, 1, 10, 8);  // fsk2a RF/50 
+	*size = fskdemod(dest, *size, 50, 1, 10, 8, waveStartIdx);  // fsk2a RF/50 
 	if (*size < 96) return -3;  //did we get a good demod?
 
 	uint8_t preamble[] = {0,0,0,0,0,0,0,1};
@@ -1715,10 +1710,10 @@ int gProxII_Demod(uint8_t BitStream[], size_t *size) {
 }
 
 // loop to get raw HID waveform then FSK demodulate the TAG ID from it
-int HIDdemodFSK(uint8_t *dest, size_t *size, uint32_t *hi2, uint32_t *hi, uint32_t *lo) {
+int HIDdemodFSK(uint8_t *dest, size_t *size, uint32_t *hi2, uint32_t *hi, uint32_t *lo, int *waveStartIdx) {
 	size_t numStart=0, size2=*size, startIdx=0; 
-	// FSK demodulator
-	*size = fskdemod(dest, size2,50,1,10,8); //fsk2a
+	// FSK demodulator  fsk2a so invert and fc/10/8
+	*size = fskdemod(dest, size2, 50, 1, 10, 8, waveStartIdx);
 	if (*size < 96*2) return -2;
 	// 00011101 bit pattern represent start of frame, 01 pattern represents a 0 and 10 represents a 1
 	uint8_t preamble[] = {0,0,0,1,1,1,0,1};
@@ -1743,11 +1738,11 @@ int HIDdemodFSK(uint8_t *dest, size_t *size, uint32_t *hi2, uint32_t *hi, uint32
 	return (int)startIdx;
 }
 
-int IOdemodFSK(uint8_t *dest, size_t size) {
+int IOdemodFSK(uint8_t *dest, size_t size, int *waveStartIdx) {
 	//make sure buffer has data
 	if (size < 66*64) return -2;
-	// FSK demodulator
-	size = fskdemod(dest, size, 64, 1, 10, 8);  // FSK2a RF/64 
+	// FSK demodulator  RF/64, fsk2a so invert, and fc/10/8
+	size = fskdemod(dest, size, 64, 1, 10, 8, waveStartIdx); 
 	if (size < 65) return -3;  //did we get a good demod?
 	//Index map
 	//0           10          20          30          40          50          60
@@ -1792,10 +1787,10 @@ int indala26decode(uint8_t *bitStream, size_t *size, uint8_t *invert) {
 }
 
 // loop to get raw paradox waveform then FSK demodulate the TAG ID from it
-int ParadoxdemodFSK(uint8_t *dest, size_t *size, uint32_t *hi2, uint32_t *hi, uint32_t *lo) {
+int ParadoxdemodFSK(uint8_t *dest, size_t *size, uint32_t *hi2, uint32_t *hi, uint32_t *lo, int *waveStartIdx) {
 	size_t numStart=0, size2=*size, startIdx=0;
 	// FSK demodulator
-	*size = fskdemod(dest, size2,50,1,10,8); //fsk2a
+	*size = fskdemod(dest, size2,50,1,10,8,waveStartIdx); //fsk2a
 	if (*size < 96) return -2;
 
 	// 00001111 bit pattern represent start of frame, 01 pattern represents a 0 and 10 represents a 1
@@ -1835,12 +1830,12 @@ int PrescoDemod(uint8_t *dest, size_t *size) {
 
 // by marshmellow
 // FSK Demod then try to locate a Farpointe Data (pyramid) ID
-int PyramiddemodFSK(uint8_t *dest, size_t *size) {
+int PyramiddemodFSK(uint8_t *dest, size_t *size, int *waveStartIdx) {
 	//make sure buffer has data
 	if (*size < 128*50) return -5;
 
 	// FSK demodulator
-	*size = fskdemod(dest, *size, 50, 1, 10, 8);  // fsk2a RF/50 
+	*size = fskdemod(dest, *size, 50, 1, 10, 8, waveStartIdx);  // fsk2a RF/50 
 	if (*size < 128) return -2;  //did we get a good demod?
 
 	uint8_t preamble[] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1};
