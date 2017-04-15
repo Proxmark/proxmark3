@@ -10,19 +10,19 @@
 #define OVERLAYS_H
 
 #include <QtCore/QVariant>
-#include <QtGui/QAction>
-#include <QtGui/QApplication>
-#include <QtGui/QButtonGroup>
-#include <QtGui/QFormLayout>
-#include <QtGui/QHBoxLayout>
-#include <QtGui/QHeaderView>
-#include <QtGui/QLabel>
-#include <QtGui/QPushButton>
-#include <QtGui/QSlider>
-#include <QtGui/QSpacerItem>
-#include <QtGui/QTabWidget>
-#include <QtGui/QVBoxLayout>
-#include <QtGui/QWidget>
+#include <QAction>
+#include <QApplication>
+#include <QButtonGroup>
+#include <QFormLayout>
+#include <QHBoxLayout>
+#include <QHeaderView>
+#include <QLabel>
+#include <QPushButton>
+#include <QSlider>
+#include <QSpacerItem>
+#include <QTabWidget>
+#include <QVBoxLayout>
+#include <QWidget>
 
 QT_BEGIN_NAMESPACE
 
@@ -236,20 +236,20 @@ public:
 
     void retranslateUi(QWidget *Form)
     {
-        Form->setWindowTitle(QApplication::translate("Form", "Overlays", 0, QApplication::UnicodeUTF8));
+        Form->setWindowTitle(QApplication::translate("Form", "Overlays", 0));
         label_5->setText(QString());
-        label->setText(QApplication::translate("Form", "Window size", 0, QApplication::UnicodeUTF8));
-        tabWidget_overlays->setTabText(tabWidget_overlays->indexOf(tab), QApplication::translate("Form", "Autocorrelate", 0, QApplication::UnicodeUTF8));
-        label_8->setText(QApplication::translate("Form", "Edge Jump Threshold", 0, QApplication::UnicodeUTF8));
+        label->setText(QApplication::translate("Form", "Window size", 0));
+        tabWidget_overlays->setTabText(tabWidget_overlays->indexOf(tab), QApplication::translate("Form", "Autocorrelate", 0));
+        label_8->setText(QApplication::translate("Form", "Edge Jump Threshold", 0));
         label_9->setText(QString());
-        tabWidget_overlays->setTabText(tabWidget_overlays->indexOf(tab_3), QApplication::translate("Form", "AskEdge", 0, QApplication::UnicodeUTF8));
-        label_2->setText(QApplication::translate("Form", "Up", 0, QApplication::UnicodeUTF8));
+        tabWidget_overlays->setTabText(tabWidget_overlays->indexOf(tab_3), QApplication::translate("Form", "AskEdge", 0));
+        label_2->setText(QApplication::translate("Form", "Up", 0));
         label_6->setText(QString());
-        label_3->setText(QApplication::translate("Form", "Down", 0, QApplication::UnicodeUTF8));
+        label_3->setText(QApplication::translate("Form", "Down", 0));
         label_7->setText(QString());
-        tabWidget_overlays->setTabText(tabWidget_overlays->indexOf(tab_2), QApplication::translate("Form", "Dirthreshold", 0, QApplication::UnicodeUTF8));
-        pushButton_apply->setText(QApplication::translate("Form", "Apply", 0, QApplication::UnicodeUTF8));
-        pushButton_sticky->setText(QApplication::translate("Form", "Restore", 0, QApplication::UnicodeUTF8));
+        tabWidget_overlays->setTabText(tabWidget_overlays->indexOf(tab_2), QApplication::translate("Form", "Dirthreshold", 0));
+        pushButton_apply->setText(QApplication::translate("Form", "Apply", 0));
+        pushButton_sticky->setText(QApplication::translate("Form", "Restore", 0));
         label_4->setText(QString());
     } // retranslateUi
 
