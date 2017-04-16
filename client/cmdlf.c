@@ -877,19 +877,20 @@ int CmdVchDemod(const char *Cmd)
 int CheckChipType(char cmdp) {
 	uint32_t wordData = 0;
 
-	//check for em4x05/em4x69 chips first
+	if (offline || cmdp == '1') return 0;
+
 	save_restoreGB(1);
 	save_restoreDB(1);
-	if ((!offline && (cmdp != '1')) && EM4x05Block0Test(&wordData)) {
+	//check for em4x05/em4x69 chips first
+	if (EM4x05Block0Test(&wordData)) {
 		PrintAndLog("\nValid EM4x05/EM4x69 Chip Found\nTry lf em 4x05... commands\n");
 		save_restoreGB(0);
 		save_restoreDB(0);
 		return 1;
 	}
 
-	//TODO check for t55xx chip...
-
-	if ((!offline && (cmdp != '1')) && tryDetectP1(true)) {
+	//check for t55xx chip...
+	if (tryDetectP1(true)) {
 		PrintAndLog("\nValid T55xx Chip Found\nTry lf t55xx ... commands\n");
 		save_restoreGB(0);
 		save_restoreDB(0);
