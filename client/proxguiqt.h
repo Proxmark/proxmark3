@@ -35,6 +35,7 @@ private:
 	int xCoordOf(int i, QRect r );
 	int yCoordOf(int v, QRect r, int maxVal);
 	int valueOf_yCoord(int y, QRect r, int maxVal);
+	void setMaxAndStart(int *buffer, int len, QRect plotRect);
 	QColor getColor(int graphNum);
 public:
 	Plot(QWidget *parent = 0);

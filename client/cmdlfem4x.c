@@ -474,9 +474,6 @@ int EM4x50Read(const char *Cmd, bool verbose)
 	// get user entry if any
 	sscanf(Cmd, "%i %i", &clk, &invert);
 	
-	// save GraphBuffer - to restore it later	
-	save_restoreGB(1);
-
 	// first get high and low values
 	for (i = 0; i < GraphTraceLen; i++) {
 		if (GraphBuffer[i] > high)
@@ -573,6 +570,8 @@ int EM4x50Read(const char *Cmd, bool verbose)
 	} else if (start < 0) return 0;
 	start = skip;
 	snprintf(tmp2, sizeof(tmp2),"%d %d 1000 %d", clk, invert, clk*47);
+	// save GraphBuffer - to restore it later	
+	save_restoreGB(1);
 	// get rid of leading crap 
 	snprintf(tmp, sizeof(tmp), "%i", skip);
 	CmdLtrim(tmp);
