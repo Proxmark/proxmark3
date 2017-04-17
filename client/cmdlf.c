@@ -879,25 +879,25 @@ int CheckChipType(char cmdp) {
 
 	if (offline || cmdp == '1') return 0;
 
-	save_restoreGB(1);
-	save_restoreDB(1);
+	save_restoreGB(GRAPH_SAVE);
+	save_restoreDB(GRAPH_SAVE);
 	//check for em4x05/em4x69 chips first
 	if (EM4x05Block0Test(&wordData)) {
 		PrintAndLog("\nValid EM4x05/EM4x69 Chip Found\nTry lf em 4x05... commands\n");
-		save_restoreGB(0);
-		save_restoreDB(0);
+		save_restoreGB(GRAPH_RESTORE);
+		save_restoreDB(GRAPH_RESTORE);
 		return 1;
 	}
 
 	//check for t55xx chip...
 	if (tryDetectP1(true)) {
 		PrintAndLog("\nValid T55xx Chip Found\nTry lf t55xx ... commands\n");
-		save_restoreGB(0);
-		save_restoreDB(0);
+		save_restoreGB(GRAPH_RESTORE);
+		save_restoreDB(GRAPH_RESTORE);
 		return 1;		
 	}
-	save_restoreGB(0);
-	save_restoreDB(0);
+	save_restoreGB(GRAPH_RESTORE);
+	save_restoreDB(GRAPH_RESTORE);
 	return 0;
 }
 
@@ -1057,7 +1057,7 @@ int CmdLFfind(const char *Cmd)
 
 	PrintAndLog("\nNo Known Tags Found!\n");
 	if (testRaw=='u' || testRaw=='U') {
-		ans=CheckChipType(cmdp);
+		//ans=CheckChipType(cmdp);
 		//test unknown tag formats (raw mode)0
 		PrintAndLog("\nChecking for Unknown tags:\n");
 		ans=AutoCorrelate(GraphBuffer, GraphBuffer, GraphTraceLen, 4000, false, false);

@@ -32,7 +32,7 @@ bool g_useOverlays = false;
 int g_absVMax = 0;
 int startMax;
 int PageWidth;
-
+int unlockStart = 0;
 
 void ProxGuiQT::ShowGraphWindow(void)
 {
@@ -119,13 +119,13 @@ ProxGuiQT::~ProxGuiQT(void)
 void ProxWidget::applyOperation()
 {
 	//printf("ApplyOperation()");
-	save_restoreGB(1);
+	save_restoreGB(GRAPH_SAVE);
 	memcpy(GraphBuffer, s_Buff, sizeof(int) * GraphTraceLen);
 	RepaintGraphWindow();
 }
 void ProxWidget::stickOperation()
 {
-	save_restoreGB(0);
+	save_restoreGB(GRAPH_RESTORE);
 	//printf("stickOperation()");
 }
 void ProxWidget::vchange_autocorr(int v)
@@ -434,11 +434,22 @@ void Plot::PlotGraph(int *buffer, int len, QRect plotRect, QRect annotationRect,
 
 void Plot::plotGridLines(QPainter* painter,QRect r)
 {
+	// set GridOffset
+	if (PlotGridX <= 0) return;
+	int offset = GridOffset;
+	if (GridLocked && PlotGridX) {
+		offset = GridOffset + PlotGridX - (GraphStart % PlotGridX);
+	} else if (!GridLocked && GraphStart > 0 && PlotGridX) {
+		offset = PlotGridX-((GraphStart - offset) % PlotGridX) + GraphStart - unlockStart;
+	}
+	offset %= PlotGridX;
+	if (offset < 0) offset += PlotGridX;
+
 	int i;
 	int grid_delta_x = (int) (PlotGridX * GraphPixelsPerPoint);
 	int grid_delta_y = PlotGridY;
 	if ((PlotGridX > 0) && ((PlotGridX * GraphPixelsPerPoint) > 1)) {
-		for(i = (GridOffset * GraphPixelsPerPoint); i < r.right(); i += grid_delta_x) {
+		for(i = (offset * GraphPixelsPerPoint); i < r.right(); i += grid_delta_x) {
 			painter->drawLine(r.left()+i, r.top(), r.left()+i, r.bottom());
 		} 
 	}
@@ -581,9 +592,6 @@ void Plot::mouseMoveEvent(QMouseEvent *event)
 void Plot::keyPressEvent(QKeyEvent *event)
 {
 	int	offset;
-	int	gridchanged;
-
-	gridchanged= 0;
 
 	if(event->modifiers() & Qt::ShiftModifier) {
 		if (PlotGridX)
@@ -611,52 +619,17 @@ void Plot::keyPressEvent(QKeyEvent *event)
 
 		case Qt::Key_Right:
 			if(GraphPixelsPerPoint < 20) {
-				if (PlotGridX && GridLocked && GraphStart < startMax){
-					GridOffset -= offset;
-					GridOffset %= PlotGridX;
-					gridchanged= 1;
-				}
 				GraphStart += offset;
 			} else {
-				if (PlotGridX && GridLocked && GraphStart < startMax){
-					GridOffset--;
-					GridOffset %= PlotGridX;
-					gridchanged= 1;
-				}
 				GraphStart++;
 			}
-			if(GridOffset < 0) {
-				GridOffset += PlotGridX;
-			}
-			if (gridchanged)
-				if (GraphStart > startMax) {
-					GridOffset += (GraphStart - startMax);
-					GridOffset %= PlotGridX;
-				}
 			break;
 
 		case Qt::Key_Left:
 			if(GraphPixelsPerPoint < 20) {
-				if (PlotGridX && GridLocked && GraphStart > 0){
-					GridOffset += offset;
-					GridOffset %= PlotGridX;
-					gridchanged= 1;
-				}
 				GraphStart -= offset;
 			} else {
-				if (PlotGridX && GridLocked && GraphStart > 0){
-					GridOffset++;
-					GridOffset %= PlotGridX;
-					gridchanged= 1;
-				}
 				GraphStart--;
-			}
-			if (gridchanged){
-				if (GraphStart < 0)
-					GridOffset += GraphStart;
-				if(GridOffset < 0)
-					GridOffset += PlotGridX;
-			GridOffset %= PlotGridX;
 			}
 			break;
 
@@ -667,7 +640,7 @@ void Plot::keyPressEvent(QKeyEvent *event)
 			} else {
 				PlotGridX= PlotGridXdefault;
 				PlotGridY= PlotGridYdefault;
-				}
+			}
 			break;
 
 		case Qt::Key_H:
@@ -692,7 +665,11 @@ void Plot::keyPressEvent(QKeyEvent *event)
 			break;
 
 		case Qt::Key_L:
-			GridLocked= !GridLocked;
+			GridLocked = !GridLocked;
+			if (GridLocked)
+				GridOffset += (GraphStart - unlockStart);
+			else
+				unlockStart = GraphStart;
 			break;
 
 		case Qt::Key_Q:

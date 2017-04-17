@@ -40,6 +40,8 @@ extern int AutoCorrelate(const int *in, int *out, size_t len, int window, bool S
 extern int directionalThreshold(const int* in, int *out, size_t len, int8_t up, int8_t down);
 extern void save_restoreGB(uint8_t saveOpt);
 
+#define GRAPH_SAVE 1
+#define GRAPH_RESTORE 0
 #define MAX_DEMOD_BUF_LEN (1024*128)
 extern uint8_t DemodBuffer[MAX_DEMOD_BUF_LEN];
 extern size_t DemodBufferLen;

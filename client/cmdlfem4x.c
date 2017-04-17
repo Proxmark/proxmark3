@@ -571,7 +571,7 @@ int EM4x50Read(const char *Cmd, bool verbose)
 	start = skip;
 	snprintf(tmp2, sizeof(tmp2),"%d %d 1000 %d", clk, invert, clk*47);
 	// save GraphBuffer - to restore it later	
-	save_restoreGB(1);
+	save_restoreGB(GRAPH_SAVE);
 	// get rid of leading crap 
 	snprintf(tmp, sizeof(tmp), "%i", skip);
 	CmdLtrim(tmp);
@@ -599,7 +599,7 @@ int EM4x50Read(const char *Cmd, bool verbose)
 			phaseoff = 0;
 		i += 2;
 		if (ASKDemod(tmp2, false, false, 1) < 1) {
-			save_restoreGB(0);
+			save_restoreGB(GRAPH_RESTORE);
 			return 0;
 		}
 		//set DemodBufferLen to just one block
@@ -638,7 +638,7 @@ int EM4x50Read(const char *Cmd, bool verbose)
 	}
 
 	//restore GraphBuffer
-	save_restoreGB(0);
+	save_restoreGB(GRAPH_RESTORE);
 	return (int)AllPTest;
 }
 

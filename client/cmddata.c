@@ -71,7 +71,7 @@ void save_restoreDB(uint8_t saveOpt)
 	static int savedDemodStartIdx = 0;
 	static int savedDemodClock = 0;
 
-	if (saveOpt==1) { //save
+	if (saveOpt == GRAPH_SAVE) { //save
 
 		memcpy(SavedDB, DemodBuffer, sizeof(DemodBuffer));
 		SavedDBlen = DemodBufferLen;
@@ -1077,7 +1077,7 @@ void setClockGrid(int clk, int offset) {
 	g_DemodClock = clk;
 	if (g_debugMode) PrintAndLog("demodoffset %d, clk %d",offset,clk);
 
-  if (offset > clk) offset %= clk;
+	if (offset > clk) offset %= clk;
 	if (offset < 0) offset += clk;
 
 	if (offset > GraphTraceLen || offset < 0) return;
