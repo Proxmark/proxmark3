@@ -99,7 +99,7 @@ static void bucket_sort_intersect(uint32_t* const estart, uint32_t* const estop,
 /** binsearch
  * Binary search for the first occurence of *stop's MSB in sorted [start,stop]
  */
-static inline uint32_t* binsearch(uint32_t *start, uint32_t *stop)
+/* static inline uint32_t* binsearch(uint32_t *start, uint32_t *stop)
 {
 	uint32_t mid, val = *stop & 0xff000000;
 	while(start != stop)
@@ -110,7 +110,7 @@ static inline uint32_t* binsearch(uint32_t *start, uint32_t *stop)
 
 	return start;
 }
-
+ */
 /** update_contribution
  * helper, calculates the partial linear feedback contributions and puts in MSB
  */
