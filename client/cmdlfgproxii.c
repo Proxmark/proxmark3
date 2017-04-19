@@ -83,7 +83,9 @@ int CmdG_Prox_II_Demod(const char *Cmd)
 		PrintAndLog("Decoded Raw: %s", sprint_hex(ByteStream, 8)); 
 	}
 	PrintAndLog("Raw: %08x%08x%08x", raw1,raw2,raw3);
-	setDemodBuf(DemodBuffer+ans, 96, 0);
+	setDemodBuf(DemodBuffer, 96, ans);
+	setClockGrid(g_DemodClock, g_DemodStartIdx + (ans*g_DemodClock));
+
 	return 1;
 }
 //by marshmellow

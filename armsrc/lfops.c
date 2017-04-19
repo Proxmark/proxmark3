@@ -769,6 +769,7 @@ void CmdHIDdemodFSK(int findone, int *high, int *low, int ledcontrol)
 	size_t size; 
 	uint32_t hi2=0, hi=0, lo=0;
 	int idx=0;
+	int dummyIdx = 0;
 	// Configure to go in 125Khz listen mode
 	LFSetupFPGAForADC(95, true);
 
@@ -784,7 +785,7 @@ void CmdHIDdemodFSK(int findone, int *high, int *low, int ledcontrol)
 		// FSK demodulator
 		//size = sizeOfBigBuff;  //variable size will change after demod so re initialize it before use
 		size = 50*128*2; //big enough to catch 2 sequences of largest format
-		idx = HIDdemodFSK(dest, &size, &hi2, &hi, &lo);
+		idx = HIDdemodFSK(dest, &size, &hi2, &hi, &lo, &dummyIdx);
 		
 		if (idx>0 && lo>0 && (size==96 || size==192)){
 			// go over previously decoded manchester data and decode into usable tag ID
@@ -861,7 +862,7 @@ void CmdAWIDdemodFSK(int findone, int *high, int *low, int ledcontrol)
 {
 	uint8_t *dest = BigBuf_get_addr();
 	size_t size; 
-	int idx=0;
+	int idx=0, dummyIdx=0;
 	//clear read buffer
 	BigBuf_Clear_keep_EM();
 	// Configure to go in 125Khz listen mode
@@ -875,7 +876,7 @@ void CmdAWIDdemodFSK(int findone, int *high, int *low, int ledcontrol)
 		DoAcquisition_default(-1,true);
 		// FSK demodulator
 		size = 50*128*2; //big enough to catch 2 sequences of largest format
-		idx = AWIDdemodFSK(dest, &size);
+		idx = AWIDdemodFSK(dest, &size, &dummyIdx);
 		
 		if (idx<=0 || size!=96) continue;
 		// Index map
@@ -1017,6 +1018,7 @@ void CmdIOdemodFSK(int findone, int *high, int *low, int ledcontrol)
 	uint8_t version=0;
 	uint8_t facilitycode=0;
 	uint16_t number=0;
+	int dummyIdx=0;
 	//clear read buffer
 	BigBuf_Clear_keep_EM();
 	// Configure to go in 125Khz listen mode
@@ -1028,7 +1030,7 @@ void CmdIOdemodFSK(int findone, int *high, int *low, int ledcontrol)
 		DoAcquisition_default(-1,true);
 		//fskdemod and get start index
 		WDT_HIT();
-		idx = IOdemodFSK(dest, BigBuf_max_traceLen());
+		idx = IOdemodFSK(dest, BigBuf_max_traceLen(), &dummyIdx);
 		if (idx<0) continue;
 		//valid tag found
 

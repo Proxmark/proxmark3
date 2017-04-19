@@ -28,6 +28,8 @@
 uint8_t DemodBuffer[MAX_DEMOD_BUF_LEN];
 uint8_t g_debugMode=0;
 size_t DemodBufferLen=0;
+int g_DemodStartIdx=0;
+int g_DemodClock=0;
 
 static int CmdHelp(const char *Cmd);
 
@@ -66,15 +68,21 @@ void save_restoreDB(uint8_t saveOpt)
 	static uint8_t SavedDB[MAX_DEMOD_BUF_LEN];
 	static size_t SavedDBlen;
 	static bool DB_Saved = false;
+	static int savedDemodStartIdx = 0;
+	static int savedDemodClock = 0;
 
-	if (saveOpt==1) { //save
+	if (saveOpt == GRAPH_SAVE) { //save
 
 		memcpy(SavedDB, DemodBuffer, sizeof(DemodBuffer));
 		SavedDBlen = DemodBufferLen;
 		DB_Saved=true;
+		savedDemodStartIdx = g_DemodStartIdx;
+		savedDemodClock = g_DemodClock;
 	} else if (DB_Saved) { //restore
 		memcpy(DemodBuffer, SavedDB, sizeof(DemodBuffer));
 		DemodBufferLen = SavedDBlen;
+		g_DemodClock = savedDemodClock;
+		g_DemodStartIdx = savedDemodStartIdx;
 	}
 	return;
 }
@@ -245,7 +253,6 @@ int ASKDemod_ext(const char *Cmd, bool verbose, bool emSearch, uint8_t askType, 
 		return 0;
 	}
 	if (verbose || g_debugMode) PrintAndLog("\nUsing Clock:%d, Invert:%d, Bits Found:%d",clk,invert,BitLen);
-
 	//output
 	setDemodBuf(BitStream,BitLen,0);
 	setClockGrid(clk, startIdx);
@@ -295,11 +302,11 @@ int Cmdaskmandemod(const char *Cmd)
 	}
 	bool st = true;
 	if (Cmd[0]=='s') 
-		return ASKDemod_ext(Cmd++, true, true, 1, &st);
+		return ASKDemod_ext(Cmd++, true, false, 1, &st);
 	else if (Cmd[1] == 's')
-		return ASKDemod_ext(Cmd+=2, true, true, 1, &st);
+		return ASKDemod_ext(Cmd+=2, true, false, 1, &st);
 	else
-		return ASKDemod(Cmd, true, true, 1);
+		return ASKDemod(Cmd, true, false, 1);
 }
 
 //by marshmellow
@@ -393,7 +400,7 @@ int CmdBiphaseDecodeRaw(const char *Cmd)
 	uint8_t BitStream[MAX_DEMOD_BUF_LEN]={0};
 	size = sizeof(BitStream);
 	if ( !getDemodBuf(BitStream, &size) ) return 0;
-	errCnt=BiphaseRawDecode(BitStream, &size, offset, invert);
+	errCnt=BiphaseRawDecode(BitStream, &size, &offset, invert);
 	if (errCnt<0){
 		PrintAndLog("Error during decode:%d", errCnt);
 		return 0;
@@ -406,10 +413,12 @@ int CmdBiphaseDecodeRaw(const char *Cmd)
 	if (errCnt>0){
 		PrintAndLog("# Errors found during Demod (shown as 7 in bit stream): %d",errCnt);
 	}
+
 	PrintAndLog("Biphase Decoded using offset: %d - # invert:%d - data:",offset,invert);
 	PrintAndLog("%s", sprint_bin_break(BitStream, size, 16));
 	
 	if (offset) setDemodBuf(DemodBuffer,DemodBufferLen-offset, offset);  //remove first bit from raw demod
+	setClockGrid(g_DemodClock, g_DemodStartIdx + g_DemodClock*offset/2);
 	return 1;
 }
 
@@ -422,26 +431,28 @@ int ASKbiphaseDemod(const char *Cmd, bool verbose)
 	sscanf(Cmd, "%i %i %i %i", &offset, &clk, &invert, &maxErr);
 
 	uint8_t BitStream[MAX_GRAPH_TRACE_LEN];	  
-	size_t size = getFromGraphBuf(BitStream);	  
+	size_t size = getFromGraphBuf(BitStream);
+	int startIdx = 0;
 	//invert here inverts the ask raw demoded bits which has no effect on the demod, but we need the pointer
-	int errCnt = askdemod(BitStream, &size, &clk, &invert, maxErr, 0, 0);  
+	int errCnt = askdemod_ext(BitStream, &size, &clk, &invert, maxErr, 0, 0, &startIdx);  
 	if ( errCnt < 0 || errCnt > maxErr ) {   
 		if (g_debugMode) PrintAndLog("DEBUG: no data or error found %d, clock: %d", errCnt, clk);  
 			return 0;  
-	} 
+	}
 
 	//attempt to Biphase decode BitStream
-	errCnt = BiphaseRawDecode(BitStream, &size, offset, invert);
+	errCnt = BiphaseRawDecode(BitStream, &size, &offset, invert);
 	if (errCnt < 0){
 		if (g_debugMode || verbose) PrintAndLog("Error BiphaseRawDecode: %d", errCnt);
 		return 0;
-	} 
+	}
 	if (errCnt > maxErr) {
 		if (g_debugMode || verbose) PrintAndLog("Error BiphaseRawDecode too many errors: %d", errCnt);
 		return 0;
 	}
 	//success set DemodBuffer and return
 	setDemodBuf(BitStream, size, 0);
+	setClockGrid(clk, startIdx + clk*offset/2);
 	if (g_debugMode || verbose){
 		PrintAndLog("Biphase Decoded using offset: %d - clock: %d - # errors:%d - data:",offset,clk,errCnt);
 		printDemodBuff();
@@ -502,45 +513,44 @@ int Cmdaskrawdemod(const char *Cmd)
 	return ASKDemod(Cmd, true, false, 0);
 }
 
-int AutoCorrelate(int window, bool SaveGrph, bool verbose)
+int AutoCorrelate(const int *in, int *out, size_t len, int window, bool SaveGrph, bool verbose)
 {
 	static int CorrelBuffer[MAX_GRAPH_TRACE_LEN];
 	size_t Correlation = 0;
 	int maxSum = 0;
 	int lastMax = 0;
 	if (verbose) PrintAndLog("performing %d correlations", GraphTraceLen - window);
-	for (int i = 0; i < GraphTraceLen - window; ++i) {
+	for (int i = 0; i < len - window; ++i) {
 		int sum = 0;
 		for (int j = 0; j < window; ++j) {
-			sum += (GraphBuffer[j]*GraphBuffer[i + j]) / 256;
+			sum += (in[j]*in[i + j]) / 256;
 		}
 		CorrelBuffer[i] = sum;
-		if (sum >= maxSum-100 && sum <= maxSum+100){
+		if (sum >= maxSum-100 && sum <= maxSum+100) {
 			//another max
 			Correlation = i-lastMax;
 			lastMax = i;
 			if (sum > maxSum) maxSum = sum;
-		} else if (sum > maxSum){
+		} else if (sum > maxSum) {
 			maxSum=sum;
 			lastMax = i;
 		}
 	}
-	if (Correlation==0){
+	if (Correlation==0) {
 		//try again with wider margin
-		for (int i = 0; i < GraphTraceLen - window; i++){
-			if (CorrelBuffer[i] >= maxSum-(maxSum*0.05) && CorrelBuffer[i] <= maxSum+(maxSum*0.05)){
+		for (int i = 0; i < len - window; i++) {
+			if (CorrelBuffer[i] >= maxSum-(maxSum*0.05) && CorrelBuffer[i] <= maxSum+(maxSum*0.05)) {
 				//another max
 				Correlation = i-lastMax;
 				lastMax = i;
-				//if (CorrelBuffer[i] > maxSum) maxSum = sum;
 			}
 		}
 	}
 	if (verbose && Correlation > 0) PrintAndLog("Possible Correlation: %d samples",Correlation);
 
-	if (SaveGrph){
-		GraphTraceLen = GraphTraceLen - window;
-		memcpy(GraphBuffer, CorrelBuffer, GraphTraceLen * sizeof (int));
+	if (SaveGrph) {
+		//GraphTraceLen = GraphTraceLen - window;
+		memcpy(out, CorrelBuffer, len * sizeof(int));
 		RepaintGraphWindow();  
 	}
 	return Correlation;
@@ -573,7 +583,7 @@ int CmdAutoCorr(const char *Cmd)
 		return 0;
 	}
 	if (grph == 'g') updateGrph=true;
-	return AutoCorrelate(window, updateGrph, true);
+	return AutoCorrelate(GraphBuffer, GraphBuffer, GraphTraceLen, window, updateGrph, true);
 }
 
 int CmdBitsamples(const char *Cmd)
@@ -676,6 +686,18 @@ int CmdGraphShiftZero(const char *Cmd)
 	return 0;
 }
 
+int AskEdgeDetect(const int *in, int *out, int len, int threshold) {
+	int Last = 0;
+	for(int i = 1; i<len; i++) {
+		if (in[i]-in[i-1] >= threshold) //large jump up
+			Last = 127;
+		else if(in[i]-in[i-1] <= -1 * threshold) //large jump down
+			Last = -127;
+		out[i-1] = Last;
+	}
+	return 0;
+}
+
 //by marshmellow
 //use large jumps in read samples to identify edges of waves and then amplify that wave to max
 //similar to dirtheshold, threshold commands 
@@ -683,18 +705,12 @@ int CmdGraphShiftZero(const char *Cmd)
 int CmdAskEdgeDetect(const char *Cmd)
 {
 	int thresLen = 25;
-	int Last = 0;
+	int ans = 0;
 	sscanf(Cmd, "%i", &thresLen); 
 
-	for(int i = 1; i<GraphTraceLen; i++){
-		if (GraphBuffer[i]-GraphBuffer[i-1]>=thresLen) //large jump up
-			Last = 127;
-		else if(GraphBuffer[i]-GraphBuffer[i-1]<=-1*thresLen) //large jump down
-			Last = -127;
-		GraphBuffer[i-1] = Last;
-	}
+	ans = AskEdgeDetect(GraphBuffer, GraphBuffer, GraphTraceLen, thresLen);
 	RepaintGraphWindow();
-	return 0;
+	return ans;
 }
 
 /* Print our clock rate */
@@ -793,12 +809,12 @@ int FSKrawDemod(const char *Cmd, bool verbose)
 		if (!rfLen) rfLen = 50;
 	}
 	int startIdx = 0;
-	int size = fskdemod_ext(BitStream, BitLen, rfLen, invert, fchigh, fclow, &startIdx);
+	int size = fskdemod(BitStream, BitLen, rfLen, invert, fchigh, fclow, &startIdx);
 	if (size > 0) {
 		setDemodBuf(BitStream,size,0);
 		setClockGrid(rfLen, startIdx);
 
-		// Now output the bitstream to the scrollback by line of 16 bits
+    // Now output the bitstream to the scrollback by line of 16 bits
 		if (verbose || g_debugMode) {
 			PrintAndLog("\nUsing Clock:%u, invert:%u, fchigh:%u, fclow:%u", (unsigned int)rfLen, (unsigned int)invert, (unsigned int)fchigh, (unsigned int)fclow);
 			PrintAndLog("%s decoded bitstream:",GetFSKType(fchigh,fclow,invert));
@@ -1057,6 +1073,10 @@ int CmdRawDemod(const char *Cmd)
 }
 
 void setClockGrid(int clk, int offset) {
+	g_DemodStartIdx = offset;
+	g_DemodClock = clk;
+	if (g_debugMode) PrintAndLog("demodoffset %d, clk %d",offset,clk);
+
 	if (offset > clk) offset %= clk;
 	if (offset < 0) offset += clk;
 
@@ -1213,6 +1233,7 @@ int getSamples(int n, bool silent)
 		GraphTraceLen = n;
 	}
 
+	setClockGrid(0,0);
 	RepaintGraphWindow();
 	return 0;
 }
@@ -1316,6 +1337,7 @@ int CmdLoad(const char *Cmd)
 	}
 	fclose(f);
 	PrintAndLog("loaded %d samples", GraphTraceLen);
+	setClockGrid(0,0);
 	RepaintGraphWindow();
 	return 0;
 }
@@ -1423,6 +1445,34 @@ int CmdScale(const char *Cmd)
 	return 0;
 }
 
+int directionalThreshold(const int* in, int *out, size_t len, int8_t up, int8_t down)
+{
+	int lastValue = in[0];
+	out[0] = 0; // Will be changed at the end, but init 0 as we adjust to last samples value if no threshold kicks in.
+
+	for (int i = 1; i < len; ++i) {
+		// Apply first threshold to samples heading up
+		if (in[i] >= up && in[i] > lastValue)
+		{
+			lastValue = out[i]; // Buffer last value as we overwrite it.
+			out[i] = 1;
+		}
+		// Apply second threshold to samples heading down
+		else if (in[i] <= down && in[i] < lastValue)
+		{
+			lastValue = out[i]; // Buffer last value as we overwrite it.
+			out[i] = -1;
+		}
+		else
+		{
+			lastValue = out[i]; // Buffer last value as we overwrite it.
+			out[i] = out[i-1];
+		}
+	}
+	out[0] = out[1]; // Align with first edited sample.
+	return 0;
+}
+
 int CmdDirectionalThreshold(const char *Cmd)
 {
 	int8_t upThres = param_get8(Cmd, 0);
@@ -1430,30 +1480,7 @@ int CmdDirectionalThreshold(const char *Cmd)
 
 	printf("Applying Up Threshold: %d, Down Threshold: %d\n", upThres, downThres);
 
-	int lastValue = GraphBuffer[0];
-	GraphBuffer[0] = 0; // Will be changed at the end, but init 0 as we adjust to last samples value if no threshold kicks in.
-
-	for (int i = 1; i < GraphTraceLen; ++i) {
-		// Apply first threshold to samples heading up
-		if (GraphBuffer[i] >= upThres && GraphBuffer[i] > lastValue)
-		{
-			lastValue = GraphBuffer[i]; // Buffer last value as we overwrite it.
-			GraphBuffer[i] = 127;
-		}
-		// Apply second threshold to samples heading down
-		else if (GraphBuffer[i] <= downThres && GraphBuffer[i] < lastValue)
-		{
-			lastValue = GraphBuffer[i]; // Buffer last value as we overwrite it.
-			GraphBuffer[i] = -127;
-		}
-		else
-		{
-			lastValue = GraphBuffer[i]; // Buffer last value as we overwrite it.
-			GraphBuffer[i] = GraphBuffer[i-1];
-
-		}
-	}
-	GraphBuffer[0] = GraphBuffer[1]; // Aline with first edited sample.
+	directionalThreshold(GraphBuffer, GraphBuffer,GraphTraceLen, upThres, downThres);
 	RepaintGraphWindow();
 	return 0;
 }

@@ -877,26 +877,27 @@ int CmdVchDemod(const char *Cmd)
 int CheckChipType(char cmdp) {
 	uint32_t wordData = 0;
 
+	if (offline || cmdp == '1') return 0;
+
+	save_restoreGB(GRAPH_SAVE);
+	save_restoreDB(GRAPH_SAVE);
 	//check for em4x05/em4x69 chips first
-	save_restoreGB(1);
-	save_restoreDB(1);
-	if ((!offline && (cmdp != '1')) && EM4x05Block0Test(&wordData)) {
+	if (EM4x05Block0Test(&wordData)) {
 		PrintAndLog("\nValid EM4x05/EM4x69 Chip Found\nTry lf em 4x05... commands\n");
-		save_restoreGB(0);
-		save_restoreDB(0);
+		save_restoreGB(GRAPH_RESTORE);
+		save_restoreDB(GRAPH_RESTORE);
 		return 1;
 	}
 
-	//TODO check for t55xx chip...
-
-	if ((!offline && (cmdp != '1')) && tryDetectP1(true)) {
+	//check for t55xx chip...
+	if (tryDetectP1(true)) {
 		PrintAndLog("\nValid T55xx Chip Found\nTry lf t55xx ... commands\n");
-		save_restoreGB(0);
-		save_restoreDB(0);
+		save_restoreGB(GRAPH_RESTORE);
+		save_restoreDB(GRAPH_RESTORE);
 		return 1;		
 	}
-	save_restoreGB(0);
-	save_restoreDB(0);
+	save_restoreGB(GRAPH_RESTORE);
+	save_restoreDB(GRAPH_RESTORE);
 	return 0;
 }
 
@@ -1056,17 +1057,17 @@ int CmdLFfind(const char *Cmd)
 
 	PrintAndLog("\nNo Known Tags Found!\n");
 	if (testRaw=='u' || testRaw=='U') {
-		ans=CheckChipType(cmdp);
+		//ans=CheckChipType(cmdp);
 		//test unknown tag formats (raw mode)0
 		PrintAndLog("\nChecking for Unknown tags:\n");
-		ans=AutoCorrelate(4000, false, false);
+		ans=AutoCorrelate(GraphBuffer, GraphBuffer, GraphTraceLen, 4000, false, false);
 		if (ans > 0) PrintAndLog("Possible Auto Correlation of %d repeating samples",ans);
 		ans=GetFskClock("",false,false); 
 		if (ans != 0) { //fsk
 			ans=FSKrawDemod("",true);
 			if (ans>0) {
 				PrintAndLog("\nUnknown FSK Modulated Tag Found!");
-				return CheckChipType(cmdp);;
+				return CheckChipType(cmdp);
 			}
 		}
 		bool st = true;
@@ -1074,14 +1075,14 @@ int CmdLFfind(const char *Cmd)
 		if (ans>0) {
 			PrintAndLog("\nUnknown ASK Modulated and Manchester encoded Tag Found!");
 			PrintAndLog("\nif it does not look right it could instead be ASK/Biphase - try 'data rawdemod ab'");
-			return CheckChipType(cmdp);;
+			return CheckChipType(cmdp);
 		}
 		ans=CmdPSK1rawDemod("");
 		if (ans>0) {
 			PrintAndLog("Possible unknown PSK1 Modulated Tag Found above!\n\nCould also be PSK2 - try 'data rawdemod p2'");
 			PrintAndLog("\nCould also be PSK3 - [currently not supported]");
 			PrintAndLog("\nCould also be NRZ - try 'data nrzrawdemod'");
-			return CheckChipType(cmdp);;
+			return CheckChipType(cmdp);
 		}
 		ans = CheckChipType(cmdp);
 		PrintAndLog("\nNo Data Found!\n");

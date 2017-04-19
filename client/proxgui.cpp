@@ -63,6 +63,7 @@ extern "C" void ExitGraphics(void)
   if (!gui)
     return;
 
-  delete gui;
+  gui->Exit();
+  //delete gui;
   gui = NULL;
 }

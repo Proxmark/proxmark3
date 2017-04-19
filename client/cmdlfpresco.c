@@ -144,8 +144,9 @@ int CmdPrescoDemod(const char *Cmd) {
 	uint32_t cardid = raw4;
 	PrintAndLog("Presco Tag Found: Card ID %08X", cardid);
 	PrintAndLog("Raw: %08X%08X%08X%08X", raw1,raw2,raw3,raw4);
-	setDemodBuf(DemodBuffer+ans, 128, 0);
-	
+	setDemodBuf(DemodBuffer, 128, ans);
+	setClockGrid(g_DemodClock, g_DemodStartIdx + (ans*g_DemodClock));
+
 	uint32_t sitecode = 0, usercode = 0, fullcode = 0;
 	bool Q5=false;
 	char cmd[12] = {0};

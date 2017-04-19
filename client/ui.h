@@ -12,6 +12,7 @@
 #define UI_H__
 
 #include <stdbool.h>
+#include <stdint.h>
 
 void ShowGui(void);
 void HideGraphWindow(void);
@@ -25,5 +26,6 @@ extern int PlotGridX, PlotGridY, PlotGridXdefault, PlotGridYdefault, CursorCPos,
 extern int offline;
 extern int flushAfterWrite;   //buzzy
 extern bool GridLocked;
+extern bool showDemod;
 
 #endif

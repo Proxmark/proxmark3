@@ -102,7 +102,7 @@ static void *main_loop(void *targ) {
 	struct receiver_arg rarg;
 	char *cmd = NULL;
 	pthread_t reader_thread;
-  
+
 	if (arg->usb_present == 1) {
 		rarg.run = 1;
 		pthread_create(&reader_thread, NULL, &uart_receiver, &rarg);
@@ -175,13 +175,13 @@ static void *main_loop(void *targ) {
 		rarg.run = 0;
 		pthread_join(reader_thread, NULL);
 	}
-
+	
+	ExitGraphics();
+	
 	if (script_file) {
 		fclose(script_file);
 		script_file = NULL;
 	}
-
-	ExitGraphics();
 	pthread_exit(NULL);
 	return NULL;
 }
@@ -254,7 +254,7 @@ int main(int argc, char* argv[]) {
 		.usb_present = 0,
 		.script_cmds_file = NULL
 	};
-	pthread_t main_loop_threat;
+	pthread_t main_loop_thread;
 
   
 	sp = uart_open(argv[1]);
@@ -288,13 +288,16 @@ int main(int argc, char* argv[]) {
 
 	// create a mutex to avoid interlacing print commands from our different threads
 	pthread_mutex_init(&print_lock, NULL);
+	pthread_create(&main_loop_thread, NULL, &main_loop, &marg);
 
-	pthread_create(&main_loop_threat, NULL, &main_loop, &marg);
+	// build ui/graph forms on separate thread (killed on main_loop_thread);
 	InitGraphics(argc, argv);
-
 	MainGraphics();
+	//this won't return until ExitGraphics() is called
 
-	pthread_join(main_loop_threat, NULL);
+	//wait for thread to finish
+	pthread_join(main_loop_thread, NULL);
+	
 
 	// Clean up the port
 	if (offline == 0) {

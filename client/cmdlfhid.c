@@ -32,7 +32,8 @@ int CmdFSKdemodHID(const char *Cmd)
   size_t BitLen = getFromGraphBuf(BitStream);
   if (BitLen==0) return 0;
   //get binary from fsk wave
-  int idx = HIDdemodFSK(BitStream,&BitLen,&hi2,&hi,&lo);
+  int waveIdx = 0;
+  int idx = HIDdemodFSK(BitStream,&BitLen,&hi2,&hi,&lo, &waveIdx);
   if (idx<0){
     if (g_debugMode){
       if (idx==-1){
@@ -99,6 +100,7 @@ int CmdFSKdemodHID(const char *Cmd)
       (unsigned int) fmtLen, (unsigned int) fc, (unsigned int) cardnum);
   }
   setDemodBuf(BitStream,BitLen,idx);
+  setClockGrid(50, waveIdx + (idx*50));
   if (g_debugMode){ 
     PrintAndLog("DEBUG: idx: %d, Len: %d, Printing Demod Buffer:", idx, BitLen);
     printDemodBuff();

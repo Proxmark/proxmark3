@@ -152,7 +152,9 @@ int AskEm410xDecode(bool verbose, uint32_t *hi, uint64_t *lo )
 
 	if (Em410xDecode(BitStream, &BitLen, &idx, hi, lo)) {
 		//set GraphBuffer for clone or sim command
-		setDemodBuf(BitStream, BitLen, idx);
+		setDemodBuf(DemodBuffer, (BitLen==40) ? 64 : 128, idx+1);
+		setClockGrid(g_DemodClock, g_DemodStartIdx + ((idx+1)*g_DemodClock));
+
 		if (g_debugMode) {
 			PrintAndLog("DEBUG: idx: %d, Len: %d, Printing Demod Buffer:", idx, BitLen);
 			printDemodBuff();
@@ -472,9 +474,6 @@ int EM4x50Read(const char *Cmd, bool verbose)
 	// get user entry if any
 	sscanf(Cmd, "%i %i", &clk, &invert);
 	
-	// save GraphBuffer - to restore it later	
-	save_restoreGB(1);
-
 	// first get high and low values
 	for (i = 0; i < GraphTraceLen; i++) {
 		if (GraphBuffer[i] > high)
@@ -571,6 +570,8 @@ int EM4x50Read(const char *Cmd, bool verbose)
 	} else if (start < 0) return 0;
 	start = skip;
 	snprintf(tmp2, sizeof(tmp2),"%d %d 1000 %d", clk, invert, clk*47);
+	// save GraphBuffer - to restore it later	
+	save_restoreGB(GRAPH_SAVE);
 	// get rid of leading crap 
 	snprintf(tmp, sizeof(tmp), "%i", skip);
 	CmdLtrim(tmp);
@@ -598,7 +599,7 @@ int EM4x50Read(const char *Cmd, bool verbose)
 			phaseoff = 0;
 		i += 2;
 		if (ASKDemod(tmp2, false, false, 1) < 1) {
-			save_restoreGB(0);
+			save_restoreGB(GRAPH_RESTORE);
 			return 0;
 		}
 		//set DemodBufferLen to just one block
@@ -637,7 +638,7 @@ int EM4x50Read(const char *Cmd, bool verbose)
 	}
 
 	//restore GraphBuffer
-	save_restoreGB(0);
+	save_restoreGB(GRAPH_RESTORE);
 	return (int)AllPTest;
 }
 
@@ -703,6 +704,8 @@ bool EM4x05testDemodReadData(uint32_t *word, bool readCmd) {
 		}
 
 		setDemodBuf(DemodBuffer, 32, 0);
+		//setClockGrid(0,0);
+
 		*word = bytebits_to_byteLSBF(DemodBuffer, 32);
 	}
 	return true;

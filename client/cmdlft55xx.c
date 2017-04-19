@@ -419,23 +419,23 @@ bool DecodeT55xxBlock(){
 			break;
 		case DEMOD_PSK1:
 			// skip first 160 samples to allow antenna to settle in (psk gets inverted occasionally otherwise)
-			save_restoreGB(1);
+			save_restoreGB(GRAPH_SAVE);
 			CmdLtrim("160");
 			snprintf(cmdStr, sizeof(buf),"%d %d 6", bitRate[config.bitrate], config.inverted );
 			ans = PSKDemod(cmdStr, false);
 			//undo trim samples
-			save_restoreGB(0);
+			save_restoreGB(GRAPH_RESTORE);
 			break;
 		case DEMOD_PSK2: //inverted won't affect this
 		case DEMOD_PSK3: //not fully implemented
 			// skip first 160 samples to allow antenna to settle in (psk gets inverted occasionally otherwise)
-			save_restoreGB(1);
+			save_restoreGB(GRAPH_SAVE);
 			CmdLtrim("160");
 			snprintf(cmdStr, sizeof(buf),"%d 0 6", bitRate[config.bitrate] );
 			ans = PSKDemod(cmdStr, false);
 			psk1TOpsk2(DemodBuffer, DemodBufferLen);
 			//undo trim samples
-			save_restoreGB(0);
+			save_restoreGB(GRAPH_RESTORE);
 			break;
 		case DEMOD_NRZ:
 			snprintf(cmdStr, sizeof(buf),"%d %d 1", bitRate[config.bitrate], config.inverted );
@@ -594,7 +594,7 @@ bool tryDetectModulation(){
 		clk = GetPskClock("", false, false);
 		if (clk>0) {
 			// allow undo
-			save_restoreGB(1);
+			save_restoreGB(GRAPH_SAVE);
 			// skip first 160 samples to allow antenna to settle in (psk gets inverted occasionally otherwise)
 			CmdLtrim("160");
 			if ( PSKDemod("0 0 6", false) && test(DEMOD_PSK1, &tests[hits].offset, &bitRate, clk, &tests[hits].Q5)) {
@@ -638,7 +638,7 @@ bool tryDetectModulation(){
 				}
 			} // inverse waves does not affect this demod
 			//undo trim samples
-			save_restoreGB(0);
+			save_restoreGB(GRAPH_RESTORE);
 		}
 	}	
 	if ( hits == 1) {
