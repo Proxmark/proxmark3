@@ -15,6 +15,7 @@
 *.moc.cpp
 *.z
 version.c
+ui_overlays.h
 
 *.exe
 proxmark3

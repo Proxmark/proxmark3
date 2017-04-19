@@ -162,10 +162,10 @@ ZLIBOBJS = $(ZLIBSRCS:%.c=$(OBJDIR)/%.o)
 
 BINS = proxmark3 flasher fpga_compress
 WINBINS = $(patsubst %, %.exe, $(BINS))
-CLEAN = $(BINS) $(WINBINS) $(COREOBJS) $(CMDOBJS) $(ZLIBOBJS) $(QTGUIOBJS) $(OBJDIR)/*.o *.moc.cpp 
-#./ui/ui_overlays.h
+CLEAN = $(BINS) $(WINBINS) $(COREOBJS) $(CMDOBJS) $(ZLIBOBJS) $(QTGUIOBJS) $(OBJDIR)/*.o *.moc.cpp ui/ui_overlays.h
 
-all: lua_build $(BINS)
+# need to assign dependancies to build these first...
+all: ui/ui_overlays.h lua_build $(BINS)
 
 all-static: LDLIBS:=-static $(LDLIBS)
 all-static: proxmark3 flasher fpga_compress
@@ -183,9 +183,8 @@ fpga_compress: $(OBJDIR)/fpga_compress.o $(ZLIBOBJS)
 proxguiqt.moc.cpp: proxguiqt.h
 	$(MOC) -o$@ $^
 
-#cannot seem to get this to work accross qt versions...
-#ui/ui_overlays.h: ./ui/overlays.ui
-#	$(UIC) $^ > $@
+ui/ui_overlays.h: ui/overlays.ui
+	$(UIC) $^ > $@
 
 lualibs/usb_cmd.lua: ../include/usb_cmd.h
 	awk -f usb_cmd_h2lua.awk $^ > $@
