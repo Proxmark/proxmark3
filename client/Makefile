@@ -20,7 +20,7 @@ LDLIBS = -L/opt/local/lib -L/usr/local/lib -lreadline -lpthread -lm
 LUALIB = ../liblua/liblua.a
 LDFLAGS = $(COMMON_FLAGS)
 CFLAGS = -std=c99 -D_ISOC99_SOURCE -I. -I../include -I../common -I../zlib -I/opt/local/include -I../liblua -Wall $(COMMON_FLAGS) -g -O3
-CXXFLAGS = -std=c++11 -fPIC -Wall -O3
+CXXFLAGS = -Wall -O3
 
 LUAPLATFORM = generic
 platform = $(shell uname)
@@ -41,8 +41,9 @@ QTINCLUDES = $(shell pkg-config --cflags Qt5Core Qt5Widgets 2>/dev/null)
 QTLDLIBS = $(shell pkg-config --libs Qt5Core Qt5Widgets 2>/dev/null)
 MOC = $(shell pkg-config --variable=host_bins Qt5Core)/moc
 UIC = $(shell pkg-config --variable=host_bins Qt5Core)/uic
+CXXFLAGS += -std=c++11 -fPIC
 ifeq ($(QTINCLUDES), )
-# if Qt5 not found Check for correctly configured Qt4	
+# if Qt5 not found check for correctly configured Qt4	
 	QTINCLUDES = $(shell pkg-config --cflags QtCore QtGui 2>/dev/null)
 	QTLDLIBS = $(shell pkg-config --libs QtCore QtGui 2>/dev/null)
 	MOC = $(shell pkg-config --variable=moc_location QtCore)
