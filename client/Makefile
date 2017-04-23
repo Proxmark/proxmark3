@@ -41,13 +41,14 @@ QTINCLUDES = $(shell pkg-config --cflags Qt5Core Qt5Widgets 2>/dev/null)
 QTLDLIBS = $(shell pkg-config --libs Qt5Core Qt5Widgets 2>/dev/null)
 MOC = $(shell pkg-config --variable=host_bins Qt5Core)/moc
 UIC = $(shell pkg-config --variable=host_bins Qt5Core)/uic
-CXXFLAGS += -std=c++11 -fPIC
 ifeq ($(QTINCLUDES), )
 # if Qt5 not found check for correctly configured Qt4	
 	QTINCLUDES = $(shell pkg-config --cflags QtCore QtGui 2>/dev/null)
 	QTLDLIBS = $(shell pkg-config --libs QtCore QtGui 2>/dev/null)
 	MOC = $(shell pkg-config --variable=moc_location QtCore)
 	UIC = $(shell pkg-config --variable=uic_location QtCore)
+else
+	CXXFLAGS += -std=c++11 -fPIC
 endif
 ifeq ($(QTINCLUDES), )
 # if both pkg-config commands failed, search in common places
@@ -57,6 +58,7 @@ ifeq ($(QTINCLUDES), )
 		ifneq ($(wildcard $(QTDIR)/include/QtWidgets),)
 			QTINCLUDES += -I$(QTDIR)/include/QtWidgets
 			QTLDLIBS = -L$(QTDIR)/lib -lQt5Widgets -lQt5Gui -lQt5Core
+			CXXFLAGS += -std=c++11 -fPIC
 		endif
 		MOC = $(QTDIR)/bin/moc
 		UIC = $(QTDIR)/bin/uic
