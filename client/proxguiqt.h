@@ -11,6 +11,9 @@
 #ifndef PROXGUI_QT
 #define PROXGUI_QT
 
+#include <stdint.h>
+#include <string.h>
+
 #include <QApplication>
 #include <QPushButton>
 #include <QObject>
