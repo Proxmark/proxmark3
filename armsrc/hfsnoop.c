@@ -29,7 +29,7 @@ static void RAMFUNC optimizedSnoop(void)
 void HfSnoop(int samplesToSkip, int triggersToSkip)
 {
 	Dbprintf("Skipping first %d sample pairs, Skipping %d triggers.", samplesToSkip, triggersToSkip);
-	bool trigger_cnt;
+	int trigger_cnt;
 	LED_D_ON();
 	// Select correct configs
 	FpgaDownloadAndGo(FPGA_BITSTREAM_HF);
