@@ -319,7 +319,7 @@ static int GetIso15693AnswerFromTag(uint8_t *receivedResponse, int maxLen, int *
 			// every other is Q. We just want power, so abs(I) + abs(Q) is
 			// close to what we want.
 			if(getNext) {
-				int8_t r = ABS(b) + ABS(prev);
+				uint8_t r = ABS(b) + ABS(prev);
 
 				dest[c++] = (uint8_t)r;
 
@@ -356,7 +356,7 @@ static int GetIso15693AnswerFromTag(uint8_t *receivedResponse, int maxLen, int *
 			maxPos = i;
 		}
 	}
-	//	DbpString("SOF at %d, correlation %d", maxPos,max/(arraylen(FrameSOF)/skip));
+		// Dbprintf("SOF at %d, correlation %d", maxPos,max/(arraylen(FrameSOF)/skip));
 
 	int k = 0; // this will be our return value
 
@@ -385,7 +385,7 @@ static int GetIso15693AnswerFromTag(uint8_t *receivedResponse, int maxLen, int *
 			corr1 *= 4;
 	
 			if(corrEOF > corr1 && corrEOF > corr0) {
-	//			DbpString("EOF at %d", i);
+				// Dbprintf("EOF at %d", i);
 				break;
 			} else if(corr1 > corr0) {
 				i += arraylen(Logic1)/skip;
@@ -457,7 +457,7 @@ static int GetIso15693AnswerFromSniff(uint8_t *receivedResponse, int maxLen, int
 			// every other is Q. We just want power, so abs(I) + abs(Q) is
 			// close to what we want.
 			if(getNext) {
-				int8_t r = ABS(b) + ABS(prev);
+				uint8_t r = ABS(b) + ABS(prev);
 
 				dest[c++] = (uint8_t)r;
 
@@ -626,7 +626,7 @@ void AcquireRawAdcSamplesIso15693(void)
 			// every other is Q. We just want power, so abs(I) + abs(Q) is
 			// close to what we want.
 			if(getNext) {
-				int8_t r = ABS(b) + ABS(prev);
+				uint8_t r = ABS(b) + ABS(prev);
 
 				dest[c++] = (uint8_t)r;
 
@@ -680,7 +680,7 @@ void RecordRawAdcSamplesIso15693(void)
 			// every other is Q. We just want power, so abs(I) + abs(Q) is
 			// close to what we want.
 			if(getNext) {
-				int8_t r = ABS(b) + ABS(prev);
+				uint8_t r = ABS(b) + ABS(prev);
 
 				dest[c++] = (uint8_t)r;
 
