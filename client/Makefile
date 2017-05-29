@@ -112,6 +112,8 @@ CMDSRCS = 	crapto1/crapto1.c\
 			cmdhficlass.c \
 			cmdhfmf.c \
 			cmdhfmfu.c \
+			cmdhfmfhard.c \
+			hardnested/hardnested_bruteforce.c \
 			cmdhftopaz.c \
 			cmdhw.c \
 			cmdlf.c \
@@ -153,6 +155,8 @@ CMDSRCS = 	crapto1/crapto1.c\
 			reveng/poly.c\
 			reveng/getopt.c\
 
+MULTIARCHSRCS = hardnested/hardnested_bf_core.c hardnested/hardnested_bitarray_core.c
+
 ZLIBSRCS = deflate.c adler32.c trees.c zutil.c inflate.c inffast.c inftrees.c
 ZLIBFLAGS = -DZ_SOLO -DZ_PREFIX -DNO_GZIP -DZLIB_PM3_TUNED 
 #-DDEBUG -Dverbose=1
@@ -162,10 +166,16 @@ QTGUISRCS = proxgui.cpp proxguiqt.cpp proxguiqt.moc.cpp guidummy.cpp
 COREOBJS = $(CORESRCS:%.c=$(OBJDIR)/%.o)
 CMDOBJS = $(CMDSRCS:%.c=$(OBJDIR)/%.o)
 ZLIBOBJS = $(ZLIBSRCS:%.c=$(OBJDIR)/%.o)
-
+MULTIARCHOBJS = $(MULTIARCHSRCS:%.c=$(OBJDIR)/%_NOSIMD.o) \
+			$(MULTIARCHSRCS:%.c=$(OBJDIR)/%_MMX.o) \
+			$(MULTIARCHSRCS:%.c=$(OBJDIR)/%_SSE2.o) \
+			$(MULTIARCHSRCS:%.c=$(OBJDIR)/%_AVX.o) \
+			$(MULTIARCHSRCS:%.c=$(OBJDIR)/%_AVX2.o) \
+			$(MULTIARCHSRCS:%.c=$(OBJDIR)/%_AVX512.o)
+			
 BINS = proxmark3 flasher fpga_compress
 WINBINS = $(patsubst %, %.exe, $(BINS))
-CLEAN = $(BINS) $(WINBINS) $(COREOBJS) $(CMDOBJS) $(ZLIBOBJS) $(QTGUIOBJS) $(OBJDIR)/*.o *.moc.cpp ui/ui_overlays.h
+CLEAN = $(BINS) $(WINBINS) $(COREOBJS) $(CMDOBJS) $(ZLIBOBJS) $(QTGUIOBJS) $(MULTIARCHOBJS) $(OBJDIR)/*.o *.moc.cpp ui/ui_overlays.h
 
 # need to assign dependancies to build these first...
 all: ui/ui_overlays.h lua_build $(BINS)
@@ -174,8 +184,8 @@ all-static: LDLIBS:=-static $(LDLIBS)
 all-static: proxmark3 flasher fpga_compress
 
 proxmark3: LDLIBS+=$(LUALIB) $(QTLDLIBS)
-proxmark3: $(OBJDIR)/proxmark3.o $(COREOBJS) $(CMDOBJS) $(QTGUIOBJS) lualibs/usb_cmd.lua
-	$(LD) $(LDFLAGS) $(OBJDIR)/proxmark3.o $(COREOBJS) $(CMDOBJS) $(QTGUIOBJS) $(LDLIBS) -o $@
+proxmark3: $(OBJDIR)/proxmark3.o $(COREOBJS) $(CMDOBJS) $(QTGUIOBJS) $(MULTIARCHOBJS) lualibs/usb_cmd.lua
+	$(LD) $(LDFLAGS) $(OBJDIR)/proxmark3.o $(COREOBJS) $(CMDOBJS) $(QTGUIOBJS) $(MULTIARCHOBJS) $(LDLIBS) -o $@
 
 flasher: $(OBJDIR)/flash.o $(OBJDIR)/flasher.o $(COREOBJS)
 	$(LD) $(LDFLAGS) $^ $(LDLIBS) -o $@
@@ -204,6 +214,24 @@ lua_build:
 	cd ../liblua && make $(LUAPLATFORM)
 
 .PHONY: all clean
+
+$(OBJDIR)/%_NOSIMD.o : %.c $(OBJDIR)/%.d
+	$(CC) $(DEPFLAGS) $(CFLAGS) -mno-mmx -mno-sse2 -mno-avx -mno-avx2 -mno-avx512f -c -o $@ $<
+
+$(OBJDIR)/%_MMX.o : %.c $(OBJDIR)/%.d
+	$(CC) $(DEPFLAGS) $(CFLAGS) -mmmx -mno-sse2 -mno-avx -mno-avx2 -mno-avx512f -c -o $@ $<
+
+$(OBJDIR)/%_SSE2.o : %.c $(OBJDIR)/%.d
+	$(CC) $(DEPFLAGS) $(CFLAGS) -mmmx -msse2 -mno-avx -mno-avx2 -mno-avx512f -c -o $@ $<
+
+$(OBJDIR)/%_AVX.o : %.c $(OBJDIR)/%.d
+	$(CC) $(DEPFLAGS) $(CFLAGS) -mmmx -msse2 -mavx -mno-avx2 -mno-avx512f -c -o $@ $<
+
+$(OBJDIR)/%_AVX2.o : %.c $(OBJDIR)/%.d
+	$(CC) $(DEPFLAGS) $(CFLAGS) -mmmx -msse2 -mavx -mavx2 -mno-avx512f -c -o $@ $<
+
+$(OBJDIR)/%_AVX512.o : %.c $(OBJDIR)/%.d
+	$(CC) $(DEPFLAGS) $(CFLAGS) -mmmx -msse2 -mavx -mavx2 -mavx512f -c -o $@ $<
 
 %.o: %.c
 $(OBJDIR)/%.o : %.c $(OBJDIR)/%.d

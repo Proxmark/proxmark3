@@ -11,13 +11,16 @@
 *.s19
 *.map
 *.bin
+!client/hardnested/*.bin
 *.dll
 *.moc.cpp
 *.z
+usb_cmd.lua
 version.c
 client/ui/ui_overlays.h
 
 *.exe
+hardnested_stats.txt
 proxmark3
 flasher
 lua

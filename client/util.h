@@ -87,5 +87,6 @@ extern void msleep(uint32_t n);		// sleep n milliseconds
 #endif // _WIN32
 
 extern uint64_t msclock(); 			// a milliseconds clock
+extern int num_CPUs(void);			// number of logical CPUs
 
 #endif // UTIL_H__

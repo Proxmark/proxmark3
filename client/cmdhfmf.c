@@ -8,6 +8,8 @@
 // High frequency MIFARE commands
 //-----------------------------------------------------------------------------
 
+#include "cmdhfmf.h"
+
 #include <inttypes.h>
 #include <string.h>
 #include <stdio.h>
@@ -15,7 +17,9 @@
 #include <ctype.h>
 #include "proxmark3.h"
 #include "cmdmain.h"
+#include "cmdhfmfhard.h"
 #include "util.h"
+#include "usb_cmd.h"
 #include "ui.h"
 #include "mifarehost.h"
 #include "mifare.h"
@@ -26,19 +30,17 @@
 
 static int CmdHelp(const char *Cmd);
 
-
 int CmdHF14AMifare(const char *Cmd)
 {
 	int isOK = 0;
 	uint64_t key = 0;
-
 	isOK = mfDarkside(&key);
 	switch (isOK) {
 		case -1 : PrintAndLog("Button pressed. Aborted."); return 1;
 		case -2 : PrintAndLog("Card is not vulnerable to Darkside attack (doesn't send NACK on authentication requests)."); return 1;
 		case -3 : PrintAndLog("Card is not vulnerable to Darkside attack (its random number generator is not predictable)."); return 1;
 		case -4 : PrintAndLog("Card is not vulnerable to Darkside attack (its random number generator seems to be based on the wellknown");
-					PrintAndLog("generating polynomial with 16 effective bits only, but shows unexpected behaviour."); return 1;
+				  PrintAndLog("generating polynomial with 16 effective bits only, but shows unexpected behaviour."); return 1;
 		case -5 : PrintAndLog("Aborted via keyboard.");  return 1;
 		default : PrintAndLog("Found valid key:%012" PRIx64 "\n", key);
 	}
@@ -763,6 +765,127 @@ int CmdHF14AMfNested(const char *Cmd)
 	}
 	return 0;
 }
+
+
+int CmdHF14AMfNestedHard(const char *Cmd)
+{
+	uint8_t blockNo = 0;
+	uint8_t keyType = 0;
+	uint8_t trgBlockNo = 0;
+	uint8_t trgKeyType = 0;
+	uint8_t key[6] = {0, 0, 0, 0, 0, 0};
+	uint8_t trgkey[6] = {0, 0, 0, 0, 0, 0};
+	
+	char ctmp;
+	ctmp = param_getchar(Cmd, 0);
+
+	if (ctmp != 'R' && ctmp != 'r' && ctmp != 'T' && ctmp != 't' && strlen(Cmd) < 20) {
+		PrintAndLog("Usage:");
+		PrintAndLog("      hf mf hardnested <block number> <key A|B> <key (12 hex symbols)>");
+		PrintAndLog("                       <target block number> <target key A|B> [known target key (12 hex symbols)] [w] [s]");
+		PrintAndLog("  or  hf mf hardnested r [known target key]");
+		PrintAndLog(" ");
+		PrintAndLog("Options: ");
+		PrintAndLog("      w: Acquire nonces and write them to binary file nonces.bin");
+		PrintAndLog("      s: Slower acquisition (required by some non standard cards)");
+		PrintAndLog("      r: Read nonces.bin and start attack");
+		PrintAndLog(" ");
+		PrintAndLog("      sample1: hf mf hardnested 0 A FFFFFFFFFFFF 4 A");
+		PrintAndLog("      sample2: hf mf hardnested 0 A FFFFFFFFFFFF 4 A w");
+		PrintAndLog("      sample3: hf mf hardnested 0 A FFFFFFFFFFFF 4 A w s");
+		PrintAndLog("      sample4: hf mf hardnested r");
+		PrintAndLog(" ");
+		PrintAndLog("Add the known target key to check if it is present in the remaining key space:");
+		PrintAndLog("      sample5: hf mf hardnested 0 A A0A1A2A3A4A5 4 A FFFFFFFFFFFF");
+		return 0;
+	}	
+	
+	bool know_target_key = false;
+	bool nonce_file_read = false;
+	bool nonce_file_write = false;
+	bool slow = false;
+	int tests = 0;
+	
+	
+	if (ctmp == 'R' || ctmp == 'r') {
+		nonce_file_read = true;
+		if (!param_gethex(Cmd, 1, trgkey, 12)) {
+			know_target_key = true;
+		}
+	} else if (ctmp == 'T' || ctmp == 't') {
+		tests = param_get32ex(Cmd, 1, 100, 10);
+		if (!param_gethex(Cmd, 2, trgkey, 12)) {
+			know_target_key = true;
+		}
+	} else {
+		blockNo = param_get8(Cmd, 0);
+		ctmp = param_getchar(Cmd, 1);
+		if (ctmp != 'a' && ctmp != 'A' && ctmp != 'b' && ctmp != 'B') {
+			PrintAndLog("Key type must be A or B");
+			return 1;
+		}
+		if (ctmp != 'A' && ctmp != 'a') { 
+			keyType = 1;
+		}
+		
+		if (param_gethex(Cmd, 2, key, 12)) {
+			PrintAndLog("Key must include 12 HEX symbols");
+			return 1;
+		}
+		
+		trgBlockNo = param_get8(Cmd, 3);
+		ctmp = param_getchar(Cmd, 4);
+		if (ctmp != 'a' && ctmp != 'A' && ctmp != 'b' && ctmp != 'B') {
+			PrintAndLog("Target key type must be A or B");
+			return 1;
+		}
+		if (ctmp != 'A' && ctmp != 'a') {
+			trgKeyType = 1;
+		}
+
+		uint16_t i = 5;
+
+		if (!param_gethex(Cmd, 5, trgkey, 12)) {
+			know_target_key = true;
+			i++;
+		}
+
+		while ((ctmp = param_getchar(Cmd, i))) {
+			if (ctmp == 's' || ctmp == 'S') {
+				slow = true;
+			} else if (ctmp == 'w' || ctmp == 'W') {
+				nonce_file_write = true;
+			} else {
+				PrintAndLog("Possible options are w and/or s");
+				return 1;
+			}
+			i++;
+		}
+	}
+
+	PrintAndLog("--target block no:%3d, target key type:%c, known target key: 0x%02x%02x%02x%02x%02x%02x%s, file action: %s, Slow: %s, Tests: %d ", 
+			trgBlockNo, 
+			trgKeyType?'B':'A',
+			trgkey[0], trgkey[1], trgkey[2], trgkey[3], trgkey[4], trgkey[5],
+			know_target_key?"":" (not set)",
+			nonce_file_write?"write":nonce_file_read?"read":"none",
+			slow?"Yes":"No",
+			tests);
+
+	int16_t isOK = mfnestedhard(blockNo, keyType, key, trgBlockNo, trgKeyType, know_target_key?trgkey:NULL, nonce_file_read, nonce_file_write, slow, tests);
+
+	if (isOK) {
+		switch (isOK) {
+			case 1 : PrintAndLog("Error: No response from Proxmark.\n"); break;
+			case 2 : PrintAndLog("Button pressed. Aborted.\n"); break;
+			default : break;
+		}
+		return 2;
+	}
+
+	return 0;
+}
+
 
 int CmdHF14AMfChk(const char *Cmd)
 {
@@ -2183,33 +2306,34 @@ int CmdDecryptTraceCmds(const char *Cmd){
 
 static command_t CommandTable[] =
 {
-  {"help",		CmdHelp,				1, "This help"},
-  {"dbg",		CmdHF14AMfDbg,			0, "Set default debug mode"},
-  {"rdbl",		CmdHF14AMfRdBl,			0, "Read MIFARE classic block"},
-  {"rdsc",		CmdHF14AMfRdSc,			0, "Read MIFARE classic sector"},
-  {"dump",		CmdHF14AMfDump,			0, "Dump MIFARE classic tag to binary file"},
-  {"restore",	CmdHF14AMfRestore,		0, "Restore MIFARE classic binary file to BLANK tag"},
-  {"wrbl",		CmdHF14AMfWrBl,			0, "Write MIFARE classic block"},
-  {"chk",		CmdHF14AMfChk,			0, "Test block keys"},
-  {"mifare",	CmdHF14AMifare,			0, "Read parity error messages."},
-  {"nested",	CmdHF14AMfNested,		0, "Test nested authentication"},
-  {"sniff",		CmdHF14AMfSniff,		0, "Sniff card-reader communication"},
-  {"sim",		CmdHF14AMf1kSim,		0, "Simulate MIFARE card"},
-  {"eclr",		CmdHF14AMfEClear,		0, "Clear simulator memory block"},
-  {"eget",		CmdHF14AMfEGet,			0, "Get simulator memory block"},
-  {"eset",		CmdHF14AMfESet,			0, "Set simulator memory block"},
-  {"eload",		CmdHF14AMfELoad,		0, "Load from file emul dump"},
-  {"esave",		CmdHF14AMfESave,		0, "Save to file emul dump"},
-  {"ecfill",	CmdHF14AMfECFill,		0, "Fill simulator memory with help of keys from simulator"},
-  {"ekeyprn",	CmdHF14AMfEKeyPrn,		0, "Print keys from simulator memory"},
-  {"csetuid",	CmdHF14AMfCSetUID,		0, "Set UID for magic Chinese card"},
-  {"csetblk",	CmdHF14AMfCSetBlk,		0, "Write block - Magic Chinese card"},
-  {"cgetblk",	CmdHF14AMfCGetBlk,		0, "Read block - Magic Chinese card"},
-  {"cgetsc",	CmdHF14AMfCGetSc,		0, "Read sector - Magic Chinese card"},
-  {"cload",		CmdHF14AMfCLoad,		0, "Load dump into magic Chinese card"},
-  {"csave",		CmdHF14AMfCSave,		0, "Save dump from magic Chinese card into file or emulator"},
-  {"decrypt", CmdDecryptTraceCmds,1, "[nt] [ar_enc] [at_enc] [data] - to decrypt snoop or trace"},
-  {NULL, NULL, 0, NULL}
+  {"help",             CmdHelp,                 1, "This help"},
+  {"dbg",              CmdHF14AMfDbg,           0, "Set default debug mode"},
+  {"rdbl",             CmdHF14AMfRdBl,          0, "Read MIFARE classic block"},
+  {"rdsc",             CmdHF14AMfRdSc,          0, "Read MIFARE classic sector"},
+  {"dump",             CmdHF14AMfDump,          0, "Dump MIFARE classic tag to binary file"},
+  {"restore",  	       CmdHF14AMfRestore,       0, "Restore MIFARE classic binary file to BLANK tag"},
+  {"wrbl",             CmdHF14AMfWrBl,          0, "Write MIFARE classic block"},
+  {"chk",              CmdHF14AMfChk,           0, "Test block keys"},
+  {"mifare",           CmdHF14AMifare,          0, "Read parity error messages."},
+  {"hardnested",       CmdHF14AMfNestedHard,    0, "Nested attack for hardened Mifare cards"},
+  {"nested",           CmdHF14AMfNested,        0, "Test nested authentication"},
+  {"sniff",            CmdHF14AMfSniff,         0, "Sniff card-reader communication"},
+  {"sim",              CmdHF14AMf1kSim,         0, "Simulate MIFARE card"},
+  {"eclr",             CmdHF14AMfEClear,        0, "Clear simulator memory block"},
+  {"eget",             CmdHF14AMfEGet,          0, "Get simulator memory block"},
+  {"eset",             CmdHF14AMfESet,          0, "Set simulator memory block"},
+  {"eload",            CmdHF14AMfELoad,         0, "Load from file emul dump"},
+  {"esave",            CmdHF14AMfESave,         0, "Save to file emul dump"},
+  {"ecfill",           CmdHF14AMfECFill,        0, "Fill simulator memory with help of keys from simulator"},
+  {"ekeyprn",          CmdHF14AMfEKeyPrn,       0, "Print keys from simulator memory"},
+  {"csetuid",          CmdHF14AMfCSetUID,       0, "Set UID for magic Chinese card"},
+  {"csetblk",          CmdHF14AMfCSetBlk,       0, "Write block - Magic Chinese card"},
+  {"cgetblk",          CmdHF14AMfCGetBlk,       0, "Read block - Magic Chinese card"},
+  {"cgetsc",           CmdHF14AMfCGetSc,        0, "Read sector - Magic Chinese card"},
+  {"cload",            CmdHF14AMfCLoad,         0, "Load dump into magic Chinese card"},
+  {"csave",            CmdHF14AMfCSave,         0, "Save dump from magic Chinese card into file or emulator"},
+  {"decrypt",          CmdDecryptTraceCmds,     1, "[nt] [ar_enc] [at_enc] [data] - to decrypt snoop or trace"},
+  {NULL,               NULL,                    0, NULL}
 };
 
 int CmdHFMF(const char *Cmd)
