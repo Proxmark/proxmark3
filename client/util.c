@@ -656,3 +656,19 @@ uint64_t msclock() {
 	return (t.tv_sec * 1000 + t.tv_nsec / 1000000);
 #endif
 }
+
+// determine number of logical CPU cores (use for multithreaded functions)
+extern int num_CPUs(void)
+{
+#if defined(_WIN32)
+	#include <sysinfoapi.h>
+	SYSTEM_INFO sysinfo;
+	GetSystemInfo(&sysinfo);
+	return sysinfo.dwNumberOfProcessors;
+#elif defined(__linux__) || defined(__APPLE__)
+	#include <unistd.h>
+	return sysconf(_SC_NPROCESSORS_ONLN);
+#else
+	return 1;
+#endif
+}

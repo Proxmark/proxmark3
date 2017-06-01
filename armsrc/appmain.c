@@ -1163,6 +1163,9 @@ void UsbPacketReceived(uint8_t *packet, int len)
 		case CMD_MIFAREU_WRITEBL:
 			MifareUWriteBlock(c->arg[0], c->arg[1], c->d.asBytes);
 			break;
+		case CMD_MIFARE_ACQUIRE_ENCRYPTED_NONCES:
+			MifareAcquireEncryptedNonces(c->arg[0], c->arg[1], c->arg[2], c->d.asBytes);
+			break;
 		case CMD_MIFARE_NESTED:
 			MifareNested(c->arg[0], c->arg[1], c->arg[2], c->d.asBytes);
 			break;
