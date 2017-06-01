@@ -84,6 +84,7 @@ void ProxGuiQT::_HideGraphWindow(void)
 void ProxGuiQT::_Exit(void) {
 	delete this;
 }
+
 void ProxGuiQT::MainLoop()
 {
 	plotapp = new QApplication(argc, argv);
@@ -110,7 +111,7 @@ ProxGuiQT::~ProxGuiQT(void)
 	//}
 	if (plotapp) {
 		plotapp->quit();
-		delete plotapp;
+		// delete plotapp;
 		plotapp = NULL;
 	}
 }
