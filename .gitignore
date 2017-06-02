@@ -18,6 +18,7 @@
 usb_cmd.lua
 version.c
 client/ui/ui_overlays.h
+*.Td
 
 *.exe
 hardnested_stats.txt
