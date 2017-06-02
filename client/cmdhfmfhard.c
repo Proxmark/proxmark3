@@ -69,7 +69,7 @@ static float brute_force_per_second;
 
 
 static void get_SIMD_instruction_set(char* instruction_set) {
-	#if (__GNUC__ > 4) 
+	#if (__GNUC__ >= 5) && (__GNUC__ > 5 || __GNUC_MINOR__ > 2) 
 	if (__builtin_cpu_supports("avx512f")) strcpy(instruction_set, "AVX512F");
 	else if (__builtin_cpu_supports("avx2")) strcpy(instruction_set, "AVX2");
 	#else 

@@ -534,7 +534,7 @@ bitslice_test_nonces_t *bitslice_test_nonces_function_p = &bitslice_test_nonces_
 
 // determine the available instruction set at runtime and call the correct function
 const uint64_t crack_states_bitsliced_dispatch(uint32_t cuid, uint8_t *best_first_bytes, statelist_t *p, uint32_t *keys_found, uint64_t *num_keys_tested, uint32_t nonces_to_bruteforce, uint8_t *bf_test_nonce_2nd_byte, noncelist_t *nonces) {
-	#if (__GNUC__ > 4) 
+	#if (__GNUC__ >= 5) && (__GNUC__ > 5 || __GNUC_MINOR__ > 2) 
 	if (__builtin_cpu_supports("avx512f")) crack_states_bitsliced_function_p = &crack_states_bitsliced_AVX512;
 	else if (__builtin_cpu_supports("avx2")) crack_states_bitsliced_function_p = &crack_states_bitsliced_AVX2;
 	#else
@@ -552,7 +552,7 @@ const uint64_t crack_states_bitsliced_dispatch(uint32_t cuid, uint8_t *best_firs
 }
 
 void bitslice_test_nonces_dispatch(uint32_t nonces_to_bruteforce, uint32_t *bf_test_nonce, uint8_t *bf_test_nonce_par) {
-	#if (__GNUC__ > 4)
+	#if (__GNUC__ >= 5) && (__GNUC__ > 5 || __GNUC_MINOR__ > 2)
 	if (__builtin_cpu_supports("avx512f")) bitslice_test_nonces_function_p = &bitslice_test_nonces_AVX512;
 	else if (__builtin_cpu_supports("avx2")) bitslice_test_nonces_function_p = &bitslice_test_nonces_AVX2;
 	#else
