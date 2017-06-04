@@ -20,7 +20,7 @@ LDLIBS = -L/opt/local/lib -L/usr/local/lib -lreadline -lpthread -lm
 LUALIB = ../liblua/liblua.a
 LDFLAGS = $(COMMON_FLAGS)
 CFLAGS = -std=c99 -D_ISOC99_SOURCE -I. -I../include -I../common -I../zlib -I/opt/local/include -I../liblua -Wall $(COMMON_FLAGS) -g -O3
-CXXFLAGS = -Wall -O3
+CXXFLAGS = -I../include -Wall -O3
 
 LUAPLATFORM = generic
 platform = $(shell uname)

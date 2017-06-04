@@ -118,4 +118,17 @@ class ProxGuiQT : public QObject
 		void HideGraphWindowSignal(void);
 		void ExitSignal(void);
 };
+
+
+class WorkerThread : public QThread {
+	Q_OBJECT;
+public:
+	WorkerThread(char*, bool);
+	~WorkerThread();
+	void run();
+private:
+	char *script_cmds_file = NULL;
+	bool usb_present = false;
+};
+
 #endif // PROXGUI_QT
