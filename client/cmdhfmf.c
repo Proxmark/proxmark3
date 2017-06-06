@@ -1120,7 +1120,8 @@ int CmdHF14AMfChk(const char *Cmd)
 }
 
 void readerAttack(nonces_t ar_resp[], bool setEmulatorMem, bool doStandardAttack) {
-	#define ATTACK_KEY_COUNT 8 // keep same as define in iso14443a.c -> Mifare1ksim()
+	#define ATTACK_KEY_COUNT 7 // keep same as define in iso14443a.c -> Mifare1ksim()
+	                           // cannot be more than 7 or it will overrun c.d.asBytes(512)
 	uint64_t key = 0;
 	typedef struct {
 			uint64_t keyA;

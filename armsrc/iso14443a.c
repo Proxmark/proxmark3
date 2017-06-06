@@ -2418,8 +2418,8 @@ void Mifare1ksim(uint8_t flags, uint8_t exitAfterNReads, uint8_t arg2, uint8_t *
 	//Here, we collect UID,sector,keytype,NT,AR,NR,NT2,AR2,NR2
 	// This will be used in the reader-only attack.
 
-	//allow collecting up to 8 sets of nonces to allow recovery of up to 8 keys
-	#define ATTACK_KEY_COUNT 8 // keep same as define in cmdhfmf.c -> readerAttack()
+	//allow collecting up to 7 sets of nonces to allow recovery of up to 7 keys
+	#define ATTACK_KEY_COUNT 7 // keep same as define in cmdhfmf.c -> readerAttack() (Cannot be more than 7)
 	nonces_t ar_nr_resp[ATTACK_KEY_COUNT*2]; //*2 for 2 separate attack types (nml, moebius)
 	memset(ar_nr_resp, 0x00, sizeof(ar_nr_resp));
 
