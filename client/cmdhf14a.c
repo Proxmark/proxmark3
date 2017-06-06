@@ -661,7 +661,7 @@ int CmdHF14ACmdRaw(const char *cmd) {
 						PrintAndLog("Buffer is full, we can't add CRC to your data");
 					break;
 				} else {
-					datalen++
+					datalen++;
 				}
 			}
 			continue;
