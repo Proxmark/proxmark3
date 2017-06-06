@@ -91,7 +91,7 @@ int GetWiegandFromPresco(const char *Cmd, uint32_t *sitecode, uint32_t *usercode
 	if(cmdp == 0) errors = 1;
 
 	//Validations
-	if(errors) return -1;
+	if(errors || stringlen == 0) return -1;
 
 	if (!hex) {
 		for (int index =0; index < strlen(id); ++index) {
