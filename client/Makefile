@@ -155,7 +155,16 @@ CMDSRCS = 	crapto1/crapto1.c\
 			reveng/poly.c\
 			reveng/getopt.c\
 
-MULTIARCHSRCS = hardnested/hardnested_bf_core.c hardnested/hardnested_bitarray_core.c
+cpu_arch = $(shell uname -m)
+ifneq ($(findstring 86, $(cpu_arch)), )
+	MULTIARCHSRCS = hardnested/hardnested_bf_core.c hardnested/hardnested_bitarray_core.c
+endif
+ifneq ($(findstring 64, $(cpu_arch)), )
+	MULTIARCHSRCS = hardnested/hardnested_bf_core.c hardnested/hardnested_bitarray_core.c
+endif
+ifeq ($(MULTIARCHSRCS), )
+	CMDSRCS += hardnested/hardnested_bf_core.c hardnested/hardnested_bitarray_core.c
+endif
 
 ZLIBSRCS = deflate.c adler32.c trees.c zutil.c inflate.c inffast.c inftrees.c
 ZLIBFLAGS = -DZ_SOLO -DZ_PREFIX -DNO_GZIP -DZLIB_PM3_TUNED 

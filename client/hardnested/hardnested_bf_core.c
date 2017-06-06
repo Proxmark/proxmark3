@@ -70,7 +70,7 @@ THE SOFTWARE.
 #define MAX_BITSLICES 128
 #elif defined(__SSE2__)
 #define MAX_BITSLICES 128
-#else // MMX or SSE
+#else // MMX or SSE or NOSIMD
 #define MAX_BITSLICES 64
 #endif
 
@@ -117,6 +117,9 @@ typedef union {
 #elif defined (__MMX__) 
 #define BITSLICE_TEST_NONCES bitslice_test_nonces_MMX
 #define CRACK_STATES_BITSLICED crack_states_bitsliced_MMX
+#else
+#define BITSLICE_TEST_NONCES bitslice_test_nonces_NOSIMD
+#define CRACK_STATES_BITSLICED crack_states_bitsliced_NOSIMD
 #endif
 
 // typedefs and declaration of functions:
@@ -126,6 +129,7 @@ crack_states_bitsliced_t crack_states_bitsliced_AVX2;
 crack_states_bitsliced_t crack_states_bitsliced_AVX;
 crack_states_bitsliced_t crack_states_bitsliced_SSE2;
 crack_states_bitsliced_t crack_states_bitsliced_MMX;
+crack_states_bitsliced_t crack_states_bitsliced_NOSIMD;
 crack_states_bitsliced_t crack_states_bitsliced_dispatch;
 
 typedef void bitslice_test_nonces_t(uint32_t, uint32_t*, uint8_t*);
@@ -134,6 +138,7 @@ bitslice_test_nonces_t bitslice_test_nonces_AVX2;
 bitslice_test_nonces_t bitslice_test_nonces_AVX;
 bitslice_test_nonces_t bitslice_test_nonces_SSE2;
 bitslice_test_nonces_t bitslice_test_nonces_MMX;
+bitslice_test_nonces_t bitslice_test_nonces_NOSIMD;
 bitslice_test_nonces_t bitslice_test_nonces_dispatch;
 
 #ifdef _WIN32
@@ -144,7 +149,6 @@ bitslice_test_nonces_t bitslice_test_nonces_dispatch;
 #define free_bitslice(x) free(x)
 #endif
 
-#if defined (__MMX__)		// (including more sophisticated instruction sets)
 typedef enum {
 	EVEN_STATE = 0,
 	ODD_STATE = 1
@@ -523,7 +527,7 @@ out:
 #endif	
     return key;
 }
-#endif
+
 
 
 #ifndef __MMX__
@@ -534,6 +538,7 @@ bitslice_test_nonces_t *bitslice_test_nonces_function_p = &bitslice_test_nonces_
 
 // determine the available instruction set at runtime and call the correct function
 const uint64_t crack_states_bitsliced_dispatch(uint32_t cuid, uint8_t *best_first_bytes, statelist_t *p, uint32_t *keys_found, uint64_t *num_keys_tested, uint32_t nonces_to_bruteforce, uint8_t *bf_test_nonce_2nd_byte, noncelist_t *nonces) {
+#if defined (__i386__) || defined (__x86_64__)	
 	#if (__GNUC__ >= 5) && (__GNUC__ > 5 || __GNUC_MINOR__ > 2) 
 	if (__builtin_cpu_supports("avx512f")) crack_states_bitsliced_function_p = &crack_states_bitsliced_AVX512;
 	else if (__builtin_cpu_supports("avx2")) crack_states_bitsliced_function_p = &crack_states_bitsliced_AVX2;
@@ -543,15 +548,16 @@ const uint64_t crack_states_bitsliced_dispatch(uint32_t cuid, uint8_t *best_firs
 	else if (__builtin_cpu_supports("avx")) crack_states_bitsliced_function_p = &crack_states_bitsliced_AVX;
 	else if (__builtin_cpu_supports("sse2")) crack_states_bitsliced_function_p = &crack_states_bitsliced_SSE2;
 	else if (__builtin_cpu_supports("mmx")) crack_states_bitsliced_function_p = &crack_states_bitsliced_MMX;
-    else {
-        printf("\nFatal: you need at least a CPU with MMX instruction set support. Aborting...\n");
-        exit(5);
-    }
+    else
+#endif
+		crack_states_bitsliced_function_p = &crack_states_bitsliced_NOSIMD;
+
     // call the most optimized function for this CPU
     return (*crack_states_bitsliced_function_p)(cuid, best_first_bytes, p, keys_found, num_keys_tested, nonces_to_bruteforce, bf_test_nonce_2nd_byte, nonces);
 }
 
 void bitslice_test_nonces_dispatch(uint32_t nonces_to_bruteforce, uint32_t *bf_test_nonce, uint8_t *bf_test_nonce_par) {
+#if defined (__i386__) || defined (__x86_64__)	
 	#if (__GNUC__ >= 5) && (__GNUC__ > 5 || __GNUC_MINOR__ > 2)
 	if (__builtin_cpu_supports("avx512f")) bitslice_test_nonces_function_p = &bitslice_test_nonces_AVX512;
 	else if (__builtin_cpu_supports("avx2")) bitslice_test_nonces_function_p = &bitslice_test_nonces_AVX2;
@@ -561,10 +567,10 @@ void bitslice_test_nonces_dispatch(uint32_t nonces_to_bruteforce, uint32_t *bf_t
 	else if (__builtin_cpu_supports("avx")) bitslice_test_nonces_function_p = &bitslice_test_nonces_AVX;
 	else if (__builtin_cpu_supports("sse2")) bitslice_test_nonces_function_p = &bitslice_test_nonces_SSE2;
 	else if (__builtin_cpu_supports("mmx")) bitslice_test_nonces_function_p = &bitslice_test_nonces_MMX;
-    else {
-        printf("\nFatal: you need at least a CPU with MMX instruction set support. Aborting...\n");
-        exit(5);
-    }
+    else
+#endif
+		bitslice_test_nonces_function_p = &bitslice_test_nonces_NOSIMD;
+
     // call the most optimized function for this CPU
     (*bitslice_test_nonces_function_p)(nonces_to_bruteforce, bf_test_nonce, bf_test_nonce_par);
 }
