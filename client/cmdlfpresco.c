@@ -68,8 +68,8 @@ int GetWiegandFromPresco(const char *Cmd, uint32_t *sitecode, uint32_t *usercode
 				*fullcode = param_get32ex(Cmd, cmdp+1, 0, 10);
 				cmdp+=2;
 				break;
-			case 'P':
-			case 'p':
+			case 'D':
+			case 'd':
 				//param get string int param_getstr(const char *line, int paramnum, char * str)
 				stringlen = param_getstr(Cmd, cmdp+1, id);
 				if (stringlen < 2) return -1;
