@@ -1039,7 +1039,7 @@ void UsbPacketReceived(uint8_t *packet, int len)
 			SimulateHitagTag((bool)c->arg[0],(byte_t*)c->d.asBytes);
 			break;
 		case CMD_READER_HITAG: // Reader for Hitag tags, args = type and function
-			ReaderHitag((hitag_function)c->arg[0],(hitag_data*)c->d.asBytes);
+			ReaderWriterHitag((hitag_function)c->arg[0],(hitag_data*)c->d.asBytes, 0);
 			break;
 		case CMD_SIMULATE_HITAG_S:// Simulate Hitag s tag, args = memory content
 			SimulateHitagSTag((bool)c->arg[0],(byte_t*)c->d.asBytes);
@@ -1051,7 +1051,12 @@ void UsbPacketReceived(uint8_t *packet, int len)
 			ReadHitagS((hitag_function)c->arg[0],(hitag_data*)c->d.asBytes);
 			break;
 		case CMD_WR_HITAG_S://writer for Hitag tags args=data to write,page and key or challenge
-			WritePageHitagS((hitag_function)c->arg[0],(hitag_data*)c->d.asBytes,c->arg[2]);
+			if ((hitag_function)c->arg[0] < 10) {
+				WritePageHitagS((hitag_function)c->arg[0],(hitag_data*)c->d.asBytes,c->arg[2]);
+			}
+			else if ((hitag_function)c->arg[0] >= 20) {
+			  ReaderWriterHitag((hitag_function)c->arg[0],(hitag_data*)c->d.asBytes, c->arg[2]);
+			}
 			break;
 #endif
 

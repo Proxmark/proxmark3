@@ -349,7 +349,9 @@ int CmdLFHitagWP(const char *Cmd) {
 			c.arg[2]= param_get32ex(Cmd, 2, 0, 10);
 			num_to_bytes(param_get32ex(Cmd,3,0,16),4,htd->auth.data);
 		} break;
-		case 04: { //WHTSF_KEY
+		case 04:
+		case 24:
+		{ //WHTSF_KEY
 			num_to_bytes(param_get64ex(Cmd,1,0,16),6,htd->crypto.key);
 			c.arg[2]= param_get32ex(Cmd, 2, 0, 10);
 			num_to_bytes(param_get32ex(Cmd,3,0,16),4,htd->crypto.data);
@@ -363,6 +365,7 @@ int CmdLFHitagWP(const char *Cmd) {
 			PrintAndLog("  04 <key> (set to 0 if no authentication is needed) <page> <byte0...byte3> write page on a Hitag S tag");
 			PrintAndLog(" Hitag1 (1*)");
 			PrintAndLog(" Hitag2 (2*)");
+			PrintAndLog("  24 <key> (set to 0 if no authentication is needed) <page> <byte0...byte3> write page on a Hitag S tag");
 			return 1;
 		} break;
 	}
