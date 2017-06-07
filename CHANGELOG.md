@@ -4,6 +4,14 @@ This project uses the changelog in accordance with [keepchangelog](http://keepac
 
 ## [unreleased][unreleased]
 
+### Changed
+
+### Fixed
+
+### Added
+
+## [3.0.0][2017-06-04]
+
 ### Added
 - Added hf mf hardnested, an attack working for hardened Mifare cards (EV1, Mifare Plus SL1) where hf mf nested fails
 - Added experimental testmode write option for t55xx (danger) (marshmellow)
