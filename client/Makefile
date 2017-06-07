@@ -179,15 +179,30 @@ MULTIARCHOBJS = $(MULTIARCHSRCS:%.c=$(OBJDIR)/%_NOSIMD.o) \
 			$(MULTIARCHSRCS:%.c=$(OBJDIR)/%_MMX.o) \
 			$(MULTIARCHSRCS:%.c=$(OBJDIR)/%_SSE2.o) \
 			$(MULTIARCHSRCS:%.c=$(OBJDIR)/%_AVX.o) \
-			$(MULTIARCHSRCS:%.c=$(OBJDIR)/%_AVX2.o) \
-			$(MULTIARCHSRCS:%.c=$(OBJDIR)/%_AVX512.o)
+			$(MULTIARCHSRCS:%.c=$(OBJDIR)/%_AVX2.o)
+
+GCC_GTEQ_490 := $(shell expr `gcc -dumpversion | sed -e 's/\.\([0-9][0-9]\)/\1/g' -e 's/\.\([0-9]\)/0\1/g' -e 's/^[0-9]\{3,4\}$$/&00/'` \>= 40900)
+HARD_SWITCH_NOSIMD = -mno-mmx -mno-sse2 -mno-avx -mno-avx2
+HARD_SWITCH_MMX = -mmmx -mno-sse2 -mno-avx -mno-avx2
+HARD_SWITCH_SSE2 = -mmmx -msse2 -mno-avx -mno-avx2
+HARD_SWITCH_AVX = -mmmx -msse2 -mavx -mno-avx2
+HARD_SWITCH_AVX2 = -mmmx -msse2 -mavx -mavx2
+HARD_SWITCH_AVX512 = -mmmx -msse2 -mavx -mavx2 -mavx512f
+ifeq "$(GCC_GTEQ_490)" "1"
+	HARD_SWITCH_NOSIMD += -mno-avx512f
+	HARD_SWITCH_MMX += -mno-avx512f
+	HARD_SWITCH_SSE2 += -mno-avx512f
+	HARD_SWITCH_AVX += -mno-avx512f
+	HARD_SWITCH_AVX2 += -mno-avx512f
+	MULTIARCHOBJS +=  $(MULTIARCHSRCS:%.c=$(OBJDIR)/%_AVX512.o)
+endif
 			
 BINS = proxmark3 flasher fpga_compress
 WINBINS = $(patsubst %, %.exe, $(BINS))
 CLEAN = $(BINS) $(WINBINS) $(COREOBJS) $(CMDOBJS) $(ZLIBOBJS) $(QTGUIOBJS) $(MULTIARCHOBJS) $(OBJDIR)/*.o *.moc.cpp ui/ui_overlays.h
 
 # need to assign dependancies to build these first...
-all: ui/ui_overlays.h lua_build $(BINS)
+all: lua_build $(BINS)
 
 all-static: LDLIBS:=-static $(LDLIBS)
 all-static: proxmark3 flasher fpga_compress
@@ -201,6 +216,8 @@ flasher: $(OBJDIR)/flash.o $(OBJDIR)/flasher.o $(COREOBJS)
 
 fpga_compress: $(OBJDIR)/fpga_compress.o $(ZLIBOBJS)
 	$(LD) $(LDFLAGS) $(ZLIBFLAGS) $^ $(LDLIBS) -o $@
+
+proxgui.cpp: ui/ui_overlays.h
 
 proxguiqt.moc.cpp: proxguiqt.h
 	$(MOC) -o$@ $^
@@ -225,22 +242,22 @@ lua_build:
 .PHONY: all clean
 
 $(OBJDIR)/%_NOSIMD.o : %.c $(OBJDIR)/%.d
-	$(CC) $(DEPFLAGS) $(CFLAGS) -mno-mmx -mno-sse2 -mno-avx -mno-avx2 -mno-avx512f -c -o $@ $<
+	$(CC) $(DEPFLAGS) $(CFLAGS) $(HARD_SWITCH_NOSIMD) -c -o $@ $<
 
 $(OBJDIR)/%_MMX.o : %.c $(OBJDIR)/%.d
-	$(CC) $(DEPFLAGS) $(CFLAGS) -mmmx -mno-sse2 -mno-avx -mno-avx2 -mno-avx512f -c -o $@ $<
+	$(CC) $(DEPFLAGS) $(CFLAGS) $(HARD_SWITCH_MMX) -c -o $@ $<
 
 $(OBJDIR)/%_SSE2.o : %.c $(OBJDIR)/%.d
-	$(CC) $(DEPFLAGS) $(CFLAGS) -mmmx -msse2 -mno-avx -mno-avx2 -mno-avx512f -c -o $@ $<
+	$(CC) $(DEPFLAGS) $(CFLAGS) $(HARD_SWITCH_SSE2) -c -o $@ $<
 
 $(OBJDIR)/%_AVX.o : %.c $(OBJDIR)/%.d
-	$(CC) $(DEPFLAGS) $(CFLAGS) -mmmx -msse2 -mavx -mno-avx2 -mno-avx512f -c -o $@ $<
+	$(CC) $(DEPFLAGS) $(CFLAGS) $(HARD_SWITCH_AVX) -c -o $@ $<
 
 $(OBJDIR)/%_AVX2.o : %.c $(OBJDIR)/%.d
-	$(CC) $(DEPFLAGS) $(CFLAGS) -mmmx -msse2 -mavx -mavx2 -mno-avx512f -c -o $@ $<
+	$(CC) $(DEPFLAGS) $(CFLAGS) $(HARD_SWITCH_AVX2) -c -o $@ $<
 
 $(OBJDIR)/%_AVX512.o : %.c $(OBJDIR)/%.d
-	$(CC) $(DEPFLAGS) $(CFLAGS) -mmmx -msse2 -mavx -mavx2 -mavx512f -c -o $@ $<
+	$(CC) $(DEPFLAGS) $(CFLAGS) $(HARD_SWITCH_AVX512) -c -o $@ $<
 
 %.o: %.c
 $(OBJDIR)/%.o : %.c $(OBJDIR)/%.d
