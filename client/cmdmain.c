@@ -23,6 +23,7 @@
 #include "cmdlf.h"
 #include "cmdmain.h"
 #include "util.h"
+#include "util_posix.h"
 #include "cmdscript.h"
 #include "cmdcrc.h"
 

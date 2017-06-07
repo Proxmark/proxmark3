@@ -60,6 +60,7 @@ THE SOFTWARE.
 #include "hardnested_bf_core.h"
 #include "ui.h"
 #include "util.h"
+#include "util_posix.h"
 #include "crapto1/crapto1.h"
 #include "parity.h"
 

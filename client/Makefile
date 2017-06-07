@@ -79,7 +79,8 @@ DEPFLAGS = -MT $@ -MMD -MP -MF $(OBJDIR)/$*.Td
 POSTCOMPILE = $(MV) -f $(OBJDIR)/$*.Td $(OBJDIR)/$*.d
 
 CORESRCS = 	uart.c \
-			util.c
+			util.c \
+			util_posix.c
 
 CMDSRCS = 	crapto1/crapto1.c\
 			crapto1/crypto1.c\

@@ -41,6 +41,7 @@
 #include <string.h>
 #include <stdio.h>
 #include "util.h"
+#include "util_posix.h"
 #include "cipherutils.h"
 #include "cipher.h"
 #include "ikeys.h"

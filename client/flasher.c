@@ -12,6 +12,7 @@
 #include <inttypes.h>
 #include "proxmark3.h"
 #include "util.h"
+#include "util_posix.h"
 #include "flash.h"
 #include "uart.h"
 #include "usb_cmd.h"

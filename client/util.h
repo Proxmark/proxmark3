@@ -77,16 +77,6 @@ extern void rol(uint8_t *data, const size_t len);
 
 extern void clean_ascii(unsigned char *buf, size_t len);
 
-// timer functions/macros
-#ifdef _WIN32
-# include <windows.h>
-# define sleep(n) Sleep(1000 *(n))
-# define msleep(n) Sleep((n))
-#else
-extern void msleep(uint32_t n);		// sleep n milliseconds
-#endif // _WIN32
-
-extern uint64_t msclock(); 			// a milliseconds clock
 extern int num_CPUs(void);			// number of logical CPUs
 
 #endif // UTIL_H__
