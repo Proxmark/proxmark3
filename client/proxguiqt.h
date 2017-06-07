@@ -128,7 +128,7 @@ public:
 	void run();
 private:
 	char *script_cmds_file = NULL;
-	bool usb_present = false;
+	bool usb_present;
 };
 
 #endif // PROXGUI_QT
