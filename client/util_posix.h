@@ -11,8 +11,6 @@
 #ifndef UTIL_POSIX_H__
 #define UTIL_POSIX_H__
 
-#include "util_posix.h"
-
 #include <stdint.h>
 
 #ifdef _WIN32
