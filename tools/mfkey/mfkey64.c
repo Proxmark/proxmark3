@@ -2,7 +2,7 @@
 #include <string.h>
 #include <inttypes.h>
 #include "crapto1/crapto1.h"
-#include "util.h"
+#include "util_posix.h"
 
 int main (int argc, char *argv[]) 
 {

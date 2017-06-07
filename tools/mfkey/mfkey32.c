@@ -4,7 +4,8 @@
 #include <stdlib.h>
 #include "crapto1/crapto1.h"
 #include "mfkey.h"
-#include "util.h"
+#include "util_posix.h"
+
 
 // 32 bit recover key from 2 nonces
 int main (int argc, char *argv[]) {
