@@ -181,7 +181,8 @@ void iClass_ReadCheck(uint8_t	blockNo, uint8_t keyType);
 // hitag2.h
 void SnoopHitag(uint32_t type);
 void SimulateHitagTag(bool tag_mem_supplied, byte_t* data);
-void ReaderWriterHitag(hitag_function htf, hitag_data* htd, int page);
+void ReaderHitag(hitag_function htf, hitag_data* htd);
+void WriterHitag(hitag_function htf, hitag_data* htd, int page);
 
 //hitagS.h
 void SimulateHitagSTag(bool tag_mem_supplied, byte_t* data);
