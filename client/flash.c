@@ -15,6 +15,7 @@
 #include <unistd.h>
 #include "proxmark3.h"
 #include "util.h"
+#include "util_posix.h"
 #include "flash.h"
 #include "elf.h"
 #include "proxendian.h"

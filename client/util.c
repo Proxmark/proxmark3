@@ -8,10 +8,6 @@
 // utilities
 //-----------------------------------------------------------------------------
 
-#if !defined(_WIN32)
-#define _POSIX_C_SOURCE	199309L			// need nanosleep()
-#endif
-
 #include "util.h"
 
 #include <stdint.h>
@@ -21,6 +17,10 @@
 #include <stdio.h>
 #include <time.h>
 #include "data.h"
+
+#ifdef _WIN32
+#include <windows.h>
+#endif
 
 #define MAX_BIN_BREAK_LENGTH   (3072+384+1)
 
@@ -614,48 +614,7 @@ void clean_ascii(unsigned char *buf, size_t len) {
 }
 
 
-// Timer functions
-#if !defined (_WIN32)
-#include <errno.h>
 
-static void nsleep(uint64_t n) {
-  struct timespec timeout;
-  timeout.tv_sec = n/1000000000;
-  timeout.tv_nsec = n%1000000000;
-  while (nanosleep(&timeout, &timeout) && errno == EINTR);
-}
-
-void msleep(uint32_t n) {
-	nsleep(1000000 * n);
-}
-
-#endif // _WIN32
-
-// a milliseconds timer for performance measurement
-uint64_t msclock() {
-#if defined(_WIN32)
-    #include <sys/types.h>
-    
-    // WORKAROUND FOR MinGW (some versions - use if normal code does not compile)
-    // It has no _ftime_s and needs explicit inclusion of timeb.h
-    #include <sys/timeb.h>
-    struct _timeb t;
-    _ftime(&t);
-    return 1000 * t.time + t.millitm;
-    
-    // NORMAL CODE (use _ftime_s)
-	//struct _timeb t;
-    //if (_ftime_s(&t)) {
-	//	return 0;
-	//} else {
-	//	return 1000 * t.time + t.millitm;
-	//}
-#else
-	struct timespec t;
-	clock_gettime(CLOCK_MONOTONIC, &t);
-	return (t.tv_sec * 1000 + t.tv_nsec / 1000000);
-#endif
-}
 
 // determine number of logical CPU cores (use for multithreaded functions)
 extern int num_CPUs(void)
@@ -672,3 +631,4 @@ extern int num_CPUs(void)
 	return 1;
 #endif
 }
+

@@ -19,6 +19,7 @@
 #include "cmdmain.h"
 #include "cmdhfmfhard.h"
 #include "util.h"
+#include "util_posix.h"
 #include "usb_cmd.h"
 #include "ui.h"
 #include "mifarehost.h"
