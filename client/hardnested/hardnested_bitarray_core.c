@@ -21,7 +21,9 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#ifndef __APPLE__
 #include <malloc.h>
+#endif
 
 // this needs to be compiled several times for each instruction set. 
 // For each instruction set, define a dedicated function name:
@@ -143,8 +145,15 @@ count_bitarray_AND4_t count_bitarray_AND4_AVX512, count_bitarray_AND4_AVX2, coun
 
 inline uint32_t *MALLOC_BITARRAY(uint32_t x)
 {
-#ifdef _WIN32
+#if defined (_WIN32)
 	return __builtin_assume_aligned(_aligned_malloc((x), __BIGGEST_ALIGNMENT__), __BIGGEST_ALIGNMENT__);
+#elif defined (__APPLE__)
+	uint32_t *allocated_memory;
+	if (posix_memalign((void**)&allocated_memory, __BIGGEST_ALIGNMENT__, x)) {
+		return NULL;
+	} else {
+		return __builtin_assume_aligned(allocated_memory, __BIGGEST_ALIGNMENT__);
+	}
 #else
 	return __builtin_assume_aligned(memalign(__BIGGEST_ALIGNMENT__, (x)), __BIGGEST_ALIGNMENT__);
 #endif

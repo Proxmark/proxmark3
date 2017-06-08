@@ -54,7 +54,7 @@ THE SOFTWARE.
 #include <stdio.h>
 #include <pthread.h>
 #include <string.h>
-#include <malloc.h>
+#include <stdlib.h>
 #include "proxmark3.h"
 #include "cmdhfmfhard.h"
 #include "hardnested_bf_core.h"
