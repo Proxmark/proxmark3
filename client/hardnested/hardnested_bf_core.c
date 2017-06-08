@@ -52,8 +52,10 @@ THE SOFTWARE.
 #include <stdint.h>
 #include <stdbool.h>
 #include <stdlib.h>
-#include <stdio.h>
+#ifndef __APPLE__
 #include <malloc.h>
+#endif
+#include <stdio.h>
 #include <string.h>
 #include "crapto1/crapto1.h"
 #include "parity.h"
@@ -141,9 +143,19 @@ bitslice_test_nonces_t bitslice_test_nonces_MMX;
 bitslice_test_nonces_t bitslice_test_nonces_NOSIMD;
 bitslice_test_nonces_t bitslice_test_nonces_dispatch;
 
-#ifdef _WIN32
+#if defined (_WIN32)
 #define malloc_bitslice(x) __builtin_assume_aligned(_aligned_malloc((x), MAX_BITSLICES/8), MAX_BITSLICES/8)
 #define free_bitslice(x) _aligned_free(x)
+#elif defined (__APPLE__)
+static void *malloc_bitslice(size_t x) {
+	char *allocated_memory;
+	if (posix_memalign((void**)&allocated_memory, MAX_BITSLICES/8, x)) {
+		return NULL;
+	} else {
+		return __builtin_assume_aligned(allocated_memory, MAX_BITSLICES/8);
+	}
+}
+#define free_bitslice(x) free(x)
 #else
 #define malloc_bitslice(x) memalign(MAX_BITSLICES/8, (x))
 #define free_bitslice(x) free(x)
