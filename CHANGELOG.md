@@ -2,6 +2,7 @@
 All notable changes to this project will be documented in this file.
 This project uses the changelog in accordance with [keepchangelog](http://keepachangelog.com/). Please use this to write notable changes, which is not the same as git commit log...
 
+
 ## [unreleased][unreleased]
 
 ### Changed
@@ -10,7 +11,16 @@ This project uses the changelog in accordance with [keepchangelog](http://keepac
 
 ### Added
 
-## [3.0.0][2017-06-04]
+
+## [3.0.1][2017-06-08]
+
+### Fixed
+- Compiles on OS X
+- Compiles with gcc 4.9
+- Compiles for non-Intel CPUs
+
+
+## [3.0.0][2017-06-05]
 
 ### Added
 - Added hf mf hardnested, an attack working for hardened Mifare cards (EV1, Mifare Plus SL1) where hf mf nested fails
