@@ -12,6 +12,7 @@
 *.map
 *.bin
 !client/hardnested/*.bin
+!client/hardnested/tables/*.bin
 *.dll
 *.moc.cpp
 *.z
