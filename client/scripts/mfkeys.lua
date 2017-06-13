@@ -86,6 +86,7 @@ function checkBlock(blockNo, keys, keyType)
 	-- The command data is only 512 bytes, each key is 6 bytes, meaning that we can send max 85 keys in one go. 
 	-- If there's more, we need to split it up
 	local start, remaining= 1, #keys
+	local arg1 = bit32.bor(bit32.lshift(keyType, 8), blockNo)
 	local packets = {}
 	while remaining > 0 do
 		local n,data = remaining, nil
@@ -95,8 +96,8 @@ function checkBlock(blockNo, keys, keyType)
 		--print("data len", #data)
 		print(("Testing block %d, keytype %d, with %d keys"):format(blockNo, keyType, n))
 		local command = Command:new{cmd = cmds.CMD_MIFARE_CHKKEYS, 
-								arg1 = blockNo, 
-								arg2 = keyType, 
+								arg1 = arg1, 
+								arg2 = 1, 
 								arg3 = n, 
 								data = data}
 		local status = checkCommand(command)
