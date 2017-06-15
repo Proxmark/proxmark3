@@ -193,13 +193,13 @@ char *sprint_hex_ascii(const uint8_t *data, const size_t len) {
 	static char buf[1024];
 	char *tmp = buf;
 	memset(buf, 0x00, 1024);
-	size_t max_len = (len > 1010) ? 1010 : len;
+	size_t max_len = (len > 500) ? 500 : len;
 
 	sprintf(tmp, "%s| ", sprint_hex(data, max_len) );
 	
 	size_t i = 0;
-	size_t pos = (max_len * 3)+2;
-	while(i < max_len){
+	size_t pos = (max_len * 2)+2;
+	while(i < max_len) {
 		char c = data[i];
 		if ( (c < 32) || (c == 127))
 			c = '.';

@@ -247,7 +247,7 @@ static void init_bitflip_bitarrays(void)
 #endif	
 
 	char state_files_path[strlen(get_my_executable_directory()) + strlen(STATE_FILES_DIRECTORY) + strlen(STATE_FILE_TEMPLATE) + 1];
-	char state_file_name[strlen(STATE_FILE_TEMPLATE)];
+	char state_file_name[strlen(STATE_FILE_TEMPLATE)+1];
 	
 	for (odd_even_t odd_even = EVEN_STATE; odd_even <= ODD_STATE; odd_even++) {
 		num_effective_bitflips[odd_even] = 0;
