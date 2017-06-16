@@ -224,7 +224,7 @@ int mfDarkside(uint64_t *key)
 
 int mfCheckKeys (uint8_t blockNo, uint8_t keyType, bool clear_trace, uint8_t keycnt, uint8_t * keyBlock, uint64_t * key){
 
-	*key = 0;
+	*key = -1;
 
 	UsbCommand c = {CMD_MIFARE_CHKKEYS, {((blockNo & 0xff) | ((keyType&0xff)<<8)), clear_trace, keycnt}};
 	memcpy(c.d.asBytes, keyBlock, 6 * keycnt);
