@@ -193,12 +193,13 @@ char *sprint_hex_ascii(const uint8_t *data, const size_t len) {
 	static char buf[1024];
 	char *tmp = buf;
 	memset(buf, 0x00, 1024);
-	size_t max_len = (len > 500) ? 500 : len;
-
+	size_t max_len = (len > 255) ? 255 : len;
+	// max 255 bytes * 3 + 2 characters = 767 in buffer
 	sprintf(tmp, "%s| ", sprint_hex(data, max_len) );
 	
 	size_t i = 0;
-	size_t pos = (max_len * 2)+2;
+	size_t pos = (max_len * 3)+2;
+	// add another 255 characters ascii = 1020 characters of buffer used
 	while(i < max_len) {
 		char c = data[i];
 		if ( (c < 32) || (c == 127))
