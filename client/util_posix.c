@@ -31,7 +31,7 @@ static void nsleep(uint64_t n) {
 }
 
 void msleep(uint32_t n) {
-	nsleep(1000000 * n);
+	nsleep(1000000 * (uint64_t)n);
 }
 #endif // _WIN32
 
