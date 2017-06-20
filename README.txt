@@ -43,15 +43,15 @@ your operating system. Please refer to the Wiki for details.
 
 OBTAINING HARDWARE:
 
-The Proxmark 3 is available for purchase (assembled and tested) from the
+The Proxmark3 is available for purchase (assembled and tested) from the
 following locations:
 
-   * http://proxmark3.com/
-   * http://www.xfpga.com/
-   * http://radiowar.taobao.com/
-   * http://www.elechouse.com/
-   * https://lab401.com/
-
+   * https://proxmark3.com/  - RyscCorp (us)
+   * http://www.elechouse.com/  - Elechouse (HK)
+   * https://lab401.com/ - Lab401 (FR)
+   * http://www.rfxsecure.com/  - RFxSecure (SG)
+   * http://proxmark3.tictail.com/ - IceSQL (SE)
+   
 Most of the ultra-low-volume contract assemblers could put
 something like this together with a reasonable yield. A run of around
 a dozen units is probably cost-effective. The BOM includes (possibly-
