@@ -199,13 +199,25 @@ int HFiClassReader(const char *Cmd, bool loop, bool verbose) {
 				return 0;
 			}
 			if( readStatus & FLAG_ICLASS_READER_CSN){
-				PrintAndLog("CSN: %s",sprint_hex(data,8));
+				PrintAndLog("   CSN: %s",sprint_hex(data,8));
 				tagFound = true;
 			}
-			if( readStatus & FLAG_ICLASS_READER_CC)  PrintAndLog("CC: %s",sprint_hex(data+16,8));
+			if( readStatus & FLAG_ICLASS_READER_CC)  PrintAndLog("    CC: %s",sprint_hex(data+16,8));
 			if( readStatus & FLAG_ICLASS_READER_CONF){
 				printIclassDumpInfo(data);
 			}
+			//TODO add iclass read block 05 and test iclass type..
+			if (readStatus & FLAG_ICLASS_READER_AA) {
+				bool legacy = true;
+				PrintAndLog(" AppIA: %s",sprint_hex(data+8*4,8));
+				for (int i = 0; i<8; i++) {
+					if (data[8*4+i] != 0xFF) {
+						legacy = false;
+					} 
+				}
+				PrintAndLog("      : Possible iClass %s",(legacy) ? "(legacy tag)" : "(NOT legacy tag)");
+			}
+
 			if (tagFound && !loop) return 1;
 		} else {
 			if (verbose) PrintAndLog("Command execute timeout");
@@ -1095,12 +1107,19 @@ int CmdHFiClassCloneTag(const char *Cmd) {
 	return 1;
 }
 
-static int ReadBlock(uint8_t *KEY, uint8_t blockno, uint8_t keyType, bool elite, bool rawkey, bool verbose) {
+static int ReadBlock(uint8_t *KEY, uint8_t blockno, uint8_t keyType, bool elite, bool rawkey, bool verbose, bool auth) {
 	uint8_t MAC[4]={0x00,0x00,0x00,0x00};
 	uint8_t div_key[8]={0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00};
 
-	if (!select_and_auth(KEY, MAC, div_key, (keyType==0x18), elite, rawkey, verbose))
-		return 0;
+	if (auth) {
+		if (!select_and_auth(KEY, MAC, div_key, (keyType==0x18), elite, rawkey, verbose))
+			return 0;
+	} else {
+		uint8_t CSN[8]={0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00};
+		uint8_t CCNR[12]={0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00};
+		if (!select_only(CSN, CCNR, (keyType==0x18), verbose))
+			return 0;
+	}
 
 	UsbCommand resp;
 	UsbCommand w = {CMD_ICLASS_READBLOCK, {blockno}};
@@ -1146,6 +1165,7 @@ int CmdHFiClass_ReadBlock(const char *Cmd) {
 	bool elite = false;
 	bool rawkey = false;
 	bool errors = false;
+	bool auth = false;
 	uint8_t cmdp = 0;
 	while(param_getchar(Cmd, cmdp) != 0x00)
 	{
@@ -1174,6 +1194,7 @@ int CmdHFiClass_ReadBlock(const char *Cmd) {
 			break;
 		case 'k':
 		case 'K':
+			auth = true;
 			dataLen = param_getstr(Cmd, cmdp+1, tempStr);
 			if (dataLen == 16) { 
 				errors = param_gethex(tempStr, 0, KEY, dataLen);
@@ -1204,9 +1225,10 @@ int CmdHFiClass_ReadBlock(const char *Cmd) {
 		if(errors) return usage_hf_iclass_readblock();
 	}
 
-	if (cmdp < 4) return usage_hf_iclass_readblock();
-
-	return ReadBlock(KEY, blockno, keyType, elite, rawkey, true);
+	if (cmdp < 2) return usage_hf_iclass_readblock();
+	if (!auth)
+		PrintAndLog("warning: no authentication used with read, only a few specific blocks can be read accurately without authentication.");
+	return ReadBlock(KEY, blockno, keyType, elite, rawkey, true, auth);
 }
 
 int CmdHFiClass_loclass(const char *Cmd) {
