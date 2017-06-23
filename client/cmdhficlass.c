@@ -180,10 +180,10 @@ int CmdHFiClassSim(const char *Cmd) {
 
 int HFiClassReader(const char *Cmd, bool loop, bool verbose) {
 	bool tagFound = false;
-	UsbCommand c = {CMD_READER_ICLASS, {FLAG_ICLASS_READER_CSN|
-					FLAG_ICLASS_READER_CONF|FLAG_ICLASS_READER_AA}};
+	UsbCommand c = {CMD_READER_ICLASS, {FLAG_ICLASS_READER_CSN |
+		    FLAG_ICLASS_READER_CC | FLAG_ICLASS_READER_CONF | FLAG_ICLASS_READER_AA |
+		    FLAG_ICLASS_READER_ONLY_ONCE | FLAG_ICLASS_READER_ONE_TRY } };
 	// loop in client not device - else on windows have a communication error
-	c.arg[0] |= FLAG_ICLASS_READER_ONLY_ONCE | FLAG_ICLASS_READER_ONE_TRY;
 	UsbCommand resp;
 	while(!ukbhit()){
 		SendCommand(&c);
@@ -191,27 +191,24 @@ int HFiClassReader(const char *Cmd, bool loop, bool verbose) {
 			uint8_t readStatus = resp.arg[0] & 0xff;
 			uint8_t *data = resp.d.asBytes;
 
-			if (verbose)
-				PrintAndLog("Readstatus:%02x", readStatus);
-			if( readStatus == 0){
-				//Aborted
-				if (verbose) PrintAndLog("Quitting...");
-				return 0;
-			}
-			if( readStatus & FLAG_ICLASS_READER_CSN){
+			// no tag found
+			if( readStatus == 0) continue;
+
+			if( readStatus & FLAG_ICLASS_READER_CSN) {
 				PrintAndLog("   CSN: %s",sprint_hex(data,8));
 				tagFound = true;
 			}
-			if( readStatus & FLAG_ICLASS_READER_CC)  PrintAndLog("    CC: %s",sprint_hex(data+16,8));
-			if( readStatus & FLAG_ICLASS_READER_CONF){
+			if( readStatus & FLAG_ICLASS_READER_CC) { 
+				PrintAndLog("    CC: %s",sprint_hex(data+16,8));
+			}
+			if( readStatus & FLAG_ICLASS_READER_CONF) {
 				printIclassDumpInfo(data);
 			}
-			//TODO add iclass read block 05 and test iclass type..
 			if (readStatus & FLAG_ICLASS_READER_AA) {
 				bool legacy = true;
-				PrintAndLog(" AppIA: %s",sprint_hex(data+8*4,8));
+				PrintAndLog(" AppIA: %s",sprint_hex(data+8*5,8));
 				for (int i = 0; i<8; i++) {
-					if (data[8*4+i] != 0xFF) {
+					if (data[8*5+i] != 0xFF) {
 						legacy = false;
 					} 
 				}
