@@ -27,12 +27,10 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  * @file uart.h
- * @brief
- *
  */
 
-#ifndef _RS232_H_
-#define _RS232_H_
+#ifndef _PM3_UART_H_
+#define _PM3_UART_H_
 
 #include <stdio.h>
 #include <string.h>
@@ -45,43 +43,63 @@ typedef unsigned char byte_t;
 
 // Handle platform specific includes
 #ifndef _WIN32
-  #include <termios.h>
-  #include <sys/ioctl.h>
-  #include <unistd.h>
-  #include <fcntl.h>
-  #include <sys/types.h>
-  #include <sys/stat.h>
-  #include <limits.h>
-  #include <sys/time.h>
-  #include <errno.h>
+
 #else
   #include <windows.h>
 #endif
 
-typedef enum {
-  SP_INVALID = 0x00, // invalid value, error occured
-  SP_NONE    = 0x01, // no parity (default)
-  SP_EVEN    = 0x02, // even parity
-  SP_ODD     = 0x03  // odd parity
-} serial_port_parity;
-
-// Define shortcut to types to make code more readable
+/* serial_port is declared as a void*, which you should cast to whatever type
+ * makes sense to your connection method. Both the posix and win32
+ * implementations define their own structs in place.
+ */
 typedef void* serial_port;
+
+/* Returned by uart_open if the serial port specified was invalid.
+ */
 #define INVALID_SERIAL_PORT (void*)(~1)
+
+/* Returned by uart_open if the serial port specified is in use by another
+ * process.
+ */
 #define CLAIMED_SERIAL_PORT (void*)(~2)
 
+/* Given a user-specified port name, connect to the port and return a structure
+ * used for future references to that port.
+ *
+ * On errors, this method returns INVALID_SERIAL_PORT or CLAIMED_SERIAL_PORT.
+ */
 serial_port uart_open(const char* pcPortName);
+
+/* Closes the given port.
+ */
 void uart_close(const serial_port sp);
 
-bool uart_set_speed(serial_port sp, const uint32_t uiPortSpeed);
-uint32_t uart_get_speed(const serial_port sp);
+/* Reads from the given serial port for up to 30ms.
+ *   pbtRx: A pointer to a buffer for the returned data to be written to.
+ *   pszMaxRxLen: The maximum data size we want to be sent.
+ *   pszRxLen: The number of bytes that we were actually sent.
+ *
+ * Returns TRUE if any data was fetched, even if it was less than pszMaxRxLen.
+ *
+ * Returns FALSE if there was an error reading from the device. Note that a
+ * partial read may have completed into the buffer by the corresponding
+ * implementation, so pszRxLen should be checked to see if any data was written. 
+ */
+bool uart_receive(const serial_port sp, byte_t* pbtRx, size_t pszMaxRxLen, size_t* pszRxLen);
 
-bool uart_set_parity(serial_port sp, serial_port_parity spp);
-serial_port_parity uart_get_parity(const serial_port sp);
-
-bool uart_receive(const serial_port sp, byte_t* pbtRx, size_t* pszRxLen);
+/* Sends a buffer to a given serial port.
+ *   pbtTx: A pointer to a buffer containing the data to send.
+ *   szTxLen: The amount of data to be sent.
+ */
 bool uart_send(const serial_port sp, const byte_t* pbtTx, const size_t szTxLen);
 
-#endif // _PROXMARK3_RS232_H_
+/* Sets the current speed of the serial port, in baud.
+ */
+bool uart_set_speed(serial_port sp, const uint32_t uiPortSpeed);
 
+/* Gets the current speed of the serial port, in baud.
+ */
+uint32_t uart_get_speed(const serial_port sp);
+
+#endif // _PM3_UART_H_
 
