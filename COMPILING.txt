@@ -3,7 +3,7 @@ The project compiles on Linux, Mac OS X and Windows (MinGW/MSYS).
 it requires:
 - gcc >= 4.4
 - libpthread
-- libreadline
+- GNU libreadline or BSD libedit (editline)
 - libusb
 - perl
 - an ARM cross-compiler to compile the firmware
@@ -119,12 +119,10 @@ Tested on OSX 10.10 Yosemite
         brew tap nitsky/stm32
         brew install arm-none-eabi-gcc
 
-4 - Edit proxmark3/client/Makefile adding path to readline and qt5
+4 - Edit proxmark3/client/Makefile adding path qt5
 
     LDLIBS = -L/usr/local/opt/qt5/lib -L/opt/local/lib -L/usr/local/lib ../liblua/liblua.a -lreadline -lpthread -lm
     CFLAGS = -std=c99 -I/usr/local/opt/qt5/include -I. -I../include -I../common -I../zlib -I/opt/local/include -I../liblua -Wall $(COMMON_FLAGS) -g -O4
-
-    If your old brew intallation use /usr/local/Cellar/ path replace /usr/local/opt/readline/lib with your actuall readline and qt5 path. See homebrew manuals.
 
 5 - Set Environment
 
