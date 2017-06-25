@@ -158,9 +158,7 @@ void FpgaSetupSsc(void)
 //-----------------------------------------------------------------------------
 bool FpgaSetupSscDma(uint8_t *buf, int len)
 {
-	if (buf == NULL) {
-        return false;
-    }
+	if (buf == NULL) return false;
 
 	AT91C_BASE_PDC_SSC->PDC_PTCR = AT91C_PDC_RXTDIS;	// Disable DMA Transfer
 	AT91C_BASE_PDC_SSC->PDC_RPR = (uint32_t) buf;		// transfer to this memory address
@@ -168,8 +166,8 @@ bool FpgaSetupSscDma(uint8_t *buf, int len)
 	AT91C_BASE_PDC_SSC->PDC_RNPR = (uint32_t) buf;		// next transfer to same memory address
 	AT91C_BASE_PDC_SSC->PDC_RNCR = len;					// ... with same number of bytes
 	AT91C_BASE_PDC_SSC->PDC_PTCR = AT91C_PDC_RXTEN;		// go!
-    
-    return true;
+
+	return true;
 }
 
 
@@ -184,12 +182,11 @@ static int get_from_fpga_combined_stream(z_streamp compressed_fpga_stream, uint8
 		compressed_fpga_stream->avail_out = OUTPUT_BUFFER_LEN;
 		fpga_image_ptr = output_buffer;
 		int res = inflate(compressed_fpga_stream, Z_SYNC_FLUSH);
-		if (res != Z_OK) {
+		if (res != Z_OK)
 			Dbprintf("inflate returned: %d, %s", res, compressed_fpga_stream->msg);
-		}
-		if (res < 0) {
+
+		if (res < 0)
 			return res;
-		}
 	}
 
 	uncompressed_bytes_cnt++;
@@ -222,7 +219,7 @@ static voidpf fpga_inflate_malloc(voidpf opaque, uInt items, uInt size)
 
 static void fpga_inflate_free(voidpf opaque, voidpf address)
 {
-	BigBuf_free();
+	BigBuf_free(); BigBuf_Clear_ext(false);
 }
 
 
@@ -277,7 +274,7 @@ static void DownloadFPGA_byte(unsigned char w)
 static void DownloadFPGA(int bitstream_version, int FpgaImageLen, z_streamp compressed_fpga_stream, uint8_t *output_buffer)
 {
 
-	Dbprintf("DownloadFPGA(len: %d)", FpgaImageLen);
+	//Dbprintf("DownloadFPGA(len: %d)", FpgaImageLen);
 	
 	int i=0;
 
@@ -416,14 +413,14 @@ static int bitparse_find_section(int bitstream_version, char section_name, unsig
 void FpgaDownloadAndGo(int bitstream_version)
 {
 	z_stream compressed_fpga_stream;
-	uint8_t output_buffer[OUTPUT_BUFFER_LEN];
+	uint8_t output_buffer[OUTPUT_BUFFER_LEN] = {0x00};
 	
 	// check whether or not the bitstream is already loaded
 	if (downloaded_bitstream == bitstream_version)
 		return;
 
 	// make sure that we have enough memory to decompress
-	BigBuf_free();
+	BigBuf_free(); BigBuf_Clear_ext(false);	
 	
 	if (!reset_fpga_stream(bitstream_version, &compressed_fpga_stream, output_buffer)) {
 		return;
@@ -436,6 +433,9 @@ void FpgaDownloadAndGo(int bitstream_version)
 	}
 
 	inflateEnd(&compressed_fpga_stream);
+	
+	// free eventually allocated BigBuf memory
+	BigBuf_free(); BigBuf_Clear_ext(false);	
 }	
 
 
@@ -448,18 +448,17 @@ void FpgaDownloadAndGo(int bitstream_version)
 void FpgaGatherVersion(int bitstream_version, char *dst, int len)
 {
 	unsigned int fpga_info_len;
-	char tempstr[40];
+	char tempstr[40] = {0x00};
 	z_stream compressed_fpga_stream;
-	uint8_t output_buffer[OUTPUT_BUFFER_LEN];
+	uint8_t output_buffer[OUTPUT_BUFFER_LEN] = {0x00};
 	
 	dst[0] = '\0';
 
 	// ensure that we can allocate enough memory for decompression:
-	BigBuf_free();
+	BigBuf_free(); BigBuf_Clear_ext(false);
 
-	if (!reset_fpga_stream(bitstream_version, &compressed_fpga_stream, output_buffer)) {
+	if (!reset_fpga_stream(bitstream_version, &compressed_fpga_stream, output_buffer))
 		return;
-	}
 
 	if(bitparse_find_section(bitstream_version, 'a', &fpga_info_len, &compressed_fpga_stream, output_buffer)) {
 		for (uint16_t i = 0; i < fpga_info_len; i++) {
@@ -559,12 +558,13 @@ void SetAdcMuxFor(uint32_t whichGpio)
 	HIGH(whichGpio);
 }
 
-void Fpga_print_status(void)
-{
+void Fpga_print_status(void) {
 	Dbprintf("Fgpa");
-	if(downloaded_bitstream == FPGA_BITSTREAM_HF) Dbprintf("  mode.............HF");
-	else if(downloaded_bitstream == FPGA_BITSTREAM_LF) Dbprintf("  mode.............LF");
-	else Dbprintf("  mode.............%d", downloaded_bitstream);
+	switch(downloaded_bitstream) {
+		case FPGA_BITSTREAM_HF: Dbprintf("  mode....................HF"); break;
+		case FPGA_BITSTREAM_LF: Dbprintf("  mode....................LF"); break;
+		default:		Dbprintf("  mode....................%d", downloaded_bitstream); break;
+	}
 }
 
 int FpgaGetCurrent() {
