@@ -2,6 +2,7 @@
 #include "apps.h"
 #include "BigBuf.h"
 #include "util.h"
+#include "usb_cdc.h"	// for usb_poll_validate_length
 
 static void RAMFUNC optimizedSnoop(void);
 
