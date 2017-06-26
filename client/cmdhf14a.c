@@ -26,6 +26,7 @@
 #include "cmdmain.h"
 #include "mifare.h"
 #include "cmdhfmfu.h"
+#include "mifarehost.h"
 
 static int CmdHelp(const char *Cmd);
 static void waitCmd(uint8_t iLen);
