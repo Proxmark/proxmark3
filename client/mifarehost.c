@@ -22,6 +22,8 @@
 #include "ui.h"
 #include "util.h"
 #include "iso14443crc.h"
+#include "mifare.h"	// for ISO14A_CONNECT etc
+#include "protocols.h"	// for MIFARE_AUTH_KEYA
 
 // mifare tracer flags used in mfTraceDecode()
 #define TRACE_IDLE		 				0x00
