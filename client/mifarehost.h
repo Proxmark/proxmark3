@@ -45,5 +45,5 @@ extern int isBlockTrailer(int blockN);
 extern int loadTraceCard(uint8_t *tuid);
 extern int saveTraceCard(void);
 extern int tryDecryptWord(uint32_t nt, uint32_t ar_enc, uint32_t at_enc, uint8_t *data, int len);
-
+extern bool detect_classic_prng();
 #endif
