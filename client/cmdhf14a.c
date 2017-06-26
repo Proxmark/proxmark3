@@ -170,9 +170,10 @@ int CmdHF14AReader(const char *Cmd)
 	PrintAndLog("ATQA : %02x %02x", card.atqa[1], card.atqa[0]);
 	PrintAndLog(" SAK : %02x [%d]", card.sak, resp.arg[0]);
 
+	bool isMifareClassic = true;
 	switch (card.sak) {
 		case 0x00: 
-
+			isMifareClassic = false;
 			//***************************************test****************
 			// disconnect
 			c.arg[0] = 0;
@@ -420,6 +421,13 @@ int CmdHF14AReader(const char *Cmd)
 	c.arg[2] = 0;
 	SendCommand(&c);
 
+	if (isMifareClassic) {		
+		if ( detect_classic_prng() )
+			PrintAndLog("Prng detection: WEAK (darkside)");
+		else
+			PrintAndLog("Prng detection: HARDEND (hardnested)");		
+	}
+	
 	return select_status;
 }
 
