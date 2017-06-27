@@ -1691,7 +1691,7 @@ int FSKClean(int *data, int *dataLen, int clk, int LowToneFC, int HighToneFC) {
 	if (clk == 0 || LowToneFC == 0 || HighToneFC == 0) {
 		int firstClockEdge=0;
 		uint8_t ans = fskClocks((uint8_t *) &LowToneFC, (uint8_t *) &HighToneFC, (uint8_t *) &clk, false, &firstClockEdge);
-		if (ans == 0) {
+		if (ans == 0 || LowToneFC == 0) {
 			return 0;
 		}
 	}
