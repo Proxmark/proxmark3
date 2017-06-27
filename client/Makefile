@@ -209,8 +209,8 @@ all-static: LDLIBS:=-static $(LDLIBS)
 all-static: proxmark3 flasher fpga_compress
 
 proxmark3: LDLIBS+=$(LUALIB) $(QTLDLIBS)
-proxmark3: $(OBJDIR)/proxmark3.o $(COREOBJS) $(CMDOBJS) $(QTGUIOBJS) $(MULTIARCHOBJS) lualibs/usb_cmd.lua
-	$(LD) $(LDFLAGS) $(OBJDIR)/proxmark3.o $(COREOBJS) $(CMDOBJS) $(QTGUIOBJS) $(MULTIARCHOBJS) $(LDLIBS) -o $@
+proxmark3: $(OBJDIR)/proxmark3.o $(COREOBJS) $(CMDOBJS) $(QTGUIOBJS) $(MULTIARCHOBJS) $(ZLIBOBJS) lualibs/usb_cmd.lua
+	$(LD) $(LDFLAGS) $(OBJDIR)/proxmark3.o $(COREOBJS) $(CMDOBJS) $(QTGUIOBJS) $(MULTIARCHOBJS) $(ZLIBOBJS) $(LDLIBS) -o $@
 
 flasher: $(OBJDIR)/flash.o $(OBJDIR)/flasher.o $(COREOBJS)
 	$(LD) $(LDFLAGS) $^ $(LDLIBS) -o $@
