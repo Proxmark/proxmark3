@@ -96,8 +96,12 @@ int CmdIndalaDemod(const char *Cmd) {
 	uint8_t rawbits[4096];
 	int rawbit = 0;
 	int worst = 0, worstPos = 0;
-	// PrintAndLog("Expecting a bit less than %d raw bits", GraphTraceLen / 32);
+
+	//clear clock grid and demod plot
+	setClockGrid(0, 0);
+	DemodBufferLen = 0;
 	
+	// PrintAndLog("Expecting a bit less than %d raw bits", GraphTraceLen / 32);
 	// loop through raw signal - since we know it is psk1 rf/32 fc/2 skip every other value (+=2)
 	for (i = 0; i < GraphTraceLen-1; i += 2) {
 		count += 1;
