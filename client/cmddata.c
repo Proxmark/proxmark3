@@ -1607,7 +1607,7 @@ int Cmdhex2bin(const char *Cmd)
 	return 0;
 }
 
-	/*
+	/* // example of FSK2 RF/50 Tones
 	static const int LowTone[]  = {
 	1,  1,  1,  1,  1, -1, -1, -1, -1, -1,
 	1,  1,  1,  1,  1, -1, -1, -1, -1, -1,
@@ -1616,12 +1616,12 @@ int Cmdhex2bin(const char *Cmd)
 	1,  1,  1,  1,  1, -1, -1, -1, -1, -1
 	};
 	static const int HighTone[] = {
-	1,  1,  1,  1,  1,     -1, -1, -1, -1,
+	1,  1,  1,  1,  1,     -1, -1, -1, -1, // note one extra 1 to padd due to 50/8 remainder (1/2 the remainder)
 	1,  1,  1,  1,         -1, -1, -1, -1,
 	1,  1,  1,  1,         -1, -1, -1, -1,
 	1,  1,  1,  1,         -1, -1, -1, -1,
 	1,  1,  1,  1,         -1, -1, -1, -1,
-	1,  1,  1,  1,     -1, -1, -1, -1, -1,
+	1,  1,  1,  1,     -1, -1, -1, -1, -1, // note one extra -1 to padd due to 50/8 remainder
 	};
 	*/
 void GetHiLoTone(int *LowTone, int *HighTone, int clk, int LowToneFC, int HighToneFC) {
@@ -1687,56 +1687,57 @@ void GetHiLoTone(int *LowTone, int *HighTone, int clk, int LowToneFC, int HighTo
 
 //old CmdFSKdemod adapted by marshmellow 
 //converts FSK to clear NRZ style wave.  (or demodulates)
-int FSKClean(int *data, int *dataLen, int clk, int LowToneFC, int HighToneFC) {
+int FSKToNRZ(int *data, int *dataLen, int clk, int LowToneFC, int HighToneFC) {
+	uint8_t ans;
 	if (clk == 0 || LowToneFC == 0 || HighToneFC == 0) {
 		int firstClockEdge=0;
-		uint8_t ans = fskClocks((uint8_t *) &LowToneFC, (uint8_t *) &HighToneFC, (uint8_t *) &clk, false, &firstClockEdge);
-		if (ans == 0 || LowToneFC == 0) {
-			return 0;
-		}
+		ans = fskClocks((uint8_t *) &LowToneFC, (uint8_t *) &HighToneFC, (uint8_t *) &clk, false, &firstClockEdge);
+	}
+	if (ans == 0 || LowToneFC == 0 || HighToneFC == 0) {
+		return 0;
 	}
 	int LowTone[clk];
 	int HighTone[clk];
-//	int LowToneFC = 10; // TODO allow args to set this
-//	int HighToneFC = 8; // TODO allow args to set this
 	GetHiLoTone(LowTone, HighTone, clk, LowToneFC, HighToneFC);
 	
-	int lowLen = sizeof(LowTone) / sizeof(int);
-	int highLen = sizeof(HighTone) / sizeof(int);
-	int convLen = (highLen > lowLen) ? highLen : lowLen;
-
 	int i, j;
-	int minMark = 0, maxMark = 0;
 
-	for (i = 0; i < *dataLen - convLen; ++i) {
+	// loop through ([all samples] - clk)
+	for (i = 0; i < *dataLen - clk; ++i) {
 		int lowSum = 0, highSum = 0;
 
-		for (j = 0; j < lowLen; ++j) {
+		// sum all samples together starting from this sample for [clk] samples for each tone (multiply tone value with sample data)
+		for (j = 0; j < clk; ++j) {
 			lowSum += LowTone[j] * data[i+j];
-		}
-		for (j = 0; j < highLen; ++j) {
 			highSum += HighTone[j] * data[i + j];
 		}
-		lowSum = abs(100 * lowSum / lowLen);
-		highSum = abs(100 * highSum / highLen);
+		// get abs( [average sample value per clk] * 100 )  (or a rolling average of sorts)
+		lowSum = abs(100 * lowSum / clk);
+		highSum = abs(100 * highSum / clk);
+		// save these back to buffer for later use
 		data[i] = (highSum << 16) | lowSum;
 	}
 
-	for(i = 0; i < *dataLen - convLen - 16; ++i) {
+	// now we have the abs( [average sample value per clk] * 100 ) for each tone
+	//   loop through again [all samples] - clk - 16  
+	//                  note why 16???  is 16 the largest FC? changed to LowToneFC as that should be the > fc
+	for(i = 0; i < *dataLen - clk - LowToneFC; ++i) {
 		int lowTot = 0, highTot = 0;
-		// 10 and 8 are fc_s divided by fc_l and fc_h, rounded
-		for (j = 0; j < 10; ++j) {
-		  lowTot += (data[i+j] & 0xffff);
+
+		// sum a field clock width of abs( [average sample values per clk] * 100) for each tone
+		for (j = 0; j < LowToneFC; ++j) {  //10 for fsk2
+		  lowTot += (data[i + j] & 0xffff);
 		}
-		for (j = 0; j < 8; j++) {
+		for (j = 0; j < HighToneFC; j++) {  //8 for fsk2
 		  highTot += (data[i + j] >> 16);
 		}
-		data[i] = lowTot - highTot;
-		if (data[i] > maxMark) maxMark = data[i];
-		if (data[i] < minMark) minMark = data[i];
-	}
 
-	*dataLen -= (convLen + 16);
+		// subtract the sum of lowTone averages by the sum of highTone averages as it 
+		//   and write back the new graph value 
+		data[i] = lowTot - highTot;
+	}
+	// update dataLen to what we put back to the data sample buffer
+	*dataLen -= (clk + LowToneFC);
 	return 0;
 }
 
@@ -1750,7 +1751,7 @@ int usage_data_fsktonrz() {
 		return 0;	
 }
 
-int CmdFSKClean(const char *Cmd) {
+int CmdFSKToNRZ(const char *Cmd) {
 	// take clk, fc_low, fc_high 
 	//   blank = auto;
 	bool errors = false;
@@ -1791,7 +1792,7 @@ int CmdFSKClean(const char *Cmd) {
 
 	setClockGrid(0,0);
 	DemodBufferLen = 0;
-	int ans = FSKClean(GraphBuffer, &GraphTraceLen, clk, fc_low, fc_high);
+	int ans = FSKToNRZ(GraphBuffer, &GraphTraceLen, clk, fc_low, fc_high);
 	CmdNorm("");
 	RepaintGraphWindow();
 	return ans;
@@ -1809,7 +1810,7 @@ static command_t CommandTable[] =
 	{"buffclear",       CmdBuffClear,       1, "Clear sample buffer and graph window"},
 	{"dec",             CmdDec,             1, "Decimate samples"},
 	{"detectclock",     CmdDetectClockRate, 1, "[modulation] Detect clock rate of wave in GraphBuffer (options: 'a','f','n','p' for ask, fsk, nrz, psk respectively)"},
-	{"fsktonrz",        CmdFSKClean,        1, "Convert fsk2 to nrz wave for alternate demodulating"},
+	{"fsktonrz",        CmdFSKToNRZ,        1, "Convert fsk2 to nrz wave for alternate fsk demodulating (for weak fsk)"},
 	{"getbitstream",    CmdGetBitStream,    1, "Convert GraphBuffer's >=1 values to 1 and <1 to 0"},
 	{"grid",            CmdGrid,            1, "<x> <y> -- overlay grid on graph window, use zero value to turn off either"},
 	{"hexsamples",      CmdHexsamples,      0, "<bytes> [<offset>] -- Dump big buffer as hex bytes"},
