@@ -1692,8 +1692,15 @@ int FSKToNRZ(int *data, int *dataLen, int clk, int LowToneFC, int HighToneFC) {
 	if (clk == 0 || LowToneFC == 0 || HighToneFC == 0) {
 		int firstClockEdge=0;
 		ans = fskClocks((uint8_t *) &LowToneFC, (uint8_t *) &HighToneFC, (uint8_t *) &clk, false, &firstClockEdge);
+		if (g_debugMode	> 1) {
+			PrintAndLog	("DEBUG FSKtoNRZ: detected clocks: fc_low %i, fc_high %i, clk %i, firstClockEdge %i, ans %u", LowToneFC, HighToneFC, clk, firstClockEdge, ans);
+		}
 	}
-	if (ans == 0 || LowToneFC == 0 || HighToneFC == 0) {
+	// currently only know fsk modulations with field clocks < 10 samples and > 4 samples. filter out to remove false positives (and possibly destroying ask/psk modulated waves...)
+	if (ans == 0 || LowToneFC == 0 || HighToneFC == 0 || LowToneFC > 10 || HighToneFC	< 4) {
+		if (g_debugMode	> 1) {
+			PrintAndLog	("DEBUG FSKtoNRZ: no fsk clocks found");
+		}
 		return 0;
 	}
 	int LowTone[clk];
