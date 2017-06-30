@@ -306,11 +306,11 @@ int CmdEM410xBrute(const char *Cmd)
 	int i, n, j, binary[4], parity[4];
 
 	char cmdp = param_getchar(Cmd, 0);
-  uint8_t uid[5] = {0x00};
+	uint8_t uid[5] = {0x00};
 
-  if (cmdp == 'h' || cmdp == 'H') return usage_lf_em410x_sim();
-  /* clock is 64 in EM410x tags */
-  uint8_t clock = 64;
+	if (cmdp == 'h' || cmdp == 'H') return usage_lf_em410x_sim();
+	/* clock is 64 in EM410x tags */
+	uint8_t clock = 64;
 
 	param_getdec(Cmd,1, &clock);
 
@@ -352,49 +352,48 @@ int CmdEM410xBrute(const char *Cmd)
 		for (i = 0; i < 9; i++)
 			AppendGraph(0, clock, 1);
 
-			/* for each hex char */
-			parity[0] = parity[1] = parity[2] = parity[3] = 0;
-			for (i = 0; i < 10; i++)
-			{
-				/* read each hex char */
-				sscanf(&buf[i], "%1x", &n);
-				for (j = 3; j >= 0; j--, n/= 2)
-					binary[j] = n % 2;
+		/* for each hex char */
+		parity[0] = parity[1] = parity[2] = parity[3] = 0;
+		for (i = 0; i < 10; i++){
+			/* read each hex char */
+			sscanf(&buf[i], "%1x", &n);
+			for (j = 3; j >= 0; j--, n/= 2)
+				binary[j] = n % 2;
 
-				/* append each bit */
-				AppendGraph(0, clock, binary[0]);
-				AppendGraph(0, clock, binary[1]);
-				AppendGraph(0, clock, binary[2]);
-				AppendGraph(0, clock, binary[3]);
+			/* append each bit */
+			AppendGraph(0, clock, binary[0]);
+			AppendGraph(0, clock, binary[1]);
+			AppendGraph(0, clock, binary[2]);
+			AppendGraph(0, clock, binary[3]);
 
-				/* append parity bit */
-				AppendGraph(0, clock, binary[0] ^ binary[1] ^ binary[2] ^ binary[3]);
+			/* append parity bit */
+			AppendGraph(0, clock, binary[0] ^ binary[1] ^ binary[2] ^ binary[3]);
 
-				/* keep track of column parity */
-				parity[0] ^= binary[0];
-				parity[1] ^= binary[1];
-				parity[2] ^= binary[2];
-				parity[3] ^= binary[3];
-			}
-
-			/* parity columns */
-			AppendGraph(0, clock, parity[0]);
-			AppendGraph(0, clock, parity[1]);
-			AppendGraph(0, clock, parity[2]);
-			AppendGraph(0, clock, parity[3]);
-
-			/* stop bit */
-			AppendGraph(1, clock, 0);
-
-			CmdLFSim("0"); //240 start_gap.
-
-			memset(buf, 0, sizeof(buf));
-
+			/* keep track of column parity */
+			parity[0] ^= binary[0];
+			parity[1] ^= binary[1];
+			parity[2] ^= binary[2];
+			parity[3] ^= binary[3];
 		}
 
-		fclose(f);
+		/* parity columns */
+		AppendGraph(0, clock, parity[0]);
+		AppendGraph(0, clock, parity[1]);
+		AppendGraph(0, clock, parity[2]);
+		AppendGraph(0, clock, parity[3]);
 
-		return 0;
+		/* stop bit */
+		AppendGraph(1, clock, 0);
+
+		CmdLFSim("0"); //240 start_gap.
+
+		memset(buf, 0, sizeof(buf));
+
+	}
+
+	fclose(f);
+
+	return 0;
 }
 
 
