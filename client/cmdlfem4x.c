@@ -23,6 +23,7 @@
 #include "cmdmain.h"
 #include "lfdemod.h"
 #include "protocols.h"
+#include "util_posix.h"
 
 uint64_t g_em410xId=0;
 
@@ -235,7 +236,7 @@ int CmdEM410xSim(const char *Cmd)
 	param_getdec(Cmd,1, &clock);
 
 	PrintAndLog("Starting simulating UID %02X%02X%02X%02X%02X  clock: %d", uid[0],uid[1],uid[2],uid[3],uid[4],clock);
-	PrintAndLog("Press pm3-button to about simulation");
+	PrintAndLog("Press pm3-button to abort simulation");
 
 
 	/* clear our graph */
@@ -282,6 +283,120 @@ int CmdEM410xSim(const char *Cmd)
 	CmdLFSim("0"); //240 start_gap.
 	return 0;
 }
+
+int usage_lf_em410x_brute(void) {
+        PrintAndLog("Bruteforcing by emulating EM410x tag");
+        PrintAndLog("");
+        PrintAndLog("Usage:  lf em 410xbrute [h] ids.txt");
+        PrintAndLog("Options:");
+        PrintAndLog("       h         - this help");
+        PrintAndLog("       ids.txt       - file with id in HEX format one per line");
+	PrintAndLog("       clock     - clock (32|64) (optional)");
+        PrintAndLog("samples:");
+        PrintAndLog("      lf em 410xbrute ids.txt");
+        PrintAndLog("      lf em 410xbrute ids.txt 32");
+	return 0;
+}
+
+int CmdEM410xBrute(const char *Cmd)
+{
+	char filename[FILE_PATH_SIZE]={0};
+	char buf[11];	
+	int i, n, j, binary[4], parity[4];
+
+        char cmdp = param_getchar(Cmd, 0);
+        uint8_t uid[5] = {0x00};
+
+        if (cmdp == 'h' || cmdp == 'H') return usage_lf_em410x_sim();
+        /* clock is 64 in EM410x tags */
+        uint8_t clock = 64;
+
+	param_getdec(Cmd,1, &clock);	
+
+	param_getstr(Cmd, 0, filename);
+        PrintAndLog("Filename: %s", filename);
+
+        FILE *f = fopen(filename, "r");
+
+        if(!f) {
+               PrintAndLog("Couldn't open '%s'", Cmd);
+                return 0;
+        }
+
+	while( fgets(buf, sizeof(buf), f) ) {
+		msleep(1000);
+		if (strlen(buf) < 10 || buf[9] == '\n') continue;
+		while (fgetc(f) != '\n' && !feof(f));  //goto next line
+
+		//The line start with # is comment, skip
+		if( buf[0]=='#' ) continue;	
+		
+		buf[10] = 0;
+		//PrintAndLog("ID: %s", buf);
+	
+	        if (param_gethex(buf, 0, uid, 10)) {
+	                PrintAndLog("UID must include 10 HEX symbols");
+	                return 0;
+	        }
+	
+	        PrintAndLog("Starting simulating UID %02X%02X%02X%02X%02X  clock: %d", uid[0],uid[1],uid[2],uid[3],uid[4],clock);
+	
+	
+	        /* clear our graph */
+	        ClearGraph(0);
+	
+	                /* write 9 start bits */
+	                for (i = 0; i < 9; i++)
+	                        AppendGraph(0, clock, 1);
+	
+	                /* for each hex char */
+	                parity[0] = parity[1] = parity[2] = parity[3] = 0;
+	                for (i = 0; i < 10; i++)
+	                {
+	                        /* read each hex char */
+	                        sscanf(&buf[i], "%1x", &n);
+	                        for (j = 3; j >= 0; j--, n/= 2)
+	                                binary[j] = n % 2;
+	
+	                        /* append each bit */
+	                        AppendGraph(0, clock, binary[0]);
+				AppendGraph(0, clock, binary[1]);
+	                        AppendGraph(0, clock, binary[2]);
+	                        AppendGraph(0, clock, binary[3]);
+	
+	                        /* append parity bit */
+	                        AppendGraph(0, clock, binary[0] ^ binary[1] ^ binary[2] ^ binary[3]);
+	
+	                        /* keep track of column parity */
+	                        parity[0] ^= binary[0];
+	                        parity[1] ^= binary[1];
+	                        parity[2] ^= binary[2];
+	                        parity[3] ^= binary[3];
+	                }
+	
+	                /* parity columns */
+	                AppendGraph(0, clock, parity[0]);
+	                AppendGraph(0, clock, parity[1]);
+	                AppendGraph(0, clock, parity[2]);
+	                AppendGraph(0, clock, parity[3]);
+	
+	                /* stop bit */
+	        AppendGraph(1, clock, 0);
+	
+	        CmdLFSim("0"); //240 start_gap.
+	 
+	
+		 memset(buf, 0, sizeof(buf));
+
+	}
+
+	fclose(f);
+	
+
+
+        return 0;
+}
+
 
 /* Function is equivalent of lf read + data samples + em410xread
  * looped until an EM410x tag is detected 
@@ -1202,6 +1317,7 @@ static command_t CommandTable[] =
 	{"410xread",  CmdEMdemodASK, 0, "[findone] -- Extract ID from EM410x tag (option 0 for continuous loop, 1 for only 1 tag)"},  
 	{"410xdemod", CmdAskEM410xDemod,  1, "[clock] [invert<0|1>] [maxErr] -- Demodulate an EM410x tag from GraphBuffer (args optional)"},
 	{"410xsim",   CmdEM410xSim, 0, "<UID> [clock rate] -- Simulate EM410x tag"},
+	{"410xbrute",   CmdEM410xBrute, 0, "ids.txt [clock rate] -- Bruteforcing by simulating EM410x tags (1 UID/s)"},
 	{"410xwatch", CmdEM410xWatch, 0, "['h'] -- Watches for EM410x 125/134 kHz tags (option 'h' for 134)"},
 	{"410xspoof", CmdEM410xWatchnSpoof, 0, "['h'] --- Watches for EM410x 125/134 kHz tags, and replays them. (option 'h' for 134)" },
 	{"410xwrite", CmdEM410xWrite, 0, "<UID> <'0' T5555> <'1' T55x7> [clock rate] -- Write EM410x UID to T5555(Q5) or T55x7 tag, optionally setting clock rate"},
