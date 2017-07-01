@@ -289,19 +289,19 @@ int CmdEM410xSim(const char *Cmd)
 }
 
 int usage_lf_em410x_brute(void) {
-		PrintAndLog("Bruteforcing by emulating EM410x tag");
-		PrintAndLog("");
-		PrintAndLog("Usage:  lf em 410xbrute [h] ids.txt [d 2000] [clock]");
-		PrintAndLog("Options:");
-		PrintAndLog("       h             - this help");
-		PrintAndLog("       ids.txt       - file with UIDs in HEX format, one per line");
-		PrintAndLog("       d (2000)      - pause delay in milliseconds between UIDs simulation, default 1000 ms (optional)");
-		PrintAndLog("       c (32)        - clock (32|64), default 64 (optional)");
-		PrintAndLog("samples:");
-		PrintAndLog("      lf em 410xbrute ids.txt");
-		PrintAndLog("      lf em 410xbrute ids.txt c 32");
-		PrintAndLog("      lf em 410xbrute ids.txt d 3000");
-		PrintAndLog("      lf em 410xbrute ids.txt d 3000 32");
+	PrintAndLog("Bruteforcing by emulating EM410x tag");
+	PrintAndLog("");
+	PrintAndLog("Usage:  lf em 410xbrute [h] ids.txt [d 2000] [clock]");
+	PrintAndLog("Options:");
+	PrintAndLog("       h             - this help");
+	PrintAndLog("       ids.txt       - file with UIDs in HEX format, one per line");
+	PrintAndLog("       d (2000)      - pause delay in milliseconds between UIDs simulation, default 1000 ms (optional)");
+	PrintAndLog("       c (32)        - clock (32|64), default 64 (optional)");
+	PrintAndLog("samples:");
+	PrintAndLog("      lf em 410xbrute ids.txt");
+	PrintAndLog("      lf em 410xbrute ids.txt c 32");
+	PrintAndLog("      lf em 410xbrute ids.txt d 3000");
+	PrintAndLog("      lf em 410xbrute ids.txt d 3000 32");
 	return 0;
 }
 
