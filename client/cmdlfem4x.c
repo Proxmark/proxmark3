@@ -294,12 +294,13 @@ int usage_lf_em410x_brute(void) {
         PrintAndLog("Usage:  lf em 410xbrute [h] ids.txt [d 2000] [clock]");
         PrintAndLog("Options:");
         PrintAndLog("       h             - this help");
-        PrintAndLog("       ids.txt       - file with UIDs in HEX format one per line");
-        PrintAndLog("       d (2000)      - pause delay in milliseonds between UIDs simulation, default 1000ms (optional)");
-		PrintAndLog("       clock         - clock (32|64), default 64 (optional)");
+        PrintAndLog("       ids.txt       - file with UIDs in HEX format, one per line");
+        PrintAndLog("       d (2000)      - pause delay in milliseconds between UIDs simulation, default 1000 ms (optional)");
+		PrintAndLog("       c (32)        - clock (32|64), default 64 (optional)");
         PrintAndLog("samples:");
         PrintAndLog("      lf em 410xbrute ids.txt");
-        PrintAndLog("      lf em 410xbrute ids.txt 32");
+        PrintAndLog("      lf em 410xbrute ids.txt c 32");
+        PrintAndLog("      lf em 410xbrute ids.txt d 3000");
         PrintAndLog("      lf em 410xbrute ids.txt d 3000 32");
 	return 0;
 }
@@ -318,7 +319,6 @@ int CmdEM410xBrute(const char *Cmd)
 	uint8_t clock = 64;
 	/* default pause time: 1 second */
 	uint32_t delay = 1000;
-	char delaystr[32] = {0x00};
 	
 	char cmdp = param_getchar(Cmd, 0);
 	
@@ -328,11 +328,11 @@ int CmdEM410xBrute(const char *Cmd)
 	cmdp = param_getchar(Cmd, 1);
 	
 	if (cmdp == 'd' || cmdp == 'D') {
-		param_getstr(Cmd,2, delaystr);
-		if (strlen(delaystr) > 0) delay = (uint32_t) atoi(delaystr);
-		param_getdec(Cmd,3, &clock);
-	} else {
-		param_getdec(Cmd,1, &clock);
+		delay = param_get32ex(Cmd, 2, 1000, 10);
+		param_getdec(Cmd, 4, &clock);
+	} else if (cmdp == 'c' || cmdp == 'C') {
+		param_getdec(Cmd, 2, &clock);
+		delay = param_get32ex(Cmd, 4, 1000, 10);
 	}
 
 	param_getstr(Cmd, 0, filename);
@@ -1339,7 +1339,7 @@ static command_t CommandTable[] =
 	{"410xread",  CmdEMdemodASK, 0, "[findone] -- Extract ID from EM410x tag (option 0 for continuous loop, 1 for only 1 tag)"},
 	{"410xdemod", CmdAskEM410xDemod,  1, "[clock] [invert<0|1>] [maxErr] -- Demodulate an EM410x tag from GraphBuffer (args optional)"},
 	{"410xsim",   CmdEM410xSim, 0, "<UID> [clock rate] -- Simulate EM410x tag"},
-	{"410xbrute",   CmdEM410xBrute, 0, "ids.txt [d (delay in ms)] [clock rate] -- Bruteforcing by simulating EM410x tags (1 UID/s)"},
+	{"410xbrute",   CmdEM410xBrute, 0, "ids.txt [d (delay in ms)] [c (clock rate)] -- Bruteforcing by simulating EM410x tags (1 UID/s)"},
 	{"410xwatch", CmdEM410xWatch, 0, "['h'] -- Watches for EM410x 125/134 kHz tags (option 'h' for 134)"},
 	{"410xspoof", CmdEM410xWatchnSpoof, 0, "['h'] --- Watches for EM410x 125/134 kHz tags, and replays them. (option 'h' for 134)" },
 	{"410xwrite", CmdEM410xWrite, 0, "<UID> <'0' T5555> <'1' T55x7> [clock rate] -- Write EM410x UID to T5555(Q5) or T55x7 tag, optionally setting clock rate"},
