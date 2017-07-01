@@ -38,9 +38,9 @@
 
 #include "uart.h"
 
-// Test if we are dealing with unix operating systems
-#ifdef _WIN32
 // The windows serial port implementation
+#ifdef _WIN32
+#include <windows.h>
 
 typedef struct {
   HANDLE hPort;     // Serial port handle

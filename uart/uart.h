@@ -41,13 +41,6 @@
 
 typedef unsigned char byte_t;
 
-// Handle platform specific includes
-#ifndef _WIN32
-
-#else
-  #include <windows.h>
-#endif
-
 /* serial_port is declared as a void*, which you should cast to whatever type
  * makes sense to your connection method. Both the posix and win32
  * implementations define their own structs in place.
