@@ -176,11 +176,12 @@ static inline uint32_t count_states(uint32_t *bitset)
 }
 
 
-static void write_bitflips_file(odd_even_t odd_even, uint16_t bitflip, int sum_a0, uint32_t *bitset)
+static void write_bitflips_file(odd_even_t odd_even, uint16_t bitflip, int sum_a0, uint32_t *bitset, uint32_t count)
 {
 	char filename[80];
 	sprintf(filename, "bitflip_%d_%03" PRIx16 "_sum%d_states.bin", odd_even, bitflip, sum_a0);
 	FILE *outfile = fopen(filename, "wb");
+	fwrite(&count, 1, sizeof(count), outfile);
 	fwrite(bitset, 1, sizeof(uint32_t)*(1<<19), outfile);
 	fclose(outfile);
 }
@@ -369,7 +370,7 @@ static void precalculate_bit0_bitflip_bitarrays(uint8_t const bitflip, uint16_t 
 				bitflip, (1<<24) - count[odd_even],
 				(float)((1<<24) - count[odd_even]) / (1<<24) * 100.0);
 			#ifndef TEST_RUN
-			write_bitflips_file(odd_even, bitflip, sum_a0, test_bitarray[odd_even]);
+			write_bitflips_file(odd_even, bitflip, sum_a0, test_bitarray[odd_even], count[odd_even]);
 			#endif
 		} else {
 			printf("All %s states for bitflip property %03x are possible. No file written.\n", odd_even==EVEN_STATE?"even":"odd", bitflip);
@@ -396,7 +397,7 @@ static void precalculate_bit0_bitflip_bitarrays(uint8_t const bitflip, uint16_t 
 					bitflip | BITFLIP_2ND_BYTE, (1<<24) - count[odd_even],
 					(float)((1<<24) - count[odd_even]) / (1<<24) * 100.0);
 				#ifndef TEST_RUN
-				write_bitflips_file(odd_even, bitflip | BITFLIP_2ND_BYTE, sum_a0, test_bitarray_2nd);
+				write_bitflips_file(odd_even, bitflip | BITFLIP_2ND_BYTE, sum_a0, test_bitarray_2nd, count[odd_even]);
 				#endif
 			} else {
 				printf("All %s states for bitflip property %03x are possible. No file written.\n", odd_even==EVEN_STATE?"even":"odd", bitflip | BITFLIP_2ND_BYTE);
@@ -481,7 +482,7 @@ static void precalculate_bit0_bitflip_bitarrays(uint8_t const bitflip, uint16_t 
 				bitflip|0x100, (1<<24) - count[odd_even],
 				(float)((1<<24) - count[odd_even]) / (1<<24) * 100.0);
 			#ifndef TEST_RUN
-			write_bitflips_file(odd_even, bitflip|0x100, sum_a0, test_not_bitarray[odd_even]);
+			write_bitflips_file(odd_even, bitflip|0x100, sum_a0, test_not_bitarray[odd_even], count[odd_even]);
 			#endif
 		} else {
 			printf("All %s states for bitflip property %03x are possible. No file written.\n", odd_even==EVEN_STATE?"even":"odd", bitflip|0x100);
@@ -508,7 +509,7 @@ static void precalculate_bit0_bitflip_bitarrays(uint8_t const bitflip, uint16_t 
 					bitflip | 0x100| BITFLIP_2ND_BYTE, (1<<24) - count[odd_even],
 					(float)((1<<24) - count[odd_even]) / (1<<24) * 100.0);
 				#ifndef TEST_RUN
-				write_bitflips_file(odd_even, bitflip | 0x100 | BITFLIP_2ND_BYTE, sum_a0, test_bitarray_2nd);
+				write_bitflips_file(odd_even, bitflip | 0x100 | BITFLIP_2ND_BYTE, sum_a0, test_bitarray_2nd, count[odd_even]);
 				#endif
 			} else {
 				printf("All %s states for bitflip property %03x are possible. No file written.\n", odd_even==EVEN_STATE?"even":"odd", bitflip | 0x100 | BITFLIP_2ND_BYTE);
