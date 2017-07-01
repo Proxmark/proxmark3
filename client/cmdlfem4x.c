@@ -301,7 +301,7 @@ int usage_lf_em410x_brute(void) {
         PrintAndLog("      lf em 410xbrute ids.txt");
         PrintAndLog("      lf em 410xbrute ids.txt c 32");
         PrintAndLog("      lf em 410xbrute ids.txt d 3000");
-        PrintAndLog("      lf em 410xbrute ids.txt d 3000 32");
+		PrintAndLog("      lf em 410xbrute ids.txt d 3000 32");
 	return 0;
 }
 
