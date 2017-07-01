@@ -21,6 +21,7 @@ extern int CmdAskEM410xDemod(const char *Cmd);
 extern int AskEm410xDecode(bool verbose, uint32_t *hi, uint64_t *lo );
 extern int AskEm410xDemod(const char *Cmd, uint32_t *hi, uint64_t *lo, bool verbose);
 extern int CmdEM410xSim(const char *Cmd);
+extern int CmdEM410xBrute(const char *Cmd);
 extern int CmdEM410xWatch(const char *Cmd);
 extern int CmdEM410xWatchnSpoof(const char *Cmd);
 extern int CmdEM410xWrite(const char *Cmd);
