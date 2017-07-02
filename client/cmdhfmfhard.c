@@ -33,6 +33,7 @@
 #include "parity.h"
 #include "hardnested/hardnested_bruteforce.h"
 #include "hardnested/hardnested_bitarray_core.h"
+#include "zlib.h"
 
 #define NUM_CHECK_BITFLIPS_THREADS		(num_CPUs())
 #define NUM_REDUCTION_WORKING_THREADS	(num_CPUs())
@@ -40,7 +41,7 @@
 #define IGNORE_BITFLIP_THRESHOLD		0.99	// ignore bitflip arrays which have nearly only valid states
 
 #define STATE_FILES_DIRECTORY			"hardnested/tables/"
-#define STATE_FILE_TEMPLATE				"bitflip_%d_%03" PRIx16 "_states.bin"
+#define STATE_FILE_TEMPLATE				"bitflip_%d_%03" PRIx16 "_states.bin.z"
 
 #define DEBUG_KEY_ELIMINATION
 // #define DEBUG_REDUCTION
@@ -242,12 +243,48 @@ static int compare_count_bitflip_bitarrays(const void *b1, const void *b2)
 }
 
 
+static voidpf inflate_malloc(voidpf opaque, uInt items, uInt size)
+{
+	return malloc(items*size);
+}
+
+
+static void inflate_free(voidpf opaque, voidpf address)
+{
+	free(address);
+}
+
+#define OUTPUT_BUFFER_LEN 80
+#define INPUT_BUFFER_LEN 80
+
+//----------------------------------------------------------------------------
+// Initialize decompression of the respective (HF or LF) FPGA stream 
+//----------------------------------------------------------------------------
+static void init_inflate(z_streamp compressed_stream, uint8_t *input_buffer, uint32_t insize, uint8_t *output_buffer, uint32_t outsize)
+{
+
+	// initialize z_stream structure for inflate:
+	compressed_stream->next_in = input_buffer;
+	compressed_stream->avail_in = insize;
+	compressed_stream->next_out = output_buffer;
+	compressed_stream->avail_out = outsize;
+	compressed_stream->zalloc = &inflate_malloc;
+	compressed_stream->zfree = &inflate_free;
+
+	inflateInit2(compressed_stream, 0);
+	
+}
+
+
 static void init_bitflip_bitarrays(void)
 {
 #if defined (DEBUG_REDUCTION)
 	uint8_t line = 0;
 #endif	
 
+
+	z_stream compressed_stream;
+	
 	char state_files_path[strlen(get_my_executable_directory()) + strlen(STATE_FILES_DIRECTORY) + strlen(STATE_FILE_TEMPLATE) + 1];
 	char state_file_name[strlen(STATE_FILE_TEMPLATE)+1];
 	
@@ -264,22 +301,31 @@ static void init_bitflip_bitarrays(void)
 			if (statesfile == NULL) {
 				continue;
 			} else {
-				uint32_t *bitset = (uint32_t *)malloc_bitarray(sizeof(uint32_t) * (1<<19));
-				if (bitset == NULL) {
-					printf("Out of memory error in init_bitflip_statelists(). Aborting...\n");
+				fseek(statesfile, 0, SEEK_END);
+				uint32_t filesize = (uint32_t)ftell(statesfile);
+				rewind(statesfile);
+				uint8_t input_buffer[filesize];
+				size_t bytesread = fread(input_buffer, 1, filesize, statesfile);
+				if (bytesread != filesize) {
+					printf("File read error with %s. Aborting...\n", state_file_name);
 					fclose(statesfile);
-					exit(4);
-				}
-				size_t bytesread = fread(bitset, 1, sizeof(uint32_t) * (1<<19), statesfile);
-				if (bytesread != sizeof(uint32_t) * (1<<19)) {
-					printf("File read error with %s. Aborting...", state_file_name);
-					fclose(statesfile);
-					free_bitarray(bitset);
+					inflateEnd(&compressed_stream);
 					exit(5);
 				}
 				fclose(statesfile);
-				uint32_t count = count_states(bitset);
+				uint32_t count = 0;
+				init_inflate(&compressed_stream, input_buffer, filesize, (uint8_t *)&count, sizeof(count));
+				inflate(&compressed_stream, Z_SYNC_FLUSH);
 				if ((float)count/(1<<24) < IGNORE_BITFLIP_THRESHOLD) {
+					uint32_t *bitset = (uint32_t *)malloc_bitarray(sizeof(uint32_t) * (1<<19));
+					if (bitset == NULL) {
+						printf("Out of memory error in init_bitflip_statelists(). Aborting...\n");
+						inflateEnd(&compressed_stream);
+						exit(4);
+					}
+					compressed_stream.next_out = (uint8_t *)bitset;
+					compressed_stream.avail_out = sizeof(uint32_t) * (1<<19);
+					inflate(&compressed_stream, Z_SYNC_FLUSH);
 					effective_bitflip[odd_even][num_effective_bitflips[odd_even]++] = bitflip;
 					bitflip_bitarrays[odd_even][bitflip] = bitset;
 					count_bitflip_bitarrays[odd_even][bitflip] = count;
@@ -291,9 +337,8 @@ static void init_bitflip_bitarrays(void)
 						line = 0;
 					}
 #endif
-				} else {
-					free_bitarray(bitset);
 				}
+				inflateEnd(&compressed_stream);
 			}
 		}
 		effective_bitflip[odd_even][num_effective_bitflips[odd_even]] = 0x400;	// EndOfList marker
@@ -2551,6 +2596,7 @@ int mfnestedhard(uint8_t blockNo, uint8_t keyType, uint8_t *key, uint8_t trgBloc
 				best_first_bytes[0] = best_first_byte_smallest_bitarray;
 				pre_XOR_nonces();
 				prepare_bf_test_nonces(nonces, best_first_bytes[0]);
+				hardnested_print_progress(num_acquired_nonces, "Starting brute force...", expected_brute_force1, 0);
 				key_found = brute_force();
 				free(candidates->states[ODD_STATE]);
 				free(candidates->states[EVEN_STATE]);
@@ -2570,6 +2616,7 @@ int mfnestedhard(uint8_t blockNo, uint8_t keyType, uint8_t *key, uint8_t trgBloc
 					// printf("Estimated remaining states: %" PRIu64 " (2^%1.1f)\n", nonces[best_first_bytes[0]].sum_a8_guess[j].num_states, log(nonces[best_first_bytes[0]].sum_a8_guess[j].num_states)/log(2.0));
 					generate_candidates(first_byte_Sum, nonces[best_first_bytes[0]].sum_a8_guess[j].sum_a8_idx);
 					// printf("Time for generating key candidates list: %1.0f sec (%1.1f sec CPU)\n", difftime(time(NULL), start_time), (float)(msclock() - start_clock)/1000.0);
+					hardnested_print_progress(num_acquired_nonces, "Starting brute force...", expected_brute_force, 0);
 					key_found = brute_force();
 					free_statelist_cache();
 					free_candidates_memory(candidates);
@@ -2610,6 +2657,12 @@ int mfnestedhard(uint8_t blockNo, uint8_t keyType, uint8_t *key, uint8_t trgBloc
 
 		if (nonce_file_read) {  	// use pre-acquired data from file nonces.bin
 			if (read_nonce_file() != 0) {
+				free_bitflip_bitarrays();
+				free_nonces_memory();
+				free_bitarray(all_bitflips_bitarray[ODD_STATE]);
+				free_bitarray(all_bitflips_bitarray[EVEN_STATE]);
+				free_sum_bitarrays();
+				free_part_sum_bitarrays();
 				return 3;
 			}
 			hardnested_stage = CHECK_1ST_BYTES | CHECK_2ND_BYTES;
@@ -2619,6 +2672,12 @@ int mfnestedhard(uint8_t blockNo, uint8_t keyType, uint8_t *key, uint8_t trgBloc
 		} else {					// acquire nonces.
 			uint16_t is_OK = acquire_nonces(blockNo, keyType, key, trgBlockNo, trgKeyType, nonce_file_write, slow);
 			if (is_OK != 0) {
+				free_bitflip_bitarrays();
+				free_nonces_memory();
+				free_bitarray(all_bitflips_bitarray[ODD_STATE]);
+				free_bitarray(all_bitflips_bitarray[EVEN_STATE]);
+				free_sum_bitarrays();
+				free_part_sum_bitarrays();
 				return is_OK;
 			}
 		}
@@ -2648,10 +2707,11 @@ int mfnestedhard(uint8_t blockNo, uint8_t keyType, uint8_t *key, uint8_t trgBloc
 			for (statelist_t *sl = candidates; sl != NULL; sl = sl->next) {
 				maximum_states += (uint64_t)sl->len[ODD_STATE] * sl->len[EVEN_STATE];
 			}
-			printf("Number of remaining possible keys: %" PRIu64 " (2^%1.1f)\n", maximum_states, log(maximum_states)/log(2.0));
+			// printf("Number of remaining possible keys: %" PRIu64 " (2^%1.1f)\n", maximum_states, log(maximum_states)/log(2.0));
 			best_first_bytes[0] = best_first_byte_smallest_bitarray;
 			pre_XOR_nonces();
 			prepare_bf_test_nonces(nonces, best_first_bytes[0]);
+			hardnested_print_progress(num_acquired_nonces, "Starting brute force...", expected_brute_force1, 0);
 			key_found = brute_force();
 			free(candidates->states[ODD_STATE]);
 			free(candidates->states[EVEN_STATE]);
@@ -2671,6 +2731,7 @@ int mfnestedhard(uint8_t blockNo, uint8_t keyType, uint8_t *key, uint8_t trgBloc
 				// printf("Estimated remaining states: %" PRIu64 " (2^%1.1f)\n", nonces[best_first_bytes[0]].sum_a8_guess[j].num_states, log(nonces[best_first_bytes[0]].sum_a8_guess[j].num_states)/log(2.0));
 				generate_candidates(first_byte_Sum, nonces[best_first_bytes[0]].sum_a8_guess[j].sum_a8_idx);
 				// printf("Time for generating key candidates list: %1.0f sec (%1.1f sec CPU)\n", difftime(time(NULL), start_time), (float)(msclock() - start_clock)/1000.0);
+				hardnested_print_progress(num_acquired_nonces, "Starting brute force...", expected_brute_force, 0);
 				key_found = brute_force();
 				free_statelist_cache();
 				free_candidates_memory(candidates);
