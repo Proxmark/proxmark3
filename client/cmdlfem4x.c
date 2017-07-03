@@ -291,7 +291,7 @@ int CmdEM410xSim(const char *Cmd)
 int usage_lf_em410x_brute(void) {
 	PrintAndLog("Bruteforcing by emulating EM410x tag");
 	PrintAndLog("");
-	PrintAndLog("Usage:  lf em 410xbrute [h] ids.txt [d 2000] [clock]");
+	PrintAndLog("Usage:  lf em 410xbrute [h] ids.txt [d 2000] [c clock]");
 	PrintAndLog("Options:");
 	PrintAndLog("       h             - this help");
 	PrintAndLog("       ids.txt       - file with UIDs in HEX format, one per line");
@@ -301,7 +301,7 @@ int usage_lf_em410x_brute(void) {
 	PrintAndLog("      lf em 410xbrute ids.txt");
 	PrintAndLog("      lf em 410xbrute ids.txt c 32");
 	PrintAndLog("      lf em 410xbrute ids.txt d 3000");
-	PrintAndLog("      lf em 410xbrute ids.txt d 3000 32");
+	PrintAndLog("      lf em 410xbrute ids.txt d 3000 c 32");
 	return 0;
 }
 
@@ -1339,7 +1339,7 @@ static command_t CommandTable[] =
 	{"410xread",  CmdEMdemodASK, 0, "[findone] -- Extract ID from EM410x tag (option 0 for continuous loop, 1 for only 1 tag)"},
 	{"410xdemod", CmdAskEM410xDemod,  1, "[clock] [invert<0|1>] [maxErr] -- Demodulate an EM410x tag from GraphBuffer (args optional)"},
 	{"410xsim",   CmdEM410xSim, 0, "<UID> [clock rate] -- Simulate EM410x tag"},
-	{"410xbrute",   CmdEM410xBrute, 0, "ids.txt [d (delay in ms)] [c (clock rate)] -- Bruteforcing by simulating EM410x tags (1 UID/s)"},
+	{"410xbrute",   CmdEM410xBrute, 0, "ids.txt [d (delay in ms)] [c (clock rate)] -- Reader bruteforce attack by simulating EM410x tags"},
 	{"410xwatch", CmdEM410xWatch, 0, "['h'] -- Watches for EM410x 125/134 kHz tags (option 'h' for 134)"},
 	{"410xspoof", CmdEM410xWatchnSpoof, 0, "['h'] --- Watches for EM410x 125/134 kHz tags, and replays them. (option 'h' for 134)" },
 	{"410xwrite", CmdEM410xWrite, 0, "<UID> <'0' T5555> <'1' T55x7> [clock rate] -- Write EM410x UID to T5555(Q5) or T55x7 tag, optionally setting clock rate"},
