@@ -1381,24 +1381,23 @@ void MifareCIdent(){
 	uint8_t wupC2[]       = { 0x43 }; 
 	
 	// variables
-	byte_t isOK = 1;
-	
+	byte_t isOK = 0;
+		
 	uint8_t receivedAnswer[MAX_MIFARE_FRAME_SIZE];
 	uint8_t receivedAnswerPar[MAX_MIFARE_PARITY_SIZE];
 
 	ReaderTransmitBitsPar(wupC1,7,0, NULL);
-	if(!ReaderReceive(receivedAnswer, receivedAnswerPar) || (receivedAnswer[0] != 0x0a)) {
-		isOK = 0;
+	if(ReaderReceive(receivedAnswer, receivedAnswerPar) && (receivedAnswer[0] == 0x0a)) {
+		isOK = 1;
 	};
 
 	ReaderTransmit(wupC2, sizeof(wupC2), NULL);
-	if(!ReaderReceive(receivedAnswer, receivedAnswerPar) || (receivedAnswer[0] != 0x0a)) {
-		isOK = 0;
+	if(ReaderReceive(receivedAnswer, receivedAnswerPar) && (receivedAnswer[0] == 0x0a)) {
+		isOK = 1;
 	};
 
-	if (mifare_classic_halt(NULL, 0)) {
-		isOK = 0;
-	};
+	// From iceman1001: removed the if,  since some magic tags misbehavies and send an answer to it.	
+	mifare_classic_halt(NULL, 0);	
 
 	cmd_send(CMD_ACK,isOK,0,0,0,0);
 }
