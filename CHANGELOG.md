@@ -23,6 +23,9 @@ This project uses the changelog in accordance with [keepchangelog](http://keepac
 ## [3.0.0][2017-06-05]
 
 ### Added
+- Added lf hitag write 24, the command writes a block to hitag2 tags in crypto mode (henjo)
+
+### Added
 - Added hf mf hardnested, an attack working for hardened Mifare cards (EV1, Mifare Plus SL1) where hf mf nested fails
 - Added experimental testmode write option for t55xx (danger) (marshmellow)
 - Added t55xx p1detect to `lf search` chip detections (marshmellow)
