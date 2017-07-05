@@ -1388,12 +1388,12 @@ void MifareCIdent(){
 
 	ReaderTransmitBitsPar(wupC1,7,0, NULL);
 	if(ReaderReceive(receivedAnswer, receivedAnswerPar) && (receivedAnswer[0] == 0x0a)) {
-		isOK = 1;
-	};
+		isOK = 2;
 
-	ReaderTransmit(wupC2, sizeof(wupC2), NULL);
-	if(ReaderReceive(receivedAnswer, receivedAnswerPar) && (receivedAnswer[0] == 0x0a)) {
-		isOK = 1;
+		ReaderTransmit(wupC2, sizeof(wupC2), NULL);
+		if(ReaderReceive(receivedAnswer, receivedAnswerPar) && (receivedAnswer[0] == 0x0a)) {
+			isOK = 1;
+		};
 	};
 
 	// From iceman1001: removed the if,  since some magic tags misbehavies and send an answer to it.	
