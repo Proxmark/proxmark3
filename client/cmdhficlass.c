@@ -191,8 +191,12 @@ int HFiClassReader(const char *Cmd, bool loop, bool verbose) {
 			uint8_t readStatus = resp.arg[0] & 0xff;
 			uint8_t *data = resp.d.asBytes;
 
-			// no tag found
-			if( readStatus == 0) continue;
+			// no tag found or button pressed
+			if( (readStatus == 0 && !loop) || readStatus == 0xFF) {
+				// abort
+				if (verbose) PrintAndLog("Quitting...");
+				return 0;
+			}
 
 			if( readStatus & FLAG_ICLASS_READER_CSN) {
 				PrintAndLog("   CSN: %s",sprint_hex(data,8));
@@ -1708,7 +1712,7 @@ static command_t CommandTable[] =
 	{"loclass",     CmdHFiClass_loclass,        	1,	"[options..] Use loclass to perform bruteforce of reader attack dump"},
 	{"managekeys",  CmdHFiClassManageKeys,      	1,	"[options..] Manage the keys to use with iClass"},
 	{"readblk",     CmdHFiClass_ReadBlock,      	0,	"[options..] Authenticate and Read iClass block"},
-	{"reader",      CmdHFiClassReader,          	0,	"            Read an iClass tag"},
+	{"reader",      CmdHFiClassReader,          	0,	"            Look for iClass tags until a key or the pm3 button is pressed"},
 	{"readtagfile", CmdHFiClassReadTagFile,     	1,	"[options..] Display Content from tagfile"},
 	{"replay",      CmdHFiClassReader_Replay,   	0,	"<mac>       Read an iClass tag via Reply Attack"},
 	{"sim",         CmdHFiClassSim,             	0,	"[options..] Simulate iClass tag"},
