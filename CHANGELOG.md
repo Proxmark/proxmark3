@@ -10,6 +10,7 @@ This project uses the changelog in accordance with [keepchangelog](http://keepac
 ### Fixed
 
 ### Added
+- Added data fsktonrz, a fsk cleaning/demodulating routine for weak fsk signal. Note: follow this up with a `data rawdemod nr` to finish demoding your signal.
 - Added lf em 410xbrute, LF EM410x reader bruteforce attack by simulating UIDs from a file (Fl0-0)
 
 ## [3.0.1][2017-06-08]
