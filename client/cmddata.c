@@ -1688,7 +1688,7 @@ void GetHiLoTone(int *LowTone, int *HighTone, int clk, int LowToneFC, int HighTo
 //old CmdFSKdemod adapted by marshmellow 
 //converts FSK to clear NRZ style wave.  (or demodulates)
 int FSKToNRZ(int *data, int *dataLen, int clk, int LowToneFC, int HighToneFC) {
-	uint8_t ans;
+	uint8_t ans=0;
 	if (clk == 0 || LowToneFC == 0 || HighToneFC == 0) {
 		int firstClockEdge=0;
 		ans = fskClocks((uint8_t *) &LowToneFC, (uint8_t *) &HighToneFC, (uint8_t *) &clk, false, &firstClockEdge);
@@ -1697,7 +1697,7 @@ int FSKToNRZ(int *data, int *dataLen, int clk, int LowToneFC, int HighToneFC) {
 		}
 	}
 	// currently only know fsk modulations with field clocks < 10 samples and > 4 samples. filter out to remove false positives (and possibly destroying ask/psk modulated waves...)
-	if (ans == 0 || LowToneFC == 0 || HighToneFC == 0 || LowToneFC > 10 || HighToneFC	< 4) {
+	if (ans == 0 || clk == 0 || LowToneFC == 0 || HighToneFC == 0 || LowToneFC > 10 || HighToneFC	< 4) {
 		if (g_debugMode	> 1) {
 			PrintAndLog	("DEBUG FSKtoNRZ: no fsk clocks found");
 		}
