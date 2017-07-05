@@ -19,6 +19,8 @@
 
 #ifdef _WIN32
 # define unlink(x)
+#else
+# include <unistd.h>
 #endif
 
 static serial_port sp;
@@ -128,7 +130,7 @@ int main(int argc, char **argv)
   
   fprintf(stderr,"Waiting for Proxmark to appear on %s",serial_port_name);
   do {
-    sleep(1);
+    msleep(1000);
     fprintf(stderr, ".");
   } while (!OpenProxmark(0));
   fprintf(stderr," Found.\n");
