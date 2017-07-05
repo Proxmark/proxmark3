@@ -49,6 +49,7 @@
 #include "iso15693tools.h"
 #include "protocols.h"
 #include "optimized_cipher.h"
+#include "usb_cdc.h" // for usb_poll_validate_length
 
 static int timeout = 4096;
 
@@ -1681,7 +1682,7 @@ void ReaderIClass(uint8_t arg0) {
 
 	uint8_t card_data[6 * 8]={0};
 	memset(card_data, 0xFF, sizeof(card_data));
-	uint8_t last_csn[8]={0};
+	uint8_t last_csn[8]={0,0,0,0,0,0,0,0};
 	uint8_t resp[ICLASS_BUFFER_SIZE];
 	memset(resp, 0xFF, sizeof(resp));
 	//Read conf block CRC(0x01) => 0xfa 0x22
@@ -1707,9 +1708,11 @@ void ReaderIClass(uint8_t arg0) {
 	setupIclassReader();
 
 	uint16_t tryCnt=0;
-	while(!BUTTON_PRESS())
+	bool userCancelled = BUTTON_PRESS() || usb_poll_validate_length();
+	while(!userCancelled)
 	{
-		if (try_once && tryCnt > 5) break; 
+		// if only looking for one card try 2 times if we missed it the first time
+		if (try_once && tryCnt > 2) break; 
 		tryCnt++;
 		if(!tracing) {
 			DbpString("Trace full");
@@ -1759,7 +1762,8 @@ void ReaderIClass(uint8_t arg0) {
 		// with 0xFF:s in block 3 and 4.
 
 		LED_B_ON();
-		//Send back to client, but don't bother if we already sent this
+		//Send back to client, but don't bother if we already sent this - 
+		//  only useful if looping in arm (not try_once && not abort_after_read)
 		if(memcmp(last_csn, card_data, 8) != 0)
 		{
 			// If caller requires that we get Conf, CC, AA, continue until we got it
@@ -1767,6 +1771,7 @@ void ReaderIClass(uint8_t arg0) {
 				cmd_send(CMD_ACK,result_status,0,0,card_data,sizeof(card_data));
 				if(abort_after_read) {
 					LED_A_OFF();
+					LED_B_OFF();
 					return;
 				}
 				//Save that we already sent this....
@@ -1775,8 +1780,13 @@ void ReaderIClass(uint8_t arg0) {
 
 		}
 		LED_B_OFF();
+		userCancelled = BUTTON_PRESS() || usb_poll_validate_length();
 	}
-	cmd_send(CMD_ACK,0,0,0,card_data, 0);
+	if (userCancelled) {
+		cmd_send(CMD_ACK,0xFF,0,0,card_data, 0);
+	} else {
+		cmd_send(CMD_ACK,0,0,0,card_data, 0);
+	}
 	LED_A_OFF();
 }
 
