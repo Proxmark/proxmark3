@@ -1930,7 +1930,7 @@ int CmdHF14AMfCLoad(const char *Cmd)
 
 			if (gen == 2)
 				/* generation 1b magic card */
-				flags += CSETBLOCK_MAGIC_1B;
+				flags |= CSETBLOCK_MAGIC_1B;
 			if (mfCSetBlock(blockNum, buf8, NULL, 0, flags)) {
 				PrintAndLog("Cant set magic card block: %d", blockNum);
 				return 3;
@@ -1980,7 +1980,7 @@ int CmdHF14AMfCLoad(const char *Cmd)
 
 			if (gen == 2)
 				/* generation 1b magic card */
-				flags += CSETBLOCK_MAGIC_1B;
+				flags |= CSETBLOCK_MAGIC_1B;
 			if (mfCSetBlock(blockNum, buf8, NULL, 0, flags)) {
 				PrintAndLog("Can't set magic card block: %d", blockNum);
 				fclose(f);
@@ -2066,7 +2066,7 @@ int CmdHF14AMfCGetSc(const char *Cmd) {
 
 		if (gen == 2)
 			/* generation 1b magic card */
-			flags += CSETBLOCK_MAGIC_1B;
+			flags |= CSETBLOCK_MAGIC_1B;
 		res = mfCGetBlock(sectorNo * 4 + i, memBlock, flags);
 		if (res) {
 			PrintAndLog("Can't read block. %d error=%d", sectorNo * 4 + i, res);
@@ -2115,7 +2115,7 @@ int CmdHF14AMfCSave(const char *Cmd) {
 
 			if (gen == 2)
 				/* generation 1b magic card */
-				flags += CSETBLOCK_MAGIC_1B;
+				flags |= CSETBLOCK_MAGIC_1B;
 
 			if (mfCGetBlock(i, buf, flags)) {
 				PrintAndLog("Cant get block: %d", i);
@@ -2138,7 +2138,7 @@ int CmdHF14AMfCSave(const char *Cmd) {
 			flags = CSETBLOCK_SINGLE_OPER;
 			if (gen == 2)
 				/* generation 1b magic card */
-				flags += CSETBLOCK_MAGIC_1B;
+				flags |= CSETBLOCK_MAGIC_1B;
 			if (mfCGetBlock(0, buf, flags)) {
 				PrintAndLog("Cant get block: %d", 0);
 				len = sprintf(fnameptr, "dump");
@@ -2171,7 +2171,7 @@ int CmdHF14AMfCSave(const char *Cmd) {
 
 			if (gen == 2)
 				/* generation 1b magic card */
-				flags += CSETBLOCK_MAGIC_1B;
+				flags |= CSETBLOCK_MAGIC_1B;
 			if (mfCGetBlock(i, buf, flags)) {
 				PrintAndLog("Cant get block: %d", i);
 				break;
