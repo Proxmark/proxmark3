@@ -1179,6 +1179,7 @@ void MifareCSetBlock(uint32_t arg0, uint32_t arg1, uint32_t arg2, uint8_t *datai
 	// bit 2 - need HALT after sequence
 	// bit 3 - need init FPGA and field before sequence
 	// bit 4 - need reset FPGA and LED
+	// bit 6 - gen1b backdoor type
 	uint8_t workFlags = arg1;
 	uint8_t blockNo = arg2;
 
@@ -1211,15 +1212,18 @@ void MifareCSetBlock(uint32_t arg0, uint32_t arg1, uint32_t arg2, uint8_t *datai
 
 		// get UID from chip
 		if (workFlags & 0x01) {
-			if(!iso14443a_select_card(uid, NULL, &cuid, true, 0)) {
-				if (MF_DBGLEVEL >= 1)	Dbprintf("Can't select card");
-				break;
-			};
+			// do no get UID for gen1b magic tag
+			if (!(workFlags & 0x40)) {
+				if(!iso14443a_select_card(uid, NULL, &cuid, true, 0)) {
+					if (MF_DBGLEVEL >= 1)	Dbprintf("Can't select card");
+					break;
+				};
 
-			if(mifare_classic_halt(NULL, cuid)) {
-				if (MF_DBGLEVEL >= 1)	Dbprintf("Halt error");
-				// Continue, some magic tags misbehavies and send an answer to it.
-                        	// break;
+				if(mifare_classic_halt(NULL, cuid)) {
+					if (MF_DBGLEVEL >= 1)	Dbprintf("Halt error");
+					// Continue, some magic tags misbehavies and send an answer to it.
+          // break;
+				};
 			};
 		};
 
@@ -1252,11 +1256,14 @@ void MifareCSetBlock(uint32_t arg0, uint32_t arg1, uint32_t arg2, uint8_t *datai
 				break;
 			};
 
-			ReaderTransmit(wupC2, sizeof(wupC2), NULL);
-			if(!ReaderReceive(receivedAnswer, receivedAnswerPar) || (receivedAnswer[0] != 0x0a)) {
-				if (MF_DBGLEVEL >= 1)	Dbprintf("wupC2 error");
-				break;
-			};
+			// do no issue for gen1b magic tag
+			if (!(workFlags & 0x40)) {
+				ReaderTransmit(wupC2, sizeof(wupC2), NULL);
+				if(!ReaderReceive(receivedAnswer, receivedAnswerPar) || (receivedAnswer[0] != 0x0a)) {
+					if (MF_DBGLEVEL >= 1)	Dbprintf("wupC2 error");
+					break;
+				};
+			}
 		}
 
 		if ((mifare_sendcmd_short(NULL, 0, 0xA0, blockNo, receivedAnswer, receivedAnswerPar, NULL) != 1) || (receivedAnswer[0] != 0x0a)) {
@@ -1304,6 +1311,7 @@ void MifareCGetBlock(uint32_t arg0, uint32_t arg1, uint32_t arg2, uint8_t *datai
 	// bit 3 - need init FPGA and field before sequence
 	// bit 4 - need reset FPGA and LED
 	// bit 5 - need to set datain instead of issuing USB reply (called via ARM for StandAloneMode14a)
+	// bit 6 - gen1b backdoor type
 	uint8_t workFlags = arg0;
 	uint8_t blockNo = arg2;
 
@@ -1335,14 +1343,16 @@ void MifareCGetBlock(uint32_t arg0, uint32_t arg1, uint32_t arg2, uint8_t *datai
 			if(!ReaderReceive(receivedAnswer, receivedAnswerPar) || (receivedAnswer[0] != 0x0a)) {
 				if (MF_DBGLEVEL >= 1)	Dbprintf("wupC1 error");
 				break;
-			};
-
-		ReaderTransmit(wupC2, sizeof(wupC2), NULL);
-		if(!ReaderReceive(receivedAnswer, receivedAnswerPar) || (receivedAnswer[0] != 0x0a)) {
+		};
+		// do no issue for gen1b magic tag
+		if (!(workFlags & 0x40)) {
+			ReaderTransmit(wupC2, sizeof(wupC2), NULL);
+			if(!ReaderReceive(receivedAnswer, receivedAnswerPar) || (receivedAnswer[0] != 0x0a)) {
 				if (MF_DBGLEVEL >= 1)	Dbprintf("wupC2 error");
 				break;
 			};
 		}
+	}
 
 		// read block
 		if ((mifare_sendcmd_short(NULL, 0, 0x30, blockNo, receivedAnswer, receivedAnswerPar, NULL) != 18)) {
