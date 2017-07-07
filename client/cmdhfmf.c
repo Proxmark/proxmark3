@@ -2096,32 +2096,38 @@ int CmdHF14AMfCSave(const char *Cmd) {
 	char * fnameptr = filename;
 	uint8_t fillFromEmulator = 0;
 	uint8_t buf[64] = {0x00};
-	int i, j, len, flags, gen = 0;
+	int i, j, len, flags, gen = 0, numblock = 64;
 
 	// memset(filename, 0, sizeof(filename));
 	// memset(buf, 0, sizeof(buf));
 
 	if (param_getchar(Cmd, 0) == 'h') {
 		PrintAndLog("It saves `magic Chinese` card dump into the file `filename.eml` or `cardID.eml`");
-		PrintAndLog("or into emulator memory (option `e`)");
-		PrintAndLog("Usage:  hf mf esave [file name w/o `.eml`][e]");
+		PrintAndLog("or into emulator memory (option `e`). 4K card: (option `4`)");
+		PrintAndLog("Usage:  hf mf esave [file name w/o `.eml`][e][4]");
 		PrintAndLog(" sample: hf mf esave ");
 		PrintAndLog("         hf mf esave filename");
-		PrintAndLog("         hf mf esave e \n");
+		PrintAndLog("         hf mf esave e");
+		PrintAndLog("         hf mf esave 4");
+		PrintAndLog("         hf mf esave filename 4");
+		PrintAndLog("         hf mf esave e 4\n");
 		return 0;
 	}
 
 	char ctmp = param_getchar(Cmd, 0);
 	if (ctmp == 'e' || ctmp == 'E') fillFromEmulator = 1;
+	if (ctmp == '4') numblock = 256;
+	ctmp = param_getchar(Cmd, 1);
+	if (ctmp == '4') numblock = 256;
 
 	gen = mfCIdentify();
-
+	PrintAndLog("Saving magic mifare %dK", numblock == 256 ? 4:1);
 	if (fillFromEmulator) {
 		// put into emulator
 		flags = CSETBLOCK_INIT_FIELD + CSETBLOCK_WUPC;
-		for (i = 0; i < 16 * 4; i++) {
+		for (i = 0; i < numblock; i++) {
 			if (i == 1) flags = 0;
-			if (i == 16 * 4 - 1) flags = CSETBLOCK_HALT + CSETBLOCK_RESET_FIELD;
+			if (i == numblock - 1) flags = CSETBLOCK_HALT + CSETBLOCK_RESET_FIELD;
 
 			if (gen == 2)
 				/* generation 1b magic card */
@@ -2139,10 +2145,13 @@ int CmdHF14AMfCSave(const char *Cmd) {
 		}
 		return 0;
 	} else {
-		len = strlen(Cmd);
+		param_getstr(Cmd, 0, filename);
+
+		len = strlen(filename);
 		if (len > FILE_PATH_SIZE - 5) len = FILE_PATH_SIZE - 5;
 
-		if (len < 1) {
+		ctmp = param_getchar(Cmd, 0);
+		if (len < 1 || (ctmp == '4')) {
 			// get filename
 
 			flags = CSETBLOCK_SINGLE_OPER;
@@ -2159,7 +2168,7 @@ int CmdHF14AMfCSave(const char *Cmd) {
 					sprintf(fnameptr, "%02x", buf[j]);
 			}
 		} else {
-			memcpy(filename, Cmd, len);
+			//memcpy(filename, Cmd, len);
 			fnameptr += len;
 		}
 
@@ -2175,9 +2184,9 @@ int CmdHF14AMfCSave(const char *Cmd) {
 
 		// put hex
 		flags = CSETBLOCK_INIT_FIELD + CSETBLOCK_WUPC;
-		for (i = 0; i < 16 * 4; i++) {
+		for (i = 0; i < numblock; i++) {
 			if (i == 1) flags = 0;
-			if (i == 16 * 4 - 1) flags = CSETBLOCK_HALT + CSETBLOCK_RESET_FIELD;
+			if (i == numblock - 1) flags = CSETBLOCK_HALT + CSETBLOCK_RESET_FIELD;
 
 			if (gen == 2)
 				/* generation 1b magic card */
