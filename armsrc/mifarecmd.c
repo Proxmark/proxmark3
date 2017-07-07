@@ -1212,11 +1212,9 @@ void MifareCSetBlock(uint32_t arg0, uint32_t arg1, uint32_t arg2, uint8_t *datai
 
 		// get UID from chip
 		if (workFlags & 0x01) {
-			// do no get UID for gen1b magic tag
-			if (!(workFlags & 0x40)) {
-				if(!iso14443a_select_card(uid, NULL, &cuid, true, 0)) {
-					if (MF_DBGLEVEL >= 1)	Dbprintf("Can't select card");
-					break;
+			if(!iso14443a_select_card(uid, NULL, &cuid, true, 0)) {
+				if (MF_DBGLEVEL >= 1)	Dbprintf("Can't select card");
+				break;
 				};
 
 				if(mifare_classic_halt(NULL, cuid)) {
@@ -1224,11 +1222,11 @@ void MifareCSetBlock(uint32_t arg0, uint32_t arg1, uint32_t arg2, uint8_t *datai
 					// Continue, some magic tags misbehavies and send an answer to it.
           // break;
 				};
-			};
 		};
 
 		// reset chip
-		if (needWipe){
+		// Wipe command don't work with gen1b
+		if (needWipe && !(workFlags & 0x40)){
 			ReaderTransmitBitsPar(wupC1,7,0, NULL);
 			if(!ReaderReceive(receivedAnswer, receivedAnswerPar) || (receivedAnswer[0] != 0x0a)) {
 				if (MF_DBGLEVEL >= 1)	Dbprintf("wupC1 error");
@@ -1251,13 +1249,15 @@ void MifareCSetBlock(uint32_t arg0, uint32_t arg1, uint32_t arg2, uint8_t *datai
 		// write block
 		if (workFlags & 0x02) {
 			ReaderTransmitBitsPar(wupC1,7,0, NULL);
-			if(!ReaderReceive(receivedAnswer, receivedAnswerPar) || (receivedAnswer[0] != 0x0a)) {
-				if (MF_DBGLEVEL >= 1)	Dbprintf("wupC1 error");
-				break;
-			};
 
-			// do no issue for gen1b magic tag
+			// gen1b magic tag : do no issue wupC2 and don't expect 0x0a response after SELECT_UID (after getting UID from chip in 'hf mf csetuid' command)
 			if (!(workFlags & 0x40)) {
+
+				if(!ReaderReceive(receivedAnswer, receivedAnswerPar) || (receivedAnswer[0] != 0x0a)) {
+					if (MF_DBGLEVEL >= 1)	Dbprintf("wupC1 error");
+					break;
+				};
+
 				ReaderTransmit(wupC2, sizeof(wupC2), NULL);
 				if(!ReaderReceive(receivedAnswer, receivedAnswerPar) || (receivedAnswer[0] != 0x0a)) {
 					if (MF_DBGLEVEL >= 1)	Dbprintf("wupC2 error");
