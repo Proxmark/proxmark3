@@ -2040,7 +2040,7 @@ int CmdHF14AMfCGetBlk(const char *Cmd) {
 int CmdHF14AMfCGetSc(const char *Cmd) {
 	uint8_t memBlock[16] = {0x00};
 	uint8_t sectorNo = 0;
-	int i, res, flags, gen = 0;
+	int i, res, flags, gen = 0, baseblock = 0, sect_size = 4;
 
 	if (strlen(Cmd) < 1 || param_getchar(Cmd, 0) == 'h') {
 		PrintAndLog("Usage:  hf mf cgetsc <sector number>");
@@ -2050,8 +2050,9 @@ int CmdHF14AMfCGetSc(const char *Cmd) {
 	}
 
 	sectorNo = param_get8(Cmd, 0);
-	if (sectorNo > 15) {
-		PrintAndLog("Sector number must be in [0..15] as in MIFARE classic.");
+
+	if (sectorNo > 39) {
+		PrintAndLog("Sector number must be in [0..15] in MIFARE classic 1k and [0..39] in MIFARE classic 4k.");
 		return 1;
 	}
 
@@ -2060,20 +2061,29 @@ int CmdHF14AMfCGetSc(const char *Cmd) {
 	gen = mfCIdentify();
 
 	flags = CSETBLOCK_INIT_FIELD + CSETBLOCK_WUPC;
-	for (i = 0; i < 4; i++) {
+	if (sectorNo < 32 ) {
+		baseblock = sectorNo * 4;
+	} else {
+		baseblock = 128 + 16 * (sectorNo - 32);
+
+	}
+	if (sectorNo > 31) sect_size = 16;
+
+	for (i = 0; i < sect_size; i++) {
 		if (i == 1) flags = 0;
-		if (i == 3) flags = CSETBLOCK_HALT + CSETBLOCK_RESET_FIELD;
+		if (i == sect_size - 1) flags = CSETBLOCK_HALT + CSETBLOCK_RESET_FIELD;
 
 		if (gen == 2)
 			/* generation 1b magic card */
 			flags |= CSETBLOCK_MAGIC_1B;
-		res = mfCGetBlock(sectorNo * 4 + i, memBlock, flags);
+
+		res = mfCGetBlock(baseblock + i, memBlock, flags);
 		if (res) {
-			PrintAndLog("Can't read block. %d error=%d", sectorNo * 4 + i, res);
+			PrintAndLog("Can't read block. %d error=%d", baseblock + i, res);
 			return 1;
 		}
 
-		PrintAndLog("block %3d data:%s", sectorNo * 4 + i, sprint_hex(memBlock, 16));
+		PrintAndLog("block %3d data:%s", baseblock + i, sprint_hex(memBlock, 16));
 	}
 	return 0;
 }
