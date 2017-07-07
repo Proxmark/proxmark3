@@ -1218,7 +1218,7 @@ void MifareCSetBlock(uint32_t arg0, uint32_t arg1, uint32_t arg2, uint8_t *datai
 				};
 
 				if(mifare_classic_halt(NULL, cuid)) {
-					if (MF_DBGLEVEL >= 1)	Dbprintf("Halt error");
+					if (MF_DBGLEVEL > 2)	Dbprintf("Halt error");
 					// Continue, some magic tags misbehavies and send an answer to it.
           // break;
 				};
@@ -1240,7 +1240,7 @@ void MifareCSetBlock(uint32_t arg0, uint32_t arg1, uint32_t arg2, uint8_t *datai
 			};
 
 			if(mifare_classic_halt(NULL, cuid)) {
-				if (MF_DBGLEVEL >= 1)	Dbprintf("Halt error");
+				if (MF_DBGLEVEL > 2)	Dbprintf("Halt error");
 				// Continue, some magic tags misbehavies and send an answer to it.
                         	// break;
 			};
@@ -1282,7 +1282,7 @@ void MifareCSetBlock(uint32_t arg0, uint32_t arg1, uint32_t arg2, uint8_t *datai
 
 		if (workFlags & 0x04) {
 			if (mifare_classic_halt(NULL, cuid)) {
-				if (MF_DBGLEVEL >= 1)	Dbprintf("Halt error");
+				if (MF_DBGLEVEL > 2)	Dbprintf("Halt error");
 				// Continue, some magic tags misbehavies and send an answer to it.
                         	// break;
 			};
@@ -1363,7 +1363,7 @@ void MifareCGetBlock(uint32_t arg0, uint32_t arg1, uint32_t arg2, uint8_t *datai
 
 		if (workFlags & 0x04) {
 			if (mifare_classic_halt(NULL, cuid)) {
-				if (MF_DBGLEVEL >= 1)	Dbprintf("Halt error");
+				if (MF_DBGLEVEL > 2)	Dbprintf("Halt error");
 			// Continue, some magic tags misbehavies and send an answer to it.
 			//		break;
 			};

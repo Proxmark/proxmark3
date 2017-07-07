@@ -1899,34 +1899,40 @@ int CmdHF14AMfCLoad(const char *Cmd)
 	FILE * f;
 	char filename[FILE_PATH_SIZE] = {0x00};
 	char * fnameptr = filename;
-	char buf[64] = {0x00};
-	uint8_t buf8[64] = {0x00};
+	char buf[256] = {0x00};
+	uint8_t buf8[256] = {0x00};
 	uint8_t fillFromEmulator = 0;
-	int i, len, blockNum, flags = 0, gen = 0;
+	int i, len, blockNum, flags = 0, gen = 0, numblock = 64;
 
 	if (param_getchar(Cmd, 0) == 'h' || param_getchar(Cmd, 0)== 0x00) {
 		PrintAndLog("It loads magic Chinese card from the file `filename.eml`");
-		PrintAndLog("or from emulator memory (option `e`)");
-		PrintAndLog("Usage:  hf mf cload <file name w/o `.eml`>");
-		PrintAndLog("   or:  hf mf cload e ");
-		PrintAndLog(" sample: hf mf cload filename");
+		PrintAndLog("or from emulator memory (option `e`). 4K card: (option `4`)");
+		PrintAndLog("Usage:  hf mf cload [file name w/o `.eml`][e][4]");
+		PrintAndLog("   or:  hf mf cload e [4]");
+		PrintAndLog("Sample: hf mf cload filename");
+		PrintAndLog("        hf mf cload filname 4");
+		PrintAndLog("        hf mf cload e");
+		PrintAndLog("        hf mf cload e 4");
 		return 0;
 	}
 
 	char ctmp = param_getchar(Cmd, 0);
 	if (ctmp == 'e' || ctmp == 'E') fillFromEmulator = 1;
+	ctmp = param_getchar(Cmd, 1);
+	if (ctmp == '4') numblock = 256;
 
 	gen = mfCIdentify();
+	PrintAndLog("Loading magic mifare %dK", numblock == 256 ? 4:1);
 
 	if (fillFromEmulator) {
-		for (blockNum = 0; blockNum < 16 * 4; blockNum += 1) {
+		for (blockNum = 0; blockNum < numblock; blockNum += 1) {
 			if (mfEmlGetMem(buf8, blockNum, 1)) {
 				PrintAndLog("Cant get block: %d", blockNum);
 				return 2;
 			}
 			if (blockNum == 0) flags = CSETBLOCK_INIT_FIELD + CSETBLOCK_WUPC;				// switch on field and send magic sequence
 			if (blockNum == 1) flags = 0;													// just write
-			if (blockNum == 16 * 4 - 1) flags = CSETBLOCK_HALT + CSETBLOCK_RESET_FIELD;		// Done. Magic Halt and switch off field.
+			if (blockNum == numblock - 1) flags = CSETBLOCK_HALT + CSETBLOCK_RESET_FIELD;		// Done. Magic Halt and switch off field.
 
 			if (gen == 2)
 				/* generation 1b magic card */
@@ -1938,10 +1944,12 @@ int CmdHF14AMfCLoad(const char *Cmd)
 		}
 		return 0;
 	} else {
-		len = strlen(Cmd);
+		param_getstr(Cmd, 0, filename);
+
+		len = strlen(filename);
 		if (len > FILE_PATH_SIZE - 5) len = FILE_PATH_SIZE - 5;
 
-		memcpy(filename, Cmd, len);
+		//memcpy(filename, Cmd, len);
 		fnameptr += len;
 
 		sprintf(fnameptr, ".eml");
@@ -1976,7 +1984,7 @@ int CmdHF14AMfCLoad(const char *Cmd)
 
 			if (blockNum == 0) flags = CSETBLOCK_INIT_FIELD + CSETBLOCK_WUPC;				// switch on field and send magic sequence
 			if (blockNum == 1) flags = 0;													// just write
-			if (blockNum == 16 * 4 - 1) flags = CSETBLOCK_HALT + CSETBLOCK_RESET_FIELD;		// Done. Switch off field.
+			if (blockNum == numblock - 1) flags = CSETBLOCK_HALT + CSETBLOCK_RESET_FIELD;		// Done. Switch off field.
 
 			if (gen == 2)
 				/* generation 1b magic card */
@@ -1988,12 +1996,13 @@ int CmdHF14AMfCLoad(const char *Cmd)
 			}
 			blockNum++;
 
-			if (blockNum >= 16 * 4) break;  // magic card type - mifare 1K
+			if (blockNum >= numblock) break;  // magic card type - mifare 1K 64 blocks, mifare 4k 256 blocks
 		}
 		fclose(f);
 
-		if (blockNum != 16 * 4 && blockNum != 32 * 4 + 8 * 16){
-			PrintAndLog("File content error. There must be 64 blocks");
+		//if (blockNum != 16 * 4 && blockNum != 32 * 4 + 8 * 16){
+		if (blockNum != numblock){
+			PrintAndLog("File content error. There must be %d blocks", numblock);
 			return 4;
 		}
 		PrintAndLog("Loaded from file: %s", filename);
@@ -2095,7 +2104,7 @@ int CmdHF14AMfCSave(const char *Cmd) {
 	char filename[FILE_PATH_SIZE] = {0x00};
 	char * fnameptr = filename;
 	uint8_t fillFromEmulator = 0;
-	uint8_t buf[64] = {0x00};
+	uint8_t buf[256] = {0x00};
 	int i, j, len, flags, gen = 0, numblock = 64;
 
 	// memset(filename, 0, sizeof(filename));
@@ -2105,12 +2114,12 @@ int CmdHF14AMfCSave(const char *Cmd) {
 		PrintAndLog("It saves `magic Chinese` card dump into the file `filename.eml` or `cardID.eml`");
 		PrintAndLog("or into emulator memory (option `e`). 4K card: (option `4`)");
 		PrintAndLog("Usage:  hf mf esave [file name w/o `.eml`][e][4]");
-		PrintAndLog(" sample: hf mf esave ");
-		PrintAndLog("         hf mf esave filename");
-		PrintAndLog("         hf mf esave e");
-		PrintAndLog("         hf mf esave 4");
-		PrintAndLog("         hf mf esave filename 4");
-		PrintAndLog("         hf mf esave e 4\n");
+		PrintAndLog("Sample: hf mf esave ");
+		PrintAndLog("        hf mf esave filename");
+		PrintAndLog("        hf mf esave e");
+		PrintAndLog("        hf mf esave 4");
+		PrintAndLog("        hf mf esave filename 4");
+		PrintAndLog("        hf mf esave e 4");
 		return 0;
 	}
 
@@ -2122,6 +2131,7 @@ int CmdHF14AMfCSave(const char *Cmd) {
 
 	gen = mfCIdentify();
 	PrintAndLog("Saving magic mifare %dK", numblock == 256 ? 4:1);
+
 	if (fillFromEmulator) {
 		// put into emulator
 		flags = CSETBLOCK_INIT_FIELD + CSETBLOCK_WUPC;
