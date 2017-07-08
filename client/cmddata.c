@@ -25,6 +25,8 @@
 #include "loclass/cipherutils.h" // for decimating samples in getsamples
 #include "cmdlfem4x.h"// for em410x demod
 
+uint8_t g_debugMode=0;
+
 static int CmdHelp(pm3_connection* conn, const char *Cmd);
 
 //set the demod buffer with given array of binary (one bit per byte)

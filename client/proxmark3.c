@@ -56,6 +56,11 @@ void main_loop(char *script_cmds_file, bool usb_present, serial_port* port, bool
 		conn.offline = true;
 	}
 
+#ifdef HAVE_GUI
+	// Setup GUI with reference to our connection struct.
+	MainGraphics(&conn);
+#endif
+
 	FILE *script_file = NULL;
 	char script_cmd_buf[256];  // iceman, needs lua script the same file_path_buffer as the rest
 
@@ -234,14 +239,12 @@ int main(int argc, char* argv[]) {
 #ifdef HAVE_GUI
 #ifdef _WIN32
 	InitGraphics(argc, argv, script_cmds_file, usb_present, sp, flush_after_write);
-	MainGraphics();
 #else
 	char* display = getenv("DISPLAY");
 
 	if (display && strlen(display) > 1)
 	{
 		InitGraphics(argc, argv, script_cmds_file, usb_present, sp, flush_after_write);
-		MainGraphics();
 	}
 	else
 	{
@@ -249,7 +252,7 @@ int main(int argc, char* argv[]) {
 	}
 #endif
 #else
-	main_loop(script_cmds_file, usb_present, sp);
+	main_loop(script_cmds_file, usb_present, sp, flush_after_write);
 #endif	
 
 	// Clean up the port

@@ -21,9 +21,9 @@ pthread_mutex_t print_lock;
 extern uint8_t g_debugMode;
 
 void ShowGui(void);
-void HideGraphWindow(pm3_connection* conn);
-void ShowGraphWindow(pm3_connection* conn);
-void RepaintGraphWindow(pm3_connection* conn);
+void HideGraphWindow();
+void ShowGraphWindow();
+void RepaintGraphWindow();
 void PrintAndLog(char *fmt, ...);
 void SetLogFilename(char *fn);
 void SetFlushAfterWrite(bool flush_after_write);

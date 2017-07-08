@@ -17,10 +17,10 @@ extern "C" {
 #include "uart.h"
 #include "comms.h"
 
-void ShowGraphWindow(pm3_connection* conn);
-void HideGraphWindow(pm3_connection* conn);
-void RepaintGraphWindow(pm3_connection* conn);
-void MainGraphics(void);
+void ShowGraphWindow(void);
+void HideGraphWindow(void);
+void RepaintGraphWindow(void);
+void MainGraphics(pm3_connection* conn);
 void InitGraphics(int argc, char **argv, char *script_cmds_file, bool usb_present, serial_port* port, bool flush_after_write);
 void ExitGraphics(void);
 

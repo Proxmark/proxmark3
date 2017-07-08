@@ -26,6 +26,8 @@
 #include <string.h>
 #include "proxgui.h"
 #include <QtGui>
+#include "graph.h"
+#include "ui.h"
 //#include <ctime>
 
 bool g_useOverlays = false;
@@ -85,7 +87,7 @@ void ProxGuiQT::_Exit(void) {
 	delete this;
 }
 
-void ProxGuiQT::MainLoop()
+void ProxGuiQT::MainLoop(pm3_connection *conn)
 {
 	plotapp = new QApplication(argc, argv);
 
@@ -94,6 +96,7 @@ void ProxGuiQT::MainLoop()
 	connect(this, SIGNAL(HideGraphWindowSignal()), this, SLOT(_HideGraphWindow()));
 	connect(this, SIGNAL(ExitSignal()), this, SLOT(_Exit()));
 
+	this->conn = conn;
 	plotapp->exec();
 }
 
@@ -120,19 +123,19 @@ ProxGuiQT::~ProxGuiQT(void)
 void ProxWidget::applyOperation()
 {
 	//printf("ApplyOperation()");
-	save_restoreGB(GRAPH_SAVE);
-	memcpy(GraphBuffer, s_Buff, sizeof(int) * GraphTraceLen);
+	save_restoreGB(master->conn, GRAPH_SAVE);
+	memcpy(master->conn->GraphBuffer, master->conn->s_Buff, sizeof(int) * master->conn->GraphTraceLen);
 	RepaintGraphWindow();
 }
 void ProxWidget::stickOperation()
 {
-	save_restoreGB(GRAPH_RESTORE);
+	save_restoreGB(master->conn, GRAPH_RESTORE);
 	//printf("stickOperation()");
 }
 void ProxWidget::vchange_autocorr(int v)
 {
 	int ans;
-	ans = AutoCorrelate(GraphBuffer, s_Buff, GraphTraceLen, v, true, false);
+	ans = AutoCorrelate(master->conn->GraphBuffer, master->conn->s_Buff, master->conn->GraphTraceLen, v, true, false);
 	if (g_debugMode) printf("vchange_autocorr(w:%d): %d\n", v, ans);
 	g_useOverlays = true;
 	RepaintGraphWindow();
@@ -141,7 +144,7 @@ void ProxWidget::vchange_askedge(int v)
 {
 	int ans;
 	//extern int AskEdgeDetect(const int *in, int *out, int len, int threshold);
-	ans = AskEdgeDetect(GraphBuffer, s_Buff, GraphTraceLen, v);
+	ans = AskEdgeDetect(master->conn->GraphBuffer, master->conn->s_Buff, master->conn->GraphTraceLen, v);
 	if (g_debugMode) printf("vchange_askedge(w:%d)%d\n", v, ans);
 	g_useOverlays = true;
 	RepaintGraphWindow();
@@ -149,7 +152,7 @@ void ProxWidget::vchange_askedge(int v)
 void ProxWidget::vchange_dthr_up(int v)
 {
 	int down = opsController->horizontalSlider_dirthr_down->value();
-	directionalThreshold(GraphBuffer, s_Buff, GraphTraceLen, v, down);
+	directionalThreshold(master->conn->GraphBuffer, master->conn->s_Buff, master->conn->GraphTraceLen, v, down);
 	//printf("vchange_dthr_up(%d)", v);
 	g_useOverlays = true;
 	RepaintGraphWindow();
@@ -158,7 +161,7 @@ void ProxWidget::vchange_dthr_down(int v)
 {
 	//printf("vchange_dthr_down(%d)", v);
 	int up = opsController->horizontalSlider_dirthr_up->value();
-	directionalThreshold(GraphBuffer,s_Buff, GraphTraceLen, v, up);
+	directionalThreshold(master->conn->GraphBuffer,master->conn->s_Buff, master->conn->GraphTraceLen, v, up);
 	g_useOverlays = true;
 	RepaintGraphWindow();
 }
@@ -194,7 +197,7 @@ ProxWidget::ProxWidget(QWidget *parent, ProxGuiQT *master) : QWidget(parent)
 
 	// Set up the plot widget, which does the actual plotting
 
-	plot = new Plot(this);
+	plot = new Plot(this, master);
 	/*
 	QSlider* slider = new QSlider(Qt::Horizontal);
 	slider->setFocusPolicy(Qt::StrongFocus);
@@ -306,20 +309,20 @@ void Plot::setMaxAndStart(int *buffer, int len, QRect plotRect)
 
 void Plot::PlotDemod(uint8_t *buffer, size_t len, QRect plotRect, QRect annotationRect, QPainter *painter, int graphNum, int plotOffset)
 {
-	if (len == 0 || PlotGridX <= 0) return;
+	if (len == 0 || master->conn->PlotGridX <= 0) return;
 	//clock_t begin = clock();
 	QPainterPath penPath;
 
-	int grid_delta_x = PlotGridX;
-	int first_delta_x = grid_delta_x; //(plotOffset > 0) ? PlotGridX : (PlotGridX +);
+	int grid_delta_x = master->conn->PlotGridX;
+	int first_delta_x = grid_delta_x; //(plotOffset > 0) ? master->conn->PlotGridX : (master->conn->PlotGridX +);
 	if (GraphStart > plotOffset) first_delta_x -= (GraphStart-plotOffset);
 	int DemodStart = GraphStart;
 	if (plotOffset > GraphStart) DemodStart = plotOffset;
 
 	int BitStart = 0;
 	// round down
-	if (DemodStart-plotOffset > 0) BitStart = (int)(((DemodStart-plotOffset)+(PlotGridX-1))/PlotGridX)-1;
-	first_delta_x += BitStart * PlotGridX;
+	if (DemodStart-plotOffset > 0) BitStart = (int)(((DemodStart-plotOffset)+(master->conn->PlotGridX-1))/master->conn->PlotGridX)-1;
+	first_delta_x += BitStart * master->conn->PlotGridX;
 	if (BitStart > (int)len) return;
 	int delta_x = 0;
 	int v = 0;
@@ -435,26 +438,26 @@ void Plot::PlotGraph(int *buffer, int len, QRect plotRect, QRect annotationRect,
 
 void Plot::plotGridLines(QPainter* painter,QRect r)
 {
-	// set GridOffset
-	if (PlotGridX <= 0) return;
-	int offset = GridOffset;
-	if (GridLocked && PlotGridX) {
-		offset = GridOffset + PlotGridX - (GraphStart % PlotGridX);
-	} else if (!GridLocked && GraphStart > 0 && PlotGridX) {
-		offset = PlotGridX-((GraphStart - offset) % PlotGridX) + GraphStart - unlockStart;
+	// set master->conn->GridOffset
+	if (master->conn->PlotGridX <= 0) return;
+	int offset = master->conn->GridOffset;
+	if (master->conn->GridLocked && master->conn->PlotGridX) {
+		offset = master->conn->GridOffset + master->conn->PlotGridX - (GraphStart % master->conn->PlotGridX);
+	} else if (!master->conn->GridLocked && GraphStart > 0 && master->conn->PlotGridX) {
+		offset = master->conn->PlotGridX-((GraphStart - offset) % master->conn->PlotGridX) + GraphStart - unlockStart;
 	}
-	offset %= PlotGridX;
-	if (offset < 0) offset += PlotGridX;
+	offset %= master->conn->PlotGridX;
+	if (offset < 0) offset += master->conn->PlotGridX;
 
 	int i;
-	int grid_delta_x = (int) (PlotGridX * GraphPixelsPerPoint);
-	int grid_delta_y = PlotGridY;
-	if ((PlotGridX > 0) && ((PlotGridX * GraphPixelsPerPoint) > 1)) {
+	int grid_delta_x = (int) (master->conn->PlotGridX * GraphPixelsPerPoint);
+	int grid_delta_y = master->conn->PlotGridY;
+	if ((master->conn->PlotGridX > 0) && ((master->conn->PlotGridX * GraphPixelsPerPoint) > 1)) {
 		for(i = (offset * GraphPixelsPerPoint); i < r.right(); i += grid_delta_x) {
 			painter->drawLine(r.left()+i, r.top(), r.left()+i, r.bottom());
 		} 
 	}
-	if (PlotGridY > 0) {
+	if (master->conn->PlotGridY > 0) {
 		for(i = 0; yCoordOf(i,r,g_absVMax) > r.top(); i += grid_delta_y) {
 			painter->drawLine( r.left(), yCoordOf(i,r,g_absVMax), r.right(), yCoordOf(i,r,g_absVMax) );
 			painter->drawLine( r.left(), yCoordOf(i*-1,r,g_absVMax), r.right(), yCoordOf(i*-1,r,g_absVMax) );
@@ -478,14 +481,14 @@ void Plot::paintEvent(QPaintEvent *event)
 		GraphStart = 0;
 	}
 
-	if (CursorAPos > GraphTraceLen)
+	if (CursorAPos > master->conn->GraphTraceLen)
 		CursorAPos= 0;
-	if(CursorBPos > GraphTraceLen)
+	if(CursorBPos > master->conn->GraphTraceLen)
 		CursorBPos= 0;
-	if(CursorCPos > GraphTraceLen)
-		CursorCPos= 0;
-	if(CursorDPos > GraphTraceLen)
-		CursorDPos= 0;
+	if(master->conn->CursorCPos > master->conn->GraphTraceLen)
+		master->conn->CursorCPos= 0;
+	if(master->conn->CursorDPos > master->conn->GraphTraceLen)
+		master->conn->CursorDPos= 0;
 
 	QRect plotRect(WIDTH_AXES, 0, width()-WIDTH_AXES, height()-HEIGHT_INFO);
 	QRect infoRect(0, height()-HEIGHT_INFO, width(), HEIGHT_INFO);
@@ -496,7 +499,7 @@ void Plot::paintEvent(QPaintEvent *event)
 	painter.fillRect(plotRect, QColor(0, 0, 0));
 
 	//init graph variables
-	setMaxAndStart(GraphBuffer,GraphTraceLen,plotRect);
+	setMaxAndStart(master->conn->GraphBuffer,master->conn->GraphTraceLen,plotRect);
 
 	// center line
 	int zeroHeight = plotRect.top() + (plotRect.bottom() - plotRect.top()) / 2;
@@ -506,14 +509,14 @@ void Plot::paintEvent(QPaintEvent *event)
 	plotGridLines(&painter, plotRect);
 
 	//Start painting graph
-	PlotGraph(GraphBuffer, GraphTraceLen,plotRect,infoRect,&painter,0);
-	if (showDemod && DemodBufferLen	> 8) {
-		PlotDemod(DemodBuffer, DemodBufferLen,plotRect,infoRect,&painter,2,g_DemodStartIdx);
+	PlotGraph(master->conn->GraphBuffer, master->conn->GraphTraceLen,plotRect,infoRect,&painter,0);
+	if (master->conn->showDemod && master->conn->DemodBufferLen	> 8) {
+		PlotDemod(master->conn->DemodBuffer, master->conn->DemodBufferLen,plotRect,infoRect,&painter,2,master->conn->g_DemodStartIdx);
 	}
 	if (g_useOverlays) {
 		//init graph variables
-		setMaxAndStart(s_Buff,GraphTraceLen,plotRect);
-		PlotGraph(s_Buff, GraphTraceLen,plotRect,infoRect,&painter,1);
+		setMaxAndStart(master->conn->s_Buff,master->conn->GraphTraceLen,plotRect);
+		PlotGraph(master->conn->s_Buff, master->conn->GraphTraceLen,plotRect,infoRect,&painter,1);
 	}
 	// End graph drawing
 
@@ -528,29 +531,31 @@ void Plot::paintEvent(QPaintEvent *event)
 		painter.setPen(QColor(255, 0, 255));
 		painter.drawLine(xCoordOf(CursorBPos, plotRect),plotRect.top(),xCoordOf(CursorBPos, plotRect),plotRect.bottom());
 	}
-	if(CursorCPos > GraphStart && xCoordOf(CursorCPos, plotRect) < plotRect.right())
+	if(master->conn->CursorCPos > GraphStart && xCoordOf(master->conn->CursorCPos, plotRect) < plotRect.right())
 	{
 		painter.setPen(QColor(255, 153, 0)); //orange
-		painter.drawLine(xCoordOf(CursorCPos, plotRect),plotRect.top(),xCoordOf(CursorCPos, plotRect),plotRect.bottom());
+		painter.drawLine(xCoordOf(master->conn->CursorCPos, plotRect),plotRect.top(),xCoordOf(master->conn->CursorCPos, plotRect),plotRect.bottom());
 	}
-	if(CursorDPos > GraphStart && xCoordOf(CursorDPos, plotRect) < plotRect.right())
+	if(master->conn->CursorDPos > GraphStart && xCoordOf(master->conn->CursorDPos, plotRect) < plotRect.right())
 	{
 		painter.setPen(QColor(0, 0, 205)); //light blue
-		painter.drawLine(xCoordOf(CursorDPos, plotRect),plotRect.top(),xCoordOf(CursorDPos, plotRect),plotRect.bottom());
+		painter.drawLine(xCoordOf(master->conn->CursorDPos, plotRect),plotRect.top(),xCoordOf(master->conn->CursorDPos, plotRect),plotRect.bottom());
 	}
 
 	//Draw annotations
 	char str[200];
 	sprintf(str, "@%d  dt=%d [%2.2f] zoom=%2.2f  CursorAPos=%d  CursorBPos=%d  GridX=%d  GridY=%d (%s) GridXoffset=%d",
-			GraphStart,	CursorBPos - CursorAPos, (CursorBPos - CursorAPos)/CursorScaleFactor,
-			GraphPixelsPerPoint,CursorAPos,CursorBPos,PlotGridXdefault,PlotGridYdefault,GridLocked?"Locked":"Unlocked",GridOffset);
+			GraphStart,	CursorBPos - CursorAPos, (CursorBPos - CursorAPos)/master->conn->CursorScaleFactor,
+			GraphPixelsPerPoint,CursorAPos,CursorBPos,master->conn->PlotGridXdefault,master->conn->PlotGridYdefault,master->conn->GridLocked?"Locked":"Unlocked",master->conn->GridOffset);
 	painter.setPen(QColor(255, 255, 255));
 	painter.drawText(20, infoRect.bottom() - 3, str);
 
 }
 
-Plot::Plot(QWidget *parent) : QWidget(parent), GraphStart(0), GraphPixelsPerPoint(1)
+Plot::Plot(QWidget *parent, ProxGuiQT *master) : QWidget(parent), GraphStart(0), GraphPixelsPerPoint(1)
 {
+	this->master = master;
+
 	//Need to set this, otherwise we don't receive keypress events
 	setFocusPolicy( Qt::StrongFocus);
 	resize(600, 300);
@@ -595,8 +600,8 @@ void Plot::keyPressEvent(QKeyEvent *event)
 	int	offset;
 
 	if(event->modifiers() & Qt::ShiftModifier) {
-		if (PlotGridX)
-			offset= PageWidth - (PageWidth % PlotGridX);
+		if (master->conn->PlotGridX)
+			offset= PageWidth - (PageWidth % master->conn->PlotGridX);
 		else
 			offset= PageWidth;
 	} else 
@@ -635,12 +640,12 @@ void Plot::keyPressEvent(QKeyEvent *event)
 			break;
 
 		case Qt::Key_G:
-			if(PlotGridX || PlotGridY) {
-				PlotGridX= 0;
-				PlotGridY= 0;
+			if(master->conn->PlotGridX || master->conn->PlotGridY) {
+				master->conn->PlotGridX= 0;
+				master->conn->PlotGridY= 0;
 			} else {
-				PlotGridX= PlotGridXdefault;
-				PlotGridY= PlotGridYdefault;
+				master->conn->PlotGridX= master->conn->PlotGridXdefault;
+				master->conn->PlotGridY= master->conn->PlotGridYdefault;
 			}
 			break;
 
@@ -666,9 +671,9 @@ void Plot::keyPressEvent(QKeyEvent *event)
 			break;
 
 		case Qt::Key_L:
-			GridLocked = !GridLocked;
-			if (GridLocked)
-				GridOffset += (GraphStart - unlockStart);
+			master->conn->GridLocked = !master->conn->GridLocked;
+			if (master->conn->GridLocked)
+				master->conn->GridOffset += (GraphStart - unlockStart);
 			else
 				unlockStart = GraphStart;
 			break;

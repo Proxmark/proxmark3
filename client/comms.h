@@ -6,6 +6,7 @@
 
 #include "usb_cmd.h"
 #include "uart.h"
+#include "util_posix.h"
 
 #ifndef CMD_BUFFER_SIZE
 #define CMD_BUFFER_SIZE 50

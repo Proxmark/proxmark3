@@ -25,7 +25,14 @@ uint8_t fskClocks(pm3_connection* conn, uint8_t *fc1, uint8_t *fc2, uint8_t *rf1
 //uint8_t fskClocks(uint8_t *fc1, uint8_t *fc2, uint8_t *rf1, bool verbose);
 bool graphJustNoise(int *BitStream, int size);
 void setGraphBuf(pm3_connection* conn, uint8_t *buff, size_t size);
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 void save_restoreGB(pm3_connection* conn, uint8_t saveOpt);
+#ifdef __cplusplus
+}
+#endif
 
 bool HasGraphData();
 void DetectHighLowInGraph(pm3_connection* conn, int *high, int *low, bool addFuzz); 

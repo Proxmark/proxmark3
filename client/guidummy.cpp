@@ -21,8 +21,8 @@ extern "C" void ShowGraphWindow(pm3_connection* conn)
 	}
 }
 
-extern "C" void HideGraphWindow(pm3_connection* conn) {}
-extern "C" void RepaintGraphWindow(pm3_connection* conn) {}
-extern "C" void MainGraphics() {}
+extern "C" void HideGraphWindow() {}
+extern "C" void RepaintGraphWindow() {}
+extern "C" void MainGraphics(pm3_connection* conn) {}
 extern "C" void InitGraphics(int argc, char **argv) {}
 extern "C" void ExitGraphics(void) {}
