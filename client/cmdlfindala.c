@@ -15,23 +15,23 @@
 #include "ui.h"
 #include "graph.h"
 #include "cmdparser.h"
-#include "cmddata.h"  //for g_debugMode, demodbuff cmds
+#include "cmddata.h"  //for demodbuff cmds
 #include "lfdemod.h"  //for indala26decode
 #include "util.h"     //for sprint_bin_break
 #include "cmdlf.h"    //for CmdLFRead
 #include "cmdmain.h"  //for clearCommandBuffer
 
-static int CmdHelp(const char *Cmd);
+static int CmdHelp(pm3_connection* conn, const char *Cmd);
 
 // Indala 26 bit decode
 // by marshmellow
 // optional arguments - same as PSKDemod (clock & invert & maxerr)
-int CmdIndalaDecode(const char *Cmd) {
+int CmdIndalaDecode(pm3_connection* conn, const char *Cmd) {
 	int ans;
 	if (strlen(Cmd)>0) {
-		ans = PSKDemod(Cmd, 0);
+		ans = PSKDemod(conn, Cmd, 0);
 	} else { //default to RF/32
-		ans = PSKDemod("32", 0);
+		ans = PSKDemod(conn, "32", 0);
 	}
 
 	if (!ans) {
@@ -39,64 +39,64 @@ int CmdIndalaDecode(const char *Cmd) {
 		return 0;
 	}
 	uint8_t invert=0;
-	size_t size = DemodBufferLen;
-	int startIdx = indala64decode(DemodBuffer, &size, &invert);
+	size_t size = conn->DemodBufferLen;
+	int startIdx = indala64decode(conn->DemodBuffer, &size, &invert);
 	if (startIdx < 0 || size != 64) {
 		// try 224 indala
 		invert = 0;
-		size = DemodBufferLen;
-		startIdx = indala224decode(DemodBuffer, &size, &invert);
+		size = conn->DemodBufferLen;
+		startIdx = indala224decode(conn->DemodBuffer, &size, &invert);
 		if (startIdx < 0 || size != 224) {
 			if (g_debugMode) PrintAndLog("Error2: %i",startIdx);
 			return -1;
 		}
 	}
-	setDemodBuf(DemodBuffer, size, (size_t)startIdx);
-	setClockGrid(g_DemodClock, g_DemodStartIdx + (startIdx*g_DemodClock));
+	setDemodBuf(conn, conn->DemodBuffer, size, (size_t)startIdx);
+	setClockGrid(conn, conn->g_DemodClock, conn->g_DemodStartIdx + (startIdx*conn->g_DemodClock));
 	if (invert)
 		if (g_debugMode)
 			PrintAndLog("Had to invert bits");
 
-	PrintAndLog("BitLen: %d",DemodBufferLen);
+	PrintAndLog("BitLen: %d",conn->DemodBufferLen);
 	//convert UID to HEX
 	uint32_t uid1, uid2, uid3, uid4, uid5, uid6, uid7;
-	uid1=bytebits_to_byte(DemodBuffer,32);
-	uid2=bytebits_to_byte(DemodBuffer+32,32);
-	if (DemodBufferLen==64) {
-		PrintAndLog("Indala UID=%s (%x%08x)", sprint_bin_break(DemodBuffer,DemodBufferLen,16), uid1, uid2);
-	} else if (DemodBufferLen==224) {
-		uid3=bytebits_to_byte(DemodBuffer+64,32);
-		uid4=bytebits_to_byte(DemodBuffer+96,32);
-		uid5=bytebits_to_byte(DemodBuffer+128,32);
-		uid6=bytebits_to_byte(DemodBuffer+160,32);
-		uid7=bytebits_to_byte(DemodBuffer+192,32);
+	uid1=bytebits_to_byte(conn->DemodBuffer,32);
+	uid2=bytebits_to_byte(conn->DemodBuffer+32,32);
+	if (conn->DemodBufferLen==64) {
+		PrintAndLog("Indala UID=%s (%x%08x)", sprint_bin_break(conn->DemodBuffer,conn->DemodBufferLen,16), uid1, uid2);
+	} else if (conn->DemodBufferLen==224) {
+		uid3=bytebits_to_byte(conn->DemodBuffer+64,32);
+		uid4=bytebits_to_byte(conn->DemodBuffer+96,32);
+		uid5=bytebits_to_byte(conn->DemodBuffer+128,32);
+		uid6=bytebits_to_byte(conn->DemodBuffer+160,32);
+		uid7=bytebits_to_byte(conn->DemodBuffer+192,32);
 		PrintAndLog("Indala UID=%s (%x%08x%08x%08x%08x%08x%08x)", 
-		    sprint_bin_break(DemodBuffer,DemodBufferLen,16), uid1, uid2, uid3, uid4, uid5, uid6, uid7);
+		    sprint_bin_break(conn->DemodBuffer,conn->DemodBufferLen,16), uid1, uid2, uid3, uid4, uid5, uid6, uid7);
 	}
 	if (g_debugMode) {
 		PrintAndLog("DEBUG: printing demodbuffer:");
-		printDemodBuff();
+		printDemodBuff(conn);
 	}
 	return 1;
 }
 
-int CmdIndalaRead(const char *Cmd) {
-	lf_read(true, 30000);
-	return CmdIndalaDecode("");
+int CmdIndalaRead(pm3_connection* conn, const char *Cmd) {
+	lf_read(conn, true, 30000);
+	return CmdIndalaDecode(conn, "");
 }
 
 // older alternative indala demodulate (has some positives and negatives)
 // returns false positives more often - but runs against more sets of samples
 // poor psk signal can be difficult to demod this approach might succeed when the other fails
 // but the other appears to currently be more accurate than this approach most of the time.
-int CmdIndalaDemod(const char *Cmd) {
+int CmdIndalaDemod(pm3_connection* conn, const char *Cmd) {
 	// Usage: recover 64bit UID by default, specify "224" as arg to recover a 224bit UID
 
 	int state = -1;
 	int count = 0;
 	int i, j;
 
-	// worst case with GraphTraceLen=64000 is < 4096
+	// worst case with conn->GraphTraceLen=64000 is < 4096
 	// under normal conditions it's < 2048
 
 	uint8_t rawbits[4096];
@@ -104,14 +104,14 @@ int CmdIndalaDemod(const char *Cmd) {
 	int worst = 0, worstPos = 0;
 
 	//clear clock grid and demod plot
-	setClockGrid(0, 0);
-	DemodBufferLen = 0;
+	setClockGrid(conn, 0, 0);
+	conn->DemodBufferLen = 0;
 	
 	// PrintAndLog("Expecting a bit less than %d raw bits", GraphTraceLen / 32);
 	// loop through raw signal - since we know it is psk1 rf/32 fc/2 skip every other value (+=2)
-	for (i = 0; i < GraphTraceLen-1; i += 2) {
+	for (i = 0; i < conn->GraphTraceLen-1; i += 2) {
 		count += 1;
-		if ((GraphBuffer[i] > GraphBuffer[i + 1]) && (state != 1)) {
+		if ((conn->GraphBuffer[i] > conn->GraphBuffer[i + 1]) && (state != 1)) {
 			// appears redundant - marshmellow
 			if (state == 0) {
 				for (j = 0; j <  count - 8; j += 16) {
@@ -124,7 +124,7 @@ int CmdIndalaDemod(const char *Cmd) {
 			}
 			state = 1;
 			count = 0;
-		} else if ((GraphBuffer[i] < GraphBuffer[i + 1]) && (state != 0)) {
+		} else if ((conn->GraphBuffer[i] < conn->GraphBuffer[i + 1]) && (state != 0)) {
 			//appears redundant
 			if (state == 1) {
 				for (j = 0; j <  count - 8; j += 16) {
@@ -141,7 +141,7 @@ int CmdIndalaDemod(const char *Cmd) {
 	}
 	
 	if (rawbit>0){
-		PrintAndLog("Recovered %d raw bits, expected: %d", rawbit, GraphTraceLen/32);
+		PrintAndLog("Recovered %d raw bits, expected: %d", rawbit, conn->GraphTraceLen/32);
 		PrintAndLog("worst metric (0=best..7=worst): %d at pos %d", worst, worstPos);
 	} else {
 		return 0;
@@ -265,7 +265,7 @@ int CmdIndalaDemod(const char *Cmd) {
 	// Remodulating for tag cloning
 	// HACK: 2015-01-04 this will have an impact on our new way of seening lf commands (demod) 
 	// since this changes graphbuffer data.
-	GraphTraceLen = 32*uidlen;
+	conn->GraphTraceLen = 32*uidlen;
 	i = 0;
 	int phase = 0;
 	for (bit = 0; bit < uidlen; bit++) {
@@ -276,16 +276,16 @@ int CmdIndalaDemod(const char *Cmd) {
 		}
 		int j;
 		for (j = 0; j < 32; j++) {
-			GraphBuffer[i++] = phase;
+			conn->GraphBuffer[i++] = phase;
 			phase = !phase;
 		}
 	}
 
-	RepaintGraphWindow();
+	RepaintGraphWindow(conn);
 	return 1;
 }
 
-int CmdIndalaClone(const char *Cmd) {
+int CmdIndalaClone(pm3_connection* conn, const char *Cmd) {
 	UsbCommand c;
 	unsigned int uid1, uid2, uid3, uid4, uid5, uid6, uid7;
 
@@ -322,14 +322,14 @@ int CmdIndalaClone(const char *Cmd) {
 		c.arg[1] = uid2;
 	}
 
-	clearCommandBuffer();
-	SendCommand(&c);
+	clearCommandBuffer(conn);
+	SendCommand(conn, &c);
 	return 0;
 }
 
 static command_t CommandTable[] = {
 	{"help",     CmdHelp,         1, "This help"},
-	{"demod",    CmdIndalaDecode, 1, "[clock] [invert<0|1>] -- Demodulate an indala tag (PSK1) from GraphBuffer (args optional)"},
+	{"demod",    CmdIndalaDecode, 1, "[clock] [invert<0|1>] -- Demodulate an indala tag (PSK1) from conn->GraphBuffer (args optional)"},
 	{"read",     CmdIndalaRead,   0, "Read an Indala Prox tag from the antenna"},
 	{"clone",    CmdIndalaClone,  0, "<UID> ['l']-- Clone Indala to T55x7 (tag must be on antenna)(UID in HEX)(option 'l' for 224 UID"},
 	{"altdemod", CmdIndalaDemod,  1, "['224'] -- Alternative method to Demodulate samples for Indala 64 bit UID (option '224' for 224 bit)"},
@@ -337,12 +337,12 @@ static command_t CommandTable[] = {
 	{NULL, NULL, 0, NULL}
 };
 
-int CmdLFINDALA(const char *Cmd) {
-	CmdsParse(CommandTable, Cmd);
+int CmdLFINDALA(pm3_connection* conn, const char *Cmd) {
+	CmdsParse(conn, CommandTable, Cmd);
 	return 0;
 }
 
-int CmdHelp(const char *Cmd) {
-	CmdsHelp(CommandTable);
+int CmdHelp(pm3_connection* conn, const char *Cmd) {
+	CmdsHelp(conn, CommandTable);
 	return 0;
 }

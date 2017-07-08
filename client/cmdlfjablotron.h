@@ -9,11 +9,13 @@
 #ifndef CMDLFJABLOTRON_H__
 #define CMDLFJABLOTRON_H__
 
-extern int CmdLFJablotron(const char *Cmd);
-extern int CmdJablotronClone(const char *Cmd);
-extern int CmdJablotronSim(const char *Cmd);
-extern int CmdJablotronRead(const char *Cmd);
-extern int CmdJablotronDemod(const char *Cmd);
+#include "comms.h"
+
+extern int CmdLFJablotron(pm3_connection* conn, const char *Cmd);
+extern int CmdJablotronClone(pm3_connection* conn, const char *Cmd);
+extern int CmdJablotronSim(pm3_connection* conn, const char *Cmd);
+extern int CmdJablotronRead(pm3_connection* conn, const char *Cmd);
+extern int CmdJablotronDemod(pm3_connection* conn, const char *Cmd);
 
 #endif
 

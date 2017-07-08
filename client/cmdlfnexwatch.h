@@ -8,7 +8,10 @@
 //-----------------------------------------------------------------------------
 #ifndef CMDLFNEXWATCH_H__
 #define CMDLFNEXWATCH_H__
-extern int CmdLFNexWatch(const char *Cmd);
-extern int CmdPSKNexWatch(const char *Cmd);
-extern int CmdNexWatchRead(const char *Cmd);
+
+#include "comms.h"
+
+extern int CmdLFNexWatch(pm3_connection* conn, const char *Cmd);
+extern int CmdPSKNexWatch(pm3_connection* conn, const char *Cmd);
+extern int CmdNexWatchRead(pm3_connection* conn, const char *Cmd);
 #endif

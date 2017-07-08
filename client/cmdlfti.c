@@ -19,9 +19,9 @@
 #include "cmdparser.h"
 #include "cmdlfti.h"
 
-static int CmdHelp(const char *Cmd);
+static int CmdHelp(pm3_connection* conn, const char *Cmd);
 
-int CmdTIDemod(const char *Cmd)
+int CmdTIDemod(pm3_connection* conn, const char *Cmd)
 {
   /* MATLAB as follows:
     f_s = 2000000;  % sampling frequency
@@ -85,40 +85,40 @@ int CmdTIDemod(const char *Cmd)
   int lowSum = 0, highSum = 0;;
   int lowTot = 0, highTot = 0;
 
-  for (i = 0; i < GraphTraceLen - convLen; i++) {
+  for (i = 0; i < conn->GraphTraceLen - convLen; i++) {
     lowSum = 0;
     highSum = 0;;
 
     for (j = 0; j < lowLen; j++) {
-      lowSum += LowTone[j]*GraphBuffer[i+j];
+      lowSum += LowTone[j]*conn->GraphBuffer[i+j];
     }
     for (j = 0; j < highLen; j++) {
-      highSum += HighTone[j]*GraphBuffer[i+j];
+      highSum += HighTone[j]*conn->GraphBuffer[i+j];
     }
     lowSum = abs((100*lowSum) / lowLen);
     highSum = abs((100*highSum) / highLen);
     lowSum = (lowSum<0)?-lowSum:lowSum;
     highSum = (highSum<0)?-highSum:highSum;
 
-    GraphBuffer[i] = (highSum << 16) | lowSum;
+    conn->GraphBuffer[i] = (highSum << 16) | lowSum;
   }
 
-  for (i = 0; i < GraphTraceLen - convLen - 16; i++) {
+  for (i = 0; i < conn->GraphTraceLen - convLen - 16; i++) {
     lowTot = 0;
     highTot = 0;
     // 16 and 15 are f_s divided by f_l and f_h, rounded
     for (j = 0; j < 16; j++) {
-      lowTot += (GraphBuffer[i+j] & 0xffff);
+      lowTot += (conn->GraphBuffer[i+j] & 0xffff);
     }
     for (j = 0; j < 15; j++) {
-      highTot += (GraphBuffer[i+j] >> 16);
+      highTot += (conn->GraphBuffer[i+j] >> 16);
     }
-    GraphBuffer[i] = lowTot - highTot;
+    conn->GraphBuffer[i] = lowTot - highTot;
   }
 
-  GraphTraceLen -= (convLen + 16);
+  conn->GraphTraceLen -= (convLen + 16);
 
-  RepaintGraphWindow();
+  RepaintGraphWindow(conn);
 
   // TI tag data format is 16 prebits, 8 start bits, 64 data bits,
   // 16 crc CCITT bits, 8 stop bits, 15 end bits
@@ -139,11 +139,11 @@ int CmdTIDemod(const char *Cmd)
     int dec = 0;
     // searching 17 consecutive lows
     for (j = 0; j < 17*lowLen; j++) {
-      dec -= GraphBuffer[i+j];
+      dec -= conn->GraphBuffer[i+j];
     }
     // searching 7 consecutive highs
     for (; j < 17*lowLen + 6*highLen; j++) {
-      dec += GraphBuffer[i+j];
+      dec += conn->GraphBuffer[i+j];
     }
     if (dec > max) {
       max = dec;
@@ -153,8 +153,8 @@ int CmdTIDemod(const char *Cmd)
 
   // place a marker in the buffer to visually aid location
   // of the start of sync
-  GraphBuffer[maxPos] = 800;
-  GraphBuffer[maxPos+1] = -800;
+  conn->GraphBuffer[maxPos] = 800;
+  conn->GraphBuffer[maxPos+1] = -800;
 
   // advance pointer to start of actual data stream (after 16 pre and 8 start bits)
   maxPos += 17*lowLen;
@@ -162,8 +162,8 @@ int CmdTIDemod(const char *Cmd)
 
   // place a marker in the buffer to visually aid location
   // of the end of sync
-  GraphBuffer[maxPos] = 800;
-  GraphBuffer[maxPos+1] = -800;
+  conn->GraphBuffer[maxPos] = 800;
+  conn->GraphBuffer[maxPos+1] = -800;
 
   PrintAndLog("actual data bits start at sample %d", maxPos);
 
@@ -179,10 +179,10 @@ int CmdTIDemod(const char *Cmd)
     int low = 0;
     int j;
     for (j = 0; j < lowLen; j++) {
-      low -= GraphBuffer[maxPos+j];
+      low -= conn->GraphBuffer[maxPos+j];
     }
     for (j = 0; j < highLen; j++) {
-      high += GraphBuffer[maxPos+j];
+      high += conn->GraphBuffer[maxPos+j];
     }
 
     if (high > low) {
@@ -202,8 +202,8 @@ int CmdTIDemod(const char *Cmd)
     shift3 >>= 1;
 
     // place a marker in the buffer between bits to visually aid location
-    GraphBuffer[maxPos] = 800;
-    GraphBuffer[maxPos+1] = -800;
+    conn->GraphBuffer[maxPos] = 800;
+    conn->GraphBuffer[maxPos+1] = -800;
   }
   PrintAndLog("Info: raw tag bits = %s", bits);
 
@@ -261,15 +261,15 @@ int CmdTIDemod(const char *Cmd)
 }
 
 // read a TI tag and return its ID
-int CmdTIRead(const char *Cmd)
+int CmdTIRead(pm3_connection* conn, const char *Cmd)
 {
   UsbCommand c = {CMD_READ_TI_TYPE};
-  SendCommand(&c);
+  SendCommand(conn, &c);
   return 0;
 }
 
 // write new data to a r/w TI tag
-int CmdTIWrite(const char *Cmd)
+int CmdTIWrite(pm3_connection* conn, const char *Cmd)
 {
   UsbCommand c = {CMD_WRITE_TI_TYPE};
   int res = 0;
@@ -280,7 +280,7 @@ int CmdTIWrite(const char *Cmd)
   if (res < 2)
     PrintAndLog("Please specify the data as two hex strings, optionally the CRC as a third");
   else
-    SendCommand(&c);
+    SendCommand(conn, &c);
   return 0;
 }
 
@@ -293,14 +293,14 @@ static command_t CommandTable[] =
   {NULL, NULL, 0, NULL}
 };
 
-int CmdLFTI(const char *Cmd)
+int CmdLFTI(pm3_connection* conn, const char *Cmd)
 {
-  CmdsParse(CommandTable, Cmd);
+  CmdsParse(conn, CommandTable, Cmd);
   return 0;
 }
 
-int CmdHelp(const char *Cmd)
+int CmdHelp(pm3_connection* conn, const char *Cmd)
 {
-  CmdsHelp(CommandTable);
+  CmdsHelp(conn, CommandTable);
   return 0;
 }

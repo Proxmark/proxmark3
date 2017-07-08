@@ -113,7 +113,7 @@ static uint32_t nonce2key(uint32_t uid, uint32_t nt, uint32_t nr, uint64_t par_i
 }
 
 
-int mfDarkside(uint64_t *key)
+int mfDarkside(pm3_connection *conn, uint64_t *key)
 {
 	uint32_t uid = 0;
 	uint32_t nt = 0, nr = 0;
@@ -132,8 +132,8 @@ int mfDarkside(uint64_t *key)
 
 
 	while (true) {
-		clearCommandBuffer();
-		SendCommand(&c);
+		clearCommandBuffer(conn);
+		SendCommand(conn, &c);
 
 		//flush queue
 		while (ukbhit()) {
@@ -150,7 +150,7 @@ int mfDarkside(uint64_t *key)
 			}
 
 			UsbCommand resp;
-			if (WaitForResponseTimeout(CMD_ACK, &resp, 1000)) {
+			if (WaitForResponseTimeout(conn, CMD_ACK, &resp, 1000)) {
 				isOK  = resp.arg[0];
 				if (isOK < 0) {
 					return isOK;
@@ -204,7 +204,7 @@ int mfDarkside(uint64_t *key)
 					num_to_bytes(last_keylist[i*max_keys + j], 6, keyBlock);
 				}
 			}
-			if (!mfCheckKeys(0, 0, false, size, keyBlock, key)) {
+			if (!mfCheckKeys(conn, 0, 0, false, size, keyBlock, key)) {
 				break;
 			}
 		}
@@ -224,22 +224,22 @@ int mfDarkside(uint64_t *key)
 }
 
 
-int mfCheckKeys (uint8_t blockNo, uint8_t keyType, bool clear_trace, uint8_t keycnt, uint8_t * keyBlock, uint64_t * key){
+int mfCheckKeys (pm3_connection* conn, uint8_t blockNo, uint8_t keyType, bool clear_trace, uint8_t keycnt, uint8_t * keyBlock, uint64_t * key){
 
 	*key = -1;
 
 	UsbCommand c = {CMD_MIFARE_CHKKEYS, {((blockNo & 0xff) | ((keyType & 0xff) << 8)), clear_trace, keycnt}}; 
 	memcpy(c.d.asBytes, keyBlock, 6 * keycnt);
-	SendCommand(&c);
+	SendCommand(conn, &c);
 
 	UsbCommand resp;
-	if (!WaitForResponseTimeout(CMD_ACK,&resp,3000)) return 1; 
+	if (!WaitForResponseTimeout(conn, CMD_ACK,&resp,3000)) return 1;
 	if ((resp.arg[0] & 0xff) != 0x01) return 2;
 	*key = bytes_to_num(resp.d.asBytes, 6);
 	return 0;
 }
 
-int mfCheckKeysSec(uint8_t sectorCnt, uint8_t keyType, uint8_t timeout14a, bool clear_trace, uint8_t keycnt, uint8_t * keyBlock, sector_t * e_sector){
+int mfCheckKeysSec(pm3_connection* conn, uint8_t sectorCnt, uint8_t keyType, uint8_t timeout14a, bool clear_trace, uint8_t keycnt, uint8_t * keyBlock, sector_t * e_sector){
 
 	uint8_t keyPtr = 0;
 
@@ -248,10 +248,10 @@ int mfCheckKeysSec(uint8_t sectorCnt, uint8_t keyType, uint8_t timeout14a, bool 
 
 	UsbCommand c = {CMD_MIFARE_CHKKEYS, {((sectorCnt & 0xff) | ((keyType & 0xff) << 8)), (clear_trace | 0x02)|((timeout14a & 0xff) << 8), keycnt}}; 
 	memcpy(c.d.asBytes, keyBlock, 6 * keycnt);
-	SendCommand(&c);
+	SendCommand(conn, &c);
 
 	UsbCommand resp;
-	if (!WaitForResponseTimeoutW(CMD_ACK, &resp, MAX(3000, 1000 + 13 * sectorCnt * keycnt * (keyType == 2 ? 2 : 1)), false)) return 1; // timeout: 13 ms / fail auth
+	if (!WaitForResponseTimeoutW(conn, CMD_ACK, &resp, MAX(3000, 1000 + 13 * sectorCnt * keycnt * (keyType == 2 ? 2 : 1)), false)) return 1; // timeout: 13 ms / fail auth
 	if ((resp.arg[0] & 0xff) != 0x01) return 2;
 	
 	bool foundAKey = false;
@@ -309,7 +309,7 @@ void* nested_worker_thread(void *arg)
 	return statelist->head.slhead;
 }
 
-int mfnested(uint8_t blockNo, uint8_t keyType, uint8_t *key, uint8_t trgBlockNo, uint8_t trgKeyType, uint8_t *resultKey, bool calibrate)
+int mfnested(pm3_connection* conn, uint8_t blockNo, uint8_t keyType, uint8_t *key, uint8_t trgBlockNo, uint8_t trgKeyType, uint8_t *resultKey, bool calibrate) 
 {
 	uint16_t i;
 	uint32_t uid;
@@ -319,13 +319,13 @@ int mfnested(uint8_t blockNo, uint8_t keyType, uint8_t *key, uint8_t trgBlockNo,
 	struct Crypto1State *p1, *p2, *p3, *p4;
 
 	// flush queue
-	WaitForResponseTimeout(CMD_ACK, NULL, 100);
+	WaitForResponseTimeout(conn, CMD_ACK, NULL, 100);
 
 	UsbCommand c = {CMD_MIFARE_NESTED, {blockNo + keyType * 0x100, trgBlockNo + trgKeyType * 0x100, calibrate}};
 	memcpy(c.d.asBytes, key, 6);
-	SendCommand(&c);
+	SendCommand(conn, &c);
 
-	if (!WaitForResponseTimeout(CMD_ACK, &resp, 1500)) {
+	if (!WaitForResponseTimeout(conn, CMD_ACK, &resp, 1500)) {
 		return -1;
 	}
 
@@ -408,7 +408,7 @@ int mfnested(uint8_t blockNo, uint8_t keyType, uint8_t *key, uint8_t trgBlockNo,
 		crypto1_get_lfsr(statelists[0].head.slhead + i, &key64);
 		num_to_bytes(key64, 6, keyBlock);
 		key64 = 0;
-		if (!mfCheckKeys(statelists[0].blockNo, statelists[0].keyType, false, 1, keyBlock, &key64)) {
+		if (!mfCheckKeys(conn, statelists[0].blockNo, statelists[0].keyType, false, 1, keyBlock, &key64)) {
 			num_to_bytes(key64, 6, resultKey);
 			break;
 		}
@@ -422,33 +422,33 @@ int mfnested(uint8_t blockNo, uint8_t keyType, uint8_t *key, uint8_t trgBlockNo,
 
 // EMULATOR
 
-int mfEmlGetMem(uint8_t *data, int blockNum, int blocksCount) {
+int mfEmlGetMem(pm3_connection* conn, uint8_t *data, int blockNum, int blocksCount) {
 	UsbCommand c = {CMD_MIFARE_EML_MEMGET, {blockNum, blocksCount, 0}};
- 	SendCommand(&c);
+ 	SendCommand(conn, &c);
 
   UsbCommand resp;
-	if (!WaitForResponseTimeout(CMD_ACK,&resp,1500)) return 1;
+	if (!WaitForResponseTimeout(conn, CMD_ACK,&resp,1500)) return 1;
 	memcpy(data, resp.d.asBytes, blocksCount * 16);
 	return 0;
 }
 
-int mfEmlSetMem(uint8_t *data, int blockNum, int blocksCount) {
+int mfEmlSetMem(pm3_connection* conn, uint8_t *data, int blockNum, int blocksCount) {
 	UsbCommand c = {CMD_MIFARE_EML_MEMSET, {blockNum, blocksCount, 0}};
-	memcpy(c.d.asBytes, data, blocksCount * 16);
-	SendCommand(&c);
+	memcpy(c.d.asBytes, data, blocksCount * 16); 
+	SendCommand(conn, &c);
 	return 0;
 }
 
 // "MAGIC" CARD
 
-int mfCGetBlock(uint8_t blockNo, uint8_t *data, uint8_t params) {
+int mfCGetBlock(pm3_connection* conn, uint8_t blockNo, uint8_t *data, uint8_t params) {
 	uint8_t isOK = 0;
 
 	UsbCommand c = {CMD_MIFARE_CGETBLOCK, {params, 0, blockNo}};
-	SendCommand(&c);
+	SendCommand(conn, &c);
 
 	UsbCommand resp;
-	if (WaitForResponseTimeout(CMD_ACK,&resp,1500)) {
+	if (WaitForResponseTimeout(conn, CMD_ACK,&resp,1500)) {
 		isOK  = resp.arg[0] & 0xff;
 		memcpy(data, resp.d.asBytes, 16);
 		if (!isOK) return 2;
@@ -459,15 +459,15 @@ int mfCGetBlock(uint8_t blockNo, uint8_t *data, uint8_t params) {
 	return 0;
 }
 
-int mfCSetBlock(uint8_t blockNo, uint8_t *data, uint8_t *uid, bool wantWipe, uint8_t params) {
+int mfCSetBlock(pm3_connection* conn, uint8_t blockNo, uint8_t *data, uint8_t *uid, bool wantWipe, uint8_t params) {
 
 	uint8_t isOK = 0;
 	UsbCommand c = {CMD_MIFARE_CSETBLOCK, {wantWipe, params & (0xFE | (uid == NULL ? 0:1)), blockNo}};
-	memcpy(c.d.asBytes, data, 16);
-	SendCommand(&c);
+	memcpy(c.d.asBytes, data, 16); 
+	SendCommand(conn, &c);
 
 	UsbCommand resp;
-	if (WaitForResponseTimeout(CMD_ACK, &resp, 1500)) {
+	if (WaitForResponseTimeout(conn, CMD_ACK,&resp,1500)) {
 		isOK  = resp.arg[0] & 0xff;
 		if (uid != NULL)
 			memcpy(uid, resp.d.asBytes, 4);
@@ -481,20 +481,20 @@ int mfCSetBlock(uint8_t blockNo, uint8_t *data, uint8_t *uid, bool wantWipe, uin
 	return 0;
 }
 
-int mfCWipe(uint32_t numSectors, bool gen1b, bool wantWipe, bool wantFill) {
+int mfCWipe(pm3_connection* conn, uint32_t numSectors, bool gen1b, bool wantWipe, bool wantFill) {
 	uint8_t isOK = 0;
 	uint8_t cmdParams = wantWipe + wantFill * 0x02 + gen1b * 0x04;
 	UsbCommand c = {CMD_MIFARE_CWIPE, {numSectors, cmdParams, 0}};
-	SendCommand(&c);
+	SendCommand(conn, &c);
 
 	UsbCommand resp;
-	WaitForResponse(CMD_ACK,&resp);
+	WaitForResponse(conn, CMD_ACK,&resp);
 	isOK  = resp.arg[0] & 0xff;
 	
 	return isOK;
 }
 
-int mfCSetUID(uint8_t *uid, uint8_t *atqa, uint8_t *sak, uint8_t *oldUID) {
+int mfCSetUID(pm3_connection* conn, uint8_t *uid, uint8_t *atqa, uint8_t *sak, uint8_t *oldUID) {
 	uint8_t oldblock0[16] = {0x00};
 	uint8_t block0[16] = {0x00};
 	int gen = 0, res;
@@ -508,7 +508,7 @@ int mfCSetUID(uint8_t *uid, uint8_t *atqa, uint8_t *sak, uint8_t *oldUID) {
 		cmdParams = CSETBLOCK_SINGLE_OPER | CSETBLOCK_MAGIC_1B;
 	}
 	
-	res = mfCGetBlock(0, oldblock0, cmdParams);
+	res = mfCGetBlock(conn, 0, oldblock0, cmdParams);
 
 	if (res == 0) {
 		memcpy(block0, oldblock0, 16);
@@ -531,7 +531,7 @@ int mfCSetUID(uint8_t *uid, uint8_t *atqa, uint8_t *sak, uint8_t *oldUID) {
 	}
 	PrintAndLog("new block 0:  %s", sprint_hex(block0, 16));
 
-	res = mfCSetBlock(0, block0, oldUID, false, cmdParams);
+	res = mfCSetBlock(conn, 0, block0, oldUID, false, cmdParams);
 	if (res) {
 		PrintAndLog("Can't set block 0. Error: %d", res);
 		return res;
@@ -540,13 +540,13 @@ int mfCSetUID(uint8_t *uid, uint8_t *atqa, uint8_t *sak, uint8_t *oldUID) {
 	return 0;
 }
 
-int mfCIdentify()
+int mfCIdentify(pm3_connection* conn)
 {
 	UsbCommand c = {CMD_READER_ISO_14443a, {ISO14A_CONNECT | ISO14A_NO_DISCONNECT, 0, 0}};
-	SendCommand(&c);
+	SendCommand(conn, &c);
 
 	UsbCommand resp;
-	WaitForResponse(CMD_ACK,&resp);
+	WaitForResponse(conn, CMD_ACK, &resp);
 
 	// iso14a_card_select_t card;
 	// memcpy(&card, (iso14a_card_select_t *)resp.d.asBytes, sizeof(iso14a_card_select_t));
@@ -567,8 +567,8 @@ int mfCIdentify()
 	c.arg[0] = 0;
 	c.arg[1] = 0;
 	c.arg[2] = 0;
-	SendCommand(&c);
-	WaitForResponse(CMD_ACK,&resp);
+	SendCommand(conn, &c);
+	WaitForResponse(conn, CMD_ACK, &resp);
 
 	uint8_t isGeneration = resp.arg[0] & 0xff;
 	switch( isGeneration ){
@@ -582,7 +582,7 @@ int mfCIdentify()
 	c.arg[0] = 0;
 	c.arg[1] = 0;
 	c.arg[2] = 0;
-	SendCommand(&c);
+	SendCommand(conn, &c);
 
 	return (int) isGeneration;
 }

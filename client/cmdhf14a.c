@@ -28,8 +28,8 @@
 #include "cmdhfmfu.h"
 #include "mifarehost.h"
 
-static int CmdHelp(const char *Cmd);
-static void waitCmd(uint8_t iLen);
+static int CmdHelp(pm3_connection* conn, const char *Cmd);
+static void waitCmd(pm3_connection* conn, uint8_t iLen);
 
 // structure and database for uid -> tagtype lookups 
 typedef struct { 
@@ -127,19 +127,19 @@ char* getTagInfo(uint8_t uid) {
 	return manufactureMapping[len-1].desc; 
 }
 
-int CmdHF14AList(const char *Cmd)
+int CmdHF14AList(pm3_connection* conn, const char *Cmd)
 {
 	PrintAndLog("Deprecated command, use 'hf list 14a' instead");
 	return 0;
 }
 
-int CmdHF14AReader(const char *Cmd)
+int CmdHF14AReader(pm3_connection* conn, const char *Cmd)
 {
 	UsbCommand c = {CMD_READER_ISO_14443a, {ISO14A_CONNECT | ISO14A_NO_DISCONNECT, 0, 0}};
-	SendCommand(&c);
+	SendCommand(conn, &c);
 
 	UsbCommand resp;
-	WaitForResponse(CMD_ACK,&resp);
+	WaitForResponse(conn, CMD_ACK,&resp);
 	
 	iso14a_card_select_t card;
 	memcpy(&card, (iso14a_card_select_t *)resp.d.asBytes, sizeof(iso14a_card_select_t));
@@ -152,7 +152,7 @@ int CmdHF14AReader(const char *Cmd)
 		c.arg[0] = 0;
 		c.arg[1] = 0;
 		c.arg[2] = 0;
-		SendCommand(&c);
+		SendCommand(conn, &c);
 		return 0;
 	}
 
@@ -163,7 +163,7 @@ int CmdHF14AReader(const char *Cmd)
 		c.arg[0] = 0;
 		c.arg[1] = 0;
 		c.arg[2] = 0;
-		SendCommand(&c);
+		SendCommand(conn, &c);
 		return 0;
 	}
 
@@ -179,9 +179,9 @@ int CmdHF14AReader(const char *Cmd)
 			c.arg[0] = 0;
 			c.arg[1] = 0;
 			c.arg[2] = 0;
-			SendCommand(&c);
+			SendCommand(conn, &c);
 			
-			uint32_t tagT = GetHF14AMfU_Type();
+			uint32_t tagT = GetHF14AMfU_Type(conn);
 			ul_print_type(tagT, 0);
 
 			//reconnect for further tests
@@ -189,10 +189,10 @@ int CmdHF14AReader(const char *Cmd)
 			c.arg[1] = 0;
 			c.arg[2] = 0;
 
-			SendCommand(&c);
+			SendCommand(conn, &c);
 
 			UsbCommand resp;
-			WaitForResponse(CMD_ACK,&resp);
+			WaitForResponse(conn, CMD_ACK,&resp);
 			
 			memcpy(&card, (iso14a_card_select_t *)resp.d.asBytes, sizeof(iso14a_card_select_t));
 
@@ -204,7 +204,7 @@ int CmdHF14AReader(const char *Cmd)
 				c.arg[0] = 0;
 				c.arg[1] = 0;
 				c.arg[2] = 0;
-				SendCommand(&c);
+				SendCommand(conn, &c);
 				return 0;
 			}
 
@@ -214,8 +214,8 @@ int CmdHF14AReader(const char *Cmd)
 			c.arg[1] = 1;
 			c.arg[2] = 0;
 			c.d.asBytes[0] = 0x60;
-			SendCommand(&c);
-			WaitForResponse(CMD_ACK,&resp);
+			SendCommand(conn, &c);
+			WaitForResponse(conn, CMD_ACK,&resp);
 
 			uint8_t version[10] = {0};
 			memcpy(version, resp.d.asBytes, resp.arg[0] < sizeof(version) ? resp.arg[0] : sizeof(version));
@@ -258,8 +258,8 @@ int CmdHF14AReader(const char *Cmd)
 		c.arg[1] = 2;
 		c.arg[2] = 0;
 		memcpy(c.d.asBytes, rats, 2);
-		SendCommand(&c);
-		WaitForResponse(CMD_ACK,&resp);
+		SendCommand(conn, &c);
+		WaitForResponse(conn, CMD_ACK,&resp);
 		
 	    memcpy(card.ats, resp.d.asBytes, resp.arg[0]);
 		card.ats_len = resp.arg[0];				// note: ats_len includes CRC Bytes
@@ -409,8 +409,8 @@ int CmdHF14AReader(const char *Cmd)
 	c.arg[0] = 0;
 	c.arg[1] = 0;
 	c.arg[2] = 0;	
-	SendCommand(&c);
-	WaitForResponse(CMD_ACK,&resp);
+	SendCommand(conn, &c);
+	WaitForResponse(conn, CMD_ACK, &resp);
 	
 	uint8_t isGeneration = resp.arg[0] & 0xff;
 	switch( isGeneration ){
@@ -424,13 +424,13 @@ int CmdHF14AReader(const char *Cmd)
 	c.arg[0] = 0;
 	c.arg[1] = 0;
 	c.arg[2] = 0;
-	SendCommand(&c);
+	SendCommand(conn, &c);
 
 	return select_status;
 }
 
 // Collect ISO14443 Type A UIDs
-int CmdHF14ACUIDs(const char *Cmd)
+int CmdHF14ACUIDs(pm3_connection* conn, const char *Cmd)
 {
 	// requested number of UIDs
 	int n = atoi(Cmd);
@@ -443,10 +443,10 @@ int CmdHF14ACUIDs(const char *Cmd)
 	for (int i = 0; i < n; i++) {
 		// execute anticollision procedure
 		UsbCommand c = {CMD_READER_ISO_14443a, {ISO14A_CONNECT | ISO14A_NO_RATS, 0, 0}};
-		SendCommand(&c);
+		SendCommand(conn, &c);
     
 		UsbCommand resp;
-		WaitForResponse(CMD_ACK,&resp);
+		WaitForResponse(conn, CMD_ACK,&resp);
 
 		iso14a_card_select_t *card = (iso14a_card_select_t *) resp.d.asBytes;
 
@@ -468,7 +468,7 @@ int CmdHF14ACUIDs(const char *Cmd)
 
 // ## simulate iso14443a tag
 // ## greg - added ability to specify tag UID
-int CmdHF14ASim(const char *Cmd)
+int CmdHF14ASim(pm3_connection* conn, const char *Cmd)
 {
 	UsbCommand c = {CMD_SIMULATE_TAG_ISO_14443a,{0,0,0}};
 	
@@ -544,11 +544,11 @@ int CmdHF14ASim(const char *Cmd)
 */
 //	UsbCommand c = {CMD_SIMULATE_TAG_ISO_14443a,param_get32ex(Cmd,0,0,10),param_get32ex(Cmd,1,0,16),param_get32ex(Cmd,2,0,16)};
 //  PrintAndLog("Emulating ISO/IEC 14443 type A tag with UID %01d %08x %08x",c.arg[0],c.arg[1],c.arg[2]);
-  SendCommand(&c);
+  SendCommand(conn, &c);
   return 0;
 }
 
-int CmdHF14ASnoop(const char *Cmd) {
+int CmdHF14ASnoop(pm3_connection* conn, const char *Cmd) {
 	int param = 0;
 	
 	uint8_t ctmp = param_getchar(Cmd, 0) ;
@@ -569,12 +569,12 @@ int CmdHF14ASnoop(const char *Cmd) {
 	}
 
 	UsbCommand c = {CMD_SNOOP_ISO_14443a, {param, 0, 0}};
-	SendCommand(&c);
+	SendCommand(conn, &c);
 	return 0;
 }
 
 
-int CmdHF14ACmdRaw(const char *cmd) {
+int CmdHF14ACmdRaw(pm3_connection* conn, const char *cmd) {
 	UsbCommand c = {CMD_READER_ISO_14443a, {0, 0, 0}};
 	bool reply=1;
 	bool crc = false;
@@ -731,25 +731,25 @@ int CmdHF14ACmdRaw(const char *cmd) {
 	c.arg[1] = (datalen & 0xFFFF) | ((uint32_t)numbits << 16);
 	memcpy(c.d.asBytes,data,datalen);
 
-	SendCommand(&c);
+	SendCommand(conn, &c);
 
 	if (reply) {
 		if(active_select)
-			waitCmd(1);
+			waitCmd(conn, 1);
 		if(datalen>0)
-			waitCmd(0);
+			waitCmd(conn, 0);
 	} // if reply
 	return 0;
 }
 
 
-static void waitCmd(uint8_t iSelect)
+static void waitCmd(pm3_connection* conn, uint8_t iSelect)
 {
     uint8_t *recv;
     UsbCommand resp;
     char *hexout;
 
-    if (WaitForResponseTimeout(CMD_ACK,&resp,1500)) {
+    if (WaitForResponseTimeout(conn, CMD_ACK,&resp,1500)) {
         recv = resp.d.asBytes;
         uint8_t iLen = iSelect ? resp.arg[1] : resp.arg[0];
         PrintAndLog("received %i octets", iLen);
@@ -782,17 +782,17 @@ static command_t CommandTable[] =
   {NULL, NULL, 0, NULL}
 };
 
-int CmdHF14A(const char *Cmd) {
+int CmdHF14A(pm3_connection* conn, const char *Cmd) {
 	// flush
-	WaitForResponseTimeout(CMD_ACK,NULL,100);
+	WaitForResponseTimeout(conn, CMD_ACK,NULL,100);
 
 	// parse
-  CmdsParse(CommandTable, Cmd);
+  CmdsParse(conn, CommandTable, Cmd);
   return 0;
 }
 
-int CmdHelp(const char *Cmd)
+int CmdHelp(pm3_connection* conn, const char *Cmd)
 {
-  CmdsHelp(CommandTable);
+  CmdsHelp(conn, CommandTable);
   return 0;
 }

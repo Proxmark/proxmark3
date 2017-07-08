@@ -23,7 +23,7 @@
 #include "protocols.h"  // for T55xx config register definitions
 #include "lfdemod.h"    // parityTest
 
-static int CmdHelp(const char *Cmd);
+static int CmdHelp(pm3_connection* conn, const char *Cmd);
 
 int usage_lf_jablotron_clone(void) {
 	PrintAndLog("clone a Jablotron tag to a T55x7 tag.");
@@ -91,16 +91,16 @@ int JablotronDetect(uint8_t *bits, size_t *size) {
 }
 
 //see ASKDemod for what args are accepted
-int CmdJablotronDemod(const char *Cmd) {
+int CmdJablotronDemod(pm3_connection* conn, const char *Cmd) {
 
 	//Differential Biphase / di-phase (inverted biphase)
 	//get binary from ask wave
-	if (!ASKbiphaseDemod("0 64 1 0", false)) {
+	if (!ASKbiphaseDemod(conn, "0 64 1 0", false)) {
 		if (g_debugMode) PrintAndLog("DEBUG: Error - Jablotron ASKbiphaseDemod failed");
 		return 0;
 	}
-	size_t size = DemodBufferLen;
-	int ans = JablotronDetect(DemodBuffer, &size);
+	size_t size = conn->DemodBufferLen;
+	int ans = JablotronDetect(conn->DemodBuffer, &size);
 	if (ans < 0) {
 		if (g_debugMode) {
 			if (ans == -1)
@@ -117,14 +117,14 @@ int CmdJablotronDemod(const char *Cmd) {
 		return 0;
 	}
 
-	setDemodBuf(DemodBuffer, 64, ans);
-	setClockGrid(g_DemodClock, g_DemodStartIdx + (ans*g_DemodClock));
+	setDemodBuf(conn, conn->DemodBuffer, 64, ans);
+	setClockGrid(conn, conn->g_DemodClock, conn->g_DemodStartIdx + (ans*conn->g_DemodClock));
 
 	//got a good demod
-	uint32_t raw1 = bytebits_to_byte(DemodBuffer, 32);
-	uint32_t raw2 = bytebits_to_byte(DemodBuffer+32, 32);
+	uint32_t raw1 = bytebits_to_byte(conn->DemodBuffer, 32);
+	uint32_t raw2 = bytebits_to_byte(conn->DemodBuffer+32, 32);
 
-	uint64_t id = (( (uint64_t)bytebits_to_byte(DemodBuffer+16, 8) )<< 32) | bytebits_to_byte(DemodBuffer+24,32);
+	uint64_t id = (( (uint64_t)bytebits_to_byte(conn->DemodBuffer+16, 8) )<< 32) | bytebits_to_byte(conn->DemodBuffer+24,32);
 
 	PrintAndLog("Jablotron Tag Found: Card ID: %"PRIx64" :: Raw: %08X%08X", id, raw1, raw2);
 
@@ -140,12 +140,12 @@ int CmdJablotronDemod(const char *Cmd) {
 	return 1;
 }
 
-int CmdJablotronRead(const char *Cmd) {
-	lf_read(true, 10000);
-	return CmdJablotronDemod(Cmd);
+int CmdJablotronRead(pm3_connection* conn, const char *Cmd) {
+	lf_read(conn, true, 10000);
+	return CmdJablotronDemod(conn, Cmd);
 }
 
-int CmdJablotronClone(const char *Cmd) {
+int CmdJablotronClone(pm3_connection* conn, const char *Cmd) {
 
 	uint64_t fullcode = 0;
 	uint32_t blocks[3] = {T55x7_MODULATION_DIPHASE | T55x7_BITRATE_RF_64 | 2 << T55x7_MAXBLOCK_SHIFT, 0, 0};
@@ -192,9 +192,9 @@ int CmdJablotronClone(const char *Cmd) {
 	for (int i = 2; i >= 0; --i) {
 		c.arg[0] = blocks[i];
 		c.arg[1] = i;
-		clearCommandBuffer();
-		SendCommand(&c);
-		if (!WaitForResponseTimeout(CMD_ACK, &resp, T55XX_WRITE_TIMEOUT)) {
+		clearCommandBuffer(conn);
+		SendCommand(conn, &c);
+		if (!WaitForResponseTimeout(conn, CMD_ACK, &resp, T55XX_WRITE_TIMEOUT)) {
 			PrintAndLog("Error occurred, device did not respond during write operation.");
 			return -1;
 		}
@@ -202,7 +202,7 @@ int CmdJablotronClone(const char *Cmd) {
 	return 0;
 }
 
-int CmdJablotronSim(const char *Cmd) {
+int CmdJablotronSim(pm3_connection* conn, const char *Cmd) {
 	uint64_t fullcode = 0;
 
 	char cmdp = param_getchar(Cmd, 0);
@@ -226,8 +226,8 @@ int CmdJablotronSim(const char *Cmd) {
 
 	UsbCommand c = {CMD_ASK_SIM_TAG, {arg1, arg2, size}};
 	getJablotronBits(fullcode, c.d.asBytes);
-	clearCommandBuffer();
-	SendCommand(&c);
+	clearCommandBuffer(conn);
+	SendCommand(conn, &c);
 	return 0;
 }
 
@@ -240,13 +240,13 @@ static command_t CommandTable[] = {
 	{NULL, NULL, 0, NULL}
 };
 
-int CmdLFJablotron(const char *Cmd) {
-	clearCommandBuffer();
-	CmdsParse(CommandTable, Cmd);
+int CmdLFJablotron(pm3_connection* conn, const char *Cmd) {
+	clearCommandBuffer(conn);
+	CmdsParse(conn, CommandTable, Cmd);
 	return 0;
 }
 
-int CmdHelp(const char *Cmd) {
-	CmdsHelp(CommandTable);
+int CmdHelp(pm3_connection* conn, const char *Cmd) {
+	CmdsHelp(conn, CommandTable);
 	return 0;
 }

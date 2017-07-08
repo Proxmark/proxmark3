@@ -9,11 +9,13 @@
 #ifndef CMDLFNORALSY_H__
 #define CMDLFNORALSY_H__
 
-extern int CmdLFNoralsy(const char *Cmd);
-extern int CmdNoralsyClone(const char *Cmd);
-extern int CmdNoralsySim(const char *Cmd);
-extern int CmdNoralsyRead(const char *Cmd);
-extern int CmdNoralsyDemod(const char *Cmd);
+#include "comms.h"
+
+extern int CmdLFNoralsy(pm3_connection* conn, const char *Cmd);
+extern int CmdNoralsyClone(pm3_connection* conn, const char *Cmd);
+extern int CmdNoralsySim(pm3_connection* conn, const char *Cmd);
+extern int CmdNoralsyRead(pm3_connection* conn, const char *Cmd);
+extern int CmdNoralsyDemod(pm3_connection* conn, const char *Cmd);
 
 #endif
 

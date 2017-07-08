@@ -22,7 +22,7 @@
 
 /* low-level hardware control */
 
-static int CmdHelp(const char *Cmd);
+static int CmdHelp(pm3_connection *conn, const char *Cmd);
 
 static void lookupChipID(uint32_t iChipID, uint32_t mem_used)
 {
@@ -308,7 +308,7 @@ static void lookupChipID(uint32_t iChipID, uint32_t mem_used)
 	PrintAndLog("Nonvolatile Program Memory Type: %s",asBuff);
 }
 
-int CmdDetectReader(const char *Cmd)
+int CmdDetectReader(pm3_connection *conn, const char *Cmd)
 {
   UsbCommand c={CMD_LISTEN_READER_FIELD};
   // 'l' means LF - 125/134 kHz
@@ -320,19 +320,19 @@ int CmdDetectReader(const char *Cmd)
     PrintAndLog("use 'detectreader' or 'detectreader l' or 'detectreader h'");
     return 0;
   }
-  SendCommand(&c);
+  SendCommand(conn, &c);
   return 0;
 }
 
 // ## FPGA Control
-int CmdFPGAOff(const char *Cmd)
+int CmdFPGAOff(pm3_connection *conn, const char *Cmd)
 {
   UsbCommand c = {CMD_FPGA_MAJOR_MODE_OFF};
-  SendCommand(&c);
+  SendCommand(conn, &c);
   return 0;
 }
 
-int CmdLCD(const char *Cmd)
+int CmdLCD(pm3_connection *conn, const char *Cmd)
 {
   int i, j;
 
@@ -340,29 +340,29 @@ int CmdLCD(const char *Cmd)
   sscanf(Cmd, "%x %d", &i, &j);
   while (j--) {
     c.arg[0] = i & 0x1ff;
-    SendCommand(&c);
+    SendCommand(conn, &c);
   }
   return 0;
 }
 
-int CmdLCDReset(const char *Cmd)
+int CmdLCDReset(pm3_connection *conn, const char *Cmd)
 {
   UsbCommand c = {CMD_LCD_RESET, {strtol(Cmd, NULL, 0), 0, 0}};
-  SendCommand(&c);
+  SendCommand(conn, &c);
   return 0;
 }
 
-int CmdReadmem(const char *Cmd)
+int CmdReadmem(pm3_connection *conn, const char *Cmd)
 {
   UsbCommand c = {CMD_READ_MEM, {strtol(Cmd, NULL, 0), 0, 0}};
-  SendCommand(&c);
+  SendCommand(conn, &c);
   return 0;
 }
 
-int CmdReset(const char *Cmd)
+int CmdReset(pm3_connection *conn, const char *Cmd)
 {
   UsbCommand c = {CMD_HARDWARE_RESET};
-  SendCommand(&c);
+  SendCommand(conn, &c);
   return 0;
 }
 
@@ -370,19 +370,19 @@ int CmdReset(const char *Cmd)
  * Sets the divisor for LF frequency clock: lets the user choose any LF frequency below
  * 600kHz.
  */
-int CmdSetDivisor(const char *Cmd)
+int CmdSetDivisor(pm3_connection *conn, const char *Cmd)
 {
   UsbCommand c = {CMD_SET_LF_DIVISOR, {strtol(Cmd, NULL, 0), 0, 0}};
   if (c.arg[0] < 19 || c.arg[0] > 255) {
     PrintAndLog("divisor must be between 19 and 255");
   } else {
-    SendCommand(&c);
+    SendCommand(conn, &c);
     PrintAndLog("Divisor set, expected freq=%dHz", 12000000 / (c.arg[0]+1));
   }
   return 0;
 }
 
-int CmdSetMux(const char *Cmd)
+int CmdSetMux(pm3_connection *conn, const char *Cmd)
 {
   UsbCommand c={CMD_SET_ADC_MUX};
   if (strcmp(Cmd, "lopkd") == 0) {
@@ -394,25 +394,24 @@ int CmdSetMux(const char *Cmd)
   } else if (strcmp(Cmd, "hiraw") == 0) {
     c.arg[0] = 3;
   }
-  SendCommand(&c);
+  SendCommand(conn, &c);
   return 0;
 }
 
-int CmdTune(const char *Cmd)
+int CmdTune(pm3_connection *conn, const char *Cmd)
 {
-    return CmdTuneSamples(Cmd);
+    return CmdTuneSamples(conn, Cmd);
 }
 
-int CmdVersion(const char *Cmd)
+int CmdVersion(pm3_connection* conn, const char *Cmd)
 {
-
-	clearCommandBuffer();
+	clearCommandBuffer(conn);
 	UsbCommand c = {CMD_VERSION};
 	static UsbCommand resp = {0, {0, 0, 0}};
 
 	if (resp.arg[0] == 0 && resp.arg[1] == 0) { // no cached information available
-		SendCommand(&c);
-		if (WaitForResponseTimeout(CMD_ACK,&resp,1000)) {
+		SendCommand(conn, &c);
+		if (WaitForResponseTimeout(conn, CMD_ACK,&resp,1000)) {
 			PrintAndLog("Prox/RFID mark3 RFID instrument");
 			PrintAndLog((char*)resp.d.asBytes);
 			lookupChipID(resp.arg[0], resp.arg[1]);
@@ -427,28 +426,30 @@ int CmdVersion(const char *Cmd)
 	return 0;
 }
 
-int CmdStatus(const char *Cmd)
+int CmdStatus(pm3_connection *conn, const char *Cmd)
 {
 	uint8_t speed_test_buffer[USB_CMD_DATA_SIZE];
-	sample_buf = speed_test_buffer;
+	conn->sample_buf = speed_test_buffer;
 
-	clearCommandBuffer();
+	clearCommandBuffer(conn);
 	UsbCommand c = {CMD_STATUS};
-	SendCommand(&c);
-	if (!WaitForResponseTimeout(CMD_ACK,&c,1900)) {
+	SendCommand(conn, &c);
+	if (!WaitForResponseTimeout(conn, CMD_ACK,&c,1900)) {
 		PrintAndLog("Status command failed. USB Speed Test timed out");
 	}
+	
+	conn->sample_buf = NULL;
 	return 0;
 }
 
 
-int CmdPing(const char *Cmd)
+int CmdPing(pm3_connection *conn, const char *Cmd)
 {
-	clearCommandBuffer();
+	clearCommandBuffer(conn);
 	UsbCommand resp;
 	UsbCommand c = {CMD_PING};
-	SendCommand(&c);
-	if (WaitForResponseTimeout(CMD_ACK,&resp,1000)) {
+	SendCommand(conn, &c);
+	if (WaitForResponseTimeout(conn, CMD_ACK,&resp,1000)) {
 		PrintAndLog("Ping successful");
 	}else{
 		PrintAndLog("Ping failed");
@@ -474,14 +475,14 @@ static command_t CommandTable[] =
 	{NULL, NULL, 0, NULL}
 };
 
-int CmdHW(const char *Cmd)
+int CmdHW(pm3_connection *conn, const char *Cmd)
 {
-  CmdsParse(CommandTable, Cmd);
+  CmdsParse(conn, CommandTable, Cmd);
   return 0;
 }
 
-int CmdHelp(const char *Cmd)
+int CmdHelp(pm3_connection *conn, const char *Cmd)
 {
-  CmdsHelp(CommandTable);
+  CmdsHelp(conn, CommandTable);
   return 0;
 }

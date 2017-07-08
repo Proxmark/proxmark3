@@ -18,23 +18,17 @@
 
 #include "ui.h"
 
-double CursorScaleFactor = 1;
-int PlotGridX=0, PlotGridY=0, PlotGridXdefault= 64, PlotGridYdefault= 64, CursorCPos= 0, CursorDPos= 0;
-int offline;
-bool flushAfterWrite = false;  //buzzy
-int GridOffset = 0;
-bool GridLocked = false;
-bool showDemod = true;
-
 extern pthread_mutex_t print_lock;
 
 static char *logfilename = "proxmark3.log";
+static bool flushAfterWrite = false;
 
 void PrintAndLog(char *fmt, ...)
 {
 	char *saved_line;
 	int saved_point;
 	va_list argptr, argptr2;
+	// TODO: stash these elsewhere
 	static FILE *logfile = NULL;
 	static int logging=1;
 
@@ -90,14 +84,9 @@ void PrintAndLog(char *fmt, ...)
 	}
 	va_end(argptr2);
 
-	if (flushAfterWrite == 1)  //buzzy
-	{
-		fflush(NULL);
-	}
 	//release lock
 	pthread_mutex_unlock(&print_lock);  
 }
-
 
 void SetLogFilename(char *fn)
 {

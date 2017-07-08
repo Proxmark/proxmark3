@@ -23,7 +23,7 @@
 #include "lfdemod.h"    // preamble test
 #include "parity.h"     // for wiegand parity test
 
-static int CmdHelp(const char *Cmd);
+static int CmdHelp(pm3_connection* conn, const char *Cmd);
 
 // by marshmellow
 // find Securakey preamble in already demoded data
@@ -39,17 +39,17 @@ int SecurakeyFind(uint8_t *dest, size_t *size) {
 }
 
 //see ASKDemod for what args are accepted
-int CmdSecurakeyDemod(const char *Cmd) {
+int CmdSecurakeyDemod(pm3_connection* conn, const char *Cmd) {
 
 	//ASK / Manchester
 	bool st = false;
-	if (!ASKDemod_ext("40 0 0", false, false, 1, &st)) {
-		if (g_debugMode) PrintAndLog("DEBUG: Error - Securakey: ASK/Manchester Demod failed");
+	if (!ASKDemod_ext(conn, "40 0 0", false, false, 1, &st)) {
+		if (g_debugMode) PrintAndLog("DEBUG: Error - Noralsy: ASK/Manchester Demod failed");
 		return 0;
 	}
 	if (st) return 0;
-	size_t size = DemodBufferLen;
-	int ans = SecurakeyFind(DemodBuffer, &size);
+	size_t size = conn->DemodBufferLen;
+	int ans = SecurakeyFind(conn->DemodBuffer, &size);
 	if (ans < 0) {
 		if (g_debugMode) {
 			if (ans == -1)
@@ -63,13 +63,13 @@ int CmdSecurakeyDemod(const char *Cmd) {
 		}
 		return 0;
 	}
-	setDemodBuf(DemodBuffer, 96, ans);
-	setClockGrid(g_DemodClock, g_DemodStartIdx + (ans*g_DemodClock));
+	setDemodBuf(conn, conn->DemodBuffer, 96, ans);
+	setClockGrid(conn, conn->g_DemodClock, conn->g_DemodStartIdx + (ans*conn->g_DemodClock));
 
 	//got a good demod
-	uint32_t raw1 = bytebits_to_byte(DemodBuffer   , 32);
-	uint32_t raw2 = bytebits_to_byte(DemodBuffer+32, 32);
-	uint32_t raw3 = bytebits_to_byte(DemodBuffer+64, 32);
+	uint32_t raw1 = bytebits_to_byte(conn->DemodBuffer   , 32);
+	uint32_t raw2 = bytebits_to_byte(conn->DemodBuffer+32, 32);
+	uint32_t raw3 = bytebits_to_byte(conn->DemodBuffer+64, 32);
 
 	// 26 bit format
 	// preamble     ??bitlen   reserved        EPx   xxxxxxxy   yyyyyyyy   yyyyyyyOP  CS?        CS2?
@@ -84,7 +84,7 @@ int CmdSecurakeyDemod(const char *Cmd) {
 	// standard wiegand parities.
 	// unknown checksum 11 bits? at the end
 	uint8_t bits_no_spacer[85];
-	memcpy(bits_no_spacer, DemodBuffer + 11, 85);
+	memcpy(bits_no_spacer, conn->DemodBuffer + 11, 85);
 
 	// remove marker bits (0's every 9th digit after preamble) (pType = 3 (always 0s))
 	size = removeParity(bits_no_spacer, 0, 9, 3, 85);
@@ -122,9 +122,9 @@ int CmdSecurakeyDemod(const char *Cmd) {
 	return 1;
 }
 
-int CmdSecurakeyRead(const char *Cmd) {
-	lf_read(true, 8000);
-	return CmdSecurakeyDemod(Cmd);
+int CmdSecurakeyRead(pm3_connection* conn, const char *Cmd) {
+	lf_read(conn, true, 8000);
+	return CmdSecurakeyDemod(conn, Cmd);
 }
 
 static command_t CommandTable[] = {
@@ -134,13 +134,13 @@ static command_t CommandTable[] = {
     {NULL, NULL, 0, NULL}
 };
 
-int CmdLFSecurakey(const char *Cmd) {
-	clearCommandBuffer();
-	CmdsParse(CommandTable, Cmd);
+int CmdLFSecurakey(pm3_connection* conn, const char *Cmd) {
+	clearCommandBuffer(conn);
+	CmdsParse(conn, CommandTable, Cmd);
 	return 0;
 }
 
-int CmdHelp(const char *Cmd) {
-	CmdsHelp(CommandTable);
+int CmdHelp(pm3_connection* conn, const char *Cmd) {
+	CmdsHelp(conn, CommandTable);
 	return 0;
 }

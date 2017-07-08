@@ -10,7 +10,11 @@
 #include "proxmark3.h"
 #include <stdint.h>
 #include <stdlib.h>
-//#include "iso15693tools.h"
+#include "iso15693tools.h"
+
+#ifdef ON_DEVICE
+#include "../armsrc/printf.h"   // for sprintf
+#endif
 
 #define POLY 0x8408
 

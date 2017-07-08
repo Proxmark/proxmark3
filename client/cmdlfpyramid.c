@@ -23,7 +23,7 @@
 #include "lfdemod.h"    // parityTest
 #include "crc.h"
 
-static int CmdHelp(const char *Cmd);
+static int CmdHelp(pm3_connection* conn, const char *Cmd);
 
 int usage_lf_pyramid_clone(void){
 	PrintAndLog("clone a Farpointe/Pyramid tag to a T55x7 tag.");
@@ -89,11 +89,11 @@ int GetPyramidBits(uint32_t fc, uint32_t cn, uint8_t *pyramidBits) {
 //by marshmellow
 //Pyramid Prox demod - FSK RF/50 with preamble of 0000000000000001  (always a 128 bit data stream)
 //print full Farpointe Data/Pyramid Prox ID and some bit format details if found
-int CmdFSKdemodPyramid(const char *Cmd)
+int CmdFSKdemodPyramid(pm3_connection* conn, const char *Cmd)
 {
 	//raw fsk demod no manchester decoding no start bit finding just get binary from wave
 	uint8_t BitStream[MAX_GRAPH_TRACE_LEN]={0};
-	size_t size = getFromGraphBuf(BitStream);
+	size_t size = getFromGraphBuf(conn, BitStream);
 	if (size==0) return 0;
 
 	int waveIdx=0;
@@ -152,8 +152,8 @@ int CmdFSKdemodPyramid(const char *Cmd)
 	uint32_t rawHi = bytebits_to_byte(BitStream+idx+64,32);
 	uint32_t rawHi2 = bytebits_to_byte(BitStream+idx+32,32);
 	uint32_t rawHi3 = bytebits_to_byte(BitStream+idx,32);
-	setDemodBuf(BitStream,128,idx);
-	setClockGrid(50, waveIdx + (idx*50));
+	setDemodBuf(conn, BitStream,128,idx);
+	setClockGrid(conn, 50, waveIdx + (idx*50));
 
 	size = removeParity(BitStream, idx+8, 8, 1, 120);
 	if (size != 105){
@@ -222,17 +222,17 @@ int CmdFSKdemodPyramid(const char *Cmd)
 
 	if (g_debugMode){
 		PrintAndLog("DEBUG: idx: %d, Len: %d, Printing Demod Buffer:", idx, 128);
-		printDemodBuff();
+		printDemodBuff(conn);
 	}
 	return 1;
 }
 
-int CmdPyramidRead(const char *Cmd) {
-	lf_read(true, 15000);
-	return CmdFSKdemodPyramid("");
+int CmdPyramidRead(pm3_connection* conn, const char *Cmd) {
+	lf_read(conn, true, 15000);
+	return CmdFSKdemodPyramid(conn, "");
 }
 
-int CmdPyramidClone(const char *Cmd) {
+int CmdPyramidClone(pm3_connection* conn, const char *Cmd) {
 
 	char cmdp = param_getchar(Cmd, 0);
 	if (strlen(Cmd) == 0 || cmdp == 'h' || cmdp == 'H') return usage_lf_pyramid_clone();
@@ -276,9 +276,9 @@ int CmdPyramidClone(const char *Cmd) {
 	for ( i = 0; i<5; ++i ) {
 		c.arg[0] = blocks[i];
 		c.arg[1] = i;
-		clearCommandBuffer();
-		SendCommand(&c);
-		if (!WaitForResponseTimeout(CMD_ACK, &resp, 1000)){
+		clearCommandBuffer(conn);
+		SendCommand(conn, &c);
+		if (!WaitForResponseTimeout(conn, CMD_ACK, &resp, 1000)){
 			PrintAndLog("Error occurred, device did not respond during write operation.");
 			return -1;
 		}
@@ -286,7 +286,7 @@ int CmdPyramidClone(const char *Cmd) {
 	return 0;
 }
 
-int CmdPyramidSim(const char *Cmd) {
+int CmdPyramidSim(pm3_connection* conn, const char *Cmd) {
 
 	char cmdp = param_getchar(Cmd, 0);
 	if (strlen(Cmd) == 0 || cmdp == 'h' || cmdp == 'H') return usage_lf_pyramid_sim();
@@ -316,8 +316,8 @@ int CmdPyramidSim(const char *Cmd) {
 
 	UsbCommand c = {CMD_FSK_SIM_TAG, {arg1, arg2, size}};
 	memcpy(c.d.asBytes, bs, size);
-	clearCommandBuffer();
-	SendCommand(&c);
+	clearCommandBuffer(conn);
+	SendCommand(conn, &c);
 	return 0;
 }
 
@@ -330,13 +330,13 @@ static command_t CommandTable[] = {
 	{NULL, NULL, 0, NULL}
 };
 
-int CmdLFPyramid(const char *Cmd) {
-	clearCommandBuffer();
-	CmdsParse(CommandTable, Cmd);
+int CmdLFPyramid(pm3_connection* conn, const char *Cmd) {
+	clearCommandBuffer(conn);
+	CmdsParse(conn, CommandTable, Cmd);
 	return 0;
 }
 
-int CmdHelp(const char *Cmd) {
-	CmdsHelp(CommandTable);
+int CmdHelp(pm3_connection* conn, const char *Cmd) {
+	CmdsHelp(conn, CommandTable);
 	return 0;
 }

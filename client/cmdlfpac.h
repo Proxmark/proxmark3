@@ -9,9 +9,11 @@
 #ifndef CMDLFPAC_H__
 #define CMDLFPAC_H__
 
-extern int CmdLFPac(const char *Cmd);
-extern int CmdPacRead(const char *Cmd);
-extern int CmdPacDemod(const char *Cmd);
+#include "comms.h"
+
+extern int CmdLFPac(pm3_connection* conn, const char *Cmd);
+extern int CmdPacRead(pm3_connection* conn, const char *Cmd);
+extern int CmdPacDemod(pm3_connection* conn, const char *Cmd);
 
 #endif
 

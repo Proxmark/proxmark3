@@ -11,10 +11,12 @@
 #ifndef CMDCRC_H__
 #define CMDCRC_H__
 
-int CmdCrc(const char *Cmd);
-int CmdrevengTest(const char *Cmd);
-int CmdrevengTestC(const char *Cmd);
-int CmdrevengSearch(const char *Cmd);
+#include "comms.h"
+
+int CmdCrc(pm3_connection* conn, const char *Cmd);
+int CmdrevengTest(pm3_connection* conn, const char *Cmd);
+int CmdrevengTestC(pm3_connection* conn, const char *Cmd);
+int CmdrevengSearch(pm3_connection* conn, const char *Cmd);
 int GetModels(char *Models[], int *count, uint8_t *width);
 int RunModel(char *inModel, char *inHexStr, bool reverse, char endian, char *result);
 #endif

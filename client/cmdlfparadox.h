@@ -8,7 +8,10 @@
 //-----------------------------------------------------------------------------
 #ifndef CMDLFPARADOX_H__
 #define CMDLFPARADOX_H__
-extern int CmdLFParadox(const char *Cmd);
-extern int CmdFSKdemodParadox(const char *Cmd);
-extern int CmdParadoxRead(const char *Cmd);
+
+#include "comms.h"
+
+extern int CmdLFParadox(pm3_connection* conn, const char *Cmd);
+extern int CmdFSKdemodParadox(pm3_connection* conn, const char *Cmd);
+extern int CmdParadoxRead(pm3_connection* conn, const char *Cmd);
 #endif

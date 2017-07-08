@@ -17,21 +17,21 @@
 #include "comms.h"
 
 
-void CmdsHelp(const command_t Commands[])
+void CmdsHelp(pm3_connection* conn, const command_t Commands[])
 {
   if (Commands[0].Name == NULL)
     return;
   int i = 0;
   while (Commands[i].Name)
   {
-    if (!IsOffline() || Commands[i].Offline)
+    if (!(conn->offline) || Commands[i].Offline)
        PrintAndLog("%-16s %s", Commands[i].Name, Commands[i].Help);
     ++i;
   }
 }
 
 
-int CmdsParse(const command_t Commands[], const char *Cmd)
+int CmdsParse(pm3_connection* conn, const command_t Commands[], const char *Cmd)
 {
 	if(strcmp( Cmd, "XX_internal_command_dump_XX") == 0)
 	{// Help dump children
@@ -68,10 +68,10 @@ int CmdsParse(const command_t Commands[], const char *Cmd)
 	if (Commands[i].Name) {
 		while (Cmd[len] == ' ')
 			++len;
-	return Commands[i].Parse(Cmd + len);
+		return Commands[i].Parse(conn, Cmd + len);
 	} else {
 		// show help for selected hierarchy or if command not recognised
-		CmdsHelp(Commands);
+		CmdsHelp(conn, Commands);
 	}
 
 	return 0;
@@ -127,9 +127,9 @@ void dumpCommandsRecursive(const command_t cmds[], int markdown)
     // This is what causes the recursion, since commands Parse-implementation
     // in turn calls the CmdsParse above. 
     if (markdown)
-      cmds[i].Parse("XX_internal_command_dump_markdown_XX");
+      cmds[i].Parse(NULL, "XX_internal_command_dump_markdown_XX");
     else
-      cmds[i].Parse("XX_internal_command_dump_XX");
+      cmds[i].Parse(NULL, "XX_internal_command_dump_XX");
     parent = old_parent;
     ++i;
   }

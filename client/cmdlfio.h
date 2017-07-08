@@ -4,8 +4,10 @@
 #ifndef CMDLFIO_H__
 #define CMDLFIO_H__
 
-extern int CmdLFIO(const char *Cmd);
-extern int CmdFSKdemodIO(const char *Cmd);
-extern int CmdIOReadFSK(const char *Cmd);
+#include "comms.h"
+
+extern int CmdLFIO(pm3_connection* conn, const char *Cmd);
+extern int CmdFSKdemodIO(pm3_connection* conn, const char *Cmd);
+extern int CmdIOReadFSK(pm3_connection* conn, const char *Cmd);
 
 #endif

@@ -14,12 +14,12 @@
 
 #include <stdint.h>
 
-int CmdHF14A(const char *Cmd);
-int CmdHF14AList(const char *Cmd);
-int CmdHF14AMifare(const char *Cmd);
-int CmdHF14AReader(const char *Cmd);
-int CmdHF14ASim(const char *Cmd);
-int CmdHF14ASnoop(const char *Cmd);
+int CmdHF14A(pm3_connection* conn, const char *Cmd);
+int CmdHF14AList(pm3_connection* conn, const char *Cmd);
+int CmdHF14AMifare(pm3_connection* conn, const char *Cmd);
+int CmdHF14AReader(pm3_connection* conn, const char *Cmd);
+int CmdHF14ASim(pm3_connection* conn, const char *Cmd);
+int CmdHF14ASnoop(pm3_connection* conn, const char *Cmd);
 char* getTagInfo(uint8_t uid);
 
 #endif

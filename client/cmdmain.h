@@ -17,8 +17,7 @@
 #include "cmdparser.h"
 #include "comms.h"
 
-
-extern int CommandReceived(char *Cmd);
+extern int CommandReceived(pm3_connection* conn, char *Cmd);
 extern command_t* getTopLevelCommandTable();
 
 #endif

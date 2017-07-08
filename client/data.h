@@ -12,12 +12,12 @@
 #define DATA_H__
 
 #include <stdint.h>
+#include "comms.h"
 
 #define FILE_PATH_SIZE 1000
 
-extern uint8_t* sample_buf;
 #define arraylen(x) (sizeof(x)/sizeof((x)[0]))
 
-void GetFromBigBuf(uint8_t *dest, int bytes, int start_index);
+void GetFromBigBuf(pm3_connection* conn, uint8_t *dest, int bytes, int start_index);
 
 #endif

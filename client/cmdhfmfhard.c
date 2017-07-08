@@ -26,6 +26,7 @@
 #include <math.h>
 #include "proxmark3.h"
 #include "cmdmain.h"
+#include "comms.h"
 #include "ui.h"
 #include "util.h"
 #include "util_posix.h"
@@ -54,6 +55,8 @@ typedef enum {
 	EVEN_STATE = 0,
 	ODD_STATE = 1
 } odd_even_t;
+
+// TODO: This module is not thread-safe. All the global state needs to be refactored here.
 
 static uint32_t num_acquired_nonces = 0;
 static uint64_t start_time = 0;
@@ -1444,7 +1447,7 @@ static void simulate_acquire_nonces()
 }
 
 
-static int acquire_nonces(uint8_t blockNo, uint8_t keyType, uint8_t *key, uint8_t trgBlockNo, uint8_t trgKeyType, bool nonce_file_write, bool slow)
+static int acquire_nonces(pm3_connection* conn, uint8_t blockNo, uint8_t keyType, uint8_t *key, uint8_t trgBlockNo, uint8_t trgKeyType, bool nonce_file_write, bool slow)
 {
 	last_sample_clock = msclock();
 	sample_period = 2000;	// initial rough estimate. Will be refined.
@@ -1462,7 +1465,7 @@ static int acquire_nonces(uint8_t blockNo, uint8_t keyType, uint8_t *key, uint8_
 
 	num_acquired_nonces = 0;
 	
-	clearCommandBuffer();
+	clearCommandBuffer(conn);
 
 	do {
 		flags = 0;
@@ -1472,12 +1475,12 @@ static int acquire_nonces(uint8_t blockNo, uint8_t keyType, uint8_t *key, uint8_
 		UsbCommand c = {CMD_MIFARE_ACQUIRE_ENCRYPTED_NONCES, {blockNo + keyType * 0x100, trgBlockNo + trgKeyType * 0x100, flags}};
 		memcpy(c.d.asBytes, key, 6);
 
-		SendCommand(&c);
+		SendCommand(conn, &c);
 		
 		if (field_off) break;
 		
 		if (initialize) {
-			if (!WaitForResponseTimeout(CMD_ACK, &resp, 3000)) return 1;
+			if (!WaitForResponseTimeout(conn, CMD_ACK, &resp, 3000)) return 1;
 
 			if (resp.arg[0]) return resp.arg[0];  // error during nested_hard
 
@@ -1551,7 +1554,7 @@ static int acquire_nonces(uint8_t blockNo, uint8_t keyType, uint8_t *key, uint8_
 		}
 
 		if (!initialize) {
-			if (!WaitForResponseTimeout(CMD_ACK, &resp, 3000)) {
+			if (!WaitForResponseTimeout(conn, CMD_ACK, &resp, 3000)) {
 				if (nonce_file_write) {
 					fclose(fnonces);
 				}
@@ -2525,7 +2528,7 @@ static void set_test_state(uint8_t byte)
 }
 
 
-int mfnestedhard(uint8_t blockNo, uint8_t keyType, uint8_t *key, uint8_t trgBlockNo, uint8_t trgKeyType, uint8_t *trgkey, bool nonce_file_read, bool nonce_file_write, bool slow, int tests) 
+int mfnestedhard(pm3_connection* conn, uint8_t blockNo, uint8_t keyType, uint8_t *key, uint8_t trgBlockNo, uint8_t trgKeyType, uint8_t *trgkey, bool nonce_file_read, bool nonce_file_write, bool slow, int tests) 
 {
 	char progress_text[80];
 
@@ -2670,7 +2673,7 @@ int mfnestedhard(uint8_t blockNo, uint8_t keyType, uint8_t *key, uint8_t trgBloc
 			float brute_force;
 			shrink_key_space(&brute_force);
 		} else {					// acquire nonces.
-			uint16_t is_OK = acquire_nonces(blockNo, keyType, key, trgBlockNo, trgKeyType, nonce_file_write, slow);
+			uint16_t is_OK = acquire_nonces(conn, blockNo, keyType, key, trgBlockNo, trgKeyType, nonce_file_write, slow);
 			if (is_OK != 0) {
 				free_bitflip_bitarrays();
 				free_nonces_memory();

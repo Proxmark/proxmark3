@@ -41,29 +41,29 @@ static const uint8_t elf_ident[] = {
 	EV_CURRENT
 };
 
-void CloseProxmark(receiver_arg* conn, char* serial_port_name) {
+void CloseProxmark(pm3_connection* conn, char* serial_port_name) {
 	pthread_mutex_lock(&conn->recv_lock);
 
 	// Block the port from being used by anything
-	serial_port* my_port = GetSerialPort();
-	SetSerialPort(NULL);
-
+	serial_port* port = conn->port;
+	conn->port = NULL;
+	
 	// Then close the port.
-	uart_close(my_port);
+	uart_close(port);
 	pthread_mutex_unlock(&conn->recv_lock);
-
+	
 	// Fix for linux, it seems that it is extremely slow to release the serial port file descriptor /dev/*
 	unlink(serial_port_name);
 }
 
-bool OpenProxmark(char* serial_port_name) {
-	serial_port *new_port = uart_open(serial_port_name);
-	if (new_port == INVALID_SERIAL_PORT || new_port == CLAIMED_SERIAL_PORT) {
+bool OpenProxmark(pm3_connection* conn, char* serial_port_name) {
+	serial_port *port = uart_open(serial_port_name);
+	if (port == INVALID_SERIAL_PORT || port == CLAIMED_SERIAL_PORT) {
 		//poll once a second
 		return false;
 	}
 	
-	SetSerialPort(new_port);
+	conn->port = port;
 	return true;
 }
 
@@ -297,13 +297,13 @@ fail:
 }
 
 // Get the state of the proxmark, backwards compatible
-static int get_proxmark_state(uint32_t *state)
+static int get_proxmark_state(pm3_connection *conn, uint32_t *state)
 {
 	UsbCommand c;
 	c.cmd = CMD_DEVICE_INFO;
-	SendCommand(&c);
+	SendCommand(conn, &c);
 	UsbCommand resp;
-	while (!WaitForResponse(CMD_ANY, &resp)) {
+	while (!WaitForResponse(conn, CMD_ANY, &resp)) {
 		// Keep waiting for a response
 		msleep(100);
 	}
@@ -333,11 +333,11 @@ static int get_proxmark_state(uint32_t *state)
 }
 
 // Enter the bootloader to be able to start flashing
-static int enter_bootloader(receiver_arg* conn, char *serial_port_name)
+static int enter_bootloader(pm3_connection* conn, char *serial_port_name)
 {
 	uint32_t state;
 
-	if (get_proxmark_state(&state) < 0)
+	if (get_proxmark_state(conn, &state) < 0)
 		return -1;
 
 	if (state & DEVICE_INFO_FLAG_CURRENT_MODE_BOOTROM) {
@@ -356,12 +356,12 @@ static int enter_bootloader(receiver_arg* conn, char *serial_port_name)
 			// New style handover: Send CMD_START_FLASH, which will reset the board
 			// and enter the bootrom on the next boot.
 			c.cmd = CMD_START_FLASH;
-			SendCommand(&c);
+			SendCommand(conn, &c);
 			fprintf(stderr,"(Press and release the button only to abort)\n");
 		} else {
 			// Old style handover: Ask the user to press the button, then reset the board
 			c.cmd = CMD_HARDWARE_RESET;
-			SendCommand(&c);
+			SendCommand(conn, &c);
 			fprintf(stderr,"Press and hold down button NOW if your bootloader requires it.\n");
 		}
 		
@@ -372,7 +372,7 @@ static int enter_bootloader(receiver_arg* conn, char *serial_port_name)
 		do {
 			sleep(1);
 			fprintf(stderr, ".");
-		} while (!OpenProxmark(serial_port_name));
+		} while (!OpenProxmark(conn, serial_port_name));
 		
 		fprintf(stderr," Found.\n");
 		return 0;
@@ -382,10 +382,10 @@ static int enter_bootloader(receiver_arg* conn, char *serial_port_name)
 	return -1;
 }
 
-static int wait_for_ack()
+static int wait_for_ack(pm3_connection* conn)
 {
 	UsbCommand resp;
-	while (!WaitForResponse(CMD_ANY, &resp)) {
+	while (!WaitForResponse(conn, CMD_ANY, &resp)) {
 		msleep(100);
 	}
 	if (resp.cmd != CMD_ACK) {
@@ -396,14 +396,14 @@ static int wait_for_ack()
 }
 
 // Go into flashing mode
-int flash_start_flashing(receiver_arg* conn, int enable_bl_writes,char *serial_port_name)
+int flash_start_flashing(pm3_connection* conn, int enable_bl_writes, char *serial_port_name)
 {
 	uint32_t state;
 
 	if (enter_bootloader(conn, serial_port_name) < 0)
 		return -1;
 
-	if (get_proxmark_state(&state) < 0)
+	if (get_proxmark_state(conn, &state) < 0)
 		return -1;
 
 	if (state & DEVICE_INFO_FLAG_UNDERSTANDS_START_FLASH) {
@@ -420,8 +420,8 @@ int flash_start_flashing(receiver_arg* conn, int enable_bl_writes,char *serial_p
 			c.arg[1] = FLASH_END;
 			c.arg[2] = 0;
 		}
-		SendCommand(&c);
-		return wait_for_ack();
+		SendCommand(conn, &c);
+		return wait_for_ack(conn);
 	} else {
 		fprintf(stderr, "Note: Your bootloader does not understand the new START_FLASH command\n");
 		fprintf(stderr, "      It is recommended that you update your bootloader\n\n");
@@ -430,7 +430,7 @@ int flash_start_flashing(receiver_arg* conn, int enable_bl_writes,char *serial_p
 	return 0;
 }
 
-static int write_block(uint32_t address, uint8_t *data, uint32_t length)
+static int write_block(pm3_connection* conn, uint32_t address, uint8_t *data, uint32_t length)
 {
 	uint8_t block_buf[BLOCK_SIZE];
 
@@ -440,12 +440,12 @@ static int write_block(uint32_t address, uint8_t *data, uint32_t length)
 	c.cmd = CMD_FINISH_WRITE;
 	c.arg[0] = address;
 	memcpy(c.d.asBytes, block_buf, length);
-  SendCommand(&c);
-  return wait_for_ack();
+  SendCommand(conn, &c);
+  return wait_for_ack(conn);
 }
 
 // Write a file's segments to Flash
-int flash_write(flash_file_t *ctx)
+int flash_write(pm3_connection* conn, flash_file_t *ctx)
 {
 	fprintf(stderr, "Writing segments for file: %s\n", ctx->filename);
 	for (int i = 0; i < ctx->num_segs; i++) {
@@ -467,7 +467,7 @@ int flash_write(flash_file_t *ctx)
 			if (block_size > BLOCK_SIZE)
 				block_size = BLOCK_SIZE;
 
-			if (write_block(baddr, data, block_size) < 0) {
+			if (write_block(conn, baddr, data, block_size) < 0) {
 				fprintf(stderr, " ERROR\n");
 				fprintf(stderr, "Error writing block %d of %d\n", block, blocks);
 				return -1;
@@ -499,9 +499,10 @@ void flash_free(flash_file_t *ctx)
 }
 
 // just reset the unit
-int flash_stop_flashing() {
+int flash_stop_flashing(pm3_connection* conn) {
 	UsbCommand c = {CMD_HARDWARE_RESET};
-	SendCommand(&c);
-	msleep(100);
-	return 0;
+  SendCommand(conn, &c);
+  msleep(100);
+  return 0;
 }
+

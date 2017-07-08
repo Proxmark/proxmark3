@@ -44,29 +44,29 @@ static struct {
 } topaz_tag;
 
 
-static void topaz_switch_on_field(void)
+static void topaz_switch_on_field(pm3_connection* conn)
 {
 	UsbCommand c = {CMD_READER_ISO_14443a, {ISO14A_CONNECT | ISO14A_NO_SELECT | ISO14A_NO_DISCONNECT | ISO14A_TOPAZMODE, 0, 0}};
-	SendCommand(&c);
+	SendCommand(conn, &c);
 }
 
 
-static void topaz_switch_off_field(void)
+static void topaz_switch_off_field(pm3_connection* conn)
 {
 	UsbCommand c = {CMD_READER_ISO_14443a, {0, 0, 0}};
-	SendCommand(&c);
+	SendCommand(conn, &c);
 }
 
 
 // send a raw topaz command, returns the length of the response (0 in case of error)
-static int topaz_send_cmd_raw(uint8_t *cmd, uint8_t len, uint8_t *response)
+static int topaz_send_cmd_raw(pm3_connection* conn, uint8_t *cmd, uint8_t len, uint8_t *response)
 {
 	UsbCommand c = {CMD_READER_ISO_14443a, {ISO14A_RAW | ISO14A_NO_DISCONNECT | ISO14A_TOPAZMODE, len, 0}};
 	memcpy(c.d.asBytes, cmd, len);
-	SendCommand(&c);
+	SendCommand(conn, &c);
 
 	UsbCommand resp;
-	WaitForResponse(CMD_ACK, &resp);
+	WaitForResponse(conn, CMD_ACK, &resp);
 
 	if (resp.arg[0] > 0) {
 		memcpy(response, resp.d.asBytes, resp.arg[0]);
@@ -77,7 +77,7 @@ static int topaz_send_cmd_raw(uint8_t *cmd, uint8_t len, uint8_t *response)
 
 
 // calculate CRC bytes and send topaz command, returns the length of the response (0 in case of error) 
-static int topaz_send_cmd(uint8_t *cmd, uint8_t len, uint8_t *response)
+static int topaz_send_cmd(pm3_connection* conn, uint8_t *cmd, uint8_t len, uint8_t *response)
 {
 	if (len > 1) {
         uint8_t first, second;
@@ -86,27 +86,27 @@ static int topaz_send_cmd(uint8_t *cmd, uint8_t len, uint8_t *response)
         cmd[len-1] = second;
 	}
 
-	return topaz_send_cmd_raw(cmd, len, response);
+	return topaz_send_cmd_raw(conn, cmd, len, response);
 }
 
 
 // select a topaz tag. Send WUPA and RID.
-static int topaz_select(uint8_t *atqa, uint8_t *rid_response)
+static int topaz_select(pm3_connection* conn, uint8_t *atqa, uint8_t *rid_response)
 {
-	// ToDo: implement anticollision
+	// TODO: implement anticollision
 
 	uint8_t wupa_cmd[] = {TOPAZ_WUPA};
 	uint8_t rid_cmd[] = {TOPAZ_RID, 0, 0, 0, 0, 0, 0, 0, 0};
 
-	topaz_switch_on_field();
+	topaz_switch_on_field(conn);
 
-	if (!topaz_send_cmd(wupa_cmd, sizeof(wupa_cmd), atqa)) {
-		topaz_switch_off_field();
+	if (!topaz_send_cmd(conn, wupa_cmd, sizeof(wupa_cmd), atqa)) {
+		topaz_switch_off_field(conn);
 		return -1;		// WUPA failed
 	}
 
-	if (!topaz_send_cmd(rid_cmd, sizeof(rid_cmd), rid_response)) {
-		topaz_switch_off_field();
+	if (!topaz_send_cmd(conn, rid_cmd, sizeof(rid_cmd), rid_response)) {
+		topaz_switch_off_field(conn);
 		return -2;		// RID failed
 	}
 	
@@ -115,13 +115,13 @@ static int topaz_select(uint8_t *atqa, uint8_t *rid_response)
 
 
 // read all of the static memory of a selected Topaz tag.
-static int topaz_rall(uint8_t *uid, uint8_t *response)
+static int topaz_rall(pm3_connection* conn, uint8_t *uid, uint8_t *response)
 {
 	uint8_t rall_cmd[] = {TOPAZ_RALL, 0, 0, 0, 0, 0, 0, 0, 0};
 
 	memcpy(&rall_cmd[3], uid, 4);
-	if (!topaz_send_cmd(rall_cmd, sizeof(rall_cmd), response)) {
-		topaz_switch_off_field();
+	if (!topaz_send_cmd(conn, rall_cmd, sizeof(rall_cmd), response)) {
+		topaz_switch_off_field(conn);
 		return -1;		// RALL failed
 	}
 	
@@ -130,15 +130,15 @@ static int topaz_rall(uint8_t *uid, uint8_t *response)
 
 
 // read a block (8 Bytes) of a selected Topaz tag.
-static int topaz_read_block(uint8_t *uid, uint8_t blockno, uint8_t *block_data)
+static int topaz_read_block(pm3_connection* conn, uint8_t *uid, uint8_t blockno, uint8_t *block_data)
 {
 	uint8_t read8_cmd[] = {TOPAZ_READ8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 	uint8_t read8_response[11];
 	
 	read8_cmd[1] = blockno;
 	memcpy(&read8_cmd[10], uid, 4);
-	if (!topaz_send_cmd(read8_cmd, sizeof(read8_cmd), read8_response)) {
-		topaz_switch_off_field();
+	if (!topaz_send_cmd(conn, read8_cmd, sizeof(read8_cmd), read8_response)) {
+		topaz_switch_off_field(conn);
 		return -1;		// READ8 failed
 	}
 	
@@ -149,15 +149,15 @@ static int topaz_read_block(uint8_t *uid, uint8_t blockno, uint8_t *block_data)
 
 
 // read a segment (16 blocks = 128 Bytes) of a selected Topaz tag. Works only for tags with dynamic memory.
-static int topaz_read_segment(uint8_t *uid, uint8_t segno, uint8_t *segment_data)
+static int topaz_read_segment(pm3_connection* conn, uint8_t *uid, uint8_t segno, uint8_t *segment_data)
 {
 	uint8_t rseg_cmd[] = {TOPAZ_RSEG, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 	uint8_t rseg_response[131];
 	
 	rseg_cmd[1] = segno << 4;
 	memcpy(&rseg_cmd[10], uid, 4);
-	if (!topaz_send_cmd(rseg_cmd, sizeof(rseg_cmd), rseg_response)) {
-		topaz_switch_off_field();
+	if (!topaz_send_cmd(conn, rseg_cmd, sizeof(rseg_cmd), rseg_response)) {
+		topaz_switch_off_field(conn);
 		return -1;		// RSEG failed
 	}
 	
@@ -362,10 +362,10 @@ static void topaz_print_control_TLVs(uint8_t *memory)
 
 
 // read all of the dynamic memory
-static int topaz_read_dynamic_data(void)
+static int topaz_read_dynamic_data(pm3_connection* conn)
 {
 	// first read the remaining block of segment 0
-	if(topaz_read_block(topaz_tag.uid, 0x0f, &topaz_tag.dynamic_memory[0]) == -1) {
+	if(topaz_read_block(conn, topaz_tag.uid, 0x0f, &topaz_tag.dynamic_memory[0]) == -1) {
 		PrintAndLog("Error while reading dynamic memory block %02x. Aborting...", 0x0f);
 		return -1;
 	}
@@ -373,7 +373,7 @@ static int topaz_read_dynamic_data(void)
 	// read the remaining segments
 	uint8_t max_segment = topaz_tag.size / 128 - 1;
 	for(uint8_t segment = 1; segment <= max_segment; segment++) {
-		if(topaz_read_segment(topaz_tag.uid, segment, &topaz_tag.dynamic_memory[(segment-1)*128+8]) == -1) {
+		if(topaz_read_segment(conn, topaz_tag.uid, segment, &topaz_tag.dynamic_memory[(segment-1)*128+8]) == -1) {
 			PrintAndLog("Error while reading dynamic memory block %02x. Aborting...", 0x0f);
 			return -1;
 		}
@@ -384,11 +384,11 @@ static int topaz_read_dynamic_data(void)
 	
 
 // read and print the dynamic memory
-static void topaz_print_dynamic_data(void)
+static void topaz_print_dynamic_data(pm3_connection* conn)
 {
 	if (topaz_tag.size > TOPAZ_STATIC_MEMORY) {
 		PrintAndLog("Dynamic Data blocks:");
-		if (topaz_read_dynamic_data() == 0) {
+		if (topaz_read_dynamic_data(conn) == 0) {
 			PrintAndLog("block# | offset | Data                    | Locked(y/n)");
 			char line[80];
 			for (uint16_t blockno = 0x0f; blockno < topaz_tag.size/8; blockno++) {
@@ -419,7 +419,7 @@ static void topaz_print_NDEF(uint8_t *data)
 
 
 // read a Topaz tag and print some usefull information	
-int CmdHFTopazReader(const char *Cmd)
+int CmdHFTopazReader(pm3_connection* conn, const char *Cmd)
 {
 	int status;
 	uint8_t atqa[2];
@@ -427,7 +427,7 @@ int CmdHFTopazReader(const char *Cmd)
 	uint8_t *uid_echo = &rid_response[2];
 	uint8_t rall_response[124];
 	
-	status = topaz_select(atqa, rid_response);
+	status = topaz_select(conn, atqa, rid_response);
 	
 	if (status == -1) {
 		PrintAndLog("Error: couldn't receive ATQA");
@@ -437,13 +437,13 @@ int CmdHFTopazReader(const char *Cmd)
 	PrintAndLog("ATQA : %02x %02x", atqa[1], atqa[0]);
 	if (atqa[1] != 0x0c && atqa[0] != 0x00) {
 		PrintAndLog("Tag doesn't support the Topaz protocol.");
-		topaz_switch_off_field();
+		topaz_switch_off_field(conn);
 		return -1;
 	}
 	
 	if (status == -2) {
 		PrintAndLog("Error: tag didn't answer to RID");
-		topaz_switch_off_field();
+		topaz_switch_off_field(conn);
 		return -1;
 	}
 
@@ -457,11 +457,11 @@ int CmdHFTopazReader(const char *Cmd)
 						(rid_response[0] & 0x0F) == 0x10 ? "static" : "dynamic");
 	PrintAndLog("HR1  : %02x", rid_response[1]);
 	
-	status = topaz_rall(uid_echo, rall_response);
+	status = topaz_rall(conn, uid_echo, rall_response);
 
 	if(status == -1) {
 		PrintAndLog("Error: tag didn't answer to RALL");
-		topaz_switch_off_field();
+		topaz_switch_off_field(conn);
 		return -1;
 	}
 
@@ -513,7 +513,7 @@ int CmdHFTopazReader(const char *Cmd)
 	
 	if (status == -1) {
 		PrintAndLog("No NDEF message data present");
-		topaz_switch_off_field();
+		topaz_switch_off_field(conn);
 		return 0;
 	}
 
@@ -521,25 +521,25 @@ int CmdHFTopazReader(const char *Cmd)
 	topaz_print_control_TLVs(&topaz_tag.data_blocks[1][4]);
 
 	PrintAndLog("");
-	topaz_print_dynamic_data();
+	topaz_print_dynamic_data(conn);
 	
 	topaz_print_lifecycle_state(&topaz_tag.data_blocks[1][0]);
 
 	topaz_print_NDEF(&topaz_tag.data_blocks[1][0]);
 	
-	topaz_switch_off_field();
+	topaz_switch_off_field(conn);
 	return 0;
 }
 
 
-int CmdHFTopazCmdRaw(const char *Cmd)
+int CmdHFTopazCmdRaw(pm3_connection* conn, const char *Cmd)
 {
 	PrintAndLog("not yet implemented. Use hf 14 raw with option -T.");
 	return 0;
 }
 
 
-static int CmdHelp(const char *Cmd);
+static int CmdHelp(pm3_connection* conn, const char *Cmd);
 
 
 static command_t CommandTable[] = 
@@ -552,19 +552,19 @@ static command_t CommandTable[] =
 };
 
 
-int CmdHFTopaz(const char *Cmd) {
+int CmdHFTopaz(pm3_connection* conn, const char *Cmd) {
 	// flush
-	WaitForResponseTimeout(CMD_ACK,NULL,100);
+	WaitForResponseTimeout(conn, CMD_ACK,NULL,100);
 
 	// parse
-	CmdsParse(CommandTable, Cmd);
+	CmdsParse(conn, CommandTable, Cmd);
 	return 0;
 }
 
 
-static int CmdHelp(const char *Cmd)
+static int CmdHelp(pm3_connection* conn, const char *Cmd)
 {
-	CmdsHelp(CommandTable);
+	CmdsHelp(conn, CommandTable);
 	return 0;
 }
 

@@ -13,22 +13,23 @@
 
 #include <stdbool.h>
 #include <stdint.h>
+#include "comms.h"
 
-extern int CmdLF(const char *Cmd);
+extern int CmdLF(pm3_connection* conn, const char *Cmd);
 
-extern int CmdLFCommandRead(const char *Cmd);
-extern int CmdFlexdemod(const char *Cmd);
-extern int CmdIndalaDemod(const char *Cmd);
-extern int CmdIndalaClone(const char *Cmd);
-extern int CmdLFRead(const char *Cmd);
-extern int CmdLFSim(const char *Cmd);
-extern int CmdLFaskSim(const char *Cmd);
-extern int CmdLFfskSim(const char *Cmd);
-extern int CmdLFpskSim(const char *Cmd);
-extern int CmdLFSimBidir(const char *Cmd);
-extern int CmdLFSnoop(const char *Cmd);
-extern int CmdVchDemod(const char *Cmd);
-extern int CmdLFfind(const char *Cmd);
-extern bool lf_read(bool silent, uint32_t samples);
+extern int CmdLFCommandRead(pm3_connection* conn, const char *Cmd);
+extern int CmdFlexdemod(pm3_connection* conn, const char *Cmd);
+extern int CmdIndalaDemod(pm3_connection* conn, const char *Cmd);
+extern int CmdIndalaClone(pm3_connection* conn, const char *Cmd);
+extern int CmdLFRead(pm3_connection* conn, const char *Cmd);
+extern int CmdLFSim(pm3_connection* conn, const char *Cmd);
+extern int CmdLFaskSim(pm3_connection* conn, const char *Cmd);
+extern int CmdLFfskSim(pm3_connection* conn, const char *Cmd);
+extern int CmdLFpskSim(pm3_connection* conn, const char *Cmd);
+extern int CmdLFSimBidir(pm3_connection* conn, const char *Cmd);
+extern int CmdLFSnoop(pm3_connection* conn, const char *Cmd);
+extern int CmdVchDemod(pm3_connection* conn, const char *Cmd);
+extern int CmdLFfind(pm3_connection* conn, const char *Cmd);
+extern bool lf_read(pm3_connection* conn, bool silent, uint32_t samples);
 
 #endif

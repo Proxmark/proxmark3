@@ -11,10 +11,12 @@
 #ifndef CMDPARSER_H__
 #define CMDPARSER_H__ 
 
+#include "comms.h"
+
 typedef struct command_s
 {
   const char * Name;
-  int (*Parse)(const char *Cmd);
+  int (*Parse)(pm3_connection *conn, const char *Cmd);
   int Offline;
   const char * Help;
 } command_t;
@@ -22,9 +24,9 @@ typedef struct command_s
 // command_t array are expected to be NULL terminated
 
 // Print help for each command in the command array
-void CmdsHelp(const command_t Commands[]);
+void CmdsHelp(pm3_connection* conn, const command_t Commands[]);
 // Parse a command line
-int CmdsParse(const command_t Commands[], const char *Cmd);
+int CmdsParse(pm3_connection* conn, const command_t Commands[], const char *Cmd);
 void dumpCommandsRecursive(const command_t cmds[], int markdown);
 
 #endif

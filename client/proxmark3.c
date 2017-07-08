@@ -27,28 +27,33 @@
 #include "whereami.h"
 #include "comms.h"
 
-void main_loop(char *script_cmds_file, bool usb_present, serial_port* sp) {
-	receiver_arg conn;
+
+void main_loop(char *script_cmds_file, bool usb_present, serial_port* port, bool flush_after_write) {
+	pm3_connection conn;
 	char *cmd = NULL;
 	pthread_t reader_thread;
-	memset(&conn, 0, sizeof(receiver_arg));
+	memset(&conn, 0, sizeof(pm3_connection));
 	pthread_mutex_init(&conn.recv_lock, NULL);
-
+	
 	// TODO: Move this into comms.c
-	PlotGridXdefault = 64;
-	PlotGridYdefault = 64;
-	showDemod = true;
-	CursorScaleFactor = 1;
+	conn.PlotGridXdefault = 64;
+	conn.PlotGridYdefault = 64;
+	conn.showDemod = true;
+	conn.CursorScaleFactor = 1;
+	
+	// TODO: Make logging better
+	conn.flushAfterWrite = flush_after_write;
+	SetFlushAfterWrite(flush_after_write);
 
 	if (usb_present) {
 		conn.run = true;
-		SetSerialPort(sp);
-		SetOffline(false);
+		conn.port = port;
+		conn.offline = false;
 		pthread_create(&reader_thread, NULL, &uart_receiver, &conn);
 		// cache Version information now:
-		CmdVersion(NULL);
+		CmdVersion(&conn, NULL);
 	} else {
-		SetOffline(true);
+		conn.offline = true;
 	}
 
 	FILE *script_file = NULL;
@@ -97,7 +102,7 @@ void main_loop(char *script_cmds_file, bool usb_present, serial_port* sp) {
 				cmd[strlen(cmd) - 1] = 0x00;
 			
 			if (cmd[0] != 0x00) {
-				int ret = CommandReceived(cmd);
+				int ret = CommandReceived(&conn, cmd);
 				add_history(cmd);
 				if (ret == 99) {  // exit or quit
 					break;
@@ -121,6 +126,8 @@ void main_loop(char *script_cmds_file, bool usb_present, serial_port* sp) {
 		fclose(script_file);
 		script_file = NULL;
 	}
+	
+	pthread_mutex_destroy(&conn.recv_lock);
 
 	pthread_mutex_destroy(&conn.recv_lock);
 }
@@ -192,6 +199,7 @@ int main(int argc, char* argv[]) {
 	bool usb_present = false;
 	char *script_cmds_file = NULL;
 
+	bool flush_after_write = false;
 	g_debugMode = 0;
   
 	serial_port *sp = uart_open(argv[1]);
@@ -214,7 +222,7 @@ int main(int argc, char* argv[]) {
 			argv[2][4] == 'h')
 		{
 			printf("Output will be flushed after every print.\n");
-			flushAfterWrite = 1;
+			flush_after_write = 1;
 		}
 		else
 		script_cmds_file = argv[2];
@@ -225,19 +233,19 @@ int main(int argc, char* argv[]) {
 
 #ifdef HAVE_GUI
 #ifdef _WIN32
-	InitGraphics(argc, argv, script_cmds_file, usb_present, sp);
+	InitGraphics(argc, argv, script_cmds_file, usb_present, sp, flush_after_write);
 	MainGraphics();
 #else
 	char* display = getenv("DISPLAY");
 
 	if (display && strlen(display) > 1)
 	{
-		InitGraphics(argc, argv, script_cmds_file, usb_present, sp);
+		InitGraphics(argc, argv, script_cmds_file, usb_present, sp, flush_after_write);
 		MainGraphics();
 	}
 	else
 	{
-		main_loop(script_cmds_file, usb_present, sp);
+		main_loop(script_cmds_file, usb_present, sp, flush_after_write);
 	}
 #endif
 #else

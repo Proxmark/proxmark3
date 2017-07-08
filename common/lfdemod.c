@@ -44,16 +44,22 @@
 #define LOWEST_DEFAULT_CLOCK 32
 #define FSK_PSK_THRESHOLD   123
 
-//to allow debug print calls when used not on device
+#ifdef ON_DEVICE
+// We're code running on the device.
+
+// To allow debug print calls when used not on device
 void dummy(char *fmt, ...){}
-#ifndef ON_DEVICE
+
+#define g_debugMode 0
+#define prnt dummy
+	
+#else
+// We're the proxmark client.
 #include "ui.h"
 #include "cmdparser.h"
 #include "cmddata.h"
 #define prnt PrintAndLog
-#else 
-	uint8_t g_debugMode=0;
-#define prnt dummy
+
 #endif
 
 uint8_t justNoise(uint8_t *BitStream, size_t size) {

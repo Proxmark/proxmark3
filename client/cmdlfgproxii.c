@@ -20,22 +20,22 @@
 #include "cmdmain.h"
 #include "cmdlf.h"
 #include "lfdemod.h"
-static int CmdHelp(const char *Cmd);
+static int CmdHelp(pm3_connection* conn, const char *Cmd);
 
 //by marshmellow
 //attempts to demodulate and identify a G_Prox_II verex/chubb card
-//WARNING: if it fails during some points it will destroy the DemodBuffer data
+//WARNING: if it fails during some points it will destroy the conn->DemodBuffer data
 // but will leave the GraphBuffer intact.
 //if successful it will push askraw data back to demod buffer ready for emulation
-int CmdG_Prox_II_Demod(const char *Cmd)
+int CmdG_Prox_II_Demod(pm3_connection* conn, const char *Cmd)
 {
-	if (!ASKbiphaseDemod(Cmd, false)){
+	if (!ASKbiphaseDemod(conn, Cmd, false)){
 		if (g_debugMode) PrintAndLog("Error gProxII: ASKbiphaseDemod failed 1st try");
 		return 0;
 	}
-	size_t size = DemodBufferLen;
+	size_t size = conn->DemodBufferLen;
 	//call lfdemod.c demod for gProxII
-	int ans = gProxII_Demod(DemodBuffer, &size);
+	int ans = gProxII_Demod(conn->DemodBuffer, &size);
 	if (ans < 0){
 		if (g_debugMode) PrintAndLog("Error gProxII_Demod");
 		return 0;
@@ -46,8 +46,8 @@ int CmdG_Prox_II_Demod(const char *Cmd)
 	size_t startIdx = ans + 6; //start after 6 bit preamble
 
 	uint8_t bits_no_spacer[90];
-	//so as to not mess with raw DemodBuffer copy to a new sample array
-	memcpy(bits_no_spacer, DemodBuffer + startIdx, 90);
+	//so as to not mess with raw conn->DemodBuffer copy to a new sample array
+	memcpy(bits_no_spacer, conn->DemodBuffer + startIdx, 90);
 	// remove the 18 (90/5=18) parity bits (down to 72 bits (96-6-18=72))
 	size_t bitLen = removeParity(bits_no_spacer, 0, 5, 3, 90); //source, startloc, paritylen, ptype, length_to_run
 	if (bitLen != 72) {
@@ -66,9 +66,9 @@ int CmdG_Prox_II_Demod(const char *Cmd)
 	uint32_t FC = 0;
 	uint32_t Card = 0;
 	//get raw 96 bits to print
-	uint32_t raw1 = bytebits_to_byte(DemodBuffer+ans,32);
-	uint32_t raw2 = bytebits_to_byte(DemodBuffer+ans+32, 32);
-	uint32_t raw3 = bytebits_to_byte(DemodBuffer+ans+64, 32);
+	uint32_t raw1 = bytebits_to_byte(conn->DemodBuffer+ans,32);
+	uint32_t raw2 = bytebits_to_byte(conn->DemodBuffer+ans+32, 32);
+	uint32_t raw3 = bytebits_to_byte(conn->DemodBuffer+ans+64, 32);
 
 	if (fmtLen==36){
 		FC = ((ByteStream[3] & 0x7F)<<7) | (ByteStream[4]>>1);
@@ -83,18 +83,18 @@ int CmdG_Prox_II_Demod(const char *Cmd)
 		PrintAndLog("Decoded Raw: %s", sprint_hex(ByteStream, 8)); 
 	}
 	PrintAndLog("Raw: %08x%08x%08x", raw1,raw2,raw3);
-	setDemodBuf(DemodBuffer, 96, ans);
-	setClockGrid(g_DemodClock, g_DemodStartIdx + (ans*g_DemodClock));
+	setDemodBuf(conn, conn->DemodBuffer, 96, ans);
+	setClockGrid(conn, conn->g_DemodClock, conn->g_DemodStartIdx + (ans*conn->g_DemodClock));
 
 	return 1;
 }
 //by marshmellow
 //see ASKDemod for what args are accepted
-int CmdG_Prox_II_Read(const char *Cmd) {
+int CmdG_Prox_II_Read(pm3_connection* conn, const char *Cmd) {
 	// read lf silently
-	lf_read(true, 10000);
+	lf_read(conn, true, 10000);
 	// demod and output viking ID	
-	return CmdG_Prox_II_Demod(Cmd);
+	return CmdG_Prox_II_Demod(conn, Cmd);
 }
 
 static command_t CommandTable[] = {
@@ -104,12 +104,12 @@ static command_t CommandTable[] = {
 	{NULL, NULL, 0, NULL}
 };
 
-int CmdLF_G_Prox_II(const char *Cmd) {
-	CmdsParse(CommandTable, Cmd);
+int CmdLF_G_Prox_II(pm3_connection* conn, const char *Cmd) {
+	CmdsParse(conn, CommandTable, Cmd);
 	return 0;
 }
 
-int CmdHelp(const char *Cmd) {
-	CmdsHelp(CommandTable);
+int CmdHelp(pm3_connection* conn, const char *Cmd) {
+	CmdsHelp(conn, CommandTable);
 	return 0;
 }

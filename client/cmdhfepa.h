@@ -10,9 +10,10 @@
 
 #ifndef CMDHFEPA_H__
 #define CMDHFEPA_H__
+#include "comms.h"
 
-int CmdHFEPA(const char *Cmd);
+int CmdHFEPA(pm3_connection* conn, const char *Cmd);
 
-int CmdHFEPACollectPACENonces(const char *Cmd);
+int CmdHFEPACollectPACENonces(pm3_connection* conn, const char *Cmd);
 
 #endif // CMDHFEPA_H__

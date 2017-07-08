@@ -20,7 +20,7 @@
 #include "cmdlf.h"
 #include "lfdemod.h"    // preamble test
 
-static int CmdHelp(const char *Cmd);
+static int CmdHelp(pm3_connection* conn, const char *Cmd);
 
 // by marshmellow
 // find PAC preamble in already demoded data
@@ -36,15 +36,15 @@ int PacFind(uint8_t *dest, size_t *size) {
 }
 
 //see NRZDemod for what args are accepted
-int CmdPacDemod(const char *Cmd) {
+int CmdPacDemod(pm3_connection* conn, const char *Cmd) {
 
 	//NRZ
-	if (!NRZrawDemod(Cmd, false)) {
+	if (!NRZrawDemod(conn, Cmd, false)) {
 		if (g_debugMode) PrintAndLog("DEBUG: Error - PAC: NRZ Demod failed");
 		return 0;
 	}
-	size_t size = DemodBufferLen;
-	int ans = PacFind(DemodBuffer, &size);
+	size_t size = conn->DemodBufferLen;
+	int ans = PacFind(conn->DemodBuffer, &size);
 	if (ans < 0) {
 		if (g_debugMode) {
 			if (ans == -1)
@@ -58,14 +58,14 @@ int CmdPacDemod(const char *Cmd) {
 		}
 		return 0;
 	}
-	setDemodBuf(DemodBuffer, 128, ans);
-	setClockGrid(g_DemodClock, g_DemodStartIdx + (ans*g_DemodClock));
+	setDemodBuf(conn, conn->DemodBuffer, 128, ans);
+	setClockGrid(conn, conn->g_DemodClock, conn->g_DemodStartIdx + (ans * conn->g_DemodClock));
 
 	//got a good demod
-	uint32_t raw1 = bytebits_to_byte(DemodBuffer   , 32);
-	uint32_t raw2 = bytebits_to_byte(DemodBuffer+32, 32);
-	uint32_t raw3 = bytebits_to_byte(DemodBuffer+64, 32);
-	uint32_t raw4 = bytebits_to_byte(DemodBuffer+96, 32);
+	uint32_t raw1 = bytebits_to_byte(conn->DemodBuffer   , 32);
+	uint32_t raw2 = bytebits_to_byte(conn->DemodBuffer+32, 32);
+	uint32_t raw3 = bytebits_to_byte(conn->DemodBuffer+64, 32);
+	uint32_t raw4 = bytebits_to_byte(conn->DemodBuffer+96, 32);
 
 	// preamble     then appears to have marker bits of "10"                                                                                                                                       CS?    
 	// 11111111001000000 10 01001100 10 00001101 10 00001101 10 00001101 10 00001101 10 00001101 10 00001101 10 00001101 10 00001101 10 10001100 10 100000001
@@ -76,9 +76,9 @@ int CmdPacDemod(const char *Cmd) {
 	return 1;
 }
 
-int CmdPacRead(const char *Cmd) {
-	lf_read(true, 4096*2 + 20);
-	return CmdPacDemod(Cmd);
+int CmdPacRead(pm3_connection* conn, const char *Cmd) {
+	lf_read(conn, true, 4096*2 + 20);
+	return CmdPacDemod(conn, Cmd);
 }
 
 static command_t CommandTable[] = {
@@ -88,13 +88,13 @@ static command_t CommandTable[] = {
 	{NULL, NULL, 0, NULL}
 };
 
-int CmdLFPac(const char *Cmd) {
-	clearCommandBuffer();
-	CmdsParse(CommandTable, Cmd);
+int CmdLFPac(pm3_connection* conn, const char *Cmd) {
+	clearCommandBuffer(conn);
+	CmdsParse(conn, CommandTable, Cmd);
 	return 0;
 }
 
-int CmdHelp(const char *Cmd) {
-	CmdsHelp(CommandTable);
+int CmdHelp(pm3_connection* conn, const char *Cmd) {
+	CmdsHelp(conn, CommandTable);
 	return 0;
 }

@@ -10,12 +10,13 @@
 
 #ifndef CMDLFHITAG_H__
 #define CMDLFHITAG_H__
+#include "comms.h"
 
-int CmdLFHitag(const char *Cmd);
+int CmdLFHitag(pm3_connection* conn, const char *Cmd);
 
-int CmdLFHitagList(const char *Cmd);
-int CmdLFHitagSnoop(const char *Cmd);
-int CmdLFHitagSim(const char *Cmd);
-int CmdLFHitagReader(const char *Cmd);
+int CmdLFHitagList(pm3_connection* conn, const char *Cmd);
+int CmdLFHitagSnoop(pm3_connection* conn, const char *Cmd);
+int CmdLFHitagSim(pm3_connection* conn, const char *Cmd);
+int CmdLFHitagReader(pm3_connection* conn, const char *Cmd);
 
 #endif

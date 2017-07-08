@@ -11,6 +11,6 @@
 #ifndef CMDHFTOPAZ_H__
 #define CMDHFTOPAZ_H__
 
-int CmdHFTopaz(const char *Cmd);
+int CmdHFTopaz(pm3_connection* conn, const char *Cmd);
 
 #endif

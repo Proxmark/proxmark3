@@ -4,26 +4,26 @@
 #ifndef CMDHFMFU_H__
 #define CMDHFMFU_H__
 
-int CmdHF14AMfUWrBl(const char *Cmd);
-int CmdHF14AMfURdBl(const char *Cmd);
+int CmdHF14AMfUWrBl(pm3_connection* conn, const char *Cmd);
+int CmdHF14AMfURdBl(pm3_connection* conn, const char *Cmd);
 
 //Crypto Cards
-int CmdHF14AMfucAuth(const char *Cmd);
+int CmdHF14AMfucAuth(pm3_connection* conn, const char *Cmd);
 
 //general stuff
-int CmdHF14AMfUDump(const char *Cmd);
-int CmdHF14AMfUInfo(const char *Cmd);
+int CmdHF14AMfUDump(pm3_connection* conn, const char *Cmd);
+int CmdHF14AMfUInfo(pm3_connection* conn, const char *Cmd);
 
-uint32_t GetHF14AMfU_Type(void);
+uint32_t GetHF14AMfU_Type(pm3_connection* conn);
 int ul_print_type(uint32_t tagtype, uint8_t spacer);
-void ul_switch_off_field(void);
+void ul_switch_off_field(pm3_connection* conn);
 
 int usage_hf_mfu_dump(void);
 int usage_hf_mfu_info(void);
 int usage_hf_mfu_rdbl(void);
 int usage_hf_mfu_wrbl(void);
 
-int CmdHFMFUltra(const char *Cmd);
+int CmdHFMFUltra(pm3_connection* conn, const char *Cmd);
 
 typedef enum TAGTYPE_UL {
 	UNKNOWN       = 0x000000,

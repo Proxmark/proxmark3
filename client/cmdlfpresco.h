@@ -11,10 +11,11 @@
 
 #include <stdint.h>  //uint_32+
 #include <stdbool.h> //bool
+#include "comms.h"
 
-int CmdLFPresco(const char *Cmd);
-int CmdPrescoClone(const char *Cmd);
-int CmdPrescoSim(const char *Cmd);
+int CmdLFPresco(pm3_connection* conn, const char *Cmd);
+int CmdPrescoClone(pm3_connection* conn, const char *Cmd);
+int CmdPrescoSim(pm3_connection* conn, const char *Cmd);
 
 int GetWiegandFromPresco(const char *id, uint32_t *sitecode, uint32_t *usercode, uint32_t *fullcode, bool *Q5);
 

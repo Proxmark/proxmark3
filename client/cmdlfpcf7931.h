@@ -12,6 +12,8 @@
 #ifndef CMDLFPCF7931_H__
 #define CMDLFPCF7931_H__
 
+#include "comms.h"
+
 struct pcf7931_config{
 	uint8_t Pwd[7];
 	uint16_t InitDelay;
@@ -26,10 +28,10 @@ int usage_pcf7931_read();
 int usage_pcf7931_write();
 int usage_pcf7931_config();
 
-int CmdLFPCF7931(const char *Cmd);
+int CmdLFPCF7931(pm3_connection* conn, const char *Cmd);
 
-int CmdLFPCF7931Read(const char *Cmd);
-int CmdLFPCF7931Write(const char *Cmd);
-int CmdLFPCF7931Config(const char *Cmd);
+int CmdLFPCF7931Read(pm3_connection* conn, const char *Cmd);
+int CmdLFPCF7931Write(pm3_connection* conn, const char *Cmd);
+int CmdLFPCF7931Config(pm3_connection* conn, const char *Cmd);
 
 #endif

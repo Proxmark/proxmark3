@@ -8,9 +8,12 @@
 //-----------------------------------------------------------------------------
 #ifndef CMDLFVIKING_H__
 #define CMDLFVIKING_H__
-extern int CmdLFViking(const char *Cmd);
-extern int CmdVikingDemod(const char *Cmd);
-extern int CmdVikingRead(const char *Cmd);
-extern int CmdVikingClone(const char *Cmd);
-extern int CmdVikingSim(const char *Cmd);
+
+#include "comms.h"
+
+extern int CmdLFViking(pm3_connection* conn, const char *Cmd);
+extern int CmdVikingDemod(pm3_connection* conn, const char *Cmd);
+extern int CmdVikingRead(pm3_connection* conn, const char *Cmd);
+extern int CmdVikingClone(pm3_connection* conn, const char *Cmd);
+extern int CmdVikingSim(pm3_connection* conn, const char *Cmd);
 #endif

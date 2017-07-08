@@ -30,9 +30,9 @@
 #include <lualib.h>
 #include <lauxlib.h>
 
-static int CmdHelp(const char *Cmd);
-static int CmdList(const char *Cmd);
-static int CmdRun(const char *Cmd);
+static int CmdHelp(pm3_connection* conn, const char *Cmd);
+static int CmdList(pm3_connection* conn, const char *Cmd);
+static int CmdRun(pm3_connection* conn, const char *Cmd);
 
 command_t CommandTable[] =
 {
@@ -61,7 +61,7 @@ int str_ends_with(const char * str, const char * suffix) {
  * @param Cmd
  * @return
  */
-int CmdHelp(const char * Cmd)
+int CmdHelp(pm3_connection* conn, const char * Cmd)
 {
     PrintAndLog("This is a feature to run Lua-scripts. You can place lua-scripts within the scripts/-folder. ");
     return 0;
@@ -72,7 +72,7 @@ int CmdHelp(const char * Cmd)
 * generate a file listing of the script-directory for files
 * ending with .lua
 */
-int CmdList(const char *Cmd)
+int CmdList(pm3_connection* conn, const char *Cmd)
 {
     DIR *dp;
     struct dirent *ep;
@@ -100,9 +100,9 @@ int CmdList(const char *Cmd)
  * @param Cmd
  * @return
  */
-int CmdScript(const char *Cmd)
+int CmdScript(pm3_connection* conn, const char *Cmd)
 {
-  CmdsParse(CommandTable, Cmd);
+  CmdsParse(conn, CommandTable, Cmd);
   return 0;
 }
 /**
@@ -120,7 +120,7 @@ bool endsWith (char* base, char* str) {
  * @param argv
  * @return
  */
-int CmdRun(const char *Cmd)
+int CmdRun(pm3_connection* conn, const char *Cmd)
 {
     // create new Lua state
     lua_State *lua_state;
@@ -130,7 +130,7 @@ int CmdRun(const char *Cmd)
     luaL_openlibs(lua_state);
 
     //Sets the pm3 core libraries, that go a bit 'under the hood'
-    set_pm3_libraries(lua_state);
+    set_pm3_libraries(lua_state, conn);
 
     //Add the 'bin' library
     set_bin_library(lua_state);

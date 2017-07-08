@@ -62,7 +62,7 @@ int split(char *str, char *arr[MAX_ARGS]){
 	return wordCnt;
 }
 
-int CmdCrc(const char *Cmd)
+int CmdCrc(pm3_connection* conn, const char *Cmd)
 {
 	char name[] = {"reveng "};
 	char Cmd2[50 + 7];
@@ -72,7 +72,7 @@ int CmdCrc(const char *Cmd)
 	int argc = split(Cmd2, argv);
 
 	if (argc == 3 && memcmp(argv[1],"-g",2)==0) {
-		CmdrevengSearch(argv[2]);
+		CmdrevengSearch(conn, argv[2]);
 	} else {
 		reveng_main(argc, argv);
 	}
@@ -269,7 +269,7 @@ int GetModels(char *Models[], int *count, uint8_t *width){
 }
 
 //test call to GetModels
-int CmdrevengTest(const char *Cmd){
+int CmdrevengTest(pm3_connection* conn, const char *Cmd){
 	char *Models[80];
 	int count = 0;
 	uint8_t widtharr[80] = {0};
@@ -427,7 +427,7 @@ int RunModel(char *inModel, char *inHexStr, bool reverse, char endian, char *res
 }
 
 //test call to RunModel
-int CmdrevengTestC(const char *Cmd){
+int CmdrevengTestC(pm3_connection* conn, const char *Cmd){
 	int cmdp = 0;
 	char inModel[30] = {0x00};
 	char inHexStr[30] = {0x00};
@@ -462,7 +462,7 @@ char *SwapEndianStr(const char *inStr, const size_t len, const uint8_t blockSize
 }
 
 // takes hex string in and searches for a matching result (hex string must include checksum)
-int CmdrevengSearch(const char *Cmd){
+int CmdrevengSearch(pm3_connection* conn, const char *Cmd){
 	char inHexStr[50] = {0x00};
 	int dataLen = param_getstr(Cmd, 0, inHexStr);
 	if (dataLen < 4) return 0;

@@ -23,10 +23,10 @@
 #include "common.h"
 #include "cmdmain.h"
 
-static int CmdHelp(const char *Cmd);
+static int CmdHelp(pm3_connection* conn, const char *Cmd);
 
 // Perform (part of) the PACE protocol
-int CmdHFEPACollectPACENonces(const char *Cmd)
+int CmdHFEPACollectPACENonces(pm3_connection* conn, const char *Cmd)
 {
 	// requested nonce size
 	unsigned int m = 0;
@@ -47,10 +47,10 @@ int CmdHFEPACollectPACENonces(const char *Cmd)
 	for (unsigned int i = 0; i < n; i++) {
 		// execute PACE
 		UsbCommand c = {CMD_EPA_PACE_COLLECT_NONCE, {(int)m, 0, 0}};
-		SendCommand(&c);
+		SendCommand(conn, &c);
 		UsbCommand resp;
 
-		WaitForResponse(CMD_ACK,&resp);
+		WaitForResponse(conn, CMD_ACK,&resp);
 
 		// check if command failed
 		if (resp.arg[0] != 0) {
@@ -78,7 +78,7 @@ int CmdHFEPACollectPACENonces(const char *Cmd)
 ////////////////////////////////The commands lie below here/////////////////////////////////////////////////////////////////////////////////////////
 
 // perform the PACE protocol by replaying APDUs
-int CmdHFEPAPACEReplay(const char *Cmd)
+int CmdHFEPAPACEReplay(pm3_connection* conn, const char *Cmd)
 {
 	// the 4 APDUs which are replayed + their lengths
 	uint8_t msesa_apdu[41], gn_apdu[8], map_apdu[75];
@@ -145,8 +145,8 @@ int CmdHFEPAPACEReplay(const char *Cmd)
 			memcpy(usb_cmd.d.asBytes, // + (j * sizeof(usb_cmd.d.asBytes)),
 			       apdus[i] + (j * sizeof(usb_cmd.d.asBytes)),
 			       packet_length);
-			SendCommand(&usb_cmd);
-			WaitForResponse(CMD_ACK, &resp);
+			SendCommand(conn, &usb_cmd);
+			WaitForResponse(conn, CMD_ACK, &resp);
 			if (resp.arg[0] != 0) {
 				PrintAndLog("Transfer of APDU #%d Part %d failed!", i, j);
 				return 0;
@@ -156,8 +156,8 @@ int CmdHFEPAPACEReplay(const char *Cmd)
 
 	// now perform the replay
 	usb_cmd.arg[0] = 0;
-	SendCommand(&usb_cmd);
-	WaitForResponse(CMD_ACK, &resp);
+	SendCommand(conn, &usb_cmd);
+	WaitForResponse(conn, CMD_ACK, &resp);
 	if (resp.arg[0] != 0) {
 		PrintAndLog("\nPACE replay failed in step %u!", (uint32_t)resp.arg[0]);
 		PrintAndLog("Measured times:");
@@ -194,18 +194,18 @@ static const command_t CommandTable[] =
   {NULL, NULL, 0, NULL}
 };
 
-int CmdHelp(const char *Cmd)
+int CmdHelp(pm3_connection* conn, const char *Cmd)
 {
-  CmdsHelp(CommandTable);
+  CmdsHelp(conn, CommandTable);
   return 0;
 }
 
-int CmdHFEPA(const char *Cmd)
+int CmdHFEPA(pm3_connection* conn, const char *Cmd)
 {
 	// flush
-	WaitForResponseTimeout(CMD_ACK,NULL,100);
+	WaitForResponseTimeout(conn, CMD_ACK,NULL,100);
 
 	// parse
-  CmdsParse(CommandTable, Cmd);
+  CmdsParse(conn, CommandTable, Cmd);
   return 0;
 }

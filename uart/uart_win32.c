@@ -57,7 +57,7 @@ void upcase(char *p) {
   }
 }
 
-serial_port uart_open(const char* pcPortName) {
+serial_port* uart_open(const char* pcPortName) {
   char acPortName[255];
   serial_port_windows* sp = malloc(sizeof(serial_port_windows));
   
@@ -102,30 +102,30 @@ serial_port uart_open(const char* pcPortName) {
   return sp;
 }
 
-void uart_close(const serial_port sp) {
+void uart_close(serial_port* sp) {
   CloseHandle(((serial_port_windows*)sp)->hPort);
   free(sp);
 }
 
-bool uart_receive(const serial_port sp, byte_t* pbtRx, size_t pszMaxRxLen, size_t* pszRxLen) {
+bool uart_receive(serial_port* sp, byte_t* pbtRx, size_t pszMaxRxLen, size_t* pszRxLen) {
   ReadFile(((serial_port_windows*)sp)->hPort,pbtRx,pszMaxRxLen,(LPDWORD)pszRxLen,NULL);
   return (*pszRxLen != 0);
 }
 
-bool uart_send(const serial_port sp, const byte_t* pbtTx, const size_t szTxLen) {
+bool uart_send(serial_port* sp, const byte_t* pbtTx, const size_t szTxLen) {
   DWORD dwTxLen = 0;
   return WriteFile(((serial_port_windows*)sp)->hPort,pbtTx,szTxLen,&dwTxLen,NULL);
   return (dwTxLen != 0);
 }
 
-bool uart_set_speed(serial_port sp, const uint32_t uiPortSpeed) {
+bool uart_set_speed(serial_port* sp, const uint32_t uiPortSpeed) {
   serial_port_windows* spw;
   spw = (serial_port_windows*)sp;
   spw->dcb.BaudRate = uiPortSpeed;
   return SetCommState(spw->hPort, &spw->dcb);
 }
 
-uint32_t uart_get_speed(const serial_port sp) {
+uint32_t uart_get_speed(serial_port* sp) {
   const serial_port_windows* spw = (serial_port_windows*)sp;
   if (!GetCommState(spw->hPort, (serial_port)&spw->dcb)) {
     return spw->dcb.BaudRate;

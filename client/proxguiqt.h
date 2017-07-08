@@ -23,6 +23,8 @@
 
 #include "uart.h"
 #include "ui/ui_overlays.h"
+#include "uart.h"
+
 /**
  * @brief The actual plot, black area were we paint the graph
  */
@@ -124,13 +126,14 @@ class ProxGuiQT : public QObject
 class WorkerThread : public QThread {
 	Q_OBJECT;
 public:
-	WorkerThread(char*, bool, serial_port*);
+	WorkerThread(char*, bool, serial_port*, bool);
 	~WorkerThread();
 	void run();
 private:
 	char *script_cmds_file = NULL;
 	bool usb_present;
 	serial_port *sp = NULL;
+	bool flush_after_write = false;
 };
 
 #endif // PROXGUI_QT

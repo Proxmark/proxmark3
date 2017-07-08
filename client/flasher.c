@@ -61,10 +61,10 @@ int main(int argc, char **argv)
 	int num_files = 0;
 	int res;
 	flash_file_t files[MAX_FILES];
-	receiver_arg conn;
+	pm3_connection conn;
 	pthread_t reader_thread;
 
-	memset(&conn, 0, sizeof(receiver_arg));
+	memset(&conn, 0, sizeof(pm3_connection));
 	memset(files, 0, sizeof(files));
 
 	if (argc < 3) {
@@ -94,14 +94,14 @@ int main(int argc, char **argv)
 	pthread_mutex_init(&conn.recv_lock, NULL);
 
 	char* serial_port_name = argv[1];
-
+  
 	fprintf(stderr,"Waiting for Proxmark to appear on %s", serial_port_name);
 	do {
 		sleep(1);
 		fprintf(stderr, ".");
-	} while (!OpenProxmark(serial_port_name));
+	} while (!OpenProxmark(&conn, serial_port_name));
 	fprintf(stderr," Found.\n");
-
+	
 	// Lets start up the communications thread
 	conn.run = true;
 	pthread_create(&reader_thread, NULL, &uart_receiver, &conn);
@@ -113,7 +113,7 @@ int main(int argc, char **argv)
 	fprintf(stderr, "\nFlashing...\n");
 
 	for (int i = 0; i < num_files; i++) {
-		res = flash_write(&files[i]);
+		res = flash_write(&conn, &files[i]);
 		if (res < 0)
 			return -1;
 		flash_free(&files[i]);
@@ -122,7 +122,7 @@ int main(int argc, char **argv)
 
 	fprintf(stderr, "Resetting hardware...\n");
 
-	res = flash_stop_flashing();
+	res = flash_stop_flashing(&conn);
 	if (res < 0)
 		return -1;
 

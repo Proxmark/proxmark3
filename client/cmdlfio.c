@@ -25,32 +25,32 @@
 #include "lfdemod.h"  //for IOdemodFSK + bytebits_to_byte
 #include "util.h"     //for sprint_bin_break
 
-static int CmdHelp(const char *Cmd);
+static int CmdHelp(pm3_connection* conn, const char *Cmd);
 
-int CmdIOReadFSK(const char *Cmd)
+int CmdIOReadFSK(pm3_connection* conn, const char *Cmd)
 {
   int findone=0;
   if(Cmd[0]=='1') findone=1;
 	
   UsbCommand c={CMD_IO_DEMOD_FSK};
   c.arg[0]=findone;
-  SendCommand(&c);
+  SendCommand(conn, &c);
   return 0;
 }
 
 //by marshmellow
 //IO-Prox demod - FSK RF/64 with preamble of 000000001
 //print ioprox ID and some format details
-int CmdFSKdemodIO(const char *Cmd)
+int CmdFSKdemodIO(pm3_connection* conn, const char *Cmd)
 {
   int idx=0;
   //something in graphbuffer?
-  if (GraphTraceLen < 65) {
-    if (g_debugMode)PrintAndLog("DEBUG: not enough samples in GraphBuffer");
+  if (conn->GraphTraceLen < 65) {
+    if (g_debugMode)PrintAndLog("DEBUG: not enough samples in conn->GraphBuffer");
     return 0;
   }
   uint8_t BitStream[MAX_GRAPH_TRACE_LEN]={0};
-  size_t BitLen = getFromGraphBuf(BitStream);
+  size_t BitLen = getFromGraphBuf(conn, BitStream);
   if (BitLen==0) return 0;
 
   int waveIdx = 0;
@@ -119,17 +119,17 @@ int CmdFSKdemodIO(const char *Cmd)
   char *crcStr = (crc == calccrc) ? "crc ok": "!crc";
 
   PrintAndLog("IO Prox XSF(%02d)%02x:%05d (%08x%08x) [%02x %s]",version,facilitycode,number,code,code2, crc, crcStr);
-  setDemodBuf(BitStream,64,idx);
-  setClockGrid(64, waveIdx + (idx*64));
+  setDemodBuf(conn, BitStream,64,idx);
+  setClockGrid(conn, 64, waveIdx + (idx*64));
 
   if (g_debugMode){
     PrintAndLog("DEBUG: idx: %d, Len: %d, Printing demod buffer:",idx,64);
-    printDemodBuff();
+    printDemodBuff(conn);
   }
   return 1;
 }
 
-int CmdIOClone(const char *Cmd)
+int CmdIOClone(pm3_connection* conn, const char *Cmd)
 {
   unsigned int hi = 0, lo = 0;
   int n = 0, i = 0;
@@ -152,27 +152,27 @@ int CmdIOClone(const char *Cmd)
   c.arg[0] = hi;
   c.arg[1] = lo;
 
-  SendCommand(&c);
+  SendCommand(conn, &c);
   return 0;
 }
 
 static command_t CommandTable[] = 
 {
   {"help",        CmdHelp,            1, "This help"},
-  {"demod",       CmdFSKdemodIO,      1, "Demodulate IO Prox tag from the GraphBuffer"},
+  {"demod",       CmdFSKdemodIO,      1, "Demodulate IO Prox tag from the conn->GraphBuffer"},
   {"read",        CmdIOReadFSK,       0, "['1'] Realtime IO FSK demodulate from antenna (option '1' for one tag only)"},
   {"clone",       CmdIOClone,         0, "Clone ioProx Tag"},
   {NULL, NULL, 0, NULL}
 };
 
-int CmdLFIO(const char *Cmd)
+int CmdLFIO(pm3_connection* conn, const char *Cmd)
 {
-  CmdsParse(CommandTable, Cmd);
+  CmdsParse(conn, CommandTable, Cmd);
   return 0; 
 }
 
-int CmdHelp(const char *Cmd)
+int CmdHelp(pm3_connection* conn, const char *Cmd)
 {
-  CmdsHelp(CommandTable);
+  CmdsHelp(conn, CommandTable);
   return 0;
 }

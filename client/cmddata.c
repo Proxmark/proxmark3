@@ -25,17 +25,11 @@
 #include "loclass/cipherutils.h" // for decimating samples in getsamples
 #include "cmdlfem4x.h"// for em410x demod
 
-uint8_t DemodBuffer[MAX_DEMOD_BUF_LEN];
-uint8_t g_debugMode=0;
-size_t DemodBufferLen=0;
-int g_DemodStartIdx=0;
-int g_DemodClock=0;
-
-static int CmdHelp(const char *Cmd);
+static int CmdHelp(pm3_connection* conn, const char *Cmd);
 
 //set the demod buffer with given array of binary (one bit per byte)
 //by marshmellow
-void setDemodBuf(uint8_t *buff, size_t size, size_t startIdx)
+void setDemodBuf(pm3_connection* conn, uint8_t *buff, size_t size, size_t startIdx)
 {
 	if (buff == NULL) 
 		return;
@@ -43,28 +37,31 @@ void setDemodBuf(uint8_t *buff, size_t size, size_t startIdx)
 	if ( size > MAX_DEMOD_BUF_LEN - startIdx)
 		size = MAX_DEMOD_BUF_LEN - startIdx;
 
+	// FIXME: memcpy
 	size_t i = 0;
 	for (; i < size; i++){
-		DemodBuffer[i]=buff[startIdx++];
+		conn->DemodBuffer[i]=buff[startIdx++];
 	}
-	DemodBufferLen=size;
+	conn->DemodBufferLen=size;
 	return;
 }
 
-bool getDemodBuf(uint8_t *buff, size_t *size) {
+bool getDemodBuf(pm3_connection* conn, uint8_t *buff, size_t *size) {
 	if (buff == NULL) return false;
 	if (size == NULL) return false;
 	if (*size == 0) return false;
 
-	*size = (*size > DemodBufferLen) ? DemodBufferLen : *size;
+	*size = (*size > conn->DemodBufferLen) ? conn->DemodBufferLen : *size;
 
-	memcpy(buff, DemodBuffer, *size);
+	memcpy(buff, conn->DemodBuffer, *size);
 	return true;
 }
 
-// option '1' to save DemodBuffer any other to restore
-void save_restoreDB(uint8_t saveOpt)
+// option '1' to save conn->DemodBuffer any other to restore
+void save_restoreDB(pm3_connection* conn, uint8_t saveOpt)
 {
+	// FIXME: This function only allows a buffer of 1 graph to be stored.
+	// FIXME: This function is not thread-safe.
 	static uint8_t SavedDB[MAX_DEMOD_BUF_LEN];
 	static size_t SavedDBlen;
 	static bool DB_Saved = false;
@@ -73,21 +70,21 @@ void save_restoreDB(uint8_t saveOpt)
 
 	if (saveOpt == GRAPH_SAVE) { //save
 
-		memcpy(SavedDB, DemodBuffer, sizeof(DemodBuffer));
-		SavedDBlen = DemodBufferLen;
+		memcpy(SavedDB, conn->DemodBuffer, sizeof(conn->DemodBuffer));
+		SavedDBlen = conn->DemodBufferLen;
 		DB_Saved=true;
-		savedDemodStartIdx = g_DemodStartIdx;
-		savedDemodClock = g_DemodClock;
+		savedDemodStartIdx = conn->g_DemodStartIdx;
+		savedDemodClock = conn->g_DemodClock;
 	} else if (DB_Saved) { //restore
-		memcpy(DemodBuffer, SavedDB, sizeof(DemodBuffer));
-		DemodBufferLen = SavedDBlen;
-		g_DemodClock = savedDemodClock;
-		g_DemodStartIdx = savedDemodStartIdx;
+		memcpy(conn->DemodBuffer, SavedDB, sizeof(conn->DemodBuffer));
+		conn->DemodBufferLen = SavedDBlen;
+		conn->g_DemodClock = savedDemodClock;
+		conn->g_DemodStartIdx = savedDemodStartIdx;
 	}
 	return;
 }
 
-int CmdSetDebugMode(const char *Cmd)
+int CmdSetDebugMode(pm3_connection* conn, const char *Cmd)
 {
 	int demod=0;
 	sscanf(Cmd, "%i", &demod);
@@ -106,22 +103,22 @@ int usage_data_printdemodbuf(){
 }
 
 //by marshmellow
-void printDemodBuff(void)
+void printDemodBuff(pm3_connection* conn)
 {
-	int bitLen = DemodBufferLen;
+	int bitLen = conn->DemodBufferLen;
 	if (bitLen<1) {
 		PrintAndLog("no bits found in demod buffer");
 		return;
 	}
 	if (bitLen>512) bitLen=512; //max output to 512 bits if we have more - should be plenty
 
-	char *bin = sprint_bin_break(DemodBuffer,bitLen,16);
+	char *bin = sprint_bin_break(conn->DemodBuffer,bitLen,16);
 	PrintAndLog("%s",bin);
 
 	return;
 }
 
-int CmdPrintDemodBuff(const char *Cmd)
+int CmdPrintDemodBuff(pm3_connection* conn, const char *Cmd)
 {
 	char hex[512]={0x00};
 	bool hexMode = false;
@@ -162,35 +159,35 @@ int CmdPrintDemodBuff(const char *Cmd)
 	}
 	//Validations
 	if(errors) return usage_data_printdemodbuf();
-	length = (length > (DemodBufferLen-offset)) ? DemodBufferLen-offset : length; 
+	length = (length > (conn->DemodBufferLen-offset)) ? conn->DemodBufferLen-offset : length; 
 	int numBits = (length) & 0x00FFC; //make sure we don't exceed our string
 
 	if (hexMode){
-		char *buf = (char *) (DemodBuffer + offset);
+		char *buf = (char *) (conn->DemodBuffer + offset);
 		numBits = (numBits > sizeof(hex)) ? sizeof(hex) : numBits;
 		numBits = binarraytohex(hex, buf, numBits);
 		if (numBits==0) return 0;
-		PrintAndLog("DemodBuffer: %s",hex);		
+		PrintAndLog("conn->DemodBuffer: %s",hex);		
 	} else {
-		PrintAndLog("DemodBuffer:\n%s", sprint_bin_break(DemodBuffer+offset,numBits,16));
+		PrintAndLog("conn->DemodBuffer:\n%s", sprint_bin_break(conn->DemodBuffer+offset,numBits,16));
 	}
 	return 1;
 }
 
 //by marshmellow
 //this function strictly converts >1 to 1 and <1 to 0 for each sample in the graphbuffer
-int CmdGetBitStream(const char *Cmd)
+int CmdGetBitStream(pm3_connection* conn, const char *Cmd)
 {
 	int i;
-	CmdHpf(Cmd);
-	for (i = 0; i < GraphTraceLen; i++) {
-		if (GraphBuffer[i] >= 1) {
-			GraphBuffer[i] = 1;
+	CmdHpf(conn, Cmd);
+	for (i = 0; i < conn->GraphTraceLen; i++) {
+		if (conn->GraphBuffer[i] >= 1) {
+			conn->GraphBuffer[i] = 1;
 		} else {
-			GraphBuffer[i] = 0;
+			conn->GraphBuffer[i] = 0;
 		}
 	}
-	RepaintGraphWindow();
+	RepaintGraphWindow(conn);
 	return 0;
 }
 
@@ -200,7 +197,7 @@ int CmdGetBitStream(const char *Cmd)
 //verbose will print results and demoding messages
 //emSearch will auto search for EM410x format in bitstream
 //askType switches decode: ask/raw = 0, ask/manchester = 1 
-int ASKDemod_ext(const char *Cmd, bool verbose, bool emSearch, uint8_t askType, bool *stCheck) {
+int ASKDemod_ext(pm3_connection* conn, const char *Cmd, bool verbose, bool emSearch, uint8_t askType, bool *stCheck) {
 	int invert=0;
 	int clk=0;
 	int maxErr=100;
@@ -218,7 +215,7 @@ int ASKDemod_ext(const char *Cmd, bool verbose, bool emSearch, uint8_t askType, 
 		invert=1;
 		clk=0;
 	}
-	size_t BitLen = getFromGraphBuf(BitStream);
+	size_t BitLen = getFromGraphBuf(conn, BitStream);
 	if (g_debugMode) PrintAndLog("DEBUG: Bitlen from grphbuff: %d",BitLen);
 	if (BitLen < 255) return 0;
 	if (maxLen < BitLen && maxLen != 0) BitLen = maxLen;
@@ -233,14 +230,14 @@ int ASKDemod_ext(const char *Cmd, bool verbose, bool emSearch, uint8_t askType, 
 	*stCheck = st;
 	if (st) {
 		clk = (clk == 0) ? foundclk : clk;
-		CursorCPos = ststart;
-		CursorDPos = stend;
+		conn->CursorCPos = ststart;
+		conn->CursorDPos = stend;
 		if (verbose || g_debugMode) PrintAndLog("\nFound Sequence Terminator - First one is shown by orange and blue graph markers");
 		//Graph ST trim (for testing)
 		//for (int i = 0; i < BitLen; i++) {
-		//	GraphBuffer[i] = BitStream[i]-128;
+		//	conn->GraphBuffer[i] = BitStream[i]-128;
 		//}
-		//RepaintGraphWindow();
+		//RepaintGraphWindow(conn);
 	}
 	int startIdx = 0;
 	int errCnt = askdemod_ext(BitStream, &BitLen, &clk, &invert, maxErr, askamp, askType, &startIdx);
@@ -254,34 +251,34 @@ int ASKDemod_ext(const char *Cmd, bool verbose, bool emSearch, uint8_t askType, 
 	}
 	if (verbose || g_debugMode) PrintAndLog("\nUsing Clock:%d, Invert:%d, Bits Found:%d",clk,invert,BitLen);
 	//output
-	setDemodBuf(BitStream,BitLen,0);
-	setClockGrid(clk, startIdx);
+	setDemodBuf(conn, BitStream, BitLen, 0);
+	setClockGrid(conn, clk, startIdx);
 
 	if (verbose || g_debugMode){
 		if (errCnt>0) PrintAndLog("# Errors during Demoding (shown as 7 in bit stream): %d",errCnt);
 		if (askType) PrintAndLog("ASK/Manchester - Clock: %d - Decoded bitstream:",clk);
 		else PrintAndLog("ASK/Raw - Clock: %d - Decoded bitstream:",clk);
 		// Now output the bitstream to the scrollback by line of 16 bits
-		printDemodBuff();
+		printDemodBuff(conn);
 		
 	}
 	uint64_t lo = 0;
 	uint32_t hi = 0;
 	if (emSearch){
-		AskEm410xDecode(true, &hi, &lo);
+		AskEm410xDecode(conn, true, &hi, &lo);
 	}
 	return 1;
 }
-int ASKDemod(const char *Cmd, bool verbose, bool emSearch, uint8_t askType) {
+int ASKDemod(pm3_connection* conn, const char *Cmd, bool verbose, bool emSearch, uint8_t askType) {
 	bool st = false;
-	return ASKDemod_ext(Cmd, verbose, emSearch, askType, &st);
+	return ASKDemod_ext(conn, Cmd, verbose, emSearch, askType, &st);
 }
 
 //by marshmellow
 //takes 5 arguments - clock, invert, maxErr, maxLen as integers and amplify as char == 'a'
 //attempts to demodulate ask while decoding manchester
 //prints binary found and saves in graphbuffer for further commands
-int Cmdaskmandemod(const char *Cmd)
+int Cmdaskmandemod(pm3_connection* conn, const char *Cmd)
 {
 	char cmdp = param_getchar(Cmd, 0);
 	if (strlen(Cmd) > 45 || cmdp == 'h' || cmdp == 'H') {
@@ -302,17 +299,17 @@ int Cmdaskmandemod(const char *Cmd)
 	}
 	bool st = true;
 	if (Cmd[0]=='s') 
-		return ASKDemod_ext(Cmd++, true, false, 1, &st);
+		return ASKDemod_ext(conn, Cmd++, true, false, 1, &st);
 	else if (Cmd[1] == 's')
-		return ASKDemod_ext(Cmd+=2, true, false, 1, &st);
+		return ASKDemod_ext(conn, Cmd+=2, true, false, 1, &st);
 	else
-		return ASKDemod(Cmd, true, false, 1);
+		return ASKDemod(conn, Cmd, true, false, 1);
 }
 
 //by marshmellow
 //manchester decode
 //stricktly take 10 and 01 and convert to 0 and 1
-int Cmdmandecoderaw(const char *Cmd)
+int Cmdmandecoderaw(pm3_connection* conn, const char *Cmd)
 {
 	int i =0;
 	int errCnt=0;
@@ -330,13 +327,13 @@ int Cmdmandecoderaw(const char *Cmd)
 		PrintAndLog("    sample: data manrawdecode   = decode manchester bitstream from the demodbuffer");
 		return 0;
 	}
-	if (DemodBufferLen==0) return 0;
+	if (conn->DemodBufferLen==0) return 0;
 	uint8_t BitStream[MAX_DEMOD_BUF_LEN]={0};
 	int high=0,low=0;
-	for (;i<DemodBufferLen;++i){
-		if (DemodBuffer[i]>high) high=DemodBuffer[i];
-		else if(DemodBuffer[i]<low) low=DemodBuffer[i];
-		BitStream[i]=DemodBuffer[i];
+	for (;i<conn->DemodBufferLen;++i){
+		if (conn->DemodBuffer[i]>high) high=conn->DemodBuffer[i];
+		else if(conn->DemodBuffer[i]<low) low=conn->DemodBuffer[i];
+		BitStream[i]=conn->DemodBuffer[i];
 	}
 	if (high>7 || low <0 ){
 		PrintAndLog("Error: please raw demod the wave first then manchester raw decode");
@@ -373,7 +370,7 @@ int Cmdmandecoderaw(const char *Cmd)
 //takes 2 arguments "offset" default = 0 if 1 it will shift the decode by one bit
 // and "invert" default = 0 if 1 it will invert output
 //  the argument offset allows us to manually shift if the output is incorrect - [EDIT: now auto detects]
-int CmdBiphaseDecodeRaw(const char *Cmd)
+int CmdBiphaseDecodeRaw(pm3_connection* conn, const char *Cmd)
 {
 	size_t size=0;
 	int offset=0, invert=0, maxErr=20, errCnt=0;
@@ -393,13 +390,13 @@ int CmdBiphaseDecodeRaw(const char *Cmd)
 		return 0;
 	}
 	sscanf(Cmd, "%i %i %i", &offset, &invert, &maxErr);
-	if (DemodBufferLen==0) {
-		PrintAndLog("DemodBuffer Empty - run 'data rawdemod ar' first");
+	if (conn->DemodBufferLen==0) {
+		PrintAndLog("conn->DemodBuffer Empty - run 'data rawdemod ar' first");
 		return 0;
 	}
 	uint8_t BitStream[MAX_DEMOD_BUF_LEN]={0};
 	size = sizeof(BitStream);
-	if ( !getDemodBuf(BitStream, &size) ) return 0;
+	if ( !getDemodBuf(conn, BitStream, &size) ) return 0;
 	errCnt=BiphaseRawDecode(BitStream, &size, &offset, invert);
 	if (errCnt<0){
 		PrintAndLog("Error during decode:%d", errCnt);
@@ -417,21 +414,21 @@ int CmdBiphaseDecodeRaw(const char *Cmd)
 	PrintAndLog("Biphase Decoded using offset: %d - # invert:%d - data:",offset,invert);
 	PrintAndLog("%s", sprint_bin_break(BitStream, size, 16));
 	
-	if (offset) setDemodBuf(DemodBuffer,DemodBufferLen-offset, offset);  //remove first bit from raw demod
-	setClockGrid(g_DemodClock, g_DemodStartIdx + g_DemodClock*offset/2);
+	if (offset) setDemodBuf(conn, conn->DemodBuffer,conn->DemodBufferLen-offset, offset);  //remove first bit from raw demod
+	setClockGrid(conn, conn->g_DemodClock, conn->g_DemodStartIdx + conn->g_DemodClock*offset/2);
 	return 1;
 }
 
 //by marshmellow
 // - ASK Demod then Biphase decode GraphBuffer samples
-int ASKbiphaseDemod(const char *Cmd, bool verbose)
+int ASKbiphaseDemod(pm3_connection* conn, const char *Cmd, bool verbose)
 {
 	//ask raw demod GraphBuffer first
 	int offset=0, clk=0, invert=0, maxErr=0;
 	sscanf(Cmd, "%i %i %i %i", &offset, &clk, &invert, &maxErr);
 
 	uint8_t BitStream[MAX_GRAPH_TRACE_LEN];	  
-	size_t size = getFromGraphBuf(BitStream);
+	size_t size = getFromGraphBuf(conn, BitStream);
 	int startIdx = 0;
 	//invert here inverts the ask raw demoded bits which has no effect on the demod, but we need the pointer
 	int errCnt = askdemod_ext(BitStream, &size, &clk, &invert, maxErr, 0, 0, &startIdx);  
@@ -450,17 +447,17 @@ int ASKbiphaseDemod(const char *Cmd, bool verbose)
 		if (g_debugMode || verbose) PrintAndLog("Error BiphaseRawDecode too many errors: %d", errCnt);
 		return 0;
 	}
-	//success set DemodBuffer and return
-	setDemodBuf(BitStream, size, 0);
-	setClockGrid(clk, startIdx + clk*offset/2);
+	//success set conn->DemodBuffer and return
+	setDemodBuf(conn, BitStream, size, 0);
+	setClockGrid(conn, clk, startIdx + clk*offset/2);
 	if (g_debugMode || verbose){
 		PrintAndLog("Biphase Decoded using offset: %d - clock: %d - # errors:%d - data:",offset,clk,errCnt);
-		printDemodBuff();
+		printDemodBuff(conn);
 	}
 	return 1;
 }
 //by marshmellow - see ASKbiphaseDemod
-int Cmdaskbiphdemod(const char *Cmd)
+int Cmdaskbiphdemod(pm3_connection* conn, const char *Cmd)
 {
 	char cmdp = param_getchar(Cmd, 0);
 	if (strlen(Cmd) > 25 || cmdp == 'h' || cmdp == 'H') {
@@ -486,11 +483,11 @@ int Cmdaskbiphdemod(const char *Cmd)
 		PrintAndLog("          : data rawdemod ab 0 64 1 0 0 a = demod an ask/biph tag from GraphBuffer using a clock of RF/64, inverting data and allowing 0 demod errors, and amp");
 		return 0;
 	}
-	return ASKbiphaseDemod(Cmd, true);
+	return ASKbiphaseDemod(conn, Cmd, true);
 }
 
 //by marshmellow - see ASKDemod
-int Cmdaskrawdemod(const char *Cmd)
+int Cmdaskrawdemod(pm3_connection* conn, const char *Cmd)
 {
 	char cmdp = param_getchar(Cmd, 0);
 	if (strlen(Cmd) > 35 || cmdp == 'h' || cmdp == 'H') {
@@ -510,16 +507,16 @@ int Cmdaskrawdemod(const char *Cmd)
 		PrintAndLog("          : data rawdemod ar 64 1 0 0 a = demod an ask tag from GraphBuffer using a clock of RF/64, inverting data and allowing 0 demod errors, and amp");
 		return 0;
 	}
-	return ASKDemod(Cmd, true, false, 0);
+	return ASKDemod(conn, Cmd, true, false, 0);
 }
 
-int AutoCorrelate(const int *in, int *out, size_t len, int window, bool SaveGrph, bool verbose)
+int AutoCorrelate(pm3_connection* conn, const int *in, int *out, size_t len, int window, bool SaveGrph, bool verbose)
 {
 	static int CorrelBuffer[MAX_GRAPH_TRACE_LEN];
 	size_t Correlation = 0;
 	int maxSum = 0;
 	int lastMax = 0;
-	if (verbose) PrintAndLog("performing %d correlations", GraphTraceLen - window);
+	if (verbose) PrintAndLog("performing %d correlations", conn->GraphTraceLen - window);
 	for (int i = 0; i < len - window; ++i) {
 		int sum = 0;
 		for (int j = 0; j < window; ++j) {
@@ -551,7 +548,7 @@ int AutoCorrelate(const int *in, int *out, size_t len, int window, bool SaveGrph
 	if (SaveGrph) {
 		//GraphTraceLen = GraphTraceLen - window;
 		memcpy(out, CorrelBuffer, len * sizeof(int));
-		RepaintGraphWindow();  
+		RepaintGraphWindow(conn);  
 	}
 	return Correlation;
 }
@@ -567,7 +564,7 @@ int usage_data_autocorr(void)
 	return 0;
 }
 
-int CmdAutoCorr(const char *Cmd)
+int CmdAutoCorr(pm3_connection* conn, const char *Cmd)
 {
 	char cmdp = param_getchar(Cmd, 0);
 	if (cmdp == 'h' || cmdp == 'H') 
@@ -577,52 +574,52 @@ int CmdAutoCorr(const char *Cmd)
 	bool updateGrph = false;
 	sscanf(Cmd, "%i %c", &window, &grph);
 
-	if (window >= GraphTraceLen) {
+	if (window >= conn->GraphTraceLen) {
 		PrintAndLog("window must be smaller than trace (%d samples)",
-			GraphTraceLen);
+			conn->GraphTraceLen);
 		return 0;
 	}
 	if (grph == 'g') updateGrph=true;
-	return AutoCorrelate(GraphBuffer, GraphBuffer, GraphTraceLen, window, updateGrph, true);
+	return AutoCorrelate(conn, conn->GraphBuffer, conn->GraphBuffer, conn->GraphTraceLen, window, updateGrph, true);
 }
 
-int CmdBitsamples(const char *Cmd)
+int CmdBitsamples(pm3_connection* conn, const char *Cmd)
 {
 	int cnt = 0;
 	uint8_t got[12288];
 
-	GetFromBigBuf(got,sizeof(got),0);
-	WaitForResponse(CMD_ACK,NULL);
+	GetFromBigBuf(conn, got, sizeof(got), 0);
+	WaitForResponse(conn, CMD_ACK,NULL);
 
 		for (int j = 0; j < sizeof(got); j++) {
 			for (int k = 0; k < 8; k++) {
 				if(got[j] & (1 << (7 - k))) {
-					GraphBuffer[cnt++] = 1;
+					conn->GraphBuffer[cnt++] = 1;
 				} else {
-					GraphBuffer[cnt++] = 0;
+					conn->GraphBuffer[cnt++] = 0;
 				}
 			}
 	}
-	GraphTraceLen = cnt;
-	RepaintGraphWindow();
+	conn->GraphTraceLen = cnt;
+	RepaintGraphWindow(conn);
 	return 0;
 }
 
-int CmdBuffClear(const char *Cmd)
+int CmdBuffClear(pm3_connection* conn, const char *Cmd)
 {
 	UsbCommand c = {CMD_BUFF_CLEAR};
-	SendCommand(&c);
-	ClearGraph(true);
+	SendCommand(conn, &c);
+	ClearGraph(conn, true);
 	return 0;
 }
 
-int CmdDec(const char *Cmd)
+int CmdDec(pm3_connection* conn, const char *Cmd)
 {
-	for (int i = 0; i < (GraphTraceLen / 2); ++i)
-		GraphBuffer[i] = GraphBuffer[i * 2];
-	GraphTraceLen /= 2;
+	for (int i = 0; i < (conn->GraphTraceLen / 2); ++i)
+		conn->GraphBuffer[i] = conn->GraphBuffer[i * 2];
+	conn->GraphTraceLen /= 2;
 	PrintAndLog("decimated by 2");
-	RepaintGraphWindow();
+	RepaintGraphWindow(conn);
 	return 0;
 }
 /**
@@ -632,7 +629,7 @@ int CmdDec(const char *Cmd)
  * @param Cmd
  * @return
  */
-int CmdUndec(const char *Cmd)
+int CmdUndec(pm3_connection* conn, const char *Cmd)
 {
 	if(param_getchar(Cmd, 0) == 'h')
 	{
@@ -649,40 +646,40 @@ int CmdUndec(const char *Cmd)
 	//We have memory, don't we?
 	int swap[MAX_GRAPH_TRACE_LEN] = { 0 };
 	uint32_t g_index = 0, s_index = 0;
-	while(g_index < GraphTraceLen && s_index + factor < MAX_GRAPH_TRACE_LEN)
+	while(g_index < conn->GraphTraceLen && s_index + factor < MAX_GRAPH_TRACE_LEN)
 	{
 		int count = 0;
 		for(count = 0; count < factor && s_index + count < MAX_GRAPH_TRACE_LEN; count++)
-			swap[s_index+count] = GraphBuffer[g_index];
+			swap[s_index+count] = conn->GraphBuffer[g_index];
 
 		s_index += count;
 		g_index++;
 	}
 
-	memcpy(GraphBuffer, swap, s_index * sizeof(int));
-	GraphTraceLen = s_index;
-	RepaintGraphWindow();
+	memcpy(conn->GraphBuffer, swap, s_index * sizeof(int));
+	conn->GraphTraceLen = s_index;
+	RepaintGraphWindow(conn);
 	return 0;
 }
 
 //by marshmellow
 //shift graph zero up or down based on input + or -
-int CmdGraphShiftZero(const char *Cmd)
+int CmdGraphShiftZero(pm3_connection* conn, const char *Cmd)
 {
 
 	int shift=0;
 	//set options from parameters entered with the command
 	sscanf(Cmd, "%i", &shift);
 	int shiftedVal=0;
-	for(int i = 0; i<GraphTraceLen; i++){
-		shiftedVal=GraphBuffer[i]+shift;
+	for(int i = 0; i<conn->GraphTraceLen; i++){
+		shiftedVal=conn->GraphBuffer[i]+shift;
 		if (shiftedVal>127) 
 			shiftedVal=127;
 		else if (shiftedVal<-127) 
 			shiftedVal=-127;
-		GraphBuffer[i]= shiftedVal;
+		conn->GraphBuffer[i]= shiftedVal;
 	}
-	CmdNorm("");
+	CmdNorm(conn, "");
 	return 0;
 }
 
@@ -702,21 +699,21 @@ int AskEdgeDetect(const int *in, int *out, int len, int threshold) {
 //use large jumps in read samples to identify edges of waves and then amplify that wave to max
 //similar to dirtheshold, threshold commands 
 //takes a threshold length which is the measured length between two samples then determines an edge
-int CmdAskEdgeDetect(const char *Cmd)
+int CmdAskEdgeDetect(pm3_connection* conn, const char *Cmd)
 {
 	int thresLen = 25;
 	int ans = 0;
 	sscanf(Cmd, "%i", &thresLen); 
 
-	ans = AskEdgeDetect(GraphBuffer, GraphBuffer, GraphTraceLen, thresLen);
-	RepaintGraphWindow();
+	ans = AskEdgeDetect(conn->GraphBuffer, conn->GraphBuffer, conn->GraphTraceLen, thresLen);
+	RepaintGraphWindow(conn);
 	return ans;
 }
 
 /* Print our clock rate */
 // uses data from graphbuffer
 // adjusted to take char parameter for type of modulation to find the clock - by marshmellow.
-int CmdDetectClockRate(const char *Cmd)
+int CmdDetectClockRate(pm3_connection* conn, const char *Cmd)
 {
 	char cmdp = param_getchar(Cmd, 0);
 	if (strlen(Cmd) > 6 || strlen(Cmd) == 0 || cmdp == 'h' || cmdp == 'H') {
@@ -732,13 +729,13 @@ int CmdDetectClockRate(const char *Cmd)
 	}
 	int ans=0;
 	if (cmdp == 'a'){
-		ans = GetAskClock(Cmd+1, true, false);
+		ans = GetAskClock(conn, Cmd+1, true, false);
 	} else if (cmdp == 'f'){
-		ans = GetFskClock("", true, false);
+		ans = GetFskClock(conn, "", true, false);
 	} else if (cmdp == 'n'){
-		ans = GetNrzClock("", true, false);
+		ans = GetNrzClock(conn, "", true, false);
 	} else if (cmdp == 'p'){
-		ans = GetPskClock("", true, false);
+		ans = GetPskClock(conn, "", true, false);
 	} else {
 		PrintAndLog ("Please specify a valid modulation to detect the clock of - see option h for help");
 	}
@@ -770,7 +767,7 @@ char *GetFSKType(uint8_t fchigh, uint8_t fclow, uint8_t invert)
 //fsk raw demod and print binary
 //takes 4 arguments - Clock, invert, fchigh, fclow
 //defaults: clock = 50, invert=1, fchigh=10, fclow=8 (RF/10 RF/8 (fsk2a))
-int FSKrawDemod(const char *Cmd, bool verbose)
+int FSKrawDemod(pm3_connection* conn, const char *Cmd, bool verbose)
 {
 	//raw fsk demod  no manchester decoding no start bit finding just get binary from wave
 	uint8_t rfLen, invert, fchigh, fclow;
@@ -788,7 +785,7 @@ int FSKrawDemod(const char *Cmd, bool verbose)
 		}
 	}
 	uint8_t BitStream[MAX_GRAPH_TRACE_LEN]={0};
-	size_t BitLen = getFromGraphBuf(BitStream);
+	size_t BitLen = getFromGraphBuf(conn, BitStream);
 	if (BitLen==0) return 0;
 	//get field clock lengths
 	uint16_t fcs=0;
@@ -811,14 +808,14 @@ int FSKrawDemod(const char *Cmd, bool verbose)
 	int startIdx = 0;
 	int size = fskdemod(BitStream, BitLen, rfLen, invert, fchigh, fclow, &startIdx);
 	if (size > 0) {
-		setDemodBuf(BitStream,size,0);
-		setClockGrid(rfLen, startIdx);
+		setDemodBuf(conn, BitStream, size, 0);
+		setClockGrid(conn, rfLen, startIdx);
 
     // Now output the bitstream to the scrollback by line of 16 bits
 		if (verbose || g_debugMode) {
 			PrintAndLog("\nUsing Clock:%u, invert:%u, fchigh:%u, fclow:%u", (unsigned int)rfLen, (unsigned int)invert, (unsigned int)fchigh, (unsigned int)fclow);
 			PrintAndLog("%s decoded bitstream:",GetFSKType(fchigh,fclow,invert));
-			printDemodBuff();
+			printDemodBuff(conn);
 		}
 
 		return 1;
@@ -832,7 +829,7 @@ int FSKrawDemod(const char *Cmd, bool verbose)
 //fsk raw demod and print binary
 //takes 4 arguments - Clock, invert, fchigh, fclow
 //defaults: clock = 50, invert=1, fchigh=10, fclow=8 (RF/10 RF/8 (fsk2a))
-int CmdFSKrawdemod(const char *Cmd)
+int CmdFSKrawdemod(pm3_connection* conn, const char *Cmd)
 {
 	char cmdp = param_getchar(Cmd, 0);
 	if (strlen(Cmd) > 20 || cmdp == 'h' || cmdp == 'H') {
@@ -851,12 +848,12 @@ int CmdFSKrawdemod(const char *Cmd)
 		PrintAndLog("          : data rawdemod fs 50 1 10 8 = demod an fsk2a RF/50 tag from GraphBuffer");
 		return 0;
 	}
-	return FSKrawDemod(Cmd, true);
+	return FSKrawDemod(conn, Cmd, true);
 }
 
 //by marshmellow
 //attempt to psk1 demod graph buffer
-int PSKDemod(const char *Cmd, bool verbose)
+int PSKDemod(pm3_connection* conn, const char *Cmd, bool verbose)
 {
 	int invert=0;
 	int clk=0;
@@ -871,7 +868,7 @@ int PSKDemod(const char *Cmd, bool verbose)
 		return 0;
 	}
 	uint8_t BitStream[MAX_GRAPH_TRACE_LEN]={0};
-	size_t BitLen = getFromGraphBuf(BitStream);
+	size_t BitLen = getFromGraphBuf(conn, BitStream);
 	if (BitLen==0) return 0;
 	int errCnt=0;
 	int startIdx = 0;
@@ -891,8 +888,8 @@ int PSKDemod(const char *Cmd, bool verbose)
 		}
 	}
 	//prime demod buffer for output
-	setDemodBuf(BitStream,BitLen,0);
-	setClockGrid(clk, startIdx);
+	setDemodBuf(conn, BitStream, BitLen, 0);
+	setClockGrid(conn, clk, startIdx);
 
 	return 1;
 }
@@ -901,7 +898,7 @@ int PSKDemod(const char *Cmd, bool verbose)
 // takes 3 arguments - clock, invert, maxErr as integers
 // attempts to demodulate nrz only
 // prints binary found and saves in demodbuffer for further commands
-int NRZrawDemod(const char *Cmd, bool verbose)
+int NRZrawDemod(pm3_connection* conn, const char *Cmd, bool verbose)
 {
 	int invert=0;
 	int clk=0;
@@ -916,7 +913,7 @@ int NRZrawDemod(const char *Cmd, bool verbose)
 		return 0;
 	}
 	uint8_t BitStream[MAX_GRAPH_TRACE_LEN]={0};
-	size_t BitLen = getFromGraphBuf(BitStream);
+	size_t BitLen = getFromGraphBuf(conn, BitStream);
 	if (BitLen==0) return 0;
 	int errCnt=0;
 	int clkStartIdx = 0;
@@ -931,20 +928,20 @@ int NRZrawDemod(const char *Cmd, bool verbose)
 	}
 	if (verbose || g_debugMode) PrintAndLog("Tried NRZ Demod using Clock: %d - invert: %d - Bits Found: %d",clk,invert,BitLen);
 	//prime demod buffer for output
-	setDemodBuf(BitStream,BitLen,0);
-	setClockGrid(clk, clkStartIdx);
+	setDemodBuf(conn, BitStream, BitLen, 0);
+	setClockGrid(conn, clk, clkStartIdx);
 
 
 	if (errCnt>0 && (verbose || g_debugMode)) PrintAndLog("# Errors during Demoding (shown as 7 in bit stream): %d",errCnt);
 	if (verbose || g_debugMode) {
 		PrintAndLog("NRZ demoded bitstream:");
 		// Now output the bitstream to the scrollback by line of 16 bits
-		printDemodBuff();
+		printDemodBuff(conn);
 	}
 	return 1; 
 }
 
-int CmdNRZrawDemod(const char *Cmd)
+int CmdNRZrawDemod(pm3_connection* conn, const char *Cmd)
 {
 	char cmdp = param_getchar(Cmd, 0);
 	if (strlen(Cmd) > 16 || cmdp == 'h' || cmdp == 'H') {
@@ -960,14 +957,14 @@ int CmdNRZrawDemod(const char *Cmd)
 		PrintAndLog("          : data rawdemod nr 64 1 0 = demod a nrz/direct tag from GraphBuffer using a clock of RF/64, inverting data and allowing 0 demod errors");
 		return 0;
 	}
-	return NRZrawDemod(Cmd, true);
+	return NRZrawDemod(conn, Cmd, true);
 }
 
 // by marshmellow
 // takes 3 arguments - clock, invert, maxErr as integers
 // attempts to demodulate psk only
 // prints binary found and saves in demodbuffer for further commands
-int CmdPSK1rawDemod(const char *Cmd)
+int CmdPSK1rawDemod(pm3_connection* conn, const char *Cmd)
 {
 	int ans;
 	char cmdp = param_getchar(Cmd, 0);
@@ -984,7 +981,7 @@ int CmdPSK1rawDemod(const char *Cmd)
 		PrintAndLog("          : data rawdemod p1 64 1 0 = demod a psk1 tag from GraphBuffer using a clock of RF/64, inverting data and allowing 0 demod errors");
 		return 0;
 	}
-	ans = PSKDemod(Cmd, true);
+	ans = PSKDemod(conn, Cmd, true);
 	//output
 	if (!ans){
 		if (g_debugMode) PrintAndLog("Error demoding: %d",ans); 
@@ -993,13 +990,13 @@ int CmdPSK1rawDemod(const char *Cmd)
  
 	PrintAndLog("PSK1 demoded bitstream:");
 	// Now output the bitstream to the scrollback by line of 16 bits
-	printDemodBuff();
+	printDemodBuff(conn);
 	return 1;
 }
 
 // by marshmellow
 // takes same args as cmdpsk1rawdemod
-int CmdPSK2rawDemod(const char *Cmd)
+int CmdPSK2rawDemod(pm3_connection* conn, const char *Cmd)
 {
 	int ans=0;
 	char cmdp = param_getchar(Cmd, 0);
@@ -1016,20 +1013,20 @@ int CmdPSK2rawDemod(const char *Cmd)
 		PrintAndLog("          : data rawdemod p2 64 1 0  = demod a psk2 tag from GraphBuffer using a clock of RF/64, inverting output and allowing 0 demod errors");
 		return 0;
 	}
-	ans=PSKDemod(Cmd, true);
+	ans=PSKDemod(conn, Cmd, true);
 	if (!ans){
 		if (g_debugMode) PrintAndLog("Error demoding: %d",ans);  
 		return 0;
 	} 
-	psk1TOpsk2(DemodBuffer, DemodBufferLen);
+	psk1TOpsk2(conn->DemodBuffer, conn->DemodBufferLen);
 	PrintAndLog("PSK2 demoded bitstream:");
 	// Now output the bitstream to the scrollback by line of 16 bits
-	printDemodBuff();  
+	printDemodBuff(conn);  
 	return 1;
 }
 
 // by marshmellow - combines all raw demod functions into one menu command
-int CmdRawDemod(const char *Cmd)
+int CmdRawDemod(pm3_connection* conn, const char *Cmd)
 {
 	char cmdp = Cmd[0]; //param_getchar(Cmd, 0);
 
@@ -1053,65 +1050,65 @@ int CmdRawDemod(const char *Cmd)
 	char cmdp2 = Cmd[1];
 	int ans = 0;
 	if (cmdp == 'f' && cmdp2 == 's'){
-		ans = CmdFSKrawdemod(Cmd+2);
+		ans = CmdFSKrawdemod(conn, Cmd+2);
 	} else if(cmdp == 'a' && cmdp2 == 'b'){
-		ans = Cmdaskbiphdemod(Cmd+2);
+		ans = Cmdaskbiphdemod(conn, Cmd+2);
 	} else if(cmdp == 'a' && cmdp2 == 'm'){
-		ans = Cmdaskmandemod(Cmd+2);
+		ans = Cmdaskmandemod(conn, Cmd+2);
 	} else if(cmdp == 'a' && cmdp2 == 'r'){
-		ans = Cmdaskrawdemod(Cmd+2);
+		ans = Cmdaskrawdemod(conn, Cmd+2);
 	} else if(cmdp == 'n' && cmdp2 == 'r'){
-		ans = CmdNRZrawDemod(Cmd+2);
+		ans = CmdNRZrawDemod(conn, Cmd+2);
 	} else if(cmdp == 'p' && cmdp2 == '1'){
-		ans = CmdPSK1rawDemod(Cmd+2);
+		ans = CmdPSK1rawDemod(conn, Cmd+2);
 	} else if(cmdp == 'p' && cmdp2 == '2'){
-		ans = CmdPSK2rawDemod(Cmd+2);
+		ans = CmdPSK2rawDemod(conn, Cmd+2);
 	} else { 
 		PrintAndLog("unknown modulation entered - see help ('h') for parameter structure");
 	}
 	return ans;
 }
 
-void setClockGrid(int clk, int offset) {
-	g_DemodStartIdx = offset;
-	g_DemodClock = clk;
+void setClockGrid(pm3_connection* conn, int clk, int offset) {
+	conn->g_DemodStartIdx = offset;
+	conn->g_DemodClock = clk;
 	if (g_debugMode) PrintAndLog("demodoffset %d, clk %d",offset,clk);
 
 	if (offset > clk) offset %= clk;
 	if (offset < 0) offset += clk;
 
-	if (offset > GraphTraceLen || offset < 0) return;
-	if (clk < 8 || clk > GraphTraceLen) {
-		GridLocked = false;
-		GridOffset = 0;
-		PlotGridX = 0;
-		PlotGridXdefault = 0;
-		RepaintGraphWindow();
+	if (offset > conn->GraphTraceLen || offset < 0) return;
+	if (clk < 8 || clk > conn->GraphTraceLen) {
+		conn->GridLocked = false;
+		conn->GridOffset = 0;
+		conn->PlotGridX = 0;
+		conn->PlotGridXdefault = 0;
+		RepaintGraphWindow(conn);
 	} else {
-		GridLocked = true;
-		GridOffset = offset;
-		PlotGridX = clk;
-		PlotGridXdefault = clk;
-		RepaintGraphWindow();
+		conn->GridLocked = true;
+		conn->GridOffset = offset;
+		conn->PlotGridX = clk;
+		conn->PlotGridXdefault = clk;
+		RepaintGraphWindow(conn);
 	}
 }
 
-int CmdGrid(const char *Cmd)
+int CmdGrid(pm3_connection* conn, const char *Cmd)
 {
-	sscanf(Cmd, "%i %i", &PlotGridX, &PlotGridY);
-	PlotGridXdefault= PlotGridX;
-	PlotGridYdefault= PlotGridY;
-	RepaintGraphWindow();
+	sscanf(Cmd, "%i %i", &conn->PlotGridX, &conn->PlotGridY);
+	conn->PlotGridXdefault= conn->PlotGridX;
+	conn->PlotGridYdefault= conn->PlotGridY;
+	RepaintGraphWindow(conn);
 	return 0;
 }
 
-int CmdSetGraphMarkers(const char *Cmd) {
-	sscanf(Cmd, "%i %i", &CursorCPos, &CursorDPos);
-	RepaintGraphWindow();
+int CmdSetGraphMarkers(pm3_connection* conn, const char *Cmd) {
+	sscanf(Cmd, "%i %i", &conn->CursorCPos, &conn->CursorDPos);
+	RepaintGraphWindow(conn);
 	return 0;
 }
 
-int CmdHexsamples(const char *Cmd)
+int CmdHexsamples(pm3_connection* conn, const char *Cmd)
 {
 	int i, j;
 	int requested = 0;
@@ -1131,8 +1128,8 @@ int CmdHexsamples(const char *Cmd)
 		return 0;
 	}
 
-	GetFromBigBuf(got,requested,offset);
-	WaitForResponse(CMD_ACK,NULL);
+	GetFromBigBuf(conn, got, requested, offset);
+	WaitForResponse(conn, CMD_ACK, NULL);
 
 	i = 0;
 	for (j = 0; j < requested; j++) {
@@ -1154,25 +1151,25 @@ int CmdHexsamples(const char *Cmd)
 	return 0;
 }
 
-int CmdHide(const char *Cmd)
+int CmdHide(pm3_connection* conn, const char *Cmd)
 {
-	HideGraphWindow();
+	HideGraphWindow(conn);
 	return 0;
 }
 
 //zero mean GraphBuffer
-int CmdHpf(const char *Cmd)
+int CmdHpf(pm3_connection* conn, const char *Cmd)
 {
 	int i;
 	int accum = 0;
 
-	for (i = 10; i < GraphTraceLen; ++i)
-		accum += GraphBuffer[i];
-	accum /= (GraphTraceLen - 10);
-	for (i = 0; i < GraphTraceLen; ++i)
-		GraphBuffer[i] -= accum;
+	for (i = 10; i < conn->GraphTraceLen; ++i)
+		accum += conn->GraphBuffer[i];
+	accum /= (conn->GraphTraceLen - 10);
+	for (i = 0; i < conn->GraphTraceLen; ++i)
+		conn->GraphBuffer[i] -= accum;
 
-	RepaintGraphWindow();
+	RepaintGraphWindow(conn);
 	return 0;
 }
 
@@ -1187,7 +1184,7 @@ uint8_t getByte(uint8_t bits_per_sample, BitstreamIn* b)
 	return val;
 }
 
-int getSamples(int n, bool silent)
+int getSamples(pm3_connection* conn, int n, bool silent)
 {
 	//If we get all but the last byte in bigbuf,
 	// we don't have to worry about remaining trash
@@ -1200,10 +1197,10 @@ int getSamples(int n, bool silent)
 		n = sizeof(got);
 
 	if (!silent) PrintAndLog("Reading %d bytes from device memory\n", n);
-	GetFromBigBuf(got,n,0);
+	GetFromBigBuf(conn, got, n, 0);
 	if (!silent) PrintAndLog("Data fetched");
 	UsbCommand response;
-	WaitForResponse(CMD_ACK, &response);
+	WaitForResponse(conn, CMD_ACK, &response);
 	uint8_t bits_per_sample = 8;
 
 	//Old devices without this feature would send 0 at arg[0]
@@ -1221,31 +1218,31 @@ int getSamples(int n, bool silent)
 		int j =0;
 		for (j = 0; j * bits_per_sample < n * 8 && j < n; j++) {
 			uint8_t sample = getByte(bits_per_sample, &bout);
-			GraphBuffer[j] = ((int) sample )- 128;
+			conn->GraphBuffer[j] = ((int) sample )- 128;
 		}
-		GraphTraceLen = j;
+		conn->GraphTraceLen = j;
 		PrintAndLog("Unpacked %d samples" , j );
 	}else
 	{
 		for (int j = 0; j < n; j++) {
-			GraphBuffer[j] = ((int)got[j]) - 128;
+			conn->GraphBuffer[j] = ((int)got[j]) - 128;
 		}
-		GraphTraceLen = n;
+		conn->GraphTraceLen = n;
 	}
 
-	setClockGrid(0,0);
-	DemodBufferLen = 0;
-	RepaintGraphWindow();
+	setClockGrid(conn, 0, 0);
+	conn->DemodBufferLen = 0;
+	RepaintGraphWindow(conn);
 	return 0;
 }
 
-int CmdSamples(const char *Cmd)
+int CmdSamples(pm3_connection* conn, const char *Cmd)
 {
 	int n = strtol(Cmd, NULL, 0);
-	return getSamples(n, false);
+	return getSamples(conn, n, false);
 }
 
-int CmdTuneSamples(const char *Cmd)
+int CmdTuneSamples(pm3_connection* conn, const char *Cmd)
 {
 	int timeout = 0, arg = FLAG_TUNE_ALL;
 
@@ -1261,10 +1258,10 @@ int CmdTuneSamples(const char *Cmd)
 	printf("\nMeasuring antenna characteristics, please wait...");
 
 	UsbCommand c = {CMD_MEASURE_ANTENNA_TUNING, {arg, 0, 0}};
-	SendCommand(&c);
+	SendCommand(conn, &c);
 
 	UsbCommand resp;
-	while(!WaitForResponseTimeout(CMD_MEASURED_ANTENNA_TUNING,&resp,1000)) {
+	while(!WaitForResponseTimeout(conn, CMD_MEASURED_ANTENNA_TUNING,&resp,1000)) {
 		timeout++;
 		printf(".");
 		if (timeout > 7) {
@@ -1302,20 +1299,20 @@ int CmdTuneSamples(const char *Cmd)
 
 	if (peakv >= LF_UNUSABLE_V)	{
 		for (int i = 0; i < 256; i++) {
-			GraphBuffer[i] = resp.d.asBytes[i] - 128;
+			conn->GraphBuffer[i] = resp.d.asBytes[i] - 128;
 		}
 		PrintAndLog("Displaying LF tuning graph. Divisor 89 is 134khz, 95 is 125khz.\n");
 		PrintAndLog("\n");
-		GraphTraceLen = 256;
-		ShowGraphWindow();
-		RepaintGraphWindow();
+		conn->GraphTraceLen = 256;
+		ShowGraphWindow(conn);
+		RepaintGraphWindow(conn);
 	}
 
 	return 0;
 }
 
 
-int CmdLoad(const char *Cmd)
+int CmdLoad(pm3_connection* conn, const char *Cmd)
 {
 	char filename[FILE_PATH_SIZE] = {0x00};
 	int len = 0;
@@ -1330,88 +1327,88 @@ int CmdLoad(const char *Cmd)
 		return 0;
 	}
 
-	GraphTraceLen = 0;
+	conn->GraphTraceLen = 0;
 	char line[80];
 	while (fgets(line, sizeof (line), f)) {
-		GraphBuffer[GraphTraceLen] = atoi(line);
-		GraphTraceLen++;
+		conn->GraphBuffer[conn->GraphTraceLen++] = atoi(line);
 	}
 	fclose(f);
-	PrintAndLog("loaded %d samples", GraphTraceLen);
-	setClockGrid(0,0);
-	DemodBufferLen = 0;
-	RepaintGraphWindow();
+
+	PrintAndLog("loaded %d samples", conn->GraphTraceLen);
+	setClockGrid(conn, 0, 0);
+	conn->DemodBufferLen = 0;
+	RepaintGraphWindow(conn);
 	return 0;
 }
 
-int CmdLtrim(const char *Cmd)
+int CmdLtrim(pm3_connection* conn, const char *Cmd)
 {
 	int ds = atoi(Cmd);
-	if (GraphTraceLen<=0) return 0;
-	for (int i = ds; i < GraphTraceLen; ++i)
-		GraphBuffer[i-ds] = GraphBuffer[i];
-	GraphTraceLen -= ds;
+	if (conn->GraphTraceLen<=0) return 0;
+	for (int i = ds; i < conn->GraphTraceLen; ++i)
+		conn->GraphBuffer[i-ds] = conn->GraphBuffer[i];
+	conn->GraphTraceLen -= ds;
 
-	RepaintGraphWindow();
+	RepaintGraphWindow(conn);
 	return 0;
 }
 
 // trim graph to input argument length
-int CmdRtrim(const char *Cmd)
+int CmdRtrim(pm3_connection* conn, const char *Cmd)
 {
 	int ds = atoi(Cmd);
 
-	GraphTraceLen = ds;
+	conn->GraphTraceLen = ds;
 
-	RepaintGraphWindow();
+	RepaintGraphWindow(conn);
 	return 0;
 }
 
 // trim graph (middle) piece
-int CmdMtrim(const char *Cmd) {
+int CmdMtrim(pm3_connection* conn, const char *Cmd) {
 	int start = 0, stop = 0;
 	sscanf(Cmd, "%i %i", &start, &stop);
 
-	if (start > GraphTraceLen	|| stop > GraphTraceLen || start > stop) return 0;
+	if (start > conn->GraphTraceLen	|| stop > conn->GraphTraceLen || start > stop) return 0;
 	start++; //leave start position sample
 
-	GraphTraceLen = stop - start;
-	for (int i = 0; i < GraphTraceLen; i++) {
-		GraphBuffer[i] = GraphBuffer[start+i];
+	conn->GraphTraceLen = stop - start;
+	for (int i = 0; i < conn->GraphTraceLen; i++) {
+		conn->GraphBuffer[i] = conn->GraphBuffer[start+i];
 	}
 	return 0;
 }
 
 
-int CmdNorm(const char *Cmd)
+int CmdNorm(pm3_connection* conn, const char *Cmd)
 {
 	int i;
 	int max = INT_MIN, min = INT_MAX;
 
-	for (i = 10; i < GraphTraceLen; ++i) {
-		if (GraphBuffer[i] > max)
-			max = GraphBuffer[i];
-		if (GraphBuffer[i] < min)
-			min = GraphBuffer[i];
+	for (i = 10; i < conn->GraphTraceLen; ++i) {
+		if (conn->GraphBuffer[i] > max)
+			max = conn->GraphBuffer[i];
+		if (conn->GraphBuffer[i] < min)
+			min = conn->GraphBuffer[i];
 	}
 
 	if (max != min) {
-		for (i = 0; i < GraphTraceLen; ++i) {
-			GraphBuffer[i] = ((long)(GraphBuffer[i] - ((max + min) / 2)) * 256) / (max - min);
+		for (i = 0; i < conn->GraphTraceLen; ++i) {
+			conn->GraphBuffer[i] = ((long)(conn->GraphBuffer[i] - ((max + min) / 2)) * 256) / (max - min);
 				//marshmelow: adjusted *1000 to *256 to make +/- 128 so demod commands still work
 		}
 	}
-	RepaintGraphWindow();
+	RepaintGraphWindow(conn);
 	return 0;
 }
 
-int CmdPlot(const char *Cmd)
+int CmdPlot(pm3_connection* conn, const char *Cmd)
 {
-	ShowGraphWindow();
+	ShowGraphWindow(conn);
 	return 0;
 }
 
-int CmdSave(const char *Cmd)
+int CmdSave(pm3_connection* conn, const char *Cmd)
 {
 	char filename[FILE_PATH_SIZE] = {0x00};
 	int len = 0;
@@ -1427,22 +1424,22 @@ int CmdSave(const char *Cmd)
 		return 0;
 	}
 	int i;
-	for (i = 0; i < GraphTraceLen; i++) {
-		fprintf(f, "%d\n", GraphBuffer[i]);
+	for (i = 0; i < conn->GraphTraceLen; i++) {
+		fprintf(f, "%d\n", conn->GraphBuffer[i]);
 	}
 	fclose(f);
 	PrintAndLog("saved to '%s'", Cmd);
 	return 0;
 }
 
-int CmdScale(const char *Cmd)
+int CmdScale(pm3_connection* conn, const char *Cmd)
 {
-	CursorScaleFactor = atoi(Cmd);
-	if (CursorScaleFactor == 0) {
+	conn->CursorScaleFactor = atoi(Cmd);
+	if (conn->CursorScaleFactor == 0) {
 		PrintAndLog("bad, can't have zero scale");
-		CursorScaleFactor = 1;
+		conn->CursorScaleFactor = 1;
 	}
-	RepaintGraphWindow();
+	RepaintGraphWindow(conn);
 	return 0;
 }
 
@@ -1474,36 +1471,36 @@ int directionalThreshold(const int* in, int *out, size_t len, int8_t up, int8_t 
 	return 0;
 }
 
-int CmdDirectionalThreshold(const char *Cmd)
+int CmdDirectionalThreshold(pm3_connection* conn, const char *Cmd)
 {
 	int8_t upThres = param_get8(Cmd, 0);
 	int8_t downThres = param_get8(Cmd, 1);
 
 	printf("Applying Up Threshold: %d, Down Threshold: %d\n", upThres, downThres);
 
-	directionalThreshold(GraphBuffer, GraphBuffer,GraphTraceLen, upThres, downThres);
-	RepaintGraphWindow();
+	directionalThreshold(conn->GraphBuffer, conn->GraphBuffer, conn->GraphTraceLen, upThres, downThres);
+	RepaintGraphWindow(conn);
 	return 0;
 }
 
-int CmdZerocrossings(const char *Cmd)
+int CmdZerocrossings(pm3_connection* conn, const char *Cmd)
 {
 	// Zero-crossings aren't meaningful unless the signal is zero-mean.
-	CmdHpf("");
+	CmdHpf(conn, "");
 
 	int sign = 1;
 	int zc = 0;
 	int lastZc = 0;
 
-	for (int i = 0; i < GraphTraceLen; ++i) {
-		if (GraphBuffer[i] * sign >= 0) {
+	for (int i = 0; i < conn->GraphTraceLen; ++i) {
+		if (conn->GraphBuffer[i] * sign >= 0) {
 			// No change in sign, reproduce the previous sample count.
 			zc++;
-			GraphBuffer[i] = lastZc;
+			conn->GraphBuffer[i] = lastZc;
 		} else {
 			// Change in sign, reset the sample count.
 			sign = -sign;
-			GraphBuffer[i] = lastZc;
+			conn->GraphBuffer[i] = lastZc;
 			if (sign > 0) {
 				lastZc = zc;
 				zc = 0;
@@ -1511,7 +1508,7 @@ int CmdZerocrossings(const char *Cmd)
 		}
 	}
 
-	RepaintGraphWindow();
+	RepaintGraphWindow(conn);
 	return 0;
 }
 
@@ -1526,7 +1523,7 @@ int usage_data_bin2hex(){
  * @param Cmd
  * @return
  */
-int Cmdbin2hex(const char *Cmd)
+int Cmdbin2hex(pm3_connection* conn, const char *Cmd)
 {
 	int bg =0, en =0;
 	if(param_getptr(Cmd, &bg, &en, 0))
@@ -1572,7 +1569,7 @@ int usage_data_hex2bin() {
 
 }
 
-int Cmdhex2bin(const char *Cmd)
+int Cmdhex2bin(pm3_connection* conn, const char *Cmd)
 {
 	int bg =0, en =0;
 	if(param_getptr(Cmd, &bg, &en, 0))
@@ -1687,11 +1684,11 @@ void GetHiLoTone(int *LowTone, int *HighTone, int clk, int LowToneFC, int HighTo
 
 //old CmdFSKdemod adapted by marshmellow 
 //converts FSK to clear NRZ style wave.  (or demodulates)
-int FSKToNRZ(int *data, int *dataLen, int clk, int LowToneFC, int HighToneFC) {
+int FSKToNRZ(pm3_connection* conn, int *data, int *dataLen, int clk, int LowToneFC, int HighToneFC) {
 	uint8_t ans=0;
 	if (clk == 0 || LowToneFC == 0 || HighToneFC == 0) {
 		int firstClockEdge=0;
-		ans = fskClocks((uint8_t *) &LowToneFC, (uint8_t *) &HighToneFC, (uint8_t *) &clk, false, &firstClockEdge);
+		ans = fskClocks(conn, (uint8_t *) &LowToneFC, (uint8_t *) &HighToneFC, (uint8_t *) &clk, false, &firstClockEdge);
 		if (g_debugMode	> 1) {
 			PrintAndLog	("DEBUG FSKtoNRZ: detected clocks: fc_low %i, fc_high %i, clk %i, firstClockEdge %i, ans %u", LowToneFC, HighToneFC, clk, firstClockEdge, ans);
 		}
@@ -1758,7 +1755,7 @@ int usage_data_fsktonrz() {
 		return 0;	
 }
 
-int CmdFSKToNRZ(const char *Cmd) {
+int CmdFSKToNRZ(pm3_connection* conn, const char *Cmd) {
 	// take clk, fc_low, fc_high 
 	//   blank = auto;
 	bool errors = false;
@@ -1797,11 +1794,11 @@ int CmdFSKToNRZ(const char *Cmd) {
 	//Validations
 	if(errors) return usage_data_fsktonrz();
 
-	setClockGrid(0,0);
-	DemodBufferLen = 0;
-	int ans = FSKToNRZ(GraphBuffer, &GraphTraceLen, clk, fc_low, fc_high);
-	CmdNorm("");
-	RepaintGraphWindow();
+	setClockGrid(conn, 0, 0);
+	conn->DemodBufferLen = 0;
+	int ans = FSKToNRZ(conn, conn->GraphBuffer, &conn->GraphTraceLen, clk, fc_low, fc_high);
+	CmdNorm(conn, "");
+	RepaintGraphWindow(conn);
 	return ans;
 }
 
@@ -1811,7 +1808,7 @@ static command_t CommandTable[] =
 	{"help",            CmdHelp,            1, "This help"},
 	{"askedgedetect",   CmdAskEdgeDetect,   1, "[threshold] Adjust Graph for manual ask demod using the length of sample differences to detect the edge of a wave (use 20-45, def:25)"},
 	{"autocorr",        CmdAutoCorr,        1, "[window length] [g] -- Autocorrelation over window - g to save back to GraphBuffer (overwrite)"},
-	{"biphaserawdecode",CmdBiphaseDecodeRaw,1, "[offset] [invert<0|1>] [maxErr] -- Biphase decode bin stream in DemodBuffer (offset = 0|1 bits to shift the decode start)"},
+	{"biphaserawdecode",CmdBiphaseDecodeRaw,1, "[offset] [invert<0|1>] [maxErr] -- Biphase decode bin stream in conn->DemodBuffer (offset = 0|1 bits to shift the decode start)"},
 	{"bin2hex",         Cmdbin2hex,         1, "bin2hex <digits>     -- Converts binary to hexadecimal"},
 	{"bitsamples",      CmdBitsamples,      0, "Get raw samples as bitstring"},
 	{"buffclear",       CmdBuffClear,       1, "Clear sample buffer and graph window"},
@@ -1828,10 +1825,10 @@ static command_t CommandTable[] =
 	{"ltrim",           CmdLtrim,           1, "<samples> -- Trim samples from left of trace"},
 	{"rtrim",           CmdRtrim,           1, "<location to end trace> -- Trim samples from right of trace"},
 	{"mtrim",           CmdMtrim,           1, "<start> <stop> -- Trim out samples from the specified start to the specified stop"},
-	{"manrawdecode",    Cmdmandecoderaw,    1, "[invert] [maxErr] -- Manchester decode binary stream in DemodBuffer"},
+	{"manrawdecode",    Cmdmandecoderaw,    1, "[invert] [maxErr] -- Manchester decode binary stream in conn->DemodBuffer"},
 	{"norm",            CmdNorm,            1, "Normalize max/min to +/-128"},
 	{"plot",            CmdPlot,            1, "Show graph window (hit 'h' in window for keystroke help)"},
-	{"printdemodbuffer",CmdPrintDemodBuff,  1, "[x] [o] <offset> [l] <length> -- print the data in the DemodBuffer - 'x' for hex output"},
+	{"printdemodbuffer",CmdPrintDemodBuff,  1, "[x] [o] <offset> [l] <length> -- print the data in the conn->DemodBuffer - 'x' for hex output"},
 	{"rawdemod",        CmdRawDemod,        1, "[modulation] ... <options> -see help (h option) -- Demodulate the data in the GraphBuffer and output binary"},  
 	{"samples",         CmdSamples,         0, "[512 - 40000] -- Get raw samples for graph window (GraphBuffer)"},
 	{"save",            CmdSave,            1, "<filename> -- Save trace (from graph window)"},
@@ -1846,14 +1843,14 @@ static command_t CommandTable[] =
 	{NULL, NULL, 0, NULL}
 };
 
-int CmdData(const char *Cmd)
+int CmdData(pm3_connection* conn, const char *Cmd)
 {
-	CmdsParse(CommandTable, Cmd);
+	CmdsParse(conn, CommandTable, Cmd);
 	return 0;
 }
 
-int CmdHelp(const char *Cmd)
+int CmdHelp(pm3_connection* conn, const char *Cmd)
 {
-	CmdsHelp(CommandTable);
+	CmdsHelp(conn, CommandTable);
 	return 0;
 }

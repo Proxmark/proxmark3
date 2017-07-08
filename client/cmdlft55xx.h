@@ -10,6 +10,8 @@
 #ifndef CMDLFT55XX_H__
 #define CMDLFT55XX_H__
 
+#include "comms.h"
+
 typedef struct {
 	uint32_t bl1;
 	uint32_t bl2; 
@@ -69,16 +71,16 @@ typedef struct {
 t55xx_conf_block_t Get_t55xx_Config(void);
 void Set_t55xx_Config(t55xx_conf_block_t conf);
 
-extern int CmdLFT55XX(const char *Cmd);
-extern int CmdT55xxBruteForce(const char *Cmd);
-extern int CmdT55xxSetConfig(const char *Cmd);
-extern int CmdT55xxReadBlock(const char *Cmd);
-extern int CmdT55xxWriteBlock(const char *Cmd);
-extern int CmdT55xxReadTrace(const char *Cmd);
-extern int CmdT55xxInfo(const char *Cmd);
-extern int CmdT55xxDetect(const char *Cmd);
-extern int CmdResetRead(const char *Cmd);
-extern int CmdT55xxWipe(const char *Cmd);
+extern int CmdLFT55XX(pm3_connection* conn, const char *Cmd);
+extern int CmdT55xxBruteForce(pm3_connection* conn, const char *Cmd);
+extern int CmdT55xxSetConfig(pm3_connection* conn, const char *Cmd);
+extern int CmdT55xxReadBlock(pm3_connection* conn, const char *Cmd);
+extern int CmdT55xxWriteBlock(pm3_connection* conn, const char *Cmd);
+extern int CmdT55xxReadTrace(pm3_connection* conn, const char *Cmd);
+extern int CmdT55xxInfo(pm3_connection* conn, const char *Cmd);
+extern int CmdT55xxDetect(pm3_connection* conn, const char *Cmd);
+extern int CmdResetRead(pm3_connection* conn, const char *Cmd);
+extern int CmdT55xxWipe(pm3_connection* conn, const char *Cmd);
 
 char * GetBitRateStr(uint32_t id, bool xmode);
 char * GetSaferStr(uint32_t id);
@@ -87,17 +89,17 @@ char * GetModelStrFromCID(uint32_t cid);
 char * GetSelectedModulationStr( uint8_t id);
 uint32_t PackBits(uint8_t start, uint8_t len, uint8_t *bitstream);
 void printT5xxHeader(uint8_t page);
-void printT55xxBlock(const char *demodStr);
+void printT55xxBlock(pm3_connection* conn, const char *demodStr);
 int printConfiguration( t55xx_conf_block_t b);
 
-bool DecodeT55xxBlock(void);
-bool tryDetectModulation(void);
-extern bool tryDetectP1(bool getData);
-bool test(uint8_t mode, uint8_t *offset, int *fndBitRate, uint8_t clk, bool *Q5);
-int special(const char *Cmd);
-int AquireData( uint8_t page, uint8_t block, bool pwdmode, uint32_t password );
+bool DecodeT55xxBlock(pm3_connection* conn);
+bool tryDetectModulation(pm3_connection* conn);
+extern bool tryDetectP1(pm3_connection* conn, bool getData);
+bool test(pm3_connection* conn, uint8_t mode, uint8_t *offset, int *fndBitRate, uint8_t clk, bool *Q5);
+int special(pm3_connection* conn, const char *Cmd);
+int AcquireData(pm3_connection* conn, uint8_t page, uint8_t block, bool pwdmode, uint32_t password );
 
-void printT55x7Trace( t55x7_tracedata_t data, uint8_t repeat );
-void printT5555Trace( t5555_tracedata_t data, uint8_t repeat );
+void printT55x7Trace(pm3_connection* conn, t55x7_tracedata_t data, uint8_t repeat );
+void printT5555Trace(pm3_connection* conn, t5555_tracedata_t data, uint8_t repeat );
 
 #endif

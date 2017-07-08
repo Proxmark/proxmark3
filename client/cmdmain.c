@@ -5,7 +5,8 @@
 // at your option, any later version. See the LICENSE.txt file for the text of
 // the license.
 //-----------------------------------------------------------------------------
-// Main command parser entry point
+// This module handles the main entry point into the command parser for the
+// proxmark3 CLI.
 //-----------------------------------------------------------------------------
 
 #include <stdio.h>
@@ -27,12 +28,9 @@
 #include "cmdscript.h"
 #include "cmdcrc.h"
 
-
-unsigned int current_command = CMD_UNKNOWN;
-
-static int CmdHelp(const char *Cmd);
-static int CmdQuit(const char *Cmd);
-static int CmdRev(const char *Cmd);
+static int CmdHelp(pm3_connection* conn, const char *Cmd);
+static int CmdQuit(pm3_connection* conn, const char *Cmd);
+static int CmdRev(pm3_connection* conn, const char *Cmd);
 
 static command_t CommandTable[] = 
 {
@@ -53,20 +51,20 @@ command_t* getTopLevelCommandTable()
   return CommandTable;
 }
 
-int CmdHelp(const char *Cmd)
+int CmdHelp(pm3_connection* conn, const char *Cmd)
 {
-  CmdsHelp(CommandTable);
+  CmdsHelp(conn, CommandTable);
   return 0;
 }
 
-int CmdQuit(const char *Cmd)
+int CmdQuit(pm3_connection* conn, const char *Cmd)
 {
   return 99;
 }
 
-int CmdRev(const char *Cmd)
+int CmdRev(pm3_connection* conn, const char *Cmd)
 {
-  CmdCrc(Cmd);
+  CmdCrc(conn, Cmd);
   return 0;
 }
 
@@ -74,7 +72,7 @@ int CmdRev(const char *Cmd)
 // Entry point into our code: called whenever the user types a command and
 // then presses Enter, which the full command line that they typed.
 //-----------------------------------------------------------------------------
-int CommandReceived(char *Cmd) {
-	return CmdsParse(CommandTable, Cmd);
+int CommandReceived(pm3_connection* conn, char *Cmd) {
+	return CmdsParse(conn, CommandTable, Cmd);
 }
 

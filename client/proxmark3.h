@@ -12,6 +12,7 @@
 #ifndef PROXMARK3_H__
 #define PROXMARK3_H__
 
+#include "uart.h"
 #include "usb_cmd.h"
 #include "uart.h"
 
@@ -21,10 +22,9 @@
 extern "C" {
 #endif
 
-void SendCommand(UsbCommand *c);
 const char *get_my_executable_path(void);
 const char *get_my_executable_directory(void);
-void main_loop(char *script_cmds_file, bool usb_present, serial_port* sp);
+void main_loop(char *script_cmds_file, bool usb_present, serial_port* port, bool flush_after_write);
 
 #ifdef __cplusplus
 }

@@ -31,12 +31,12 @@
 #include "cmdhftopaz.h"
 #include "protocols.h"
 
-static int CmdHelp(const char *Cmd);
+static int CmdHelp(pm3_connection* conn, const char *Cmd);
 
-int CmdHFTune(const char *Cmd)
+int CmdHFTune(pm3_connection* conn, const char *Cmd)
 {
   UsbCommand c={CMD_MEASURE_ANTENNA_TUNING_HF};
-  SendCommand(&c);
+  SendCommand(conn, &c);
   return 0;
 }
 
@@ -557,7 +557,7 @@ uint16_t printTraceLine(uint16_t tracepos, uint16_t traceLen, uint8_t *trace, ui
 }
 
 
-int CmdHFList(const char *Cmd)
+int CmdHFList(pm3_connection* conn, const char *Cmd)
 {
 	bool showWaitCycles = false;
 	bool markCRCBytes = false;
@@ -627,8 +627,8 @@ int CmdHFList(const char *Cmd)
 
 	// Query for the size of the trace
 	UsbCommand response;
-	GetFromBigBuf(trace, USB_CMD_DATA_SIZE, 0);
-	WaitForResponse(CMD_ACK, &response);
+	GetFromBigBuf(conn, trace, USB_CMD_DATA_SIZE, 0);
+	WaitForResponse(conn, CMD_ACK, &response);
 	uint16_t traceLen = response.arg[2];
 	if (traceLen > USB_CMD_DATA_SIZE) {
 		uint8_t *p = realloc(trace, traceLen);
@@ -638,8 +638,8 @@ int CmdHFList(const char *Cmd)
 			return 2;
 		}
 		trace = p;
-		GetFromBigBuf(trace, traceLen, 0);
-		WaitForResponse(CMD_ACK, NULL);
+		GetFromBigBuf(conn, trace, traceLen, 0);
+		WaitForResponse(conn, CMD_ACK, NULL);
 	}
 	
 	PrintAndLog("Recorded Activity (TraceLen = %d bytes)", traceLen);
@@ -660,26 +660,27 @@ int CmdHFList(const char *Cmd)
 	return 0;
 }
 
-int CmdHFSearch(const char *Cmd){
+int CmdHFSearch(pm3_connection* conn, const char *Cmd){
 	int ans = 0;
 	PrintAndLog("");
-	ans = CmdHF14AReader("s");
+	ans = CmdHF14AReader(conn, "s");
 	if (ans > 0) {
 		PrintAndLog("\nValid ISO14443A Tag Found - Quiting Search\n");
 		return ans;
 	}
-	ans = HFiClassReader("", false, false);
+	ans = HFiClassReader(conn, "", false, false);
 	if (ans) {
 		PrintAndLog("\nValid iClass Tag (or PicoPass Tag) Found - Quiting Search\n");
 		return ans;
 	}
-	ans = HF15Reader("", false);
+	ans = HF15Reader(conn, "", false);
 	if (ans) {
 		PrintAndLog("\nValid ISO15693 Tag Found - Quiting Search\n");
 		return ans;
 	}
+
 	//14b is longest test currently (and rarest chip type) ... put last
-	ans = HF14BInfo(false);
+	ans = HF14BInfo(conn, false);
 	if (ans) {
 		PrintAndLog("\nValid ISO14443B Tag Found - Quiting Search\n");
 		return ans;
@@ -688,11 +689,11 @@ int CmdHFSearch(const char *Cmd){
 	return 0;
 }
 
-int CmdHFSnoop(const char *Cmd)
+int CmdHFSnoop(pm3_connection* conn, const char *Cmd)
 {
 	char * pEnd;
 	UsbCommand c = {CMD_HF_SNIFFER, {strtol(Cmd, &pEnd,0),strtol(pEnd, &pEnd,0),0}};
-	SendCommand(&c);
+	SendCommand(conn, &c);
 	return 0;
 }
 
@@ -715,14 +716,14 @@ static command_t CommandTable[] =
 	{NULL,		NULL,			0, NULL}
 };
 
-int CmdHF(const char *Cmd)
+int CmdHF(pm3_connection* conn, const char *Cmd)
 {
-  CmdsParse(CommandTable, Cmd);
+  CmdsParse(conn, CommandTable, Cmd);
   return 0; 
 }
 
-int CmdHelp(const char *Cmd)
+int CmdHelp(pm3_connection* conn, const char *Cmd)
 {
-  CmdsHelp(CommandTable);
+  CmdsHelp(conn, CommandTable);
   return 0;
 }

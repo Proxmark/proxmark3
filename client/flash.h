@@ -27,12 +27,12 @@ typedef struct {
 } flash_file_t;
 
 int flash_load(flash_file_t *ctx, const char *name, int can_write_bl);
-int flash_start_flashing(receiver_arg* conn, int enable_bl_writes, char *serial_port_name);
-int flash_write(flash_file_t *ctx);
+int flash_start_flashing(pm3_connection* conn, int enable_bl_writes, char *serial_port_name);
+int flash_write(pm3_connection* conn, flash_file_t *ctx);
 void flash_free(flash_file_t *ctx);
-int flash_stop_flashing(void);
-void CloseProxmark(receiver_arg* conn, char* serial_port_name);
-bool OpenProxmark(char* serial_port_name);
+int flash_stop_flashing(pm3_connection* conn);
+void CloseProxmark(pm3_connection* conn, char* serial_port_name);
+bool OpenProxmark(pm3_connection* conn, char* serial_port_name);
 
 #endif
 

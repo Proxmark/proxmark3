@@ -19,62 +19,56 @@
 
 command_t * CmdDataCommands();
 
-int CmdData(const char *Cmd);
-void printDemodBuff(void);
-void setDemodBuf(uint8_t *buff, size_t size, size_t startIdx);
-bool getDemodBuf(uint8_t *buff, size_t *size);
-void save_restoreDB(uint8_t saveOpt);// option '1' to save DemodBuffer any other to restore
-int CmdPrintDemodBuff(const char *Cmd);
-int Cmdaskrawdemod(const char *Cmd);
-int Cmdaskmandemod(const char *Cmd);
-int AutoCorrelate(const int *in, int *out, size_t len, int window, bool SaveGrph, bool verbose);
-int CmdAutoCorr(const char *Cmd);
-int CmdBiphaseDecodeRaw(const char *Cmd);
-int CmdBitsamples(const char *Cmd);
-int CmdBuffClear(const char *Cmd);
-int CmdDec(const char *Cmd);
-int CmdDetectClockRate(const char *Cmd);
-int CmdFSKrawdemod(const char *Cmd);
-int CmdPSK1rawDemod(const char *Cmd);
-int CmdPSK2rawDemod(const char *Cmd);
-int CmdGrid(const char *Cmd);
-int CmdGetBitStream(const char *Cmd);
-int CmdHexsamples(const char *Cmd);
-int CmdHide(const char *Cmd);
-int CmdHpf(const char *Cmd);
-int CmdLoad(const char *Cmd);
-int CmdLtrim(const char *Cmd);
-int CmdRtrim(const char *Cmd);
-int Cmdmandecoderaw(const char *Cmd);
-int CmdNorm(const char *Cmd);
-int CmdNRZrawDemod(const char *Cmd);
-int CmdPlot(const char *Cmd);
-int CmdPrintDemodBuff(const char *Cmd);
-int CmdRawDemod(const char *Cmd);
-int CmdSamples(const char *Cmd);
-int CmdTuneSamples(const char *Cmd);
-int CmdSave(const char *Cmd);
-int CmdScale(const char *Cmd);
-int CmdDirectionalThreshold(const char *Cmd);
-int CmdZerocrossings(const char *Cmd);
-int ASKbiphaseDemod(const char *Cmd, bool verbose);
-int ASKDemod(const char *Cmd, bool verbose, bool emSearch, uint8_t askType);
-int ASKDemod_ext(const char *Cmd, bool verbose, bool emSearch, uint8_t askType, bool *stCheck);
-int FSKrawDemod(const char *Cmd, bool verbose);
-int PSKDemod(const char *Cmd, bool verbose);
-int NRZrawDemod(const char *Cmd, bool verbose);
-int getSamples(int n, bool silent);
-void setClockGrid(int clk, int offset);
+int CmdData(pm3_connection* conn, const char *Cmd);
+void printDemodBuff(pm3_connection* conn);
+void setDemodBuf(pm3_connection* conn, uint8_t *buff, size_t size, size_t startIdx);
+bool getDemodBuf(pm3_connection* conn, uint8_t *buff, size_t *size);
+// option '1' to save DemodBuffer any other to restore
+void save_restoreDB(pm3_connection* conn, uint8_t saveOpt);
+
+int CmdPrintDemodBuff(pm3_connection* conn, const char *Cmd);
+int Cmdaskrawdemod(pm3_connection* conn, const char *Cmd);
+int Cmdaskmandemod(pm3_connection* conn, const char *Cmd);
+int AutoCorrelate(pm3_connection* conn, const int *in, int *out, size_t len, int window, bool SaveGrph, bool verbose);
+int CmdAutoCorr(pm3_connection* conn, const char *Cmd);
+int CmdBiphaseDecodeRaw(pm3_connection* conn, const char *Cmd);
+int CmdBitsamples(pm3_connection* conn, const char *Cmd);
+int CmdBuffClear(pm3_connection* conn, const char *Cmd);
+int CmdDec(pm3_connection* conn, const char *Cmd);
+int CmdDetectClockRate(pm3_connection* conn, const char *Cmd);
+int CmdFSKrawdemod(pm3_connection* conn, const char *Cmd);
+int CmdPSK1rawDemod(pm3_connection* conn, const char *Cmd);
+int CmdPSK2rawDemod(pm3_connection* conn, const char *Cmd);
+int CmdGrid(pm3_connection* conn, const char *Cmd);
+int CmdGetBitStream(pm3_connection* conn, const char *Cmd);
+int CmdHexsamples(pm3_connection* conn, const char *Cmd);
+int CmdHide(pm3_connection* conn, const char *Cmd);
+int CmdHpf(pm3_connection* conn, const char *Cmd);
+int CmdLoad(pm3_connection* conn, const char *Cmd);
+int CmdLtrim(pm3_connection* conn, const char *Cmd);
+int CmdRtrim(pm3_connection* conn, const char *Cmd);
+int Cmdmandecoderaw(pm3_connection* conn, const char *Cmd);
+int CmdNorm(pm3_connection* conn, const char *Cmd);
+int CmdNRZrawDemod(pm3_connection* conn, const char *Cmd);
+int CmdPlot(pm3_connection* conn, const char *Cmd);
+int CmdPrintDemodBuff(pm3_connection* conn, const char *Cmd);
+int CmdRawDemod(pm3_connection* conn, const char *Cmd);
+int CmdSamples(pm3_connection* conn, const char *Cmd);
+int CmdTuneSamples(pm3_connection* conn, const char *Cmd);
+int CmdSave(pm3_connection* conn, const char *Cmd);
+int CmdScale(pm3_connection* conn, const char *Cmd);
+int CmdDirectionalThreshold(pm3_connection* conn, const char *Cmd);
+int CmdZerocrossings(pm3_connection* conn, const char *Cmd);
+int ASKbiphaseDemod(pm3_connection* conn, const char *Cmd, bool verbose);
+int ASKDemod(pm3_connection* conn, const char *Cmd, bool verbose, bool emSearch, uint8_t askType);
+int ASKDemod_ext(pm3_connection* conn, const char *Cmd, bool verbose, bool emSearch, uint8_t askType, bool *stCheck);
+int FSKrawDemod(pm3_connection* conn, const char *Cmd, bool verbose);
+int PSKDemod(pm3_connection* conn, const char *Cmd, bool verbose);
+int NRZrawDemod(pm3_connection* conn, const char *Cmd, bool verbose);
+int getSamples(pm3_connection* conn, int n, bool silent);
+void setClockGrid(pm3_connection* conn, int clk, int offset);
 int directionalThreshold(const int* in, int *out, size_t len, int8_t up, int8_t down);
 extern int AskEdgeDetect(const int *in, int *out, int len, int threshold);
 //int autoCorr(const int* in, int *out, size_t len, int window);
-
-#define MAX_DEMOD_BUF_LEN (1024*128)
-extern uint8_t DemodBuffer[MAX_DEMOD_BUF_LEN];
-extern size_t DemodBufferLen;
-extern int g_DemodStartIdx;
-extern int g_DemodClock;
-extern uint8_t g_debugMode;
-#define BIGBUF_SIZE 40000
 
 #endif
