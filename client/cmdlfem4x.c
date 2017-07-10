@@ -405,7 +405,7 @@ int CmdEM410xBrute(const char *Cmd)
 			return 0;
 		}
 				
-		sprintf(testuid, "%010lX", bytes_to_num(uidBlock + 5*c, 5));
+		sprintf(testuid, "%010" PRIX64, bytes_to_num(uidBlock + 5*c, 5));
 		PrintAndLog("Bruteforce %d / %d: simulating UID  %s, clock %d", c + 1, uidcnt, testuid, clock);
 		
 		ConstructEM410xEmulGraph(testuid, clock);

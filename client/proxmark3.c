@@ -57,26 +57,22 @@ struct receiver_arg {
 	int run;
 };
 
-byte_t rx[0x1000000];
+byte_t rx[sizeof(UsbCommand)];
 byte_t* prx = rx;
 
 static void *uart_receiver(void *targ) {
 	struct receiver_arg *arg = (struct receiver_arg*)targ;
 	size_t rxlen;
-	size_t cmd_count;
 
 	while (arg->run) {
-		rxlen = sizeof(UsbCommand);
-		if (uart_receive(sp, prx, &rxlen)) {
+		rxlen = 0;
+		if (uart_receive(sp, prx, sizeof(UsbCommand) - (prx-rx), &rxlen)) {
 			prx += rxlen;
-			if (((prx-rx) % sizeof(UsbCommand)) != 0) {
+			if (prx-rx < sizeof(UsbCommand)) {
 				continue;
 			}
-			cmd_count = (prx-rx) / sizeof(UsbCommand);
-
-			for (size_t i = 0; i < cmd_count; i++) {
-				UsbCommandReceived((UsbCommand*)(rx+(i*sizeof(UsbCommand))));
-			}
+			
+			UsbCommandReceived((UsbCommand*)rx);
 		}
 		prx = rx;
 
