@@ -73,6 +73,8 @@ wire hi_read_tx_shallow_modulation = conf_word[0];
 wire hi_read_rx_xcorr_848 = conf_word[0];
 // and whether to drive the coil (reader) or just short it (snooper)
 wire hi_read_rx_xcorr_snoop = conf_word[1];
+// divide subcarrier frequency by 4
+wire hi_read_rx_xcorr_quarter = conf_word[2];
 
 // For the high-frequency simulated tag: what kind of modulation to use.
 wire [2:0] hi_simulate_mod_type = conf_word[2:0];
@@ -100,7 +102,7 @@ hi_read_rx_xcorr hrxc(
 	hrxc_ssp_frame, hrxc_ssp_din, ssp_dout, hrxc_ssp_clk,
 	cross_hi, cross_lo,
 	hrxc_dbg,
-	hi_read_rx_xcorr_848, hi_read_rx_xcorr_snoop
+	hi_read_rx_xcorr_848, hi_read_rx_xcorr_snoop, hi_read_rx_xcorr_quarter
 );
 
 hi_simulate hs(
