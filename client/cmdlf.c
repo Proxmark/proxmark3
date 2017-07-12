@@ -1081,7 +1081,7 @@ int CmdLFfind(const char *Cmd)
 		if (ans>0) {
 			PrintAndLog("Possible unknown PSK1 Modulated Tag Found above!\n\nCould also be PSK2 - try 'data rawdemod p2'");
 			PrintAndLog("\nCould also be PSK3 - [currently not supported]");
-			PrintAndLog("\nCould also be NRZ - try 'data nrzrawdemod'");
+			PrintAndLog("\nCould also be NRZ - try 'data rawdemod nr'");
 			return CheckChipType(cmdp);
 		}
 		ans = CheckChipType(cmdp);
