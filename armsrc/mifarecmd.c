@@ -1281,11 +1281,14 @@ void MifareCSetBlock(uint32_t arg0, uint32_t arg1, uint32_t arg2, uint8_t *datai
 		};
 
 		if (workFlags & 0x04) {
-			if (mifare_classic_halt(NULL, cuid)) {
-				if (MF_DBGLEVEL > 2)	Dbprintf("Halt error");
-				// Continue, some magic tags misbehavies and send an answer to it.
-                        	// break;
-			};
+			// do no issue halt command for gen1b magic tag (#db# halt error. response len: 1)
+			if (!(workFlags & 0x40)) {
+				if (mifare_classic_halt(NULL, cuid)) {
+					if (MF_DBGLEVEL > 2)	Dbprintf("Halt error");
+					// Continue, some magic tags misbehavies and send an answer to it.
+					// break;
+				}
+			}
 		}
 
 		isOK = 1;
@@ -1362,11 +1365,14 @@ void MifareCGetBlock(uint32_t arg0, uint32_t arg1, uint32_t arg2, uint8_t *datai
 		memcpy(data, receivedAnswer, 18);
 
 		if (workFlags & 0x04) {
-			if (mifare_classic_halt(NULL, cuid)) {
-				if (MF_DBGLEVEL > 2)	Dbprintf("Halt error");
-			// Continue, some magic tags misbehavies and send an answer to it.
-			//		break;
-			};
+			// do no issue halt command for gen1b magic tag (#db# halt error. response len: 1)
+			if (!(workFlags & 0x40)) {
+				if (mifare_classic_halt(NULL, cuid)) {
+					if (MF_DBGLEVEL > 1)	Dbprintf("Halt error");
+					// Continue, some magic tags misbehavies and send an answer to it.
+					//		break;
+				}
+			}
 		}
 
 		isOK = 1;
