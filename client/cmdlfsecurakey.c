@@ -44,7 +44,7 @@ int CmdSecurakeyDemod(const char *Cmd) {
 	//ASK / Manchester
 	bool st = false;
 	if (!ASKDemod_ext("40 0 0", false, false, 1, &st)) {
-		if (g_debugMode) PrintAndLog("DEBUG: Error - Noralsy: ASK/Manchester Demod failed");
+		if (g_debugMode) PrintAndLog("DEBUG: Error - Securakey: ASK/Manchester Demod failed");
 		return 0;
 	}
 	if (st) return 0;
