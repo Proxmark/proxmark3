@@ -140,6 +140,7 @@ CMDSRCS = 	crapto1/crapto1.c\
 			cmdlfti.c \
 			cmdlfviking.c\
 			cmdlfvisa2000.c\
+			cmdlfpac.c\
 			cmdparser.c \
 			cmdmain.c \
 			scripting.c\
