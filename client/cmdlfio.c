@@ -133,20 +133,21 @@ int CmdIOClone(const char *Cmd)
 {
   unsigned int hi = 0, lo = 0;
   int n = 0, i = 0;
+  char ch;
   UsbCommand c;
 
-  
-  //if (1 == sscanf(str, "0x%"SCNx32, &hi)) {
-    // value now contains the value in the string--decimal 255, in this case.
-  //}
-  
   while (sscanf(&Cmd[i++], "%1x", &n ) == 1) {
       hi = (hi << 4) | (lo >> 28);
       lo = (lo << 4) | (n & 0xf);
   }
 
-  PrintAndLog("Cloning tag with ID %08x %08x", hi, lo);
-  PrintAndLog("Press pm3-button to abort simulation");
+  if (sscanf(&Cmd[--i], "%c", &ch) == 1) {
+	  PrintAndLog("Usage:    lf io clone <tag-ID>");
+	  return 0;
+  }
+  
+  PrintAndLog("Cloning ioProx tag with ID %08x %08x", hi, lo);
+
   c.cmd = CMD_IO_CLONE_TAG;
   c.arg[0] = hi;
   c.arg[1] = lo;
