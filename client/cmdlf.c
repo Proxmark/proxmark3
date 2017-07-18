@@ -350,7 +350,8 @@ bool lf_read(bool silent, uint32_t samples) {
 			return false;
 		}
 	}
-	getSamples(resp.arg[0], silent);
+	// resp.arg[0] is bits read not bytes read.
+	getSamples(resp.arg[0]/8, silent);
 
 	return true;
 }
