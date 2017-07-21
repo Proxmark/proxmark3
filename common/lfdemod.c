@@ -505,13 +505,14 @@ int DetectASKClock(uint8_t dest[], size_t size, int *clock, int maxErr) {
 	return bestStart[best];
 }
 
-int DetectStrongNRZClk(uint8_t *dest, size_t size, int peak, int low){
+int DetectStrongNRZClk(uint8_t *dest, size_t size, int peak, int low, bool *strong) {
 	//find shortest transition from high to low
+	*strong = false;
 	size_t i = 0;
 	size_t transition1 = 0;
 	int lowestTransition = 255;
 	bool lastWasHigh = false;
-
+	size_t transitionSampleCount = 0;
 	//find first valid beginning of a high or low wave
 	while ((dest[i] >= peak || dest[i] <= low) && (i < size))
 		++i;
@@ -527,10 +528,17 @@ int DetectStrongNRZClk(uint8_t *dest, size_t size, int peak, int low){
 			lastWasHigh = (dest[i] >= peak);
 			if (i-transition1 < lowestTransition) lowestTransition = i-transition1;
 			transition1 = i;
+		} else if (dest[i] < peak && dest[i] > low) {
+			transitionSampleCount++;
 		}
 	}
 	if (lowestTransition == 255) lowestTransition = 0;
 	if (g_debugMode==2) prnt("DEBUG NRZ: detectstrongNRZclk smallest wave: %d",lowestTransition);
+	// if less than 10% of the samples were not peaks (or 90% were peaks) then we have a strong wave
+	if (transitionSampleCount / size < 10) {
+		*strong = true;
+		lowestTransition = getClosestClock(lowestTransition);
+	}
 	return lowestTransition;
 }
 
@@ -550,7 +558,9 @@ int DetectNRZClock(uint8_t dest[], size_t size, int clock, size_t *clockStartIdx
 	int peak, low;
 	if (getHiLo(dest, loopCnt, &peak, &low, 90, 90) < 1) return 0;
 
-	int lowestTransition = DetectStrongNRZClk(dest, size-20, peak, low);
+	bool strong = false;
+	int lowestTransition = DetectStrongNRZClk(dest, size-20, peak, low, &strong);
+	if (strong) return lowestTransition;
 	size_t ii;
 	uint8_t clkCnt;
 	uint8_t tol = 0;

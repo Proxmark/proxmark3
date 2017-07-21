@@ -6,11 +6,17 @@ This project uses the changelog in accordance with [keepchangelog](http://keepac
 ## [unreleased][unreleased]
 
 ### Changed
+- Improved backdoor detection missbehaving magic s50/1k tag (Fl0-0)
 
 ### Fixed
 
 ### Added
-
+- Added PAC/Stanley detection to lf search (marshmellow)
+- Added lf pac demod and lf pac read - extracts the raw blocks from a PAC/Stanley tag (marshmellow)
+- Added hf mf c* commands compatibity for 4k and gen1b backdoor (Fl0-0)
+- Added backdoor detection for gen1b magic s70/4k tag (Fl0-0)
+- Added data fsktonrz, a fsk cleaning/demodulating routine for weak fsk signal. Note: follow this up with a `data rawdemod nr` to finish demoding your signal. (marshmellow)
+- Added lf em 410xbrute, LF EM410x reader bruteforce attack by simulating UIDs from a file (Fl0-0)
 
 ## [3.0.1][2017-06-08]
 
@@ -21,6 +27,9 @@ This project uses the changelog in accordance with [keepchangelog](http://keepac
 
 
 ## [3.0.0][2017-06-05]
+
+### Added
+- Added lf hitag write 24, the command writes a block to hitag2 tags in crypto mode (henjo)
 
 ### Added
 - Added hf mf hardnested, an attack working for hardened Mifare cards (EV1, Mifare Plus SL1) where hf mf nested fails

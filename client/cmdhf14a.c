@@ -26,6 +26,7 @@
 #include "cmdmain.h"
 #include "mifare.h"
 #include "cmdhfmfu.h"
+#include "mifarehost.h"
 
 static int CmdHelp(const char *Cmd);
 static void waitCmd(uint8_t iLen);
@@ -410,8 +411,13 @@ int CmdHF14AReader(const char *Cmd)
 	c.arg[2] = 0;	
 	SendCommand(&c);
 	WaitForResponse(CMD_ACK,&resp);
-	uint8_t isOK  = resp.arg[0] & 0xff;
-	PrintAndLog("Answers to chinese magic backdoor commands: %s", (isOK ? "YES" : "NO") );
+	
+	uint8_t isGeneration = resp.arg[0] & 0xff;
+	switch( isGeneration ){
+		case 1: PrintAndLog("Answers to chinese magic backdoor commands (GEN 1a): YES"); break;
+		case 2: PrintAndLog("Answers to chinese magic backdoor commands (GEN 1b): YES"); break;
+		default: PrintAndLog("Answers to chinese magic backdoor commands: NO"); break;
+	}
 	
 	// disconnect
 	c.cmd = CMD_READER_ISO_14443a;

@@ -16,12 +16,13 @@
 #include "data.h"
 
 // mfCSetBlock work flags
-#define CSETBLOCK_UID 					0x01
-#define CSETBLOCK_WUPC					0x02
-#define CSETBLOCK_HALT					0x04
+#define CSETBLOCK_UID 				0x01
+#define CSETBLOCK_WUPC				0x02
+#define CSETBLOCK_HALT				0x04
 #define CSETBLOCK_INIT_FIELD			0x08
 #define CSETBLOCK_RESET_FIELD			0x10
 #define CSETBLOCK_SINGLE_OPER			0x1F
+#define CSETBLOCK_MAGIC_1B 			0x40
 
 extern char logHexFileName[FILE_PATH_SIZE];
 
@@ -45,5 +46,7 @@ extern int isBlockTrailer(int blockN);
 extern int loadTraceCard(uint8_t *tuid);
 extern int saveTraceCard(void);
 extern int tryDecryptWord(uint32_t nt, uint32_t ar_enc, uint32_t at_enc, uint8_t *data, int len);
+
+extern int mfCIdentify();
 
 #endif

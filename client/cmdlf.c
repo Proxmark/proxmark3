@@ -45,6 +45,7 @@
 #include "cmdlfjablotron.h" //for jablotron menu
 #include "cmdlfnoralsy.h"// for noralsy menu
 #include "cmdlfsecurakey.h"//for securakey menu
+#include "cmdlfpac.h"    // for pac menu
 
 bool g_lf_threshold_set = false;
 static int CmdHelp(const char *Cmd);
@@ -349,7 +350,8 @@ bool lf_read(bool silent, uint32_t samples) {
 			return false;
 		}
 	}
-	getSamples(resp.arg[0], silent);
+	// resp.arg[0] is bits read not bytes read.
+	getSamples(resp.arg[0]/8, silent);
 
 	return true;
 }
@@ -1055,6 +1057,12 @@ int CmdLFfind(const char *Cmd)
 		return CheckChipType(cmdp);
 	}
 
+	ans=CmdPacDemod("");
+	if (ans>0) {
+		PrintAndLog("\nValid PAC/Stanley ID Found!");
+		return CheckChipType(cmdp);		
+	}
+
 	PrintAndLog("\nNo Known Tags Found!\n");
 	if (testRaw=='u' || testRaw=='U') {
 		//ans=CheckChipType(cmdp);
@@ -1081,7 +1089,7 @@ int CmdLFfind(const char *Cmd)
 		if (ans>0) {
 			PrintAndLog("Possible unknown PSK1 Modulated Tag Found above!\n\nCould also be PSK2 - try 'data rawdemod p2'");
 			PrintAndLog("\nCould also be PSK3 - [currently not supported]");
-			PrintAndLog("\nCould also be NRZ - try 'data nrzrawdemod'");
+			PrintAndLog("\nCould also be NRZ - try 'data rawdemod nr'");
 			return CheckChipType(cmdp);
 		}
 		ans = CheckChipType(cmdp);
@@ -1105,6 +1113,7 @@ static command_t CommandTable[] =
 	{"jablotron",   CmdLFJablotron,     1, "{ Jablotron RFIDs...         }"},
 	{"nexwatch",    CmdLFNexWatch,      1, "{ NexWatch RFIDs...          }"},
 	{"noralsy",     CmdLFNoralsy,       1, "{ Noralsy RFIDs...           }"},
+	{"pac",         CmdLFPac,           1, "{ PAC/Stanley RFIDs...       }"},
 	{"paradox",     CmdLFParadox,       1, "{ Paradox RFIDs...           }"},
 	{"presco",      CmdLFPresco,        1, "{ Presco RFIDs...            }"},
 	{"pcf7931",     CmdLFPCF7931,       1, "{ PCF7931 CHIPs...           }"},

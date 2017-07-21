@@ -13,13 +13,13 @@ RM = rm -f
 MV = mv
 
 #COMMON_FLAGS = -m32
-VPATH = ../common ../zlib
+VPATH = ../common ../zlib ../uart
 OBJDIR = obj
 
 LDLIBS = -L/opt/local/lib -L/usr/local/lib -lreadline -lpthread -lm
 LUALIB = ../liblua/liblua.a
 LDFLAGS = $(COMMON_FLAGS)
-CFLAGS = -std=c99 -D_ISOC99_SOURCE -I. -I../include -I../common -I../zlib -I/opt/local/include -I../liblua -Wall $(COMMON_FLAGS) -g -O3
+CFLAGS = -std=c99 -D_ISOC99_SOURCE -I. -I../include -I../common -I../zlib -I../uart -I/opt/local/include -I../liblua -Wall $(COMMON_FLAGS) -g -O3
 CXXFLAGS = -I../include -Wall -O3
 
 LUAPLATFORM = generic
@@ -78,7 +78,8 @@ DEPFLAGS = -MT $@ -MMD -MP -MF $(OBJDIR)/$*.Td
 # make temporary to final dependeny files after successful compilation
 POSTCOMPILE = $(MV) -f $(OBJDIR)/$*.Td $(OBJDIR)/$*.d
 
-CORESRCS = 	uart.c \
+CORESRCS = 	uart_posix.c \
+			uart_win32.c \
 			util.c \
 			util_posix.c
 
@@ -139,6 +140,7 @@ CMDSRCS = 	crapto1/crapto1.c\
 			cmdlfti.c \
 			cmdlfviking.c\
 			cmdlfvisa2000.c\
+			cmdlfpac.c\
 			cmdparser.c \
 			cmdmain.c \
 			scripting.c\
@@ -209,8 +211,8 @@ all-static: LDLIBS:=-static $(LDLIBS)
 all-static: proxmark3 flasher fpga_compress
 
 proxmark3: LDLIBS+=$(LUALIB) $(QTLDLIBS)
-proxmark3: $(OBJDIR)/proxmark3.o $(COREOBJS) $(CMDOBJS) $(QTGUIOBJS) $(MULTIARCHOBJS) lualibs/usb_cmd.lua
-	$(LD) $(LDFLAGS) $(OBJDIR)/proxmark3.o $(COREOBJS) $(CMDOBJS) $(QTGUIOBJS) $(MULTIARCHOBJS) $(LDLIBS) -o $@
+proxmark3: $(OBJDIR)/proxmark3.o $(COREOBJS) $(CMDOBJS) $(QTGUIOBJS) $(MULTIARCHOBJS) $(ZLIBOBJS) lualibs/usb_cmd.lua
+	$(LD) $(LDFLAGS) $(OBJDIR)/proxmark3.o $(COREOBJS) $(CMDOBJS) $(QTGUIOBJS) $(MULTIARCHOBJS) $(ZLIBOBJS) $(LDLIBS) -o $@
 
 flasher: $(OBJDIR)/flash.o $(OBJDIR)/flasher.o $(COREOBJS)
 	$(LD) $(LDFLAGS) $^ $(LDLIBS) -o $@

@@ -48,7 +48,9 @@ void PrintAndLog(char *fmt, ...)
 			logging=0;
 		}
 	}
-	
+
+#ifdef RL_STATE_READCMD
+	// We are using GNU readline.
 	int need_hack = (rl_readline_state & RL_STATE_READCMD) > 0;
 
 	if (need_hack) {
@@ -58,6 +60,10 @@ void PrintAndLog(char *fmt, ...)
 		rl_replace_line("", 0);
 		rl_redisplay();
 	}
+#else
+	// We are using libedit (OSX), which doesn't support this flag.
+	int need_hack = 0;
+#endif
 	
 	va_start(argptr, fmt);
 	va_copy(argptr2, argptr);

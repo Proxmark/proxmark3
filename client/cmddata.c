@@ -1234,6 +1234,7 @@ int getSamples(int n, bool silent)
 	}
 
 	setClockGrid(0,0);
+	DemodBufferLen = 0;
 	RepaintGraphWindow();
 	return 0;
 }
@@ -1338,6 +1339,7 @@ int CmdLoad(const char *Cmd)
 	fclose(f);
 	PrintAndLog("loaded %d samples", GraphTraceLen);
 	setClockGrid(0,0);
+	DemodBufferLen = 0;
 	RepaintGraphWindow();
 	return 0;
 }
@@ -1395,8 +1397,7 @@ int CmdNorm(const char *Cmd)
 
 	if (max != min) {
 		for (i = 0; i < GraphTraceLen; ++i) {
-			GraphBuffer[i] = (GraphBuffer[i] - ((max + min) / 2)) * 256 /
-				(max - min);
+			GraphBuffer[i] = ((long)(GraphBuffer[i] - ((max + min) / 2)) * 256) / (max - min);
 				//marshmelow: adjusted *1000 to *256 to make +/- 128 so demod commands still work
 		}
 	}
@@ -1606,6 +1607,205 @@ int Cmdhex2bin(const char *Cmd)
 	return 0;
 }
 
+	/* // example of FSK2 RF/50 Tones
+	static const int LowTone[]  = {
+	1,  1,  1,  1,  1, -1, -1, -1, -1, -1,
+	1,  1,  1,  1,  1, -1, -1, -1, -1, -1,
+	1,  1,  1,  1,  1, -1, -1, -1, -1, -1,
+	1,  1,  1,  1,  1, -1, -1, -1, -1, -1,
+	1,  1,  1,  1,  1, -1, -1, -1, -1, -1
+	};
+	static const int HighTone[] = {
+	1,  1,  1,  1,  1,     -1, -1, -1, -1, // note one extra 1 to padd due to 50/8 remainder (1/2 the remainder)
+	1,  1,  1,  1,         -1, -1, -1, -1,
+	1,  1,  1,  1,         -1, -1, -1, -1,
+	1,  1,  1,  1,         -1, -1, -1, -1,
+	1,  1,  1,  1,         -1, -1, -1, -1,
+	1,  1,  1,  1,     -1, -1, -1, -1, -1, // note one extra -1 to padd due to 50/8 remainder
+	};
+	*/
+void GetHiLoTone(int *LowTone, int *HighTone, int clk, int LowToneFC, int HighToneFC) {
+	int i,j=0;
+	int Left_Modifier = ((clk % LowToneFC) % 2) + ((clk % LowToneFC)/2);
+	int Right_Modifier = (clk % LowToneFC) / 2;
+	//int HighToneMod = clk mod HighToneFC;
+	int LeftHalfFCCnt = (LowToneFC % 2) + (LowToneFC/2); //truncate
+	int FCs_per_clk = clk/LowToneFC;
+	
+	// need to correctly split up the clock to field clocks.
+	// First attempt uses modifiers on each end to make up for when FCs don't evenly divide into Clk
+
+	// start with LowTone
+	// set extra 1 modifiers to make up for when FC doesn't divide evenly into Clk
+	for (i = 0; i < Left_Modifier; i++) {
+		LowTone[i] = 1;
+	}
+
+	// loop # of field clocks inside the main clock
+	for (i = 0; i < (FCs_per_clk); i++) {
+		// loop # of samples per field clock
+		for (j = 0; j < LowToneFC; j++) {
+			LowTone[(i*LowToneFC)+Left_Modifier+j] = ( j < LeftHalfFCCnt ) ? 1 : -1;
+		}
+	}
+
+	int k;
+	// add last -1 modifiers
+	for (k = 0; k < Right_Modifier; k++) {
+		LowTone[((i-1)*LowToneFC)+Left_Modifier+j+k] = -1;
+	}
+
+	// now do hightone
+	Left_Modifier = ((clk % HighToneFC) % 2) + ((clk % HighToneFC)/2);
+	Right_Modifier = (clk % HighToneFC) / 2;
+	LeftHalfFCCnt = (HighToneFC % 2) + (HighToneFC/2); //truncate
+	FCs_per_clk = clk/HighToneFC;
+
+	for (i = 0; i < Left_Modifier; i++) {
+		HighTone[i] = 1;
+	}
+
+	// loop # of field clocks inside the main clock
+	for (i = 0; i < (FCs_per_clk); i++) {
+		// loop # of samples per field clock
+		for (j = 0; j < HighToneFC; j++) {
+			HighTone[(i*HighToneFC)+Left_Modifier+j] = ( j < LeftHalfFCCnt ) ? 1 : -1;
+		}
+	}
+
+	// add last -1 modifiers
+	for (k = 0; k < Right_Modifier; k++) {
+		PrintAndLog("(i-1)*HighToneFC+lm+j+k %i",((i-1)*HighToneFC)+Left_Modifier+j+k);
+		HighTone[((i-1)*HighToneFC)+Left_Modifier+j+k] = -1;
+	}
+	if (g_debugMode == 2) {
+		for ( i = 0; i < clk; i++) {
+			PrintAndLog("Low: %i,  High: %i",LowTone[i],HighTone[i]);
+		}
+	}
+}
+
+//old CmdFSKdemod adapted by marshmellow 
+//converts FSK to clear NRZ style wave.  (or demodulates)
+int FSKToNRZ(int *data, int *dataLen, int clk, int LowToneFC, int HighToneFC) {
+	uint8_t ans=0;
+	if (clk == 0 || LowToneFC == 0 || HighToneFC == 0) {
+		int firstClockEdge=0;
+		ans = fskClocks((uint8_t *) &LowToneFC, (uint8_t *) &HighToneFC, (uint8_t *) &clk, false, &firstClockEdge);
+		if (g_debugMode	> 1) {
+			PrintAndLog	("DEBUG FSKtoNRZ: detected clocks: fc_low %i, fc_high %i, clk %i, firstClockEdge %i, ans %u", LowToneFC, HighToneFC, clk, firstClockEdge, ans);
+		}
+	}
+	// currently only know fsk modulations with field clocks < 10 samples and > 4 samples. filter out to remove false positives (and possibly destroying ask/psk modulated waves...)
+	if (ans == 0 || clk == 0 || LowToneFC == 0 || HighToneFC == 0 || LowToneFC > 10 || HighToneFC	< 4) {
+		if (g_debugMode	> 1) {
+			PrintAndLog	("DEBUG FSKtoNRZ: no fsk clocks found");
+		}
+		return 0;
+	}
+	int LowTone[clk];
+	int HighTone[clk];
+	GetHiLoTone(LowTone, HighTone, clk, LowToneFC, HighToneFC);
+	
+	int i, j;
+
+	// loop through ([all samples] - clk)
+	for (i = 0; i < *dataLen - clk; ++i) {
+		int lowSum = 0, highSum = 0;
+
+		// sum all samples together starting from this sample for [clk] samples for each tone (multiply tone value with sample data)
+		for (j = 0; j < clk; ++j) {
+			lowSum += LowTone[j] * data[i+j];
+			highSum += HighTone[j] * data[i + j];
+		}
+		// get abs( [average sample value per clk] * 100 )  (or a rolling average of sorts)
+		lowSum = abs(100 * lowSum / clk);
+		highSum = abs(100 * highSum / clk);
+		// save these back to buffer for later use
+		data[i] = (highSum << 16) | lowSum;
+	}
+
+	// now we have the abs( [average sample value per clk] * 100 ) for each tone
+	//   loop through again [all samples] - clk - 16  
+	//                  note why 16???  is 16 the largest FC? changed to LowToneFC as that should be the > fc
+	for(i = 0; i < *dataLen - clk - LowToneFC; ++i) {
+		int lowTot = 0, highTot = 0;
+
+		// sum a field clock width of abs( [average sample values per clk] * 100) for each tone
+		for (j = 0; j < LowToneFC; ++j) {  //10 for fsk2
+		  lowTot += (data[i + j] & 0xffff);
+		}
+		for (j = 0; j < HighToneFC; j++) {  //8 for fsk2
+		  highTot += (data[i + j] >> 16);
+		}
+
+		// subtract the sum of lowTone averages by the sum of highTone averages as it 
+		//   and write back the new graph value 
+		data[i] = lowTot - highTot;
+	}
+	// update dataLen to what we put back to the data sample buffer
+	*dataLen -= (clk + LowToneFC);
+	return 0;
+}
+
+int usage_data_fsktonrz() {
+		PrintAndLog("Usage: data fsktonrz c <clock> l <fc_low> f <fc_high>");
+		PrintAndLog("Options:        ");
+		PrintAndLog("       h            This help");
+		PrintAndLog("       c <clock>    enter the a clock (omit to autodetect)");
+		PrintAndLog("       l <fc_low>   enter a field clock (omit to autodetect)");
+		PrintAndLog("       f <fc_high>  enter a field clock (omit to autodetect)");
+		return 0;	
+}
+
+int CmdFSKToNRZ(const char *Cmd) {
+	// take clk, fc_low, fc_high 
+	//   blank = auto;
+	bool errors = false;
+	int clk = 0;
+	char cmdp = 0;
+	int fc_low = 10, fc_high = 8;
+	while(param_getchar(Cmd, cmdp) != 0x00)
+	{
+		switch(param_getchar(Cmd, cmdp))
+		{
+		case 'h':
+		case 'H':
+			return usage_data_fsktonrz();
+		case 'C':
+		case 'c':
+			clk = param_get32ex(Cmd, cmdp+1, 0, 10);
+			cmdp += 2;
+			break;
+		case 'F':
+		case 'f':
+			fc_high = param_get32ex(Cmd, cmdp+1, 0, 10);
+			cmdp += 2;
+			break;
+		case 'L':
+		case 'l':
+			fc_low = param_get32ex(Cmd, cmdp+1, 0, 10);
+			cmdp += 2;
+			break;
+		default:
+			PrintAndLog("Unknown parameter '%c'", param_getchar(Cmd, cmdp));
+			errors = true;
+			break;
+		}
+		if(errors) break;
+	}
+	//Validations
+	if(errors) return usage_data_fsktonrz();
+
+	setClockGrid(0,0);
+	DemodBufferLen = 0;
+	int ans = FSKToNRZ(GraphBuffer, &GraphTraceLen, clk, fc_low, fc_high);
+	CmdNorm("");
+	RepaintGraphWindow();
+	return ans;
+}
+
+
 static command_t CommandTable[] =
 {
 	{"help",            CmdHelp,            1, "This help"},
@@ -1617,6 +1817,7 @@ static command_t CommandTable[] =
 	{"buffclear",       CmdBuffClear,       1, "Clear sample buffer and graph window"},
 	{"dec",             CmdDec,             1, "Decimate samples"},
 	{"detectclock",     CmdDetectClockRate, 1, "[modulation] Detect clock rate of wave in GraphBuffer (options: 'a','f','n','p' for ask, fsk, nrz, psk respectively)"},
+	{"fsktonrz",        CmdFSKToNRZ,        1, "Convert fsk2 to nrz wave for alternate fsk demodulating (for weak fsk)"},
 	{"getbitstream",    CmdGetBitStream,    1, "Convert GraphBuffer's >=1 values to 1 and <1 to 0"},
 	{"grid",            CmdGrid,            1, "<x> <y> -- overlay grid on graph window, use zero value to turn off either"},
 	{"hexsamples",      CmdHexsamples,      0, "<bytes> [<offset>] -- Dump big buffer as hex bytes"},
