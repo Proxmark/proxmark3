@@ -437,8 +437,8 @@ int mfCSetBlock(uint8_t blockNo, uint8_t *data, uint8_t *uid, bool wantWipe, uin
 	memcpy(c.d.asBytes, data, 16);
 	SendCommand(&c);
 
-  UsbCommand resp;
-	if (WaitForResponseTimeout(CMD_ACK,&resp,1500)) {
+	UsbCommand resp;
+	if (WaitForResponseTimeout(CMD_ACK, &resp, 1500)) {
 		isOK  = resp.arg[0] & 0xff;
 		if (uid != NULL)
 			memcpy(uid, resp.d.asBytes, 4);
@@ -448,6 +448,7 @@ int mfCSetBlock(uint8_t blockNo, uint8_t *data, uint8_t *uid, bool wantWipe, uin
 		PrintAndLog("Command execute timeout");
 		return 1;
 	}
+
 	return 0;
 }
 
@@ -456,7 +457,6 @@ int mfCSetUID(uint8_t *uid, uint8_t *atqa, uint8_t *sak, uint8_t *oldUID, bool w
 	uint8_t block0[16] = {0x00};
 	uint8_t block1[16] = {0x00};
 	uint8_t blockK[16] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x08, 0x77, 0x8F, 0x00, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
-	uint8_t blockt[16] = {0x00};
 	int gen = 0, res;
 
 	gen = mfCIdentify();
@@ -493,7 +493,7 @@ int mfCSetUID(uint8_t *uid, uint8_t *atqa, uint8_t *sak, uint8_t *oldUID, bool w
 
 	res = mfCSetBlock(0, block0, oldUID, wantWipe, cmdParams);
 	if (res) {
-		PrintAndLog("Can't set block 0. Error: %s", res);
+		PrintAndLog("Can't set block 0. Error: %d", res);
 		return res;
 	}
 	
@@ -503,9 +503,9 @@ int mfCSetUID(uint8_t *uid, uint8_t *atqa, uint8_t *sak, uint8_t *oldUID, bool w
 		printf("write blocks ");
 		while (blockNo < 64) {
 			if ((blockNo + 1) % 4) {
-				res = mfCSetBlock(blockNo, block1, blockt, false, cmdParams);
+				res = mfCSetBlock(blockNo, block1, NULL, false, cmdParams);
 			} else {
-				res = mfCSetBlock(blockNo, blockK, blockt, false, cmdParams);
+				res = mfCSetBlock(blockNo, blockK, NULL, false, cmdParams);
 				printf(".");
 			}
 			if (res) {
