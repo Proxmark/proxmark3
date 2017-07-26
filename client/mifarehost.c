@@ -481,13 +481,13 @@ int mfCSetUID(uint8_t *uid, uint8_t *atqa, uint8_t *sak, uint8_t *oldUID, bool w
 	// UID
 	memcpy(block0, uid, 4);
 	// Mifare UID BCC
-	block0[4] = block0[0]^block0[1]^block0[2]^block0[3];
+	block0[4] = block0[0] ^ block0[1] ^ block0[2] ^ block0[3];
 	// mifare classic SAK(byte 5) and ATQA(byte 6 and 7, reversed)
-	if (sak!=NULL)
-		block0[5]=sak[0];
-	if (atqa!=NULL) {
-		block0[6]=atqa[1];
-		block0[7]=atqa[0];
+	if (sak != NULL)
+		block0[5] = sak[0];
+	if (atqa != NULL) {
+		block0[6] = atqa[1];
+		block0[7] = atqa[0];
 	}
 	PrintAndLog("new block 0:  %s", sprint_hex(block0, 16));
 
@@ -510,7 +510,7 @@ int mfCSetUID(uint8_t *uid, uint8_t *atqa, uint8_t *sak, uint8_t *oldUID, bool w
 			}
 			if (res) {
 				printf("\n");
-				PrintAndLog("Can't set block %d. Error: %s", blockNo, res);
+				PrintAndLog("Can't set block %d. Error: %d", blockNo, res);
 				return res;
 			}
 
@@ -522,6 +522,54 @@ int mfCSetUID(uint8_t *uid, uint8_t *atqa, uint8_t *sak, uint8_t *oldUID, bool w
 	
 	return 0;
 }
+
+int mfCIdentify()
+{
+	UsbCommand c = {CMD_READER_ISO_14443a, {ISO14A_CONNECT | ISO14A_NO_DISCONNECT, 0, 0}};
+	SendCommand(&c);
+
+	UsbCommand resp;
+	WaitForResponse(CMD_ACK,&resp);
+
+	iso14a_card_select_t card;
+	memcpy(&card, (iso14a_card_select_t *)resp.d.asBytes, sizeof(iso14a_card_select_t));
+
+	uint64_t select_status = resp.arg[0];		// 0: couldn't read, 1: OK, with ATS, 2: OK, no ATS, 3: proprietary Anticollision
+
+	if(select_status != 0) {
+		uint8_t rats[] = { 0xE0, 0x80 }; // FSDI=8 (FSD=256), CID=0
+		c.arg[0] = ISO14A_RAW | ISO14A_APPEND_CRC | ISO14A_NO_DISCONNECT;
+		c.arg[1] = 2;
+		c.arg[2] = 0;
+		memcpy(c.d.asBytes, rats, 2);
+		SendCommand(&c);
+		WaitForResponse(CMD_ACK,&resp);
+	}
+
+	c.cmd = CMD_MIFARE_CIDENT;
+	c.arg[0] = 0;
+	c.arg[1] = 0;
+	c.arg[2] = 0;
+	SendCommand(&c);
+	WaitForResponse(CMD_ACK,&resp);
+
+	uint8_t isGeneration = resp.arg[0] & 0xff;
+	switch( isGeneration ){
+		case 1: PrintAndLog("Chinese magic backdoor commands (GEN 1a) detected"); break;
+		case 2: PrintAndLog("Chinese magic backdoor command (GEN 1b) detected"); break;
+		default: PrintAndLog("No chinese magic backdoor command detected"); break;
+	}
+
+	// disconnect
+	c.cmd = CMD_READER_ISO_14443a;
+	c.arg[0] = 0;
+	c.arg[1] = 0;
+	c.arg[2] = 0;
+	SendCommand(&c);
+
+	return (int) isGeneration;
+}
+
 
 // SNIFFER
 
@@ -847,6 +895,8 @@ int mfTraceDecode(uint8_t *data_src, int len, bool wantSaveToEmlFile) {
 	return 0;
 }
 
+// DECODING
+
 int tryDecryptWord(uint32_t nt, uint32_t ar_enc, uint32_t at_enc, uint8_t *data, int len){
 	/*
 	uint32_t nt;      // tag challenge
@@ -867,49 +917,3 @@ int tryDecryptWord(uint32_t nt, uint32_t ar_enc, uint32_t at_enc, uint8_t *data,
 	return 0;
 }
 
-int mfCIdentify()
-{
-	UsbCommand c = {CMD_READER_ISO_14443a, {ISO14A_CONNECT | ISO14A_NO_DISCONNECT, 0, 0}};
-	SendCommand(&c);
-
-	UsbCommand resp;
-	WaitForResponse(CMD_ACK,&resp);
-
-	iso14a_card_select_t card;
-	memcpy(&card, (iso14a_card_select_t *)resp.d.asBytes, sizeof(iso14a_card_select_t));
-
-	uint64_t select_status = resp.arg[0];		// 0: couldn't read, 1: OK, with ATS, 2: OK, no ATS, 3: proprietary Anticollision
-
-	if(select_status != 0) {
-		uint8_t rats[] = { 0xE0, 0x80 }; // FSDI=8 (FSD=256), CID=0
-		c.arg[0] = ISO14A_RAW | ISO14A_APPEND_CRC | ISO14A_NO_DISCONNECT;
-		c.arg[1] = 2;
-		c.arg[2] = 0;
-		memcpy(c.d.asBytes, rats, 2);
-		SendCommand(&c);
-		WaitForResponse(CMD_ACK,&resp);
-	}
-
-	c.cmd = CMD_MIFARE_CIDENT;
-	c.arg[0] = 0;
-	c.arg[1] = 0;
-	c.arg[2] = 0;
-	SendCommand(&c);
-	WaitForResponse(CMD_ACK,&resp);
-
-	uint8_t isGeneration = resp.arg[0] & 0xff;
-	switch( isGeneration ){
-		case 1: PrintAndLog("Chinese magic backdoor commands (GEN 1a) detected"); break;
-		case 2: PrintAndLog("Chinese magic backdoor command (GEN 1b) detected"); break;
-		default: PrintAndLog("No chinese magic backdoor command detected"); break;
-	}
-
-	// disconnect
-	c.cmd = CMD_READER_ISO_14443a;
-	c.arg[0] = 0;
-	c.arg[1] = 0;
-	c.arg[2] = 0;
-	SendCommand(&c);
-
-	return (int) isGeneration;
-}
