@@ -451,20 +451,24 @@ int mfCSetBlock(uint8_t blockNo, uint8_t *data, uint8_t *uid, bool wantWipe, uin
 	return 0;
 }
 
-int mfCSetUID(uint8_t *uid, uint8_t *atqa, uint8_t *sak, uint8_t *oldUID, bool wantWipe) {
+int mfCSetUID(uint8_t *uid, uint8_t *atqa, uint8_t *sak, uint8_t *oldUID, bool wantWipe, bool wantFill) {
 	uint8_t oldblock0[16] = {0x00};
 	uint8_t block0[16] = {0x00};
-	int old, gen = 0;
+	uint8_t block1[16] = {0x00};
+	uint8_t blockK[16] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x08, 77, 0x8F, 0x00, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
+	uint8_t blockt[16] = {0x00};
+	int old, gen = 0, res;
 
 	gen = mfCIdentify();
 
+	/* generation 1a magic card by default */
+	uint8_t cmdParams = CSETBLOCK_SINGLE_OPER;
 	if (gen == 2) {
 		/* generation 1b magic card */
-		old = mfCGetBlock(0, oldblock0, CSETBLOCK_SINGLE_OPER | CSETBLOCK_MAGIC_1B);
-	} else {
-		/* generation 1a magic card by default */
-		old = mfCGetBlock(0, oldblock0, CSETBLOCK_SINGLE_OPER);
+		cmdParams = CSETBLOCK_SINGLE_OPER | CSETBLOCK_MAGIC_1B;
 	}
+	
+	old = mfCGetBlock(0, oldblock0, cmdParams);
 
 	if (old == 0) {
 		memcpy(block0, oldblock0, 16);
@@ -485,15 +489,33 @@ int mfCSetUID(uint8_t *uid, uint8_t *atqa, uint8_t *sak, uint8_t *oldUID, bool w
 		block0[6]=atqa[1];
 		block0[7]=atqa[0];
 	}
-	PrintAndLog("new block 0:  %s", sprint_hex(block0,16));
+	PrintAndLog("new block 0:  %s", sprint_hex(block0, 16));
 
-	if (gen == 2) {
-		/* generation 1b magic card */
-		return mfCSetBlock(0, block0, oldUID, wantWipe, CSETBLOCK_SINGLE_OPER | CSETBLOCK_MAGIC_1B);
-	} else {
-		/* generation 1a magic card by default */
-		return mfCSetBlock(0, block0, oldUID, wantWipe, CSETBLOCK_SINGLE_OPER);
+	res = mfCSetBlock(0, block0, oldUID, wantWipe, cmdParams);
+	if (res) {
+		PrintAndLog("Can't set block 0. Error: %s", res);
+		return res;
 	}
+	
+	if (wantFill) {
+		int blockNo = 1;
+		
+		while (blockNo < 16) {
+			if ((blockNo + 1) % 4) {
+				res = mfCSetBlock(blockNo, block1, blockt, false, cmdParams);
+			} else {
+				res = mfCSetBlock(blockNo, blockk, blockt, false, cmdParams);
+			}
+			if (res) {
+				PrintAndLog("Can't set block %d. Error: %s", blockNo, res);
+				return res;
+			}
+
+			blockNo++;
+		}
+	}
+	
+	return 0;
 }
 
 // SNIFFER
