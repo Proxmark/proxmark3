@@ -455,9 +455,9 @@ int mfCSetUID(uint8_t *uid, uint8_t *atqa, uint8_t *sak, uint8_t *oldUID, bool w
 	uint8_t oldblock0[16] = {0x00};
 	uint8_t block0[16] = {0x00};
 	uint8_t block1[16] = {0x00};
-	uint8_t blockK[16] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x08, 77, 0x8F, 0x00, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
+	uint8_t blockK[16] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x08, 0x77, 0x8F, 0x00, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
 	uint8_t blockt[16] = {0x00};
-	int old, gen = 0, res;
+	int gen = 0, res;
 
 	gen = mfCIdentify();
 
@@ -468,9 +468,9 @@ int mfCSetUID(uint8_t *uid, uint8_t *atqa, uint8_t *sak, uint8_t *oldUID, bool w
 		cmdParams = CSETBLOCK_SINGLE_OPER | CSETBLOCK_MAGIC_1B;
 	}
 	
-	old = mfCGetBlock(0, oldblock0, cmdParams);
+	res = mfCGetBlock(0, oldblock0, cmdParams);
 
-	if (old == 0) {
+	if (res == 0) {
 		memcpy(block0, oldblock0, 16);
 		PrintAndLog("old block 0:  %s", sprint_hex(block0,16));
 	} else {
@@ -500,19 +500,24 @@ int mfCSetUID(uint8_t *uid, uint8_t *atqa, uint8_t *sak, uint8_t *oldUID, bool w
 	if (wantFill) {
 		int blockNo = 1;
 		
-		while (blockNo < 16) {
+		printf("write blocks ");
+		while (blockNo < 64) {
 			if ((blockNo + 1) % 4) {
 				res = mfCSetBlock(blockNo, block1, blockt, false, cmdParams);
 			} else {
-				res = mfCSetBlock(blockNo, blockk, blockt, false, cmdParams);
+				res = mfCSetBlock(blockNo, blockK, blockt, false, cmdParams);
+				printf(".");
 			}
 			if (res) {
+				printf("\n");
 				PrintAndLog("Can't set block %d. Error: %s", blockNo, res);
 				return res;
 			}
 
 			blockNo++;
 		}
+		printf("\n");
+		PrintAndLog("64 blocks writed successfully.");
 	}
 	
 	return 0;
