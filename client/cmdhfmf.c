@@ -516,6 +516,7 @@ typedef struct {
 } sector_t;
 
 
+# define NESTED_KEY_COUNT 15
 int CmdHF14AMfNested(const char *Cmd)
 {
 	int i, j, res, iterations;
@@ -526,7 +527,7 @@ int CmdHF14AMfNested(const char *Cmd)
 	uint8_t trgKeyType = 0;
 	uint8_t SectorsCnt = 0;
 	uint8_t key[6] = {0, 0, 0, 0, 0, 0};
-	uint8_t keyBlock[14 * 6];
+	uint8_t keyBlock[NESTED_KEY_COUNT * 6];
 	uint64_t key64 = 0;
 
 	bool transferToEml = false;
@@ -542,6 +543,7 @@ int CmdHF14AMfNested(const char *Cmd)
 		PrintAndLog(" all sectors:  hf mf nested  <card memory> <block number> <key A/B> <key (12 hex symbols)> [t,d]");
 		PrintAndLog(" one sector:   hf mf nested  o <block number> <key A/B> <key (12 hex symbols)>");
 		PrintAndLog("               <target block number> <target key A/B> [t]");
+//		PrintAndLog(" all sectors autosearch key:  hf mf nested  s <card memory> [t,d]");
 		PrintAndLog("card memory - 0 - MINI(320 bytes), 1 - 1K, 2 - 2K, 4 - 4K, <other> - 1K");
 		PrintAndLog("t - transfer keys into emulator memory");
 		PrintAndLog("d - write keys to binary file");
@@ -666,13 +668,14 @@ int CmdHF14AMfNested(const char *Cmd)
 		num_to_bytes(0xa0478cc39091, 6, (uint8_t*)(keyBlock + 11 * 6));
 		num_to_bytes(0x533cb6c723f6, 6, (uint8_t*)(keyBlock + 12 * 6));
 		num_to_bytes(0x8fd0a4f256e9, 6, (uint8_t*)(keyBlock + 13 * 6));
+		num_to_bytes(0x1a2b3c4d5e6f, 6, (uint8_t*)(keyBlock + 14 * 6));
 
 		PrintAndLog("Testing known keys. Sector count=%d", SectorsCnt);
 		for (i = 0; i < SectorsCnt; i++) {
 			for (j = 0; j < 2; j++) {
 				if (e_sector[i].foundKey[j]) continue;
 
-				res = mfCheckKeys(FirstBlockOfSector(i), j, true, 6, keyBlock, &key64);
+				res = mfCheckKeys(FirstBlockOfSector(i), j, true, NESTED_KEY_COUNT, keyBlock, &key64); // bbbuuuuggg!!!!!!!!
 
 				if (!res) {
 					e_sector[i].Key[j] = key64;
@@ -680,6 +683,18 @@ int CmdHF14AMfNested(const char *Cmd)
 				}
 			}
 		}
+		
+		
+//		PrintAndLog("---- known key:");
+//		PrintAndLog("|sec|key A           |res|key B           |res|");
+//		for (i = 0; i < SectorsCnt; i++) {
+//			PrintAndLog("|%03d|  %012" PRIx64 "  | %d |  %012" PRIx64 "  | %d |", i,
+//				e_sector[i].Key[0], e_sector[i].foundKey[0], e_sector[i].Key[1], e_sector[i].foundKey[1]);
+//		}
+//		PrintAndLog("|---|----------------|---|----------------|---|");
+		
+		
+//		return 0;
 		
 		// get known key
 		if (false) {
