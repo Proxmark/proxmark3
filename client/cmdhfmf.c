@@ -754,6 +754,10 @@ int CmdHF14AMfNested(const char *Cmd)
 				}
 			}
 		}
+
+		// print nested statistic
+		PrintAndLog("\n\n-----------------------------------------------\nNested statistic:\nIterations count: %d", iterations);
+		PrintAndLog("Time in nested: %1.3f (%1.3f sec per key)", ((float)(msclock() - msclock1))/1000.0, ((float)(msclock() - msclock1))/iterations/1000.0);
 		
 		// check if we have unrecognized keys
 		bool notFoundKeys = false;
@@ -768,7 +772,7 @@ int CmdHF14AMfNested(const char *Cmd)
 		}		
 		
 		if (notFoundKeys) {
-			PrintAndLog("\n\n-----------------------------------------------\n");
+			PrintAndLog("-----------------------------------------------\n");
 			PrintAndLog("We have unrecognized keys. Trying to check if we have this keys on key buffer...");
 
 			// fill keyBlock with known keys
@@ -799,7 +803,7 @@ int CmdHF14AMfNested(const char *Cmd)
 			}
 
 			// try to auth with known keys to not recognized sectors keys
-			PrintAndLog("Testing keys. Sector count=%d keys count:%d", SectorsCnt, cnt);
+			PrintAndLog("Testing keys. Sector count=%d known keys count:%d", SectorsCnt, cnt);
 			for (i = 0; i < SectorsCnt; i++) {
 				for (j = 0; j < 2; j++) {
 					if (e_sector[i].foundKey[j]) continue;
@@ -816,9 +820,6 @@ int CmdHF14AMfNested(const char *Cmd)
 		} // if (notFoundKeys)
 		
 		// print result
-		PrintAndLog("-----------------------------------------------\nIterations count: %d", iterations);
-		printf("Time in nested: %1.3f (%1.3f sec per key)\n\n\n", ((float)(msclock() - msclock1))/1000.0, ((float)(msclock() - msclock1))/iterations/1000.0);
-		//print them
 		PrintAndLog("|---|----------------|---|----------------|---|");
 		PrintAndLog("|sec|key A           |res|key B           |res|");
 		PrintAndLog("|---|----------------|---|----------------|---|");
