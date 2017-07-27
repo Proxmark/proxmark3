@@ -546,14 +546,16 @@ int CmdHF14AMfNested(const char *Cmd)
 		PrintAndLog(" one sector:   hf mf nested  o <block number> <key A/B> <key (12 hex symbols)>");
 		PrintAndLog("               <target block number> <target key A/B> [t]");
 		PrintAndLog(" all sectors autosearch key:  hf mf nested  <card memory> * [t,d]");
+		PrintAndLog(" ");
 		PrintAndLog("card memory - 0 - MINI(320 bytes), 1 - 1K, 2 - 2K, 4 - 4K, <other> - 1K");
-		PrintAndLog("t - transfer keys into emulator memory");
-		PrintAndLog("d - write keys to binary file");
+		PrintAndLog("t - transfer keys to emulator memory");
+		PrintAndLog("d - write keys to binary file dumpkeys.bin");
 		PrintAndLog(" ");
 		PrintAndLog("      sample1: hf mf nested 1 0 A FFFFFFFFFFFF ");
 		PrintAndLog("      sample2: hf mf nested 1 0 A FFFFFFFFFFFF t ");
 		PrintAndLog("      sample3: hf mf nested 1 0 A FFFFFFFFFFFF d ");
 		PrintAndLog("      sample4: hf mf nested o 0 A FFFFFFFFFFFF 4 A");
+		PrintAndLog("      sample5: hf mf nested 1 * t");
 		return 0;
 	}
 
