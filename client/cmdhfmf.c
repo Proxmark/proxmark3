@@ -526,10 +526,10 @@ int CmdHF14AMfNested(const char *Cmd)
 	uint8_t trgKeyType = 0;
 	uint8_t SectorsCnt = 0;
 	uint8_t key[6] = {0, 0, 0, 0, 0, 0};
-	uint8_t keyBlock[14*6];
+	uint8_t keyBlock[14 * 6];
 	uint64_t key64 = 0;
-	bool transferToEml = false;
 
+	bool transferToEml = false;
 	bool createDumpFile = false;
 	FILE *fkeys;
 	uint8_t standart[6] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
@@ -555,8 +555,8 @@ int CmdHF14AMfNested(const char *Cmd)
 
 	cmdp = param_getchar(Cmd, 0);
 	blockNo = param_get8(Cmd, 1);
-	ctmp = param_getchar(Cmd, 2);
 
+	ctmp = param_getchar(Cmd, 2);
 	if (ctmp != 'a' && ctmp != 'A' && ctmp != 'b' && ctmp != 'B') {
 		PrintAndLog("Key type must be A or B");
 		return 1;
@@ -570,35 +570,42 @@ int CmdHF14AMfNested(const char *Cmd)
 		return 1;
 	}
 
-	if (cmdp == 'o' || cmdp == 'O') {
-		cmdp = 'o';
-		trgBlockNo = param_get8(Cmd, 4);
-		ctmp = param_getchar(Cmd, 5);
-		if (ctmp != 'a' && ctmp != 'A' && ctmp != 'b' && ctmp != 'B') {
-			PrintAndLog("Target key type must be A or B");
-			return 1;
-		}
-		if (ctmp != 'A' && ctmp != 'a')
-			trgKeyType = 1;
-	} else {
-
-		switch (cmdp) {
-			case '0': SectorsCnt = 05; break;
-			case '1': SectorsCnt = 16; break;
-			case '2': SectorsCnt = 32; break;
-			case '4': SectorsCnt = 40; break;
-			default:  SectorsCnt = 16;
-		}
+	switch (cmdp) {
+		case 'o':
+		case 'O':
+			cmdp = 'o';
+			trgBlockNo = param_get8(Cmd, 4);
+			ctmp = param_getchar(Cmd, 5);
+			if (ctmp != 'a' && ctmp != 'A' && ctmp != 'b' && ctmp != 'B') {
+				PrintAndLog("Target key type must be A or B");
+				return 1;
+			}
+			if (ctmp != 'A' && ctmp != 'a')
+				trgKeyType = 1;
+			break;
+		case '0': SectorsCnt = 05; break;
+		case '1': SectorsCnt = 16; break;
+		case '2': SectorsCnt = 32; break;
+		case '4': SectorsCnt = 40; break;
+		default:  SectorsCnt = 16;
 	}
 
 	ctmp = param_getchar(Cmd, 4);
-	if		(ctmp == 't' || ctmp == 'T') transferToEml = true;
-	else if (ctmp == 'd' || ctmp == 'D') createDumpFile = true;
+	transferToEml |= (ctmp == 't' || ctmp == 'T');
+	createDumpFile |= (ctmp == 'd' || ctmp == 'D');
 
 	ctmp = param_getchar(Cmd, 6);
 	transferToEml |= (ctmp == 't' || ctmp == 'T');
-	transferToEml |= (ctmp == 'd' || ctmp == 'D');
+	createDumpFile |= (ctmp == 'd' || ctmp == 'D');
 
+	// check if we can authenticate to sector
+	res = mfCheckKeys(blockNo, keyType, true, 1, key, &key64);
+	if (res) {
+		PrintAndLog("Can't authenticate to block:%3d key type:%c key:%s", blockNo, keyType?'B':'A', sprint_hex(key, 6));
+		return 3;
+	}
+	
+	// one-sector nested
 	if (cmdp == 'o') {
 		PrintAndLog("--target block no:%3d, target key type:%c ", trgBlockNo, trgKeyType?'B':'A');
 		int16_t isOK = mfnested(blockNo, keyType, key, trgBlockNo, trgKeyType, keyBlock, true);
@@ -670,6 +677,24 @@ int CmdHF14AMfNested(const char *Cmd)
 					e_sector[i].foundKey[j] = 1;
 				}
 			}
+		}
+		
+		// get known key
+		if (false) {
+			key64 = bytes_to_num(keyBlock, 6);
+			for (i = 0; i < SectorsCnt; i++) {
+				for (j = 0; j < 2; j++) {
+					if (e_sector[i].foundKey[j] && e_sector[i].Key[j] == key64) {
+						// get here
+						break;
+					}
+				}
+
+				// Can't found a key....
+				if (i == SectorsCnt - 1) {
+					
+				}
+			}		
 		}
 
 		// nested sectors
