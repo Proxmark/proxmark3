@@ -529,6 +529,8 @@ int CmdHF14AMfNested(const char *Cmd)
 	uint8_t key[6] = {0, 0, 0, 0, 0, 0};
 	uint8_t keyBlock[NESTED_KEY_COUNT * 6];
 	uint64_t key64 = 0;
+	
+	bool autosearchKey = false;
 
 	bool transferToEml = false;
 	bool createDumpFile = false;
@@ -543,7 +545,7 @@ int CmdHF14AMfNested(const char *Cmd)
 		PrintAndLog(" all sectors:  hf mf nested  <card memory> <block number> <key A/B> <key (12 hex symbols)> [t,d]");
 		PrintAndLog(" one sector:   hf mf nested  o <block number> <key A/B> <key (12 hex symbols)>");
 		PrintAndLog("               <target block number> <target key A/B> [t]");
-//		PrintAndLog(" all sectors autosearch key:  hf mf nested  s <card memory> [t,d]");
+		PrintAndLog(" all sectors autosearch key:  hf mf nested  <card memory> * [t,d]");
 		PrintAndLog("card memory - 0 - MINI(320 bytes), 1 - 1K, 2 - 2K, 4 - 4K, <other> - 1K");
 		PrintAndLog("t - transfer keys into emulator memory");
 		PrintAndLog("d - write keys to binary file");
@@ -556,22 +558,6 @@ int CmdHF14AMfNested(const char *Cmd)
 	}
 
 	cmdp = param_getchar(Cmd, 0);
-	blockNo = param_get8(Cmd, 1);
-
-	ctmp = param_getchar(Cmd, 2);
-	if (ctmp != 'a' && ctmp != 'A' && ctmp != 'b' && ctmp != 'B') {
-		PrintAndLog("Key type must be A or B");
-		return 1;
-	}
-
-	if (ctmp != 'A' && ctmp != 'a')
-		keyType = 1;
-
-	if (param_gethex(Cmd, 3, key, 12)) {
-		PrintAndLog("Key must include 12 HEX symbols");
-		return 1;
-	}
-
 	switch (cmdp) {
 		case 'o':
 		case 'O':
@@ -593,19 +579,43 @@ int CmdHF14AMfNested(const char *Cmd)
 		default:  SectorsCnt = 16;
 	}
 
-	ctmp = param_getchar(Cmd, 4);
-	transferToEml |= (ctmp == 't' || ctmp == 'T');
-	createDumpFile |= (ctmp == 'd' || ctmp == 'D');
+	if (param_getchar(Cmd, 1) == '*') {
+		autosearchKey = true;
 
-	ctmp = param_getchar(Cmd, 6);
-	transferToEml |= (ctmp == 't' || ctmp == 'T');
-	createDumpFile |= (ctmp == 'd' || ctmp == 'D');
+		ctmp = param_getchar(Cmd, 2);
+		transferToEml |= (ctmp == 't' || ctmp == 'T');
+		createDumpFile |= (ctmp == 'd' || ctmp == 'D');
+	} else {
+		blockNo = param_get8(Cmd, 1);
 
-	// check if we can authenticate to sector
-	res = mfCheckKeys(blockNo, keyType, true, 1, key, &key64);
-	if (res) {
-		PrintAndLog("Can't authenticate to block:%3d key type:%c key:%s", blockNo, keyType?'B':'A', sprint_hex(key, 6));
-		return 3;
+		ctmp = param_getchar(Cmd, 2);
+		if (ctmp != 'a' && ctmp != 'A' && ctmp != 'b' && ctmp != 'B') {
+			PrintAndLog("Key type must be A or B");
+			return 1;
+		}
+
+		if (ctmp != 'A' && ctmp != 'a')
+			keyType = 1;
+
+		if (param_gethex(Cmd, 3, key, 12)) {
+			PrintAndLog("Key must include 12 HEX symbols");
+			return 1;
+		}
+
+		ctmp = param_getchar(Cmd, 4);
+		transferToEml |= (ctmp == 't' || ctmp == 'T');
+		createDumpFile |= (ctmp == 'd' || ctmp == 'D');
+
+		ctmp = param_getchar(Cmd, 6);
+		transferToEml |= (ctmp == 't' || ctmp == 'T');
+		createDumpFile |= (ctmp == 'd' || ctmp == 'D');
+		
+		// check if we can authenticate to sector
+		res = mfCheckKeys(blockNo, keyType, true, 1, key, &key64);
+		if (res) {
+			PrintAndLog("Can't authenticate to block:%3d key type:%c key:%s", blockNo, keyType?'B':'A', sprint_hex(key, 6));
+			return 3;
+		}
 	}
 	
 	// one-sector nested
@@ -675,7 +685,7 @@ int CmdHF14AMfNested(const char *Cmd)
 			for (j = 0; j < 2; j++) {
 				if (e_sector[i].foundKey[j]) continue;
 
-				res = mfCheckKeys(FirstBlockOfSector(i), j, true, NESTED_KEY_COUNT, keyBlock, &key64); // bbbuuuuggg!!!!!!!!
+				res = mfCheckKeys(FirstBlockOfSector(i), j, true, NESTED_KEY_COUNT, keyBlock, &key64); 
 
 				if (!res) {
 					e_sector[i].Key[j] = key64;
@@ -685,34 +695,48 @@ int CmdHF14AMfNested(const char *Cmd)
 		}
 		
 		
-//		PrintAndLog("---- known key:");
-//		PrintAndLog("|sec|key A           |res|key B           |res|");
-//		for (i = 0; i < SectorsCnt; i++) {
-//			PrintAndLog("|%03d|  %012" PRIx64 "  | %d |  %012" PRIx64 "  | %d |", i,
-//				e_sector[i].Key[0], e_sector[i].foundKey[0], e_sector[i].Key[1], e_sector[i].foundKey[1]);
-//		}
-//		PrintAndLog("|---|----------------|---|----------------|---|");
 		
 		
-//		return 0;
 		
-		// get known key
-		if (false) {
-			key64 = bytes_to_num(keyBlock, 6);
+		
+		
+		
+		PrintAndLog("---- known key:");
+		PrintAndLog("|sec|key A           |res|key B           |res|");
+		for (i = 0; i < SectorsCnt; i++) {
+			PrintAndLog("|%03d|  %012" PRIx64 "  | %d |  %012" PRIx64 "  | %d |", i,
+				e_sector[i].Key[0], e_sector[i].foundKey[0], e_sector[i].Key[1], e_sector[i].foundKey[1]);
+		}
+		PrintAndLog("|---|----------------|---|----------------|---|");
+		
+		
+		// get known key from array
+		bool keyFound = false;
+		if (autosearchKey) {
 			for (i = 0; i < SectorsCnt; i++) {
 				for (j = 0; j < 2; j++) {
-					if (e_sector[i].foundKey[j] && e_sector[i].Key[j] == key64) {
-						// get here
+					if (e_sector[i].foundKey[j]) {
+						// get known key
+						blockNo = i * 4;
+						keyType = j;
+						num_to_bytes(e_sector[i].Key[j], 6, key);
+						
+						keyFound = true;
 						break;
 					}
 				}
-
-				// Can't found a key....
-				if (i == SectorsCnt - 1) {
-					
-				}
+				if (keyFound) break;
 			}		
+
+			// Can't found a key....
+			if (!keyFound) {
+				PrintAndLog("Can't found any of the known keys.");
+				return 4;
+			}
+			PrintAndLog("--auto key. block no:%3d, key type:%c key:%s", blockNo, keyType?'B':'A', sprint_hex(key, 6));
 		}
+
+//		return 0;
 
 		// nested sectors
 		iterations = 0;
