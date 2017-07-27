@@ -437,8 +437,8 @@ int mfCSetBlock(uint8_t blockNo, uint8_t *data, uint8_t *uid, bool wantWipe, uin
 	memcpy(c.d.asBytes, data, 16);
 	SendCommand(&c);
 
-  UsbCommand resp;
-	if (WaitForResponseTimeout(CMD_ACK,&resp,1500)) {
+	UsbCommand resp;
+	if (WaitForResponseTimeout(CMD_ACK, &resp, 1500)) {
 		isOK  = resp.arg[0] & 0xff;
 		if (uid != NULL)
 			memcpy(uid, resp.d.asBytes, 4);
@@ -448,25 +448,29 @@ int mfCSetBlock(uint8_t blockNo, uint8_t *data, uint8_t *uid, bool wantWipe, uin
 		PrintAndLog("Command execute timeout");
 		return 1;
 	}
+
 	return 0;
 }
 
-int mfCSetUID(uint8_t *uid, uint8_t *atqa, uint8_t *sak, uint8_t *oldUID, bool wantWipe) {
+int mfCSetUID(uint8_t *uid, uint8_t *atqa, uint8_t *sak, uint8_t *oldUID, bool wantWipe, bool wantFill) {
 	uint8_t oldblock0[16] = {0x00};
 	uint8_t block0[16] = {0x00};
-	int old, gen = 0;
+	uint8_t block1[16] = {0x00};
+	uint8_t blockK[16] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x08, 0x77, 0x8F, 0x00, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
+	int gen = 0, res;
 
 	gen = mfCIdentify();
 
+	/* generation 1a magic card by default */
+	uint8_t cmdParams = CSETBLOCK_SINGLE_OPER;
 	if (gen == 2) {
 		/* generation 1b magic card */
-		old = mfCGetBlock(0, oldblock0, CSETBLOCK_SINGLE_OPER | CSETBLOCK_MAGIC_1B);
-	} else {
-		/* generation 1a magic card by default */
-		old = mfCGetBlock(0, oldblock0, CSETBLOCK_SINGLE_OPER);
+		cmdParams = CSETBLOCK_SINGLE_OPER | CSETBLOCK_MAGIC_1B;
 	}
+	
+	res = mfCGetBlock(0, oldblock0, cmdParams);
 
-	if (old == 0) {
+	if (res == 0) {
 		memcpy(block0, oldblock0, 16);
 		PrintAndLog("old block 0:  %s", sprint_hex(block0,16));
 	} else {
@@ -477,24 +481,95 @@ int mfCSetUID(uint8_t *uid, uint8_t *atqa, uint8_t *sak, uint8_t *oldUID, bool w
 	// UID
 	memcpy(block0, uid, 4);
 	// Mifare UID BCC
-	block0[4] = block0[0]^block0[1]^block0[2]^block0[3];
+	block0[4] = block0[0] ^ block0[1] ^ block0[2] ^ block0[3];
 	// mifare classic SAK(byte 5) and ATQA(byte 6 and 7, reversed)
-	if (sak!=NULL)
-		block0[5]=sak[0];
-	if (atqa!=NULL) {
-		block0[6]=atqa[1];
-		block0[7]=atqa[0];
+	if (sak != NULL)
+		block0[5] = sak[0];
+	if (atqa != NULL) {
+		block0[6] = atqa[1];
+		block0[7] = atqa[0];
 	}
-	PrintAndLog("new block 0:  %s", sprint_hex(block0,16));
+	PrintAndLog("new block 0:  %s", sprint_hex(block0, 16));
 
-	if (gen == 2) {
-		/* generation 1b magic card */
-		return mfCSetBlock(0, block0, oldUID, wantWipe, CSETBLOCK_SINGLE_OPER | CSETBLOCK_MAGIC_1B);
-	} else {
-		/* generation 1a magic card by default */
-		return mfCSetBlock(0, block0, oldUID, wantWipe, CSETBLOCK_SINGLE_OPER);
+	res = mfCSetBlock(0, block0, oldUID, wantWipe, cmdParams);
+	if (res) {
+		PrintAndLog("Can't set block 0. Error: %d", res);
+		return res;
 	}
+	
+	if (wantFill) {
+		int blockNo = 1;
+		
+		printf("write blocks ");
+		while (blockNo < 64) {
+			if ((blockNo + 1) % 4) {
+				res = mfCSetBlock(blockNo, block1, NULL, false, cmdParams);
+			} else {
+				res = mfCSetBlock(blockNo, blockK, NULL, false, cmdParams);
+				printf(".");
+			}
+			if (res) {
+				printf("\n");
+				PrintAndLog("Can't set block %d. Error: %d", blockNo, res);
+				return res;
+			}
+
+			blockNo++;
+		}
+		printf("\n");
+		PrintAndLog("64 blocks writed successfully.");
+	}
+	
+	return 0;
 }
+
+int mfCIdentify()
+{
+	UsbCommand c = {CMD_READER_ISO_14443a, {ISO14A_CONNECT | ISO14A_NO_DISCONNECT, 0, 0}};
+	SendCommand(&c);
+
+	UsbCommand resp;
+	WaitForResponse(CMD_ACK,&resp);
+
+	iso14a_card_select_t card;
+	memcpy(&card, (iso14a_card_select_t *)resp.d.asBytes, sizeof(iso14a_card_select_t));
+
+	uint64_t select_status = resp.arg[0];		// 0: couldn't read, 1: OK, with ATS, 2: OK, no ATS, 3: proprietary Anticollision
+
+	if(select_status != 0) {
+		uint8_t rats[] = { 0xE0, 0x80 }; // FSDI=8 (FSD=256), CID=0
+		c.arg[0] = ISO14A_RAW | ISO14A_APPEND_CRC | ISO14A_NO_DISCONNECT;
+		c.arg[1] = 2;
+		c.arg[2] = 0;
+		memcpy(c.d.asBytes, rats, 2);
+		SendCommand(&c);
+		WaitForResponse(CMD_ACK,&resp);
+	}
+
+	c.cmd = CMD_MIFARE_CIDENT;
+	c.arg[0] = 0;
+	c.arg[1] = 0;
+	c.arg[2] = 0;
+	SendCommand(&c);
+	WaitForResponse(CMD_ACK,&resp);
+
+	uint8_t isGeneration = resp.arg[0] & 0xff;
+	switch( isGeneration ){
+		case 1: PrintAndLog("Chinese magic backdoor commands (GEN 1a) detected"); break;
+		case 2: PrintAndLog("Chinese magic backdoor command (GEN 1b) detected"); break;
+		default: PrintAndLog("No chinese magic backdoor command detected"); break;
+	}
+
+	// disconnect
+	c.cmd = CMD_READER_ISO_14443a;
+	c.arg[0] = 0;
+	c.arg[1] = 0;
+	c.arg[2] = 0;
+	SendCommand(&c);
+
+	return (int) isGeneration;
+}
+
 
 // SNIFFER
 
@@ -820,6 +895,8 @@ int mfTraceDecode(uint8_t *data_src, int len, bool wantSaveToEmlFile) {
 	return 0;
 }
 
+// DECODING
+
 int tryDecryptWord(uint32_t nt, uint32_t ar_enc, uint32_t at_enc, uint8_t *data, int len){
 	/*
 	uint32_t nt;      // tag challenge
@@ -840,49 +917,3 @@ int tryDecryptWord(uint32_t nt, uint32_t ar_enc, uint32_t at_enc, uint8_t *data,
 	return 0;
 }
 
-int mfCIdentify()
-{
-	UsbCommand c = {CMD_READER_ISO_14443a, {ISO14A_CONNECT | ISO14A_NO_DISCONNECT, 0, 0}};
-	SendCommand(&c);
-
-	UsbCommand resp;
-	WaitForResponse(CMD_ACK,&resp);
-
-	iso14a_card_select_t card;
-	memcpy(&card, (iso14a_card_select_t *)resp.d.asBytes, sizeof(iso14a_card_select_t));
-
-	uint64_t select_status = resp.arg[0];		// 0: couldn't read, 1: OK, with ATS, 2: OK, no ATS, 3: proprietary Anticollision
-
-	if(select_status != 0) {
-		uint8_t rats[] = { 0xE0, 0x80 }; // FSDI=8 (FSD=256), CID=0
-		c.arg[0] = ISO14A_RAW | ISO14A_APPEND_CRC | ISO14A_NO_DISCONNECT;
-		c.arg[1] = 2;
-		c.arg[2] = 0;
-		memcpy(c.d.asBytes, rats, 2);
-		SendCommand(&c);
-		WaitForResponse(CMD_ACK,&resp);
-	}
-
-	c.cmd = CMD_MIFARE_CIDENT;
-	c.arg[0] = 0;
-	c.arg[1] = 0;
-	c.arg[2] = 0;
-	SendCommand(&c);
-	WaitForResponse(CMD_ACK,&resp);
-
-	uint8_t isGeneration = resp.arg[0] & 0xff;
-	switch( isGeneration ){
-		case 1: PrintAndLog("Chinese magic backdoor commands (GEN 1a) detected"); break;
-		case 2: PrintAndLog("Chinese magic backdoor command (GEN 1b) detected"); break;
-		default: PrintAndLog("No chinese magic backdoor command detected"); break;
-	}
-
-	// disconnect
-	c.cmd = CMD_READER_ISO_14443a;
-	c.arg[0] = 0;
-	c.arg[1] = 0;
-	c.arg[2] = 0;
-	SendCommand(&c);
-
-	return (int) isGeneration;
-}

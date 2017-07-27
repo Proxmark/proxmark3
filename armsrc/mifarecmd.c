@@ -1214,13 +1214,14 @@ void MifareCSetBlock(uint32_t arg0, uint32_t arg1, uint32_t arg2, uint8_t *datai
 		if (workFlags & 0x01) {
 			if(!iso14443a_select_card(uid, NULL, &cuid, true, 0)) {
 				if (MF_DBGLEVEL >= 1)	Dbprintf("Can't select card");
-				break;
+				// Continue, if we set wrong UID or wrong UID checksum or some ATQA or SAK we will can't select card. But we need to write block 0 to make card work.
+				//break;
 				};
 
 				if(mifare_classic_halt(NULL, cuid)) {
 					if (MF_DBGLEVEL > 2)	Dbprintf("Halt error");
 					// Continue, some magic tags misbehavies and send an answer to it.
-          // break;
+					// break;
 				};
 		};
 

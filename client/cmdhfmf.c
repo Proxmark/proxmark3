@@ -516,6 +516,7 @@ typedef struct {
 } sector_t;
 
 
+# define NESTED_KEY_COUNT 15
 int CmdHF14AMfNested(const char *Cmd)
 {
 	int i, j, res, iterations;
@@ -526,10 +527,12 @@ int CmdHF14AMfNested(const char *Cmd)
 	uint8_t trgKeyType = 0;
 	uint8_t SectorsCnt = 0;
 	uint8_t key[6] = {0, 0, 0, 0, 0, 0};
-	uint8_t keyBlock[14*6];
+	uint8_t keyBlock[NESTED_KEY_COUNT * 6];
 	uint64_t key64 = 0;
-	bool transferToEml = false;
+	
+	bool autosearchKey = false;
 
+	bool transferToEml = false;
 	bool createDumpFile = false;
 	FILE *fkeys;
 	uint8_t standart[6] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
@@ -542,63 +545,82 @@ int CmdHF14AMfNested(const char *Cmd)
 		PrintAndLog(" all sectors:  hf mf nested  <card memory> <block number> <key A/B> <key (12 hex symbols)> [t,d]");
 		PrintAndLog(" one sector:   hf mf nested  o <block number> <key A/B> <key (12 hex symbols)>");
 		PrintAndLog("               <target block number> <target key A/B> [t]");
+		PrintAndLog(" all sectors autosearch key:  hf mf nested  <card memory> * [t,d]");
+		PrintAndLog(" ");
 		PrintAndLog("card memory - 0 - MINI(320 bytes), 1 - 1K, 2 - 2K, 4 - 4K, <other> - 1K");
-		PrintAndLog("t - transfer keys into emulator memory");
-		PrintAndLog("d - write keys to binary file");
+		PrintAndLog("t - transfer keys to emulator memory");
+		PrintAndLog("d - write keys to binary file dumpkeys.bin");
 		PrintAndLog(" ");
 		PrintAndLog("      sample1: hf mf nested 1 0 A FFFFFFFFFFFF ");
 		PrintAndLog("      sample2: hf mf nested 1 0 A FFFFFFFFFFFF t ");
 		PrintAndLog("      sample3: hf mf nested 1 0 A FFFFFFFFFFFF d ");
 		PrintAndLog("      sample4: hf mf nested o 0 A FFFFFFFFFFFF 4 A");
+		PrintAndLog("      sample5: hf mf nested 1 * t");
 		return 0;
 	}
 
 	cmdp = param_getchar(Cmd, 0);
-	blockNo = param_get8(Cmd, 1);
-	ctmp = param_getchar(Cmd, 2);
+	switch (cmdp) {
+		case 'o':
+		case 'O':
+			cmdp = 'o';
+			trgBlockNo = param_get8(Cmd, 4);
 
-	if (ctmp != 'a' && ctmp != 'A' && ctmp != 'b' && ctmp != 'B') {
-		PrintAndLog("Key type must be A or B");
-		return 1;
+			ctmp = param_getchar(Cmd, 5);
+			if (ctmp != 'a' && ctmp != 'A' && ctmp != 'b' && ctmp != 'B') {
+				PrintAndLog("Target key type must be A or B");
+				return 1;
+			}
+			if (ctmp != 'A' && ctmp != 'a')
+				trgKeyType = 1;
+			break;
+		case '0': SectorsCnt = 05; break;
+		case '1': SectorsCnt = 16; break;
+		case '2': SectorsCnt = 32; break;
+		case '4': SectorsCnt = 40; break;
+		default:  SectorsCnt = 16;
 	}
 
-	if (ctmp != 'A' && ctmp != 'a')
-		keyType = 1;
+	if (param_getchar(Cmd, 1) == '*') {
+		autosearchKey = true;
 
-	if (param_gethex(Cmd, 3, key, 12)) {
-		PrintAndLog("Key must include 12 HEX symbols");
-		return 1;
-	}
+		ctmp = param_getchar(Cmd, 2);
+		transferToEml |= (ctmp == 't' || ctmp == 'T');
+		createDumpFile |= (ctmp == 'd' || ctmp == 'D');
+	} else {
+		blockNo = param_get8(Cmd, 1);
 
-	if (cmdp == 'o' || cmdp == 'O') {
-		cmdp = 'o';
-		trgBlockNo = param_get8(Cmd, 4);
-		ctmp = param_getchar(Cmd, 5);
+		ctmp = param_getchar(Cmd, 2);
 		if (ctmp != 'a' && ctmp != 'A' && ctmp != 'b' && ctmp != 'B') {
-			PrintAndLog("Target key type must be A or B");
+			PrintAndLog("Key type must be A or B");
 			return 1;
 		}
-		if (ctmp != 'A' && ctmp != 'a')
-			trgKeyType = 1;
-	} else {
 
-		switch (cmdp) {
-			case '0': SectorsCnt = 05; break;
-			case '1': SectorsCnt = 16; break;
-			case '2': SectorsCnt = 32; break;
-			case '4': SectorsCnt = 40; break;
-			default:  SectorsCnt = 16;
+		if (ctmp != 'A' && ctmp != 'a')
+			keyType = 1;
+
+		if (param_gethex(Cmd, 3, key, 12)) {
+			PrintAndLog("Key must include 12 HEX symbols");
+			return 1;
+		}
+
+		ctmp = param_getchar(Cmd, 4);
+		transferToEml |= (ctmp == 't' || ctmp == 'T');
+		createDumpFile |= (ctmp == 'd' || ctmp == 'D');
+
+		ctmp = param_getchar(Cmd, 6);
+		transferToEml |= (ctmp == 't' || ctmp == 'T');
+		createDumpFile |= (ctmp == 'd' || ctmp == 'D');
+		
+		// check if we can authenticate to sector
+		res = mfCheckKeys(blockNo, keyType, true, 1, key, &key64);
+		if (res) {
+			PrintAndLog("Can't authenticate to block:%3d key type:%c key:%s", blockNo, keyType?'B':'A', sprint_hex(key, 6));
+			return 3;
 		}
 	}
-
-	ctmp = param_getchar(Cmd, 4);
-	if		(ctmp == 't' || ctmp == 'T') transferToEml = true;
-	else if (ctmp == 'd' || ctmp == 'D') createDumpFile = true;
-
-	ctmp = param_getchar(Cmd, 6);
-	transferToEml |= (ctmp == 't' || ctmp == 'T');
-	transferToEml |= (ctmp == 'd' || ctmp == 'D');
-
+	
+	// one-sector nested
 	if (cmdp == 'o') {
 		PrintAndLog("--target block no:%3d, target key type:%c ", trgBlockNo, trgKeyType?'B':'A');
 		int16_t isOK = mfnested(blockNo, keyType, key, trgBlockNo, trgKeyType, keyBlock, true);
@@ -630,6 +652,7 @@ int CmdHF14AMfNested(const char *Cmd)
 				else
 					num_to_bytes(key64, 6, &keyBlock[10]);
 				mfEmlSetMem(keyBlock, sectortrailer, 1);
+				PrintAndLog("Key transferred to emulator memory.");
 			}
 		} else {
 			PrintAndLog("No valid key found");
@@ -657,19 +680,46 @@ int CmdHF14AMfNested(const char *Cmd)
 		num_to_bytes(0xa0478cc39091, 6, (uint8_t*)(keyBlock + 11 * 6));
 		num_to_bytes(0x533cb6c723f6, 6, (uint8_t*)(keyBlock + 12 * 6));
 		num_to_bytes(0x8fd0a4f256e9, 6, (uint8_t*)(keyBlock + 13 * 6));
+		num_to_bytes(0x1a2b3c4d5e6f, 6, (uint8_t*)(keyBlock + 14 * 6));
 
 		PrintAndLog("Testing known keys. Sector count=%d", SectorsCnt);
 		for (i = 0; i < SectorsCnt; i++) {
 			for (j = 0; j < 2; j++) {
 				if (e_sector[i].foundKey[j]) continue;
 
-				res = mfCheckKeys(FirstBlockOfSector(i), j, true, 6, keyBlock, &key64);
+				res = mfCheckKeys(FirstBlockOfSector(i), j, true, NESTED_KEY_COUNT, keyBlock, &key64); 
 
 				if (!res) {
 					e_sector[i].Key[j] = key64;
 					e_sector[i].foundKey[j] = 1;
 				}
 			}
+		}
+		
+		// get known key from array
+		bool keyFound = false;
+		if (autosearchKey) {
+			for (i = 0; i < SectorsCnt; i++) {
+				for (j = 0; j < 2; j++) {
+					if (e_sector[i].foundKey[j]) {
+						// get known key
+						blockNo = i * 4;
+						keyType = j;
+						num_to_bytes(e_sector[i].Key[j], 6, key);
+						
+						keyFound = true;
+						break;
+					}
+				}
+				if (keyFound) break;
+			}		
+
+			// Can't found a key....
+			if (!keyFound) {
+				PrintAndLog("Can't found any of the known keys.");
+				return 4;
+			}
+			PrintAndLog("--auto key. block no:%3d, key type:%c key:%s", blockNo, keyType?'B':'A', sprint_hex(key, 6));
 		}
 
 		// nested sectors
@@ -707,10 +757,71 @@ int CmdHF14AMfNested(const char *Cmd)
 			}
 		}
 
-		printf("Time in nested: %1.3f (%1.3f sec per key)\n\n", ((float)(msclock() - msclock1))/1000.0, ((float)(msclock() - msclock1))/iterations/1000.0);
+		// print nested statistic
+		PrintAndLog("\n\n-----------------------------------------------\nNested statistic:\nIterations count: %d", iterations);
+		PrintAndLog("Time in nested: %1.3f (%1.3f sec per key)", ((float)(msclock() - msclock1))/1000.0, ((float)(msclock() - msclock1))/iterations/1000.0);
+		
+		// check if we have unrecognized keys
+		bool notFoundKeys = false;
+		for (i = 0; i < SectorsCnt; i++) {
+			for (j = 0; j < 2; j++) {
+				if (!e_sector[i].foundKey[j]) {
+					notFoundKeys = true;
+					break;
+				}
+			}
+			if (notFoundKeys) break;
+		}		
+		
+		if (notFoundKeys) {
+			PrintAndLog("-----------------------------------------------\n");
+			PrintAndLog("We have unrecognized keys. Trying to check if we have this keys on key buffer...");
 
-		PrintAndLog("-----------------------------------------------\nIterations count: %d\n\n", iterations);
-		//print them
+			// fill keyBlock with known keys
+			int cnt = 0;
+			for (i = 0; i < SectorsCnt; i++) {
+				for (j = 0; j < 2; j++) {
+					if (e_sector[i].foundKey[j]) {
+						// try to insert key to keyBlock						
+						if (cnt < NESTED_KEY_COUNT) {
+
+							// search for dublicates
+							bool dubl = false;
+							for (int v = 0; v < NESTED_KEY_COUNT; v++) {
+								if (e_sector[i].Key[j] == bytes_to_num((uint8_t*)(keyBlock + v * 6), 6)) {
+									dubl = true;
+									break;
+								}
+							}
+							
+							// insert
+							if (!dubl) {
+								num_to_bytes(e_sector[i].Key[j], 6, (uint8_t*)(keyBlock + cnt * 6));
+								cnt++;
+							}
+						}
+					}
+				}
+			}
+
+			// try to auth with known keys to not recognized sectors keys
+			PrintAndLog("Testing keys. Sector count=%d known keys count:%d", SectorsCnt, cnt);
+			for (i = 0; i < SectorsCnt; i++) {
+				for (j = 0; j < 2; j++) {
+					if (e_sector[i].foundKey[j]) continue;
+
+					res = mfCheckKeys(FirstBlockOfSector(i), j, true, cnt, keyBlock, &key64); 
+
+					if (!res) {
+						e_sector[i].Key[j] = key64;
+						e_sector[i].foundKey[j] = 1;
+					}
+				}
+			}			
+			
+		} // if (notFoundKeys)
+		
+		// print result
 		PrintAndLog("|---|----------------|---|----------------|---|");
 		PrintAndLog("|sec|key A           |res|key B           |res|");
 		PrintAndLog("|---|----------------|---|----------------|---|");
@@ -720,7 +831,7 @@ int CmdHF14AMfNested(const char *Cmd)
 		}
 		PrintAndLog("|---|----------------|---|----------------|---|");
 
-		// transfer them to the emulator
+		// transfer keys to the emulator memory
 		if (transferToEml) {
 			for (i = 0; i < SectorsCnt; i++) {
 				mfEmlGetMem(keyBlock, FirstBlockOfSector(i) + NumBlocksPerSector(i) - 1, 1);
@@ -730,6 +841,7 @@ int CmdHF14AMfNested(const char *Cmd)
 					num_to_bytes(e_sector[i].Key[1], 6, &keyBlock[10]);
 				mfEmlSetMem(keyBlock, FirstBlockOfSector(i) + NumBlocksPerSector(i) - 1, 1);
 			}
+			PrintAndLog("Keys transferred to emulator memory.");
 		}
 
 		// Create dump file
@@ -1784,64 +1896,81 @@ int CmdHF14AMfEKeyPrn(const char *Cmd)
 int CmdHF14AMfCSetUID(const char *Cmd)
 {
 	uint8_t wipeCard = 0;
+	uint8_t fillCard = 0;
 	uint8_t uid[8] = {0x00};
 	uint8_t oldUid[8] = {0x00};
 	uint8_t atqa[2] = {0x00};
 	uint8_t sak[1] = {0x00};
-	uint8_t atqaPresent = 1;
+	uint8_t atqaPresent = 0;
 	int res;
-	char ctmp;
-	int argi=0;
 
-	if (strlen(Cmd) < 1 || param_getchar(Cmd, argi) == 'h') {
-		PrintAndLog("Usage:  hf mf csetuid <UID 8 hex symbols> [ATQA 4 hex symbols SAK 2 hex symbols] [w]");
-		PrintAndLog("sample:  hf mf csetuid 01020304");
-		PrintAndLog("sample:  hf mf csetuid 01020304 0004 08 w");
-		PrintAndLog("Set UID, ATQA, and SAK for magic Chinese card (only works with such cards)");
-		PrintAndLog("If you also want to wipe the card then add 'w' at the end of the command line.");
-		return 0;
-	}
-
-	if (param_getchar(Cmd, argi) && param_gethex(Cmd, argi, uid, 8)) {
+	uint8_t needHelp = 0;
+	char cmdp = 1;
+	
+	if (param_getchar(Cmd, 0) && param_gethex(Cmd, 0, uid, 8)) {
 		PrintAndLog("UID must include 8 HEX symbols");
 		return 1;
 	}
-	argi++;
 
-	ctmp = param_getchar(Cmd, argi);
-	if (ctmp == 'w' || ctmp == 'W') {
-		wipeCard = 1;
-		atqaPresent = 0;
-	}
-
-	if (atqaPresent) {
-		if (param_getchar(Cmd, argi)) {
-			if (param_gethex(Cmd, argi, atqa, 4)) {
-				PrintAndLog("ATQA must include 4 HEX symbols");
-				return 1;
-			}
-			argi++;
-			if (!param_getchar(Cmd, argi) || param_gethex(Cmd, argi, sak, 2)) {
-				PrintAndLog("SAK must include 2 HEX symbols");
-				return 1;
-			}
-			argi++;
-		} else
-			atqaPresent = 0;
-	}
-
-	if(!wipeCard) {
-		ctmp = param_getchar(Cmd, argi);
-		if (ctmp == 'w' || ctmp == 'W') {
-			wipeCard = 1;
+	if (param_getlength(Cmd, 1) > 1 && param_getlength(Cmd, 2) >  1) {
+		atqaPresent = 1;
+		cmdp = 3;
+		
+		if (param_gethex(Cmd, 1, atqa, 4)) {
+			PrintAndLog("ATQA must include 4 HEX symbols");
+			return 1;
+		}
+				
+		if (param_gethex(Cmd, 2, sak, 2)) {
+			PrintAndLog("SAK must include 2 HEX symbols");
+			return 1;
 		}
 	}
 
-	PrintAndLog("--wipe card:%s  uid:%s", (wipeCard)?"YES":"NO", sprint_hex(uid, 4));
+	while(param_getchar(Cmd, cmdp) != 0x00)
+	{
+		switch(param_getchar(Cmd, cmdp))
+		{
+		case 'h':
+		case 'H':
+			needHelp = 1;
+			break;
+		case 'w':
+		case 'W':
+			wipeCard = 1;
+			break;
+		case 'k':
+		case 'K':
+			fillCard = 1;
+			break;
+		default:
+			PrintAndLog("ERROR: Unknown parameter '%c'", param_getchar(Cmd, cmdp));
+			needHelp = 1;
+			break;
+		}
+		cmdp++;
+	}
 
-	res = mfCSetUID(uid, (atqaPresent)?atqa:NULL, (atqaPresent)?sak:NULL, oldUid, wipeCard);
+	if (strlen(Cmd) < 1 || needHelp) {
+		PrintAndLog("");
+		PrintAndLog("Usage:  hf mf csetuid <UID 8 hex symbols> [ATQA 4 hex symbols SAK 2 hex symbols] [w] [k]");
+		PrintAndLog("sample:  hf mf csetuid 01020304");
+		PrintAndLog("sample:  hf mf csetuid 01020304 0004 08 w");
+		PrintAndLog("sample:  hf mf csetuid 01020304 0004 08 f");
+		PrintAndLog("Set UID, ATQA, and SAK for magic Chinese card (only works with such cards)");
+		PrintAndLog("'w' - wipe the card. Works only for cards with this function");
+		PrintAndLog("'k' - fill data blocks with 0x00 and keys with 0xFFFFFFFFFFFF");
+		return 0;
+	}
+
+	PrintAndLog("--wipe card:%s fill card:%s  uid:%s", (wipeCard)?"YES":"NO", (fillCard)?"YES":"NO", sprint_hex(uid, 4));
+	if (atqaPresent) {
+		PrintAndLog("--atqa:%s sak:%02x", sprint_hex(atqa, 2), sak[0]);
+	}
+
+	res = mfCSetUID(uid, (atqaPresent)?atqa:NULL, (atqaPresent)?sak:NULL, oldUid, wipeCard, fillCard);
 	if (res) {
-			PrintAndLog("Can't set UID. error=%d", res);
+			PrintAndLog("Can't set UID. Error=%d", res);
 			return 1;
 		}
 
