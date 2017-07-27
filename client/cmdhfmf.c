@@ -575,6 +575,7 @@ int CmdHF14AMfNested(const char *Cmd)
 		case 'O':
 			cmdp = 'o';
 			trgBlockNo = param_get8(Cmd, 4);
+
 			ctmp = param_getchar(Cmd, 5);
 			if (ctmp != 'a' && ctmp != 'A' && ctmp != 'b' && ctmp != 'B') {
 				PrintAndLog("Target key type must be A or B");
@@ -637,6 +638,7 @@ int CmdHF14AMfNested(const char *Cmd)
 				else
 					num_to_bytes(key64, 6, &keyBlock[10]);
 				mfEmlSetMem(keyBlock, sectortrailer, 1);
+				PrintAndLog("Key transferred to emulator memory.");
 			}
 		} else {
 			PrintAndLog("No valid key found");
@@ -755,6 +757,7 @@ int CmdHF14AMfNested(const char *Cmd)
 					num_to_bytes(e_sector[i].Key[1], 6, &keyBlock[10]);
 				mfEmlSetMem(keyBlock, FirstBlockOfSector(i) + NumBlocksPerSector(i) - 1, 1);
 			}
+			PrintAndLog("Keys transferred to emulator memory.");
 		}
 
 		// Create dump file
