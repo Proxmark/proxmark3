@@ -736,8 +736,6 @@ int CmdHF14AMfNested(const char *Cmd)
 			PrintAndLog("--auto key. block no:%3d, key type:%c key:%s", blockNo, keyType?'B':'A', sprint_hex(key, 6));
 		}
 
-//		return 0;
-
 		// nested sectors
 		iterations = 0;
 		PrintAndLog("nested...");
@@ -773,9 +771,9 @@ int CmdHF14AMfNested(const char *Cmd)
 			}
 		}
 
-		printf("Time in nested: %1.3f (%1.3f sec per key)\n\n", ((float)(msclock() - msclock1))/1000.0, ((float)(msclock() - msclock1))/iterations/1000.0);
-
+		// print result
 		PrintAndLog("-----------------------------------------------\nIterations count: %d\n\n", iterations);
+		printf("Time in nested: %1.3f (%1.3f sec per key)\n\n", ((float)(msclock() - msclock1))/1000.0, ((float)(msclock() - msclock1))/iterations/1000.0);
 		//print them
 		PrintAndLog("|---|----------------|---|----------------|---|");
 		PrintAndLog("|sec|key A           |res|key B           |res|");
@@ -786,7 +784,7 @@ int CmdHF14AMfNested(const char *Cmd)
 		}
 		PrintAndLog("|---|----------------|---|----------------|---|");
 
-		// transfer them to the emulator
+		// transfer keys to the emulator memory
 		if (transferToEml) {
 			for (i = 0; i < SectorsCnt; i++) {
 				mfEmlGetMem(keyBlock, FirstBlockOfSector(i) + NumBlocksPerSector(i) - 1, 1);
