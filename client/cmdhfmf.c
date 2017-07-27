@@ -766,24 +766,9 @@ int CmdHF14AMfNested(const char *Cmd)
 			}
 			if (notFoundKeys) break;
 		}		
-
-
-
-		
-		
-		
-		
-		
-		
-
-		PrintAndLog("---- found key:");
-		for (i = 0; i < SectorsCnt; i++) {
-			PrintAndLog("|%03d|  %012" PRIx64 "  | %d |  %012" PRIx64 "  | %d |", i,
-				e_sector[i].Key[0], e_sector[i].foundKey[0], e_sector[i].Key[1], e_sector[i].foundKey[1]);
-		}
 		
 		if (notFoundKeys) {
-			PrintAndLog("-----------------------------------------------\n");
+			PrintAndLog("\n\n-----------------------------------------------\n");
 			PrintAndLog("We have unrecognized keys. Trying to check if we have this keys on key buffer...");
 
 			// fill keyBlock with known keys
@@ -814,7 +799,7 @@ int CmdHF14AMfNested(const char *Cmd)
 			}
 
 			// try to auth with known keys to not recognized sectors keys
-			PrintAndLog("Testing keys. Sector count=%d", SectorsCnt);
+			PrintAndLog("Testing keys. Sector count=%d keys count:%d", SectorsCnt, cnt);
 			for (i = 0; i < SectorsCnt; i++) {
 				for (j = 0; j < 2; j++) {
 					if (e_sector[i].foundKey[j]) continue;
