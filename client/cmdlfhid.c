@@ -120,20 +120,20 @@ int CmdHIDReadFSK(const char *Cmd)
 
 int CmdHIDSim(const char *Cmd)
 {
-  unsigned int hi = 0, lo = 0;
-  int n = 0, i = 0;
+	uint32_t hi = 0, lo = 0;
+	int n = 0, i = 0;
 
-  while (sscanf(&Cmd[i++], "%1x", &n ) == 1) {
-    hi = (hi << 4) | (lo >> 28);
-    lo = (lo << 4) | (n & 0xf);
-  }
+	while (sscanf(&Cmd[i++], "%1x", &n ) == 1) {
+		hi = (hi << 4) | (lo >> 28);
+		lo = (lo << 4) | (n & 0xf);
+	}
 
-  PrintAndLog("Emulating tag with ID %x%16x", hi, lo);
-  PrintAndLog("Press pm3-button to abort simulation");
+	PrintAndLog("Emulating tag with ID %x%08x", hi, lo);
+	PrintAndLog("Press pm3-button to abort simulation");
 
-  UsbCommand c = {CMD_HID_SIM_TAG, {hi, lo, 0}};
-  SendCommand(&c);
-  return 0;
+	UsbCommand c = {CMD_HID_SIM_TAG, {hi, lo, 0}};
+	SendCommand(&c);
+	return 0;
 }
 
 int CmdHIDClone(const char *Cmd)
