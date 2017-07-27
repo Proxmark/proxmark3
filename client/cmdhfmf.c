@@ -694,22 +694,6 @@ int CmdHF14AMfNested(const char *Cmd)
 			}
 		}
 		
-		
-		
-		
-		
-		
-		
-		
-		PrintAndLog("---- known key:");
-		PrintAndLog("|sec|key A           |res|key B           |res|");
-		for (i = 0; i < SectorsCnt; i++) {
-			PrintAndLog("|%03d|  %012" PRIx64 "  | %d |  %012" PRIx64 "  | %d |", i,
-				e_sector[i].Key[0], e_sector[i].foundKey[0], e_sector[i].Key[1], e_sector[i].foundKey[1]);
-		}
-		PrintAndLog("|---|----------------|---|----------------|---|");
-		
-		
 		// get known key from array
 		bool keyFound = false;
 		if (autosearchKey) {
@@ -770,10 +754,85 @@ int CmdHF14AMfNested(const char *Cmd)
 				}
 			}
 		}
+		
+		// check if we have unrecognized keys
+		bool notFoundKeys = false;
+		for (i = 0; i < SectorsCnt; i++) {
+			for (j = 0; j < 2; j++) {
+				if (!e_sector[i].foundKey[j]) {
+					notFoundKeys = true;
+					break;
+				}
+			}
+			if (notFoundKeys) break;
+		}		
 
+
+
+		
+		
+		
+		
+		
+		
+
+		PrintAndLog("---- found key:");
+		for (i = 0; i < SectorsCnt; i++) {
+			PrintAndLog("|%03d|  %012" PRIx64 "  | %d |  %012" PRIx64 "  | %d |", i,
+				e_sector[i].Key[0], e_sector[i].foundKey[0], e_sector[i].Key[1], e_sector[i].foundKey[1]);
+		}
+		
+		if (notFoundKeys) {
+			PrintAndLog("-----------------------------------------------\n");
+			PrintAndLog("We have unrecognized keys. Trying to check if we have this keys on key buffer...");
+
+			// fill keyBlock with known keys
+			int cnt = 0;
+			for (i = 0; i < SectorsCnt; i++) {
+				for (j = 0; j < 2; j++) {
+					if (e_sector[i].foundKey[j]) {
+						// try to insert key to keyBlock						
+						if (cnt < NESTED_KEY_COUNT) {
+
+							// search for dublicates
+							bool dubl = false;
+							for (int v = 0; v < NESTED_KEY_COUNT; v++) {
+								if (e_sector[i].Key[j] == bytes_to_num((uint8_t*)(keyBlock + v * 6), 6)) {
+									dubl = true;
+									break;
+								}
+							}
+							
+							// insert
+							if (!dubl) {
+								num_to_bytes(e_sector[i].Key[j], 6, (uint8_t*)(keyBlock + cnt * 6));
+								cnt++;
+							}
+						}
+					}
+				}
+			}
+
+			// try to auth with known keys to not recognized sectors keys
+			PrintAndLog("Testing keys. Sector count=%d", SectorsCnt);
+			for (i = 0; i < SectorsCnt; i++) {
+				for (j = 0; j < 2; j++) {
+					if (e_sector[i].foundKey[j]) continue;
+
+					res = mfCheckKeys(FirstBlockOfSector(i), j, true, cnt, keyBlock, &key64); 
+
+					if (!res) {
+						e_sector[i].Key[j] = key64;
+						e_sector[i].foundKey[j] = 1;
+					}
+				}
+			}			
+			
+		} // if (notFoundKeys)
+		
 		// print result
-		PrintAndLog("-----------------------------------------------\nIterations count: %d\n\n", iterations);
-		printf("Time in nested: %1.3f (%1.3f sec per key)\n\n", ((float)(msclock() - msclock1))/1000.0, ((float)(msclock() - msclock1))/iterations/1000.0);
+		PrintAndLog("-----------------------------------------------\nIterations count: %d", iterations);
+		printf("Time in nested: %1.3f (%1.3f sec per key)\n\n\n", ((float)(msclock() - msclock1))/1000.0, ((float)(msclock() - msclock1))/iterations/1000.0);
 		//print them
 		PrintAndLog("|---|----------------|---|----------------|---|");
 		PrintAndLog("|sec|key A           |res|key B           |res|");
