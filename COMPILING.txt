@@ -135,12 +135,20 @@ Tested on OSX 10.10 Yosemite
 =   Linux  =
 ============
 
-1 - Download 
+On Debian 9 and Ubuntu 17.04 (zesty), install these packages:
+
+  apt install build-essential gcc-arm-none-eabi libncurses5-dev libreadline-dev libusb-dev libqt4-dev
+
+Other distributions:
+
+1 - Download devkitarm
 
 A precompiled DevKitARM cross compiler tool chain package can be found at 
 http://sourceforge.net/projects/devkitpro/files/devkitARM
 Select the one you need (32bit or 64bit) and unpack to a convinient place, eg 
 $HOME/proxmark3/. It will create a devkitARM/ subdirectory.
+
+2 - Install development dependencies
 
 You will also need a general compiling environment on your computer for
 the client and the libusb headers. In most distributions you will get all you 
@@ -150,7 +158,7 @@ call `aptitude install lsb libusb-dev libreadline-dev libreadline6`.
 For the graphical plot view, you might need the qtlibs (debian/ubuntu: 
 libqt4-dev), too.
 
-2 - Set Environment
+3 - Set Environment
 
 export DEVKITPRO=$HOME/proxmark3/
 export DEVKITARM=$DEVKITPRO/devkitARM
