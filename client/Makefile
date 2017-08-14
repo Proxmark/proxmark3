@@ -85,10 +85,11 @@ CORESRCS = 	uart_posix.c \
 
 CMDSRCS = 	crapto1/crapto1.c\
 			crapto1/crypto1.c\
+			polarssl/des.c \
+			polarssl/aes.c\
 			mfkey.c\
 			loclass/cipher.c \
 			loclass/cipherutils.c \
-			loclass/des.c \
 			loclass/ikeys.c \
 			loclass/elite_crack.c\
 			loclass/fileutils.c\
@@ -147,7 +148,6 @@ CMDSRCS = 	crapto1/crapto1.c\
 			cmdscript.c\
 			pm3_binlib.c\
 			pm3_bitlib.c\
-			aes.c\
 			protocols.c\
 			sha1.c\
 			cmdcrc.c\

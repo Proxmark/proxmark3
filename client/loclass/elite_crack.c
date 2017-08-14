@@ -47,7 +47,7 @@
 #include "ikeys.h"
 #include "elite_crack.h"
 #include "fileutils.h"
-#include "des.h"
+#include "polarssl/des.h"
 
 /**
  * @brief Permutes a key from standard NIST format to Iclass specific format
