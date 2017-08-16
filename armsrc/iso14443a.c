@@ -2359,6 +2359,7 @@ typedef struct {
   uint32_t nonce;
   uint32_t ar;
   uint32_t nr;
+  uint32_t at;
   uint32_t nonce2;
   uint32_t ar2;
   uint32_t nr2;
@@ -2562,7 +2563,10 @@ void Mifare1ksim(uint8_t flags, uint8_t exitAfterNReads, uint8_t arg2, uint8_t *
 				LED_A_ON();
 			}
 		}
-		if (cardSTATE == MFEMUL_NOFIELD) continue;
+		if (cardSTATE == MFEMUL_NOFIELD) {
+			button_pushed = BUTTON_PRESS();
+			continue;
+		}
 
 		//Now, get data
 		res = EmGetCmd(receivedCmd, &len, receivedCmd_par);
