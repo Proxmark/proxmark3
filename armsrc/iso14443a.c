@@ -2352,18 +2352,6 @@ void ReaderMifare(bool first_try)
 	set_tracing(false);
 }
 
-typedef struct {
-  uint32_t cuid;
-  uint8_t  sector;
-  uint8_t  keytype;
-  uint32_t nonce;
-  uint32_t ar;
-  uint32_t nr;
-  uint32_t nonce2;
-  uint32_t ar2;
-  uint32_t nr2;
-} nonces_t;
-
 /**
   *MIFARE 1K simulate.
   *
@@ -2562,7 +2550,10 @@ void Mifare1ksim(uint8_t flags, uint8_t exitAfterNReads, uint8_t arg2, uint8_t *
 				LED_A_ON();
 			}
 		}
-		if (cardSTATE == MFEMUL_NOFIELD) continue;
+		if (cardSTATE == MFEMUL_NOFIELD) {
+			button_pushed = BUTTON_PRESS();
+			continue;
+		}
 
 		//Now, get data
 		res = EmGetCmd(receivedCmd, &len, receivedCmd_par);
