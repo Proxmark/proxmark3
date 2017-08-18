@@ -10,7 +10,6 @@
 // MIFARE Darkside hack
 //-----------------------------------------------------------------------------
 
-#include "mifare.h"
 #include "mfkey.h"
 
 #include "crapto1/crapto1.h"

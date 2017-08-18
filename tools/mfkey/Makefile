@@ -1,7 +1,7 @@
 VPATH = ../../common ../../common/crapto1 ../../client
 CC = gcc
 LD = gcc
-CFLAGS = -std=c99 -D_ISOC99_SOURCE -I../../common -I../../client -Wall -O3
+CFLAGS = -std=c99 -D_ISOC99_SOURCE -I../../common -I../../client -I../../include -Wall -O3
 LDFLAGS =
 
 OBJS = crypto1.o crapto1.o parity.o util_posix.o mfkey.o
