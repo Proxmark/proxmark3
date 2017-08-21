@@ -58,6 +58,7 @@ void SetAdcMuxFor(uint32_t whichGpio);
 // Options for the HF reader, correlating against rx from tag
 #define FPGA_HF_READER_RX_XCORR_848_KHZ				(1<<0)
 #define FPGA_HF_READER_RX_XCORR_SNOOP				(1<<1)
+#define FPGA_HF_READER_RX_XCORR_QUARTER_FREQ		(1<<2)
 // Options for the HF simulated tag, how to modulate
 #define FPGA_HF_SIMULATOR_NO_MODULATION				(0<<0)
 #define FPGA_HF_SIMULATOR_MODULATE_BPSK				(1<<0)
