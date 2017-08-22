@@ -9,17 +9,17 @@
 // Work with mifare cards.
 //-----------------------------------------------------------------------------
 
+#include <string.h>
 #include "mifareutil.h"
 #include "proxmark3.h"
 #include "apps.h"
 #include "util.h"
 #include "parity.h"
-#include "string.h"
 
 #include "iso14443crc.h"
 #include "iso14443a.h"
 #include "crapto1/crapto1.h"
-#include "des.h"
+#include "polarssl/des.h"
 
 int MF_DBGLEVEL = MF_DBG_ALL;
 
@@ -290,6 +290,7 @@ int mifare_ultra_auth(uint8_t *keybytes){
 
 	/// 3des2k
 
+	des3_context ctx = { 0x00 };
 	uint8_t random_a[8] = {1,1,1,1,1,1,1,1};
 	uint8_t random_b[8] = {0x00};
 	uint8_t enc_random_b[8] = {0x00};
@@ -313,7 +314,16 @@ int mifare_ultra_auth(uint8_t *keybytes){
 	memcpy(enc_random_b,resp+1,8);
 
 	// decrypt nonce.
-	tdes_2key_dec(random_b, enc_random_b, sizeof(random_b), key, IV );
+	// tdes_2key_dec(random_b, enc_random_b, sizeof(random_b), key, IV );
+	des3_set2key_dec(&ctx, key);
+	des3_crypt_cbc(&ctx  	// des3_context
+		, DES_DECRYPT    	// int mode
+		, sizeof(random_b)	// length
+		, IV            	// iv[8]
+		, enc_random_b		// input
+		, random_b			// output
+		);
+
 	rol(random_b,8);
 	memcpy(rnd_ab  ,random_a,8);
 	memcpy(rnd_ab+8,random_b,8);
@@ -333,7 +343,16 @@ int mifare_ultra_auth(uint8_t *keybytes){
 	}
 
 	// encrypt    out, in, length, key, iv
-	tdes_2key_enc(rnd_ab, rnd_ab, sizeof(rnd_ab), key, enc_random_b);
+	//tdes_2key_enc(rnd_ab, rnd_ab, sizeof(rnd_ab), key, enc_random_b);
+	des3_set2key_enc(&ctx, key);
+	des3_crypt_cbc(&ctx  	// des3_context
+		, DES_ENCRYPT    	// int mode
+		, sizeof(rnd_ab)	// length
+		, enc_random_b     	// iv[8]
+		, rnd_ab			// input
+		, rnd_ab			// output
+		);
+
 	//len = mifare_sendcmd_short_mfucauth(NULL, 1, 0xAF, rnd_ab, resp, respPar, NULL);
 	len = mifare_sendcmd(0xAF, rnd_ab, sizeof(rnd_ab), resp, respPar, NULL);
 	if (len != 11) {
@@ -346,7 +365,15 @@ int mifare_ultra_auth(uint8_t *keybytes){
 	memcpy(enc_resp, resp+1, 8);
 
 	// decrypt    out, in, length, key, iv 
-	tdes_2key_dec(resp_random_a, enc_resp, 8, key, enc_random_b);
+	// tdes_2key_dec(resp_random_a, enc_resp, 8, key, enc_random_b);
+	des3_set2key_dec(&ctx, key);
+	des3_crypt_cbc(&ctx  	// des3_context
+		, DES_DECRYPT    	// int mode
+		, 8					// length
+		, enc_random_b     	// iv[8]
+		, enc_resp			// input
+		, resp_random_a		// output
+		);
 	if ( memcmp(resp_random_a, random_a, 8) != 0 ) {
 		if (MF_DBGLEVEL >= MF_DBG_ERROR) Dbprintf("failed authentication");
 		return 0;
