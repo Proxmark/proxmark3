@@ -40,10 +40,16 @@ int CmdIndalaDecode(const char *Cmd) {
 	}
 	uint8_t invert=0;
 	size_t size = DemodBufferLen;
-	int startIdx = indala26decode(DemodBuffer, &size, &invert);
-	if (startIdx < 0 || size > 224) {
-		if (g_debugMode) PrintAndLog("Error2: %i",startIdx);
-		return -1;
+	int startIdx = indala64decode(DemodBuffer, &size, &invert);
+	if (startIdx < 0 || size != 64) {
+		// try 224 indala
+		invert = 0;
+		size = DemodBufferLen;
+		startIdx = indala224decode(DemodBuffer, &size, &invert);
+		if (startIdx < 0 || size != 224) {
+			if (g_debugMode) PrintAndLog("Error2: %i",startIdx);
+			return -1;
+		}
 	}
 	setDemodBuf(DemodBuffer, size, (size_t)startIdx);
 	setClockGrid(g_DemodClock, g_DemodStartIdx + (startIdx*g_DemodClock));
