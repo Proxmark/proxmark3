@@ -274,8 +274,17 @@ int main(int argc, char* argv[]) {
 	pthread_mutex_init(&print_lock, NULL);
 
 #ifdef HAVE_GUI
-	InitGraphics(argc, argv, script_cmds_file, usb_present);
-	MainGraphics();
+	char* display = getenv("DISPLAY");
+
+	if (display && strlen(display) > 1)
+	{
+		InitGraphics(argc, argv, script_cmds_file, usb_present);
+		MainGraphics();
+	}
+	else
+	{
+		main_loop(script_cmds_file, usb_present);
+	}
 #else
 	main_loop(script_cmds_file, usb_present);
 #endif	
