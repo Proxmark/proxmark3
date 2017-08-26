@@ -396,8 +396,7 @@ int mfnested(uint8_t blockNo, uint8_t keyType, uint8_t *key, uint8_t trgBlockNo,
 int mfEmlGetMem(uint8_t *data, int blockNum, int blocksCount) {
 	UsbCommand c = {CMD_MIFARE_EML_MEMGET, {blockNum, blocksCount, 0}};
  	SendCommand(&c);
-
-  UsbCommand resp;
+	UsbCommand resp;
 	if (!WaitForResponseTimeout(CMD_ACK,&resp,1500)) return 1;
 	memcpy(data, resp.d.asBytes, blocksCount * 16);
 	return 0;
@@ -417,8 +416,7 @@ int mfCGetBlock(uint8_t blockNo, uint8_t *data, uint8_t params) {
 
 	UsbCommand c = {CMD_MIFARE_CGETBLOCK, {params, 0, blockNo}};
 	SendCommand(&c);
-
-  UsbCommand resp;
+	UsbCommand resp;
 	if (WaitForResponseTimeout(CMD_ACK,&resp,1500)) {
 		isOK  = resp.arg[0] & 0xff;
 		memcpy(data, resp.d.asBytes, 16);
@@ -436,8 +434,7 @@ int mfCSetBlock(uint8_t blockNo, uint8_t *data, uint8_t *uid, bool wantWipe, uin
 	UsbCommand c = {CMD_MIFARE_CSETBLOCK, {wantWipe, params & (0xFE | (uid == NULL ? 0:1)), blockNo}};
 	memcpy(c.d.asBytes, data, 16);
 	SendCommand(&c);
-
-  UsbCommand resp;
+	UsbCommand resp;
 	if (WaitForResponseTimeout(CMD_ACK,&resp,1500)) {
 		isOK  = resp.arg[0] & 0xff;
 		if (uid != NULL)
@@ -534,7 +531,7 @@ int isBlockEmpty(int blockN) {
 }
 
 int isBlockTrailer(int blockN) {
- return ((blockN & 0x03) == 0x03);
+	return ((blockN & 0x03) == 0x03);
 }
 
 int saveTraceCard(void) {
@@ -596,7 +593,6 @@ int loadTraceCard(uint8_t *tuid) {
 		blockNum++;
 	}
 	fclose(f);
-
 	return 0;
 }
 
@@ -617,7 +613,6 @@ int mfTraceInit(uint8_t *tuid, uint8_t *atqa, uint8_t sak, bool wantSaveToEmlFil
 	uid = bytes_to_num(tuid + 3, 4);
 
 	traceState = TRACE_IDLE;
-
 	return 0;
 }
 
@@ -844,7 +839,6 @@ int mfCIdentify()
 {
 	UsbCommand c = {CMD_READER_ISO_14443a, {ISO14A_CONNECT | ISO14A_NO_DISCONNECT, 0, 0}};
 	SendCommand(&c);
-
 	UsbCommand resp;
 	WaitForResponse(CMD_ACK,&resp);
 
