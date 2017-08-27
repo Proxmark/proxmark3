@@ -1417,10 +1417,10 @@ void CopyIndala224toT55x7(uint32_t uid1, uint32_t uid2, uint32_t uid3, uint32_t 
 	//Program the 7 data blocks for supplied 224bit UID
 	uint32_t data[] = {0, uid1, uid2, uid3, uid4, uid5, uid6, uid7};
 	// and the block 0 for Indala224 format	
-	//Config for Indala (RF/32;PSK1 with RF/2;Maxblock=7)
-	data[0] = T55x7_BITRATE_RF_32 | T55x7_MODULATION_PSK1 | (7 << T55x7_MAXBLOCK_SHIFT);
+	//Config for Indala (RF/32;PSK2 with RF/2;Maxblock=7)
+	data[0] = T55x7_BITRATE_RF_32 | T55x7_MODULATION_PSK2 | (7 << T55x7_MAXBLOCK_SHIFT);
 	//TODO add selection of chip for Q5 or T55x7
-	// data[0] = (((32-2)>>1)<<T5555_BITRATE_SHIFT) | T5555_MODULATION_PSK1 | 7 << T5555_MAXBLOCK_SHIFT;
+	// data[0] = (((32-2)>>1)<<T5555_BITRATE_SHIFT) | T5555_MODULATION_PSK2 | 7 << T5555_MAXBLOCK_SHIFT;
 	WriteT55xx(data, 0, 8);
 	//Alternative config for Indala (Extended mode;RF/32;PSK1 with RF/2;Maxblock=7;Inverse data)
 	//	T5567WriteBlock(0x603E10E2,0);
