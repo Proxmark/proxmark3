@@ -1304,7 +1304,7 @@ void UsbPacketReceived(uint8_t *packet, int len)
 			break;
 
 		case CMD_SET_LF_DIVISOR:
-		  	FpgaDownloadAndGo(FPGA_BITSTREAM_LF);
+			FpgaDownloadAndGo(FPGA_BITSTREAM_LF);
 			FpgaSendCommand(FPGA_CMD_SET_DIVISOR, c->arg[0]);
 			break;
 
