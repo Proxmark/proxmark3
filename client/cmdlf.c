@@ -410,32 +410,27 @@ int CmdLFSim(const char *Cmd)
 
 	sscanf(Cmd, "%i", &gap);
 
-	//prep fpga to lf (divisor is not important)
-	UsbCommand c = {CMD_SET_LF_DIVISOR, {89,0,0}};
-	clearCommandBuffer();
-	SendCommand(&c);
-
 	// convert to bitstream if necessary
 	ChkBitstream(Cmd);
 
 	//can send only 512 bits at a time (1 byte sent per bit...)
 	printf("Sending [%d bytes]", GraphTraceLen);
 	for (i = 0; i < GraphTraceLen; i += USB_CMD_DATA_SIZE) {
-		UsbCommand c2 = {CMD_DOWNLOADED_SIM_SAMPLES_125K, {i, 0, 0}};
+		UsbCommand c = {CMD_DOWNLOADED_SIM_SAMPLES_125K, {i, 0, 0}};
 
 		for (j = 0; j < USB_CMD_DATA_SIZE; j++) {
-			c2.d.asBytes[j] = GraphBuffer[i+j];
+			c.d.asBytes[j] = GraphBuffer[i+j];
 		}
-		SendCommand(&c2);
+		SendCommand(&c);
 		WaitForResponse(CMD_ACK,NULL);
 		printf(".");
 	}
 
 	printf("\n");
 	PrintAndLog("Starting to simulate");
-	UsbCommand c3 = {CMD_SIMULATE_TAG_125K, {GraphTraceLen, gap, 0}};
+	UsbCommand c = {CMD_SIMULATE_TAG_125K, {GraphTraceLen, gap, 0}};
 	clearCommandBuffer();
-	SendCommand(&c3);
+	SendCommand(&c);
 	return 0;
 }
 
