@@ -251,7 +251,7 @@ int CmdLegicLoad(const char *Cmd)
           fclose(f);
           return -1;
         }
-        UsbCommand c={CMD_DOWNLOADED_SIM_SAMPLES_125K, {offset, 0, 0}};
+        UsbCommand c={CMD_DOWNLOADED_SIM_SAMPLES_125K, {offset, 1, 0}};
         int j; for(j = 0; j < 8; j++) {
             c.d.asBytes[j] = data[j];
         }
@@ -351,7 +351,7 @@ int CmdLegicRfFill(const char *Cmd)
     }
 
     int i;
-    UsbCommand c={CMD_DOWNLOADED_SIM_SAMPLES_125K, {0, 0, 0}};
+    UsbCommand c={CMD_DOWNLOADED_SIM_SAMPLES_125K, {0, 1, 0}};
     for(i = 0; i < 48; i++) {
       c.d.asBytes[i] = cmd.arg[2];
     }

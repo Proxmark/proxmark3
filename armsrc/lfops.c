@@ -387,8 +387,8 @@ void SimulateTagLowFrequency(int period, int gap, int ledcontrol)
 	int i;
 	uint8_t *tab = BigBuf_get_addr();
 
-	//note this may destroy the bigbuf so be sure this is called before now...
-	FpgaDownloadAndGo(FPGA_BITSTREAM_LF);  
+	//note FpgaDownloadAndGo destroys the bigbuf so be sure this is called before now...
+	//FpgaDownloadAndGo(FPGA_BITSTREAM_LF);  
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_LF_EDGE_DETECT);
 
 	AT91C_BASE_PIOA->PIO_PER = GPIO_SSC_DOUT | GPIO_SSC_CLK;
