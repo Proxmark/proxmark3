@@ -1199,6 +1199,9 @@ void UsbPacketReceived(uint8_t *packet, int len)
 			break;
 			
 		// Work with "magic Chinese" card
+		case CMD_MIFARE_CWIPE:
+			MifareCWipe(c->arg[0], c->arg[1], c->arg[2], c->d.asBytes);
+			break;
 		case CMD_MIFARE_CSETBLOCK:
 			MifareCSetBlock(c->arg[0], c->arg[1], c->arg[2], c->d.asBytes);
 			break;

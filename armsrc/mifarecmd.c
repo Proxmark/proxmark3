@@ -1170,6 +1170,72 @@ void MifareECardLoad(uint32_t arg0, uint32_t arg1, uint32_t arg2, uint8_t *datai
 // Work with "magic Chinese" card (email him: ouyangweidaxian@live.cn)
 //
 //-----------------------------------------------------------------------------
+
+void MifareCWipe(uint32_t arg0, uint32_t arg1, uint32_t arg2, uint8_t *datain){
+	// var
+	byte_t isOK = 0;
+	uint8_t numSectors = arg0;
+	uint8_t needWipe = arg1;
+	uint8_t needPut = arg2;
+
+	uint8_t receivedAnswer[MAX_MIFARE_FRAME_SIZE];
+	uint8_t receivedAnswerPar[MAX_MIFARE_PARITY_SIZE];
+	
+	// card commands
+	uint8_t wupC1[]       = { 0x40 };
+	uint8_t wipeC[]       = { 0x41 };
+	
+	// iso14443 setup
+	LED_A_ON();
+	LED_B_OFF();
+	LED_C_OFF();
+	iso14443a_setup(FPGA_HF_ISO14443A_READER_LISTEN);
+
+	// tracing
+	clear_trace();
+	set_tracing(true);
+		
+	while (true){
+		// wipe
+		if (needWipe){
+			ReaderTransmitBitsPar(wupC1,7,0, NULL);
+			if(!ReaderReceive(receivedAnswer, receivedAnswerPar) || (receivedAnswer[0] != 0x0a)) {
+				if (MF_DBGLEVEL >= 1)	Dbprintf("wupC1 error");
+				break;
+			};
+
+			ReaderTransmit(wipeC, sizeof(wipeC), NULL);
+			if(!ReaderReceive(receivedAnswer, receivedAnswerPar) || (receivedAnswer[0] != 0x0a)) {
+				if (MF_DBGLEVEL >= 1)	Dbprintf("wipeC error");
+				break;
+			};
+
+			if(mifare_classic_halt(NULL, 0)) {
+				if (MF_DBGLEVEL > 2)	Dbprintf("Halt error");
+			};
+		};
+	
+		// put default data
+		if (needPut){
+			for (int i = 0; i < numSectors; i++) {
+			// MifareCSetBlock here
+			}
+		}
+	}
+	
+
+	// send response
+	LED_B_ON();
+	cmd_send(CMD_ACK,isOK,0,0,NULL,0);
+	LED_B_OFF();
+	
+	// reset fpga
+	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
+	LEDsoff();
+		
+	return;
+}
+
 void MifareCSetBlock(uint32_t arg0, uint32_t arg1, uint32_t arg2, uint8_t *datain){
 
   // params
@@ -1240,7 +1306,7 @@ void MifareCSetBlock(uint32_t arg0, uint32_t arg1, uint32_t arg2, uint8_t *datai
 				break;
 			};
 
-			if(mifare_classic_halt(NULL, cuid)) {
+			if(mifare_classic_halt(NULL, 0)) {
 				if (MF_DBGLEVEL > 2)	Dbprintf("Halt error");
 				// Continue, some magic tags misbehavies and send an answer to it.
                         	// break;
@@ -1284,7 +1350,7 @@ void MifareCSetBlock(uint32_t arg0, uint32_t arg1, uint32_t arg2, uint8_t *datai
 		if (workFlags & 0x04) {
 			// do no issue halt command for gen1b magic tag (#db# halt error. response len: 1)
 			if (!(workFlags & 0x40)) {
-				if (mifare_classic_halt(NULL, cuid)) {
+				if (mifare_classic_halt(NULL, 0)) {
 					if (MF_DBGLEVEL > 2)	Dbprintf("Halt error");
 					// Continue, some magic tags misbehavies and send an answer to it.
 					// break;

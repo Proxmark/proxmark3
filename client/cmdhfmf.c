@@ -1887,14 +1887,17 @@ int CmdHF14AMfCWipe(const char *Cmd)
 	bool setCard = false;
 	
 	if (strlen(Cmd) < 1 || param_getchar(Cmd, 0) == 'h') {
-		PrintAndLog("Usage:  hf mf cwipe <card size> [w]");
+		PrintAndLog("Usage:  hf mf cwipe [card size] [w] [p]");
 		PrintAndLog("sample:  hf mf cwipe 1 w s");
-		PrintAndLog("w - Wipe for magic Chinese card (only works with such cards)");
+		PrintAndLog("[card size]: 0 = 320 bytes (Mifare Mini), 1 = 1K (default), 2 = 2K, 4 = 4K");
+		PrintAndLog("w - Wipe magic Chinese card (only works with gen:1a cards)");
 		PrintAndLog("p - Put default data to the card ");
 		return 0;
 	}
 
 	gen = mfCIdentify();
+	
+	// here check 1a 1b
 
 	char cardSize = param_getchar(Cmd, 1);
 	numSectors = ParamGetCardSize(cardSize);
@@ -1906,10 +1909,13 @@ int CmdHF14AMfCWipe(const char *Cmd)
 
 	if (gen == 2) {
 		/* generation 1b magic card */
-		res = mfCWipe(numSectors, wipeCard, setCard); // wipeCard, CSETBLOCK_SINGLE_OPER | CSETBLOCK_MAGIC_1B
+		if (wipeCard) {
+			PrintAndLog("WARNING: can't wipe magic card 1b generation");
+		}
+		res = mfCWipe(numSectors, false, setCard); 
 	} else {
 		/* generation 1a magic card by default */
-		res = mfCWipe(numSectors, wipeCard, setCard); // wipeCard, CSETBLOCK_SINGLE_OPER
+		res = mfCWipe(numSectors, wipeCard, setCard); 
 	}
 
 	if (res) {
@@ -2467,6 +2473,7 @@ static command_t CommandTable[] =
   {"esave",            CmdHF14AMfESave,         0, "Save to file emul dump"},
   {"ecfill",           CmdHF14AMfECFill,        0, "Fill simulator memory with help of keys from simulator"},
   {"ekeyprn",          CmdHF14AMfEKeyPrn,       0, "Print keys from simulator memory"},
+  {"cwipe",            CmdHF14AMfCWipe,         0, "Wipe magic Chinese card"},
   {"csetuid",          CmdHF14AMfCSetUID,       0, "Set UID for magic Chinese card"},
   {"csetblk",          CmdHF14AMfCSetBlk,       0, "Write block - Magic Chinese card"},
   {"cgetblk",          CmdHF14AMfCGetBlk,       0, "Read block - Magic Chinese card"},

@@ -453,6 +453,12 @@ int mfCSetBlock(uint8_t blockNo, uint8_t *data, uint8_t *uid, bool wantWipe, uin
 }
 
 int mfCWipe(uint8_t numSectors, bool wantWipe, bool wantSet) {
+	UsbCommand c = {CMD_MIFARE_CWIPE, {ISO14A_CONNECT | ISO14A_NO_DISCONNECT, 0, 0}};
+	SendCommand(&c);
+
+	UsbCommand resp;
+	WaitForResponse(CMD_ACK,&resp);
+	
 	return 0;
 }
 
