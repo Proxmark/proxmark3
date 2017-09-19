@@ -452,6 +452,10 @@ int mfCSetBlock(uint8_t blockNo, uint8_t *data, uint8_t *uid, bool wantWipe, uin
 	return 0;
 }
 
+int mfCWipe(uint8_t numSectors, bool wantWipe, bool wantSet) {
+	return 0;
+}
+
 int mfCSetUID(uint8_t *uid, uint8_t *atqa, uint8_t *sak, uint8_t *oldUID, bool wantWipe, bool wantFill) {
 	uint8_t oldblock0[16] = {0x00};
 	uint8_t block0[16] = {0x00};

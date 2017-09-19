@@ -1867,6 +1867,58 @@ int CmdHF14AMfCSetUID(const char *Cmd)
 	return 0;
 }
 
+int ParamGetCardSize(const char c) {
+	int numSectors = 16;
+	switch (c) {
+		case '0' : numSectors = 5; break;
+		case '2' : numSectors = 32; break;
+		case '4' : numSectors = 40; break;
+		default:   numSectors = 16;
+	}
+	return numSectors;
+}
+
+int CmdHF14AMfCWipe(const char *Cmd)
+{
+	int res, gen = 0;
+	char ctmp;
+	int numSectors = 16;
+	bool wipeCard = false;
+	bool setCard = false;
+	
+	if (strlen(Cmd) < 1 || param_getchar(Cmd, 0) == 'h') {
+		PrintAndLog("Usage:  hf mf cwipe <card size> [w]");
+		PrintAndLog("sample:  hf mf cwipe 1 w s");
+		PrintAndLog("w - Wipe for magic Chinese card (only works with such cards)");
+		PrintAndLog("p - Put default data to the card ");
+		return 0;
+	}
+
+	gen = mfCIdentify();
+
+	char cardSize = param_getchar(Cmd, 1);
+	numSectors = ParamGetCardSize(cardSize);
+
+	ctmp = param_getchar(Cmd, 2);
+	wipeCard = (ctmp == 'w' || ctmp == 'W');
+	setCard = (ctmp == 'p' || ctmp == 'P');
+	PrintAndLog("--sectors count:%2d ", numSectors);
+
+	if (gen == 2) {
+		/* generation 1b magic card */
+		res = mfCWipe(numSectors, wipeCard, setCard); // wipeCard, CSETBLOCK_SINGLE_OPER | CSETBLOCK_MAGIC_1B
+	} else {
+		/* generation 1a magic card by default */
+		res = mfCWipe(numSectors, wipeCard, setCard); // wipeCard, CSETBLOCK_SINGLE_OPER
+	}
+
+	if (res) {
+		PrintAndLog("Can't wipe. error=%d", res);
+		return 1;
+	}
+	return 0;
+}
+
 int CmdHF14AMfCSetBlk(const char *Cmd)
 {
 	uint8_t memBlock[16] = {0x00};
