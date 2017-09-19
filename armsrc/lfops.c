@@ -387,7 +387,8 @@ void SimulateTagLowFrequency(int period, int gap, int ledcontrol)
 	int i;
 	uint8_t *tab = BigBuf_get_addr();
 
-	FpgaDownloadAndGo(FPGA_BITSTREAM_LF);
+	//note FpgaDownloadAndGo destroys the bigbuf so be sure this is called before now...
+	//FpgaDownloadAndGo(FPGA_BITSTREAM_LF);  
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_LF_EDGE_DETECT);
 
 	AT91C_BASE_PIOA->PIO_PER = GPIO_SSC_DOUT | GPIO_SSC_CLK;
@@ -401,13 +402,19 @@ void SimulateTagLowFrequency(int period, int gap, int ledcontrol)
 	i = 0;
 	for(;;) {
 		//wait until SSC_CLK goes HIGH
+		int ii = 0;
 		while(!(AT91C_BASE_PIOA->PIO_PDSR & GPIO_SSC_CLK)) {
-			if(BUTTON_PRESS() || (usb_poll_validate_length() )) {
-				FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
-				DbpString("Stopped");
-				return;
+			//only check every 1000th time (usb_poll_validate_length on some systems was too slow)
+			if ( ii == 1000 ) {
+				if (BUTTON_PRESS() || usb_poll_validate_length() ) {
+					FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
+					DbpString("Stopped");
+					return;
+				}
+				ii=0;
 			}
 			WDT_HIT();
+			ii++;
 		}
 		if (ledcontrol)
 			LED_D_ON();
@@ -419,14 +426,20 @@ void SimulateTagLowFrequency(int period, int gap, int ledcontrol)
 
 		if (ledcontrol)
 			LED_D_OFF();
+		ii=0;
 		//wait until SSC_CLK goes LOW
 		while(AT91C_BASE_PIOA->PIO_PDSR & GPIO_SSC_CLK) {
-			if(BUTTON_PRESS() || (usb_poll_validate_length() )) {
-				DbpString("Stopped");
-				FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
-				return;
+			//only check every 1000th time (usb_poll_validate_length on some systems was too slow)
+			if ( ii == 1000 ) { 
+				if (BUTTON_PRESS() || usb_poll_validate_length() ) {
+					FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
+					DbpString("Stopped");
+					return;
+				}
+				ii=0;
 			}
 			WDT_HIT();
+			ii++;
 		}
 
 		i++;
@@ -545,6 +558,9 @@ void CmdHIDsimTAG(int hi, int lo, int ledcontrol)
 		DbpString("Tags can only have 44 bits. - USE lf simfsk for larger tags");
 		return;
 	}
+	// set LF so we don't kill the bigbuf we are setting with simulation data.
+	FpgaDownloadAndGo(FPGA_BITSTREAM_LF);
+
 	fc(0,&n);
 	// special start of frame marker containing invalid bit sequences
 	fc(8,  &n);	fc(8,  &n); // invalid
@@ -594,6 +610,9 @@ void CmdFSKsimTAG(uint16_t arg1, uint16_t arg2, size_t size, uint8_t *BitStream)
 	uint16_t modCnt = 0;
 	uint8_t clk = arg2 & 0xFF;
 	uint8_t invert = (arg2 >> 8) & 1;
+
+	// set LF so we don't kill the bigbuf we are setting with simulation data.
+	FpgaDownloadAndGo(FPGA_BITSTREAM_LF);
 
 	for (i=0; i<size; i++){
 		if (BitStream[i] == invert){
@@ -670,6 +689,9 @@ void CmdASKsimTag(uint16_t arg1, uint16_t arg2, size_t size, uint8_t *BitStream)
 	uint8_t separator = arg2 & 1;
 	uint8_t invert = (arg2 >> 8) & 1;
 
+	// set LF so we don't kill the bigbuf we are setting with simulation data.
+	FpgaDownloadAndGo(FPGA_BITSTREAM_LF);
+
 	if (encoding==2){  //biphase
 		uint8_t phase=0;
 		for (i=0; i<size; i++){
@@ -741,6 +763,9 @@ void CmdPSKsimTag(uint16_t arg1, uint16_t arg2, size_t size, uint8_t *BitStream)
 	uint8_t carrier = arg1 & 0xFF;
 	uint8_t invert = arg2 & 0xFF;
 	uint8_t curPhase = 0;
+	// set LF so we don't kill the bigbuf we are setting with simulation data.
+	FpgaDownloadAndGo(FPGA_BITSTREAM_LF);
+
 	for (i=0; i<size; i++){
 		if (BitStream[i] == curPhase){
 			pskSimBit(carrier, &n, clk, &curPhase, FALSE);
@@ -1392,10 +1417,10 @@ void CopyIndala224toT55x7(uint32_t uid1, uint32_t uid2, uint32_t uid3, uint32_t 
 	//Program the 7 data blocks for supplied 224bit UID
 	uint32_t data[] = {0, uid1, uid2, uid3, uid4, uid5, uid6, uid7};
 	// and the block 0 for Indala224 format	
-	//Config for Indala (RF/32;PSK1 with RF/2;Maxblock=7)
-	data[0] = T55x7_BITRATE_RF_32 | T55x7_MODULATION_PSK1 | (7 << T55x7_MAXBLOCK_SHIFT);
+	//Config for Indala (RF/32;PSK2 with RF/2;Maxblock=7)
+	data[0] = T55x7_BITRATE_RF_32 | T55x7_MODULATION_PSK2 | (7 << T55x7_MAXBLOCK_SHIFT);
 	//TODO add selection of chip for Q5 or T55x7
-	// data[0] = (((32-2)>>1)<<T5555_BITRATE_SHIFT) | T5555_MODULATION_PSK1 | 7 << T5555_MAXBLOCK_SHIFT;
+	// data[0] = (((32-2)>>1)<<T5555_BITRATE_SHIFT) | T5555_MODULATION_PSK2 | 7 << T5555_MAXBLOCK_SHIFT;
 	WriteT55xx(data, 0, 8);
 	//Alternative config for Indala (Extended mode;RF/32;PSK1 with RF/2;Maxblock=7;Inverse data)
 	//	T5567WriteBlock(0x603E10E2,0);

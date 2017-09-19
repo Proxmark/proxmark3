@@ -29,26 +29,26 @@ static int CmdHelp(const char *Cmd);
 
 int usage_lf_visa2k_clone(void){
 	PrintAndLog("clone a Visa2000 tag to a T55x7 tag.");
-	PrintAndLog("Usage: lf visa2k clone [h] <card ID> <Q5>");
+	PrintAndLog("Usage: lf visa2000 clone [h] <card ID> <Q5>");
 	PrintAndLog("Options:");
 	PrintAndLog("      h          : This help");
-	PrintAndLog("      <card ID>  : Visa2k card ID");
+	PrintAndLog("      <card ID>  : Visa2000 card ID");
 	PrintAndLog("      <Q5>       : specify write to Q5 (t5555 instead of t55x7)");
 	PrintAndLog("");
-	PrintAndLog("Sample: lf visa2k clone 112233");
+	PrintAndLog("Sample: lf visa2000 clone 112233");
 	return 0;
 }
 
 int usage_lf_visa2k_sim(void) {
-	PrintAndLog("Enables simulation of visa2k card with specified card number.");
+	PrintAndLog("Enables simulation of visa2000 card with specified card number.");
 	PrintAndLog("Simulation runs until the button is pressed or another USB command is issued.");
 	PrintAndLog("");
-	PrintAndLog("Usage:  lf visa2k sim [h] <card ID>");
+	PrintAndLog("Usage:  lf visa2000 sim [h] <card ID>");
 	PrintAndLog("Options:");
 	PrintAndLog("      h          : This help");
-	PrintAndLog("      <card ID>  : Visa2k card ID");
+	PrintAndLog("      <card ID>  : Visa2000 card ID");
 	PrintAndLog("");
-	PrintAndLog("Sample: lf visa2k sim 112233");
+	PrintAndLog("Sample: lf visa2000 sim 112233");
 	return 0;
 }
 
@@ -100,7 +100,7 @@ int CmdVisa2kDemod(const char *Cmd) {
 	//ASK / Manchester
 	bool st = true;
 	if (!ASKDemod_ext("64 0 0", false, false, 1, &st)) {
-		if (g_debugMode) PrintAndLog("DEBUG: Error - Visa2k: ASK/Manchester Demod failed");
+		if (g_debugMode) PrintAndLog("DEBUG: Error - Visa2000: ASK/Manchester Demod failed");
 		return 0;
 	}
 	size_t size = DemodBufferLen;
@@ -108,13 +108,13 @@ int CmdVisa2kDemod(const char *Cmd) {
 	if (ans < 0){
 		if (g_debugMode){
 			if (ans == -1)
-				PrintAndLog("DEBUG: Error - Visa2k: too few bits found");
+				PrintAndLog("DEBUG: Error - Visa2000: too few bits found");
 			else if (ans == -2)
-				PrintAndLog("DEBUG: Error - Visa2k: preamble not found");
+				PrintAndLog("DEBUG: Error - Visa2000: preamble not found");
 			else if (ans == -3)
-				PrintAndLog("DEBUG: Error - Visa2k: Size not correct: %d", size);
+				PrintAndLog("DEBUG: Error - Visa2000: Size not correct: %d", size);
 			else
-				PrintAndLog("DEBUG: Error - Visa2k: ans: %d", ans);
+				PrintAndLog("DEBUG: Error - Visa2000: ans: %d", ans);
 		}
 		return 0;
 	}

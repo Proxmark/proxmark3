@@ -58,7 +58,7 @@ int usage_lf_fdx_clone(void){
 	// extended data
 	PrintAndLog("      <Q5>        : Specify write to Q5 (t5555 instead of t55x7)");
 	PrintAndLog("");
-	PrintAndLog("Sample: lf animal clone 999 112233");
+	PrintAndLog("Sample: lf fdx clone 999 112233");
 	return 0;
 }
 

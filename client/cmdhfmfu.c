@@ -16,7 +16,7 @@
 #include "usb_cmd.h"
 #include "cmdmain.h"
 #include "ui.h"
-#include "loclass/des.h"
+#include "polarssl/des.h"
 #include "cmdhfmf.h"
 #include "cmdhf14a.h"
 #include "mifare.h"

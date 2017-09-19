@@ -12,6 +12,7 @@
 
 #include "mfkey.h"
 
+#include "mifare.h"
 #include "crapto1/crapto1.h"
 
 

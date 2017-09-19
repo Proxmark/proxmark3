@@ -37,4 +37,17 @@ typedef enum ISO14A_COMMAND {
 	ISO14A_TOPAZMODE =			(1 << 8)
 } iso14a_command_t;
 
+typedef struct {
+	uint32_t cuid;
+	uint8_t  sector;
+	uint8_t  keytype;
+	uint32_t nonce;
+	uint32_t ar;
+	uint32_t nr;
+	uint32_t at;
+	uint32_t nonce2;
+	uint32_t ar2;
+	uint32_t nr2;
+} nonces_t;
+
 #endif // _MIFARE_H_
