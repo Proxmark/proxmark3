@@ -621,7 +621,7 @@ int CmdHF14AMfNested(const char *Cmd)
 	}
 	
 	// one-sector nested
-	if (cmdp == 'o') {
+	if (cmdp == 'o') { // ------------------------------------  one sector working
 		PrintAndLog("--target block no:%3d, target key type:%c ", trgBlockNo, trgKeyType?'B':'A');
 		int16_t isOK = mfnested(blockNo, keyType, key, trgBlockNo, trgKeyType, keyBlock, true);
 		if (isOK) {
