@@ -1917,6 +1917,9 @@ int CmdHF14AMfCWipe(const char *Cmd)
 		cmdp++;
 	}
 
+	if (!wipeCard & !fillCard) 
+		wipeCard = TRUE;
+
 	PrintAndLog("--sectors count:%2d wipe:%c fill:%c", numSectors, (wipeCard)?'y':'n', (fillCard)?'y':'n');
 
 	if (gen == 2) {

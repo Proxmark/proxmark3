@@ -415,10 +415,11 @@ int mfEmlSetMem(uint8_t *data, int blockNum, int blocksCount) {
 int mfCGetBlock(uint8_t blockNo, uint8_t *data, uint8_t params) {
 	uint8_t isOK = 0;
 
+	return 0;
 	UsbCommand c = {CMD_MIFARE_CGETBLOCK, {params, 0, blockNo}};
 	SendCommand(&c);
 
-  UsbCommand resp;
+	UsbCommand resp;
 	if (WaitForResponseTimeout(CMD_ACK,&resp,1500)) {
 		isOK  = resp.arg[0] & 0xff;
 		memcpy(data, resp.d.asBytes, 16);
@@ -452,14 +453,16 @@ int mfCSetBlock(uint8_t blockNo, uint8_t *data, uint8_t *uid, bool wantWipe, uin
 	return 0;
 }
 
-int mfCWipe(uint8_t numSectors, bool wantWipe, bool wantSet) {
-	UsbCommand c = {CMD_MIFARE_CWIPE, {ISO14A_CONNECT | ISO14A_NO_DISCONNECT, 0, 0}};
+int mfCWipe(uint8_t numSectors, bool wantWipe, bool wantFill) {
+	uint8_t isOK = 0;
+	UsbCommand c = {CMD_MIFARE_CWIPE, {numSectors, wantWipe, wantFill}};
 	SendCommand(&c);
 
 	UsbCommand resp;
 	WaitForResponse(CMD_ACK,&resp);
+	isOK  = resp.arg[0] & 0xff;
 	
-	return 0;
+	return isOK;
 }
 
 int mfCSetUID(uint8_t *uid, uint8_t *atqa, uint8_t *sak, uint8_t *oldUID, bool wantWipe, bool wantFill) {
