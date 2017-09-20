@@ -452,9 +452,10 @@ int mfCSetBlock(uint8_t blockNo, uint8_t *data, uint8_t *uid, bool wantWipe, uin
 	return 0;
 }
 
-int mfCWipe(uint32_t numSectors, bool wantWipe, bool wantFill) {
+int mfCWipe(uint32_t numSectors, bool gen1b, bool wantWipe, bool wantFill) {
 	uint8_t isOK = 0;
-	UsbCommand c = {CMD_MIFARE_CWIPE, {numSectors, wantWipe, wantFill}};
+	uint8_t cmdParams = wantWipe + wantFill * 0x02 + gen1b * 0x04;
+	UsbCommand c = {CMD_MIFARE_CWIPE, {numSectors, cmdParams, 0}};
 	SendCommand(&c);
 
 	UsbCommand resp;

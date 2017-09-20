@@ -1185,10 +1185,15 @@ void MifareCWipe(uint32_t arg0, uint32_t arg1, uint32_t arg2, uint8_t *datain){
 	// var
 	byte_t isOK = 0;
 	uint32_t numBlocks = arg0;
-	uint8_t needWipe = arg1;
-	uint8_t needFill = arg2;
-	bool gen1b = FALSE;
-
+	// cmdParams:
+	// bit 0 - wipe gen1a
+	// bit 1 - fill card with default data
+	// bit 2 - gen1a = 0, gen1b = 1
+	uint8_t cmdParams = arg1;
+	bool needWipe = cmdParams & 0x01;
+	bool needFill = cmdParams & 0x02;
+	bool gen1b = cmdParams & 0x04;
+	
 	uint8_t receivedAnswer[MAX_MIFARE_FRAME_SIZE];
 	uint8_t receivedAnswerPar[MAX_MIFARE_PARITY_SIZE];
 	

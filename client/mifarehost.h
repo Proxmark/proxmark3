@@ -33,7 +33,7 @@ extern int mfCheckKeys (uint8_t blockNo, uint8_t keyType, bool clear_trace, uint
 extern int mfEmlGetMem(uint8_t *data, int blockNum, int blocksCount);
 extern int mfEmlSetMem(uint8_t *data, int blockNum, int blocksCount);
 
-extern int mfCWipe(uint32_t numSectors, bool wantWipe, bool wantFill);
+extern int mfCWipe(uint32_t numSectors, bool gen1b, bool wantWipe, bool wantFill);
 extern int mfCSetUID(uint8_t *uid, uint8_t *atqa, uint8_t *sak, uint8_t *oldUID);
 extern int mfCSetBlock(uint8_t blockNo, uint8_t *data, uint8_t *uid, bool wantWipe, uint8_t params);
 extern int mfCGetBlock(uint8_t blockNo, uint8_t *data, uint8_t params);

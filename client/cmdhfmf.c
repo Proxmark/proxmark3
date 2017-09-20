@@ -1914,10 +1914,10 @@ int CmdHF14AMfCWipe(const char *Cmd)
 		if (wipeCard) {
 			PrintAndLog("WARNING: can't wipe magic card 1b generation");
 		}
-		res = mfCWipe(numBlocks, false, fillCard); 
+		res = mfCWipe(numBlocks, true, false, fillCard); 
 	} else {
 		/* generation 1a magic card by default */
-		res = mfCWipe(numBlocks, wipeCard, fillCard); 
+		res = mfCWipe(numBlocks, false, wipeCard, fillCard); 
 	}
 
 	if (res) {
