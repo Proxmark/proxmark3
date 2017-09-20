@@ -1881,41 +1881,53 @@ int ParamGetCardSize(const char c) {
 int CmdHF14AMfCWipe(const char *Cmd)
 {
 	int res, gen = 0;
-	char ctmp;
 	int numSectors = 16;
 	bool wipeCard = false;
-	bool setCard = false;
+	bool fillCard = false;
 	
 	if (strlen(Cmd) < 1 || param_getchar(Cmd, 0) == 'h') {
 		PrintAndLog("Usage:  hf mf cwipe [card size] [w] [p]");
 		PrintAndLog("sample:  hf mf cwipe 1 w s");
 		PrintAndLog("[card size]: 0 = 320 bytes (Mifare Mini), 1 = 1K (default), 2 = 2K, 4 = 4K");
 		PrintAndLog("w - Wipe magic Chinese card (only works with gen:1a cards)");
-		PrintAndLog("p - Put default data to the card ");
+		PrintAndLog("f - Fill the card with default data and keys");
 		return 0;
 	}
 
 	gen = mfCIdentify();
+	if ((gen != 1) & (gen != 2)) 
+		return 1;
 	
-	// here check 1a 1b
+	numSectors = ParamGetCardSize(param_getchar(Cmd, 1));
 
-	char cardSize = param_getchar(Cmd, 1);
-	numSectors = ParamGetCardSize(cardSize);
+	char cmdp = 0;
+	while(param_getchar(Cmd, cmdp) != 0x00){
+		switch(param_getchar(Cmd, cmdp)) {
+		case 'w':
+		case 'W':
+			wipeCard = 1;
+			break;
+		case 'f':
+		case 'F':
+			fillCard = 1;
+			break;
+		default:
+			break;
+		}
+		cmdp++;
+	}
 
-	ctmp = param_getchar(Cmd, 2);
-	wipeCard = (ctmp == 'w' || ctmp == 'W');
-	setCard = (ctmp == 'p' || ctmp == 'P');
-	PrintAndLog("--sectors count:%2d ", numSectors);
+	PrintAndLog("--sectors count:%2d wipe:%c fill:%c", numSectors, (wipeCard)?'y':'n', (fillCard)?'y':'n');
 
 	if (gen == 2) {
 		/* generation 1b magic card */
 		if (wipeCard) {
 			PrintAndLog("WARNING: can't wipe magic card 1b generation");
 		}
-		res = mfCWipe(numSectors, false, setCard); 
+		res = mfCWipe(numSectors, false, fillCard); 
 	} else {
 		/* generation 1a magic card by default */
-		res = mfCWipe(numSectors, wipeCard, setCard); 
+		res = mfCWipe(numSectors, wipeCard, fillCard); 
 	}
 
 	if (res) {
@@ -1941,6 +1953,8 @@ int CmdHF14AMfCSetBlk(const char *Cmd)
 	}
 
 	gen = mfCIdentify();
+	if ((gen != 1) & (gen != 2)) 
+		return 1;
 
 	blockNo = param_get8(Cmd, 0);
 
