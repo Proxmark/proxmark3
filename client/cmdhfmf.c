@@ -1783,8 +1783,6 @@ int CmdHF14AMfEKeyPrn(const char *Cmd)
 
 int CmdHF14AMfCSetUID(const char *Cmd)
 {
-	uint8_t wipeCard = 0;
-	uint8_t fillCard = 0;
 	uint8_t uid[8] = {0x00};
 	uint8_t oldUid[8] = {0x00};
 	uint8_t atqa[2] = {0x00};
@@ -1823,14 +1821,6 @@ int CmdHF14AMfCSetUID(const char *Cmd)
 		case 'H':
 			needHelp = 1;
 			break;
-		case 'w':
-		case 'W':
-			wipeCard = 1;
-			break;
-		case 'k':
-		case 'K':
-			fillCard = 1;
-			break;
 		default:
 			PrintAndLog("ERROR: Unknown parameter '%c'", param_getchar(Cmd, cmdp));
 			needHelp = 1;
@@ -1841,22 +1831,19 @@ int CmdHF14AMfCSetUID(const char *Cmd)
 
 	if (strlen(Cmd) < 1 || needHelp) {
 		PrintAndLog("");
-		PrintAndLog("Usage:  hf mf csetuid <UID 8 hex symbols> [ATQA 4 hex symbols SAK 2 hex symbols] [w] [k]");
+		PrintAndLog("Usage:  hf mf csetuid <UID 8 hex symbols> [ATQA 4 hex symbols SAK 2 hex symbols]");
 		PrintAndLog("sample:  hf mf csetuid 01020304");
-		PrintAndLog("sample:  hf mf csetuid 01020304 0004 08 w");
-		PrintAndLog("sample:  hf mf csetuid 01020304 0004 08 f");
+		PrintAndLog("sample:  hf mf csetuid 01020304 0004 08");
 		PrintAndLog("Set UID, ATQA, and SAK for magic Chinese card (only works with such cards)");
-		PrintAndLog("'w' - wipe the card. Works only for cards with this function");
-		PrintAndLog("'k' - fill data blocks with 0x00 and keys with 0xFFFFFFFFFFFF");
 		return 0;
 	}
 
-	PrintAndLog("--wipe card:%s fill card:%s  uid:%s", (wipeCard)?"YES":"NO", (fillCard)?"YES":"NO", sprint_hex(uid, 4));
+	PrintAndLog("uid:%s", sprint_hex(uid, 4));
 	if (atqaPresent) {
 		PrintAndLog("--atqa:%s sak:%02x", sprint_hex(atqa, 2), sak[0]);
 	}
 
-	res = mfCSetUID(uid, (atqaPresent)?atqa:NULL, (atqaPresent)?sak:NULL, oldUid, wipeCard, fillCard);
+	res = mfCSetUID(uid, (atqaPresent)?atqa:NULL, (atqaPresent)?sak:NULL, oldUid);
 	if (res) {
 			PrintAndLog("Can't set UID. Error=%d", res);
 			return 1;
