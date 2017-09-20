@@ -1171,19 +1171,31 @@ void MifareECardLoad(uint32_t arg0, uint32_t arg1, uint32_t arg2, uint8_t *datai
 //
 //-----------------------------------------------------------------------------
 
+bool isBlockTrailer(int blockN) {
+	if (blockN >= 0 && blockN < 128) {
+		return ((blockN & 0x03) == 0x03);
+	}
+	if (blockN >= 128 && blockN <= 256) {
+		return ((blockN & 0x0F) == 0x0F);
+	}
+	return FALSE;
+}
+
 void MifareCWipe(uint32_t arg0, uint32_t arg1, uint32_t arg2, uint8_t *datain){
 	// var
 	byte_t isOK = 0;
-	uint8_t numSectors = arg0;
+	uint32_t numBlocks = arg0;
 	uint8_t needWipe = arg1;
 	uint8_t needFill = arg2;
+	bool gen1b = FALSE;
 
 	uint8_t receivedAnswer[MAX_MIFARE_FRAME_SIZE];
 	uint8_t receivedAnswerPar[MAX_MIFARE_PARITY_SIZE];
 	
-//	uint8_t block0[16] = {0x01, 0x02, 0x03, 0x04, 0xFF, 0xFF, 0x08, 0x77, 0x8F, 0x00, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
-//	uint8_t block1[16] = {0x00};
-//	uint8_t blockK[16] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x08, 0x77, 0x8F, 0x00, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
+	uint8_t block0[16] = {0x01, 0x02, 0x03, 0x04, 0xFF, 0xFF, 0x08, 0x77, 0x8F, 0x00, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
+	uint8_t block1[16] = {0x00};
+	uint8_t blockK[16] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x08, 0x77, 0x8F, 0x00, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
+	uint8_t d_block[18] = {0x00};
 	
 	// card commands
 	uint8_t wupC1[]       = { 0x40 };
@@ -1223,10 +1235,10 @@ void MifareCWipe(uint32_t arg0, uint32_t arg1, uint32_t arg2, uint8_t *datain){
 		// put default data
 		if (needFill){
 			// select commands
-			ReaderTransmitBitsPar(wupC1,7,0, NULL);
+			ReaderTransmitBitsPar(wupC1, 7, 0, NULL);
 
 			// gen1b magic tag : do no issue wupC2 and don't expect 0x0a response after SELECT_UID (after getting UID from chip in 'hf mf csetuid' command)
-			if (!(true)) { //workFlags & 0x40
+			if (!gen1b) { 
 
 				if(!ReaderReceive(receivedAnswer, receivedAnswerPar) || (receivedAnswer[0] != 0x0a)) {
 					if (MF_DBGLEVEL >= 1)	Dbprintf("wupC1 error");
@@ -1241,18 +1253,48 @@ void MifareCWipe(uint32_t arg0, uint32_t arg1, uint32_t arg2, uint8_t *datain){
 			}
 
 			// send blocks command
-			for (int blockNo = 0; blockNo < numSectors; blockNo++) {
+			for (int blockNo = 0; blockNo < numBlocks; blockNo++) {
 				if ((mifare_sendcmd_short(NULL, 0, 0xA0, blockNo, receivedAnswer, receivedAnswerPar, NULL) != 1) || (receivedAnswer[0] != 0x0a)) {
 					if (MF_DBGLEVEL >= 1)	Dbprintf("write block auth command error");
 					break;
 				};
-			// MifareCSetBlock here
+				
+				// check type of block and add crc
+    			Dbprintf("--- %d", blockNo);
+				if (!isBlockTrailer(blockNo)){
+					memcpy(d_block, block1, 16);
+					Dbprintf("1");
+				} else {
+					memcpy(d_block, blockK, 16);
+					Dbprintf("K");
+				}
+				if (blockNo == 0) {
+					memcpy(d_block, block0, 16);
+					Dbprintf("0");
+				}
+				AppendCrc14443a(d_block, 16);
+
+				// send write command
+				ReaderTransmit(d_block, sizeof(d_block), NULL);
+				if ((ReaderReceive(receivedAnswer, receivedAnswerPar) != 1) || (receivedAnswer[0] != 0x0a)) {
+					if (MF_DBGLEVEL >= 1)	Dbprintf("write block send data error");
+					break;
+				};
+			}
+			
+			// halt
+			// do no issue halt command for gen1b 
+			if (!gen1b) {
+				if (mifare_classic_halt(NULL, 0)) {
+					if (MF_DBGLEVEL > 2)	Dbprintf("Halt error");
+						break;
+				}
 			}
 		}
 		break;
 	}	
 
-	// send response
+	// send USB response
 	LED_B_ON();
 	cmd_send(CMD_ACK,isOK,0,0,NULL,0);
 	LED_B_OFF();

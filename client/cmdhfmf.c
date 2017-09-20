@@ -1868,20 +1868,20 @@ int CmdHF14AMfCSetUID(const char *Cmd)
 }
 
 int ParamGetCardSize(const char c) {
-	int numSectors = 16;
+	int numBlocks = 16 * 4;
 	switch (c) {
-		case '0' : numSectors = 5; break;
-		case '2' : numSectors = 32; break;
-		case '4' : numSectors = 40; break;
-		default:   numSectors = 16;
+		case '0' : numBlocks = 5 * 4; break;
+		case '2' : numBlocks = 32 * 4; break;
+		case '4' : numBlocks = 32 * 4 + 8 * 16; break;
+		default:   numBlocks = 16 * 4;
 	}
-	return numSectors;
+	return numBlocks;
 }
 
 int CmdHF14AMfCWipe(const char *Cmd)
 {
 	int res, gen = 0;
-	int numSectors = 16;
+	int numBlocks = 16 * 4;
 	bool wipeCard = false;
 	bool fillCard = false;
 	
@@ -1895,10 +1895,10 @@ int CmdHF14AMfCWipe(const char *Cmd)
 	}
 
 	gen = mfCIdentify();
-	if ((gen != 1) & (gen != 2)) 
+	if ((gen != 1) && (gen != 2)) 
 		return 1;
 	
-	numSectors = ParamGetCardSize(param_getchar(Cmd, 1));
+	numBlocks = ParamGetCardSize(param_getchar(Cmd, 0));
 
 	char cmdp = 0;
 	while(param_getchar(Cmd, cmdp) != 0x00){
@@ -1917,20 +1917,20 @@ int CmdHF14AMfCWipe(const char *Cmd)
 		cmdp++;
 	}
 
-	if (!wipeCard & !fillCard) 
+	if (!wipeCard && !fillCard) 
 		wipeCard = TRUE;
 
-	PrintAndLog("--sectors count:%2d wipe:%c fill:%c", numSectors, (wipeCard)?'y':'n', (fillCard)?'y':'n');
+	PrintAndLog("--blocks count:%2d wipe:%c fill:%c", numBlocks, (wipeCard)?'y':'n', (fillCard)?'y':'n');
 
 	if (gen == 2) {
 		/* generation 1b magic card */
 		if (wipeCard) {
 			PrintAndLog("WARNING: can't wipe magic card 1b generation");
 		}
-		res = mfCWipe(numSectors, false, fillCard); 
+		res = mfCWipe(numBlocks, false, fillCard); 
 	} else {
 		/* generation 1a magic card by default */
-		res = mfCWipe(numSectors, wipeCard, fillCard); 
+		res = mfCWipe(numBlocks, wipeCard, fillCard); 
 	}
 
 	if (res) {
@@ -1957,7 +1957,7 @@ int CmdHF14AMfCSetBlk(const char *Cmd)
 	}
 
 	gen = mfCIdentify();
-	if ((gen != 1) & (gen != 2)) 
+	if ((gen != 1) && (gen != 2)) 
 		return 1;
 
 	blockNo = param_get8(Cmd, 0);
