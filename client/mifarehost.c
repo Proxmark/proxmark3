@@ -464,11 +464,9 @@ int mfCWipe(uint32_t numSectors, bool wantWipe, bool wantFill) {
 	return isOK;
 }
 
-int mfCSetUID(uint8_t *uid, uint8_t *atqa, uint8_t *sak, uint8_t *oldUID, bool wantWipe, bool wantFill) {
+int mfCSetUID(uint8_t *uid, uint8_t *atqa, uint8_t *sak, uint8_t *oldUID) {
 	uint8_t oldblock0[16] = {0x00};
 	uint8_t block0[16] = {0x00};
-	uint8_t block1[16] = {0x00};
-	uint8_t blockK[16] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x08, 0x77, 0x8F, 0x00, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
 	int gen = 0, res;
 
 	gen = mfCIdentify();
@@ -503,33 +501,10 @@ int mfCSetUID(uint8_t *uid, uint8_t *atqa, uint8_t *sak, uint8_t *oldUID, bool w
 	}
 	PrintAndLog("new block 0:  %s", sprint_hex(block0, 16));
 
-	res = mfCSetBlock(0, block0, oldUID, wantWipe, cmdParams);
+	res = mfCSetBlock(0, block0, oldUID, false, cmdParams);
 	if (res) {
 		PrintAndLog("Can't set block 0. Error: %d", res);
 		return res;
-	}
-	
-	if (wantFill) {
-		int blockNo = 1;
-		
-		printf("write blocks ");
-		while (blockNo < 64) {
-			if ((blockNo + 1) % 4) {
-				res = mfCSetBlock(blockNo, block1, NULL, false, cmdParams);
-			} else {
-				res = mfCSetBlock(blockNo, blockK, NULL, false, cmdParams);
-				printf(".");
-			}
-			if (res) {
-				printf("\n");
-				PrintAndLog("Can't set block %d. Error: %d", blockNo, res);
-				return res;
-			}
-
-			blockNo++;
-		}
-		printf("\n");
-		PrintAndLog("64 blocks writed successfully.");
 	}
 	
 	return 0;
