@@ -1176,13 +1176,18 @@ void MifareCWipe(uint32_t arg0, uint32_t arg1, uint32_t arg2, uint8_t *datain){
 	byte_t isOK = 0;
 	uint8_t numSectors = arg0;
 	uint8_t needWipe = arg1;
-	uint8_t needPut = arg2;
+	uint8_t needFill = arg2;
 
 	uint8_t receivedAnswer[MAX_MIFARE_FRAME_SIZE];
 	uint8_t receivedAnswerPar[MAX_MIFARE_PARITY_SIZE];
 	
+//	uint8_t block0[16] = {0x01, 0x02, 0x03, 0x04, 0xFF, 0xFF, 0x08, 0x77, 0x8F, 0x00, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
+//	uint8_t block1[16] = {0x00};
+//	uint8_t blockK[16] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x08, 0x77, 0x8F, 0x00, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
+	
 	// card commands
 	uint8_t wupC1[]       = { 0x40 };
+	uint8_t wupC2[]       = { 0x43 };
 	uint8_t wipeC[]       = { 0x41 };
 	
 	// iso14443 setup
@@ -1216,13 +1221,36 @@ void MifareCWipe(uint32_t arg0, uint32_t arg1, uint32_t arg2, uint8_t *datain){
 		};
 	
 		// put default data
-		if (needPut){
-			for (int i = 0; i < numSectors; i++) {
+		if (needFill){
+			// select commands
+			ReaderTransmitBitsPar(wupC1,7,0, NULL);
+
+			// gen1b magic tag : do no issue wupC2 and don't expect 0x0a response after SELECT_UID (after getting UID from chip in 'hf mf csetuid' command)
+			if (!(true)) { //workFlags & 0x40
+
+				if(!ReaderReceive(receivedAnswer, receivedAnswerPar) || (receivedAnswer[0] != 0x0a)) {
+					if (MF_DBGLEVEL >= 1)	Dbprintf("wupC1 error");
+					break;
+				};
+
+				ReaderTransmit(wupC2, sizeof(wupC2), NULL);
+				if(!ReaderReceive(receivedAnswer, receivedAnswerPar) || (receivedAnswer[0] != 0x0a)) {
+					if (MF_DBGLEVEL >= 1)	Dbprintf("wupC2 error");
+					break;
+				};
+			}
+
+			// send blocks command
+			for (int blockNo = 0; blockNo < numSectors; blockNo++) {
+				if ((mifare_sendcmd_short(NULL, 0, 0xA0, blockNo, receivedAnswer, receivedAnswerPar, NULL) != 1) || (receivedAnswer[0] != 0x0a)) {
+					if (MF_DBGLEVEL >= 1)	Dbprintf("write block auth command error");
+					break;
+				};
 			// MifareCSetBlock here
 			}
 		}
-	}
-	
+		break;
+	}	
 
 	// send response
 	LED_B_ON();
