@@ -415,7 +415,6 @@ int mfEmlSetMem(uint8_t *data, int blockNum, int blocksCount) {
 int mfCGetBlock(uint8_t blockNo, uint8_t *data, uint8_t params) {
 	uint8_t isOK = 0;
 
-	return 0;
 	UsbCommand c = {CMD_MIFARE_CGETBLOCK, {params, 0, blockNo}};
 	SendCommand(&c);
 

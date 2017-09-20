@@ -1255,22 +1255,18 @@ void MifareCWipe(uint32_t arg0, uint32_t arg1, uint32_t arg2, uint8_t *datain){
 			// send blocks command
 			for (int blockNo = 0; blockNo < numBlocks; blockNo++) {
 				if ((mifare_sendcmd_short(NULL, 0, 0xA0, blockNo, receivedAnswer, receivedAnswerPar, NULL) != 1) || (receivedAnswer[0] != 0x0a)) {
-					if (MF_DBGLEVEL >= 1)	Dbprintf("write block auth command error");
+					if (MF_DBGLEVEL >= 1)	Dbprintf("write block send command error");
 					break;
 				};
 				
 				// check type of block and add crc
-    			Dbprintf("--- %d", blockNo);
 				if (!isBlockTrailer(blockNo)){
 					memcpy(d_block, block1, 16);
-					Dbprintf("1");
 				} else {
 					memcpy(d_block, blockK, 16);
-					Dbprintf("K");
 				}
 				if (blockNo == 0) {
 					memcpy(d_block, block0, 16);
-					Dbprintf("0");
 				}
 				AppendCrc14443a(d_block, 16);
 
