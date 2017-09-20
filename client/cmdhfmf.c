@@ -1937,6 +1937,7 @@ int CmdHF14AMfCWipe(const char *Cmd)
 		PrintAndLog("Can't wipe. error=%d", res);
 		return 1;
 	}
+	PrintAndLog("OK");
 	return 0;
 }
 
