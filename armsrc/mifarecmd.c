@@ -1171,7 +1171,7 @@ void MifareECardLoad(uint32_t arg0, uint32_t arg1, uint32_t arg2, uint8_t *datai
 //
 //-----------------------------------------------------------------------------
 
-bool isBlockTrailer(int blockN) {
+static bool isBlockTrailer(int blockN) {
 	if (blockN >= 0 && blockN < 128) {
 		return ((blockN & 0x03) == 0x03);
 	}

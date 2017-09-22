@@ -1854,7 +1854,7 @@ int CmdHF14AMfCSetUID(const char *Cmd)
 	return 0;
 }
 
-int ParamGetCardSize(const char c) {
+static int ParamGetCardSize(const char c) {
 	int numBlocks = 16 * 4;
 	switch (c) {
 		case '0' : numBlocks = 5 * 4; break;
