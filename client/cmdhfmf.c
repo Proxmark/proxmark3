@@ -1877,7 +1877,7 @@ int CmdHF14AMfCWipe(const char *Cmd)
 		PrintAndLog("sample:  hf mf cwipe 1 w s");
 		PrintAndLog("[card size]: 0 = 320 bytes (Mifare Mini), 1 = 1K (default), 2 = 2K, 4 = 4K");
 		PrintAndLog("w - Wipe magic Chinese card (only works with gen:1a cards)");
-		PrintAndLog("f - Fill the card with default data and keys");
+		PrintAndLog("f - Fill the card with default data and keys (works with gen:1a and gen:1b cards only)");
 		return 0;
 	}
 
