@@ -1783,70 +1783,148 @@ int CmdHF14AMfEKeyPrn(const char *Cmd)
 
 int CmdHF14AMfCSetUID(const char *Cmd)
 {
-	uint8_t wipeCard = 0;
 	uint8_t uid[8] = {0x00};
 	uint8_t oldUid[8] = {0x00};
 	uint8_t atqa[2] = {0x00};
 	uint8_t sak[1] = {0x00};
-	uint8_t atqaPresent = 1;
+	uint8_t atqaPresent = 0;
 	int res;
-	char ctmp;
-	int argi=0;
 
-	if (strlen(Cmd) < 1 || param_getchar(Cmd, argi) == 'h') {
-		PrintAndLog("Usage:  hf mf csetuid <UID 8 hex symbols> [ATQA 4 hex symbols SAK 2 hex symbols] [w]");
-		PrintAndLog("sample:  hf mf csetuid 01020304");
-		PrintAndLog("sample:  hf mf csetuid 01020304 0004 08 w");
-		PrintAndLog("Set UID, ATQA, and SAK for magic Chinese card (only works with such cards)");
-		PrintAndLog("If you also want to wipe the card then add 'w' at the end of the command line.");
-		return 0;
-	}
-
-	if (param_getchar(Cmd, argi) && param_gethex(Cmd, argi, uid, 8)) {
+	uint8_t needHelp = 0;
+	char cmdp = 1;
+	
+	if (param_getchar(Cmd, 0) && param_gethex(Cmd, 0, uid, 8)) {
 		PrintAndLog("UID must include 8 HEX symbols");
 		return 1;
 	}
-	argi++;
 
-	ctmp = param_getchar(Cmd, argi);
-	if (ctmp == 'w' || ctmp == 'W') {
-		wipeCard = 1;
-		atqaPresent = 0;
-	}
-
-	if (atqaPresent) {
-		if (param_getchar(Cmd, argi)) {
-			if (param_gethex(Cmd, argi, atqa, 4)) {
-				PrintAndLog("ATQA must include 4 HEX symbols");
-				return 1;
-			}
-			argi++;
-			if (!param_getchar(Cmd, argi) || param_gethex(Cmd, argi, sak, 2)) {
-				PrintAndLog("SAK must include 2 HEX symbols");
-				return 1;
-			}
-			argi++;
-		} else
-			atqaPresent = 0;
-	}
-
-	if(!wipeCard) {
-		ctmp = param_getchar(Cmd, argi);
-		if (ctmp == 'w' || ctmp == 'W') {
-			wipeCard = 1;
+	if (param_getlength(Cmd, 1) > 1 && param_getlength(Cmd, 2) >  1) {
+		atqaPresent = 1;
+		cmdp = 3;
+		
+		if (param_gethex(Cmd, 1, atqa, 4)) {
+			PrintAndLog("ATQA must include 4 HEX symbols");
+			return 1;
+		}
+				
+		if (param_gethex(Cmd, 2, sak, 2)) {
+			PrintAndLog("SAK must include 2 HEX symbols");
+			return 1;
 		}
 	}
 
-	PrintAndLog("--wipe card:%s  uid:%s", (wipeCard)?"YES":"NO", sprint_hex(uid, 4));
+	while(param_getchar(Cmd, cmdp) != 0x00)
+	{
+		switch(param_getchar(Cmd, cmdp))
+		{
+		case 'h':
+		case 'H':
+			needHelp = 1;
+			break;
+		default:
+			PrintAndLog("ERROR: Unknown parameter '%c'", param_getchar(Cmd, cmdp));
+			needHelp = 1;
+			break;
+		}
+		cmdp++;
+	}
 
-	res = mfCSetUID(uid, (atqaPresent)?atqa:NULL, (atqaPresent)?sak:NULL, oldUid, wipeCard);
+	if (strlen(Cmd) < 1 || needHelp) {
+		PrintAndLog("");
+		PrintAndLog("Usage:  hf mf csetuid <UID 8 hex symbols> [ATQA 4 hex symbols SAK 2 hex symbols]");
+		PrintAndLog("sample:  hf mf csetuid 01020304");
+		PrintAndLog("sample:  hf mf csetuid 01020304 0004 08");
+		PrintAndLog("Set UID, ATQA, and SAK for magic Chinese card (only works with such cards)");
+		return 0;
+	}
+
+	PrintAndLog("uid:%s", sprint_hex(uid, 4));
+	if (atqaPresent) {
+		PrintAndLog("--atqa:%s sak:%02x", sprint_hex(atqa, 2), sak[0]);
+	}
+
+	res = mfCSetUID(uid, (atqaPresent)?atqa:NULL, (atqaPresent)?sak:NULL, oldUid);
 	if (res) {
-			PrintAndLog("Can't set UID. error=%d", res);
+			PrintAndLog("Can't set UID. Error=%d", res);
 			return 1;
 		}
 
 	PrintAndLog("old UID:%s", sprint_hex(oldUid, 4));
 	PrintAndLog("new UID:%s", sprint_hex(uid, 4));
+	return 0;
+}
+
+static int ParamGetCardSize(const char c) {
+	int numBlocks = 16 * 4;
+	switch (c) {
+		case '0' : numBlocks = 5 * 4; break;
+		case '2' : numBlocks = 32 * 4; break;
+		case '4' : numBlocks = 32 * 4 + 8 * 16; break;
+		default:   numBlocks = 16 * 4;
+	}
+	return numBlocks;
+}
+
+int CmdHF14AMfCWipe(const char *Cmd)
+{
+	int res, gen = 0;
+	int numBlocks = 16 * 4;
+	bool wipeCard = false;
+	bool fillCard = false;
+	
+	if (strlen(Cmd) < 1 || param_getchar(Cmd, 0) == 'h') {
+		PrintAndLog("Usage:  hf mf cwipe [card size] [w] [p]");
+		PrintAndLog("sample:  hf mf cwipe 1 w s");
+		PrintAndLog("[card size]: 0 = 320 bytes (Mifare Mini), 1 = 1K (default), 2 = 2K, 4 = 4K");
+		PrintAndLog("w - Wipe magic Chinese card (only works with gen:1a cards)");
+		PrintAndLog("f - Fill the card with default data and keys (works with gen:1a and gen:1b cards only)");
+		return 0;
+	}
+
+	gen = mfCIdentify();
+	if ((gen != 1) && (gen != 2)) 
+		return 1;
+	
+	numBlocks = ParamGetCardSize(param_getchar(Cmd, 0));
+
+	char cmdp = 0;
+	while(param_getchar(Cmd, cmdp) != 0x00){
+		switch(param_getchar(Cmd, cmdp)) {
+		case 'w':
+		case 'W':
+			wipeCard = 1;
+			break;
+		case 'f':
+		case 'F':
+			fillCard = 1;
+			break;
+		default:
+			break;
+		}
+		cmdp++;
+	}
+
+	if (!wipeCard && !fillCard) 
+		wipeCard = TRUE;
+
+	PrintAndLog("--blocks count:%2d wipe:%c fill:%c", numBlocks, (wipeCard)?'y':'n', (fillCard)?'y':'n');
+
+	if (gen == 2) {
+		/* generation 1b magic card */
+		if (wipeCard) {
+			PrintAndLog("WARNING: can't wipe magic card 1b generation");
+		}
+		res = mfCWipe(numBlocks, true, false, fillCard); 
+	} else {
+		/* generation 1a magic card by default */
+		res = mfCWipe(numBlocks, false, wipeCard, fillCard); 
+	}
+
+	if (res) {
+		PrintAndLog("Can't wipe. error=%d", res);
+		return 1;
+	}
+	PrintAndLog("OK");
 	return 0;
 }
 
@@ -1866,6 +1944,8 @@ int CmdHF14AMfCSetBlk(const char *Cmd)
 	}
 
 	gen = mfCIdentify();
+	if ((gen != 1) && (gen != 2)) 
+		return 1;
 
 	blockNo = param_get8(Cmd, 0);
 
@@ -2398,6 +2478,7 @@ static command_t CommandTable[] =
   {"esave",            CmdHF14AMfESave,         0, "Save to file emul dump"},
   {"ecfill",           CmdHF14AMfECFill,        0, "Fill simulator memory with help of keys from simulator"},
   {"ekeyprn",          CmdHF14AMfEKeyPrn,       0, "Print keys from simulator memory"},
+  {"cwipe",            CmdHF14AMfCWipe,         0, "Wipe magic Chinese card"},
   {"csetuid",          CmdHF14AMfCSetUID,       0, "Set UID for magic Chinese card"},
   {"csetblk",          CmdHF14AMfCSetBlk,       0, "Write block - Magic Chinese card"},
   {"cgetblk",          CmdHF14AMfCGetBlk,       0, "Read block - Magic Chinese card"},
