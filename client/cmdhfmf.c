@@ -1905,7 +1905,7 @@ int CmdHF14AMfCWipe(const char *Cmd)
 	}
 
 	if (!wipeCard && !fillCard) 
-		wipeCard = TRUE;
+		wipeCard = true;
 
 	PrintAndLog("--blocks count:%2d wipe:%c fill:%c", numBlocks, (wipeCard)?'y':'n', (fillCard)?'y':'n');
 
