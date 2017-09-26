@@ -2193,13 +2193,13 @@ int CmdHF14AMfCSave(const char *Cmd) {
 	if (param_getchar(Cmd, 0) == 'h') {
 		PrintAndLog("It saves `magic Chinese` card dump into the file `filename.eml` or `cardID.eml`");
 		PrintAndLog("or into emulator memory (option `e`). 4K card: (option `4`)");
-		PrintAndLog("Usage:  hf mf esave [file name w/o `.eml`][e][4]");
-		PrintAndLog("Sample: hf mf esave ");
-		PrintAndLog("        hf mf esave filename");
-		PrintAndLog("        hf mf esave e");
-		PrintAndLog("        hf mf esave 4");
-		PrintAndLog("        hf mf esave filename 4");
-		PrintAndLog("        hf mf esave e 4");
+		PrintAndLog("Usage:  hf mf csave [file name w/o `.eml`][e][4]");
+		PrintAndLog("Sample: hf mf csave ");
+		PrintAndLog("        hf mf csave filename");
+		PrintAndLog("        hf mf csave e");
+		PrintAndLog("        hf mf csave 4");
+		PrintAndLog("        hf mf csave filename 4");
+		PrintAndLog("        hf mf csave e 4");
 		return 0;
 	}
 
