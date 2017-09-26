@@ -410,14 +410,13 @@ int CmdLFSim(const char *Cmd)
 
 	sscanf(Cmd, "%i", &gap);
 
-	// convert to bitstream if necessary 
-
+	// convert to bitstream if necessary
 	ChkBitstream(Cmd);
 
 	//can send only 512 bits at a time (1 byte sent per bit...)
 	printf("Sending [%d bytes]", GraphTraceLen);
 	for (i = 0; i < GraphTraceLen; i += USB_CMD_DATA_SIZE) {
-		UsbCommand c={CMD_DOWNLOADED_SIM_SAMPLES_125K, {i, 0, 0}};
+		UsbCommand c = {CMD_DOWNLOADED_SIM_SAMPLES_125K, {i, 0, 0}};
 
 		for (j = 0; j < USB_CMD_DATA_SIZE; j++) {
 			c.d.asBytes[j] = GraphBuffer[i+j];

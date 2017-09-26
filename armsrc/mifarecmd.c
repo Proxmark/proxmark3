@@ -1170,6 +1170,143 @@ void MifareECardLoad(uint32_t arg0, uint32_t arg1, uint32_t arg2, uint8_t *datai
 // Work with "magic Chinese" card (email him: ouyangweidaxian@live.cn)
 //
 //-----------------------------------------------------------------------------
+
+static bool isBlockTrailer(int blockN) {
+	if (blockN >= 0 && blockN < 128) {
+		return ((blockN & 0x03) == 0x03);
+	}
+	if (blockN >= 128 && blockN <= 256) {
+		return ((blockN & 0x0F) == 0x0F);
+	}
+	return FALSE;
+}
+
+void MifareCWipe(uint32_t arg0, uint32_t arg1, uint32_t arg2, uint8_t *datain){
+	// var
+	byte_t isOK = 0;
+	uint32_t numBlocks = arg0;
+	// cmdParams:
+	// bit 0 - wipe gen1a
+	// bit 1 - fill card with default data
+	// bit 2 - gen1a = 0, gen1b = 1
+	uint8_t cmdParams = arg1;
+	bool needWipe = cmdParams & 0x01;
+	bool needFill = cmdParams & 0x02;
+	bool gen1b = cmdParams & 0x04;
+	
+	uint8_t receivedAnswer[MAX_MIFARE_FRAME_SIZE];
+	uint8_t receivedAnswerPar[MAX_MIFARE_PARITY_SIZE];
+	
+	uint8_t block0[16] = {0x01, 0x02, 0x03, 0x04, 0x04, 0x08, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xBE, 0xAF};
+	uint8_t block1[16] = {0x00};
+	uint8_t blockK[16] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x08, 0x77, 0x8F, 0x00, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
+	uint8_t d_block[18] = {0x00};
+	
+	// card commands
+	uint8_t wupC1[]       = { 0x40 };
+	uint8_t wupC2[]       = { 0x43 };
+	uint8_t wipeC[]       = { 0x41 };
+	
+	// iso14443 setup
+	LED_A_ON();
+	LED_B_OFF();
+	LED_C_OFF();
+	iso14443a_setup(FPGA_HF_ISO14443A_READER_LISTEN);
+
+	// tracing
+	clear_trace();
+	set_tracing(true);
+		
+	while (true){
+		// wipe
+		if (needWipe){
+			ReaderTransmitBitsPar(wupC1,7,0, NULL);
+			if(!ReaderReceive(receivedAnswer, receivedAnswerPar) || (receivedAnswer[0] != 0x0a)) {
+				if (MF_DBGLEVEL >= 1)	Dbprintf("wupC1 error");
+				break;
+			};
+
+			ReaderTransmit(wipeC, sizeof(wipeC), NULL);
+			if(!ReaderReceive(receivedAnswer, receivedAnswerPar) || (receivedAnswer[0] != 0x0a)) {
+				if (MF_DBGLEVEL >= 1)	Dbprintf("wipeC error");
+				break;
+			};
+
+			if(mifare_classic_halt(NULL, 0)) {
+				if (MF_DBGLEVEL > 2)	Dbprintf("Halt error");
+			};
+		};
+	
+		// put default data
+		if (needFill){
+			// select commands
+			ReaderTransmitBitsPar(wupC1, 7, 0, NULL);
+
+			// gen1b magic tag : do no issue wupC2 and don't expect 0x0a response after SELECT_UID (after getting UID from chip in 'hf mf csetuid' command)
+			if (!gen1b) { 
+
+				if(!ReaderReceive(receivedAnswer, receivedAnswerPar) || (receivedAnswer[0] != 0x0a)) {
+					if (MF_DBGLEVEL >= 1)	Dbprintf("wupC1 error");
+					break;
+				};
+
+				ReaderTransmit(wupC2, sizeof(wupC2), NULL);
+				if(!ReaderReceive(receivedAnswer, receivedAnswerPar) || (receivedAnswer[0] != 0x0a)) {
+					if (MF_DBGLEVEL >= 1)	Dbprintf("wupC2 error");
+					break;
+				};
+			}
+
+			// send blocks command
+			for (int blockNo = 0; blockNo < numBlocks; blockNo++) {
+				if ((mifare_sendcmd_short(NULL, 0, 0xA0, blockNo, receivedAnswer, receivedAnswerPar, NULL) != 1) || (receivedAnswer[0] != 0x0a)) {
+					if (MF_DBGLEVEL >= 1)	Dbprintf("write block send command error");
+					break;
+				};
+				
+				// check type of block and add crc
+				if (!isBlockTrailer(blockNo)){
+					memcpy(d_block, block1, 16);
+				} else {
+					memcpy(d_block, blockK, 16);
+				}
+				if (blockNo == 0) {
+					memcpy(d_block, block0, 16);
+				}
+				AppendCrc14443a(d_block, 16);
+
+				// send write command
+				ReaderTransmit(d_block, sizeof(d_block), NULL);
+				if ((ReaderReceive(receivedAnswer, receivedAnswerPar) != 1) || (receivedAnswer[0] != 0x0a)) {
+					if (MF_DBGLEVEL >= 1)	Dbprintf("write block send data error");
+					break;
+				};
+			}
+			
+			// halt
+			// do no issue halt command for gen1b 
+			if (!gen1b) {
+				if (mifare_classic_halt(NULL, 0)) {
+					if (MF_DBGLEVEL > 2)	Dbprintf("Halt error");
+						break;
+				}
+			}
+		}
+		break;
+	}	
+
+	// send USB response
+	LED_B_ON();
+	cmd_send(CMD_ACK,isOK,0,0,NULL,0);
+	LED_B_OFF();
+	
+	// reset fpga
+	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
+	LEDsoff();
+		
+	return;
+}
+
 void MifareCSetBlock(uint32_t arg0, uint32_t arg1, uint32_t arg2, uint8_t *datain){
 
   // params
@@ -1214,13 +1351,14 @@ void MifareCSetBlock(uint32_t arg0, uint32_t arg1, uint32_t arg2, uint8_t *datai
 		if (workFlags & 0x01) {
 			if(!iso14443a_select_card(uid, NULL, &cuid, true, 0)) {
 				if (MF_DBGLEVEL >= 1)	Dbprintf("Can't select card");
-				break;
+				// Continue, if we set wrong UID or wrong UID checksum or some ATQA or SAK we will can't select card. But we need to write block 0 to make card work.
+				//break;
 				};
 
 				if(mifare_classic_halt(NULL, cuid)) {
 					if (MF_DBGLEVEL > 2)	Dbprintf("Halt error");
 					// Continue, some magic tags misbehavies and send an answer to it.
-          // break;
+					// break;
 				};
 		};
 
@@ -1239,7 +1377,7 @@ void MifareCSetBlock(uint32_t arg0, uint32_t arg1, uint32_t arg2, uint8_t *datai
 				break;
 			};
 
-			if(mifare_classic_halt(NULL, cuid)) {
+			if(mifare_classic_halt(NULL, 0)) {
 				if (MF_DBGLEVEL > 2)	Dbprintf("Halt error");
 				// Continue, some magic tags misbehavies and send an answer to it.
                         	// break;
@@ -1283,7 +1421,7 @@ void MifareCSetBlock(uint32_t arg0, uint32_t arg1, uint32_t arg2, uint8_t *datai
 		if (workFlags & 0x04) {
 			// do no issue halt command for gen1b magic tag (#db# halt error. response len: 1)
 			if (!(workFlags & 0x40)) {
-				if (mifare_classic_halt(NULL, cuid)) {
+				if (mifare_classic_halt(NULL, 0)) {
 					if (MF_DBGLEVEL > 2)	Dbprintf("Halt error");
 					// Continue, some magic tags misbehavies and send an answer to it.
 					// break;

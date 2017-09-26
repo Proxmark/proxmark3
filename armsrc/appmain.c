@@ -1199,6 +1199,9 @@ void UsbPacketReceived(uint8_t *packet, int len)
 			break;
 			
 		// Work with "magic Chinese" card
+		case CMD_MIFARE_CWIPE:
+			MifareCWipe(c->arg[0], c->arg[1], c->arg[2], c->d.asBytes);
+			break;
 		case CMD_MIFARE_CSETBLOCK:
 			MifareCSetBlock(c->arg[0], c->arg[1], c->arg[2], c->d.asBytes);
 			break;
@@ -1294,6 +1297,15 @@ void UsbPacketReceived(uint8_t *packet, int len)
 			break;
 
 		case CMD_DOWNLOADED_SIM_SAMPLES_125K: {
+			// iceman; since changing fpga_bitstreams clears bigbuff, Its better to call it before.
+			// to be able to use this one for uploading data to device 
+			// arg1 = 0 upload for LF usage 
+			//        1 upload for HF usage
+			if (c->arg[1] == 0)
+				FpgaDownloadAndGo(FPGA_BITSTREAM_LF);
+			else
+				FpgaDownloadAndGo(FPGA_BITSTREAM_HF);
+
 			uint8_t *b = BigBuf_get_addr();
 			memcpy(b+c->arg[0], c->d.asBytes, USB_CMD_DATA_SIZE);
 			cmd_send(CMD_ACK,0,0,0,0,0);
@@ -1304,7 +1316,7 @@ void UsbPacketReceived(uint8_t *packet, int len)
 			break;
 
 		case CMD_SET_LF_DIVISOR:
-		  	FpgaDownloadAndGo(FPGA_BITSTREAM_LF);
+			FpgaDownloadAndGo(FPGA_BITSTREAM_LF);
 			FpgaSendCommand(FPGA_CMD_SET_DIVISOR, c->arg[0]);
 			break;
 

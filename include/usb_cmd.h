@@ -175,6 +175,7 @@ typedef struct{
 #define CMD_MIFARE_CSETBLOCK                                              0x0605
 #define CMD_MIFARE_CGETBLOCK                                              0x0606
 #define CMD_MIFARE_CIDENT                                                 0x0607
+#define CMD_MIFARE_CWIPE                                                  0x0608
 
 #define CMD_SIMULATE_MIFARE_CARD                                          0x0610
 

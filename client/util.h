@@ -51,6 +51,7 @@ extern uint32_t SwapBits(uint32_t value, int nrbits);
 extern uint8_t *SwapEndian64(const uint8_t *src, const size_t len, const uint8_t blockSize);
 extern void SwapEndian64ex(const uint8_t *src, const size_t len, const uint8_t blockSize, uint8_t *dest);
 
+extern int param_getlength(const char *line, int paramnum);
 extern char param_getchar(const char *line, int paramnum);
 extern int param_getptr(const char *line, int *bg, int *en, int paramnum);
 extern uint8_t param_get8(const char *line, int paramnum);

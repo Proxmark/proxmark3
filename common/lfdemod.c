@@ -1777,22 +1777,53 @@ int IOdemodFSK(uint8_t *dest, size_t size, int *waveStartIdx) {
 } 
 
 // redesigned by marshmellow adjusted from existing decode functions
-// indala id decoding - only tested on 26 bit tags, but attempted to make it work for more
-int indala26decode(uint8_t *bitStream, size_t *size, uint8_t *invert) {
-	//26 bit 40134 format  (don't know other formats)
-	uint8_t preamble[] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1};
-	uint8_t preamble_i[] = {1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0};
-	size_t startidx = 0; 
-	if (!preambleSearch(bitStream, preamble, sizeof(preamble), size, &startidx)){
-		// if didn't find preamble try again inverting
-		if (!preambleSearch(bitStream, preamble_i, sizeof(preamble_i), size, &startidx)) return -1;
+// indala id decoding
+int indala64decode(uint8_t *bitStream, size_t *size, uint8_t *invert) {
+	//standard 64 bit indala formats including 26 bit 40134 format
+	uint8_t preamble64[] = {1,0,1,0, 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0, 1};
+	uint8_t preamble64_i[] = {0,1,0,1, 1,1,1,1, 1,1,1,1, 1,1,1,1, 1,1,1,1, 1,1,1,1, 1,1,1,1, 1,1,1,1, 0};
+	size_t startidx = 0;
+	size_t found_size = *size;
+	bool found = preambleSearch(bitStream, preamble64, sizeof(preamble64), &found_size, &startidx);
+	if (!found) {
+		found = preambleSearch(bitStream, preamble64_i, sizeof(preamble64_i), &found_size, &startidx);
+		if (!found) return -1;
 		*invert ^= 1;
-	} 
-	if (*size != 64 && *size != 224) return -2;
+	}
+	if (found_size != 64) return -2;
 	if (*invert==1)
-		for (size_t i = startidx; i < *size + startidx; i++) 
+		for (size_t i = startidx; i < found_size + startidx; i++) 
 			bitStream[i] ^= 1;
 
+	// note: don't change *size until we are sure we got it... 
+	*size = found_size;
+	return (int) startidx;
+}
+
+int indala224decode(uint8_t *bitStream, size_t *size, uint8_t *invert) {
+	//large 224 bit indala formats (different preamble too...)
+	uint8_t preamble224[] = {1,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,1};
+	uint8_t preamble224_i[] = {0,1,1,1, 1,1,1,1, 1,1,1,1, 1,1,1,1, 1,1,1,1, 1,1,1,1, 1,1,1,1, 1,1,1,0};
+	size_t startidx = 0;
+	size_t found_size = *size;
+	bool found = preambleSearch(bitStream, preamble224, sizeof(preamble224), &found_size, &startidx);
+	if (!found) {
+		found = preambleSearch(bitStream, preamble224_i, sizeof(preamble224_i), &found_size, &startidx);
+		if (!found) return -1;
+		*invert ^= 1;
+	}
+	if (found_size != 224) return -2;
+	if (*invert==1 && startidx > 0)
+		for (size_t i = startidx-1; i < found_size + startidx + 2; i++) 
+			bitStream[i] ^= 1;
+
+	// 224 formats are typically PSK2 (afaik 2017 Marshmellow)
+	// note loses 1 bit at beginning of transformation...
+	// don't need to verify array is big enough as to get here there has to be a full preamble after all of our data
+	psk1TOpsk2(bitStream + (startidx-1), found_size+2);
+	startidx++;
+
+	*size = found_size;
 	return (int) startidx;
 }
 
