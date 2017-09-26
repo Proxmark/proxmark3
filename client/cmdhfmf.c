@@ -222,6 +222,17 @@ uint8_t NumBlocksPerSector(uint8_t sectorNo)
 	}
 }
 
+static int ParamGetCardSize(const char c) {
+	int numBlocks = 16 * 4;
+	switch (c) {
+		case '0' : numBlocks = 5 * 4; break;
+		case '2' : numBlocks = 32 * 4; break;
+		case '4' : numBlocks = 32 * 4 + 8 * 16; break;
+		default:   numBlocks = 16 * 4;
+	}
+	return numBlocks;
+}
+
 int CmdHF14AMfDump(const char *Cmd)
 {
 	uint8_t sectorNo, blockNo;
@@ -1964,17 +1975,6 @@ int CmdHF14AMfCSetUID(const char *Cmd)
 	PrintAndLog("old UID:%s", sprint_hex(oldUid, 4));
 	PrintAndLog("new UID:%s", sprint_hex(uid, 4));
 	return 0;
-}
-
-static int ParamGetCardSize(const char c) {
-	int numBlocks = 16 * 4;
-	switch (c) {
-		case '0' : numBlocks = 5 * 4; break;
-		case '2' : numBlocks = 32 * 4; break;
-		case '4' : numBlocks = 32 * 4 + 8 * 16; break;
-		default:   numBlocks = 16 * 4;
-	}
-	return numBlocks;
 }
 
 int CmdHF14AMfCWipe(const char *Cmd)
