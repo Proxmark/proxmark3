@@ -558,9 +558,9 @@ int CmdHF14AMfNested(const char *Cmd)
 	if (strlen(Cmd)<3) {
 		PrintAndLog("Usage:");
 		PrintAndLog(" all sectors:  hf mf nested  <card memory> <block number> <key A/B> <key (12 hex symbols)> [t,d]");
+		PrintAndLog(" all sectors autosearch key:  hf mf nested  <card memory> * [t,d]");
 		PrintAndLog(" one sector:   hf mf nested  o <block number> <key A/B> <key (12 hex symbols)>");
 		PrintAndLog("               <target block number> <target key A/B> [t]");
-		PrintAndLog(" all sectors autosearch key:  hf mf nested  <card memory> * [t,d]");
 		PrintAndLog(" ");
 		PrintAndLog("card memory - 0 - MINI(320 bytes), 1 - 1K, 2 - 2K, 4 - 4K, <other> - 1K");
 		PrintAndLog("t - transfer keys to emulator memory");
@@ -593,7 +593,7 @@ int CmdHF14AMfNested(const char *Cmd)
 		default:  SectorsCnt = ParamCardSizeSectors(cmdp);
 	}
 
-	// if - block number
+	// block number. number or autosearch key (*)
 	if (param_getchar(Cmd, 1) == '*') {
 		autosearchKey = true;
 
