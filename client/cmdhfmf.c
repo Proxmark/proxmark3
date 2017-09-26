@@ -222,7 +222,18 @@ uint8_t NumBlocksPerSector(uint8_t sectorNo)
 	}
 }
 
-static int ParamGetCardSize(const char c) {
+static int ParamCardSizeSectors(const char c) {
+	int numBlocks = 16;
+	switch (c) {
+		case '0' : numBlocks = 5; break;
+		case '2' : numBlocks = 32; break;
+		case '4' : numBlocks = 40; break;
+		default:   numBlocks = 16;
+	}
+	return numBlocks;
+}
+
+static int ParamCardSizeBlocks(const char c) {
 	int numBlocks = 16 * 4;
 	switch (c) {
 		case '0' : numBlocks = 5 * 4; break;
@@ -249,14 +260,7 @@ int CmdHF14AMfDump(const char *Cmd)
 	UsbCommand resp;
 
 	char cmdp = param_getchar(Cmd, 0);
-	switch (cmdp) {
-		case '0' : numSectors = 5; break;
-		case '1' :
-		case '\0': numSectors = 16; break;
-		case '2' : numSectors = 32; break;
-		case '4' : numSectors = 40; break;
-		default:   numSectors = 16;
-	}
+	numSectors = ParamCardSizeSectors(cmdp);
 
 	if (strlen(Cmd) > 1 || cmdp == 'h' || cmdp == 'H') {
 		PrintAndLog("Usage:   hf mf dump [card memory]");
@@ -585,13 +589,11 @@ int CmdHF14AMfNested(const char *Cmd)
 			if (ctmp != 'A' && ctmp != 'a')
 				trgKeyType = 1;
 			break;
-		case '0': SectorsCnt = 05; break;
-		case '1': SectorsCnt = 16; break;
-		case '2': SectorsCnt = 32; break;
-		case '4': SectorsCnt = 40; break;
-		default:  SectorsCnt = 16;
+		// size of card 0.5k - 4k
+		default:  SectorsCnt = ParamCardSizeSectors(cmdp);
 	}
 
+	// if - block number
 	if (param_getchar(Cmd, 1) == '*') {
 		autosearchKey = true;
 
@@ -1069,13 +1071,7 @@ int CmdHF14AMfChk(const char *Cmd)
 
 	if (param_getchar(Cmd, 0)=='*') {
 		blockNo = 3;
-		switch(param_getchar(Cmd+1, 0)) {
-			case '0': SectorsCnt =  5; break;
-			case '1': SectorsCnt = 16; break;
-			case '2': SectorsCnt = 32; break;
-			case '4': SectorsCnt = 40; break;
-			default:  SectorsCnt = 16;
-		}
+		SectorsCnt = ParamCardSizeSectors(param_getchar(Cmd + 1, 0));
 	}
 	else
 		blockNo = param_get8(Cmd, 0);
@@ -1997,7 +1993,7 @@ int CmdHF14AMfCWipe(const char *Cmd)
 	if ((gen != 1) && (gen != 2)) 
 		return 1;
 	
-	numBlocks = ParamGetCardSize(param_getchar(Cmd, 0));
+	numBlocks = ParamCardSizeBlocks(param_getchar(Cmd, 0));
 
 	char cmdp = 0;
 	while(param_getchar(Cmd, cmdp) != 0x00){
