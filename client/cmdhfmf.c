@@ -591,7 +591,7 @@ int CmdHF14AMfNested(const char *Cmd)
 		transferToEml |= (ctmp == 't' || ctmp == 'T');
 		createDumpFile |= (ctmp == 'd' || ctmp == 'D');
 
-		PrintAndLog("--nested. sectors:%2d, block no:*, , eml:%c, dmp=%c ", SectorsCnt, transferToEml?'y':'n', createDumpFile?'y':'n');
+		PrintAndLog("--nested. sectors:%2d, block no:*, eml:%c, dmp=%c ", SectorsCnt, transferToEml?'y':'n', createDumpFile?'y':'n');
 	} else {
 		blockNo = param_get8(Cmd, 1);
 
@@ -616,6 +616,7 @@ int CmdHF14AMfNested(const char *Cmd)
 			return 3;
 		}
 
+		// one sector nested
 		if (cmdp == 'o') { 
 			trgBlockNo = param_get8(Cmd, 4);
 
