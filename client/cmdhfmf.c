@@ -574,32 +574,24 @@ int CmdHF14AMfNested(const char *Cmd)
 		return 0;
 	}
 
+	// <card memory>
 	cmdp = param_getchar(Cmd, 0);
-	switch (cmdp) {
-		case 'o':
-		case 'O':
-			cmdp = 'o';
-			trgBlockNo = param_get8(Cmd, 4);
-
-			ctmp = param_getchar(Cmd, 5);
-			if (ctmp != 'a' && ctmp != 'A' && ctmp != 'b' && ctmp != 'B') {
-				PrintAndLog("Target key type must be A or B");
-				return 1;
-			}
-			if (ctmp != 'A' && ctmp != 'a')
-				trgKeyType = 1;
-			break;
-		// size of card 0.5k - 4k
-		default:  SectorsCnt = ParamCardSizeSectors(cmdp);
+	if (cmdp == 'o' || cmdp == 'O') {
+		cmdp = 'o';
+		SectorsCnt = 1;
+	} else {
+		SectorsCnt = ParamCardSizeSectors(cmdp);
 	}
-
-	// block number. number or autosearch key (*)
+		
+	// <block number>. number or autosearch key (*)
 	if (param_getchar(Cmd, 1) == '*') {
 		autosearchKey = true;
 
 		ctmp = param_getchar(Cmd, 2);
 		transferToEml |= (ctmp == 't' || ctmp == 'T');
 		createDumpFile |= (ctmp == 'd' || ctmp == 'D');
+
+		PrintAndLog("--nested. sectors:%2d, block no:*, , eml:%c, dmp=%c ", SectorsCnt, transferToEml?'y':'n', createDumpFile?'y':'n');
 	} else {
 		blockNo = param_get8(Cmd, 1);
 
@@ -617,22 +609,36 @@ int CmdHF14AMfNested(const char *Cmd)
 			return 1;
 		}
 
-		ctmp = param_getchar(Cmd, 4);
-		transferToEml |= (ctmp == 't' || ctmp == 'T');
-		createDumpFile |= (ctmp == 'd' || ctmp == 'D');
-
-		ctmp = param_getchar(Cmd, 6);
-		transferToEml |= (ctmp == 't' || ctmp == 'T');
-		createDumpFile |= (ctmp == 'd' || ctmp == 'D');
-		
 		// check if we can authenticate to sector
 		res = mfCheckKeys(blockNo, keyType, true, 1, key, &key64);
 		if (res) {
 			PrintAndLog("Can't authenticate to block:%3d key type:%c key:%s", blockNo, keyType?'B':'A', sprint_hex(key, 6));
 			return 3;
 		}
+
+		if (cmdp == 'o') { 
+			trgBlockNo = param_get8(Cmd, 4);
+
+			ctmp = param_getchar(Cmd, 5);
+			if (ctmp != 'a' && ctmp != 'A' && ctmp != 'b' && ctmp != 'B') {
+				PrintAndLog("Target key type must be A or B");
+				return 1;
+			}
+			if (ctmp != 'A' && ctmp != 'a')
+				trgKeyType = 1;
+
+			ctmp = param_getchar(Cmd, 6);
+			transferToEml |= (ctmp == 't' || ctmp == 'T');
+			createDumpFile |= (ctmp == 'd' || ctmp == 'D');
+		} else {
+			ctmp = param_getchar(Cmd, 4);
+			transferToEml |= (ctmp == 't' || ctmp == 'T');
+			createDumpFile |= (ctmp == 'd' || ctmp == 'D');
+		}
+
+		PrintAndLog("--nested. sectors:%2d, block no:%3d, key type:%c, eml:%c, dmp=%c ", SectorsCnt, blockNo, keyType?'B':'A', transferToEml?'y':'n', createDumpFile?'y':'n');
 	}
-	
+
 	// one-sector nested
 	if (cmdp == 'o') { // ------------------------------------  one sector working
 		PrintAndLog("--target block no:%3d, target key type:%c ", trgBlockNo, trgKeyType?'B':'A');
