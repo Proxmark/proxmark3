@@ -442,7 +442,7 @@ int CmdHF14ACUIDs(const char *Cmd)
 	// repeat n times
 	for (int i = 0; i < n; i++) {
 		// execute anticollision procedure
-		UsbCommand c = {CMD_READER_ISO_14443a, {ISO14A_CONNECT, 0, 0}};
+		UsbCommand c = {CMD_READER_ISO_14443a, {ISO14A_CONNECT | ISO14A_NO_RATS, 0, 0}};
 		SendCommand(&c);
     
 		UsbCommand resp;
@@ -581,6 +581,7 @@ int CmdHF14ACmdRaw(const char *cmd) {
 	bool power = false;
 	bool active = false;
 	bool active_select = false;
+	bool no_rats = false;
 	uint16_t numbits = 0;
 	bool bTimeout = false;
 	uint32_t timeout = 0;
@@ -601,6 +602,7 @@ int CmdHF14ACmdRaw(const char *cmd) {
 		PrintAndLog("       -b    number of bits to send. Useful for send partial byte");
 		PrintAndLog("       -t    timeout in ms");
 		PrintAndLog("       -T    use Topaz protocol to send command");
+		PrintAndLog("       -3    ISO14443-3 select only (skip RATS)");
 		return 0;
 	}
 
@@ -644,6 +646,9 @@ int CmdHF14ACmdRaw(const char *cmd) {
 					break;
 				case 'T':
 					topazmode = true;
+					break;
+				case '3':
+					no_rats = true;
 					break;
 				default:
 					PrintAndLog("Invalid option");
@@ -716,6 +721,10 @@ int CmdHF14ACmdRaw(const char *cmd) {
 
 	if(topazmode) {
 		c.arg[0] |= ISO14A_TOPAZMODE;
+	}
+
+	if(no_rats) {
+		c.arg[0] |= ISO14A_NO_RATS;
 	}
 
 	// Max buffer is USB_CMD_DATA_SIZE (512)

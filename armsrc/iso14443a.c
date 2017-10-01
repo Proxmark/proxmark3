@@ -1733,7 +1733,8 @@ int ReaderReceive(uint8_t *receivedAnswer, uint8_t *parity)
 // fills the card info record unless NULL
 // if anticollision is false, then the UID must be provided in uid_ptr[] 
 // and num_cascades must be set (1: 4 Byte UID, 2: 7 Byte UID, 3: 10 Byte UID)
-int iso14443a_select_card(byte_t *uid_ptr, iso14a_card_select_t *p_hi14a_card, uint32_t *cuid_ptr, bool anticollision, uint8_t num_cascades) {
+// requests ATS unless no_rats is true
+int iso14443a_select_card(byte_t *uid_ptr, iso14a_card_select_t *p_hi14a_card, uint32_t *cuid_ptr, bool anticollision, uint8_t num_cascades, bool no_rats) {
 	uint8_t wupa[]       = { 0x52 };  // 0x26 - REQA  0x52 - WAKE-UP
 	uint8_t sel_all[]    = { 0x93,0x20 };
 	uint8_t sel_uid[]    = { 0x93,0x70,0x00,0x00,0x00,0x00,0x00,0x00,0x00};
@@ -1868,24 +1869,24 @@ int iso14443a_select_card(byte_t *uid_ptr, iso14a_card_select_t *p_hi14a_card, u
 	// non iso14443a compliant tag
 	if( (sak & 0x20) == 0) return 2; 
 
-	// Request for answer to select
-	AppendCrc14443a(rats, 2);
-	ReaderTransmit(rats, sizeof(rats), NULL);
+	if (!no_rats) {
+		// Request for answer to select
+		AppendCrc14443a(rats, 2);
+		ReaderTransmit(rats, sizeof(rats), NULL);
 
-	if (!(len = ReaderReceive(resp, resp_par))) return 0;
+		if (!(len = ReaderReceive(resp, resp_par))) return 0;
 
-	
-	if(p_hi14a_card) {
-		memcpy(p_hi14a_card->ats, resp, sizeof(p_hi14a_card->ats));
-		p_hi14a_card->ats_len = len;
+		if(p_hi14a_card) {
+			memcpy(p_hi14a_card->ats, resp, len);
+			p_hi14a_card->ats_len = len;
+		}
+
+		// reset the PCB block number
+		iso14_pcb_blocknum = 0;
+
+		// set default timeout based on ATS
+		iso14a_set_ATS_timeout(resp);
 	}
-
-	// reset the PCB block number
-	iso14_pcb_blocknum = 0;
-
-	// set default timeout based on ATS
-	iso14a_set_ATS_timeout(resp);
-
 	return 1;	
 }
 
@@ -1971,7 +1972,7 @@ void ReaderIso14443a(UsbCommand *c)
 		iso14443a_setup(FPGA_HF_ISO14443A_READER_LISTEN);
 		if(!(param & ISO14A_NO_SELECT)) {
 			iso14a_card_select_t *card = (iso14a_card_select_t*)buf;
-			arg0 = iso14443a_select_card(NULL, card, NULL, true, 0);
+			arg0 = iso14443a_select_card(NULL, card, NULL, true, 0, param & ISO14A_NO_RATS);
 			cmd_send(CMD_ACK,arg0,card->uidlen,0,buf,sizeof(iso14a_card_select_t));
 		}
 	}
@@ -2168,7 +2169,7 @@ void ReaderMifare(bool first_try)
 			SpinDelay(100);
 		}
 		
-		if(!iso14443a_select_card(uid, NULL, &cuid, true, 0)) {
+		if(!iso14443a_select_card(uid, NULL, &cuid, true, 0, true)) {
 			if (MF_DBGLEVEL >= 1)	Dbprintf("Mifare: Can't select card");
 			continue;
 		}

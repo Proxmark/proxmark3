@@ -108,7 +108,7 @@ char *getUlev1CardSizeStr( uint8_t fsize ){
 }
 
 static void ul_switch_on_field(void) {
-	UsbCommand c = {CMD_READER_ISO_14443a, {ISO14A_CONNECT | ISO14A_NO_DISCONNECT, 0, 0}};
+	UsbCommand c = {CMD_READER_ISO_14443a, {ISO14A_CONNECT | ISO14A_NO_DISCONNECT | ISO14A_NO_RATS, 0, 0}};
 	clearCommandBuffer();
 	SendCommand(&c);
 }
