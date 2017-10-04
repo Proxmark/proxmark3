@@ -406,7 +406,7 @@ function main(args)
 
 	-- GET TAG UID
 	
-	result, err = lib14a.read1443a(false)
+	result, err = lib14a.read1443a(false, true)
 	if not result then
 		return oops(err)
 	end
