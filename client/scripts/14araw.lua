@@ -90,7 +90,7 @@ function main(args)
 	local no_rats = false
 
 	-- Read the parameters
-	for o, a in getopt.getopt(args, 'corcpxt3:') do
+	for o, a in getopt.getopt(args, 'orcpx:dt3') do
 		if o == "o" then doconnect = false end		
 		if o == "r" then ignore_response = true end
 		if o == "c" then appendcrc = true end
@@ -114,7 +114,7 @@ function main(args)
 
 	-- The actual raw payload, if any
 	if payload then
-		res,err = sendRaw(payload,{ignore_response = ignore_response})
+		res,err = sendRaw(payload,{ignore_response = ignore_response, topaz_mode = topaz_mode})
 		if err then return oops(err) end
 	
 		if not ignoreresponse then 
@@ -148,7 +148,7 @@ function sendRaw(rawdata, options)
 	print(">> ", rawdata)
 	
 	local flags = lib14a.ISO14A_COMMAND.ISO14A_NO_DISCONNECT + lib14a.ISO14A_COMMAND.ISO14A_RAW
-	if topaz_mode == true then flags = flags + lib14a.ISO14A_COMMAND.ISO14A_TOPAZMODE end
+	if options.topaz_mode == true then flags = flags + lib14a.ISO14A_COMMAND.ISO14A_TOPAZMODE end
 
 	local command = Command:new{cmd = cmds.CMD_READER_ISO_14443a, 
 									arg1 = flags, -- Send raw 
