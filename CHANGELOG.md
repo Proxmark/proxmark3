@@ -8,6 +8,8 @@ This project uses the changelog in accordance with [keepchangelog](http://keepac
 ### Changed
 - Improved backdoor detection missbehaving magic s50/1k tag (Fl0-0)
 - Deleted wipe functionality from `hf mf csetuid` (Merlok)
+- Changed `hf mf nested` logic (Merlok)
+- Added `hf mf nested` mode: autosearch keys for attack (from well known keys) (Merlok)
 
 ### Fixed
 
@@ -19,6 +21,8 @@ This project uses the changelog in accordance with [keepchangelog](http://keepac
 - Added data fsktonrz, a fsk cleaning/demodulating routine for weak fsk signal. Note: follow this up with a `data rawdemod nr` to finish demoding your signal. (marshmellow)
 - Added lf em 410xbrute, LF EM410x reader bruteforce attack by simulating UIDs from a file (Fl0-0)
 - Added `hf mf cwipe` command. It wipes "magic Chinese" card. For 1a generation it uses card's "wipe" command. For gen1a and gen1b it uses a write command. (Merlok)
+- Added to `hf mf nested` source key check before attack (Merlok)
+- Added to `hf mf nested` after attack it checks all found keys on non-open sectors (Merlok)
 
 ## [3.0.1][2017-06-08]
 
