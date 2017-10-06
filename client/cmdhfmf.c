@@ -1224,8 +1224,10 @@ int CmdHF14AMfChk(const char *Cmd)
 				bytes_to_num(foundKey[0][i], 6), validKey[0][i]?1:0, bytes_to_num(foundKey[1][i], 6), validKey[1][i]?1:0);
 		}
 		PrintAndLog("|---|----------------|---|----------------|---|");
+	} else {
+		PrintAndLog("");
+		PrintAndLog("No valid keys found.");
 	}
-	
 	
 	if (transferToEml) {
 		uint8_t block[16];
