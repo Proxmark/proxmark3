@@ -961,6 +961,48 @@ void MifareNested(uint32_t arg0, uint32_t arg1, uint32_t calibrate, uint8_t *dat
 // MIFARE check keys. key count up to 85.
 //
 //-----------------------------------------------------------------------------
+// one key check
+int MifareChkKey(uint8_t *uid, uint32_t *cuid, uint8_t *cascade_levels, uint64_t ui64Key, uint8_t blockNo, uint8_t keyType, uint8_t debugLevel) {
+
+	uint32_t timeout = 0;
+	struct Crypto1State mpcs = {0, 0};
+	struct Crypto1State *pcs;
+	pcs = &mpcs;
+
+	// Iceman: use piwi's faster nonce collecting part in hardnested.
+	if (*cascade_levels == 0) { // need a full select cycle to get the uid first
+		iso14a_card_select_t card_info;
+		if(!iso14443a_select_card(uid, &card_info, cuid, true, 0, true)) {
+			if (debugLevel >= 1) 	Dbprintf("ChkKeys: Can't select card");
+			return  1;
+		}
+		switch (card_info.uidlen) {
+			case 4 : *cascade_levels = 1; break;
+			case 7 : *cascade_levels = 2; break;
+			case 10: *cascade_levels = 3; break;
+			default: break;
+		}
+	} else { // no need for anticollision. We can directly select the card
+		if(!iso14443a_select_card(uid, NULL, NULL, false, *cascade_levels, true)) {
+			if (debugLevel >= 1)	Dbprintf("ChkKeys: Can't select card (UID) %d", *cascade_levels);
+			return  1;
+		}
+	}
+	
+	if(mifare_classic_auth(pcs, *cuid, blockNo, keyType, ui64Key, AUTH_FIRST)) {
+		uint8_t dummy_answer = 0;
+		ReaderTransmit(&dummy_answer, 1, NULL);
+		timeout = GetCountSspClk() + AUTHENTICATION_TIMEOUT;
+
+		// wait for the card to become ready again
+		while(GetCountSspClk() < timeout);
+		return 1;
+	}
+	
+	return 0;
+}
+
+// multi key check
 void MifareChkKeys(uint16_t arg0, uint8_t arg1, uint8_t arg2, uint8_t *datain)
 {
 	uint8_t blockNo = arg0 & 0xff;
@@ -969,16 +1011,12 @@ void MifareChkKeys(uint16_t arg0, uint8_t arg1, uint8_t arg2, uint8_t *datain)
 	uint8_t keyCount = arg2;
 	uint64_t ui64Key = 0;
 
-	bool have_uid = false;
+//	bool have_uid = false;
 	uint8_t cascade_levels = 0;
-	uint32_t timeout = 0;
 	int i;
 	byte_t isOK = 0;
 	uint8_t uid[10];
-	uint32_t cuid;
-	struct Crypto1State mpcs = {0, 0};
-	struct Crypto1State *pcs;
-	pcs = &mpcs;
+	uint32_t cuid = 0;
 
 	// clear debug level
 	int OLD_MF_DBGLEVEL = MF_DBGLEVEL;
@@ -997,7 +1035,24 @@ void MifareChkKeys(uint16_t arg0, uint8_t arg1, uint8_t arg2, uint8_t *datain)
 //			if (MF_DBGLEVEL >= 1)	Dbprintf("ChkKeys: Halt error");
 //		}
 
-		// Iceman: use piwi's faster nonce collecting part in hardnested.
+		// Allow button press / usb cmd to interrupt device
+		if (BUTTON_PRESS()) { // && !usb_poll_validate_length()
+			Dbprintf("ChkKeys: Cancel operation. Exit...");
+			break;
+		}
+
+		ui64Key = bytes_to_num(datain + i * 6, 6);
+		switch (MifareChkKey(uid, &cuid, &cascade_levels, ui64Key, blockNo, keyType, OLD_MF_DBGLEVEL)) {
+			case 1:
+				//--i; // can't select. try same key once again
+			case 2:
+				continue; // can't auth. wrong key.
+				break;
+			default: 
+				break;
+		}
+		
+/*		// Iceman: use piwi's faster nonce collecting part in hardnested.
 		if (!have_uid) { // need a full select cycle to get the uid first
 			iso14a_card_select_t card_info;
 			if(!iso14443a_select_card(uid, &card_info, &cuid, true, 0, true)) {
@@ -1030,7 +1085,7 @@ void MifareChkKeys(uint16_t arg0, uint8_t arg1, uint8_t arg2, uint8_t *datain)
 			while(GetCountSspClk() < timeout);
 			continue;
 		}
-
+*/
 		isOK = 1;
 		break;
 	}

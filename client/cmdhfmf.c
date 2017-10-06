@@ -1189,6 +1189,7 @@ int CmdHF14AMfChk(const char *Cmd)
 		}
 	}
 
+	bool foundAKey = false;
 	for ( int t = !keyType; t < 2; keyType==2?(t++):(t=2) ) {
 		int b=blockNo;
 		for (int i = 0; i < SectorsCnt; ++i) {
@@ -1202,6 +1203,7 @@ int CmdHF14AMfChk(const char *Cmd)
 						PrintAndLog("Found valid key:[%012" PRIx64 "]",key64);
 						num_to_bytes(key64, 6, foundKey[t][i]);
 						validKey[t][i] = true;
+						foundAKey = true;
 					}
 				} else {
 					PrintAndLog("Command execute timeout");
@@ -1211,6 +1213,20 @@ int CmdHF14AMfChk(const char *Cmd)
 		}
 	}
 
+	// print result
+	if (foundAKey) {
+		PrintAndLog("");
+		PrintAndLog("|---|----------------|---|----------------|---|");
+		PrintAndLog("|sec|key A           |res|key B           |res|");
+		PrintAndLog("|---|----------------|---|----------------|---|");
+		for (i = 0; i < SectorsCnt; i++) {
+			PrintAndLog("|%03d|  %012" PRIx64 "  | %d |  %012" PRIx64 "  | %d |", i,
+				bytes_to_num(foundKey[0][i], 6), validKey[0][i]?1:0, bytes_to_num(foundKey[1][i], 6), validKey[0][i]?1:0);
+		}
+		PrintAndLog("|---|----------------|---|----------------|---|");
+	}
+	
+	
 	if (transferToEml) {
 		uint8_t block[16];
 		for (uint16_t sectorNo = 0; sectorNo < SectorsCnt; sectorNo++) {
