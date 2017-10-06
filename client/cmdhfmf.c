@@ -1221,7 +1221,7 @@ int CmdHF14AMfChk(const char *Cmd)
 		PrintAndLog("|---|----------------|---|----------------|---|");
 		for (i = 0; i < SectorsCnt; i++) {
 			PrintAndLog("|%03d|  %012" PRIx64 "  | %d |  %012" PRIx64 "  | %d |", i,
-				bytes_to_num(foundKey[0][i], 6), validKey[0][i]?1:0, bytes_to_num(foundKey[1][i], 6), validKey[0][i]?1:0);
+				bytes_to_num(foundKey[0][i], 6), validKey[0][i]?1:0, bytes_to_num(foundKey[1][i], 6), validKey[1][i]?1:0);
 		}
 		PrintAndLog("|---|----------------|---|----------------|---|");
 	}
