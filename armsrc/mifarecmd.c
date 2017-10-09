@@ -1003,7 +1003,7 @@ int MifareChkBlockKey(uint8_t *uid, uint32_t *cuid, uint8_t *cascade_levels, uin
 }
 
 // multi key check
-uint8_t MifareChkBlockKeys(uint8_t *keys, uint8_t keyCount, uint8_t blockNo, uint8_t keyType, uint8_t debugLevel) {
+int MifareChkBlockKeys(uint8_t *keys, uint8_t keyCount, uint8_t blockNo, uint8_t keyType, uint8_t debugLevel) {
 	uint8_t uid[10];
 	uint32_t cuid = 0;
 	uint8_t cascade_levels = 0;
@@ -1015,11 +1015,12 @@ uint8_t MifareChkBlockKeys(uint8_t *keys, uint8_t keyCount, uint8_t blockNo, uin
 		// Allow button press / usb cmd to interrupt device
 		if (BUTTON_PRESS() && !usb_poll_validate_length()) { 
 			Dbprintf("ChkKeys: Cancel operation. Exit...");
-			break;
+			return -1;
 		}
 
 		ui64Key = bytes_to_num(keys + i * 6, 6);
 		int res = MifareChkBlockKey(uid, &cuid, &cascade_levels, ui64Key, blockNo, keyType, debugLevel);
+		
 		// can't select
 		if (res == 1) {
 			retryCount++;
@@ -1029,6 +1030,7 @@ uint8_t MifareChkBlockKeys(uint8_t *keys, uint8_t keyCount, uint8_t blockNo, uin
 			--i; // try same key once again
 			continue;
 		}
+		
 		// can't authenticate
 		if (res == 2) {
 			retryCount = 0;
@@ -1061,10 +1063,10 @@ void MifareChkKeys(uint16_t arg0, uint8_t arg1, uint8_t arg2, uint8_t *datain)
 	if (clearTrace) clear_trace();
 	set_tracing(true);
 
-    uint8_t res = MifareChkBlockKeys(datain, keyCount, blockNo, keyType, OLD_MF_DBGLEVEL);
+    int res = MifareChkBlockKeys(datain, keyCount, blockNo, keyType, OLD_MF_DBGLEVEL);
 	
 	LED_B_ON();
-	if (res != 0) {
+	if (res > 0) {
 		cmd_send(CMD_ACK, 1, 0, 0, datain + (res - 1) * 6, 6);
 	} else {
 		cmd_send(CMD_ACK, 0, 0, 0, NULL, 0);
