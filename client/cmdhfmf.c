@@ -1043,7 +1043,7 @@ int CmdHF14AMfChk(const char *Cmd)
 	int	keycnt = 0;
 	char ctmp	= 0x00;
 	uint8_t blockNo = 0;
-	uint8_t SectorsCnt = 1;
+	uint8_t SectorsCnt = 0;
 	uint8_t keyType = 0;
 	uint64_t key64 = 0;
 
@@ -1077,7 +1077,6 @@ int CmdHF14AMfChk(const char *Cmd)
 	}
 
 	if (param_getchar(Cmd, 0)=='*') {
-		blockNo = 0;
 		SectorsCnt = ParamCardSizeSectors(param_getchar(Cmd + 1, 0));
 	}
 	else
@@ -1190,40 +1189,53 @@ int CmdHF14AMfChk(const char *Cmd)
 	}
 
 	bool foundAKey = false;
+	printf("--");
 	for ( int t = !keyType; t < 2; keyType==2?(t++):(t=2) ) {
-		int b=blockNo;
-		for (int i = 0; i < SectorsCnt; ++i) {
-			PrintAndLog("--sector:%2d, block:%3d, key type:%C, key count:%2d ", i, b, t?'B':'A', keycnt);
+		for (int i = 0; (i < SectorsCnt) || (SectorsCnt == 0); ++i) {
+//			PrintAndLog("--sector:%2d, block:%3d, key type:%C, key count:%2d ", i, FirstBlockOfSector(i), t?'B':'A', keycnt);
 			uint32_t max_keys = keycnt>USB_CMD_DATA_SIZE/6?USB_CMD_DATA_SIZE/6:keycnt;
+
 			for (uint32_t c = 0; c < keycnt; c+=max_keys) {
+
 				uint32_t size = keycnt-c>max_keys?max_keys:keycnt-c;
-				res = mfCheckKeys(b, t, true, size, &keyBlock[6*c], &key64);
+				res = mfCheckKeys(SectorsCnt == 0?blockNo:FirstBlockOfSector(i), t, true, size, &keyBlock[6*c], &key64);
+
 				if (res != 1) {
 					if (!res) {
-						PrintAndLog("Found valid key:[%012" PRIx64 "]",key64);
+//						PrintAndLog("Found valid key:[%012" PRIx64 "]",key64);
+						printf("o");
 						num_to_bytes(key64, 6, foundKey[t][i]);
 						validKey[t][i] = true;
 						foundAKey = true;
+					} else {
+						printf(".");
 					}
 				} else {
+					printf("\n");
 					PrintAndLog("Command execute timeout");
 				}
 			}
-			b<127?(b+=4):(b+=16);
+			if (SectorsCnt == 0)
+				break;
 		}
 	}
+	printf("\n");
 
 	// print result
 	if (foundAKey) {
-		PrintAndLog("");
-		PrintAndLog("|---|----------------|---|----------------|---|");
-		PrintAndLog("|sec|key A           |res|key B           |res|");
-		PrintAndLog("|---|----------------|---|----------------|---|");
-		for (i = 0; i < SectorsCnt; i++) {
-			PrintAndLog("|%03d|  %012" PRIx64 "  | %d |  %012" PRIx64 "  | %d |", i,
-				bytes_to_num(foundKey[0][i], 6), validKey[0][i]?1:0, bytes_to_num(foundKey[1][i], 6), validKey[1][i]?1:0);
+		if (SectorsCnt == 0) {
+			PrintAndLog("block=%d key=%012"PRIx64, blockNo, bytes_to_num(foundKey[keyType - 1][0], 6), validKey[keyType][0]?1:0);
+		} else {
+			PrintAndLog("");
+			PrintAndLog("|---|----------------|---|----------------|---|");
+			PrintAndLog("|sec|key A           |res|key B           |res|");
+			PrintAndLog("|---|----------------|---|----------------|---|");
+			for (i = 0; i < SectorsCnt; i++) {
+				PrintAndLog("|%03d|  %012" PRIx64 "  | %d |  %012" PRIx64 "  | %d |", i,
+					bytes_to_num(foundKey[0][i], 6), validKey[0][i]?1:0, bytes_to_num(foundKey[1][i], 6), validKey[1][i]?1:0);
+			}
+			PrintAndLog("|---|----------------|---|----------------|---|");
 		}
-		PrintAndLog("|---|----------------|---|----------------|---|");
 	} else {
 		PrintAndLog("");
 		PrintAndLog("No valid keys found.");
