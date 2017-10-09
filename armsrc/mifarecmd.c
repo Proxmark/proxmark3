@@ -996,7 +996,7 @@ int MifareChkKey(uint8_t *uid, uint32_t *cuid, uint8_t *cascade_levels, uint64_t
 
 		// wait for the card to become ready again
 		while(GetCountSspClk() < timeout);
-		return 1;
+		return 2;
 	}
 	
 	return 0;
@@ -1011,7 +1011,6 @@ void MifareChkKeys(uint16_t arg0, uint8_t arg1, uint8_t arg2, uint8_t *datain)
 	uint8_t keyCount = arg2;
 	uint64_t ui64Key = 0;
 
-//	bool have_uid = false;
 	uint8_t cascade_levels = 0;
 	int i;
 	byte_t isOK = 0;
@@ -1030,10 +1029,8 @@ void MifareChkKeys(uint16_t arg0, uint8_t arg1, uint8_t arg2, uint8_t *datain)
 	if (clearTrace) clear_trace();
 	set_tracing(true);
 
+	int retryCount = 0;
 	for (i = 0; i < keyCount; i++) {
-//		if(mifare_classic_halt(pcs, cuid)) {
-//			if (MF_DBGLEVEL >= 1)	Dbprintf("ChkKeys: Halt error");
-//		}
 
 		// Allow button press / usb cmd to interrupt device
 		if (BUTTON_PRESS() && !usb_poll_validate_length()) { 
@@ -1042,50 +1039,22 @@ void MifareChkKeys(uint16_t arg0, uint8_t arg1, uint8_t arg2, uint8_t *datain)
 		}
 
 		ui64Key = bytes_to_num(datain + i * 6, 6);
-		switch (MifareChkKey(uid, &cuid, &cascade_levels, ui64Key, blockNo, keyType, OLD_MF_DBGLEVEL)) {
-			case 1:
-				//--i; // can't select. try same key once again
-			case 2:
-				continue; // can't auth. wrong key.
+		int res = MifareChkKey(uid, &cuid, &cascade_levels, ui64Key, blockNo, keyType, OLD_MF_DBGLEVEL);
+		// can't select
+		if (res == 1) {
+			retryCount++;
+			if (retryCount > 10) {
 				break;
-			default: 
-				break;
-		}
-		
-/*		// Iceman: use piwi's faster nonce collecting part in hardnested.
-		if (!have_uid) { // need a full select cycle to get the uid first
-			iso14a_card_select_t card_info;
-			if(!iso14443a_select_card(uid, &card_info, &cuid, true, 0, true)) {
-				if (OLD_MF_DBGLEVEL >= 1) 	Dbprintf("ChkKeys: Can't select card");
-				--i; // try same key once again
-				continue;
 			}
-			switch (card_info.uidlen) {
-				case 4 : cascade_levels = 1; break;
-				case 7 : cascade_levels = 2; break;
-				case 10: cascade_levels = 3; break;
-				default: break;
-			}
-			have_uid = true;
-		} else { // no need for anticollision. We can directly select the card
-			if(!iso14443a_select_card(uid, NULL, NULL, false, cascade_levels, true)) {
-				if (OLD_MF_DBGLEVEL >= 1)	Dbprintf("ChkKeys: Can't select card (UID)");
-				--i; // try same key once again
-				continue;
-			}
-		}
-
-		ui64Key = bytes_to_num(datain + i * 6, 6);
-		if(mifare_classic_auth(pcs, cuid, blockNo, keyType, ui64Key, AUTH_FIRST)) {
-			uint8_t dummy_answer = 0;
-			ReaderTransmit(&dummy_answer, 1, NULL);
-			timeout = GetCountSspClk() + AUTHENTICATION_TIMEOUT;
-
-			// wait for the card to become ready again
-			while(GetCountSspClk() < timeout);
+			--i; // try same key once again
 			continue;
 		}
-*/
+		// can't authenticate
+		if (res == 2) {
+			retryCount = 0;
+			continue; // can't auth. wrong key.
+		}
+		
 		isOK = 1;
 		break;
 	}

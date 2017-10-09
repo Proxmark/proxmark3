@@ -1077,7 +1077,7 @@ int CmdHF14AMfChk(const char *Cmd)
 	}
 
 	if (param_getchar(Cmd, 0)=='*') {
-		blockNo = 3;
+		blockNo = 0;
 		SectorsCnt = ParamCardSizeSectors(param_getchar(Cmd + 1, 0));
 	}
 	else
