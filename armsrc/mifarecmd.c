@@ -1036,7 +1036,7 @@ void MifareChkKeys(uint16_t arg0, uint8_t arg1, uint8_t arg2, uint8_t *datain)
 //		}
 
 		// Allow button press / usb cmd to interrupt device
-		if (BUTTON_PRESS()) { // && !usb_poll_validate_length()
+		if (BUTTON_PRESS() && !usb_poll_validate_length()) { 
 			Dbprintf("ChkKeys: Cancel operation. Exit...");
 			break;
 		}

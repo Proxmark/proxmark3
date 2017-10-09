@@ -17,6 +17,7 @@
 #include "apps.h"
 #include "util.h"
 #include "string.h"
+#include "usb_cdc.h"
 
 #include "iso14443crc.h"
 #include "iso14443a.h"
