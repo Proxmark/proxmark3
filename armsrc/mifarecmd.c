@@ -962,7 +962,7 @@ void MifareNested(uint32_t arg0, uint32_t arg1, uint32_t calibrate, uint8_t *dat
 //
 //-----------------------------------------------------------------------------
 // one key check
-int MifareChkKey(uint8_t *uid, uint32_t *cuid, uint8_t *cascade_levels, uint64_t ui64Key, uint8_t blockNo, uint8_t keyType, uint8_t debugLevel) {
+int MifareChkBlockKey(uint8_t *uid, uint32_t *cuid, uint8_t *cascade_levels, uint64_t ui64Key, uint8_t blockNo, uint8_t keyType, uint8_t debugLevel) {
 
 	uint32_t timeout = 0;
 	struct Crypto1State mpcs = {0, 0};
@@ -1003,34 +1003,14 @@ int MifareChkKey(uint8_t *uid, uint32_t *cuid, uint8_t *cascade_levels, uint64_t
 }
 
 // multi key check
-void MifareChkKeys(uint16_t arg0, uint8_t arg1, uint8_t arg2, uint8_t *datain)
-{
-	uint8_t blockNo = arg0 & 0xff;
-	uint8_t keyType = (arg0 >> 8) & 0xff;
-	bool clearTrace = arg1;
-	uint8_t keyCount = arg2;
-	uint64_t ui64Key = 0;
-
-	uint8_t cascade_levels = 0;
-	int i;
-	byte_t isOK = 0;
+uint8_t MifareChkBlockKeys(uint8_t *keys, uint8_t keyCount, uint8_t blockNo, uint8_t keyType, uint8_t debugLevel) {
 	uint8_t uid[10];
 	uint32_t cuid = 0;
-
-	// clear debug level
-	int OLD_MF_DBGLEVEL = MF_DBGLEVEL;
-	MF_DBGLEVEL = MF_DBG_NONE;
-
-	LED_A_ON();
-	LED_B_OFF();
-	LED_C_OFF();
-	iso14443a_setup(FPGA_HF_ISO14443A_READER_LISTEN);
-
-	if (clearTrace) clear_trace();
-	set_tracing(true);
+	uint8_t cascade_levels = 0;
+	uint64_t ui64Key = 0;
 
 	int retryCount = 0;
-	for (i = 0; i < keyCount; i++) {
+	for (uint8_t i = 0; i < keyCount; i++) {
 
 		// Allow button press / usb cmd to interrupt device
 		if (BUTTON_PRESS() && !usb_poll_validate_length()) { 
@@ -1038,8 +1018,8 @@ void MifareChkKeys(uint16_t arg0, uint8_t arg1, uint8_t arg2, uint8_t *datain)
 			break;
 		}
 
-		ui64Key = bytes_to_num(datain + i * 6, 6);
-		int res = MifareChkKey(uid, &cuid, &cascade_levels, ui64Key, blockNo, keyType, OLD_MF_DBGLEVEL);
+		ui64Key = bytes_to_num(keys + i * 6, 6);
+		int res = MifareChkBlockKey(uid, &cuid, &cascade_levels, ui64Key, blockNo, keyType, debugLevel);
 		// can't select
 		if (res == 1) {
 			retryCount++;
@@ -1054,13 +1034,41 @@ void MifareChkKeys(uint16_t arg0, uint8_t arg1, uint8_t arg2, uint8_t *datain)
 			retryCount = 0;
 			continue; // can't auth. wrong key.
 		}
-		
-		isOK = 1;
-		break;
-	}
 
+		return i + 1;
+	}
+	
+	return 0;
+}
+
+// key check via usb
+void MifareChkKeys(uint16_t arg0, uint8_t arg1, uint8_t arg2, uint8_t *datain)
+{
+	uint8_t blockNo = arg0 & 0xff;
+	uint8_t keyType = (arg0 >> 8) & 0xff;
+	bool clearTrace = arg1;
+	uint8_t keyCount = arg2;
+
+	// clear debug level
+	int OLD_MF_DBGLEVEL = MF_DBGLEVEL;
+	MF_DBGLEVEL = MF_DBG_NONE;
+
+	LED_A_ON();
+	LED_B_OFF();
+	LED_C_OFF();
+	iso14443a_setup(FPGA_HF_ISO14443A_READER_LISTEN);
+
+	if (clearTrace) clear_trace();
+	set_tracing(true);
+
+    uint8_t res = MifareChkBlockKeys(datain, keyCount, blockNo, keyType, OLD_MF_DBGLEVEL);
+	
 	LED_B_ON();
-    cmd_send(CMD_ACK,isOK,0,0,datain + i * 6,6);
+	if (res != 0) {
+		cmd_send(CMD_ACK, 1, 0, 0, datain + (res - 1) * 6, 6);
+	} else {
+		cmd_send(CMD_ACK, 0, 0, 0, NULL, 0);
+	}
 	LED_B_OFF();
 
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
