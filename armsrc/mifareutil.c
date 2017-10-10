@@ -764,3 +764,110 @@ int mifare_desfire_des_auth2(uint32_t uid, uint8_t *key, uint8_t *blockData){
 	}
 	return 1;
 }
+
+//-----------------------------------------------------------------------------
+// MIFARE check keys
+//
+//-----------------------------------------------------------------------------
+// one key check
+int MifareChkBlockKey(uint8_t *uid, uint32_t *cuid, uint8_t *cascade_levels, uint64_t ui64Key, uint8_t blockNo, uint8_t keyType, uint8_t debugLevel) {
+
+	uint32_t timeout = 0;
+	struct Crypto1State mpcs = {0, 0};
+	struct Crypto1State *pcs;
+	pcs = &mpcs;
+
+	// Iceman: use piwi's faster nonce collecting part in hardnested.
+	if (*cascade_levels == 0) { // need a full select cycle to get the uid first
+		iso14a_card_select_t card_info;
+		if(!iso14443a_select_card(uid, &card_info, cuid, true, 0, true)) {
+			if (debugLevel >= 1) 	Dbprintf("ChkKeys: Can't select card");
+			return  1;
+		}
+		switch (card_info.uidlen) {
+			case 4 : *cascade_levels = 1; break;
+			case 7 : *cascade_levels = 2; break;
+			case 10: *cascade_levels = 3; break;
+			default: break;
+		}
+	} else { // no need for anticollision. We can directly select the card
+		if(!iso14443a_select_card(uid, NULL, NULL, false, *cascade_levels, true)) {
+			if (debugLevel >= 1)	Dbprintf("ChkKeys: Can't select card (UID) %d", *cascade_levels);
+			return  1;
+		}
+	}
+	
+	if(mifare_classic_auth(pcs, *cuid, blockNo, keyType, ui64Key, AUTH_FIRST)) {
+		uint8_t dummy_answer = 0;
+		ReaderTransmit(&dummy_answer, 1, NULL);
+		timeout = GetCountSspClk() + AUTHENTICATION_TIMEOUT;
+
+		// wait for the card to become ready again
+		while(GetCountSspClk() < timeout);
+		return 2;
+	}
+	
+	return 0;
+}
+
+// multi key check
+int MifareChkBlockKeys(uint8_t *keys, uint8_t keyCount, uint8_t blockNo, uint8_t keyType, uint8_t debugLevel) {
+	uint8_t uid[10];
+	uint32_t cuid = 0;
+	uint8_t cascade_levels = 0;
+	uint64_t ui64Key = 0;
+
+	int retryCount = 0;
+	for (uint8_t i = 0; i < keyCount; i++) {
+
+		// Allow button press / usb cmd to interrupt device
+		if (BUTTON_PRESS() && !usb_poll_validate_length()) { 
+			Dbprintf("ChkKeys: Cancel operation. Exit...");
+			return -2;
+		}
+
+		ui64Key = bytes_to_num(keys + i * 6, 6);
+		int res = MifareChkBlockKey(uid, &cuid, &cascade_levels, ui64Key, blockNo, keyType, debugLevel);
+		
+		// can't select
+		if (res == 1) {
+			retryCount++;
+			if (retryCount > 10) {
+				return -1;
+			}
+			--i; // try same key once again
+			continue;
+		}
+		
+		// can't authenticate
+		if (res == 2) {
+			retryCount = 0;
+			continue; // can't auth. wrong key.
+		}
+
+		return i + 1;
+	}
+	
+	return 0;
+}
+
+// multisector multikey check
+int MifareMultisectorChk(uint8_t *keys, uint8_t keyCount, uint8_t SectorCount, uint8_t keyType, uint8_t debugLevel, uint8_t (*keyIndex)[2][40]) {
+	int res = 0;
+
+	for(int sc = 0; sc < SectorCount; sc++){
+		for(int key = keyType & 0x01; key < 2; keyType==2?(key++):(key = 2)) {
+			res = MifareChkBlockKeys(keys, keyCount, FirstBlockOfSector(sc), key, debugLevel);
+			if (res < 0) {
+				return res;
+			}
+			if (res > 0){
+				(*keyIndex)[key][sc] = res;
+				break;
+			}
+		}
+	}
+	return 0;
+}
+
+

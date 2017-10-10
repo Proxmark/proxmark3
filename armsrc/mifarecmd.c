@@ -20,10 +20,6 @@
 #include "parity.h"
 #include "crc.h"
 
-#define AUTHENTICATION_TIMEOUT 848			// card times out 1ms after wrong authentication (according to NXP documentation)
-#define PRE_AUTHENTICATION_LEADTIME 400		// some (non standard) cards need a pause after select before they are ready for first authentication
-
-
 // the block number for the ISO14443-4 PCB
 static uint8_t pcb_blocknum = 0;
 // Deselect card by sending a s-block. the crc is precalced for speed
@@ -961,94 +957,11 @@ void MifareNested(uint32_t arg0, uint32_t arg1, uint32_t calibrate, uint8_t *dat
 // MIFARE check keys. key count up to 85.
 //
 //-----------------------------------------------------------------------------
-// one key check
-int MifareChkBlockKey(uint8_t *uid, uint32_t *cuid, uint8_t *cascade_levels, uint64_t ui64Key, uint8_t blockNo, uint8_t keyType, uint8_t debugLevel) {
-
-	uint32_t timeout = 0;
-	struct Crypto1State mpcs = {0, 0};
-	struct Crypto1State *pcs;
-	pcs = &mpcs;
-
-	// Iceman: use piwi's faster nonce collecting part in hardnested.
-	if (*cascade_levels == 0) { // need a full select cycle to get the uid first
-		iso14a_card_select_t card_info;
-		if(!iso14443a_select_card(uid, &card_info, cuid, true, 0, true)) {
-			if (debugLevel >= 1) 	Dbprintf("ChkKeys: Can't select card");
-			return  1;
-		}
-		switch (card_info.uidlen) {
-			case 4 : *cascade_levels = 1; break;
-			case 7 : *cascade_levels = 2; break;
-			case 10: *cascade_levels = 3; break;
-			default: break;
-		}
-	} else { // no need for anticollision. We can directly select the card
-		if(!iso14443a_select_card(uid, NULL, NULL, false, *cascade_levels, true)) {
-			if (debugLevel >= 1)	Dbprintf("ChkKeys: Can't select card (UID) %d", *cascade_levels);
-			return  1;
-		}
-	}
-	
-	if(mifare_classic_auth(pcs, *cuid, blockNo, keyType, ui64Key, AUTH_FIRST)) {
-		uint8_t dummy_answer = 0;
-		ReaderTransmit(&dummy_answer, 1, NULL);
-		timeout = GetCountSspClk() + AUTHENTICATION_TIMEOUT;
-
-		// wait for the card to become ready again
-		while(GetCountSspClk() < timeout);
-		return 2;
-	}
-	
-	return 0;
-}
-
-// multi key check
-int MifareChkBlockKeys(uint8_t *keys, uint8_t keyCount, uint8_t blockNo, uint8_t keyType, uint8_t debugLevel) {
-	uint8_t uid[10];
-	uint32_t cuid = 0;
-	uint8_t cascade_levels = 0;
-	uint64_t ui64Key = 0;
-
-	int retryCount = 0;
-	for (uint8_t i = 0; i < keyCount; i++) {
-
-		// Allow button press / usb cmd to interrupt device
-		if (BUTTON_PRESS() && !usb_poll_validate_length()) { 
-			Dbprintf("ChkKeys: Cancel operation. Exit...");
-			return -1;
-		}
-
-		ui64Key = bytes_to_num(keys + i * 6, 6);
-		int res = MifareChkBlockKey(uid, &cuid, &cascade_levels, ui64Key, blockNo, keyType, debugLevel);
-		
-		// can't select
-		if (res == 1) {
-			retryCount++;
-			if (retryCount > 10) {
-				break;
-			}
-			--i; // try same key once again
-			continue;
-		}
-		
-		// can't authenticate
-		if (res == 2) {
-			retryCount = 0;
-			continue; // can't auth. wrong key.
-		}
-
-		return i + 1;
-	}
-	
-	return 0;
-}
-
-// key check via usb
 void MifareChkKeys(uint16_t arg0, uint8_t arg1, uint8_t arg2, uint8_t *datain)
 {
 	uint8_t blockNo = arg0 & 0xff;
 	uint8_t keyType = (arg0 >> 8) & 0xff;
-	bool clearTrace = arg1;
+	bool clearTrace = arg1 & 0x01;
 	uint8_t keyCount = arg2;
 
 	// clear debug level
