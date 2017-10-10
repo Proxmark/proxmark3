@@ -11,6 +11,8 @@
 #ifndef CMDHFMF_H__
 #define CMDHFMF_H__
 
+#include "mifaredefault.h"
+
 extern int CmdHFMF(const char *Cmd);
 
 extern int CmdHF14AMfDbg(const char* cmd);
