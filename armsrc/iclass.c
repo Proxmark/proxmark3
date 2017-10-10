@@ -42,6 +42,7 @@
 #include "string.h"
 #include "common.h"
 #include "cmd.h"
+#include "iso14443a.h"
 // Needed for CRC in emulation mode;
 // same construction as in ISO 14443;
 // different initial value (CRC_ICLASS)

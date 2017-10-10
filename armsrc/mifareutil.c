@@ -24,21 +24,25 @@
 int MF_DBGLEVEL = MF_DBG_ALL;
 
 // crypto1 helpers
-void mf_crypto1_decrypt(struct Crypto1State *pcs, uint8_t *data, int len){
+void mf_crypto1_decryptEx(struct Crypto1State *pcs, uint8_t *data_in, int len, uint8_t *data_out){
 	uint8_t	bt = 0;
 	int i;
 	
 	if (len != 1) {
 		for (i = 0; i < len; i++)
-			data[i] = crypto1_byte(pcs, 0x00, 0) ^ data[i];
+			data_out[i] = crypto1_byte(pcs, 0x00, 0) ^ data_in[i];
 	} else {
 		bt = 0;
 		for (i = 0; i < 4; i++)
-			bt |= (crypto1_bit(pcs, 0, 0) ^ BIT(data[0], i)) << i;
+			bt |= (crypto1_bit(pcs, 0, 0) ^ BIT(data_in[0], i)) << i;
 				
-		data[0] = bt;
+		data_out[0] = bt;
 	}
 	return;
+}
+
+void mf_crypto1_decrypt(struct Crypto1State *pcs, uint8_t *data, int len){
+	mf_crypto1_decryptEx(pcs, data, len, data);
 }
 
 void mf_crypto1_encrypt(struct Crypto1State *pcs, uint8_t *data, uint16_t len, uint8_t *par) {

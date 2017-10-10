@@ -99,14 +99,9 @@ void ReadSTMemoryIso14443b(uint32_t);
 void RAMFUNC SnoopIso14443b(void);
 void SendRawCommand14443B(uint32_t, uint32_t, uint8_t, uint8_t[]);
 
-/// iso14443a.h
-void RAMFUNC SnoopIso14443a(uint8_t param);
-void SimulateIso14443aTag(int tagType, int uid_1st, int uid_2nd, byte_t* data);
-void ReaderIso14443a(UsbCommand * c);
 // Also used in iclass.c
 bool RAMFUNC LogTrace(const uint8_t *btBytes, uint16_t len, uint32_t timestamp_start, uint32_t timestamp_end, uint8_t *parity, bool readerToTag);
 void GetParity(const uint8_t *pbtCmd, uint16_t len, uint8_t *parity);
-void iso14a_set_trigger(bool enable);
 
 void RAMFUNC SniffMifare(uint8_t param);
 
@@ -115,8 +110,6 @@ void EPA_PACE_Collect_Nonce(UsbCommand * c);
 void EPA_PACE_Replay(UsbCommand *c);
 
 // mifarecmd.h
-void ReaderMifare(bool first_try);
-int32_t dist_nt(uint32_t nt1, uint32_t nt2);
 void MifareReadBlock(uint8_t arg0, uint8_t arg1, uint8_t arg2, uint8_t *data);
 void MifareUReadBlock(uint8_t arg0, uint8_t arg1, uint8_t *datain);
 void MifareUC_Auth(uint8_t arg0, uint8_t *datain);
