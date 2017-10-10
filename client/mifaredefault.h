@@ -22,6 +22,7 @@ static const uint64_t MifareDefaultKeys[] =
 	0xa0a1a2a3a4a5, // NFCForum MAD key
 	0xb0b1b2b3b4b5,
 	0xaabbccddeeff,
+	0x1a2b3c4d5e6f,
 	0x4d3a99c351dd,
 	0x1a982c7e459a,
 	0xd3f7d3f7d3f7,
