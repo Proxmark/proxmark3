@@ -684,18 +684,7 @@ int CmdHF14AMfNested(const char *Cmd)
 		}
 
 		PrintAndLog("Testing known keys. Sector count=%d", SectorsCnt);
-		for (i = 0; i < SectorsCnt; i++) {
-			for (j = 0; j < 2; j++) {
-				if (e_sector[i].foundKey[j]) continue;
-
-				res = mfCheckKeys(FirstBlockOfSector(i), j, true, NESTED_KEY_COUNT, keyBlock, &key64); 
-
-				if (!res) {
-					e_sector[i].Key[j] = key64;
-					e_sector[i].foundKey[j] = 1;
-				}
-			}
-		}
+		mfCheckKeysSec(SectorsCnt, 2, true, NESTED_KEY_COUNT, keyBlock, e_sector);
 		
 		// get known key from array
 		bool keyFound = false;
@@ -807,18 +796,7 @@ int CmdHF14AMfNested(const char *Cmd)
 
 			// try to auth with known keys to not recognized sectors keys
 			PrintAndLog("Testing keys. Sector count=%d known keys count:%d", SectorsCnt, cnt);
-			for (i = 0; i < SectorsCnt; i++) {
-				for (j = 0; j < 2; j++) {
-					if (e_sector[i].foundKey[j]) continue;
-
-					res = mfCheckKeys(FirstBlockOfSector(i), j, true, cnt, keyBlock, &key64); 
-
-					if (!res) {
-						e_sector[i].Key[j] = key64;
-						e_sector[i].foundKey[j] = 1;
-					}
-				}
-			}			
+			mfCheckKeysSec(SectorsCnt, 2, true, cnt, keyBlock, e_sector);
 			
 		} // if (notFoundKeys)
 		
