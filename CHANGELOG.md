@@ -10,6 +10,8 @@ This project uses the changelog in accordance with [keepchangelog](http://keepac
 - Deleted wipe functionality from `hf mf csetuid` (Merlok)
 - Changed `hf mf nested` logic (Merlok)
 - Added `hf mf nested` mode: autosearch keys for attack (from well known keys) (Merlok)
+- `hf mf nested` Check keys after they have found (Merlok)
+- `hf mf chk` Move main cycle to arm (Merlok)
 
 ### Fixed
 

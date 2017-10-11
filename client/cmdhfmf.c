@@ -1144,8 +1144,7 @@ int CmdHF14AMfChk(const char *Cmd)
 	} else {
 		PrintAndLog("");
 		PrintAndLog("No valid keys found.");
-	}
-	
+	}	
 	
 	if (transferToEml) {
 		uint8_t block[16];
