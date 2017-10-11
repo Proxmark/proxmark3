@@ -1089,6 +1089,7 @@ int CmdHF14AMfChk(const char *Cmd)
 	bool foundAKey = false;
 	uint32_t max_keys = keycnt > USB_CMD_DATA_SIZE / 6 ? USB_CMD_DATA_SIZE / 6 : keycnt;
 	if (SectorsCnt) {
+		PrintAndLog("To cancel this operation by press the button on the proxmark...");
 		printf("--");
 		for (uint32_t c = 0; c < keycnt; c += max_keys) {
 

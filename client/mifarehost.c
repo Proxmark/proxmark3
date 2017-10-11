@@ -251,7 +251,7 @@ int mfCheckKeysSec(uint8_t sectorCnt, uint8_t keyType, bool clear_trace, uint8_t
 	SendCommand(&c);
 
 	UsbCommand resp;
-	if (!WaitForResponseTimeout(CMD_ACK, &resp, MAX(3000, 1000 + 13 * sectorCnt * keycnt * (keyType == 2 ? 2 : 1)))) return 1; // timeout: 13 ms / fail auth
+	if (!WaitForResponseTimeoutW(CMD_ACK, &resp, MAX(3000, 1000 + 13 * sectorCnt * keycnt * (keyType == 2 ? 2 : 1)), false)) return 1; // timeout: 13 ms / fail auth
 	if ((resp.arg[0] & 0xff) != 0x01) return 2;
 	
 	bool foundAKey = false;
