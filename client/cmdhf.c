@@ -546,7 +546,7 @@ uint16_t printTraceLine(uint16_t tracepos, uint16_t traceLen, uint8_t *trace, ui
 	
 	if (showWaitCycles && !isResponse && next_record_is_response(tracepos, trace)) {
 		uint32_t next_timestamp = *((uint32_t *)(trace + tracepos));
-		PrintAndLog(" %9d | %9d | %s | fdt (Frame Delay Time): %d",
+		PrintAndLog(" %10d | %10d | %s | fdt (Frame Delay Time): %d",
 			(EndOfTransmissionTimestamp - first_timestamp),
 			(next_timestamp - first_timestamp),
 			"   ",
