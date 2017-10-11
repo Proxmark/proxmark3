@@ -854,24 +854,23 @@ int MifareChkBlockKeys(uint8_t *keys, uint8_t keyCount, uint8_t blockNo, uint8_t
 int MifareMultisectorChk(uint8_t *keys, uint8_t keyCount, uint8_t SectorCount, uint8_t keyType, uint8_t debugLevel, TKeyIndex *keyIndex) {
 	int res = 0;
 	
-//  3.2 ms/auth
 	int clk = GetCountSspClk();
 
 	for(int sc = 0; sc < SectorCount; sc++){
-		for(int key = keyType & 0x01; key < 2; keyType==2?(key++):(key = 2)) {
+		int keyAB = keyType;
+		do {
 			WDT_HIT();
-			res = MifareChkBlockKeys(keys, keyCount, FirstBlockOfSector(sc), key, debugLevel);
-			if (res < 0) {
+			res = MifareChkBlockKeys(keys, keyCount, FirstBlockOfSector(sc), keyAB & 0x01, debugLevel);
+			if (res < 0){
 				return res;
 			}
 			if (res > 0){
-				(*keyIndex)[key][sc] = res;
-				break;
+				(*keyIndex)[keyAB & 0x01][sc] = res;
 			}
-		}
+		} while(--keyAB > 0);
 	}
 	
-	Dbprintf("%d %d", GetCountSspClk() - clk, (GetCountSspClk() - clk)/(SectorCount*keyCount*2));
+	Dbprintf("%d %d", GetCountSspClk() - clk, (GetCountSspClk() - clk)/(SectorCount*keyCount*(keyType==2?2:1)));
 	
 	return 0;
 }

@@ -524,13 +524,6 @@ int CmdHF14AMfRestore(const char *Cmd)
 	return 0;
 }
 
-
-typedef struct {
-	uint64_t Key[2];
-	int foundKey[2];
-} sector_t;
-
-
 # define NESTED_KEY_COUNT 15
 int CmdHF14AMfNested(const char *Cmd)
 {
@@ -1037,6 +1030,8 @@ int CmdHF14AMfChk(const char *Cmd)
 
 	int transferToEml = 0;
 	int createDumpFile = 0;
+	
+	sector_t *e_sector = NULL;
 
 	keyBlock = calloc(stKeyBlock, 6);
 	if (keyBlock == NULL) return 1;
@@ -1055,10 +1050,10 @@ int CmdHF14AMfChk(const char *Cmd)
 	ctmp = param_getchar(Cmd, 1);
 	switch (ctmp) {
 	case 'a': case 'A':
-		keyType = !0;
+		keyType = 0;
 		break;
 	case 'b': case 'B':
-		keyType = !1;
+		keyType = 1;
 		break;
 	case '?':
 		keyType = 2;
@@ -1069,6 +1064,7 @@ int CmdHF14AMfChk(const char *Cmd)
 		return 1;
 	};
 
+	// transfer to emulator & create dump file
 	ctmp = param_getchar(Cmd, 2);
 	if		(ctmp == 't' || ctmp == 'T') transferToEml = 1;
 	else if (ctmp == 'd' || ctmp == 'D') createDumpFile = 1;
@@ -1138,6 +1134,7 @@ int CmdHF14AMfChk(const char *Cmd)
 		}
 	}
 
+	// fill with default keys
 	if (keycnt == 0) {
 		PrintAndLog("No key specified, trying default keys");
 		for (;keycnt < defaultKeysSize; keycnt++)
@@ -1147,54 +1144,59 @@ int CmdHF14AMfChk(const char *Cmd)
 	}
 
 	// initialize storage for found keys
-	bool validKey[2][40];
-	uint8_t foundKey[2][40][6];
-	for (uint16_t t = 0; t < 2; t++) {
+	e_sector = calloc(SectorsCnt, sizeof(sector_t));
+	if (e_sector == NULL) return 1;
+	for (uint16_t keyAB = 0; keyAB < 2; keyAB++) {
 		for (uint16_t sectorNo = 0; sectorNo < SectorsCnt; sectorNo++) {
-			validKey[t][sectorNo] = false;
-			for (uint16_t i = 0; i < 6; i++) {
-				foundKey[t][sectorNo][i] = 0xff;
-			}
+			e_sector[sectorNo].foundKey[keyAB] = false;
+			e_sector[sectorNo].Key[keyAB] = 0xffffffffffff;
 		}
 	}
 
 	bool foundAKey = false;
-	printf("--");
-	for ( int t = !keyType; t < 2; keyType==2?(t++):(t=2) ) {
-		for (int i = 0; (i < SectorsCnt) || (SectorsCnt == 0); ++i) {
-//			PrintAndLog("--sector:%2d, block:%3d, key type:%C, key count:%2d ", i, FirstBlockOfSector(i), t?'B':'A', keycnt);
-			uint32_t max_keys = keycnt>USB_CMD_DATA_SIZE/6?USB_CMD_DATA_SIZE/6:keycnt;
+	uint32_t max_keys = keycnt > USB_CMD_DATA_SIZE / 6 ? USB_CMD_DATA_SIZE / 6 : keycnt;
+	if (SectorsCnt) {
+		printf("--");
+		for (uint32_t c = 0; c < keycnt; c += max_keys) {
 
-			for (uint32_t c = 0; c < keycnt; c+=max_keys) {
+			uint32_t size = keycnt-c > max_keys ? max_keys : keycnt-c;
+			res = mfCheckKeysSec(SectorsCnt, keyType, true, size, &keyBlock[6 * c], e_sector);
 
-				uint32_t size = keycnt-c>max_keys?max_keys:keycnt-c;
-				res = mfCheckKeys(SectorsCnt == 0?blockNo:FirstBlockOfSector(i), t, true, size, &keyBlock[6*c], &key64);
-
-				if (res != 1) {
-					if (!res) {
-//						PrintAndLog("Found valid key:[%012" PRIx64 "]",key64);
-						printf("o");
-						num_to_bytes(key64, 6, foundKey[t][i]);
-						validKey[t][i] = true;
-						foundAKey = true;
-					} else {
-						printf(".");
-					}
+			if (res != 1) {
+				if (!res) {
+					printf("o");
+					foundAKey = true;
 				} else {
-					printf("\n");
-					PrintAndLog("Command execute timeout");
+					printf(".");
 				}
+			} else {
+				printf("\n");
+				PrintAndLog("Command execute timeout");
 			}
-			if (SectorsCnt == 0)
-				break;
+		}
+	} else {
+		for (uint32_t c = 0; c < keycnt; c+=max_keys) {
+
+			uint32_t size = keycnt-c > max_keys ? max_keys : keycnt-c;
+			res = mfCheckKeys(blockNo, keyType, true, size, &keyBlock[6*c], &key64); // t=keyType
+
+			if (res != 1) {
+				if (!res) {
+					PrintAndLog("Found valid key:[%012" PRIx64 "]",key64);
+					e_sector[blockNo / 4].Key[0] = key64; //  t!!!!!!!!!!!
+					e_sector[blockNo / 4].foundKey[0] = true;
+					foundAKey = true;
+				}
+			} else {
+				PrintAndLog("Command execute timeout");
+			}
 		}
 	}
-	printf("\n");
-
+	
 	// print result
 	if (foundAKey) {
 		if (SectorsCnt == 0) {
-			PrintAndLog("block=%d key=%012"PRIx64, blockNo, bytes_to_num(foundKey[keyType - 1][0], 6), validKey[keyType][0]?1:0);
+			PrintAndLog("block=%d key=%012"PRIx64" type=", blockNo, e_sector[blockNo / 4].Key[keyType], e_sector[blockNo / 4].foundKey[keyType]?'B':'A'); //!!!!!!!!!!!!!!
 		} else {
 			PrintAndLog("");
 			PrintAndLog("|---|----------------|---|----------------|---|");
@@ -1202,7 +1204,7 @@ int CmdHF14AMfChk(const char *Cmd)
 			PrintAndLog("|---|----------------|---|----------------|---|");
 			for (i = 0; i < SectorsCnt; i++) {
 				PrintAndLog("|%03d|  %012" PRIx64 "  | %d |  %012" PRIx64 "  | %d |", i,
-					bytes_to_num(foundKey[0][i], 6), validKey[0][i]?1:0, bytes_to_num(foundKey[1][i], 6), validKey[1][i]?1:0);
+					e_sector[i].Key[0], e_sector[i].foundKey[0]?1:0, e_sector[i].Key[1], e_sector[i].foundKey[1]?1:0);
 			}
 			PrintAndLog("|---|----------------|---|----------------|---|");
 		}
@@ -1211,14 +1213,15 @@ int CmdHF14AMfChk(const char *Cmd)
 		PrintAndLog("No valid keys found.");
 	}
 	
+	
 	if (transferToEml) {
 		uint8_t block[16];
 		for (uint16_t sectorNo = 0; sectorNo < SectorsCnt; sectorNo++) {
-			if (validKey[0][sectorNo] || validKey[1][sectorNo]) {
+			if (e_sector[sectorNo].foundKey[0] || e_sector[sectorNo].foundKey[1]) {
 				mfEmlGetMem(block, FirstBlockOfSector(sectorNo) + NumBlocksPerSector(sectorNo) - 1, 1);
 				for (uint16_t t = 0; t < 2; t++) {
-					if (validKey[t][sectorNo]) {
-						memcpy(block + t*10, foundKey[t][sectorNo], 6);
+					if (e_sector[sectorNo].foundKey[t]) {
+						num_to_bytes(e_sector[sectorNo].Key[t], 6, block + t * 10);
 					}
 				}
 				mfEmlSetMem(block, FirstBlockOfSector(sectorNo) + NumBlocksPerSector(sectorNo) - 1, 1);
@@ -1234,8 +1237,12 @@ int CmdHF14AMfChk(const char *Cmd)
 			free(keyBlock);
 			return 1;
 		}
-		for (uint16_t t = 0; t < 2; t++) {
-			fwrite(foundKey[t], 1, 6*SectorsCnt, fkeys);
+		uint8_t mkey[6];
+		for (uint8_t t = 0; t < 2; t++) {
+			for (uint8_t sectorNo = 0; sectorNo < SectorsCnt; sectorNo++) {
+				num_to_bytes(e_sector[sectorNo].Key[t], 6, mkey);
+				fwrite(mkey, 1, 6, fkeys);
+			}
 		}
 		fclose(fkeys);
 		PrintAndLog("Found keys have been dumped to file dumpkeys.bin. 0xffffffffffff has been inserted for unknown keys.");
