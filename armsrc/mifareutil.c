@@ -772,7 +772,6 @@ int mifare_desfire_des_auth2(uint32_t uid, uint8_t *key, uint8_t *blockData){
 // one key check
 int MifareChkBlockKey(uint8_t *uid, uint32_t *cuid, uint8_t *cascade_levels, uint64_t ui64Key, uint8_t blockNo, uint8_t keyType, uint8_t debugLevel) {
 
-	uint32_t timeout = 0;
 	struct Crypto1State mpcs = {0, 0};
 	struct Crypto1State *pcs;
 	pcs = &mpcs;
@@ -792,19 +791,17 @@ int MifareChkBlockKey(uint8_t *uid, uint32_t *cuid, uint8_t *cascade_levels, uin
 		}
 	} else { // no need for anticollision. We can directly select the card
 		if(!iso14443a_select_card(uid, NULL, NULL, false, *cascade_levels, true)) {
-			if (debugLevel >= 1)	Dbprintf("ChkKeys: Can't select card (UID) %d", *cascade_levels);
+			if (debugLevel >= 1)	Dbprintf("ChkKeys: Can't select card (UID) lvl=%d", *cascade_levels);
 			return  1;
 		}
 	}
 	
 	if(mifare_classic_auth(pcs, *cuid, blockNo, keyType, ui64Key, AUTH_FIRST)) {
-		uint8_t dummy_answer = 0;
-		ReaderTransmit(&dummy_answer, 1, NULL);
-		timeout = GetCountSspClk() + AUTHENTICATION_TIMEOUT;
-
-		// wait for the card to become ready again
-		while(GetCountSspClk() < timeout);
+		SpinDelayUs(AUTHENTICATION_TIMEOUT);
 		return 2;
+	} else {
+		// it needs after success authentication
+		mifare_classic_halt(pcs, *cuid);
 	}
 	
 	return 0;
@@ -832,10 +829,12 @@ int MifareChkBlockKeys(uint8_t *keys, uint8_t keyCount, uint8_t blockNo, uint8_t
 		// can't select
 		if (res == 1) {
 			retryCount++;
-			if (retryCount > 10) {
+			if (retryCount >= 5) {
 				return -1;
 			}
-			--i; // try same key once again
+			--i; // try the same key once again
+			SpinDelay(50);
+//			Dbprintf("ChkKeys: block=%d key=%d. Try the same key once again...", blockNo, keyType);
 			continue;
 		}
 		
@@ -852,11 +851,15 @@ int MifareChkBlockKeys(uint8_t *keys, uint8_t keyCount, uint8_t blockNo, uint8_t
 }
 
 // multisector multikey check
-int MifareMultisectorChk(uint8_t *keys, uint8_t keyCount, uint8_t SectorCount, uint8_t keyType, uint8_t debugLevel, uint8_t (*keyIndex)[2][40]) {
+int MifareMultisectorChk(uint8_t *keys, uint8_t keyCount, uint8_t SectorCount, uint8_t keyType, uint8_t debugLevel, TKeyIndex *keyIndex) {
 	int res = 0;
+	
+//  3.2 ms/auth
+	int clk = GetCountSspClk();
 
 	for(int sc = 0; sc < SectorCount; sc++){
 		for(int key = keyType & 0x01; key < 2; keyType==2?(key++):(key = 2)) {
+			WDT_HIT();
 			res = MifareChkBlockKeys(keys, keyCount, FirstBlockOfSector(sc), key, debugLevel);
 			if (res < 0) {
 				return res;
@@ -867,6 +870,9 @@ int MifareMultisectorChk(uint8_t *keys, uint8_t keyCount, uint8_t SectorCount, u
 			}
 		}
 	}
+	
+	Dbprintf("%d %d", GetCountSspClk() - clk, (GetCountSspClk() - clk)/(SectorCount*keyCount*2));
+	
 	return 0;
 }
 

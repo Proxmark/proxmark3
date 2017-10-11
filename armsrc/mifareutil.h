@@ -103,8 +103,9 @@ int emlSetValBl(uint32_t blReg, uint8_t blBlock, int blockNum);
 int emlCheckValBl(int blockNum);
 
 // mifare check keys
+typedef uint8_t TKeyIndex[2][40];
 int MifareChkBlockKey(uint8_t *uid, uint32_t *cuid, uint8_t *cascade_levels, uint64_t ui64Key, uint8_t blockNo, uint8_t keyType, uint8_t debugLevel);
 int MifareChkBlockKeys(uint8_t *keys, uint8_t keyCount, uint8_t blockNo, uint8_t keyType, uint8_t debugLevel);
-int MifareMultisectorChk(uint8_t *keys, uint8_t keyCount, uint8_t SectorCount, uint8_t keyType, uint8_t debugLevel, uint8_t (*keyIndex)[2][40]);
+int MifareMultisectorChk(uint8_t *keys, uint8_t keyCount, uint8_t SectorCount, uint8_t keyType, uint8_t debugLevel, TKeyIndex *keyIndex);
 
 #endif
