@@ -978,11 +978,9 @@ void MifareChkKeys(uint16_t arg0, uint8_t arg1, uint8_t arg2, uint8_t *datain)
 	set_tracing(true);
 
 	if (multisectorCheck) {
-		Dbprintf("multisector");
 		TKeyIndex keyIndex = {0};
 		uint8_t sectorCnt = blockNo;
 		int res = MifareMultisectorChk(datain, keyCount, sectorCnt, keyType, OLD_MF_DBGLEVEL, &keyIndex);
-		Dbprintf("[0][0]=%d [0][13]=%d [0][15]=%d [1][15]=%d ", keyIndex[0][0], keyIndex[0][13], keyIndex[0][15], keyIndex[1][15]);
 
 		LED_B_ON();
 		if (res >= 0) {

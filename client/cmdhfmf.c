@@ -742,6 +742,9 @@ int CmdHF14AMfNested(const char *Cmd)
 						PrintAndLog("Found valid key:%012" PRIx64, key64);
 						e_sector[sectorNo].foundKey[trgKeyType] = 1;
 						e_sector[sectorNo].Key[trgKeyType] = key64;
+						
+						// try to check this key as a key to the other sectors
+						mfCheckKeysSec(SectorsCnt, 2, true, 1, keyBlock, e_sector);
 					}
 				}
 			}
@@ -750,55 +753,6 @@ int CmdHF14AMfNested(const char *Cmd)
 		// print nested statistic
 		PrintAndLog("\n\n-----------------------------------------------\nNested statistic:\nIterations count: %d", iterations);
 		PrintAndLog("Time in nested: %1.3f (%1.3f sec per key)", ((float)(msclock() - msclock1))/1000.0, ((float)(msclock() - msclock1))/iterations/1000.0);
-		
-		// check if we have unrecognized keys
-		bool notFoundKeys = false;
-		for (i = 0; i < SectorsCnt; i++) {
-			for (j = 0; j < 2; j++) {
-				if (!e_sector[i].foundKey[j]) {
-					notFoundKeys = true;
-					break;
-				}
-			}
-			if (notFoundKeys) break;
-		}		
-		
-		if (notFoundKeys) {
-			PrintAndLog("-----------------------------------------------\n");
-			PrintAndLog("We have unrecognized keys. Trying to check if we have this keys on key buffer...");
-
-			// fill keyBlock with known keys
-			int cnt = 0;
-			for (i = 0; i < SectorsCnt; i++) {
-				for (j = 0; j < 2; j++) {
-					if (e_sector[i].foundKey[j]) {
-						// try to insert key to keyBlock						
-						if (cnt < NESTED_KEY_COUNT) {
-
-							// search for dublicates
-							bool dubl = false;
-							for (int v = 0; v < NESTED_KEY_COUNT; v++) {
-								if (e_sector[i].Key[j] == bytes_to_num((uint8_t*)(keyBlock + v * 6), 6)) {
-									dubl = true;
-									break;
-								}
-							}
-							
-							// insert
-							if (!dubl) {
-								num_to_bytes(e_sector[i].Key[j], 6, (uint8_t*)(keyBlock + cnt * 6));
-								cnt++;
-							}
-						}
-					}
-				}
-			}
-
-			// try to auth with known keys to not recognized sectors keys
-			PrintAndLog("Testing keys. Sector count=%d known keys count:%d", SectorsCnt, cnt);
-			mfCheckKeysSec(SectorsCnt, 2, true, cnt, keyBlock, e_sector);
-			
-		} // if (notFoundKeys)
 		
 		// print result
 		PrintAndLog("|---|----------------|---|----------------|---|");
