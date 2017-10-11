@@ -834,7 +834,7 @@ int MifareChkBlockKeys(uint8_t *keys, uint8_t keyCount, uint8_t blockNo, uint8_t
 			}
 			--i; // try the same key once again
 			SpinDelay(50);
-//			Dbprintf("ChkKeys: block=%d key=%d. Try the same key once again...", blockNo, keyType);
+			//Dbprintf("ChkKeys: block=%d key=%d. Try the same key once again...", blockNo, keyType);
 			continue;
 		}
 		
@@ -857,9 +857,10 @@ int MifareMultisectorChk(uint8_t *keys, uint8_t keyCount, uint8_t SectorCount, u
 	int clk = GetCountSspClk();
 
 	for(int sc = 0; sc < SectorCount; sc++){
+		WDT_HIT();
+
 		int keyAB = keyType;
 		do {
-			WDT_HIT();
 			res = MifareChkBlockKeys(keys, keyCount, FirstBlockOfSector(sc), keyAB & 0x01, debugLevel);
 			if (res < 0){
 				return res;
