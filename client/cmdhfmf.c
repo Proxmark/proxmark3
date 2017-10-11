@@ -1146,12 +1146,13 @@ int CmdHF14AMfChk(const char *Cmd)
 	// initialize storage for found keys
 	e_sector = calloc(SectorsCnt, sizeof(sector_t));
 	if (e_sector == NULL) return 1;
-	for (uint16_t keyAB = 0; keyAB < 2; keyAB++) {
+	for (uint8_t keyAB = 0; keyAB < 2; keyAB++) {
 		for (uint16_t sectorNo = 0; sectorNo < SectorsCnt; sectorNo++) {
-			e_sector[sectorNo].foundKey[keyAB] = false;
 			e_sector[sectorNo].Key[keyAB] = 0xffffffffffff;
+			e_sector[sectorNo].foundKey[keyAB] = 0;
 		}
 	}
+	printf("\n");
 
 	bool foundAKey = false;
 	uint32_t max_keys = keycnt > USB_CMD_DATA_SIZE / 6 ? USB_CMD_DATA_SIZE / 6 : keycnt;
@@ -1175,36 +1176,35 @@ int CmdHF14AMfChk(const char *Cmd)
 			}
 		}
 	} else {
-		for (uint32_t c = 0; c < keycnt; c+=max_keys) {
+		int keyAB = keyType;
+		do {
+			for (uint32_t c = 0; c < keycnt; c+=max_keys) {
 
-			uint32_t size = keycnt-c > max_keys ? max_keys : keycnt-c;
-			res = mfCheckKeys(blockNo, keyType, true, size, &keyBlock[6*c], &key64); // t=keyType
+				uint32_t size = keycnt-c > max_keys ? max_keys : keycnt-c;
+				res = mfCheckKeys(blockNo, keyAB & 0x01, true, size, &keyBlock[6 * c], &key64); 
 
-			if (res != 1) {
-				if (!res) {
-					PrintAndLog("Found valid key:[%012" PRIx64 "]",key64);
-					e_sector[blockNo / 4].Key[0] = key64; //  t!!!!!!!!!!!
-					e_sector[blockNo / 4].foundKey[0] = true;
-					foundAKey = true;
+				if (res != 1) {
+					if (!res) {
+						PrintAndLog("Found valid key:[%d:%c]%012" PRIx64, blockNo, (keyAB & 0x01)?'B':'A', key64);
+						foundAKey = true;
+					}
+				} else {
+					PrintAndLog("Command execute timeout");
 				}
-			} else {
-				PrintAndLog("Command execute timeout");
 			}
-		}
+		} while(--keyAB > 0);
 	}
 	
 	// print result
 	if (foundAKey) {
-		if (SectorsCnt == 0) {
-			PrintAndLog("block=%d key=%012"PRIx64" type=", blockNo, e_sector[blockNo / 4].Key[keyType], e_sector[blockNo / 4].foundKey[keyType]?'B':'A'); //!!!!!!!!!!!!!!
-		} else {
+		if (SectorsCnt) {
 			PrintAndLog("");
 			PrintAndLog("|---|----------------|---|----------------|---|");
 			PrintAndLog("|sec|key A           |res|key B           |res|");
 			PrintAndLog("|---|----------------|---|----------------|---|");
 			for (i = 0; i < SectorsCnt; i++) {
 				PrintAndLog("|%03d|  %012" PRIx64 "  | %d |  %012" PRIx64 "  | %d |", i,
-					e_sector[i].Key[0], e_sector[i].foundKey[0]?1:0, e_sector[i].Key[1], e_sector[i].foundKey[1]?1:0);
+					e_sector[i].Key[0], e_sector[i].foundKey[0], e_sector[i].Key[1], e_sector[i].foundKey[1]);
 			}
 			PrintAndLog("|---|----------------|---|----------------|---|");
 		}
@@ -1234,6 +1234,7 @@ int CmdHF14AMfChk(const char *Cmd)
 		FILE *fkeys = fopen("dumpkeys.bin","wb");
 		if (fkeys == NULL) {
 			PrintAndLog("Could not create file dumpkeys.bin");
+			free(e_sector);
 			free(keyBlock);
 			return 1;
 		}
@@ -1248,6 +1249,7 @@ int CmdHF14AMfChk(const char *Cmd)
 		PrintAndLog("Found keys have been dumped to file dumpkeys.bin. 0xffffffffffff has been inserted for unknown keys.");
 	}
 
+	free(e_sector);
 	free(keyBlock);
 	PrintAndLog("");
 	return 0;
