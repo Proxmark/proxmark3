@@ -957,7 +957,7 @@ void MifareNested(uint32_t arg0, uint32_t arg1, uint32_t calibrate, uint8_t *dat
 // MIFARE check keys. key count up to 85.
 //
 //-----------------------------------------------------------------------------
-void MifareChkKeys(uint16_t arg0, uint8_t arg1, uint8_t arg2, uint8_t *datain)
+void MifareChkKeys(uint16_t arg0, uint16_t arg1, uint8_t arg2, uint8_t *datain)
 {
 	uint8_t blockNo = arg0 & 0xff;
 	uint8_t keyType = (arg0 >> 8) & 0xff;
@@ -978,7 +978,7 @@ void MifareChkKeys(uint16_t arg0, uint8_t arg1, uint8_t arg2, uint8_t *datain)
 	if (clearTrace) clear_trace();
 	set_tracing(true);
 
-	if (!set14aTimeout){
+	if (set14aTimeout){
 		iso14a_set_timeout(set14aTimeout * 10); // timeout: ms = x/106  35-minimum, 50-OK 106-recommended 500-safe
 	}
 	

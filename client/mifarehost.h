@@ -15,6 +15,11 @@
 #include <stdbool.h>
 #include "data.h"
 
+// defaults
+// timeout in units. (ms * 106)/10 or us*0.0106
+// 5 == 500us
+#define MF_CHKKEYS_DEFTIMEOUT		5
+
 // mfCSetBlock work flags
 #define CSETBLOCK_UID 				0x01
 #define CSETBLOCK_WUPC				0x02
@@ -34,7 +39,7 @@ extern char logHexFileName[FILE_PATH_SIZE];
 extern int mfDarkside(uint64_t *key);
 extern int mfnested(uint8_t blockNo, uint8_t keyType, uint8_t *key, uint8_t trgBlockNo, uint8_t trgKeyType, uint8_t *ResultKeys, bool calibrate);
 extern int mfCheckKeys (uint8_t blockNo, uint8_t keyType, bool clear_trace, uint8_t keycnt, uint8_t *keyBlock, uint64_t *key);
-extern int mfCheckKeysSec(uint8_t sectorCnt, uint8_t keyType, bool clear_trace, uint8_t keycnt, uint8_t * keyBlock, sector_t * e_sector);
+extern int mfCheckKeysSec(uint8_t sectorCnt, uint8_t keyType, uint8_t timeout14a, bool clear_trace, uint8_t keycnt, uint8_t * keyBlock, sector_t * e_sector);
 
 extern int mfEmlGetMem(uint8_t *data, int blockNum, int blocksCount);
 extern int mfEmlSetMem(uint8_t *data, int blockNum, int blocksCount);

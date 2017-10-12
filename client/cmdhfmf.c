@@ -684,7 +684,7 @@ int CmdHF14AMfNested(const char *Cmd)
 		}
 
 		PrintAndLog("Testing known keys. Sector count=%d", SectorsCnt);
-		mfCheckKeysSec(SectorsCnt, 2, true, NESTED_KEY_COUNT, keyBlock, e_sector);
+		mfCheckKeysSec(SectorsCnt, 2, MF_CHKKEYS_DEFTIMEOUT, true, NESTED_KEY_COUNT, keyBlock, e_sector);
 		
 		// get known key from array
 		bool keyFound = false;
@@ -744,7 +744,7 @@ int CmdHF14AMfNested(const char *Cmd)
 						e_sector[sectorNo].Key[trgKeyType] = key64;
 						
 						// try to check this key as a key to the other sectors
-						mfCheckKeysSec(SectorsCnt, 2, true, 1, keyBlock, e_sector);
+						mfCheckKeysSec(SectorsCnt, 2, MF_CHKKEYS_DEFTIMEOUT, true, 1, keyBlock, e_sector);
 					}
 				}
 			}
@@ -959,6 +959,7 @@ int CmdHF14AMfChk(const char *Cmd)
 	uint8_t SectorsCnt = 0;
 	uint8_t keyType = 0;
 	uint64_t key64 = 0;
+	uint32_t timeout14a = 0; // timeout in us
 
 	int transferToEml = 0;
 	int createDumpFile = 0;
@@ -1086,6 +1087,8 @@ int CmdHF14AMfChk(const char *Cmd)
 	}
 	printf("\n");
 
+	timeout14a = 500; // fast
+	
 	bool foundAKey = false;
 	uint32_t max_keys = keycnt > USB_CMD_DATA_SIZE / 6 ? USB_CMD_DATA_SIZE / 6 : keycnt;
 	if (SectorsCnt) {
@@ -1094,7 +1097,7 @@ int CmdHF14AMfChk(const char *Cmd)
 		for (uint32_t c = 0; c < keycnt; c += max_keys) {
 
 			uint32_t size = keycnt-c > max_keys ? max_keys : keycnt-c;
-			res = mfCheckKeysSec(SectorsCnt, keyType, true, size, &keyBlock[6 * c], e_sector);
+			res = mfCheckKeysSec(SectorsCnt, keyType, timeout14a * 1.06 / 100, true, size, &keyBlock[6 * c], e_sector); // timeout is (ms * 106)/10 or us*0.0106
 
 			if (res != 1) {
 				if (!res) {
