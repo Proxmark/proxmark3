@@ -935,14 +935,18 @@ int CmdHF14AMfNestedHard(const char *Cmd)
 int CmdHF14AMfChk(const char *Cmd)
 {
 	if (strlen(Cmd)<3) {
-		PrintAndLog("Usage:  hf mf chk <block number>|<*card memory> <key type (A/B/?)> [t|d] [<key (12 hex symbols)>] [<dic (*.dic)>]");
+		PrintAndLog("Usage:  hf mf chk <block number>|<*card memory> <key type (A/B/?)> [t|d|s|ss] [<key (12 hex symbols)>] [<dic (*.dic)>]");
 		PrintAndLog("          * - all sectors");
 		PrintAndLog("card memory - 0 - MINI(320 bytes), 1 - 1K, 2 - 2K, 4 - 4K, <other> - 1K");
 		PrintAndLog("d - write keys to binary file\n");
 		PrintAndLog("t - write keys to emulator memory");
+		PrintAndLog("s - slow execute. timeout 1ms");
+		PrintAndLog("ss- very slow execute. timeout 5ms");
 		PrintAndLog("      sample: hf mf chk 0 A 1234567890ab keys.dic");
 		PrintAndLog("              hf mf chk *1 ? t");
 		PrintAndLog("              hf mf chk *1 ? d");
+		PrintAndLog("              hf mf chk *1 ? s");
+		PrintAndLog("              hf mf chk *1 ? dss");
 		return 0;
 	}
 
@@ -955,11 +959,13 @@ int CmdHF14AMfChk(const char *Cmd)
 	int i, res;
 	int	keycnt = 0;
 	char ctmp	= 0x00;
+	char ctmp3[3]	= {0x00};
 	uint8_t blockNo = 0;
 	uint8_t SectorsCnt = 0;
 	uint8_t keyType = 0;
 	uint64_t key64 = 0;
 	uint32_t timeout14a = 0; // timeout in us
+	bool param3InUse = false;
 
 	int transferToEml = 0;
 	int createDumpFile = 0;
@@ -999,10 +1005,31 @@ int CmdHF14AMfChk(const char *Cmd)
 
 	// transfer to emulator & create dump file
 	ctmp = param_getchar(Cmd, 2);
-	if		(ctmp == 't' || ctmp == 'T') transferToEml = 1;
-	else if (ctmp == 'd' || ctmp == 'D') createDumpFile = 1;
+	if (ctmp == 't' || ctmp == 'T') transferToEml = 1;
+	if (ctmp == 'd' || ctmp == 'D') createDumpFile = 1;
+	
+	param3InUse = transferToEml | createDumpFile;
+	
+	timeout14a = 500; // fast by default
+	// double parameters - ts, ds
+	int clen = param_getlength(Cmd, 2);
+	if (clen == 2 || clen == 3){
+		param_getstr(Cmd, 2, ctmp3);
+		ctmp = ctmp3[1];
+	}
+	//parse
+	if (ctmp == 's' || ctmp == 'S') {
+		timeout14a = 1000; // slow
+		if (!param3InUse && clen == 2 && (ctmp3[1] == 's' || ctmp3[1] == 'S')) {
+			timeout14a = 5000; // very slow
+		}
+		if (param3InUse && clen == 3 && (ctmp3[2] == 's' || ctmp3[2] == 'S')) {
+			timeout14a = 5000; // very slow
+		}
+		param3InUse = true;
+	}
 
-	for (i = transferToEml || createDumpFile; param_getchar(Cmd, 2 + i); i++) {
+	for (i = param3InUse; param_getchar(Cmd, 2 + i); i++) {
 		if (!param_gethex(Cmd, 2 + i, keyBlock + 6 * keycnt, 12)) {
 			if ( stKeyBlock - keycnt < 2) {
 				p = realloc(keyBlock, 6*(stKeyBlock+=10));
@@ -1087,8 +1114,6 @@ int CmdHF14AMfChk(const char *Cmd)
 	}
 	printf("\n");
 
-	timeout14a = 500; // fast
-	
 	bool foundAKey = false;
 	uint32_t max_keys = keycnt > USB_CMD_DATA_SIZE / 6 ? USB_CMD_DATA_SIZE / 6 : keycnt;
 	if (SectorsCnt) {
