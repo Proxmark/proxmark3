@@ -963,6 +963,7 @@ void MifareChkKeys(uint16_t arg0, uint8_t arg1, uint8_t arg2, uint8_t *datain)
 	uint8_t keyType = (arg0 >> 8) & 0xff;
 	bool clearTrace = arg1 & 0x01;
 	bool multisectorCheck = arg1 & 0x02;
+	uint8_t set14aTimeout = (arg1 >> 8) & 0xff;
 	uint8_t keyCount = arg2;
 
 	// clear debug level
@@ -977,6 +978,10 @@ void MifareChkKeys(uint16_t arg0, uint8_t arg1, uint8_t arg2, uint8_t *datain)
 	if (clearTrace) clear_trace();
 	set_tracing(true);
 
+	if (!set14aTimeout){
+		iso14a_set_timeout(set14aTimeout * 10); // timeout: ms = x/106  35-minimum, 50-OK 106-recommended 500-safe
+	}
+	
 	if (multisectorCheck) {
 		TKeyIndex keyIndex = {0};
 		uint8_t sectorCnt = blockNo;

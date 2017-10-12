@@ -797,7 +797,7 @@ int MifareChkBlockKey(uint8_t *uid, uint32_t *cuid, uint8_t *cascade_levels, uin
 	}
 	
 	if(mifare_classic_auth(pcs, *cuid, blockNo, keyType, ui64Key, AUTH_FIRST)) {
-		SpinDelayUs(AUTHENTICATION_TIMEOUT);
+//		SpinDelayUs(AUTHENTICATION_TIMEOUT);
 		return 2;
 	} else {
 		// it needs after success authentication
@@ -830,11 +830,13 @@ int MifareChkBlockKeys(uint8_t *keys, uint8_t keyCount, uint8_t blockNo, uint8_t
 		if (res == 1) {
 			retryCount++;
 			if (retryCount >= 5) {
+				Dbprintf("ChkKeys: block=%d key=%d. Can't select. Exit...", blockNo, keyType);
 				return -1;
 			}
 			--i; // try the same key once again
-			SpinDelay(50);
-			//Dbprintf("ChkKeys: block=%d key=%d. Try the same key once again...", blockNo, keyType);
+
+			SpinDelay(20);
+//			Dbprintf("ChkKeys: block=%d key=%d. Try the same key once again...", blockNo, keyType);
 			continue;
 		}
 		
@@ -854,7 +856,7 @@ int MifareChkBlockKeys(uint8_t *keys, uint8_t keyCount, uint8_t blockNo, uint8_t
 int MifareMultisectorChk(uint8_t *keys, uint8_t keyCount, uint8_t SectorCount, uint8_t keyType, uint8_t debugLevel, TKeyIndex *keyIndex) {
 	int res = 0;
 	
-	int clk = GetCountSspClk();
+//	int clk = GetCountSspClk();
 
 	for(int sc = 0; sc < SectorCount; sc++){
 		WDT_HIT();
@@ -871,7 +873,7 @@ int MifareMultisectorChk(uint8_t *keys, uint8_t keyCount, uint8_t SectorCount, u
 		} while(--keyAB > 0);
 	}
 	
-	Dbprintf("%d %d", GetCountSspClk() - clk, (GetCountSspClk() - clk)/(SectorCount*keyCount*(keyType==2?2:1)));
+//	Dbprintf("%d %d", GetCountSspClk() - clk, (GetCountSspClk() - clk)/(SectorCount*keyCount*(keyType==2?2:1)));
 	
 	return 0;
 }
