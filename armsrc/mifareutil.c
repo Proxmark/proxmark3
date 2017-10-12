@@ -797,9 +797,16 @@ int MifareChkBlockKey(uint8_t *uid, uint32_t *cuid, uint8_t *cascade_levels, uin
 	}
 	
 	if(mifare_classic_auth(pcs, *cuid, blockNo, keyType, ui64Key, AUTH_FIRST)) {
-//		SpinDelayUs(AUTHENTICATION_TIMEOUT);
+//		SpinDelayUs(AUTHENTICATION_TIMEOUT); // it not needs because mifare_classic_auth have timeout from iso14a_set_timeout()
 		return 2;
 	} else {
+/*		// let it be here. it like halt command, but maybe it will work in some strange cases
+		uint8_t dummy_answer = 0;
+		ReaderTransmit(&dummy_answer, 1, NULL);
+		int timeout = GetCountSspClk() + AUTHENTICATION_TIMEOUT;			
+		// wait for the card to become ready again
+		while(GetCountSspClk() < timeout) {};
+*/
 		// it needs after success authentication
 		mifare_classic_halt(pcs, *cuid);
 	}
