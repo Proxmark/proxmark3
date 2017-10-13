@@ -322,9 +322,8 @@ int main(int argc, char* argv[]) {
 						memset(ctmp, 0, len);
 						strcpy(ctmp, "script run ");
 						strcpy(&ctmp[11], script_cmd);
-						strcpy(script_cmd, ctmp);
-						free(ctmp);
-					}					
+						script_cmd = ctmp;
+					}
 				}
 				
 				printf("Execute command from commandline: %s\n", script_cmd);
