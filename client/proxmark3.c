@@ -18,6 +18,7 @@
 #include <readline/history.h>
 
 #include "proxmark3.h"
+#include "util_posix.h"
 #include "proxgui.h"
 #include "cmdmain.h"
 #include "uart.h"
@@ -212,36 +213,75 @@ static void set_my_executable_path(void)
 	}
 }
 
-
 int main(int argc, char* argv[]) {
 	srand(time(0));
   
+	bool usb_present = false;
+	bool waitCOMPort = false;
+	char *script_cmds_file = NULL;
+  
 	if (argc < 2) {
-		printf("syntax: %s <port>\n\n",argv[0]);
-		printf("\tLinux example:'%s /dev/ttyACM0'\n\n", argv[0]);
-		printf("help:   %s -h\n\n", argv[0]);
-		printf("\tDump all interactive help at once\n");
-		printf("markdown:   %s -m\n\n", argv[0]);
-		printf("\tDump all interactive help at once in markdown syntax\n");
+		printf("syntax: %s <port> [-h|-help|-m|-f|-flush|-w|-wait] [cmd_script_file_name]\n",argv[0]);
+		printf("\tLinux example:'%s /dev/ttyACM0'\n", argv[0]);
+		printf("\tWindows example:'%s com3'\n\n", argv[0]);
+		printf("help: Dump all interactive command's help at once.\n");
+		printf("\t%s -h\n", argv[0]);
+		printf("\t%s -help\n\n", argv[0]);
+		printf("markdown: Dump all interactive help at once in markdown syntax\n");
+		printf("\t%s -m\n\n", argv[0]);
+		printf("flush: Output will be flushed after every print.\n");
+		printf("\t%s -f\n", argv[0]);
+		printf("\t%s -flush\n\n", argv[0]);
+		printf("wait: 20sec waiting the serial port to appear in the OS\n");
+		printf("\t%s -w\n", argv[0]);
+		printf("\t%s -wait\n\n", argv[0]);
+		printf("script: A script file with one proxmark3 command per line.\n\n");
 		return 1;
 	}
-	if (strcmp(argv[1], "-h") == 0) {
-		printf("syntax: %s <port>\n\n",argv[0]);
-		printf("\tLinux example:'%s /dev/ttyACM0'\n\n", argv[0]);
-		dumpAllHelp(0);
-		return 0;
+
+	for (int i = 1; i < argc; i++) {
+		if (strcmp(argv[i], "-h") == 0 || strcmp(argv[i],"-help") == 0) {
+			printf("syntax: %s <port>\n\n",argv[0]);
+			printf("\tLinux example:'%s /dev/ttyACM0'\n\n", argv[0]);
+			dumpAllHelp(0);
+			return 0;
+		}
+		
+		if (strcmp(argv[i], "-m") == 0) {
+			dumpAllHelp(1);
+			return 0;
+		}
+		
+		if(strcmp(argv[i],"-f") == 0 || strcmp(argv[i],"-flush") == 0){
+			printf("Output will be flushed after every print.\n");
+			flushAfterWrite = 1;
+		}
+		
+		if(strcmp(argv[i],"-w") == 0 || strcmp(argv[i],"-wait") == 0){
+			waitCOMPort = true;
+			printf("Waiting for Proxmark to appear on %s ", argv[1]);
+		}
 	}
-	if (strcmp(argv[1], "-m") == 0) {
-		dumpAllHelp(1);
-		return 0;
+
+	// If the user passed the filename of the 'script' to execute, get it from last parameter
+	if (argc > 2 && argv[argc - 1] && argv[argc - 1][0] != '-') {
+		script_cmds_file = argv[argc - 1];
 	}
 
 	set_my_executable_path();
 	
-	bool usb_present = false;
-	char *script_cmds_file = NULL;
-  
-	sp = uart_open(argv[1]);
+	// open uart
+	int openCount = 0;
+	do {
+		sp = uart_open(argv[1]);
+		if (sp != INVALID_SERIAL_PORT && sp != CLAIMED_SERIAL_PORT)
+			break;
+		msleep(1000);
+		printf(".");
+	} while(waitCOMPort && (++openCount < 20));
+	printf("\n");
+
+	// check result of uart opening
 	if (sp == INVALID_SERIAL_PORT) {
 		printf("ERROR: invalid serial port\n");
 		usb_present = false;
@@ -254,22 +294,7 @@ int main(int argc, char* argv[]) {
 		usb_present = true;
 		offline = 0;
 	}
-
-	// If the user passed the filename of the 'script' to execute, get it
-	if (argc > 2 && argv[2]) {
-		if (argv[2][0] == 'f' &&  //buzzy, if a word 'flush' passed, flush the output after every log entry.
-			argv[2][1] == 'l' &&
-			argv[2][2] == 'u' &&
-			argv[2][3] == 's' &&
-			argv[2][4] == 'h')
-		{
-			printf("Output will be flushed after every print.\n");
-			flushAfterWrite = 1;
-		}
-		else
-		script_cmds_file = argv[2];
-	}
-
+	
 	// create a mutex to avoid interlacing print commands from our different threads
 	pthread_mutex_init(&print_lock, NULL);
 
