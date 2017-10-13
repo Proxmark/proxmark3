@@ -271,15 +271,17 @@ int main(int argc, char* argv[]) {
 	set_my_executable_path();
 	
 	// open uart
-	int openCount = 0;
-	do {
+	if (!waitCOMPort) {
 		sp = uart_open(argv[1]);
-		if (sp != INVALID_SERIAL_PORT && sp != CLAIMED_SERIAL_PORT)
-			break;
-		msleep(1000);
-		printf(".");
-	} while(waitCOMPort && (++openCount < 20));
-	printf("\n");
+	} else {
+		int openCount = 0;
+		do {
+			sp = uart_open(argv[1]);
+			msleep(1000);
+			printf(".");
+		} while(++openCount < 20 && (sp == INVALID_SERIAL_PORT || sp == CLAIMED_SERIAL_PORT));
+		printf("\n");
+	}
 
 	// check result of uart opening
 	if (sp == INVALID_SERIAL_PORT) {
