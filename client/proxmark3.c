@@ -122,8 +122,6 @@ void main_loop(char *script_cmds_file, char *script_cmd, bool usb_present) {
 	read_history(".history");
 
 	while(1)  {
-		break;
-
 		// If there is a script file
 		if (script_file)
 		{
