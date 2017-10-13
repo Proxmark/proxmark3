@@ -95,7 +95,7 @@ static void *uart_receiver(void *targ) {
 }
 
 
-void main_loop(char *script_cmds_file, bool usb_present) {
+void main_loop(char *script_cmds_file, char *script_cmd, bool usb_present) {
 	struct receiver_arg rarg;
 	char *cmd = NULL;
 	pthread_t reader_thread;
@@ -267,13 +267,12 @@ int main(int argc, char* argv[]) {
 			flushAfterWrite = 1;
 		}
 		
-		if(strcmp(argv[i],"-w") == 0 || strcmp(argv[i],"-wait") == 0){
-			waitCOMPort = true;
-			printf("Waiting for Proxmark to appear on %s ", argv[1]);
-		}
-
 		if(strcmp(argv[i],"-c") == 0 || strcmp(argv[i],"-command") == 0){
 			executeCommand = true;
+		}
+
+		if(strcmp(argv[i],"-w") == 0 || strcmp(argv[i],"-wait") == 0){
+			waitCOMPort = true;
 		}
 	}
 
@@ -293,6 +292,7 @@ int main(int argc, char* argv[]) {
 	if (!waitCOMPort) {
 		sp = uart_open(argv[1]);
 	} else {
+		printf("Waiting for Proxmark to appear on %s ", argv[1]);
 		int openCount = 0;
 		do {
 			sp = uart_open(argv[1]);
@@ -321,23 +321,23 @@ int main(int argc, char* argv[]) {
 
 #ifdef HAVE_GUI
 #ifdef _WIN32
-	InitGraphics(argc, argv, script_cmds_file, usb_present);
+	InitGraphics(argc, argv, script_cmds_file, script_cmd, usb_present);
 	MainGraphics();
 #else
 	char* display = getenv("DISPLAY");
 
 	if (display && strlen(display) > 1)
 	{
-		InitGraphics(argc, argv, script_cmds_file, usb_present);
+		InitGraphics(argc, argv, script_cmds_file, script_cmd, usb_present);
 		MainGraphics();
 	}
 	else
 	{
-		main_loop(script_cmds_file, usb_present);
+		main_loop(script_cmds_file, script_cmd, usb_present);
 	}
 #endif
 #else
-	main_loop(script_cmds_file, usb_present);
+	main_loop(script_cmds_file, script_cmd, usb_present);
 #endif	
 
 	// Clean up the port

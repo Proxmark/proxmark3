@@ -123,11 +123,12 @@ class ProxGuiQT : public QObject
 class WorkerThread : public QThread {
 	Q_OBJECT;
 public:
-	WorkerThread(char*, bool);
+	WorkerThread(char*, char*, bool);
 	~WorkerThread();
 	void run();
 private:
 	char *script_cmds_file = NULL;
+	char *script_cmd = NULL;
 	bool usb_present;
 };
 
