@@ -230,6 +230,30 @@ static void set_my_executable_path(void)
 	}
 }
 
+static void show_help(bool showFullHelp, char *command_line){
+	printf("syntax: %s <port> [-h|-help|-m|-f|-flush|-w|-wait|-c|-command] [cmd_script_file_name] []\n", command_line);
+	printf("\tLinux example:'%s /dev/ttyACM0'\n", command_line);
+	printf("\tWindows example:'%s com3'\n\n", command_line);
+	
+	if (showFullHelp){
+		printf("help: Dump all interactive command's help at once.\n");
+		printf("\t%s  -h\n", command_line);
+		printf("\t%s  -help\n\n", command_line);
+		printf("markdown: Dump all interactive help at once in markdown syntax\n");
+		printf("\t%s -m\n\n", command_line);
+		printf("flush: Output will be flushed after every print.\n");
+		printf("\t%s -f\n", command_line);
+		printf("\t%s -flush\n\n", command_line);
+		printf("wait: 20sec waiting the serial port to appear in the OS\n");
+		printf("\t%s "SERIAL_PORT_H" -w\n", command_line);
+		printf("\t%s "SERIAL_PORT_H" -wait\n\n", command_line);
+		printf("script: A script file with one proxmark3 command per line.\n\n");
+		printf("command: One proxmark3 command.\n");
+		printf("\t%s "SERIAL_PORT_H" -c \"hf mf chk 1* ?\"\n", command_line);
+		printf("\t%s "SERIAL_PORT_H" -command \"hf mf nested 1 *\"\n\n", command_line);
+	}
+}
+
 int main(int argc, char* argv[]) {
 	srand(time(0));
   
@@ -240,31 +264,13 @@ int main(int argc, char* argv[]) {
 	char *script_cmd = NULL;
   
 	if (argc < 2) {
-		printf("syntax: %s <port> [-h|-help|-m|-f|-flush|-w|-wait] [cmd_script_file_name]\n",argv[0]);
-		printf("\tLinux example:'%s /dev/ttyACM0'\n", argv[0]);
-		printf("\tWindows example:'%s com3'\n\n", argv[0]);
-		printf("help: Dump all interactive command's help at once.\n");
-		printf("\t%s  -h\n", argv[0]);
-		printf("\t%s  -help\n\n", argv[0]);
-		printf("markdown: Dump all interactive help at once in markdown syntax\n");
-		printf("\t%s -m\n\n", argv[0]);
-		printf("flush: Output will be flushed after every print.\n");
-		printf("\t%s -f\n", argv[0]);
-		printf("\t%s -flush\n\n", argv[0]);
-		printf("wait: 20sec waiting the serial port to appear in the OS\n");
-		printf("\t%s "SERIAL_PORT_H" -w\n", argv[0]);
-		printf("\t%s "SERIAL_PORT_H" -wait\n\n", argv[0]);
-		printf("script: A script file with one proxmark3 command per line.\n\n");
-		printf("command: One proxmark3 command.\n");
-		printf("\t%s "SERIAL_PORT_H" -c \"hf mf chk 1* ?\"\n\n", argv[0]);
+		show_help(true, argv[0]);
 		return 1;
 	}
 
 	for (int i = 1; i < argc; i++) {
 		if (strcmp(argv[i], "-h") == 0 || strcmp(argv[i],"-help") == 0) {
-			printf("syntax: %s <port> [-h|-help|-m|-f|-flush|-w|-wait] [cmd_script_file_name]\n",argv[0]);
-			printf("\tWindows example:'%s com3'\n", argv[0]);
-			printf("\tLinux example:'%s /dev/ttyACM0'\n\n", argv[0]);
+			show_help(false, argv[0]);
 			dumpAllHelp(0);
 			return 0;
 		}
@@ -279,12 +285,12 @@ int main(int argc, char* argv[]) {
 			flushAfterWrite = 1;
 		}
 		
-		if(strcmp(argv[i],"-c") == 0 || strcmp(argv[i],"-command") == 0){
-			executeCommand = true;
-		}
-
 		if(strcmp(argv[i],"-w") == 0 || strcmp(argv[i],"-wait") == 0){
 			waitCOMPort = true;
+		}
+
+		if(strcmp(argv[i],"-c") == 0 || strcmp(argv[i],"-command") == 0){
+			executeCommand = true;
 		}
 	}
 
@@ -292,12 +298,27 @@ int main(int argc, char* argv[]) {
 	if (argc > 2 && argv[argc - 1] && argv[argc - 1][0] != '-') {
 		if (executeCommand){
 			script_cmd = argv[argc - 1];
-			printf("Execute command from commandline: %s\n", script_cmd);
+			
+			while(script_cmd[strlen(script_cmd) - 1] == ' ')
+				script_cmd[strlen(script_cmd) - 1] = 0x00;
+			
+			if (strlen(script_cmd) == 0) {
+				script_cmd = NULL;
+			} else {
+				printf("Execute command from commandline: %s\n", script_cmd);
+			}
 		} else {
 			script_cmds_file = argv[argc - 1];
 		}
 	}
 
+	// check command
+	if (executeCommand && (!script_cmd || strlen(script_cmd) == 0)){
+		printf("ERROR: execute command: command not found.\n");
+		return 2;
+	}
+	
+	// set global variables
 	set_my_executable_path();
 	
 	// open uart
@@ -326,6 +347,12 @@ int main(int argc, char* argv[]) {
 	} else {
 		usb_present = true;
 		offline = 0;
+	}
+	
+	// dont execute comamnds in offline mode
+	if (offline && (executeCommand || script_cmds_file)) {
+		printf("ERROR: can't execute in offline mode.\n");
+		return 2;
 	}
 	
 	// create a mutex to avoid interlacing print commands from our different threads
