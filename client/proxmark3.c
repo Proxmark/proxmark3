@@ -146,7 +146,7 @@ void main_loop(char *script_cmds_file, char *script_cmd, bool usb_present) {
 			// If there is a script command
 			if (execCommand){
 				if ((cmd = (char*) malloc(strlen(script_cmd) + 1)) != NULL) {
-					memset(cmd, 0, strlen(script_cmd));
+					memset(cmd, 0, strlen(script_cmd) + 1);
 					strcpy(cmd, script_cmd);
 					printf(PROXPROMPT"%s\n", cmd);
 				}
