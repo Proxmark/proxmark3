@@ -235,26 +235,25 @@ static void set_my_executable_path(void)
 }
 
 static void show_help(bool showFullHelp, char *command_line){
-	printf("syntax: %s <port> [-h|-help|-m|-f|-flush|-w|-wait|-c|-command] [cmd_script_file_name] []\n", command_line);
+	printf("syntax: %s <port> [-h|-help|-m|-f|-flush|-w|-wait|-c|-command|-l|-lua] [cmd_script_file_name] [command][lua_script_name]\n", command_line);
 	printf("\tLinux example:'%s /dev/ttyACM0'\n", command_line);
 	printf("\tWindows example:'%s com3'\n\n", command_line);
 	
 	if (showFullHelp){
-		printf("help: Dump all interactive command's help at once.\n");
-		printf("\t%s  -h\n", command_line);
-		printf("\t%s  -help\n\n", command_line);
-		printf("markdown: Dump all interactive help at once in markdown syntax\n");
+		printf("help: <-h|-help> Dump all interactive command's help at once.\n");
+		printf("\t%s  -h\n\n", command_line);
+		printf("markdown: <-m> Dump all interactive help at once in markdown syntax\n");
 		printf("\t%s -m\n\n", command_line);
-		printf("flush: Output will be flushed after every print.\n");
-		printf("\t%s -f\n", command_line);
-		printf("\t%s -flush\n\n", command_line);
-		printf("wait: 20sec waiting the serial port to appear in the OS\n");
-		printf("\t%s "SERIAL_PORT_H" -w\n", command_line);
-		printf("\t%s "SERIAL_PORT_H" -wait\n\n", command_line);
+		printf("flush: <-f|-flush> Output will be flushed after every print.\n");
+		printf("\t%s -f\n\n", command_line);
+		printf("wait: <-w|-wait> 20sec waiting the serial port to appear in the OS\n");
+		printf("\t%s "SERIAL_PORT_H" -w\n\n", command_line);
 		printf("script: A script file with one proxmark3 command per line.\n\n");
-		printf("command: One proxmark3 command.\n");
+		printf("command: <-c|-command> Execute one proxmark3 command.\n");
 		printf("\t%s "SERIAL_PORT_H" -c \"hf mf chk 1* ?\"\n", command_line);
 		printf("\t%s "SERIAL_PORT_H" -command \"hf mf nested 1 *\"\n\n", command_line);
+		printf("lua: <-l|-lua> Execute lua script.\n");
+		printf("\t%s "SERIAL_PORT_H" -l hf_read\n\n", command_line);
 	}
 }
 
@@ -264,6 +263,7 @@ int main(int argc, char* argv[]) {
 	bool usb_present = false;
 	bool waitCOMPort = false;
 	bool executeCommand = false;
+	bool addLuaExec = false;
 	char *script_cmds_file = NULL;
 	char *script_cmd = NULL;
   
@@ -296,6 +296,11 @@ int main(int argc, char* argv[]) {
 		if(strcmp(argv[i],"-c") == 0 || strcmp(argv[i],"-command") == 0){
 			executeCommand = true;
 		}
+
+		if(strcmp(argv[i],"-l") == 0 || strcmp(argv[i],"-lua") == 0){
+			executeCommand = true;
+			addLuaExec = true;
+		}
 	}
 
 	// If the user passed the filename of the 'script' to execute, get it from last parameter
@@ -309,6 +314,19 @@ int main(int argc, char* argv[]) {
 			if (strlen(script_cmd) == 0) {
 				script_cmd = NULL;
 			} else {
+				if (addLuaExec){
+					// add "script run " to command
+					char *ctmp = NULL;
+					int len = strlen(script_cmd) + 11 + 1;
+					if ((ctmp = (char*) malloc(len)) != NULL) {
+						memset(ctmp, 0, len);
+						strcpy(ctmp, "script run ");
+						strcpy(&ctmp[11], script_cmd);
+						strcpy(script_cmd, ctmp);
+						free(ctmp);
+					}					
+				}
+				
 				printf("Execute command from commandline: %s\n", script_cmd);
 			}
 		} else {
