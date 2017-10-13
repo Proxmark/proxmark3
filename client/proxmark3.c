@@ -27,6 +27,11 @@
 #include "cmdhw.h"
 #include "whereami.h"
 
+#ifdef _WIN32
+#define SERIAL_PORT_H	"com3"
+#else
+#define SERIAL_PORT_H	"/dev/ttyACM0"
+#endif
 
 // a global mutex to prevent interlaced printing from different threads
 pthread_mutex_t print_lock;
@@ -218,30 +223,35 @@ int main(int argc, char* argv[]) {
   
 	bool usb_present = false;
 	bool waitCOMPort = false;
+	bool executeCommand = false;
 	char *script_cmds_file = NULL;
+	char *script_cmd = NULL;
   
 	if (argc < 2) {
 		printf("syntax: %s <port> [-h|-help|-m|-f|-flush|-w|-wait] [cmd_script_file_name]\n",argv[0]);
 		printf("\tLinux example:'%s /dev/ttyACM0'\n", argv[0]);
 		printf("\tWindows example:'%s com3'\n\n", argv[0]);
 		printf("help: Dump all interactive command's help at once.\n");
-		printf("\t%s -h\n", argv[0]);
-		printf("\t%s -help\n\n", argv[0]);
+		printf("\t%s  -h\n", argv[0]);
+		printf("\t%s  -help\n\n", argv[0]);
 		printf("markdown: Dump all interactive help at once in markdown syntax\n");
 		printf("\t%s -m\n\n", argv[0]);
 		printf("flush: Output will be flushed after every print.\n");
 		printf("\t%s -f\n", argv[0]);
 		printf("\t%s -flush\n\n", argv[0]);
 		printf("wait: 20sec waiting the serial port to appear in the OS\n");
-		printf("\t%s -w\n", argv[0]);
-		printf("\t%s -wait\n\n", argv[0]);
+		printf("\t%s "SERIAL_PORT_H" -w\n", argv[0]);
+		printf("\t%s "SERIAL_PORT_H" -wait\n\n", argv[0]);
 		printf("script: A script file with one proxmark3 command per line.\n\n");
+		printf("command: One proxmark3 command.\n");
+		printf("\t%s "SERIAL_PORT_H" -c \"hf mf chk 1* ?\"\n\n", argv[0]);
 		return 1;
 	}
 
 	for (int i = 1; i < argc; i++) {
 		if (strcmp(argv[i], "-h") == 0 || strcmp(argv[i],"-help") == 0) {
-			printf("syntax: %s <port>\n\n",argv[0]);
+			printf("syntax: %s <port> [-h|-help|-m|-f|-flush|-w|-wait] [cmd_script_file_name]\n",argv[0]);
+			printf("\tWindows example:'%s com3'\n", argv[0]);
 			printf("\tLinux example:'%s /dev/ttyACM0'\n\n", argv[0]);
 			dumpAllHelp(0);
 			return 0;
@@ -261,11 +271,20 @@ int main(int argc, char* argv[]) {
 			waitCOMPort = true;
 			printf("Waiting for Proxmark to appear on %s ", argv[1]);
 		}
+
+		if(strcmp(argv[i],"-c") == 0 || strcmp(argv[i],"-command") == 0){
+			executeCommand = true;
+		}
 	}
 
 	// If the user passed the filename of the 'script' to execute, get it from last parameter
 	if (argc > 2 && argv[argc - 1] && argv[argc - 1][0] != '-') {
-		script_cmds_file = argv[argc - 1];
+		if (executeCommand){
+			script_cmd = argv[argc - 1];
+			printf("Execute command from commandline: %s\n", script_cmd);
+		} else {
+			script_cmds_file = argv[argc - 1];
+		}
 	}
 
 	set_my_executable_path();
