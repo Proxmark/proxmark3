@@ -99,7 +99,8 @@ void main_loop(char *script_cmds_file, char *script_cmd, bool usb_present) {
 	struct receiver_arg rarg;
 	char *cmd = NULL;
 	pthread_t reader_thread;
-
+	bool execCommand = (script_cmd != NULL);
+	
 	if (usb_present) {
 		rarg.run = 1;
 		pthread_create(&reader_thread, NULL, &uart_receiver, &rarg);
@@ -107,6 +108,7 @@ void main_loop(char *script_cmds_file, char *script_cmd, bool usb_present) {
 		CmdVersion(NULL);
 	}
 
+	// file with script
 	FILE *script_file = NULL;
 	char script_cmd_buf[256];  // iceman, needs lua script the same file_path_buffer as the rest
 
@@ -116,7 +118,7 @@ void main_loop(char *script_cmds_file, char *script_cmd, bool usb_present) {
 			printf("using 'scripting' commands file %s\n", script_cmds_file);
 		}
 	}
-
+	
 	read_history(".history");
 
 	while(1)  {
@@ -141,12 +143,22 @@ void main_loop(char *script_cmds_file, char *script_cmd, bool usb_present) {
 					printf("%s\n", cmd);
 				}
 			}
+		} else {
+			// If there is a script command
+			if (execCommand){
+				cmd = script_cmd;
+				execCommand = false;
+			} else {
+				// exit after exec command
+				if (script_cmd)
+					break;
+				
+				// read command from command prompt
+				cmd = readline(PROXPROMPT);
+			}
 		}
 		
-		if (!script_file) {
-			cmd = readline(PROXPROMPT);
-		}
-		
+		// execute command
 		if (cmd) {
 
 			while(cmd[strlen(cmd) - 1] == ' ')
