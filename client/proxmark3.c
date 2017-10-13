@@ -122,6 +122,7 @@ void main_loop(char *script_cmds_file, char *script_cmd, bool usb_present) {
 	read_history(".history");
 
 	while(1)  {
+		break;
 
 		// If there is a script file
 		if (script_file)
@@ -140,13 +141,18 @@ void main_loop(char *script_cmds_file, char *script_cmd, bool usb_present) {
 				if ((cmd = (char*) malloc(strlen(script_cmd_buf) + 1)) != NULL) {
 					memset(cmd, 0, strlen(script_cmd_buf));
 					strcpy(cmd, script_cmd_buf);
-					printf("%s\n", cmd);
+					printf(PROXPROMPT"%s\n", cmd);
 				}
 			}
 		} else {
 			// If there is a script command
 			if (execCommand){
-				cmd = script_cmd;
+				if ((cmd = (char*) malloc(strlen(script_cmd) + 1)) != NULL) {
+					memset(cmd, 0, strlen(script_cmd));
+					strcpy(cmd, script_cmd);
+					printf(PROXPROMPT"%s\n", cmd);
+				}
+				
 				execCommand = false;
 			} else {
 				// exit after exec command
@@ -172,12 +178,13 @@ void main_loop(char *script_cmds_file, char *script_cmd, bool usb_present) {
 				}
 			}
 			free(cmd);
+			cmd = NULL;
 		} else {
 			printf("\n");
 			break;
 		}
 	}
-  
+
 	write_history(".history");
   
 	if (usb_present) {
@@ -189,7 +196,6 @@ void main_loop(char *script_cmds_file, char *script_cmd, bool usb_present) {
 		fclose(script_file);
 		script_file = NULL;
 	}
-
 }
 
 static void dumpAllHelp(int markdown)

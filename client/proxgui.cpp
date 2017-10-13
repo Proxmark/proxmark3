@@ -56,7 +56,6 @@ extern "C" void MainGraphics(void)
 	if (!gui)
 		return;
 
-	main_loop_thread->start();
 	gui->MainLoop();
 }
 
@@ -70,18 +69,15 @@ extern "C" void InitGraphics(int argc, char **argv, char *script_cmds_file, char
 	if (!useGUI)
 		return;
 
-	gui = new ProxGuiQT(argc, argv);
 	main_loop_thread = new WorkerThread(script_cmds_file, script_cmd, usb_present);
-	QObject::connect(main_loop_thread, SIGNAL(finished()), main_loop_thread, SLOT(deleteLater()));
-	QObject::connect(main_loop_thread, SIGNAL(finished()), gui, SLOT(_Exit()));
+	gui = new ProxGuiQT(argc, argv, main_loop_thread);
 }
-
 
 extern "C" void ExitGraphics(void)
 {
-  if (!gui)
-    return;
+	if (!gui)
+		return;
 
-  gui->Exit();
-  gui = NULL;
+	gui->Exit();
+	gui = NULL;
 }
