@@ -370,12 +370,6 @@ int main(int argc, char* argv[]) {
 		offline = 0;
 	}
 	
-	// dont execute comamnds in offline mode
-	if (offline && (executeCommand || script_cmds_file)) {
-		printf("ERROR: can't execute in offline mode.\n");
-		return 2;
-	}
-	
 	// create a mutex to avoid interlacing print commands from our different threads
 	pthread_mutex_init(&print_lock, NULL);
 
