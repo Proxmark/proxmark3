@@ -228,15 +228,44 @@ int mfCheckKeys (uint8_t blockNo, uint8_t keyType, bool clear_trace, uint8_t key
 
 	*key = -1;
 
-	UsbCommand c = {CMD_MIFARE_CHKKEYS, {((blockNo & 0xff) | ((keyType&0xff)<<8)), clear_trace, keycnt}};
+	UsbCommand c = {CMD_MIFARE_CHKKEYS, {((blockNo & 0xff) | ((keyType & 0xff) << 8)), clear_trace, keycnt}}; 
 	memcpy(c.d.asBytes, keyBlock, 6 * keycnt);
 	SendCommand(&c);
 
 	UsbCommand resp;
-	if (!WaitForResponseTimeout(CMD_ACK,&resp,3000)) return 1;
+	if (!WaitForResponseTimeout(CMD_ACK,&resp,3000)) return 1; 
 	if ((resp.arg[0] & 0xff) != 0x01) return 2;
 	*key = bytes_to_num(resp.d.asBytes, 6);
 	return 0;
+}
+
+int mfCheckKeysSec(uint8_t sectorCnt, uint8_t keyType, uint8_t timeout14a, bool clear_trace, uint8_t keycnt, uint8_t * keyBlock, sector_t * e_sector){
+
+	uint8_t keyPtr = 0;
+
+	if (e_sector == NULL)
+		return -1;
+
+	UsbCommand c = {CMD_MIFARE_CHKKEYS, {((sectorCnt & 0xff) | ((keyType & 0xff) << 8)), (clear_trace | 0x02)|((timeout14a & 0xff) << 8), keycnt}}; 
+	memcpy(c.d.asBytes, keyBlock, 6 * keycnt);
+	SendCommand(&c);
+
+	UsbCommand resp;
+	if (!WaitForResponseTimeoutW(CMD_ACK, &resp, MAX(3000, 1000 + 13 * sectorCnt * keycnt * (keyType == 2 ? 2 : 1)), false)) return 1; // timeout: 13 ms / fail auth
+	if ((resp.arg[0] & 0xff) != 0x01) return 2;
+	
+	bool foundAKey = false;
+	for(int sec = 0; sec < sectorCnt; sec++){
+		for(int keyAB = 0; keyAB < 2; keyAB++){
+			keyPtr = *(resp.d.asBytes + keyAB * 40 + sec);
+			if (keyPtr){
+				e_sector[sec].foundKey[keyAB] = true;
+				e_sector[sec].Key[keyAB] = bytes_to_num(keyBlock + (keyPtr - 1) * 6, 6);
+				foundAKey = true;
+			}
+		}
+	}
+	return foundAKey ? 0 : 3;
 }
 
 // Compare 16 Bits out of cryptostate

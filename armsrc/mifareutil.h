@@ -13,6 +13,7 @@
 #define __MIFAREUTIL_H
 
 #include "crapto1/crapto1.h"
+#include "usb_cdc.h"
 
 // mifare authentication
 #define CRYPT_NONE    0
@@ -20,6 +21,8 @@
 #define CRYPT_REQUEST 2
 #define AUTH_FIRST    0	
 #define AUTH_NESTED   2
+#define AUTHENTICATION_TIMEOUT 848			// card times out 1ms after wrong authentication (according to NXP documentation)
+#define PRE_AUTHENTICATION_LEADTIME 400		// some (non standard) cards need a pause after select before they are ready for first authentication
 
 // mifare 4bit card answers
 #define CARD_ACK      0x0A  // 1010 - ACK
@@ -98,5 +101,11 @@ uint64_t emlGetKey(int sectorNum, int keyType);
 int emlGetValBl(uint32_t *blReg, uint8_t *blBlock, int blockNum);
 int emlSetValBl(uint32_t blReg, uint8_t blBlock, int blockNum);
 int emlCheckValBl(int blockNum);
+
+// mifare check keys
+typedef uint8_t TKeyIndex[2][40];
+int MifareChkBlockKey(uint8_t *uid, uint32_t *cuid, uint8_t *cascade_levels, uint64_t ui64Key, uint8_t blockNo, uint8_t keyType, uint8_t debugLevel);
+int MifareChkBlockKeys(uint8_t *keys, uint8_t keyCount, uint8_t blockNo, uint8_t keyType, uint8_t debugLevel);
+int MifareMultisectorChk(uint8_t *keys, uint8_t keyCount, uint8_t SectorCount, uint8_t keyType, uint8_t debugLevel, TKeyIndex *keyIndex);
 
 #endif
