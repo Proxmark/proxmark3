@@ -983,7 +983,7 @@ void MifareChkKeys(uint16_t arg0, uint16_t arg1, uint8_t arg2, uint8_t *datain)
 	}
 	
 	if (multisectorCheck) {
-		TKeyIndex keyIndex = {0};
+		TKeyIndex keyIndex = {{0}};
 		uint8_t sectorCnt = blockNo;
 		int res = MifareMultisectorChk(datain, keyCount, sectorCnt, keyType, OLD_MF_DBGLEVEL, &keyIndex);
 
