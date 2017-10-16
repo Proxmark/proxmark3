@@ -7,7 +7,7 @@
 // at your option, any later version. See the LICENSE.txt file for the text of
 // the license.
 //-----------------------------------------------------------------------------
-// Routines to support ISO 14443 type A.
+// Routines to support ISO 14443 type B.
 //-----------------------------------------------------------------------------
 
 #ifndef __ISO14443B_H
