@@ -611,7 +611,7 @@ void AT91F_CDC_Enumerate() {
 			else if (wIndex == 2)
 				pUdp->UDP_CSR[2] = (AT91C_UDP_EPEDS | AT91C_UDP_EPTYPE_BULK_IN);
 			else if (wIndex == 3)
-				pUdp->UDP_CSR[3] = (AT91C_UDP_EPEDS | AT91C_UDP_EPTYPE_ISO_IN);
+				pUdp->UDP_CSR[3] = (AT91C_UDP_EPEDS | AT91C_UDP_EPTYPE_INT_IN);
 			AT91F_USB_SendZlp(pUdp);
 		}
 		else
