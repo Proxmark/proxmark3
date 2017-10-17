@@ -1,0 +1,14 @@
+armsrc
+client
+client/hardnested
+client/hid-flasher
+client/loclass
+client/reveng
+client/ui
+common
+common/crapto1
+common/polarssl
+include
+liblua
+uart
+zlib
