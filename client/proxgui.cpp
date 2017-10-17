@@ -65,13 +65,10 @@ extern "C" void MainGraphics(pm3_connection* conn)
 
 extern "C" void InitGraphics(int argc, char **argv, char *script_cmds_file, bool usb_present, serial_port* port, bool flush_after_write)
 {
-#ifdef Q_WS_X11
-	bool useGUI = getenv("DISPLAY") != 0;
-#else
-	bool useGUI = true;
-#endif
-	if (!useGUI)
+	if (!has_gui()) {
+		printf("Oops, InitGraphics called when we have no GUI!\n");
 		return;
+	}
 
 	gui = new ProxGuiQT(argc, argv);
 	main_loop_thread = new WorkerThread(script_cmds_file, usb_present, port, flush_after_write);

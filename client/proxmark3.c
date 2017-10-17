@@ -27,6 +27,23 @@
 #include "whereami.h"
 #include "comms.h"
 
+/* Returns true if we have a display that we should set up a GUI on.
+ */
+bool has_gui() {
+#ifdef HAVE_GUI
+# ifdef Q_WS_X11
+	// Check for "DISPLAY" environment variable.  If present, we have a GUI
+	char* display = getenv("DISPLAY");
+	return (display && strlen(display) > 1);
+# else
+	// Non-X11 always has GUI, if this is built.
+	return true;
+# endif
+#else
+	// Built without GUI support
+	return false;
+#endif
+}
 
 void main_loop(char *script_cmds_file, bool usb_present, serial_port* port, bool flush_after_write) {
 	pm3_connection conn;
@@ -57,8 +74,10 @@ void main_loop(char *script_cmds_file, bool usb_present, serial_port* port, bool
 	}
 
 #ifdef HAVE_GUI
-	// Setup GUI with reference to our connection struct.
-	MainGraphics(&conn);
+	if (has_gui()) {
+		// Setup GUI with reference to our connection struct.
+		MainGraphics(&conn);
+	}
 #endif
 
 	FILE *script_file = NULL;
@@ -237,23 +256,15 @@ int main(int argc, char* argv[]) {
 	pthread_mutex_init(&print_lock, NULL);
 
 #ifdef HAVE_GUI
-#ifdef _WIN32
-	InitGraphics(argc, argv, script_cmds_file, usb_present, sp, flush_after_write);
-#else
-	char* display = getenv("DISPLAY");
-
-	if (display && strlen(display) > 1)
+	if (has_gui())
 	{
 		InitGraphics(argc, argv, script_cmds_file, usb_present, sp, flush_after_write);
 	}
 	else
+#endif
 	{
 		main_loop(script_cmds_file, usb_present, sp, flush_after_write);
 	}
-#endif
-#else
-	main_loop(script_cmds_file, usb_present, sp, flush_after_write);
-#endif	
 
 	// Clean up the port
 	if (usb_present) {

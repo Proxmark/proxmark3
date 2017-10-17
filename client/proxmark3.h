@@ -22,6 +22,7 @@
 extern "C" {
 #endif
 
+bool has_gui();
 const char *get_my_executable_path(void);
 const char *get_my_executable_directory(void);
 void main_loop(char *script_cmds_file, bool usb_present, serial_port* port, bool flush_after_write);
