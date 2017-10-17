@@ -145,6 +145,9 @@ typedef struct global_State {
   TString *memerrmsg;  /* memory-error message */
   TString *tmname[TM_N];  /* array with tag-method names */
   struct Table *mt[LUA_NUMTAGS];  /* metatables for basic types */
+  
+  // Pointer to additional context storage.
+  void* user_context;
 } global_State;
 
 

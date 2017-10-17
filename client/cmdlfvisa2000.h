@@ -8,12 +8,15 @@
 //-----------------------------------------------------------------------------
 #ifndef CMDLFVISA2000_H__
 #define CMDLFVISA2000_H__
+
 #include <inttypes.h>
-extern int CmdLFVisa2k(const char *Cmd);
-extern int CmdVisa2kClone(const char *Cmd);
-extern int CmdVisa2kSim(const char *Cmd);
-extern int CmdVisa2kRead(const char *Cmd);
-extern int CmdVisa2kDemod(const char *Cmd);
+#include "comms.h"
+
+extern int CmdLFVisa2k(pm3_connection* conn, const char *Cmd);
+extern int CmdVisa2kClone(pm3_connection* conn, const char *Cmd);
+extern int CmdVisa2kSim(pm3_connection* conn, const char *Cmd);
+extern int CmdVisa2kRead(pm3_connection* conn, const char *Cmd);
+extern int CmdVisa2kDemod(pm3_connection* conn, const char *Cmd);
 
 #endif
 

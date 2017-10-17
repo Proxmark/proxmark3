@@ -8,10 +8,11 @@
 //-----------------------------------------------------------------------------
 #ifndef CMDLFFDX_H__
 #define CMDLFFDX_H__
+#include "comms.h"
 
-extern int CmdLFFdx(const char *Cmd);
-extern int CmdFdxClone(const char *Cmd);
-extern int CmdFdxSim(const char *Cmd);
-extern int CmdFdxRead(const char *Cmd);
-extern int CmdFdxDemod(const char *Cmd);
+extern int CmdLFFdx(pm3_connection* conn, const char *Cmd);
+extern int CmdFdxClone(pm3_connection* conn, const char *Cmd);
+extern int CmdFdxSim(pm3_connection* conn, const char *Cmd);
+extern int CmdFdxRead(pm3_connection* conn, const char *Cmd);
+extern int CmdFdxDemod(pm3_connection* conn, const char *Cmd);
 #endif

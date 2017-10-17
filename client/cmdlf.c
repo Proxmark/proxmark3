@@ -46,9 +46,10 @@
 #include "cmdlfnoralsy.h"// for noralsy menu
 #include "cmdlfsecurakey.h"//for securakey menu
 #include "cmdlfpac.h"    // for pac menu
+#include "comms.h"       // for pm3_connection
 
 bool g_lf_threshold_set = false;
-static int CmdHelp(const char *Cmd);
+static int CmdHelp(pm3_connection* conn, const char *Cmd);
 
 
 
@@ -71,7 +72,7 @@ int usage_lf_cmdread(void)
 }
 
 /* send a command before reading */
-int CmdLFCommandRead(const char *Cmd)
+int CmdLFCommandRead(pm3_connection* conn, const char *Cmd)
 {
 	static char dummy[3] = {0x20,0x00,0x00};
 	UsbCommand c = {CMD_MOD_THEN_ACQUIRE_RAW_ADC_SAMPLES_125K};
@@ -124,28 +125,28 @@ int CmdLFCommandRead(const char *Cmd)
 	// in case they specified 'H'
 	strcpy((char *)&c.d.asBytes + strlen((char *)c.d.asBytes), dummy);
 
-	clearCommandBuffer();
-	SendCommand(&c);
+	clearCommandBuffer(conn);
+	SendCommand(conn, &c);
 	return 0;
 }
 
-int CmdFlexdemod(const char *Cmd)
+int CmdFlexdemod(pm3_connection* conn, const char *Cmd)
 {
 	int i;
-	for (i = 0; i < GraphTraceLen; ++i) {
-		if (GraphBuffer[i] < 0) {
-			GraphBuffer[i] = -1;
+	for (i = 0; i < conn->GraphTraceLen; ++i) {
+		if (conn->GraphBuffer[i] < 0) {
+			conn->GraphBuffer[i] = -1;
 		} else {
-			GraphBuffer[i] = 1;
+			conn->GraphBuffer[i] = 1;
 		}
 	}
 
  #define LONG_WAIT 100
 	int start;
-	for (start = 0; start < GraphTraceLen - LONG_WAIT; start++) {
-		int first = GraphBuffer[start];
+	for (start = 0; start < conn->GraphTraceLen - LONG_WAIT; start++) {
+		int first = conn->GraphBuffer[start];
 		for (i = start; i < start + LONG_WAIT; i++) {
-			if (GraphBuffer[i] != first) {
+			if (conn->GraphBuffer[i] != first) {
 				break;
 			}
 		}
@@ -153,13 +154,13 @@ int CmdFlexdemod(const char *Cmd)
 			break;
 		}
 	}
-	if (start == GraphTraceLen - LONG_WAIT) {
+	if (start == conn->GraphTraceLen - LONG_WAIT) {
 		PrintAndLog("nothing to wait for");
 		return 0;
 	}
 
-	GraphBuffer[start] = 2;
-	GraphBuffer[start+1] = -2;
+	conn->GraphBuffer[start] = 2;
+	conn->GraphBuffer[start+1] = -2;
 	uint8_t bits[64] = {0x00};
 
 	int bit, sum;
@@ -167,7 +168,7 @@ int CmdFlexdemod(const char *Cmd)
 	for (bit = 0; bit < 64; bit++) {
 		sum = 0;
 		for (int j = 0; j < 16; j++) {
-			sum += GraphBuffer[i++];
+			sum += conn->GraphBuffer[i++];
 		}
 
 		bits[bit] = (sum > 0) ? 1 : 0;
@@ -179,7 +180,7 @@ int CmdFlexdemod(const char *Cmd)
 		int j;
 		int sum = 0;
 		for (j = 0; j < 16; j++) {
-			sum += GraphBuffer[i++];
+			sum += conn->GraphBuffer[i++];
 		}
 		if (sum > 0 && bits[bit] != 1) {
 			PrintAndLog("oops1 at %d", bit);
@@ -190,7 +191,7 @@ int CmdFlexdemod(const char *Cmd)
 	}
 
 	// HACK writing back to graphbuffer.
-	GraphTraceLen = 32*64;
+	conn->GraphTraceLen = 32*64;
 	i = 0;
 	int phase = 0;
 	for (bit = 0; bit < 64; bit++) {
@@ -199,12 +200,12 @@ int CmdFlexdemod(const char *Cmd)
 		
 		int j;
 		for (j = 0; j < 32; j++) {
-			GraphBuffer[i++] = phase;
+			conn->GraphBuffer[i++] = phase;
 			phase = !phase;
 		}
 	}
 
-	RepaintGraphWindow();
+	RepaintGraphWindow(conn);
 	return 0;
 }	
 
@@ -253,7 +254,7 @@ int usage_lf_config(void)
 	return 0;
 }
 
-int CmdLFSetConfig(const char *Cmd)
+int CmdLFSetConfig(pm3_connection* conn, const char *Cmd)
 {
 
 	uint8_t divisor =  0;//Frequency divisor
@@ -329,34 +330,34 @@ int CmdLFSetConfig(const char *Cmd)
 	//Averaging is a flag on high-bit of arg[1]
 	UsbCommand c = {CMD_SET_LF_SAMPLING_CONFIG};
 	memcpy(c.d.asBytes,&config,sizeof(sample_config));
-	clearCommandBuffer();
-	SendCommand(&c);
+	clearCommandBuffer(conn);
+	SendCommand(conn, &c);
 	return 0;
 }
 
-bool lf_read(bool silent, uint32_t samples) {
-	if (offline) return false;
+bool lf_read(pm3_connection* conn, bool silent, uint32_t samples) {
+	if (conn->offline) return false;
 	UsbCommand c = {CMD_ACQUIRE_RAW_ADC_SAMPLES_125K, {silent,samples,0}};
-	clearCommandBuffer();
+	clearCommandBuffer(conn);
 	//And ship it to device
-	SendCommand(&c);
+	SendCommand(conn, &c);
 
 	UsbCommand resp;
 	if (g_lf_threshold_set) {
-		WaitForResponse(CMD_ACK,&resp);
+		WaitForResponse(conn, CMD_ACK,&resp);
 	} else {
-		if ( !WaitForResponseTimeout(CMD_ACK,&resp,2500) ) {
+		if ( !WaitForResponseTimeout(conn, CMD_ACK,&resp,2500) ) {
 			PrintAndLog("command execution time out");
 			return false;
 		}
 	}
 	// resp.arg[0] is bits read not bytes read.
-	getSamples(resp.arg[0]/8, silent);
+	getSamples(conn, resp.arg[0]/8, silent);
 
 	return true;
 }
 
-int CmdLFRead(const char *Cmd)
+int CmdLFRead(pm3_connection* conn, const char *Cmd)
 {
 	uint8_t cmdp = 0;
 	bool silent = false;
@@ -369,10 +370,10 @@ int CmdLFRead(const char *Cmd)
 		cmdp++;
 	}
 	uint32_t samples = param_get32ex(Cmd, cmdp, 0, 10);
-	return lf_read(silent, samples);
+	return lf_read(conn, silent, samples);
 }
 
-int CmdLFSnoop(const char *Cmd)
+int CmdLFSnoop(pm3_connection* conn, const char *Cmd)
 {
 	uint8_t cmdp =0;
 	if(param_getchar(Cmd, cmdp) == 'h')
@@ -381,29 +382,29 @@ int CmdLFSnoop(const char *Cmd)
 	}
 
 	UsbCommand c = {CMD_LF_SNOOP_RAW_ADC_SAMPLES};
-	clearCommandBuffer();
-	SendCommand(&c);
-	WaitForResponse(CMD_ACK,NULL);
-	getSamples(0, true);
+	clearCommandBuffer(conn);
+	SendCommand(conn, &c);
+	WaitForResponse(conn, CMD_ACK,NULL);
+	getSamples(conn, 0, true);
 
 	return 0;
 }
 
-static void ChkBitstream(const char *str)
+static void ChkBitstream(pm3_connection* conn, const char *str)
 {
 	int i;
  
 	/* convert to bitstream if necessary */
-	for (i = 0; i < (int)(GraphTraceLen / 2); i++){
-		if (GraphBuffer[i] > 1 || GraphBuffer[i] < 0) {
-			CmdGetBitStream("");
+	for (i = 0; i < (int)(conn->GraphTraceLen / 2); i++){
+		if (conn->GraphBuffer[i] > 1 || conn->GraphBuffer[i] < 0) {
+			CmdGetBitStream(conn, "");
 			break;
 		}
 	}
 }
 //Attempt to simulate any wave in buffer (one bit per output sample)
-// converts GraphBuffer to bitstream (based on zero crossings) if needed.
-int CmdLFSim(const char *Cmd)
+// converts conn->GraphBuffer to bitstream (based on zero crossings) if needed.
+int CmdLFSim(pm3_connection* conn, const char *Cmd)
 {
 	int i,j;
 	static int gap;
@@ -411,26 +412,26 @@ int CmdLFSim(const char *Cmd)
 	sscanf(Cmd, "%i", &gap);
 
 	// convert to bitstream if necessary
-	ChkBitstream(Cmd);
+	ChkBitstream(conn, Cmd);
 
 	//can send only 512 bits at a time (1 byte sent per bit...)
-	printf("Sending [%d bytes]", GraphTraceLen);
-	for (i = 0; i < GraphTraceLen; i += USB_CMD_DATA_SIZE) {
+	printf("Sending [%d bytes]", conn->GraphTraceLen);
+	for (i = 0; i < conn->GraphTraceLen; i += USB_CMD_DATA_SIZE) {
 		UsbCommand c = {CMD_DOWNLOADED_SIM_SAMPLES_125K, {i, 0, 0}};
 
 		for (j = 0; j < USB_CMD_DATA_SIZE; j++) {
-			c.d.asBytes[j] = GraphBuffer[i+j];
+			c.d.asBytes[j] = conn->GraphBuffer[i+j];
 		}
-		SendCommand(&c);
-		WaitForResponse(CMD_ACK,NULL);
+		SendCommand(conn, &c);
+		WaitForResponse(conn, CMD_ACK,NULL);
 		printf(".");
 	}
 
 	printf("\n");
 	PrintAndLog("Starting to simulate");
-	UsbCommand c = {CMD_SIMULATE_TAG_125K, {GraphTraceLen, gap, 0}};
-	clearCommandBuffer();
-	SendCommand(&c);
+	UsbCommand c = {CMD_SIMULATE_TAG_125K, {conn->GraphTraceLen, gap, 0}};
+	clearCommandBuffer(conn);
+	SendCommand(conn, &c);
 	return 0;
 }
 
@@ -440,12 +441,12 @@ int usage_lf_simfsk(void)
 	PrintAndLog("Usage: lf simfsk [c <clock>] [i] [H <fcHigh>] [L <fcLow>] [d <hexdata>]");
 	PrintAndLog("Options:        ");
 	PrintAndLog("       h              This help");
-	PrintAndLog("       c <clock>      Manually set clock - can autodetect if using DemodBuffer");
+	PrintAndLog("       c <clock>      Manually set clock - can autodetect if using conn->DemodBuffer");
 	PrintAndLog("       i              invert data");
 	PrintAndLog("       H <fcHigh>     Manually set the larger Field Clock");
 	PrintAndLog("       L <fcLow>      Manually set the smaller Field Clock");
 	//PrintAndLog("       s              TBD- -to enable a gap between playback repetitions - default: no gap");
-	PrintAndLog("       d <hexdata>    Data to sim as hex - omit to sim from DemodBuffer");
+	PrintAndLog("       d <hexdata>    Data to sim as hex - omit to sim from conn->DemodBuffer");
 	PrintAndLog("\n  NOTE: if you set one clock manually set them all manually");
 	return 0;
 }
@@ -456,13 +457,13 @@ int usage_lf_simask(void)
 	PrintAndLog("Usage: lf simask [c <clock>] [i] [b|m|r] [s] [d <raw hex to sim>]");
 	PrintAndLog("Options:        ");
 	PrintAndLog("       h              This help");
-	PrintAndLog("       c <clock>      Manually set clock - can autodetect if using DemodBuffer");
+	PrintAndLog("       c <clock>      Manually set clock - can autodetect if using conn->DemodBuffer");
 	PrintAndLog("       i              invert data");
 	PrintAndLog("       b              sim ask/biphase");
 	PrintAndLog("       m              sim ask/manchester - Default");
 	PrintAndLog("       r              sim ask/raw");
 	PrintAndLog("       s              add t55xx Sequence Terminator gap - default: no gaps (only manchester)");
-	PrintAndLog("       d <hexdata>    Data to sim as hex - omit to sim from DemodBuffer");
+	PrintAndLog("       d <hexdata>    Data to sim as hex - omit to sim from conn->DemodBuffer");
 	return 0;
 }
 
@@ -472,19 +473,19 @@ int usage_lf_simpsk(void)
 	PrintAndLog("Usage: lf simpsk [1|2|3] [c <clock>] [i] [r <carrier>] [d <raw hex to sim>]");
 	PrintAndLog("Options:        ");
 	PrintAndLog("       h              This help");
-	PrintAndLog("       c <clock>      Manually set clock - can autodetect if using DemodBuffer");
+	PrintAndLog("       c <clock>      Manually set clock - can autodetect if using conn->DemodBuffer");
 	PrintAndLog("       i              invert data");
 	PrintAndLog("       1              set PSK1 (default)");
 	PrintAndLog("       2              set PSK2");
 	PrintAndLog("       3              set PSK3");
 	PrintAndLog("       r <carrier>    2|4|8 are valid carriers: default = 2");
-	PrintAndLog("       d <hexdata>    Data to sim as hex - omit to sim from DemodBuffer");
+	PrintAndLog("       d <hexdata>    Data to sim as hex - omit to sim from conn->DemodBuffer");
 	return 0;
 }
 
 // by marshmellow - sim fsk data given clock, fcHigh, fcLow, invert 
-// - allow pull data from DemodBuffer
-int CmdLFfskSim(const char *Cmd)
+// - allow pull data from conn->DemodBuffer
+int CmdLFfskSim(pm3_connection* conn, const char *Cmd)
 {
 	//might be able to autodetect FCs and clock from Graphbuffer if using demod buffer
 	// otherwise will need FChigh, FClow, Clock, and bitstream
@@ -539,7 +540,7 @@ int CmdLFfskSim(const char *Cmd)
 		}
 		if(errors) break;
 	}
-	if(cmdp == 0 && DemodBufferLen == 0)
+	if(cmdp == 0 && conn->DemodBufferLen == 0)
 	{
 		errors = true;// No args
 	}
@@ -550,9 +551,9 @@ int CmdLFfskSim(const char *Cmd)
 		return usage_lf_simfsk();
 	}
 	int firstClockEdge = 0;
-	if (dataLen == 0){ //using DemodBuffer 
+	if (dataLen == 0){ //using conn->DemodBuffer 
 		if (clk==0 || fcHigh==0 || fcLow==0){ //manual settings must set them all
-			uint8_t ans = fskClocks(&fcHigh, &fcLow, &clk, 0, &firstClockEdge);
+			uint8_t ans = fskClocks(conn, &fcHigh, &fcLow, &clk, 0, &firstClockEdge);
 			if (ans==0){
 				if (!fcHigh) fcHigh=10;
 				if (!fcLow) fcLow=8;
@@ -560,7 +561,7 @@ int CmdLFfskSim(const char *Cmd)
 			}
 		}
 	} else {
-		setDemodBuf(data, dataLen, 0);
+		setDemodBuf(conn, data, dataLen, 0);
 	}
 
 	//default if not found
@@ -571,22 +572,22 @@ int CmdLFfskSim(const char *Cmd)
 	uint16_t arg1, arg2;
 	arg1 = fcHigh << 8 | fcLow;
 	arg2 = invert << 8 | clk;
-	size_t size = DemodBufferLen;
+	size_t size = conn->DemodBufferLen;
 	if (size > USB_CMD_DATA_SIZE) {
-		PrintAndLog("DemodBuffer too long for current implementation - length: %d - max: %d", size, USB_CMD_DATA_SIZE);
+		PrintAndLog("conn->DemodBuffer too long for current implementation - length: %d - max: %d", size, USB_CMD_DATA_SIZE);
 		size = USB_CMD_DATA_SIZE;
 	} 
 	UsbCommand c = {CMD_FSK_SIM_TAG, {arg1, arg2, size}};
 
-	memcpy(c.d.asBytes, DemodBuffer, size);
-	clearCommandBuffer();
-	SendCommand(&c);
+	memcpy(c.d.asBytes, conn->DemodBuffer, size);
+	clearCommandBuffer(conn);
+	SendCommand(conn, &c);
 	return 0;
 }
 
 // by marshmellow - sim ask data given clock, invert, manchester or raw, separator 
-// - allow pull data from DemodBuffer
-int CmdLFaskSim(const char *Cmd)
+// - allow pull data from conn->DemodBuffer
+int CmdLFaskSim(pm3_connection* conn, const char *Cmd)
 {
 	//autodetect clock from Graphbuffer if using demod buffer
 	// needs clock, invert, manchester/raw as m or r, separator as s, and bitstream
@@ -645,7 +646,7 @@ int CmdLFaskSim(const char *Cmd)
 		}
 		if(errors) break;
 	}
-	if(cmdp == 0 && DemodBufferLen == 0)
+	if(cmdp == 0 && conn->DemodBufferLen == 0)
 	{
 		errors = true;// No args
 	}
@@ -655,32 +656,32 @@ int CmdLFaskSim(const char *Cmd)
 	{
 		return usage_lf_simask();
 	}
-	if (dataLen == 0){ //using DemodBuffer
-		if (clk == 0) clk = GetAskClock("0", false, false);
+	if (dataLen == 0){ //using conn->DemodBuffer
+		if (clk == 0) clk = GetAskClock(conn, "0", false, false);
 	} else {
-		setDemodBuf(data, dataLen, 0);
+		setDemodBuf(conn, data, dataLen, 0);
 	}
 	if (clk == 0) clk = 64;
 	if (encoding == 0) clk = clk/2; //askraw needs to double the clock speed
 	uint16_t arg1, arg2;
-	size_t size=DemodBufferLen;
+	size_t size=conn->DemodBufferLen;
 	arg1 = clk << 8 | encoding;
 	arg2 = invert << 8 | separator;
 	if (size > USB_CMD_DATA_SIZE) {
-		PrintAndLog("DemodBuffer too long for current implementation - length: %d - max: %d", size, USB_CMD_DATA_SIZE);
+		PrintAndLog("conn->DemodBuffer too long for current implementation - length: %d - max: %d", size, USB_CMD_DATA_SIZE);
 		size = USB_CMD_DATA_SIZE;
 	}
 	UsbCommand c = {CMD_ASK_SIM_TAG, {arg1, arg2, size}};
 	PrintAndLog("preparing to sim ask data: %d bits", size);
-	memcpy(c.d.asBytes, DemodBuffer, size);
-	clearCommandBuffer();
-	SendCommand(&c);
+	memcpy(c.d.asBytes, conn->DemodBuffer, size);
+	clearCommandBuffer(conn);
+	SendCommand(conn, &c);
 	return 0;
 }
 
 // by marshmellow - sim psk data given carrier, clock, invert 
-// - allow pull data from DemodBuffer or parameters
-int CmdLFpskSim(const char *Cmd)
+// - allow pull data from conn->DemodBuffer or parameters
+int CmdLFpskSim(pm3_connection* conn, const char *Cmd)
 {
 	//might be able to autodetect FC and clock from Graphbuffer if using demod buffer
 	//will need carrier, Clock, and bitstream
@@ -740,7 +741,7 @@ int CmdLFpskSim(const char *Cmd)
 		}
 		if (errors) break;
 	}
-	if (cmdp == 0 && DemodBufferLen == 0)
+	if (cmdp == 0 && conn->DemodBufferLen == 0)
 	{
 		errors = true;// No args
 	}
@@ -750,14 +751,14 @@ int CmdLFpskSim(const char *Cmd)
 	{
 		return usage_lf_simpsk();
 	}
-	if (dataLen == 0){ //using DemodBuffer
+	if (dataLen == 0){ //using conn->DemodBuffer
 		PrintAndLog("Getting Clocks");
-		if (clk==0) clk = GetPskClock("", false, false);
+		if (clk==0) clk = GetPskClock(conn, "", false, false);
 		PrintAndLog("clk: %d",clk);
-		if (!carrier) carrier = GetPskCarrier("", false, false); 
+		if (!carrier) carrier = GetPskCarrier(conn, "", false, false); 
 		PrintAndLog("carrier: %d", carrier);
 	} else {
-		setDemodBuf(data, dataLen, 0);
+		setDemodBuf(conn, data, dataLen, 0);
 	}
 
 	if (clk <= 0) clk = 32;
@@ -765,7 +766,7 @@ int CmdLFpskSim(const char *Cmd)
 	if (pskType != 1){
 		if (pskType == 2){
 			//need to convert psk2 to psk1 data before sim
-			psk2TOpsk1(DemodBuffer, DemodBufferLen);
+			psk2TOpsk1(conn->DemodBuffer, conn->DemodBufferLen);
 		} else {
 			PrintAndLog("Sorry, PSK3 not yet available");
 		}
@@ -773,31 +774,31 @@ int CmdLFpskSim(const char *Cmd)
 	uint16_t arg1, arg2;
 	arg1 = clk << 8 | carrier;
 	arg2 = invert;
-	size_t size=DemodBufferLen;
+	size_t size=conn->DemodBufferLen;
 	if (size > USB_CMD_DATA_SIZE) {
-		PrintAndLog("DemodBuffer too long for current implementation - length: %d - max: %d", size, USB_CMD_DATA_SIZE);
+		PrintAndLog("conn->DemodBuffer too long for current implementation - length: %d - max: %d", size, USB_CMD_DATA_SIZE);
 		size=USB_CMD_DATA_SIZE;
 	}
 	UsbCommand c = {CMD_PSK_SIM_TAG, {arg1, arg2, size}};
-	PrintAndLog("DEBUG: Sending DemodBuffer Length: %d", size);
-	memcpy(c.d.asBytes, DemodBuffer, size);
-	clearCommandBuffer();
-	SendCommand(&c);
+	PrintAndLog("DEBUG: Sending conn->DemodBuffer Length: %d", size);
+	memcpy(c.d.asBytes, conn->DemodBuffer, size);
+	clearCommandBuffer(conn);
+	SendCommand(conn, &c);
 	
 	return 0;
 }
 
-int CmdLFSimBidir(const char *Cmd)
+int CmdLFSimBidir(pm3_connection* conn, const char *Cmd)
 {
 	// Set ADC to twice the carrier for a slight supersampling
 	// HACK: not implemented in ARMSRC.
 	PrintAndLog("Not implemented yet.");
 	UsbCommand c = {CMD_LF_SIMULATE_BIDIR, {47, 384, 0}};
-	SendCommand(&c);
+	SendCommand(conn, &c);
 	return 0;
 }
 
-int CmdVchDemod(const char *Cmd)
+int CmdVchDemod(pm3_connection* conn, const char *Cmd)
 {
 	// Is this the entire sync pattern, or does this also include some
 	// data bits that happen to be the same everywhere? That would be
@@ -820,11 +821,11 @@ int CmdVchDemod(const char *Cmd)
 	int i;
 	// It does us no good to find the sync pattern, with fewer than
 	// 2048 samples after it...
-	for (i = 0; i < (GraphTraceLen-2048); i++) {
+	for (i = 0; i < (conn->GraphTraceLen-2048); i++) {
 		int sum = 0;
 		int j;
 		for (j = 0; j < arraylen(SyncPattern); j++) {
-			sum += GraphBuffer[i+j]*SyncPattern[j];
+			sum += conn->GraphBuffer[i+j]*SyncPattern[j];
 		}
 		if (sum > bestCorrel) {
 			bestCorrel = sum;
@@ -843,7 +844,7 @@ int CmdVchDemod(const char *Cmd)
 		int sum = 0;
 		int j;
 		for (j = 0; j < 8; j++) {
-			sum += GraphBuffer[bestPos+i+j];
+			sum += conn->GraphBuffer[bestPos+i+j];
 		}
 		if (sum < 0) {
 			bits[i/8] = '.';
@@ -860,50 +861,50 @@ int CmdVchDemod(const char *Cmd)
 	PrintAndLog("worst metric: %d at pos %d", worst, worstPos);
 
 	if (strcmp(Cmd, "clone")==0) {
-		GraphTraceLen = 0;
+		conn->GraphTraceLen = 0;
 		char *s;
 		for(s = bits; *s; s++) {
 			int j;
 			for(j = 0; j < 16; j++) {
-				GraphBuffer[GraphTraceLen++] = (*s == '1') ? 1 : 0;
+				conn->GraphBuffer[conn->GraphTraceLen++] = (*s == '1') ? 1 : 0;
 			}
 		}
-		RepaintGraphWindow();
+		RepaintGraphWindow(conn);
 	}
 	return 0;
 }
 
 
 //by marshmellow
-int CheckChipType(char cmdp) {
+int CheckChipType(pm3_connection* conn, char cmdp) {
 	uint32_t wordData = 0;
 
-	if (offline || cmdp == '1') return 0;
+	if (conn->offline || cmdp == '1') return 0;
 
-	save_restoreGB(GRAPH_SAVE);
-	save_restoreDB(GRAPH_SAVE);
+	save_restoreGB(conn, GRAPH_SAVE);
+	save_restoreDB(conn, GRAPH_SAVE);
 	//check for em4x05/em4x69 chips first
-	if (EM4x05Block0Test(&wordData)) {
+	if (EM4x05Block0Test(conn, &wordData)) {
 		PrintAndLog("\nValid EM4x05/EM4x69 Chip Found\nTry lf em 4x05... commands\n");
-		save_restoreGB(GRAPH_RESTORE);
-		save_restoreDB(GRAPH_RESTORE);
+		save_restoreGB(conn, GRAPH_RESTORE);
+		save_restoreDB(conn, GRAPH_RESTORE);
 		return 1;
 	}
 
 	//check for t55xx chip...
-	if (tryDetectP1(true)) {
+	if (tryDetectP1(conn, true)) {
 		PrintAndLog("\nValid T55xx Chip Found\nTry lf t55xx ... commands\n");
-		save_restoreGB(GRAPH_RESTORE);
-		save_restoreDB(GRAPH_RESTORE);
+		save_restoreGB(conn, GRAPH_RESTORE);
+		save_restoreDB(conn, GRAPH_RESTORE);
 		return 1;		
 	}
-	save_restoreGB(GRAPH_RESTORE);
-	save_restoreDB(GRAPH_RESTORE);
+	save_restoreGB(conn, GRAPH_RESTORE);
+	save_restoreDB(conn, GRAPH_RESTORE);
 	return 0;
 }
 
 //by marshmellow
-int CmdLFfind(const char *Cmd)
+int CmdLFfind(pm3_connection* conn, const char *Cmd)
 {
 	uint32_t wordData = 0;
 	int ans=0;
@@ -916,16 +917,16 @@ int CmdLFfind(const char *Cmd)
 		PrintAndLog("     [Search for Unknown tags] , if not set, reads only known tags.");
 		PrintAndLog("");
 		PrintAndLog("    sample: lf search     = try reading data from tag & search for known tags");
-		PrintAndLog("          : lf search 1   = use data from GraphBuffer & search for known tags");
+		PrintAndLog("          : lf search 1   = use data from conn->GraphBuffer & search for known tags");
 		PrintAndLog("          : lf search u   = try reading data from tag & search for known and unknown tags");
-		PrintAndLog("          : lf search 1 u = use data from GraphBuffer & search for known and unknown tags");
+		PrintAndLog("          : lf search 1 u = use data from conn->GraphBuffer & search for known and unknown tags");
 
 		return 0;
 	}
 
-	if (!offline && (cmdp != '1')) {
-		lf_read(true, 30000);
-	} else if (GraphTraceLen < minLength) {
+	if (!conn->offline && (cmdp != '1')) {
+		lf_read(conn, true, 30000);
+	} else if (conn->GraphTraceLen < minLength) {
 		PrintAndLog("Data in Graphbuffer was too small.");
 		return 0;
 	}
@@ -937,19 +938,19 @@ int CmdLFfind(const char *Cmd)
 
 	size_t testLen = minLength;
 	// only run if graphbuffer is just noise as it should be for hitag/cotag
-	if (graphJustNoise(GraphBuffer, testLen)) {
+	if (graphJustNoise(conn->GraphBuffer, testLen)) {
 		// only run these tests if we are in online mode 
-		if (!offline && (cmdp != '1')) {
+		if (!conn->offline && (cmdp != '1')) {
 			// test for em4x05 in reader talk first mode.
-			if (EM4x05Block0Test(&wordData)) {
+			if (EM4x05Block0Test(conn, &wordData)) {
 				PrintAndLog("\nValid EM4x05/EM4x69 Chip Found\nUse lf em 4x05readword/dump commands to read\n");
 				return 1;
 			}
-			ans=CmdLFHitagReader("26");
+			ans=CmdLFHitagReader(conn, "26");
 			if (ans==0) {
 				return 1;
 			}
-			ans=CmdCOTAGRead("");
+			ans=CmdCOTAGRead(conn, "");
 			if (ans>0) {
 				PrintAndLog("\nValid COTAG ID Found!");
 				return 1;
@@ -960,138 +961,138 @@ int CmdLFfind(const char *Cmd)
 
 	// TODO test for modulation then only test formats that use that modulation
 
-	ans=CmdFSKdemodIO("");
+	ans=CmdFSKdemodIO(conn, "");
 	if (ans>0) {
 		PrintAndLog("\nValid IO Prox ID Found!");
-		return CheckChipType(cmdp);
+		return CheckChipType(conn, cmdp);
 	}
 
-	ans=CmdFSKdemodPyramid("");
+	ans=CmdFSKdemodPyramid(conn, "");
 	if (ans>0) {
 		PrintAndLog("\nValid Pyramid ID Found!");
-		return CheckChipType(cmdp);
+		return CheckChipType(conn, cmdp);
 	}
 
-	ans=CmdFSKdemodParadox("");
+	ans=CmdFSKdemodParadox(conn, "");
 	if (ans>0) {
 		PrintAndLog("\nValid Paradox ID Found!");
-		return CheckChipType(cmdp);
+		return CheckChipType(conn, cmdp);
 	}
 
-	ans=CmdFSKdemodAWID("");
+	ans=CmdFSKdemodAWID(conn, "");
 	if (ans>0) {
 		PrintAndLog("\nValid AWID ID Found!");
-		return CheckChipType(cmdp);
+		return CheckChipType(conn, cmdp);
 	}
 
-	ans=CmdFSKdemodHID("");
+	ans=CmdFSKdemodHID(conn, "");
 	if (ans>0) {
 		PrintAndLog("\nValid HID Prox ID Found!");
-		return CheckChipType(cmdp);
+		return CheckChipType(conn, cmdp);
 	}
 
-	ans=CmdAskEM410xDemod("");
+	ans=CmdAskEM410xDemod(conn, "");
 	if (ans>0) {
 		PrintAndLog("\nValid EM410x ID Found!");
-		return CheckChipType(cmdp);
+		return CheckChipType(conn, cmdp);
 	}
 
-	ans=CmdVisa2kDemod("");
+	ans=CmdVisa2kDemod(conn, "");
 	if (ans>0) {
 		PrintAndLog("\nValid Visa2000 ID Found!");
-		return CheckChipType(cmdp);		
+		return CheckChipType(conn, cmdp);		
 	}
 	
-	ans=CmdG_Prox_II_Demod("");
+	ans=CmdG_Prox_II_Demod(conn, "");
 	if (ans>0) {
 		PrintAndLog("\nValid G Prox II ID Found!");
-		return CheckChipType(cmdp);
+		return CheckChipType(conn, cmdp);
 	}
 
-	ans=CmdFdxDemod(""); //biphase
+	ans=CmdFdxDemod(conn, ""); //biphase
 	if (ans>0) {
 		PrintAndLog("\nValid FDX-B ID Found!");
-		return CheckChipType(cmdp);
+		return CheckChipType(conn, cmdp);
 	}
 
-	ans=EM4x50Read("", false); //ask
+	ans=EM4x50Read(conn, "", false); //ask
 	if (ans>0) {
 		PrintAndLog("\nValid EM4x50 ID Found!");
 		return 1;
 	}
 
-	ans=CmdJablotronDemod("");
+	ans=CmdJablotronDemod(conn, "");
 	if (ans>0) {
 		PrintAndLog("\nValid Jablotron ID Found!");
-		return CheckChipType(cmdp);
+		return CheckChipType(conn, cmdp);
 	}
 
-	ans=CmdNoralsyDemod("");
+	ans=CmdNoralsyDemod(conn, "");
 	if (ans>0) {
 		PrintAndLog("\nValid Noralsy ID Found!");
-		return CheckChipType(cmdp);
+		return CheckChipType(conn, cmdp);
 	}
 
-	ans=CmdSecurakeyDemod("");
+	ans=CmdSecurakeyDemod(conn, "");
 	if (ans>0) {
 		PrintAndLog("\nValid Securakey ID Found!");
-		return CheckChipType(cmdp);
+		return CheckChipType(conn, cmdp);
 	}
 
-	ans=CmdVikingDemod("");
+	ans=CmdVikingDemod(conn, "");
 	if (ans>0) {
 		PrintAndLog("\nValid Viking ID Found!");
-		return CheckChipType(cmdp);
+		return CheckChipType(conn, cmdp);
 	}
 
-	ans=CmdIndalaDecode(""); //psk
+	ans=CmdIndalaDecode(conn, ""); //psk
 	if (ans>0) {
 		PrintAndLog("\nValid Indala ID Found!");
-		return CheckChipType(cmdp);
+		return CheckChipType(conn, cmdp);
 	}
 
-	ans=CmdPSKNexWatch("");
+	ans=CmdPSKNexWatch(conn, "");
 	if (ans>0) {
 		PrintAndLog("\nValid NexWatch ID Found!");
-		return CheckChipType(cmdp);
+		return CheckChipType(conn, cmdp);
 	}
 
-	ans=CmdPacDemod("");
+	ans=CmdPacDemod(conn, "");
 	if (ans>0) {
 		PrintAndLog("\nValid PAC/Stanley ID Found!");
-		return CheckChipType(cmdp);		
+		return CheckChipType(conn, cmdp);		
 	}
 
 	PrintAndLog("\nNo Known Tags Found!\n");
 	if (testRaw=='u' || testRaw=='U') {
-		//ans=CheckChipType(cmdp);
+		//ans=CheckChipType(conn, cmdp);
 		//test unknown tag formats (raw mode)0
 		PrintAndLog("\nChecking for Unknown tags:\n");
-		ans=AutoCorrelate(GraphBuffer, GraphBuffer, GraphTraceLen, 4000, false, false);
+		ans=AutoCorrelate(conn, conn->GraphBuffer, conn->GraphBuffer, conn->GraphTraceLen, 4000, false, false);
 		if (ans > 0) PrintAndLog("Possible Auto Correlation of %d repeating samples",ans);
-		ans=GetFskClock("",false,false); 
+		ans=GetFskClock(conn, "", false, false); 
 		if (ans != 0) { //fsk
-			ans=FSKrawDemod("",true);
+			ans=FSKrawDemod(conn, "", true);
 			if (ans>0) {
 				PrintAndLog("\nUnknown FSK Modulated Tag Found!");
-				return CheckChipType(cmdp);
+				return CheckChipType(conn, cmdp);
 			}
 		}
 		bool st = true;
-		ans=ASKDemod_ext("0 0 0",true,false,1,&st);
+		ans=ASKDemod_ext(conn, "0 0 0",true,false,1,&st);
 		if (ans>0) {
 			PrintAndLog("\nUnknown ASK Modulated and Manchester encoded Tag Found!");
 			PrintAndLog("\nif it does not look right it could instead be ASK/Biphase - try 'data rawdemod ab'");
-			return CheckChipType(cmdp);
+			return CheckChipType(conn, cmdp);
 		}
-		ans=CmdPSK1rawDemod("");
+		ans=CmdPSK1rawDemod(conn, "");
 		if (ans>0) {
 			PrintAndLog("Possible unknown PSK1 Modulated Tag Found above!\n\nCould also be PSK2 - try 'data rawdemod p2'");
 			PrintAndLog("\nCould also be PSK3 - [currently not supported]");
 			PrintAndLog("\nCould also be NRZ - try 'data rawdemod nr'");
-			return CheckChipType(cmdp);
+			return CheckChipType(conn, cmdp);
 		}
-		ans = CheckChipType(cmdp);
+		ans = CheckChipType(conn, cmdp);
 		PrintAndLog("\nNo Data Found!\n");
 	}
 	return 0;
@@ -1122,29 +1123,29 @@ static command_t CommandTable[] =
 	{"ti",          CmdLFTI,            1, "{ TI CHIPs...                }"},
 	{"viking",      CmdLFViking,        1, "{ Viking RFIDs...            }"},
 	{"visa2000",    CmdLFVisa2k,        1, "{ Visa2000 RFIDs...          }"},
-	{"cmdread",     CmdLFCommandRead,   0, "<d period> <z period> <o period> <c command> ['H'] -- Modulate LF reader field to send command before read (all periods in microseconds) (option 'H' for 134)"},
+	{"cmdread",     CmdLFCommandRead,   0, "<d period> <z period> <o period> <c command> ['H'] -- Modulate LF reader field to send command before read (conn, all periods in microseconds) (option 'H' for 134)"},
 	{"config",      CmdLFSetConfig,     0, "Set config for LF sampling, bit/sample, decimation, frequency"},
 	{"flexdemod",   CmdFlexdemod,       1, "Demodulate samples for FlexPass"},
 	{"read",        CmdLFRead,          0, "['s' silent] Read 125/134 kHz LF ID-only tag. Do 'lf read h' for help"},
-	{"search",      CmdLFfind,          1, "[offline] ['u'] Read and Search for valid known tag (in offline mode it you can load first then search) - 'u' to search for unknown tags"},
-	{"sim",         CmdLFSim,           0, "[GAP] -- Simulate LF tag from buffer with optional GAP (in microseconds)"},
+	{"search",      CmdLFfind,          1, "[offline] ['u'] Read and Search for valid known tag (conn, in offline mode it you can load first then search) - 'u' to search for unknown tags"},
+	{"sim",         CmdLFSim,           0, "[GAP] -- Simulate LF tag from buffer with optional GAP (conn, in microseconds)"},
 	{"simask",      CmdLFaskSim,        0, "[clock] [invert <1|0>] [biphase/manchester/raw <'b'|'m'|'r'>] [msg separator 's'] [d <hexdata>] -- Simulate LF ASK tag from demodbuffer or input"},
 	{"simfsk",      CmdLFfskSim,        0, "[c <clock>] [i] [H <fcHigh>] [L <fcLow>] [d <hexdata>] -- Simulate LF FSK tag from demodbuffer or input"},
 	{"simpsk",      CmdLFpskSim,        0, "[1|2|3] [c <clock>] [i] [r <carrier>] [d <raw hex to sim>] -- Simulate LF PSK tag from demodbuffer or input"},
-	{"simbidir",    CmdLFSimBidir,      0, "Simulate LF tag (with bidirectional data transmission between reader and tag)"},
-	{"snoop",       CmdLFSnoop,         0, "['l'|'h'|<divisor>] [trigger threshold]-- Snoop LF (l:125khz, h:134khz)"},
+	{"simbidir",    CmdLFSimBidir,      0, "Simulate LF tag (conn, with bidirectional data transmission between reader and tag)"},
+	{"snoop",       CmdLFSnoop,         0, "['l'|'h'|<divisor>] [trigger threshold]-- Snoop LF (conn, l:125khz, h:134khz)"},
 	{"vchdemod",    CmdVchDemod,        1, "['clone'] -- Demodulate samples for VeriChip"},
 	{NULL, NULL, 0, NULL}
 };
 
-int CmdLF(const char *Cmd)
+int CmdLF(pm3_connection* conn, const char *Cmd)
 {
-	CmdsParse(CommandTable, Cmd);
+	CmdsParse(conn, CommandTable, Cmd);
 	return 0; 
 }
 
-int CmdHelp(const char *Cmd)
+int CmdHelp(pm3_connection* conn, const char *Cmd)
 {
-	CmdsHelp(CommandTable);
+	CmdsHelp(conn, CommandTable);
 	return 0;
 }

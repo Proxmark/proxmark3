@@ -11,6 +11,7 @@
 #define SCRIPTING_H__
 
 #include <lua.h>
+#include "comms.h"
 
 #define LUA_LIBRARIES_DIRECTORY 	"lualibs/"
 #define LUA_SCRIPTS_DIRECTORY 		"scripts/"
@@ -22,6 +23,6 @@
  * @param L
  */
 
-int set_pm3_libraries(lua_State *L);
+int set_pm3_libraries(lua_State *L, pm3_connection* conn);
 
 #endif

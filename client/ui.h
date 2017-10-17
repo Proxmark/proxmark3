@@ -13,19 +13,19 @@
 
 #include <stdbool.h>
 #include <stdint.h>
+#include <pthread.h>
+#include "comms.h"
+
+// a global mutex to prevent interlaced printing from different threads
+pthread_mutex_t print_lock;
+extern uint8_t g_debugMode;
 
 void ShowGui(void);
-void HideGraphWindow(void);
-void ShowGraphWindow(void);
-void RepaintGraphWindow(void);
+void HideGraphWindow();
+void ShowGraphWindow();
+void RepaintGraphWindow();
 void PrintAndLog(char *fmt, ...);
 void SetLogFilename(char *fn);
-
-extern double CursorScaleFactor;
-extern int PlotGridX, PlotGridY, PlotGridXdefault, PlotGridYdefault, CursorCPos, CursorDPos, GridOffset;
-extern int offline;
-extern int flushAfterWrite;   //buzzy
-extern bool GridLocked;
-extern bool showDemod;
+void SetFlushAfterWrite(bool flush_after_write);
 
 #endif

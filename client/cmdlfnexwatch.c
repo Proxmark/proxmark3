@@ -21,30 +21,30 @@
 #include "cmdlf.h"
 #include "lfdemod.h"
 
-static int CmdHelp(const char *Cmd);
+static int CmdHelp(pm3_connection* conn, const char *Cmd);
 
-int CmdPSKNexWatch(const char *Cmd)
+int CmdPSKNexWatch(pm3_connection* conn, const char *Cmd)
 {
-	if (!PSKDemod("", false)) return 0;
+	if (!PSKDemod(conn, "", false)) return 0;
 	uint8_t preamble[28] = {0,0,0,0,0,1,0,1,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
-	size_t startIdx = 0, size = DemodBufferLen; 
+	size_t startIdx = 0, size = conn->DemodBufferLen; 
 	bool invert = false;
-	if (!preambleSearch(DemodBuffer, preamble, sizeof(preamble), &size, &startIdx)){
+	if (!preambleSearch(conn->DemodBuffer, preamble, sizeof(preamble), &size, &startIdx)){
 		// if didn't find preamble try again inverting
-		if (!PSKDemod("1", false)) return 0; 
-		size = DemodBufferLen;
-		if (!preambleSearch(DemodBuffer, preamble, sizeof(preamble), &size, &startIdx)) return 0;
+		if (!PSKDemod(conn, "1", false)) return 0; 
+		size = conn->DemodBufferLen;
+		if (!preambleSearch(conn->DemodBuffer, preamble, sizeof(preamble), &size, &startIdx)) return 0;
 		invert = true;
 	}
 	if (size != 128) return 0;
-	setDemodBuf(DemodBuffer, size, startIdx+4);
-	setClockGrid(g_DemodClock, g_DemodStartIdx + ((startIdx+4)*g_DemodClock));
+	setDemodBuf(conn, conn->DemodBuffer, size, startIdx+4);
+	setClockGrid(conn, conn->g_DemodClock, conn->g_DemodStartIdx + ((startIdx+4)*conn->g_DemodClock));
 	startIdx = 8+32; // 8 = preamble, 32 = reserved bits (always 0)
 	//get ID
 	uint32_t ID = 0;
 	for (uint8_t wordIdx=0; wordIdx<4; wordIdx++){
 		for (uint8_t idx=0; idx<8; idx++){
-			ID = (ID << 1) | DemodBuffer[startIdx+wordIdx+(idx*4)];
+			ID = (ID << 1) | conn->DemodBuffer[startIdx+wordIdx+(idx*4)];
 		}	
 	}
 	//parity check (TBD)
@@ -56,20 +56,20 @@ int CmdPSKNexWatch(const char *Cmd)
 	if (invert){
 		PrintAndLog("Had to Invert - probably NexKey");
 		for (uint8_t idx=0; idx<size; idx++)
-			DemodBuffer[idx] ^= 1;
+			conn->DemodBuffer[idx] ^= 1;
 	} 
 
-	CmdPrintDemodBuff("x");
+	CmdPrintDemodBuff(conn, "x");
 	return 1;
 }
 
 //by marshmellow
 //see ASKDemod for what args are accepted
-int CmdNexWatchRead(const char *Cmd) {
+int CmdNexWatchRead(pm3_connection* conn, const char *Cmd) {
 	// read lf silently
-	lf_read(true, 10000);
+	lf_read(conn, true, 10000);
 	// demod and output viking ID	
-	return CmdPSKNexWatch(Cmd);
+	return CmdPSKNexWatch(conn, Cmd);
 }
 
 static command_t CommandTable[] = {
@@ -79,12 +79,12 @@ static command_t CommandTable[] = {
 	{NULL, NULL, 0, NULL}
 };
 
-int CmdLFNexWatch(const char *Cmd) {
-	CmdsParse(CommandTable, Cmd);
+int CmdLFNexWatch(pm3_connection* conn, const char *Cmd) {
+	CmdsParse(conn, CommandTable, Cmd);
 	return 0;
 }
 
-int CmdHelp(const char *Cmd) {
-	CmdsHelp(CommandTable);
+int CmdHelp(pm3_connection* conn, const char *Cmd) {
+	CmdsHelp(conn, CommandTable);
 	return 0;
 }

@@ -11,17 +11,19 @@
 #ifndef CMDHW_H__
 #define CMDHW_H__
 
-int CmdHW(const char *Cmd);
+#include "comms.h"
 
-int CmdDetectReader(const char *Cmd);
-int CmdFPGAOff(const char *Cmd);
-int CmdLCD(const char *Cmd);
-int CmdLCDReset(const char *Cmd);
-int CmdReadmem(const char *Cmd);
-int CmdReset(const char *Cmd);
-int CmdSetDivisor(const char *Cmd);
-int CmdSetMux(const char *Cmd);
-int CmdTune(const char *Cmd);
-int CmdVersion(const char *Cmd);
+int CmdHW(pm3_connection *conn, const char *Cmd);
+
+int CmdDetectReader(pm3_connection *conn, const char *Cmd);
+int CmdFPGAOff(pm3_connection *conn, const char *Cmd);
+int CmdLCD(pm3_connection *conn, const char *Cmd);
+int CmdLCDReset(pm3_connection *conn, const char *Cmd);
+int CmdReadmem(pm3_connection *conn, const char *Cmd);
+int CmdReset(pm3_connection *conn, const char *Cmd);
+int CmdSetDivisor(pm3_connection *conn, const char *Cmd);
+int CmdSetMux(pm3_connection *conn, const char *Cmd);
+int CmdTune(pm3_connection *conn, const char *Cmd);
+int CmdVersion(pm3_connection *conn, const char *Cmd);
 
 #endif

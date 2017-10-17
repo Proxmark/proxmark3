@@ -18,7 +18,7 @@
 #include "cmdhflegic.h"
 #include "cmdmain.h"
 #include "util.h"
-static int CmdHelp(const char *Cmd);
+static int CmdHelp(pm3_connection* conn, const char *Cmd);
 
 static command_t CommandTable[] = 
 {
@@ -33,15 +33,15 @@ static command_t CommandTable[] =
   {NULL, NULL, 0, NULL}
 };
 
-int CmdHFLegic(const char *Cmd)
+int CmdHFLegic(pm3_connection* conn, const char *Cmd)
 {
-  CmdsParse(CommandTable, Cmd);
+  CmdsParse(conn, CommandTable, Cmd);
   return 0;
 }
 
-int CmdHelp(const char *Cmd)
+int CmdHelp(pm3_connection* conn, const char *Cmd)
 {
-  CmdsHelp(CommandTable);
+  CmdsHelp(conn, CommandTable);
   return 0;
 }
 
@@ -50,7 +50,7 @@ int CmdHelp(const char *Cmd)
  *   This is based on information given in the talk held
  *  by Henryk Ploetz and Karsten Nohl at 26c3
  */
-int CmdLegicDecode(const char *Cmd)
+int CmdLegicDecode(pm3_connection* conn, const char *Cmd)
 {
   int i, j, k, n;
   int segment_len = 0;
@@ -64,8 +64,8 @@ int CmdLegicDecode(const char *Cmd)
   char token_type[4];
   
   // copy data from proxmark into buffer
-   GetFromBigBuf(data_buf,sizeof(data_buf),0);
-   WaitForResponse(CMD_ACK,NULL);
+   GetFromBigBuf(conn, data_buf,sizeof(data_buf),0);
+   WaitForResponse(conn, CMD_ACK,NULL);
     
   // Output CDF System area (9 bytes) plus remaining header area (12 bytes)
   
@@ -206,18 +206,18 @@ int CmdLegicDecode(const char *Cmd)
   return 0;
 }
 
-int CmdLegicRFRead(const char *Cmd)
+int CmdLegicRFRead(pm3_connection* conn, const char *Cmd)
 {
   int byte_count=0,offset=0;
   sscanf(Cmd, "%i %i", &offset, &byte_count);
   if(byte_count == 0) byte_count = -1;
   if(byte_count + offset > 1024) byte_count = 1024 - offset;
   UsbCommand c={CMD_READER_LEGIC_RF, {offset, byte_count, 0}};
-  SendCommand(&c);
+  SendCommand(conn, &c);
   return 0;
 }
 
-int CmdLegicLoad(const char *Cmd)
+int CmdLegicLoad(pm3_connection* conn, const char *Cmd)
 {
 	char filename[FILE_PATH_SIZE] = {0x00};
 	int len = 0;
@@ -255,8 +255,8 @@ int CmdLegicLoad(const char *Cmd)
         int j; for(j = 0; j < 8; j++) {
             c.d.asBytes[j] = data[j];
         }
-        SendCommand(&c);
-        WaitForResponse(CMD_ACK, NULL);
+        SendCommand(conn, &c);
+        WaitForResponse(conn, CMD_ACK, NULL);
         offset += 8;
     }
     fclose(f);
@@ -264,7 +264,7 @@ int CmdLegicLoad(const char *Cmd)
     return 0;
 }
 
-int CmdLegicSave(const char *Cmd)
+int CmdLegicSave(pm3_connection* conn, const char *Cmd)
 {
   int requested = 1024;
   int offset = 0;
@@ -294,8 +294,8 @@ int CmdLegicSave(const char *Cmd)
     return -1;
   }
 
-  GetFromBigBuf(got,requested,offset);
-  WaitForResponse(CMD_ACK,NULL);
+  GetFromBigBuf(conn, got,requested,offset);
+  WaitForResponse(conn, CMD_ACK,NULL);
 
   for (int j = 0; j < requested; j += 8) {
     fprintf(f, "%02x %02x %02x %02x %02x %02x %02x %02x\n",
@@ -318,18 +318,18 @@ int CmdLegicSave(const char *Cmd)
   return 0;
 }
 
-int CmdLegicRfSim(const char *Cmd)
+int CmdLegicRfSim(pm3_connection* conn, const char *Cmd)
 {
    UsbCommand c={CMD_SIMULATE_TAG_LEGIC_RF};
    c.arg[0] = 6;
    c.arg[1] = 3;
    c.arg[2] = 0;
    sscanf(Cmd, " %" SCNi64 " %" SCNi64 " %" SCNi64, &c.arg[0], &c.arg[1], &c.arg[2]);
-   SendCommand(&c);
+   SendCommand(conn, &c);
    return 0;
 }
 
-int CmdLegicRfWrite(const char *Cmd)
+int CmdLegicRfWrite(pm3_connection* conn, const char *Cmd)
 {
     UsbCommand c={CMD_WRITER_LEGIC_RF};
     int res = sscanf(Cmd, " 0x%" SCNx64 " 0x%" SCNx64, &c.arg[0], &c.arg[1]);
@@ -337,11 +337,11 @@ int CmdLegicRfWrite(const char *Cmd)
 		PrintAndLog("Please specify the offset and length as two hex strings");
         return -1;
     }
-    SendCommand(&c);
+    SendCommand(conn, &c);
     return 0;
 }
 
-int CmdLegicRfFill(const char *Cmd)
+int CmdLegicRfFill(pm3_connection* conn, const char *Cmd)
 {
     UsbCommand cmd ={CMD_WRITER_LEGIC_RF};
     int res = sscanf(Cmd, " 0x%" SCNx64 " 0x%" SCNx64 " 0x%" SCNx64, &cmd.arg[0], &cmd.arg[1], &cmd.arg[2]);
@@ -357,10 +357,10 @@ int CmdLegicRfFill(const char *Cmd)
     }
     for(i = 0; i < 22; i++) {
       c.arg[0] = i*48;
-      SendCommand(&c);
-      WaitForResponse(CMD_ACK,NULL);
+      SendCommand(conn, &c);
+      WaitForResponse(conn, CMD_ACK,NULL);
     }
-    SendCommand(&cmd);
+    SendCommand(conn, &cmd);
     return 0;
  }
 

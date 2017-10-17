@@ -8,7 +8,9 @@
 //-----------------------------------------------------------------------------
 #ifndef CMDLFGPROXII_H__
 #define CMDLFGPROXII_H__
-extern int CmdLF_G_Prox_II(const char *Cmd);
-extern int CmdG_Prox_II_Demod(const char *Cmd);
-extern int CmdG_Prox_II_Read(const char *Cmd);
+#include "comms.h"
+
+extern int CmdLF_G_Prox_II(pm3_connection* conn, const char *Cmd);
+extern int CmdG_Prox_II_Demod(pm3_connection* conn, const char *Cmd);
+extern int CmdG_Prox_II_Read(pm3_connection* conn, const char *Cmd);
 #endif

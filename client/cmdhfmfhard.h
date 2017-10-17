@@ -13,6 +13,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include "comms.h"
 
 #define NUM_SUMS 						19		// number of possible sum property values
 
@@ -41,7 +42,7 @@ typedef struct noncelist {
 	noncelistentry_t *first;
 } noncelist_t;
 
-int mfnestedhard(uint8_t blockNo, uint8_t keyType, uint8_t *key, uint8_t trgBlockNo, uint8_t trgKeyType, uint8_t *trgkey, bool nonce_file_read, bool nonce_file_write, bool slow, int tests);
+int mfnestedhard(pm3_connection* conn, uint8_t blockNo, uint8_t keyType, uint8_t *key, uint8_t trgBlockNo, uint8_t trgKeyType, uint8_t *trgkey, bool nonce_file_read, bool nonce_file_write, bool slow, int tests);
 void hardnested_print_progress(uint32_t nonces, char *activity, float brute_force, uint64_t min_diff_print_time);
 
 #endif

@@ -20,7 +20,7 @@
 #include "cmdlf.h"
 #include "cmdlfpcf7931.h"
 
-static int CmdHelp(const char *Cmd);
+static int CmdHelp(pm3_connection* conn, const char *Cmd);
 
 #define PCF7931_DEFAULT_INITDELAY 17500
 #define PCF7931_DEFAULT_OFFSET_WIDTH 0
@@ -94,23 +94,23 @@ int usage_pcf7931_config(){
 	return 0;
 }
 
-int CmdLFPCF7931Read(const char *Cmd){  
+int CmdLFPCF7931Read(pm3_connection* conn, const char *Cmd){  
 
 	uint8_t ctmp = param_getchar(Cmd, 0);
 	if ( ctmp == 'H' || ctmp == 'h' ) return usage_pcf7931_read();
 
 	UsbCommand resp;
 	UsbCommand c = {CMD_PCF7931_READ, {0, 0, 0}};
-	clearCommandBuffer();
-	SendCommand(&c);
-	if ( !WaitForResponseTimeout(CMD_ACK, &resp, 2500) ) {
+	clearCommandBuffer(conn);
+	SendCommand(conn, &c);
+	if ( !WaitForResponseTimeout(conn, CMD_ACK, &resp, 2500) ) {
 		PrintAndLog("command execution time out");
 		return 1;
 	}
 	return 0;
 }
 
-int CmdLFPCF7931Config(const char *Cmd){ 
+int CmdLFPCF7931Config(pm3_connection* conn, const char *Cmd){ 
 
 	uint8_t ctmp = param_getchar(Cmd, 0);
 	if ( ctmp == 0) return pcf7931_printConfig();
@@ -127,7 +127,7 @@ int CmdLFPCF7931Config(const char *Cmd){
 	return 0;
 }
 
-int CmdLFPCF7931Write(const char *Cmd){
+int CmdLFPCF7931Write(pm3_connection* conn, const char *Cmd){
 
 	uint8_t ctmp = param_getchar(Cmd, 0);
 	if (strlen(Cmd) < 1 || ctmp == 'h' || ctmp == 'H') return usage_pcf7931_write();  
@@ -151,8 +151,8 @@ int CmdLFPCF7931Write(const char *Cmd){
 	  c.d.asDwords[8] = (configPcf.OffsetPosition + 128);
 	  c.d.asDwords[9] = configPcf.InitDelay;
 
-	clearCommandBuffer();
-	SendCommand(&c);
+	clearCommandBuffer(conn);
+	SendCommand(conn, &c);
 	//no ack?
 	return 0;
 }
@@ -166,14 +166,14 @@ static command_t CommandTable[] =
 	{NULL,     NULL,               0, NULL}
 };
 
-int CmdLFPCF7931(const char *Cmd)
+int CmdLFPCF7931(pm3_connection* conn, const char *Cmd)
 {
-	CmdsParse(CommandTable, Cmd);
+	CmdsParse(conn, CommandTable, Cmd);
 	return 0;
 }
 
-int CmdHelp(const char *Cmd)
+int CmdHelp(pm3_connection* conn, const char *Cmd)
 {
-	CmdsHelp(CommandTable);
+	CmdsHelp(conn, CommandTable);
 	return 0;
 }

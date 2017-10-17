@@ -18,23 +18,17 @@
 
 #include "ui.h"
 
-double CursorScaleFactor = 1;
-int PlotGridX=0, PlotGridY=0, PlotGridXdefault= 64, PlotGridYdefault= 64, CursorCPos= 0, CursorDPos= 0;
-int offline;
-int flushAfterWrite = 0;  //buzzy
-int GridOffset = 0;
-bool GridLocked = false;
-bool showDemod = true;
-
 extern pthread_mutex_t print_lock;
 
 static char *logfilename = "proxmark3.log";
+static bool flushAfterWrite = false;
 
 void PrintAndLog(char *fmt, ...)
 {
 	char *saved_line;
 	int saved_point;
 	va_list argptr, argptr2;
+	// TODO: stash these elsewhere
 	static FILE *logfile = NULL;
 	static int logging=1;
 
@@ -62,7 +56,6 @@ void PrintAndLog(char *fmt, ...)
 	}
 #else
 	// We are using libedit (OSX), which doesn't support this flag.
-	int need_hack = 0;
 #endif
 	
 	va_start(argptr, fmt);
@@ -72,6 +65,9 @@ void PrintAndLog(char *fmt, ...)
 	va_end(argptr);
 	printf("\n");
 
+	// This needs to be wrapped in ifdefs, as this if optimisation is disabled,
+	// this block won't be removed, and it'll fail at the linker.
+#ifdef RL_STATE_READCMD
 	if (need_hack) {
 		rl_restore_prompt();
 		rl_replace_line(saved_line, 0);
@@ -79,6 +75,7 @@ void PrintAndLog(char *fmt, ...)
 		rl_redisplay();
 		free(saved_line);
 	}
+#endif
 	
 	if (logging && logfile) {
 		vfprintf(logfile, fmt, argptr2);
@@ -87,16 +84,16 @@ void PrintAndLog(char *fmt, ...)
 	}
 	va_end(argptr2);
 
-	if (flushAfterWrite == 1)  //buzzy
-	{
-		fflush(NULL);
-	}
 	//release lock
 	pthread_mutex_unlock(&print_lock);  
 }
-
 
 void SetLogFilename(char *fn)
 {
   logfilename = fn;
 }
+
+void SetFlushAfterWrite(bool flush_after_write) {
+	flushAfterWrite = flush_after_write;
+}
+

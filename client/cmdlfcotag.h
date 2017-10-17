@@ -15,9 +15,9 @@
 #define COTAG_BITS 264
 #endif
 
-int CmdLFCOTAG(const char *Cmd);
-int CmdCOTAGRead(const char *Cmd);
-int CmdCOTAGDemod(const char *Cmd);
+int CmdLFCOTAG(pm3_connection* conn, const char *Cmd);
+int CmdCOTAGRead(pm3_connection* conn, const char *Cmd);
+int CmdCOTAGDemod(pm3_connection* conn, const char *Cmd);
 
 int usage_lf_cotag_read(void);
 #endif

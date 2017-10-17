@@ -25,81 +25,60 @@
 #include "cmdparser.h"
 #include "cmdhw.h"
 #include "whereami.h"
+#include "comms.h"
 
-
-// a global mutex to prevent interlaced printing from different threads
-pthread_mutex_t print_lock;
-
-static serial_port sp;
-static UsbCommand txcmd;
-volatile static bool txcmd_pending = false;
-
-void SendCommand(UsbCommand *c) {
-	#if 0
-		printf("Sending %d bytes\n", sizeof(UsbCommand));
-	#endif
-
-	if (offline) {
-      PrintAndLog("Sending bytes to proxmark failed - offline");
-      return;
-    }
-  /**
-	The while-loop below causes hangups at times, when the pm3 unit is unresponsive
-	or disconnected. The main console thread is alive, but comm thread just spins here.
-	Not good.../holiman
-	**/
-	while(txcmd_pending);
-	txcmd = *c;
-	txcmd_pending = true;
+/* Returns true if we have a display that we should set up a GUI on.
+ */
+bool has_gui() {
+#ifdef HAVE_GUI
+# ifdef Q_WS_X11
+	// Check for "DISPLAY" environment variable.  If present, we have a GUI
+	char* display = getenv("DISPLAY");
+	return (display && strlen(display) > 1);
+# else
+	// Non-X11 always has GUI, if this is built.
+	return true;
+# endif
+#else
+	// Built without GUI support
+	return false;
+#endif
 }
 
-struct receiver_arg {
-	int run;
-};
-
-byte_t rx[sizeof(UsbCommand)];
-byte_t* prx = rx;
-
-static void *uart_receiver(void *targ) {
-	struct receiver_arg *arg = (struct receiver_arg*)targ;
-	size_t rxlen;
-
-	while (arg->run) {
-		rxlen = 0;
-		if (uart_receive(sp, prx, sizeof(UsbCommand) - (prx-rx), &rxlen)) {
-			prx += rxlen;
-			if (prx-rx < sizeof(UsbCommand)) {
-				continue;
-			}
-			
-			UsbCommandReceived((UsbCommand*)rx);
-		}
-		prx = rx;
-
-		if(txcmd_pending) {
-			if (!uart_send(sp, (byte_t*) &txcmd, sizeof(UsbCommand))) {
-				PrintAndLog("Sending bytes to proxmark failed");
-			}
-			txcmd_pending = false;
-		}
-	}
-
-	pthread_exit(NULL);
-	return NULL;
-}
-
-
-void main_loop(char *script_cmds_file, bool usb_present) {
-	struct receiver_arg rarg;
+void main_loop(char *script_cmds_file, bool usb_present, serial_port* port, bool flush_after_write) {
+	pm3_connection conn;
 	char *cmd = NULL;
 	pthread_t reader_thread;
+	memset(&conn, 0, sizeof(pm3_connection));
+	pthread_mutex_init(&conn.recv_lock, NULL);
+	
+	// TODO: Move this into comms.c
+	conn.PlotGridXdefault = 64;
+	conn.PlotGridYdefault = 64;
+	conn.showDemod = true;
+	conn.CursorScaleFactor = 1;
+	
+	// TODO: Make logging better
+	conn.flushAfterWrite = flush_after_write;
+	SetFlushAfterWrite(flush_after_write);
 
 	if (usb_present) {
-		rarg.run = 1;
-		pthread_create(&reader_thread, NULL, &uart_receiver, &rarg);
+		conn.run = true;
+		conn.port = port;
+		conn.offline = false;
+		pthread_create(&reader_thread, NULL, &uart_receiver, &conn);
 		// cache Version information now:
-		CmdVersion(NULL);
+		CmdVersion(&conn, NULL);
+	} else {
+		conn.offline = true;
 	}
+
+#ifdef HAVE_GUI
+	if (has_gui()) {
+		// Setup GUI with reference to our connection struct.
+		MainGraphics(&conn);
+	}
+#endif
 
 	FILE *script_file = NULL;
 	char script_cmd_buf[256];  // iceman, needs lua script the same file_path_buffer as the rest
@@ -113,7 +92,7 @@ void main_loop(char *script_cmds_file, bool usb_present) {
 
 	read_history(".history");
 
-	while(1)  {
+	while (1) {
 
 		// If there is a script file
 		if (script_file)
@@ -147,7 +126,7 @@ void main_loop(char *script_cmds_file, bool usb_present) {
 				cmd[strlen(cmd) - 1] = 0x00;
 			
 			if (cmd[0] != 0x00) {
-				int ret = CommandReceived(cmd);
+				int ret = CommandReceived(&conn, cmd);
 				add_history(cmd);
 				if (ret == 99) {  // exit or quit
 					break;
@@ -163,7 +142,7 @@ void main_loop(char *script_cmds_file, bool usb_present) {
 	write_history(".history");
   
 	if (usb_present) {
-		rarg.run = 0;
+		conn.run = false;
 		pthread_join(reader_thread, NULL);
 	}
 	
@@ -171,7 +150,10 @@ void main_loop(char *script_cmds_file, bool usb_present) {
 		fclose(script_file);
 		script_file = NULL;
 	}
+	
+	pthread_mutex_destroy(&conn.recv_lock);
 
+	pthread_mutex_destroy(&conn.recv_lock);
 }
 
 static void dumpAllHelp(int markdown)
@@ -240,19 +222,19 @@ int main(int argc, char* argv[]) {
 	
 	bool usb_present = false;
 	char *script_cmds_file = NULL;
+
+	bool flush_after_write = false;
+	g_debugMode = 0;
   
-	sp = uart_open(argv[1]);
+	serial_port *sp = uart_open(argv[1]);
 	if (sp == INVALID_SERIAL_PORT) {
 		printf("ERROR: invalid serial port\n");
 		usb_present = false;
-		offline = 1;
 	} else if (sp == CLAIMED_SERIAL_PORT) {
 		printf("ERROR: serial port is claimed by another process\n");
 		usb_present = false;
-		offline = 1;
 	} else {
 		usb_present = true;
-		offline = 0;
 	}
 
 	// If the user passed the filename of the 'script' to execute, get it
@@ -264,7 +246,7 @@ int main(int argc, char* argv[]) {
 			argv[2][4] == 'h')
 		{
 			printf("Output will be flushed after every print.\n");
-			flushAfterWrite = 1;
+			flush_after_write = 1;
 		}
 		else
 		script_cmds_file = argv[2];
@@ -274,25 +256,15 @@ int main(int argc, char* argv[]) {
 	pthread_mutex_init(&print_lock, NULL);
 
 #ifdef HAVE_GUI
-#ifdef _WIN32
-	InitGraphics(argc, argv, script_cmds_file, usb_present);
-	MainGraphics();
-#else
-	char* display = getenv("DISPLAY");
-
-	if (display && strlen(display) > 1)
+	if (has_gui())
 	{
-		InitGraphics(argc, argv, script_cmds_file, usb_present);
-		MainGraphics();
+		InitGraphics(argc, argv, script_cmds_file, usb_present, sp, flush_after_write);
 	}
 	else
-	{
-		main_loop(script_cmds_file, usb_present);
-	}
 #endif
-#else
-	main_loop(script_cmds_file, usb_present);
-#endif	
+	{
+		main_loop(script_cmds_file, usb_present, sp, flush_after_write);
+	}
 
 	// Clean up the port
 	if (usb_present) {

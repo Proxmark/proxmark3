@@ -11,16 +11,16 @@
 #ifndef CMDHF15_H__
 #define CMDHF15_H__
 
-int CmdHF15(const char *Cmd);
+int CmdHF15(pm3_connection* conn, const char *Cmd);
 
-int CmdHF15Demod(const char *Cmd);
-int CmdHF15Read(const char *Cmd);
-int HF15Reader(const char *Cmd, bool verbose);
-int CmdHF15Reader(const char *Cmd);
-int CmdHF15Sim(const char *Cmd);
-int CmdHF15Record(const char *Cmd);
-int CmdHF15Cmd(const char*Cmd);
-int CmdHF15CmdHelp(const char*Cmd);
-int CmdHF15Help(const char*Cmd);
+int CmdHF15Demod(pm3_connection* conn, const char *Cmd);
+int CmdHF15Read(pm3_connection* conn, const char *Cmd);
+int HF15Reader(pm3_connection* conn, const char *Cmd, bool verbose);
+int CmdHF15Reader(pm3_connection* conn, const char *Cmd);
+int CmdHF15Sim(pm3_connection* conn, const char *Cmd);
+int CmdHF15Record(pm3_connection* conn, const char *Cmd);
+int CmdHF15Cmd(pm3_connection* conn, const char*Cmd);
+int CmdHF15CmdHelp(pm3_connection* conn, const char*Cmd);
+int CmdHF15Help(pm3_connection* conn, const char*Cmd);
 
 #endif

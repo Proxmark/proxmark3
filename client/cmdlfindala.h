@@ -9,10 +9,11 @@
 
 #ifndef CMDLFINDALA_H__
 #define CMDLFINDALA_H__
+#include "comms.h"
 
-extern int CmdLFINDALA(const char *Cmd);
-extern int CmdIndalaDecode(const char *Cmd);
-extern int CmdIndalaRead(const char *Cmd);
-extern int CmdIndalaClone(const char *Cmd);
+extern int CmdLFINDALA(pm3_connection* conn, const char *Cmd);
+extern int CmdIndalaDecode(pm3_connection* conn, const char *Cmd);
+extern int CmdIndalaRead(pm3_connection* conn, const char *Cmd);
+extern int CmdIndalaClone(pm3_connection* conn, const char *Cmd);
 
 #endif

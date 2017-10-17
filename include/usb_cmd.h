@@ -213,6 +213,8 @@ typedef struct{
 
 #define CMD_UNKNOWN                                                       0xFFFF
 
+// Special mode for WaitForResponse: listens for any command in response.
+#define CMD_ANY                                               0xFFFFFFFFFFFFFFFF
 
 //Mifare simulation flags
 #define FLAG_INTERACTIVE      0x01

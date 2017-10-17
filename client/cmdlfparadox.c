@@ -19,18 +19,18 @@
 #include "cmddata.h"
 #include "cmdlf.h"
 #include "lfdemod.h"
-static int CmdHelp(const char *Cmd);
+static int CmdHelp(pm3_connection* conn, const char *Cmd);
 
 //by marshmellow
 //Paradox Prox demod - FSK RF/50 with preamble of 00001111 (then manchester encoded)
 //print full Paradox Prox ID and some bit format details if found
-int CmdFSKdemodParadox(const char *Cmd)
+int CmdFSKdemodParadox(pm3_connection* conn, const char *Cmd)
 {
 	//raw fsk demod no manchester decoding no start bit finding just get binary from wave
 	uint32_t hi2=0, hi=0, lo=0;
 
 	uint8_t BitStream[MAX_GRAPH_TRACE_LEN]={0};
-	size_t BitLen = getFromGraphBuf(BitStream);
+	size_t BitLen = getFromGraphBuf(conn, BitStream);
 	if (BitLen==0) return 0;
 	int waveIdx=0;
 	//get binary from fsk wave
@@ -63,21 +63,21 @@ int CmdFSKdemodParadox(const char *Cmd)
 
 	PrintAndLog("Paradox TAG ID: %x%08x - FC: %d - Card: %d - Checksum: %02x - RAW: %08x%08x%08x",
 		hi>>10, (hi & 0x3)<<26 | (lo>>10), fc, cardnum, (lo>>2) & 0xFF, rawHi2, rawHi, rawLo);
-	setDemodBuf(BitStream,BitLen,idx);
-	setClockGrid(50, waveIdx + (idx*50));
+	setDemodBuf(conn, BitStream,BitLen,idx);
+	setClockGrid(conn, 50, waveIdx + (idx*50));
 	if (g_debugMode){ 
 		PrintAndLog("DEBUG: idx: %d, len: %d, Printing Demod Buffer:", idx, BitLen);
-		printDemodBuff();
+		printDemodBuff(conn);
 	}
 	return 1;
 }
 //by marshmellow
 //see ASKDemod for what args are accepted
-int CmdParadoxRead(const char *Cmd) {
+int CmdParadoxRead(pm3_connection* conn, const char *Cmd) {
 	// read lf silently
-	lf_read(true, 10000);
+	lf_read(conn, true, 10000);
 	// demod and output viking ID	
-	return CmdFSKdemodParadox(Cmd);
+	return CmdFSKdemodParadox(conn, Cmd);
 }
 
 static command_t CommandTable[] = {
@@ -87,12 +87,12 @@ static command_t CommandTable[] = {
 	{NULL, NULL, 0, NULL}
 };
 
-int CmdLFParadox(const char *Cmd) {
-	CmdsParse(CommandTable, Cmd);
+int CmdLFParadox(pm3_connection* conn, const char *Cmd) {
+	CmdsParse(conn, CommandTable, Cmd);
 	return 0;
 }
 
-int CmdHelp(const char *Cmd) {
-	CmdsHelp(CommandTable);
+int CmdHelp(pm3_connection* conn, const char *Cmd) {
+	CmdsHelp(conn, CommandTable);
 	return 0;
 }

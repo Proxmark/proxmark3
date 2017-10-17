@@ -15,11 +15,11 @@
 #include "proxmark3.h"
 #include "cmdmain.h"
 
-uint8_t* sample_buf;
-
-void GetFromBigBuf(uint8_t *dest, int bytes, int start_index)
+void GetFromBigBuf(pm3_connection* conn, uint8_t *dest, int bytes, int start_index)
 {
-  sample_buf = dest;
-  UsbCommand c = {CMD_DOWNLOAD_RAW_ADC_SAMPLES_125K, {start_index, bytes, 0}};
-  SendCommand(&c);
+	// FIXME: This instructs the proxmark3 hardware to write into a buffer, and then
+	// implicitly trusts that it'll do the right thing in comms.c:UsbCommandReceived.
+	conn->sample_buf = dest;
+	UsbCommand c = {CMD_DOWNLOAD_RAW_ADC_SAMPLES_125K, {start_index, bytes, 0}};
+	SendCommand(conn, &c);
 }

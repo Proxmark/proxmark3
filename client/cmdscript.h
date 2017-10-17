@@ -12,7 +12,8 @@
 #ifndef CMDSCRIPT_H__
 #define CMDSCRIPT_H__
 
+#include "comms.h"
 
-int CmdScript(const char *Cmd);
+int CmdScript(pm3_connection* conn, const char *Cmd);
 
 #endif

@@ -11,14 +11,16 @@
 #ifndef CMDHFLEGIC_H__
 #define CMDHFLEGIC_H__
 
-int CmdHFLegic(const char *Cmd);
+#include "comms.h"
 
-int CmdLegicRFRead(const char *Cmd);
-int CmdLegicDecode(const char *Cmd);
-int CmdLegicLoad(const char *Cmd);
-int CmdLegicSave(const char *Cmd);
-int CmdLegicRfSim(const char *Cmd);
-int CmdLegicRfWrite(const char *Cmd);
-int CmdLegicRfFill(const char *Cmd);
+int CmdHFLegic(pm3_connection* conn, const char *Cmd);
+
+int CmdLegicRFRead(pm3_connection* conn, const char *Cmd);
+int CmdLegicDecode(pm3_connection* conn, const char *Cmd);
+int CmdLegicLoad(pm3_connection* conn, const char *Cmd);
+int CmdLegicSave(pm3_connection* conn, const char *Cmd);
+int CmdLegicRfSim(pm3_connection* conn, const char *Cmd);
+int CmdLegicRfWrite(pm3_connection* conn, const char *Cmd);
+int CmdLegicRfFill(pm3_connection* conn, const char *Cmd);
 
 #endif

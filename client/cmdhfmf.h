@@ -10,38 +10,37 @@
 
 #ifndef CMDHFMF_H__
 #define CMDHFMF_H__
+#include "comms.h"
 
-#include "mifaredefault.h"
+extern int CmdHFMF(pm3_connection* conn, const char *Cmd);
 
-extern int CmdHFMF(const char *Cmd);
-
-extern int CmdHF14AMfDbg(const char* cmd);
-extern int CmdHF14AMfRdBl(const char* cmd);
-extern int CmdHF14AMfURdBl(const char* cmd);
-extern int CmdHF14AMfRdSc(const char* cmd);
-extern int CmdHF14SMfURdCard(const char* cmd);
-extern int CmdHF14AMfDump(const char* cmd);
-extern int CmdHF14AMfRestore(const char* cmd);
-extern int CmdHF14AMfWrBl(const char* cmd);
-extern int CmdHF14AMfUWrBl(const char* cmd);
-extern int CmdHF14AMfChk(const char* cmd);
-extern int CmdHF14AMifare(const char* cmd);
-extern int CmdHF14AMfNested(const char* cmd);
-extern int CmdHF14AMfSniff(const char* cmd);
-extern int CmdHF14AMf1kSim(const char* cmd);
-extern int CmdHF14AMfEClear(const char* cmd);
-extern int CmdHF14AMfEGet(const char* cmd);
-extern int CmdHF14AMfESet(const char* cmd);
-extern int CmdHF14AMfELoad(const char* cmd);
-extern int CmdHF14AMfESave(const char* cmd);
-extern int CmdHF14AMfECFill(const char* cmd);
-extern int CmdHF14AMfEKeyPrn(const char* cmd);
-extern int CmdHF14AMfCWipe(const char* cmd);
-extern int CmdHF14AMfCSetUID(const char* cmd);
-extern int CmdHF14AMfCSetBlk(const char* cmd);
-extern int CmdHF14AMfCGetBlk(const char* cmd);
-extern int CmdHF14AMfCGetSc(const char* cmd);
-extern int CmdHF14AMfCLoad(const char* cmd);
-extern int CmdHF14AMfCSave(const char* cmd);
+extern int CmdHF14AMfDbg(pm3_connection* conn, const char* cmd);
+extern int CmdHF14AMfRdBl(pm3_connection* conn, const char* cmd);
+extern int CmdHF14AMfURdBl(pm3_connection* conn, const char* cmd);
+extern int CmdHF14AMfRdSc(pm3_connection* conn, const char* cmd);
+extern int CmdHF14SMfURdCard(pm3_connection* conn, const char* cmd);
+extern int CmdHF14AMfDump(pm3_connection* conn, const char* cmd);
+extern int CmdHF14AMfRestore(pm3_connection* conn, const char* cmd);
+extern int CmdHF14AMfWrBl(pm3_connection* conn, const char* cmd);
+extern int CmdHF14AMfUWrBl(pm3_connection* conn, const char* cmd);
+extern int CmdHF14AMfChk(pm3_connection* conn, const char* cmd);
+extern int CmdHF14AMifare(pm3_connection* conn, const char* cmd);
+extern int CmdHF14AMfNested(pm3_connection* conn, const char* cmd);
+extern int CmdHF14AMfSniff(pm3_connection* conn, const char* cmd);
+extern int CmdHF14AMf1kSim(pm3_connection* conn, const char* cmd);
+extern int CmdHF14AMfEClear(pm3_connection* conn, const char* cmd);
+extern int CmdHF14AMfEGet(pm3_connection* conn, const char* cmd);
+extern int CmdHF14AMfESet(pm3_connection* conn, const char* cmd);
+extern int CmdHF14AMfELoad(pm3_connection* conn, const char* cmd);
+extern int CmdHF14AMfESave(pm3_connection* conn, const char* cmd);
+extern int CmdHF14AMfECFill(pm3_connection* conn, const char* cmd);
+extern int CmdHF14AMfEKeyPrn(pm3_connection* conn, const char* cmd);
+extern int CmdHF14AMfCSetUID(pm3_connection* conn, const char* cmd);
+extern int CmdHF14AMfCSetBlk(pm3_connection* conn, const char* cmd);
+extern int CmdHF14AMfCGetBlk(pm3_connection* conn, const char* cmd);
+extern int CmdHF14AMfCGetSc(pm3_connection* conn, const char* cmd);
+extern int CmdHF14AMfCLoad(pm3_connection* conn, const char* cmd);
+extern int CmdHF14AMfCSave(pm3_connection* conn, const char* cmd);
 
 #endif
+

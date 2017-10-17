@@ -12,12 +12,13 @@
 #define CMDLFAWID_H__
 
 #include <stdint.h>  // for uint_32+
+#include "comms.h"
 
-int CmdLFAWID(const char *Cmd);
-int CmdAWIDReadFSK(const char *Cmd);
-int CmdAWIDSim(const char *Cmd);
-int CmdAWIDClone(const char *Cmd);
-int CmdFSKdemodAWID(const char *Cmd);
+int CmdLFAWID(pm3_connection* conn, const char *Cmd);
+int CmdAWIDReadFSK(pm3_connection* conn, const char *Cmd);
+int CmdAWIDSim(pm3_connection* conn, const char *Cmd);
+int CmdAWIDClone(pm3_connection* conn, const char *Cmd);
+int CmdFSKdemodAWID(pm3_connection* conn, const char *Cmd);
 int getAWIDBits(unsigned int fc, unsigned int cn, uint8_t *AWIDBits);
 int usage_lf_awid_fskdemod(void);
 int usage_lf_awid_clone(void);

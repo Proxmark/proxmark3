@@ -22,7 +22,7 @@
 #include "protocols.h"  // for T55xx config register definitions
 #include "lfdemod.h"    // parityTest
 
-static int CmdHelp(const char *Cmd);
+static int CmdHelp(pm3_connection* conn, const char *Cmd);
 
 int usage_lf_noralsy_clone(void){
 	PrintAndLog("clone a Noralsy tag to a T55x7 tag.");
@@ -109,18 +109,18 @@ int NoralsyDemod_AM(uint8_t *dest, size_t *size) {
 **/
 
 //see ASKDemod for what args are accepted
-int CmdNoralsyDemod(const char *Cmd) {
+int CmdNoralsyDemod(pm3_connection* conn, const char *Cmd) {
 
 	//ASK / Manchester
 	bool st = true;
-	if (!ASKDemod_ext("32 0 0", false, false, 1, &st)) {
+	if (!ASKDemod_ext(conn, "32 0 0", false, false, 1, &st)) {
 		if (g_debugMode) PrintAndLog("DEBUG: Error - Noralsy: ASK/Manchester Demod failed");
 		return 0;
 	}
 	if (!st) return 0;
 
-	size_t size = DemodBufferLen;
-	int ans = NoralsyDemod_AM(DemodBuffer, &size);
+	size_t size = conn->DemodBufferLen;
+	int ans = NoralsyDemod_AM(conn->DemodBuffer, &size);
 	if (ans < 0){
 		if (g_debugMode){
 			if (ans == -1)
@@ -134,26 +134,26 @@ int CmdNoralsyDemod(const char *Cmd) {
 		}
 		return 0;
 	}
-	setDemodBuf(DemodBuffer, 96, ans);
-	setClockGrid(g_DemodClock, g_DemodStartIdx + (ans*g_DemodClock));
+	setDemodBuf(conn, conn->DemodBuffer, 96, ans);
+	setClockGrid(conn, conn->g_DemodClock, conn->g_DemodStartIdx + (ans*conn->g_DemodClock));
 	//setGrid_Clock(32);
 
 	//got a good demod
-	uint32_t raw1 = bytebits_to_byte(DemodBuffer, 32);
-	uint32_t raw2 = bytebits_to_byte(DemodBuffer+32, 32);
-	uint32_t raw3 = bytebits_to_byte(DemodBuffer+64, 32);
+	uint32_t raw1 = bytebits_to_byte(conn->DemodBuffer, 32);
+	uint32_t raw2 = bytebits_to_byte(conn->DemodBuffer+32, 32);
+	uint32_t raw3 = bytebits_to_byte(conn->DemodBuffer+64, 32);
 
-	uint32_t cardid = (bytebits_to_byte(DemodBuffer+32, 12)<<16) | bytebits_to_byte(DemodBuffer+32+24, 16);
+	uint32_t cardid = (bytebits_to_byte(conn->DemodBuffer+32, 12)<<16) | bytebits_to_byte(conn->DemodBuffer+32+24, 16);
 
 	uint16_t year = (raw2 & 0x000ff000) >> 12;
 	year += ( year > 0x60 ) ? 0x1900: 0x2000;
 
 	// calc checksums
-	uint8_t calc1 = noralsy_chksum(DemodBuffer+32, 40);
-	uint8_t calc2 = noralsy_chksum(DemodBuffer, 76);
+	uint8_t calc1 = noralsy_chksum(conn->DemodBuffer+32, 40);
+	uint8_t calc2 = noralsy_chksum(conn->DemodBuffer, 76);
 	uint8_t chk1 = 0, chk2 = 0;
-	chk1 = bytebits_to_byte(DemodBuffer+72, 4);
-	chk2 = bytebits_to_byte(DemodBuffer+76, 4);
+	chk1 = bytebits_to_byte(conn->DemodBuffer+72, 4);
+	chk2 = bytebits_to_byte(conn->DemodBuffer+76, 4);
 	// test checksums
 	if ( chk1 != calc1 ) { 
 		if (g_debugMode) PrintAndLog("DEBUG: Error - Noralsy: checksum 1 failed %x - %x\n", chk1, calc1);
@@ -172,12 +172,12 @@ int CmdNoralsyDemod(const char *Cmd) {
 	return 1;
 }
 
-int CmdNoralsyRead(const char *Cmd) {
-	lf_read(true, 8000);
-	return CmdNoralsyDemod(Cmd);
+int CmdNoralsyRead(pm3_connection* conn, const char *Cmd) {
+	lf_read(conn, true, 8000);
+	return CmdNoralsyDemod(conn, Cmd);
 }
 
-int CmdNoralsyClone(const char *Cmd) {
+int CmdNoralsyClone(pm3_connection* conn, const char *Cmd) {
 
 	uint16_t year = 0;
 	uint32_t id = 0;
@@ -222,9 +222,9 @@ int CmdNoralsyClone(const char *Cmd) {
 	for (int i = 3; i >= 0; --i) {
 		c.arg[0] = blocks[i];
 		c.arg[1] = i;
-		clearCommandBuffer();
-		SendCommand(&c);
-		if (!WaitForResponseTimeout(CMD_ACK, &resp, T55XX_WRITE_TIMEOUT)){
+		clearCommandBuffer(conn);
+		SendCommand(conn, &c);
+		if (!WaitForResponseTimeout(conn, CMD_ACK, &resp, T55XX_WRITE_TIMEOUT)){
 			PrintAndLog("Error occurred, device did not respond during write operation.");
 			return -1;
 		}
@@ -232,7 +232,7 @@ int CmdNoralsyClone(const char *Cmd) {
 	return 0;
 }
 
-int CmdNoralsySim(const char *Cmd) {
+int CmdNoralsySim(pm3_connection* conn, const char *Cmd) {
 
 	uint8_t bits[96];
 	uint8_t *bs = bits;
@@ -262,8 +262,8 @@ int CmdNoralsySim(const char *Cmd) {
 
 	UsbCommand c = {CMD_ASK_SIM_TAG, {arg1, arg2, size}};
 	memcpy(c.d.asBytes, bs, size);
-	clearCommandBuffer();
-	SendCommand(&c);
+	clearCommandBuffer(conn);
+	SendCommand(conn, &c);
 	return 0;
 }
 
@@ -276,13 +276,13 @@ static command_t CommandTable[] = {
     {NULL, NULL, 0, NULL}
 };
 
-int CmdLFNoralsy(const char *Cmd) {
-	clearCommandBuffer();
-	CmdsParse(CommandTable, Cmd);
+int CmdLFNoralsy(pm3_connection* conn, const char *Cmd) {
+	clearCommandBuffer(conn);
+	CmdsParse(conn, CommandTable, Cmd);
 	return 0;
 }
 
-int CmdHelp(const char *Cmd) {
-	CmdsHelp(CommandTable);
+int CmdHelp(pm3_connection* conn, const char *Cmd) {
+	CmdsHelp(conn, CommandTable);
 	return 0;
 }

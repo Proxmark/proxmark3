@@ -20,7 +20,7 @@
 #include "cmdmain.h"
 #include "cmdlf.h"
 #include "lfdemod.h"
-static int CmdHelp(const char *Cmd);
+static int CmdHelp(pm3_connection* conn, const char *Cmd);
 
 int usage_lf_viking_clone(void) {
 	PrintAndLog("clone a Viking AM tag to a T55x7 tag.");
@@ -54,40 +54,40 @@ uint64_t getVikingBits(uint32_t id) {
 
 //by marshmellow
 //see ASKDemod for what args are accepted
-int CmdVikingDemod(const char *Cmd) {
-	if (!ASKDemod(Cmd, false, false, 1)) {
+int CmdVikingDemod(pm3_connection* conn, const char *Cmd) {
+	if (!ASKDemod(conn, Cmd, false, false, 1)) {
 		if (g_debugMode) PrintAndLog("ASKDemod failed");
 		return 0;
 	}
-	size_t size = DemodBufferLen;
+	size_t size = conn->DemodBufferLen;
 	//call lfdemod.c demod for Viking
-	int ans = VikingDemod_AM(DemodBuffer, &size);
+	int ans = VikingDemod_AM(conn->DemodBuffer, &size);
 	if (ans < 0) {
 		if (g_debugMode) PrintAndLog("Error Viking_Demod %d", ans);
 		return 0;
 	}
 	//got a good demod
-	uint32_t raw1 = bytebits_to_byte(DemodBuffer+ans, 32);
-	uint32_t raw2 = bytebits_to_byte(DemodBuffer+ans+32, 32);
-	uint32_t cardid = bytebits_to_byte(DemodBuffer+ans+24, 32);
-	uint8_t  checksum = bytebits_to_byte(DemodBuffer+ans+32+24, 8);
+	uint32_t raw1 = bytebits_to_byte(conn->DemodBuffer+ans, 32);
+	uint32_t raw2 = bytebits_to_byte(conn->DemodBuffer+ans+32, 32);
+	uint32_t cardid = bytebits_to_byte(conn->DemodBuffer+ans+24, 32);
+	uint8_t  checksum = bytebits_to_byte(conn->DemodBuffer+ans+32+24, 8);
 	PrintAndLog("Viking Tag Found: Card ID %08X, Checksum: %02X", cardid, (unsigned int) checksum);
 	PrintAndLog("Raw: %08X%08X", raw1,raw2);
-	setDemodBuf(DemodBuffer, 64, ans);
-	setClockGrid(g_DemodClock, g_DemodStartIdx + (ans*g_DemodClock));
+	setDemodBuf(conn, conn->DemodBuffer, 64, ans);
+	setClockGrid(conn, conn->g_DemodClock, conn->g_DemodStartIdx + (ans*conn->g_DemodClock));
 	return 1;
 }
 
 //by marshmellow
 //see ASKDemod for what args are accepted
-int CmdVikingRead(const char *Cmd) {
+int CmdVikingRead(pm3_connection* conn, const char *Cmd) {
 	// read lf silently
-	lf_read(true, 10000);
+	lf_read(conn, true, 10000);
 	// demod and output viking ID	
-	return CmdVikingDemod(Cmd);
+	return CmdVikingDemod(conn, Cmd);
 }
 
-int CmdVikingClone(const char *Cmd) {
+int CmdVikingClone(pm3_connection* conn, const char *Cmd) {
 	uint32_t id = 0;
 	uint64_t rawID = 0;
 	bool Q5 = false;
@@ -102,14 +102,14 @@ int CmdVikingClone(const char *Cmd) {
 	rawID = getVikingBits(id);
 	PrintAndLog("Cloning - ID: %08X, Raw: %08X%08X",id,(uint32_t)(rawID >> 32),(uint32_t) (rawID & 0xFFFFFFFF));
 	UsbCommand c = {CMD_VIKING_CLONE_TAG,{rawID >> 32, rawID & 0xFFFFFFFF, Q5}};
-	clearCommandBuffer();
-	SendCommand(&c);
+	clearCommandBuffer(conn);
+	SendCommand(conn, &c);
 	//check for ACK
-	WaitForResponse(CMD_ACK,NULL);
+	WaitForResponse(conn, CMD_ACK,NULL);
 	return 0;
 }
 
-int CmdVikingSim(const char *Cmd) {
+int CmdVikingSim(pm3_connection* conn, const char *Cmd) {
 	uint32_t id = 0;
 	uint64_t rawID = 0;
 	uint8_t clk = 32, encoding = 1, separator = 0, invert = 0;
@@ -129,8 +129,8 @@ int CmdVikingSim(const char *Cmd) {
   UsbCommand c = {CMD_ASK_SIM_TAG, {arg1, arg2, size}};
   PrintAndLog("preparing to sim ask data: %d bits", size);
   num_to_bytebits(rawID, 64, c.d.asBytes);
-	clearCommandBuffer();
-  SendCommand(&c);
+	clearCommandBuffer(conn);
+  SendCommand(conn, &c);
   return 0;
 }
 
@@ -143,12 +143,12 @@ static command_t CommandTable[] = {
 	{NULL, NULL, 0, NULL}
 };
 
-int CmdLFViking(const char *Cmd) {
-	CmdsParse(CommandTable, Cmd);
+int CmdLFViking(pm3_connection* conn, const char *Cmd) {
+	CmdsParse(conn, CommandTable, Cmd);
 	return 0;
 }
 
-int CmdHelp(const char *Cmd) {
-	CmdsHelp(CommandTable);
+int CmdHelp(pm3_connection* conn, const char *Cmd) {
+	CmdsHelp(conn, CommandTable);
 	return 0;
 }

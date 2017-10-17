@@ -17,7 +17,7 @@
 #include "ui.h"
 #include "util.h"
 #include "graph.h"
-#include "cmddata.h"    // for ASKDemod_ext, g_debugMode, DemodBuffer ...
+#include "cmddata.h"    // for ASKDemod_ext, g_debugMode, conn->DemodBuffer ...
 #include "cmdmain.h"    // for clearCommandBuffer and WaitForResponseTimeout
 #include "cmdlf.h"
 #include "protocols.h"  // for T55xx config register definitions
@@ -25,7 +25,7 @@
 
 #define BL0CK1 0x56495332
 
-static int CmdHelp(const char *Cmd);
+static int CmdHelp(pm3_connection* conn, const char *Cmd);
 
 int usage_lf_visa2k_clone(void){
 	PrintAndLog("clone a Visa2000 tag to a T55x7 tag.");
@@ -93,18 +93,18 @@ static uint8_t visa_parity( uint32_t id) {
 * 
 **/
 //see ASKDemod for what args are accepted
-int CmdVisa2kDemod(const char *Cmd) {
+int CmdVisa2kDemod(pm3_connection* conn, const char *Cmd) {
 
 	//sCmdAskEdgeDetect("");
 
 	//ASK / Manchester
 	bool st = true;
-	if (!ASKDemod_ext("64 0 0", false, false, 1, &st)) {
-		if (g_debugMode) PrintAndLog("DEBUG: Error - Visa2000: ASK/Manchester Demod failed");
+	if (!ASKDemod_ext(conn, "64 0 0", false, false, 1, &st)) {
+		if (g_debugMode) PrintAndLog("DEBUG: Error - Visa2k: ASK/Manchester Demod failed");
 		return 0;
 	}
-	size_t size = DemodBufferLen;
-	int ans = Visa2kDemod_AM(DemodBuffer, &size);
+	size_t size = conn->DemodBufferLen;
+	int ans = Visa2kDemod_AM(conn->DemodBuffer, &size);
 	if (ans < 0){
 		if (g_debugMode){
 			if (ans == -1)
@@ -118,13 +118,13 @@ int CmdVisa2kDemod(const char *Cmd) {
 		}
 		return 0;
 	}
-	setDemodBuf(DemodBuffer, 96, ans);
-	setClockGrid(g_DemodClock, g_DemodStartIdx + (ans*g_DemodClock));
+	setDemodBuf(conn, conn->DemodBuffer, 96, ans);
+	setClockGrid(conn, conn->g_DemodClock, conn->g_DemodStartIdx + (ans*conn->g_DemodClock));
 
 	//got a good demod
-	uint32_t raw1 = bytebits_to_byte(DemodBuffer, 32);
-	uint32_t raw2 = bytebits_to_byte(DemodBuffer+32, 32);
-	uint32_t raw3 = bytebits_to_byte(DemodBuffer+64, 32);
+	uint32_t raw1 = bytebits_to_byte(conn->DemodBuffer, 32);
+	uint32_t raw2 = bytebits_to_byte(conn->DemodBuffer+32, 32);
+	uint32_t raw3 = bytebits_to_byte(conn->DemodBuffer+64, 32);
 
 	// chksum
 	uint8_t calc = visa_chksum(raw2);
@@ -146,13 +146,13 @@ int CmdVisa2kDemod(const char *Cmd) {
 	return 1;
 }
 
-int CmdVisa2kRead(const char *Cmd) {
+int CmdVisa2kRead(pm3_connection* conn, const char *Cmd) {
 	//64*96*2=12288 samples just in case we just missed the first preamble we can still catch 2 of them
-	lf_read(true, 12500);
-	return CmdVisa2kDemod(Cmd);
+	lf_read(conn, true, 12500);
+	return CmdVisa2kDemod(conn, Cmd);
 }
 
-int CmdVisa2kClone(const char *Cmd) {
+int CmdVisa2kClone(pm3_connection* conn, const char *Cmd) {
 
 	uint64_t id = 0;
 	uint32_t blocks[4] = {T55x7_MODULATION_MANCHESTER | T55x7_BITRATE_RF_64 | T55x7_ST_TERMINATOR | 3 << T55x7_MAXBLOCK_SHIFT, BL0CK1, 0};
@@ -183,9 +183,9 @@ int CmdVisa2kClone(const char *Cmd) {
 	for (int i = 3; i >= 0; --i) {
 		c.arg[0] = blocks[i];
 		c.arg[1] = i;
-		clearCommandBuffer();
-		SendCommand(&c);
-		if (!WaitForResponseTimeout(CMD_ACK, &resp, T55XX_WRITE_TIMEOUT)){
+		clearCommandBuffer(conn);
+		SendCommand(conn, &c);
+		if (!WaitForResponseTimeout(conn, CMD_ACK, &resp, T55XX_WRITE_TIMEOUT)){
 			PrintAndLog("Error occurred, device did not respond during write operation.");
 			return -1;
 		}
@@ -193,7 +193,7 @@ int CmdVisa2kClone(const char *Cmd) {
 	return 0;
 }
 
-int CmdVisa2kSim(const char *Cmd) {
+int CmdVisa2kSim(pm3_connection* conn, const char *Cmd) {
 
 	uint32_t id = 0;
 	char cmdp = param_getchar(Cmd, 0);
@@ -216,8 +216,8 @@ int CmdVisa2kSim(const char *Cmd) {
 	for(int i=0; i<3; ++i)
 		num_to_bytebits(blocks[i], 32, c.d.asBytes + i*32);
 
-	clearCommandBuffer();
-	SendCommand(&c);
+	clearCommandBuffer(conn);
+	SendCommand(conn, &c);
 	return 0;
 }
 
@@ -230,13 +230,13 @@ static command_t CommandTable[] = {
 	{NULL, NULL, 0, NULL}
 };
 
-int CmdLFVisa2k(const char *Cmd) {
-	clearCommandBuffer();
-	CmdsParse(CommandTable, Cmd);
+int CmdLFVisa2k(pm3_connection* conn, const char *Cmd) {
+	clearCommandBuffer(conn);
+	CmdsParse(conn, CommandTable, Cmd);
 	return 0;
 }
 
-int CmdHelp(const char *Cmd) {
-	CmdsHelp(CommandTable);
+int CmdHelp(pm3_connection* conn, const char *Cmd) {
+	CmdsHelp(conn, CommandTable);
 	return 0;
 }

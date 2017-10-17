@@ -10,11 +10,12 @@
 
 #ifndef CMDLFHID_H__
 #define CMDLFHID_H__
+#include "comms.h"
 
-int CmdLFHID(const char *Cmd);
-int CmdFSKdemodHID(const char *Cmd);
-int CmdHIDReadDemod(const char *Cmd);
-int CmdHIDSim(const char *Cmd);
-int CmdHIDClone(const char *Cmd);
+int CmdLFHID(pm3_connection* conn, const char *Cmd);
+int CmdFSKdemodHID(pm3_connection* conn, const char *Cmd);
+int CmdHIDReadDemod(pm3_connection* conn, const char *Cmd);
+int CmdHIDSim(pm3_connection* conn, const char *Cmd);
+int CmdHIDClone(pm3_connection* conn, const char *Cmd);
 
 #endif

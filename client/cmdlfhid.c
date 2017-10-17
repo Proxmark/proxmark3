@@ -18,18 +18,18 @@
 #include "cmddata.h"  //for g_debugMode, demodbuff cmds
 #include "lfdemod.h" // for HIDdemodFSK
 
-static int CmdHelp(const char *Cmd);
+static int CmdHelp(pm3_connection* conn, const char *Cmd);
 
 //by marshmellow (based on existing demod + holiman's refactor)
 //HID Prox demod - FSK RF/50 with preamble of 00011101 (then manchester encoded)
 //print full HID Prox ID and some bit format details if found
-int CmdFSKdemodHID(const char *Cmd)
+int CmdFSKdemodHID(pm3_connection* conn, const char *Cmd)
 {
   //raw fsk demod no manchester decoding no start bit finding just get binary from wave
   uint32_t hi2=0, hi=0, lo=0;
 
   uint8_t BitStream[MAX_GRAPH_TRACE_LEN]={0};
-  size_t BitLen = getFromGraphBuf(BitStream);
+  size_t BitLen = getFromGraphBuf(conn, BitStream);
   if (BitLen==0) return 0;
   //get binary from fsk wave
   int waveIdx = 0;
@@ -99,26 +99,26 @@ int CmdFSKdemodHID(const char *Cmd)
       (unsigned int) hi, (unsigned int) lo, (unsigned int) (lo>>1) & 0xFFFF,
       (unsigned int) fmtLen, (unsigned int) fc, (unsigned int) cardnum);
   }
-  setDemodBuf(BitStream,BitLen,idx);
-  setClockGrid(50, waveIdx + (idx*50));
+  setDemodBuf(conn, BitStream,BitLen,idx);
+  setClockGrid(conn, 50, waveIdx + (idx*50));
   if (g_debugMode){ 
     PrintAndLog("DEBUG: idx: %d, Len: %d, Printing Demod Buffer:", idx, BitLen);
-    printDemodBuff();
+    printDemodBuff(conn);
   }
   return 1;
 }
 
-int CmdHIDReadFSK(const char *Cmd)
+int CmdHIDReadFSK(pm3_connection* conn, const char *Cmd)
 {
   int findone=0;
 	if(Cmd[0]=='1') findone=1;
   UsbCommand c={CMD_HID_DEMOD_FSK};
   c.arg[0]=findone;
-  SendCommand(&c);
+  SendCommand(conn, &c);
   return 0;
 }
 
-int CmdHIDSim(const char *Cmd)
+int CmdHIDSim(pm3_connection* conn, const char *Cmd)
 {
 	uint32_t hi = 0, lo = 0;
 	int n = 0, i = 0;
@@ -132,11 +132,11 @@ int CmdHIDSim(const char *Cmd)
 	PrintAndLog("Press pm3-button to abort simulation");
 
 	UsbCommand c = {CMD_HID_SIM_TAG, {hi, lo, 0}};
-	SendCommand(&c);
+	SendCommand(conn, &c);
 	return 0;
 }
 
-int CmdHIDClone(const char *Cmd)
+int CmdHIDClone(pm3_connection* conn, const char *Cmd)
 {
   unsigned int hi2 = 0, hi = 0, lo = 0;
   int n = 0, i = 0;
@@ -170,7 +170,7 @@ int CmdHIDClone(const char *Cmd)
   c.arg[1] = hi;
   c.arg[2] = lo;
 
-  SendCommand(&c);
+  SendCommand(conn, &c);
   return 0;
 }
 
@@ -184,14 +184,14 @@ static command_t CommandTable[] =
   {NULL, NULL, 0, NULL}
 };
 
-int CmdLFHID(const char *Cmd)
+int CmdLFHID(pm3_connection* conn, const char *Cmd)
 {
-  CmdsParse(CommandTable, Cmd);
+  CmdsParse(conn, CommandTable, Cmd);
   return 0;
 }
 
-int CmdHelp(const char *Cmd)
+int CmdHelp(pm3_connection* conn, const char *Cmd)
 {
-  CmdsHelp(CommandTable);
+  CmdsHelp(conn, CommandTable);
   return 0;
 }

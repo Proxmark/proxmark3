@@ -33,7 +33,7 @@
 #include "usb_cmd.h"
 #include "cmdhfmfu.h"
 
-static int CmdHelp(const char *Cmd);
+static int CmdHelp(pm3_connection* conn, const char *Cmd);
 
 #define ICLASS_KEYS_MAX 8
 static uint8_t iClass_Key_Table[ICLASS_KEYS_MAX][8] = {
@@ -59,14 +59,14 @@ int xorbits_8(uint8_t val) {
 	return res & 1;
 }
 
-int CmdHFiClassList(const char *Cmd) {
+int CmdHFiClassList(pm3_connection* conn, const char *Cmd) {
 	PrintAndLog("Deprecated command, use 'hf list iclass' instead");
 	return 0;
 }
 
-int CmdHFiClassSnoop(const char *Cmd) {
+int CmdHFiClassSnoop(pm3_connection* conn, const char *Cmd) {
 	UsbCommand c = {CMD_SNOOP_ICLASS};
-	SendCommand(&c);
+	SendCommand(conn, &c);
 	return 0;
 }
 
@@ -85,7 +85,7 @@ int usage_hf_iclass_sim(void) {
 }
 
 #define NUM_CSNS 15
-int CmdHFiClassSim(const char *Cmd) {
+int CmdHFiClassSim(pm3_connection* conn, const char *Cmd) {
 	uint8_t simType = 0;
 	uint8_t CSN[8] = {0, 0, 0, 0, 0, 0, 0, 0};
 
@@ -134,8 +134,8 @@ int CmdHFiClassSim(const char *Cmd) {
 
 		memcpy(c.d.asBytes, csns, 8*NUM_CSNS);
 
-		SendCommand(&c);
-		if (!WaitForResponseTimeout(CMD_ACK, &resp, -1)) {
+		SendCommand(conn, &c);
+		if (!WaitForResponseTimeout(conn, CMD_ACK, &resp, -1)) {
 			PrintAndLog("Command timed out");
 			return 0;
 		}
@@ -172,13 +172,13 @@ int CmdHFiClassSim(const char *Cmd) {
 	{
 		UsbCommand c = {CMD_SIMULATE_TAG_ICLASS, {simType,numberOfCSNs}};
 		memcpy(c.d.asBytes, CSN, 8);
-		SendCommand(&c);
+		SendCommand(conn, &c);
 	}
 
 	return 0;
 }
 
-int HFiClassReader(const char *Cmd, bool loop, bool verbose) {
+int HFiClassReader(pm3_connection* conn, const char *Cmd, bool loop, bool verbose) {
 	bool tagFound = false;
 	UsbCommand c = {CMD_READER_ICLASS, {FLAG_ICLASS_READER_CSN |
 		    FLAG_ICLASS_READER_CC | FLAG_ICLASS_READER_CONF | FLAG_ICLASS_READER_AA |
@@ -186,8 +186,8 @@ int HFiClassReader(const char *Cmd, bool loop, bool verbose) {
 	// loop in client not device - else on windows have a communication error
 	UsbCommand resp;
 	while(!ukbhit()){
-		SendCommand(&c);
-		if (WaitForResponseTimeout(CMD_ACK,&resp, 4500)) {
+		SendCommand(conn, &c);
+		if (WaitForResponseTimeout(conn, CMD_ACK,&resp, 4500)) {
 			uint8_t readStatus = resp.arg[0] & 0xff;
 			uint8_t *data = resp.d.asBytes;
 
@@ -228,11 +228,11 @@ int HFiClassReader(const char *Cmd, bool loop, bool verbose) {
 	return 0;
 }
 
-int CmdHFiClassReader(const char *Cmd) {
-	return HFiClassReader(Cmd, true, true);
+int CmdHFiClassReader(pm3_connection* conn, const char *Cmd) {
+	return HFiClassReader(conn, Cmd, true, true);
 }
 
-int CmdHFiClassReader_Replay(const char *Cmd) {
+int CmdHFiClassReader_Replay(pm3_connection* conn, const char *Cmd) {
 	uint8_t readerType = 0;
 	uint8_t MAC[4]={0x00, 0x00, 0x00, 0x00};
 
@@ -249,15 +249,15 @@ int CmdHFiClassReader_Replay(const char *Cmd) {
 
 	UsbCommand c = {CMD_READER_ICLASS_REPLAY, {readerType}};
 	memcpy(c.d.asBytes, MAC, 4);
-	SendCommand(&c);
+	SendCommand(conn, &c);
 
 	return 0;
 }
 
-int iclassEmlSetMem(uint8_t *data, int blockNum, int blocksCount) {
+int iclassEmlSetMem(pm3_connection* conn, uint8_t *data, int blockNum, int blocksCount) {
 	UsbCommand c = {CMD_MIFARE_EML_MEMSET, {blockNum, blocksCount, 0}};
 	memcpy(c.d.asBytes, data, blocksCount * 16);
-	SendCommand(&c);
+	SendCommand(conn, &c);
 	return 0;
 }
 
@@ -269,7 +269,7 @@ int hf_iclass_eload_usage(void) {
 	return 0;
 }
 
-int CmdHFiClassELoad(const char *Cmd) {
+int CmdHFiClassELoad(pm3_connection* conn, const char *Cmd) {
 
 	char opt = param_getchar(Cmd, 0);
 	if (strlen(Cmd)<1 || opt == 'h')
@@ -322,7 +322,7 @@ int CmdHFiClassELoad(const char *Cmd) {
 		uint32_t bytes_in_packet = MIN(USB_CMD_DATA_SIZE, bytes_remaining);
 		UsbCommand c = {CMD_ICLASS_EML_MEMSET, {bytes_sent,bytes_in_packet,0}};
 		memcpy(c.d.asBytes, dump, bytes_in_packet);
-		SendCommand(&c);
+		SendCommand(conn, &c);
 		bytes_remaining -= bytes_in_packet;
 		bytes_sent += bytes_in_packet;
 	}
@@ -369,7 +369,7 @@ int usage_hf_iclass_decrypt(void) {
 	return 1;
 }
 
-int CmdHFiClassDecrypt(const char *Cmd) {
+int CmdHFiClassDecrypt(pm3_connection* conn, const char *Cmd) {
 	uint8_t key[16] = { 0 };
 	if(readKeyfile("iclass_decryptionkey.bin", 16, key))
 	{
@@ -461,7 +461,7 @@ static int iClassEncryptBlkData(uint8_t *blkData) {
 	return 1;
 }
 
-int CmdHFiClassEncryptBlk(const char *Cmd) {
+int CmdHFiClassEncryptBlk(pm3_connection* conn, const char *Cmd) {
 	uint8_t blkData[8] = {0};
 	char opt = param_getchar(Cmd, 0);
 	if (strlen(Cmd)<1 || opt == 'h')
@@ -487,7 +487,7 @@ void Calc_wb_mac(uint8_t blockno, uint8_t *data, uint8_t *div_key, uint8_t MAC[4
 	//printf("Cal wb mac block [%02x][%02x%02x%02x%02x%02x%02x%02x%02x] : MAC [%02x%02x%02x%02x]",WB[0],WB[1],WB[2],WB[3],WB[4],WB[5],WB[6],WB[7],WB[8],MAC[0],MAC[1],MAC[2],MAC[3]);
 }
 
-static bool select_only(uint8_t *CSN, uint8_t *CCNR, bool use_credit_key, bool verbose) {
+static bool select_only(pm3_connection* conn, uint8_t *CSN, uint8_t *CCNR, bool use_credit_key, bool verbose) {
 	UsbCommand resp;
 
 	UsbCommand c = {CMD_READER_ICLASS, {0}};
@@ -495,9 +495,9 @@ static bool select_only(uint8_t *CSN, uint8_t *CCNR, bool use_credit_key, bool v
 	if (use_credit_key)
 		c.arg[0] |= FLAG_ICLASS_READER_CEDITKEY;
 
-	clearCommandBuffer();
-	SendCommand(&c);
-	if (!WaitForResponseTimeout(CMD_ACK,&resp,4500))
+	clearCommandBuffer(conn);
+	SendCommand(conn, &c);
+	if (!WaitForResponseTimeout(conn, CMD_ACK,&resp,4500))
 	{
 		PrintAndLog("Command execute timeout");
 		return false;
@@ -519,11 +519,11 @@ static bool select_only(uint8_t *CSN, uint8_t *CCNR, bool use_credit_key, bool v
 	return true;	
 }
 
-static bool select_and_auth(uint8_t *KEY, uint8_t *MAC, uint8_t *div_key, bool use_credit_key, bool elite, bool rawkey, bool verbose) {
+static bool select_and_auth(pm3_connection* conn, uint8_t *KEY, uint8_t *MAC, uint8_t *div_key, bool use_credit_key, bool elite, bool rawkey, bool verbose) {
 	uint8_t CSN[8]={0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00};
 	uint8_t CCNR[12]={0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00};
 
-	if (!select_only(CSN, CCNR, use_credit_key, verbose))
+	if (!select_only(conn, CSN, CCNR, use_credit_key, verbose))
 		return false;
 
 	//get div_key
@@ -537,9 +537,9 @@ static bool select_and_auth(uint8_t *KEY, uint8_t *MAC, uint8_t *div_key, bool u
 	UsbCommand resp;
 	UsbCommand d = {CMD_ICLASS_AUTHENTICATION, {0}};
 	memcpy(d.d.asBytes, MAC, 4);
-	clearCommandBuffer();
-	SendCommand(&d);
-	if (!WaitForResponseTimeout(CMD_ACK,&resp,4500))
+	clearCommandBuffer(conn);
+	SendCommand(conn, &d);
+	if (!WaitForResponseTimeout(conn, CMD_ACK,&resp,4500))
 	{
 		PrintAndLog("Auth Command execute timeout");
 		return false;
@@ -570,7 +570,7 @@ int usage_hf_iclass_dump(void) {
 	return 0;
 }
 
-int CmdHFiClassReader_Dump(const char *Cmd) {
+int CmdHFiClassReader_Dump(pm3_connection* conn, const char *Cmd) {
 
 	uint8_t MAC[4] = {0x00,0x00,0x00,0x00};
 	uint8_t div_key[8] = {0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00};
@@ -679,11 +679,11 @@ int CmdHFiClassReader_Dump(const char *Cmd) {
 	UsbCommand resp;
 	uint8_t tag_data[255*8];
 
-	clearCommandBuffer();
-	SendCommand(&c);
-	if (!WaitForResponseTimeout(CMD_ACK, &resp, 4500)) {
+	clearCommandBuffer(conn);
+	SendCommand(conn, &c);
+	if (!WaitForResponseTimeout(conn, CMD_ACK, &resp, 4500)) {
 		PrintAndLog("Command execute timeout");
-		ul_switch_off_field();
+		ul_switch_off_field(conn);
 		return 0;
 	}
 	uint8_t readStatus = resp.arg[0] & 0xff;
@@ -691,7 +691,7 @@ int CmdHFiClassReader_Dump(const char *Cmd) {
 
 	if(readStatus == 0){
 		PrintAndLog("No tag found...");
-		ul_switch_off_field();
+		ul_switch_off_field(conn);
 		return 0;
 	}
 	if( readStatus & (FLAG_ICLASS_READER_CSN|FLAG_ICLASS_READER_CONF|FLAG_ICLASS_READER_CC)){
@@ -702,30 +702,30 @@ int CmdHFiClassReader_Dump(const char *Cmd) {
 		// large memory - not able to dump pages currently
 		if (numblks > maxBlk) numblks = maxBlk;
 	}
-	ul_switch_off_field();
+	ul_switch_off_field(conn);
 	// authenticate debit key and get div_key - later store in dump block 3
-	if (!select_and_auth(KEY, MAC, div_key, use_credit_key, elite, rawkey, false)){
+	if (!select_and_auth(conn, KEY, MAC, div_key, use_credit_key, elite, rawkey, false)){
 		//try twice - for some reason it sometimes fails the first time...
-		if (!select_and_auth(KEY, MAC, div_key, use_credit_key, elite, rawkey, false)){
-			ul_switch_off_field();
+		if (!select_and_auth(conn, KEY, MAC, div_key, use_credit_key, elite, rawkey, false)){
+			ul_switch_off_field(conn);
 			return 0;
 		}
 	}
 	
 	// begin dump
 	UsbCommand w = {CMD_ICLASS_DUMP, {blockno, numblks-blockno+1}};
-	clearCommandBuffer();
-	SendCommand(&w);
-	if (!WaitForResponseTimeout(CMD_ACK, &resp, 4500)) {
+	clearCommandBuffer(conn);
+	SendCommand(conn, &w);
+	if (!WaitForResponseTimeout(conn, CMD_ACK, &resp, 4500)) {
 		PrintAndLog("Command execute time-out 1");
-		ul_switch_off_field();
+		ul_switch_off_field(conn);
 		return 1;
 	}
 	uint32_t blocksRead = resp.arg[1];
 	uint8_t isOK = resp.arg[0] & 0xff;
 	if (!isOK && !blocksRead) {
 		PrintAndLog("Read Block Failed");
-		ul_switch_off_field();
+		ul_switch_off_field(conn);
 		return 0;
 	}
 	uint32_t startindex = resp.arg[2];
@@ -734,20 +734,20 @@ int CmdHFiClassReader_Dump(const char *Cmd) {
 		blocksRead = (sizeof(tag_data)/8) - blockno;
 	}
 	// response ok - now get bigbuf content of the dump
-	GetFromBigBuf(tag_data+(blockno*8), blocksRead*8, startindex);
-	WaitForResponse(CMD_ACK,NULL);
+	GetFromBigBuf(conn, tag_data+(blockno*8), blocksRead*8, startindex);
+	WaitForResponse(conn, CMD_ACK,NULL);
 	size_t gotBytes = blocksRead*8 + blockno*8;
 
 	// try AA2
 	if (have_credit_key) {
 		//turn off hf field before authenticating with different key
-		ul_switch_off_field();
+		ul_switch_off_field(conn);
 		memset(MAC,0,4);
 		// AA2 authenticate credit key and git c_div_key - later store in dump block 4
-		if (!select_and_auth(CreditKEY, MAC, c_div_key, true, false, false, false)){
+		if (!select_and_auth(conn, CreditKEY, MAC, c_div_key, true, false, false, false)){
 			//try twice - for some reason it sometimes fails the first time...
-			if (!select_and_auth(CreditKEY, MAC, c_div_key, true, false, false, false)){
-				ul_switch_off_field();
+			if (!select_and_auth(conn, CreditKEY, MAC, c_div_key, true, false, false, false)){
+				ul_switch_off_field(conn);
 				return 0;
 			}
 		}
@@ -756,18 +756,18 @@ int CmdHFiClassReader_Dump(const char *Cmd) {
 			// setup dump and start
 			w.arg[0] = blockno + blocksRead;
 			w.arg[1] = maxBlk - (blockno + blocksRead);
-			clearCommandBuffer();
-			SendCommand(&w);
-			if (!WaitForResponseTimeout(CMD_ACK, &resp, 4500)) {
+			clearCommandBuffer(conn);
+			SendCommand(conn, &w);
+			if (!WaitForResponseTimeout(conn, CMD_ACK, &resp, 4500)) {
 				PrintAndLog("Command execute timeout 2");
-				ul_switch_off_field();
+				ul_switch_off_field(conn);
 				return 0;
 			}
 			uint8_t isOK = resp.arg[0] & 0xff;
 			blocksRead = resp.arg[1];
 			if (!isOK && !blocksRead) {
 				PrintAndLog("Read Block Failed 2");
-				ul_switch_off_field();
+				ul_switch_off_field(conn);
 				return 0;
 			}		
 
@@ -777,12 +777,12 @@ int CmdHFiClassReader_Dump(const char *Cmd) {
 				blocksRead = (sizeof(tag_data) - gotBytes)/8;
 			}
 			// get dumped data from bigbuf
-			GetFromBigBuf(tag_data+gotBytes, blocksRead*8, startindex);
-			WaitForResponse(CMD_ACK,NULL);
+			GetFromBigBuf(conn, tag_data+gotBytes, blocksRead*8, startindex);
+			WaitForResponse(conn, CMD_ACK,NULL);
 
 			gotBytes += blocksRead*8;			
 		} else { //field is still on - turn it off...
-			ul_switch_off_field();
+			ul_switch_off_field(conn);
 		}
 	}
 
@@ -806,10 +806,10 @@ int CmdHFiClassReader_Dump(const char *Cmd) {
 	return 1;
 }
 
-static int WriteBlock(uint8_t blockno, uint8_t *bldata, uint8_t *KEY, bool use_credit_key, bool elite, bool rawkey, bool verbose) {
+static int WriteBlock(pm3_connection* conn, uint8_t blockno, uint8_t *bldata, uint8_t *KEY, bool use_credit_key, bool elite, bool rawkey, bool verbose) {
 	uint8_t MAC[4]={0x00,0x00,0x00,0x00};
 	uint8_t div_key[8]={0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00};
-	if (!select_and_auth(KEY, MAC, div_key, use_credit_key, elite, rawkey, verbose))
+	if (!select_and_auth(conn, KEY, MAC, div_key, use_credit_key, elite, rawkey, verbose))
 		return 0;
 
 	UsbCommand resp;
@@ -819,9 +819,9 @@ static int WriteBlock(uint8_t blockno, uint8_t *bldata, uint8_t *KEY, bool use_c
 	memcpy(w.d.asBytes, bldata, 8);
 	memcpy(w.d.asBytes + 8, MAC, 4);
 	
-	clearCommandBuffer();
-	SendCommand(&w);
-	if (!WaitForResponseTimeout(CMD_ACK,&resp,4500))
+	clearCommandBuffer(conn);
+	SendCommand(conn, &w);
+	if (!WaitForResponseTimeout(conn, CMD_ACK,&resp,4500))
 	{
 		PrintAndLog("Write Command execute timeout");
 		return 0;
@@ -850,7 +850,7 @@ int usage_hf_iclass_writeblock(void) {
 	return 0;
 }
 
-int CmdHFiClass_WriteBlock(const char *Cmd) {
+int CmdHFiClass_WriteBlock(pm3_connection* conn, const char *Cmd) {
 	uint8_t blockno=0;
 	uint8_t bldata[8]={0,0,0,0,0,0,0,0};
 	uint8_t KEY[8]={0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00};
@@ -929,8 +929,8 @@ int CmdHFiClass_WriteBlock(const char *Cmd) {
 	}
 
 	if (cmdp < 6) return usage_hf_iclass_writeblock();
-	int ans = WriteBlock(blockno, bldata, KEY, use_credit_key, elite, rawkey, true);
-	ul_switch_off_field();
+	int ans = WriteBlock(conn, blockno, bldata, KEY, use_credit_key, elite, rawkey, true);
+	ul_switch_off_field(conn);
 	return ans;
 }
 
@@ -951,7 +951,7 @@ int usage_hf_iclass_clone(void) {
 	return -1;
 }
 
-int CmdHFiClassCloneTag(const char *Cmd) {
+int CmdHFiClassCloneTag(pm3_connection* conn, const char *Cmd) {
 	char filename[FILE_PATH_SIZE] = {0};
 	char tempStr[50]={0};
 	uint8_t KEY[8]={0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00};
@@ -1075,7 +1075,7 @@ int CmdHFiClassCloneTag(const char *Cmd) {
 	uint8_t MAC[4]={0x00,0x00,0x00,0x00};
 	uint8_t div_key[8]={0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00};
 
-	if (!select_and_auth(KEY, MAC, div_key, use_credit_key, elite, rawkey, true))
+	if (!select_and_auth(conn, KEY, MAC, div_key, use_credit_key, elite, rawkey, true))
 		return 0;
 
 	UsbCommand w = {CMD_ICLASS_CLONE,{startblock,endblock}};
@@ -1099,8 +1099,8 @@ int CmdHFiClassCloneTag(const char *Cmd) {
 	    printf(" MAC |%02x%02x%02x%02x|\n",p[8],p[9],p[10],p[11]);
 	}
 	UsbCommand resp;
-	SendCommand(&w);
-	if (!WaitForResponseTimeout(CMD_ACK,&resp,4500))
+	SendCommand(conn, &w);
+	if (!WaitForResponseTimeout(conn, CMD_ACK,&resp,4500))
 	{
 		PrintAndLog("Command execute timeout");
 		return 0;
@@ -1108,25 +1108,25 @@ int CmdHFiClassCloneTag(const char *Cmd) {
 	return 1;
 }
 
-static int ReadBlock(uint8_t *KEY, uint8_t blockno, uint8_t keyType, bool elite, bool rawkey, bool verbose, bool auth) {
+static int ReadBlock(pm3_connection* conn, uint8_t *KEY, uint8_t blockno, uint8_t keyType, bool elite, bool rawkey, bool verbose, bool auth) {
 	uint8_t MAC[4]={0x00,0x00,0x00,0x00};
 	uint8_t div_key[8]={0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00};
 
 	if (auth) {
-		if (!select_and_auth(KEY, MAC, div_key, (keyType==0x18), elite, rawkey, verbose))
+		if (!select_and_auth(conn, KEY, MAC, div_key, (keyType==0x18), elite, rawkey, verbose))
 			return 0;
 	} else {
 		uint8_t CSN[8]={0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00};
 		uint8_t CCNR[12]={0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00};
-		if (!select_only(CSN, CCNR, (keyType==0x18), verbose))
+		if (!select_only(conn, CSN, CCNR, (keyType==0x18), verbose))
 			return 0;
 	}
 
 	UsbCommand resp;
 	UsbCommand w = {CMD_ICLASS_READBLOCK, {blockno}};
-	clearCommandBuffer();
-	SendCommand(&w);
-	if (!WaitForResponseTimeout(CMD_ACK,&resp,4500))
+	clearCommandBuffer(conn);
+	SendCommand(conn, &w);
+	if (!WaitForResponseTimeout(conn, CMD_ACK,&resp,4500))
 	{
 		PrintAndLog("Command execute timeout");
 		return 0;
@@ -1156,7 +1156,7 @@ int usage_hf_iclass_readblock(void) {
 	return 0;
 }
 
-int CmdHFiClass_ReadBlock(const char *Cmd) {
+int CmdHFiClass_ReadBlock(pm3_connection* conn, const char *Cmd) {
 	uint8_t blockno=0;
 	uint8_t keyType = 0x88; //debit key
 	uint8_t KEY[8]={0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00};
@@ -1229,10 +1229,10 @@ int CmdHFiClass_ReadBlock(const char *Cmd) {
 	if (cmdp < 2) return usage_hf_iclass_readblock();
 	if (!auth)
 		PrintAndLog("warning: no authentication used with read, only a few specific blocks can be read accurately without authentication.");
-	return ReadBlock(KEY, blockno, keyType, elite, rawkey, true, auth);
+	return ReadBlock(conn, KEY, blockno, keyType, elite, rawkey, true, auth);
 }
 
-int CmdHFiClass_loclass(const char *Cmd) {
+int CmdHFiClass_loclass(pm3_connection* conn, const char *Cmd) {
 	char opt = param_getchar(Cmd, 0);
 
 	if (strlen(Cmd)<1 || opt == 'h') {
@@ -1312,7 +1312,7 @@ int usage_hf_iclass_readtagfile() {
 	return 1;
 }
 
-int CmdHFiClassReadTagFile(const char *Cmd) {
+int CmdHFiClassReadTagFile(pm3_connection* conn, const char *Cmd) {
 	int startblock = 0;
 	int endblock = 0;
 	char tempnum[5];
@@ -1435,7 +1435,7 @@ int usage_hf_iclass_calc_newkey(void) {
 	return 1;
 }
 
-int CmdHFiClassCalcNewKey(const char *Cmd) {
+int CmdHFiClassCalcNewKey(pm3_connection* conn, const char *Cmd) {
 	uint8_t OLDKEY[8] = {0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00};
 	uint8_t NEWKEY[8] = {0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00};
 	uint8_t xor_div_key[8] = {0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00};
@@ -1520,7 +1520,7 @@ int CmdHFiClassCalcNewKey(const char *Cmd) {
 	if (cmdp < 4) return usage_hf_iclass_calc_newkey();
 
 	if (!givenCSN)
-		if (!select_only(CSN, CCNR, false, true))
+		if (!select_only(conn, CSN, CCNR, false, true))
 			return 0;
 	
 	HFiClassCalcNewKey(CSN, OLDKEY, NEWKEY, xor_div_key, elite, oldElite, true);
@@ -1606,7 +1606,7 @@ int usage_hf_iclass_managekeys(void) {
 	return 0;
 }
 
-int CmdHFiClassManageKeys(const char *Cmd) {
+int CmdHFiClassManageKeys(pm3_connection* conn, const char *Cmd) {
 	uint8_t keyNbr = 0;
 	uint8_t dataLen = 0;
 	uint8_t KEY[8] = {0};
@@ -1721,14 +1721,14 @@ static command_t CommandTable[] =
 	{NULL, NULL, 0, NULL}
 };
 
-int CmdHFiClass(const char *Cmd)
+int CmdHFiClass(pm3_connection* conn, const char *Cmd)
 {
-	CmdsParse(CommandTable, Cmd);
+	CmdsParse(conn, CommandTable, Cmd);
 	return 0;
 }
 
-int CmdHelp(const char *Cmd)
+int CmdHelp(pm3_connection* conn, const char *Cmd)
 {
-	CmdsHelp(CommandTable);
+	CmdsHelp(conn, CommandTable);
 	return 0;
 }

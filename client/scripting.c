@@ -14,6 +14,7 @@
 #include <lua.h>
 #include <lualib.h>
 #include <lauxlib.h>
+#include <lstate.h>
 #include "proxmark3.h"
 #include "usb_cmd.h"
 #include "cmdmain.h"
@@ -26,6 +27,10 @@
 #include "../common/sha1.h"
 #include "polarssl/aes.h"
 #include "cmdcrc.h"
+
+#define GET_PM3_CONNECTION pm3_connection* conn = (pm3_connection*)L->l_G->user_context;
+
+
 /**
  * The following params expected:
  *  UsbCommand c
@@ -34,7 +39,7 @@
  * @return
  */
 static int l_SendCommand(lua_State *L){
-
+	GET_PM3_CONNECTION;
 	/*
 	 *
 	 The SendCommand (native) expects the following structure:
@@ -61,7 +66,7 @@ static int l_SendCommand(lua_State *L){
 	}
 
 //    UsbCommand c = (*data);
-	SendCommand((UsbCommand* )data);
+	SendCommand(conn, (UsbCommand* )data);
 	return 0; // no return values
 }
 /**
@@ -72,7 +77,7 @@ static int l_SendCommand(lua_State *L){
  * @return
  */
 static int l_WaitForResponseTimeout(lua_State *L){
-
+	GET_PM3_CONNECTION;
 	uint32_t cmd = 0;
 	size_t ms_timeout = -1;
 
@@ -100,7 +105,7 @@ static int l_WaitForResponseTimeout(lua_State *L){
 
 	UsbCommand response;
 
-	if(WaitForResponseTimeout(cmd, &response, ms_timeout))
+	if(WaitForResponseTimeout(conn, cmd, &response, ms_timeout))
 	{
 		//Push it as a string
 		lua_pushlstring(L,(const char *)&response,sizeof(UsbCommand));
@@ -127,10 +132,10 @@ static int returnToLuaWithError(lua_State *L, const char* fmt, ...)
 }
 
 static int l_mfDarkside(lua_State *L){
-
+	GET_PM3_CONNECTION;
 	uint64_t key;
 	
-	int retval = mfDarkside(&key);
+	int retval = mfDarkside(conn, &key);
 	
 	//Push the retval on the stack
 	lua_pushinteger(L, retval);
@@ -148,7 +153,8 @@ static int l_mfDarkside(lua_State *L){
 //static int l_PrintAndLog(lua_State *L){ return CmdHF14AMfDump(luaL_checkstring(L, 1));}
 
 static int l_clearCommandBuffer(lua_State *L){
-	clearCommandBuffer();
+	GET_PM3_CONNECTION;
+	clearCommandBuffer(conn);
 	return 0;
 }
 /**
@@ -196,7 +202,8 @@ static int l_ukbhit(lua_State *L)
  */
 static int l_CmdConsole(lua_State *L)
 {
-	CommandReceived((char *)luaL_checkstring(L, 1));
+	GET_PM3_CONNECTION;
+	CommandReceived(conn, (char *)luaL_checkstring(L, 1));
 	return 0;
 }
 
@@ -472,7 +479,7 @@ int setLuaPath( lua_State* L, const char* path )
 }
 
 
-int set_pm3_libraries(lua_State *L)
+int set_pm3_libraries(lua_State *L, pm3_connection* conn)
 {
 
 	static const luaL_Reg libs[] = {
@@ -521,6 +528,10 @@ int set_pm3_libraries(lua_State *L)
 	strcat(libraries_path, LUA_LIBRARIES_DIRECTORY);
 	strcat(libraries_path, LUA_LIBRARIES_WILDCARD);
 	setLuaPath(L, libraries_path);
+
+	// Stuff the pm3_connection in the lua_State as "context".
+	// TODO: Find a better way to do this within Lua's API.
+	L->l_G->user_context = conn;
 
 	return 1;
 }

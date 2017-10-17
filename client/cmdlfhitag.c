@@ -22,20 +22,20 @@
 #include "hitagS.h"
 #include "cmdmain.h"
 
-static int CmdHelp(const char *Cmd);
+static int CmdHelp(pm3_connection* conn, const char *Cmd);
 
 size_t nbytes(size_t nbits) {
 	return (nbits/8)+((nbits%8)>0);
 }
 
-int CmdLFHitagList(const char *Cmd)
+int CmdLFHitagList(pm3_connection* conn, const char *Cmd)
 {
  	uint8_t *got = malloc(USB_CMD_DATA_SIZE);
 
 	// Query for the actual size of the trace
 	UsbCommand response;
-	GetFromBigBuf(got, USB_CMD_DATA_SIZE, 0);
-	WaitForResponse(CMD_ACK, &response);
+	GetFromBigBuf(conn, got, USB_CMD_DATA_SIZE, 0);
+	WaitForResponse(conn, CMD_ACK, &response);
 	uint16_t traceLen = response.arg[2];
 	if (traceLen > USB_CMD_DATA_SIZE) {
 		uint8_t *p = realloc(got, traceLen);
@@ -45,8 +45,8 @@ int CmdLFHitagList(const char *Cmd)
 			return 2;
 		}
 		got = p;
-		GetFromBigBuf(got, traceLen, 0);
-		WaitForResponse(CMD_ACK,NULL);
+		GetFromBigBuf(conn, got, traceLen, 0);
+		WaitForResponse(conn, CMD_ACK,NULL);
 	}
 	
 	PrintAndLog("recorded activity (TraceLen = %d bytes):");
@@ -145,13 +145,13 @@ int CmdLFHitagList(const char *Cmd)
 	return 0;
 }
 
-int CmdLFHitagSnoop(const char *Cmd) {
+int CmdLFHitagSnoop(pm3_connection* conn, const char *Cmd) {
   UsbCommand c = {CMD_SNOOP_HITAG};
-  SendCommand(&c);
+  SendCommand(conn, &c);
   return 0;
 }
 
-int CmdLFHitagSim(const char *Cmd) {
+int CmdLFHitagSim(pm3_connection* conn, const char *Cmd) {
     
   UsbCommand c = {CMD_SIMULATE_HITAG};
 	char filename[FILE_PATH_SIZE] = { 0x00 };
@@ -180,11 +180,11 @@ int CmdLFHitagSim(const char *Cmd) {
 	// Does the tag comes with memory
 	c.arg[0] = (uint32_t)tag_mem_supplied;
 
-  SendCommand(&c);
+  SendCommand(conn, &c);
   return 0;
 }
 
-int CmdLFHitagReader(const char *Cmd) {
+int CmdLFHitagReader(pm3_connection* conn, const char *Cmd) {
 	UsbCommand c = {CMD_READER_HITAG};//, {param_get32ex(Cmd,0,0,10),param_get32ex(Cmd,1,0,16),param_get32ex(Cmd,2,0,16),param_get32ex(Cmd,3,0,16)}};
 	hitag_data* htd = (hitag_data*)c.d.asBytes;
 	hitag_function htf = param_get32ex(Cmd,0,0,10);
@@ -239,10 +239,10 @@ int CmdLFHitagReader(const char *Cmd) {
 	c.arg[0] = htf;
 
 	// Send the command to the proxmark
-	SendCommand(&c);
+	SendCommand(conn, &c);
 
 	UsbCommand resp;
-	WaitForResponse(CMD_ACK,&resp);
+	WaitForResponse(conn, CMD_ACK,&resp);
 
 	// Check the return status, stored in the first argument
 	if (resp.arg[0] == false) return 1;
@@ -273,7 +273,7 @@ int CmdLFHitagReader(const char *Cmd) {
 }
 
 
-int CmdLFHitagSimS(const char *Cmd) {
+int CmdLFHitagSimS(pm3_connection* conn, const char *Cmd) {
 	UsbCommand c = { CMD_SIMULATE_HITAG_S };
 	char filename[FILE_PATH_SIZE] = { 0x00 };
 	FILE* pf;
@@ -302,11 +302,11 @@ int CmdLFHitagSimS(const char *Cmd) {
 	// Does the tag comes with memory
 	c.arg[0] = (uint32_t) tag_mem_supplied;
 
-	SendCommand(&c);
+	SendCommand(conn, &c);
 	return 0;
 }
 
-int CmdLFHitagCheckChallenges(const char *Cmd) {
+int CmdLFHitagCheckChallenges(pm3_connection* conn, const char *Cmd) {
 	UsbCommand c = { CMD_TEST_HITAGS_TRACES };
 	char filename[FILE_PATH_SIZE] = { 0x00 };
 	FILE* pf;
@@ -334,12 +334,12 @@ int CmdLFHitagCheckChallenges(const char *Cmd) {
 	//file with all the challenges to try
 	c.arg[0] = (uint32_t)file_given;
 
-  SendCommand(&c);
+  SendCommand(conn, &c);
   return 0;
 }
 
 
-int CmdLFHitagWP(const char *Cmd) {
+int CmdLFHitagWP(pm3_connection* conn, const char *Cmd) {
 	UsbCommand c = { CMD_WR_HITAG_S };
 	hitag_data* htd = (hitag_data*)c.d.asBytes;
 	hitag_function htf = param_get32ex(Cmd,0,0,10);
@@ -373,10 +373,10 @@ int CmdLFHitagWP(const char *Cmd) {
 	c.arg[0] = htf;
 
   // Send the command to the proxmark
-  SendCommand(&c);
+  SendCommand(conn, &c);
   
   UsbCommand resp;
-  WaitForResponse(CMD_ACK,&resp);
+  WaitForResponse(conn, CMD_ACK,&resp);
   
   // Check the return status, stored in the first argument
   if (resp.arg[0] == false) return 1;
@@ -397,14 +397,14 @@ static command_t CommandTable[] =
 				NULL,NULL, 0, NULL }
 };
 
-int CmdLFHitag(const char *Cmd)
+int CmdLFHitag(pm3_connection* conn, const char *Cmd)
 {
-  CmdsParse(CommandTable, Cmd);
+  CmdsParse(conn, CommandTable, Cmd);
   return 0;
 }
 
-int CmdHelp(const char *Cmd)
+int CmdHelp(pm3_connection* conn, const char *Cmd)
 {
-  CmdsHelp(CommandTable);
+  CmdsHelp(conn, CommandTable);
   return 0;
 }

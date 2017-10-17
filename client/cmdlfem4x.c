@@ -27,16 +27,16 @@
 
 uint64_t g_em410xId=0;
 
-static int CmdHelp(const char *Cmd);
-void ConstructEM410xEmulGraph(const char *uid,const  uint8_t clock);
+static int CmdHelp(pm3_connection* conn, const char *Cmd);
+void ConstructEM410xEmulGraph(pm3_connection* conn, const char *uid, const uint8_t clock);
 
-int CmdEMdemodASK(const char *Cmd)
+int CmdEMdemodASK(pm3_connection* conn, const char *Cmd)
 {
 	char cmdp = param_getchar(Cmd, 0);
 	int findone = (cmdp == '1') ? 1 : 0;
 	UsbCommand c={CMD_EM410X_DEMOD};
 	c.arg[0]=findone;
-	SendCommand(&c);
+	SendCommand(conn, &c);
 	return 0;
 }
 
@@ -145,21 +145,21 @@ void printEM410x(uint32_t hi, uint64_t id)
  *   CCCC                  <-- each bit here is parity for the 10 bits above in corresponding column
  *   0                     <-- stop bit, end of tag
  */
-int AskEm410xDecode(bool verbose, uint32_t *hi, uint64_t *lo )
+int AskEm410xDecode(pm3_connection* conn, bool verbose, uint32_t *hi, uint64_t *lo )
 {
 	size_t idx = 0;
 	uint8_t BitStream[512]={0};
 	size_t BitLen = sizeof(BitStream);
-	if ( !getDemodBuf(BitStream, &BitLen) ) return 0;
+	if ( !getDemodBuf(conn, BitStream, &BitLen) ) return 0;
 
 	if (Em410xDecode(BitStream, &BitLen, &idx, hi, lo)) {
-		//set GraphBuffer for clone or sim command
-		setDemodBuf(DemodBuffer, (BitLen==40) ? 64 : 128, idx+1);
-		setClockGrid(g_DemodClock, g_DemodStartIdx + ((idx+1)*g_DemodClock));
+		//set conn->GraphBuffer for clone or sim command
+		setDemodBuf(conn, conn->DemodBuffer, (BitLen==40) ? 64 : 128, idx+1);
+		setClockGrid(conn, conn->g_DemodClock, conn->g_DemodStartIdx + ((idx+1)*conn->g_DemodClock));
 
 		if (g_debugMode) {
 			PrintAndLog("DEBUG: idx: %d, Len: %d, Printing Demod Buffer:", idx, BitLen);
-			printDemodBuff();
+			printDemodBuff(conn);
 		}
 		if (verbose) {
 			PrintAndLog("EM410x pattern found: ");
@@ -172,18 +172,18 @@ int AskEm410xDecode(bool verbose, uint32_t *hi, uint64_t *lo )
 }
 
 //askdemod then call Em410xdecode
-int AskEm410xDemod(const char *Cmd, uint32_t *hi, uint64_t *lo, bool verbose)
+int AskEm410xDemod(pm3_connection* conn, const char *Cmd, uint32_t *hi, uint64_t *lo, bool verbose)
 {
 	bool st = true;
-	if (!ASKDemod_ext(Cmd, false, false, 1, &st)) return 0;
-	return AskEm410xDecode(verbose, hi, lo);
+	if (!ASKDemod_ext(conn, Cmd, false, false, 1, &st)) return 0;
+	return AskEm410xDecode(conn, verbose, hi, lo);
 }
 
 //by marshmellow
 //takes 3 arguments - clock, invert and maxErr as integers
 //attempts to demodulate ask while decoding manchester
 //prints binary found and saves in graphbuffer for further commands
-int CmdAskEM410xDemod(const char *Cmd)
+int CmdAskEM410xDemod(pm3_connection* conn, const char *Cmd)
 {
 	char cmdp = param_getchar(Cmd, 0);
 	if (strlen(Cmd) > 10 || cmdp == 'h' || cmdp == 'H') {
@@ -192,16 +192,16 @@ int CmdAskEM410xDemod(const char *Cmd)
 		PrintAndLog("     <invert>, 1 for invert output");
 		PrintAndLog("     [set maximum allowed errors], default = 100.");
 		PrintAndLog("");
-		PrintAndLog("    sample: lf em 410xdemod        = demod an EM410x Tag ID from GraphBuffer");
-		PrintAndLog("          : lf em 410xdemod 32     = demod an EM410x Tag ID from GraphBuffer using a clock of RF/32");
-		PrintAndLog("          : lf em 410xdemod 32 1   = demod an EM410x Tag ID from GraphBuffer using a clock of RF/32 and inverting data");
-		PrintAndLog("          : lf em 410xdemod 1      = demod an EM410x Tag ID from GraphBuffer while inverting data");
-		PrintAndLog("          : lf em 410xdemod 64 1 0 = demod an EM410x Tag ID from GraphBuffer using a clock of RF/64 and inverting data and allowing 0 demod errors");
+		PrintAndLog("    sample: lf em 410xdemod        = demod an EM410x Tag ID from conn->GraphBuffer");
+		PrintAndLog("          : lf em 410xdemod 32     = demod an EM410x Tag ID from conn->GraphBuffer using a clock of RF/32");
+		PrintAndLog("          : lf em 410xdemod 32 1   = demod an EM410x Tag ID from conn->GraphBuffer using a clock of RF/32 and inverting data");
+		PrintAndLog("          : lf em 410xdemod 1      = demod an EM410x Tag ID from conn->GraphBuffer while inverting data");
+		PrintAndLog("          : lf em 410xdemod 64 1 0 = demod an EM410x Tag ID from conn->GraphBuffer using a clock of RF/64 and inverting data and allowing 0 demod errors");
 		return 0;
 	}
 	uint64_t lo = 0;
 	uint32_t hi = 0;
-	return AskEm410xDemod(Cmd, &hi, &lo, true);
+	return AskEm410xDemod(conn, Cmd, &hi, &lo, true);
 }
 
 int usage_lf_em410x_sim(void) {
@@ -219,15 +219,15 @@ int usage_lf_em410x_sim(void) {
 }
 
 // Construct the graph for emulating an EM410X tag
-void ConstructEM410xEmulGraph(const char *uid,const  uint8_t clock)
+void ConstructEM410xEmulGraph(pm3_connection* conn, const char *uid,const  uint8_t clock)
 {
 	int i, n, j, binary[4], parity[4];
 	/* clear our graph */
-	ClearGraph(0);
+	ClearGraph(conn, 0);
 
 	/* write 9 start bits */
 	for (i = 0; i < 9; i++)
-		AppendGraph(0, clock, 1);
+		AppendGraph(conn, 0, clock, 1);
 
 	/* for each hex char */
 	parity[0] = parity[1] = parity[2] = parity[3] = 0;
@@ -238,13 +238,13 @@ void ConstructEM410xEmulGraph(const char *uid,const  uint8_t clock)
 			binary[j] = n % 2;
 
 		/* append each bit */
-		AppendGraph(0, clock, binary[0]);
-		AppendGraph(0, clock, binary[1]);
-		AppendGraph(0, clock, binary[2]);
-		AppendGraph(0, clock, binary[3]);
+		AppendGraph(conn, 0, clock, binary[0]);
+		AppendGraph(conn, 0, clock, binary[1]);
+		AppendGraph(conn, 0, clock, binary[2]);
+		AppendGraph(conn, 0, clock, binary[3]);
 
 		/* append parity bit */
-		AppendGraph(0, clock, binary[0] ^ binary[1] ^ binary[2] ^ binary[3]);
+		AppendGraph(conn, 0, clock, binary[0] ^ binary[1] ^ binary[2] ^ binary[3]);
 
 		/* keep track of column parity */
 		parity[0] ^= binary[0];
@@ -254,17 +254,17 @@ void ConstructEM410xEmulGraph(const char *uid,const  uint8_t clock)
 	}
 
 	/* parity columns */
-	AppendGraph(0, clock, parity[0]);
-	AppendGraph(0, clock, parity[1]);
-	AppendGraph(0, clock, parity[2]);
-	AppendGraph(0, clock, parity[3]);
+	AppendGraph(conn, 0, clock, parity[0]);
+	AppendGraph(conn, 0, clock, parity[1]);
+	AppendGraph(conn, 0, clock, parity[2]);
+	AppendGraph(conn, 0, clock, parity[3]);
 
 	/* stop bit */
-	AppendGraph(1, clock, 0);
+	AppendGraph(conn, 1, clock, 0);
 }
 
 // emulate an EM410X tag
-int CmdEM410xSim(const char *Cmd)
+int CmdEM410xSim(pm3_connection* conn, const char *Cmd)
 {
 	char cmdp = param_getchar(Cmd, 0);
 	uint8_t uid[5] = {0x00};
@@ -282,9 +282,9 @@ int CmdEM410xSim(const char *Cmd)
 	PrintAndLog("Starting simulating UID %02X%02X%02X%02X%02X  clock: %d", uid[0],uid[1],uid[2],uid[3],uid[4],clock);
 	PrintAndLog("Press pm3-button to abort simulation");
 
-	ConstructEM410xEmulGraph(Cmd, clock);
+	ConstructEM410xEmulGraph(conn, Cmd, clock);
 	
-	CmdLFSim("0"); //240 start_gap.
+	CmdLFSim(conn, "0"); //240 start_gap.
 	return 0;
 }
 
@@ -305,7 +305,7 @@ int usage_lf_em410x_brute(void) {
 	return 0;
 }
 
-int CmdEM410xBrute(const char *Cmd)
+int CmdEM410xBrute(pm3_connection* conn, const char *Cmd)
 {
 	char filename[FILE_PATH_SIZE]={0};
 	FILE *f = NULL;
@@ -408,9 +408,9 @@ int CmdEM410xBrute(const char *Cmd)
 		sprintf(testuid, "%010" PRIX64, bytes_to_num(uidBlock + 5*c, 5));
 		PrintAndLog("Bruteforce %d / %d: simulating UID  %s, clock %d", c + 1, uidcnt, testuid, clock);
 		
-		ConstructEM410xEmulGraph(testuid, clock);
+		ConstructEM410xEmulGraph(conn, testuid, clock);
 		
-		CmdLFSim("0"); //240 start_gap.
+		CmdLFSim(conn, "0"); //240 start_gap.
 
 		msleep(delay);
 	}
@@ -431,29 +431,29 @@ int CmdEM410xBrute(const char *Cmd)
  *
  *  EDIT -- capture enough to get 2 complete preambles at the slowest data rate known to be used (rf/64) (64*64*2+9 = 8201)	marshmellow
 */
-int CmdEM410xWatch(const char *Cmd)
+int CmdEM410xWatch(pm3_connection* conn, const char *Cmd)
 {
 	do {
 		if (ukbhit()) {
 			printf("\naborted via keyboard!\n");
 			break;
 		}
-		lf_read(true, 8201);
-	} while (!CmdAskEM410xDemod(""));
+		lf_read(conn, true, 8201);
+	} while (!CmdAskEM410xDemod(conn, ""));
 
 	return 0;
 }
 
 //currently only supports manchester modulations
-int CmdEM410xWatchnSpoof(const char *Cmd)
+int CmdEM410xWatchnSpoof(pm3_connection* conn, const char *Cmd)
 {
-	CmdEM410xWatch(Cmd);
+	CmdEM410xWatch(conn, Cmd);
 	PrintAndLog("# Replaying captured ID: %010"PRIx64, g_em410xId);
-	CmdLFaskSim("");
+	CmdLFaskSim(conn, "");
 	return 0;
 }
 
-int CmdEM410xWrite(const char *Cmd)
+int CmdEM410xWrite(pm3_connection* conn, const char *Cmd)
 {
 	uint64_t id = 0xFFFFFFFFFFFFFFFF; // invalid id value
 	int card = 0xFF; // invalid card value
@@ -508,7 +508,7 @@ int CmdEM410xWrite(const char *Cmd)
 	}
 
 	UsbCommand c = {CMD_EM410X_WRITE_TAG, {card, (uint32_t)(id >> 32), (uint32_t)id}};
-	SendCommand(&c);
+	SendCommand(conn, &c);
 
 	return 0;
 }
@@ -542,7 +542,7 @@ bool EM_ByteParityTest(uint8_t *BitStream, size_t size, uint8_t rows, uint8_t co
 	return true;
 }
 
-uint32_t OutputEM4x50_Block(uint8_t *BitStream, size_t size, bool verbose, bool pTest)
+uint32_t OutputEM4x50_Block(pm3_connection* conn, uint8_t *BitStream, size_t size, bool verbose, bool pTest)
 {
 	if (size<45) return 0;
 	uint32_t code = bytebits_to_byte(BitStream,8);
@@ -592,7 +592,7 @@ uint32_t OutputEM4x50_Block(uint8_t *BitStream, size_t size, bool verbose, bool 
  * Word Read values. UID is stored in block 32.
  */
  //completed by Marshmellow
-int EM4x50Read(const char *Cmd, bool verbose)
+int EM4x50Read(pm3_connection* conn, const char *Cmd, bool verbose)
 {
 	uint8_t fndClk[] = {8,16,32,40,50,64,128};
 	int clk = 0;
@@ -612,38 +612,38 @@ int EM4x50Read(const char *Cmd, bool verbose)
 	sscanf(Cmd, "%i %i", &clk, &invert);
 
 	// first get high and low values
-	for (i = 0; i < GraphTraceLen; i++) {
-		if (GraphBuffer[i] > high)
-			high = GraphBuffer[i];
-		else if (GraphBuffer[i] < low)
-			low = GraphBuffer[i];
+	for (i = 0; i < conn->GraphTraceLen; i++) {
+		if (conn->GraphBuffer[i] > high)
+			high = conn->GraphBuffer[i];
+		else if (conn->GraphBuffer[i] < low)
+			low = conn->GraphBuffer[i];
 	}
 
 	i = 0;
 	j = 0;
 	minClk = 255;
 	// get to first full low to prime loop and skip incomplete first pulse
-	while ((GraphBuffer[i] < high) && (i < GraphTraceLen))
+	while ((conn->GraphBuffer[i] < high) && (i < conn->GraphTraceLen))
 		++i;
-	while ((GraphBuffer[i] > low) && (i < GraphTraceLen))
+	while ((conn->GraphBuffer[i] > low) && (i < conn->GraphTraceLen))
 		++i;
 	skip = i;
 
 	// populate tmpbuff buffer with pulse lengths
-	while (i < GraphTraceLen) {
+	while (i < conn->GraphTraceLen) {
 		// measure from low to low
-		while ((GraphBuffer[i] > low) && (i < GraphTraceLen))
+		while ((conn->GraphBuffer[i] > low) && (i < conn->GraphTraceLen))
 			++i;
 		start= i;
-		while ((GraphBuffer[i] < high) && (i < GraphTraceLen))
+		while ((conn->GraphBuffer[i] < high) && (i < conn->GraphTraceLen))
 			++i;
-		while ((GraphBuffer[i] > low) && (i < GraphTraceLen))
+		while ((conn->GraphBuffer[i] > low) && (i < conn->GraphTraceLen))
 			++i;
 		if (j>=(MAX_GRAPH_TRACE_LEN/64)) {
 			break;
 		}
 		tmpbuff[j++]= i - start;
-		if (i-start < minClk && i < GraphTraceLen) {
+		if (i-start < minClk && i < conn->GraphTraceLen) {
 			minClk = i - start;
 		}
 	}
@@ -707,11 +707,11 @@ int EM4x50Read(const char *Cmd, bool verbose)
 	} else if (start < 0) return 0;
 	start = skip;
 	snprintf(tmp2, sizeof(tmp2),"%d %d 1000 %d", clk, invert, clk*47);
-	// save GraphBuffer - to restore it later
-	save_restoreGB(GRAPH_SAVE);
-	// get rid of leading crap
+	// save GraphBuffer - to restore it later	
+	save_restoreGB(conn, GRAPH_SAVE);
+	// get rid of leading crap 
 	snprintf(tmp, sizeof(tmp), "%i", skip);
-	CmdLtrim(tmp);
+	CmdLtrim(conn, tmp);
 	bool pTest;
 	bool AllPTest = true;
 	// now work through remaining buffer printing out data blocks
@@ -735,22 +735,22 @@ int EM4x50Read(const char *Cmd, bool verbose)
 		else
 			phaseoff = 0;
 		i += 2;
-		if (ASKDemod(tmp2, false, false, 1) < 1) {
-			save_restoreGB(GRAPH_RESTORE);
+		if (ASKDemod(conn, tmp2, false, false, 1) < 1) {
+			save_restoreGB(conn, GRAPH_RESTORE);
 			return 0;
 		}
-		//set DemodBufferLen to just one block
-		DemodBufferLen = skip/clk;
+		//set conn->DemodBufferLen to just one block
+		conn->DemodBufferLen = skip/clk;
 		//test parities
-		pTest = EM_ByteParityTest(DemodBuffer,DemodBufferLen,5,9,0);
-		pTest &= EM_EndParityTest(DemodBuffer,DemodBufferLen,5,9,0);
+		pTest = EM_ByteParityTest(conn->DemodBuffer,conn->DemodBufferLen,5,9,0);	
+		pTest &= EM_EndParityTest(conn->DemodBuffer,conn->DemodBufferLen,5,9,0);
 		AllPTest &= pTest;
 		//get output
-		Code[block] = OutputEM4x50_Block(DemodBuffer,DemodBufferLen,verbose, pTest);
+		Code[block] = OutputEM4x50_Block(conn, conn->DemodBuffer,conn->DemodBufferLen,verbose, pTest);
 		if (g_debugMode) PrintAndLog("\nskipping %d samples, bits:%d", skip, skip/clk);
 		//skip to start of next block
 		snprintf(tmp,sizeof(tmp),"%i",skip);
-		CmdLtrim(tmp);
+		CmdLtrim(conn, tmp);
 		block++;
 		if (i >= end) break; //in case chip doesn't output 6 blocks
 	}
@@ -775,13 +775,13 @@ int EM4x50Read(const char *Cmd, bool verbose)
 	}
 
 	//restore GraphBuffer
-	save_restoreGB(GRAPH_RESTORE);
+	save_restoreGB(conn, GRAPH_RESTORE);
 	return (int)AllPTest;
 }
 
-int CmdEM4x50Read(const char *Cmd)
+int CmdEM4x50Read(pm3_connection* conn, const char *Cmd)
 {
-	return EM4x50Read(Cmd, true);
+	return EM4x50Read(conn, Cmd, true);
 }
 
 //**************** Start of EM4x05/EM4x69 Code ************************
@@ -801,19 +801,19 @@ int usage_lf_em_read(void) {
 
 // for command responses from em4x05 or em4x69
 // download samples from device and copy them to the Graphbuffer
-bool downloadSamplesEM() {
+bool downloadSamplesEM(pm3_connection* conn) {
 	// 8 bit preamble + 32 bit word response (max clock (128) * 40bits = 5120 samples)
-	uint8_t got[6000];
-	GetFromBigBuf(got, sizeof(got), 0);
-	if ( !WaitForResponseTimeout(CMD_ACK, NULL, 4000) ) {
+	uint8_t got[6000]; 
+	GetFromBigBuf(conn, got, sizeof(got), 0);
+	if ( !WaitForResponseTimeout(conn, CMD_ACK, NULL, 4000) ) {
 		PrintAndLog("command execution time out");
 		return false;
 	}
-	setGraphBuf(got, sizeof(got));
+	setGraphBuf(conn, got, sizeof(got));
 	return true;
 }
 
-bool EM4x05testDemodReadData(uint32_t *word, bool readCmd) {
+bool EM4x05testDemodReadData(pm3_connection* conn, uint32_t *word, bool readCmd) {
 	// em4x05/em4x69 command response preamble is 00001010
 	// skip first two 0 bits as they might have been missed in the demod
 	uint8_t preamble[] = {0,0,1,0,1,0};
@@ -822,28 +822,28 @@ bool EM4x05testDemodReadData(uint32_t *word, bool readCmd) {
 	// set size to 20 to only test first 14 positions for the preamble or less if not a read command
 	size_t size = (readCmd) ? 20 : 11;
 	// sanity check
-	size = (size > DemodBufferLen) ? DemodBufferLen : size;
+	size = (size > conn->DemodBufferLen) ? conn->DemodBufferLen : size;
 	// test preamble
-	if ( !preambleSearchEx(DemodBuffer, preamble, sizeof(preamble), &size, &startIdx, true) ) {
+	if ( !preambleSearchEx(conn->DemodBuffer, preamble, sizeof(preamble), &size, &startIdx, true) ) {
 		if (g_debugMode) PrintAndLog("DEBUG: Error - EM4305 preamble not found :: %d", startIdx);
 		return false;
 	}
 	// if this is a readword command, get the read bytes and test the parities
 	if (readCmd) {
-		if (!EM_EndParityTest(DemodBuffer + startIdx + sizeof(preamble), 45, 5, 9, 0)) {
+		if (!EM_EndParityTest(conn->DemodBuffer + startIdx + sizeof(preamble), 45, 5, 9, 0)) {
 			if (g_debugMode) PrintAndLog("DEBUG: Error - End Parity check failed");
 			return false;
 		}
 		// test for even parity bits and remove them. (leave out the end row of parities so 36 bits)
-		if ( removeParity(DemodBuffer, startIdx + sizeof(preamble),9,0,36) == 0 ) {
+		if ( removeParity(conn->DemodBuffer, startIdx + sizeof(preamble),9,0,36) == 0 ) {		
 			if (g_debugMode) PrintAndLog("DEBUG: Error - Parity not detected");
 			return false;
 		}
 
-		setDemodBuf(DemodBuffer, 32, 0);
-		//setClockGrid(0,0);
+		setDemodBuf(conn, conn->DemodBuffer, 32, 0);
+		//setClockGrid(conn, 0,0);
 
-		*word = bytebits_to_byteLSBF(DemodBuffer, 32);
+		*word = bytebits_to_byteLSBF(conn->DemodBuffer, 32);
 	}
 	return true;
 }
@@ -851,49 +851,49 @@ bool EM4x05testDemodReadData(uint32_t *word, bool readCmd) {
 // FSK, PSK, ASK/MANCHESTER, ASK/BIPHASE, ASK/DIPHASE
 // should cover 90% of known used configs
 // the rest will need to be manually demoded for now...
-int demodEM4x05resp(uint32_t *word, bool readCmd) {
+int demodEM4x05resp(pm3_connection* conn, uint32_t *word, bool readCmd) {
 	int ans = 0;
 
 	// test for FSK wave (easiest to 99% ID)
-	if (GetFskClock("", false, false)) {
+	if (GetFskClock(conn, "", false, false)) {
 		//valid fsk clocks found
-		ans = FSKrawDemod("0 0", false);
+		ans = FSKrawDemod(conn, "0 0", false);
 		if (!ans) {
 			if (g_debugMode) PrintAndLog("DEBUG: Error - EM4305: FSK Demod failed, ans: %d", ans);
 		} else {
-			if (EM4x05testDemodReadData(word, readCmd)) {
+			if (EM4x05testDemodReadData(conn, word, readCmd)) {
 				return 1;
 			}
 		}
 	}
 	// PSK clocks should be easy to detect ( but difficult to demod a non-repeating pattern... )
-	ans = GetPskClock("", false, false);
+	ans = GetPskClock(conn, "", false, false);
 	if (ans>0) {
 		//try psk1
-		ans = PSKDemod("0 0 6", false);
+		ans = PSKDemod(conn, "0 0 6", false);
 		if (!ans) {
 			if (g_debugMode) PrintAndLog("DEBUG: Error - EM4305: PSK1 Demod failed, ans: %d", ans);
 		} else {
-			if (EM4x05testDemodReadData(word, readCmd)) {
+			if (EM4x05testDemodReadData(conn, word, readCmd)) {
 				return 1;
 			} else {
 				//try psk2
-				psk1TOpsk2(DemodBuffer, DemodBufferLen);
-				if (EM4x05testDemodReadData(word, readCmd)) {
+				psk1TOpsk2(conn->DemodBuffer, conn->DemodBufferLen);
+				if (EM4x05testDemodReadData(conn, word, readCmd)) {
 					return 1;
 				}
 			}
 			//try psk1 inverted
-			ans = PSKDemod("0 1 6", false);
+			ans = PSKDemod(conn, "0 1 6", false);
 			if (!ans) {
 				if (g_debugMode) PrintAndLog("DEBUG: Error - EM4305: PSK1 Demod failed, ans: %d", ans);
 			} else {
-				if (EM4x05testDemodReadData(word, readCmd)) {
+				if (EM4x05testDemodReadData(conn, word, readCmd)) {
 					return 1;
 				} else {
 					//try psk2
-					psk1TOpsk2(DemodBuffer, DemodBufferLen);
-					if (EM4x05testDemodReadData(word, readCmd)) {
+					psk1TOpsk2(conn->DemodBuffer, conn->DemodBufferLen);
+					if (EM4x05testDemodReadData(conn, word, readCmd)) {
 						return 1;
 					}
 				}
@@ -904,31 +904,31 @@ int demodEM4x05resp(uint32_t *word, bool readCmd) {
 	// manchester is more common than biphase... try first
 	bool stcheck = false;
 	// try manchester - NOTE: ST only applies to T55x7 tags.
-	ans = ASKDemod_ext("0,0,1", false, false, 1, &stcheck);
+	ans = ASKDemod_ext(conn, "0,0,1", false, false, 1, &stcheck);
 	if (!ans) {
 		if (g_debugMode) PrintAndLog("DEBUG: Error - EM4305: ASK/Manchester Demod failed, ans: %d", ans);
 	} else {
-		if (EM4x05testDemodReadData(word, readCmd)) {
+		if (EM4x05testDemodReadData(conn, word, readCmd)) {
 			return 1;
 		}
 	}
 
 	//try biphase
-	ans = ASKbiphaseDemod("0 0 1", false);
-	if (!ans) {
+	ans = ASKbiphaseDemod(conn, "0 0 1", false);
+	if (!ans) { 
 		if (g_debugMode) PrintAndLog("DEBUG: Error - EM4305: ASK/biphase Demod failed, ans: %d", ans);
 	} else {
-		if (EM4x05testDemodReadData(word, readCmd)) {
+		if (EM4x05testDemodReadData(conn, word, readCmd)) {
 			return 1;
 		}
 	}
 
 	//try diphase (differential biphase or inverted)
-	ans = ASKbiphaseDemod("0 1 1", false);
-	if (!ans) {
+	ans = ASKbiphaseDemod(conn, "0 1 1", false);
+	if (!ans) { 
 		if (g_debugMode) PrintAndLog("DEBUG: Error - EM4305: ASK/biphase Demod failed, ans: %d", ans);
 	} else {
-		if (EM4x05testDemodReadData(word, readCmd)) {
+		if (EM4x05testDemodReadData(conn, word, readCmd)) {
 			return 1;
 		}
 	}
@@ -936,30 +936,30 @@ int demodEM4x05resp(uint32_t *word, bool readCmd) {
 	return -1;
 }
 
-int EM4x05ReadWord_ext(uint8_t addr, uint32_t pwd, bool usePwd, uint32_t *wordData) {
+int EM4x05ReadWord_ext(pm3_connection* conn, uint8_t addr, uint32_t pwd, bool usePwd, uint32_t *wordData) {
 	UsbCommand c = {CMD_EM4X_READ_WORD, {addr, pwd, usePwd}};
-	clearCommandBuffer();
-	SendCommand(&c);
-	UsbCommand resp;
-	if (!WaitForResponseTimeout(CMD_ACK, &resp, 2500)){
+	clearCommandBuffer(conn);
+	SendCommand(conn, &c);
+	UsbCommand resp;	
+	if (!WaitForResponseTimeout(conn, CMD_ACK, &resp, 2500)){
 		PrintAndLog("Command timed out");
 		return -1;
 	}
-	if ( !downloadSamplesEM() ) {
+	if ( !downloadSamplesEM(conn) ) {
 		return -1;
 	}
-	int testLen = (GraphTraceLen < 1000) ? GraphTraceLen : 1000;
-	if (graphJustNoise(GraphBuffer, testLen)) {
+	int testLen = (conn->GraphTraceLen < 1000) ? conn->GraphTraceLen : 1000;
+	if (graphJustNoise(conn->GraphBuffer, testLen)) {
 		PrintAndLog("no tag not found");
 		return -1;
 	}
 	//attempt demod:
-	return demodEM4x05resp(wordData, true);
+	return demodEM4x05resp(conn, wordData, true);
 }
 
-int EM4x05ReadWord(uint8_t addr, uint32_t pwd, bool usePwd) {
+int EM4x05ReadWord(pm3_connection* conn, uint8_t addr, uint32_t pwd, bool usePwd) {
 	uint32_t wordData = 0;
-	int success = EM4x05ReadWord_ext(addr, pwd, usePwd, &wordData);
+	int success = EM4x05ReadWord_ext(conn, addr, pwd, usePwd, &wordData);
 	if (success == 1)
 		PrintAndLog("%s Address %02d | %08X", (addr>13) ? "Lock":" Got",addr,wordData);
 	else
@@ -968,7 +968,7 @@ int EM4x05ReadWord(uint8_t addr, uint32_t pwd, bool usePwd) {
 	return success;
 }
 
-int CmdEM4x05ReadWord(const char *Cmd) {
+int CmdEM4x05ReadWord(pm3_connection* conn, const char *Cmd) {
 	uint8_t addr;
 	uint32_t pwd;
 	bool usePwd = false;
@@ -990,7 +990,7 @@ int CmdEM4x05ReadWord(const char *Cmd) {
 		PrintAndLog("Reading address %02u | password %08X", addr, pwd);
 	}
 
-	return EM4x05ReadWord(addr, pwd, usePwd);
+	return EM4x05ReadWord(conn, addr, pwd, usePwd);
 }
 
 int usage_lf_em_dump(void) {
@@ -1006,7 +1006,7 @@ int usage_lf_em_dump(void) {
 	return 0;
 }
 
-int CmdEM4x05dump(const char *Cmd) {
+int CmdEM4x05dump(pm3_connection* conn, const char *Cmd) {
 	uint8_t addr = 0;
 	uint32_t pwd;
 	bool usePwd = false;
@@ -1028,7 +1028,7 @@ int CmdEM4x05dump(const char *Cmd) {
 				PrintAndLog(" PWD Address 02 | cannot read");
 			}
 		} else {
-			success &= EM4x05ReadWord(addr, pwd, usePwd);
+			success &= EM4x05ReadWord(conn, addr, pwd, usePwd);
 		}
 	}
 
@@ -1056,7 +1056,7 @@ int usage_lf_em_write(void) {
 // note: em4x05 doesn't have a way to invert data output so we must invert the data prior to writing
 //         it if invertion is needed. (example FSK2a vs FSK)
 //       also em4x05 requires swapping word data when compared to the data used for t55xx chips.
-int EM4x05WriteWord(uint8_t addr, uint32_t data, uint32_t pwd, bool usePwd, bool swap, bool invert) {
+int EM4x05WriteWord(pm3_connection* conn, uint8_t addr, uint32_t data, uint32_t pwd, bool usePwd, bool swap, bool invert) {
 	if (swap) data = SwapBits(data, 32);
 
 	if (invert) data ^= 0xFFFFFFFF;
@@ -1074,20 +1074,20 @@ int EM4x05WriteWord(uint8_t addr, uint32_t data, uint32_t pwd, bool usePwd, bool
 	uint16_t flag = (addr << 8 ) | usePwd;
 
 	UsbCommand c = {CMD_EM4X_WRITE_WORD, {flag, data, pwd}};
-	clearCommandBuffer();
-	SendCommand(&c);
+	clearCommandBuffer(conn);
+	SendCommand(conn, &c);
 	UsbCommand resp;
-	if (!WaitForResponseTimeout(CMD_ACK, &resp, 2000)){
+	if (!WaitForResponseTimeout(conn, CMD_ACK, &resp, 2000)){
 		PrintAndLog("Error occurred, device did not respond during write operation.");
 		return -1;
 	}
-	if ( !downloadSamplesEM() ) {
+	if ( !downloadSamplesEM(conn) ) {
 		return -1;
 	}
 	//check response for 00001010 for write confirmation!
 	//attempt demod:
 	uint32_t dummy = 0;
-	int result = demodEM4x05resp(&dummy,false);
+	int result = demodEM4x05resp(conn, &dummy, false);
 	if (result == 1) {
 		PrintAndLog("Write Verified");
 	} else {
@@ -1096,7 +1096,7 @@ int EM4x05WriteWord(uint8_t addr, uint32_t data, uint32_t pwd, bool usePwd, bool
 	return result;
 }
 
-int CmdEM4x05WriteWord(const char *Cmd) {
+int CmdEM4x05WriteWord(pm3_connection* conn, const char *Cmd) {
 	bool errors = false;
 	bool usePwd = false;
 	uint32_t data = 0xFFFFFFFF;
@@ -1160,7 +1160,7 @@ int CmdEM4x05WriteWord(const char *Cmd) {
 		PrintAndLog("You must enter the data you want to write");
 		return usage_lf_em_write();
 	}
-	return EM4x05WriteWord(addr, data, pwd, usePwd, swap, invert);
+	return EM4x05WriteWord(conn, addr, data, pwd, usePwd, swap, invert);
 }
 
 void printEM4x05config(uint32_t wordData) {
@@ -1262,14 +1262,14 @@ void printEM4x05ProtectionBits(uint32_t wordData) {
 }
 
 //quick test for EM4x05/EM4x69 tag
-bool EM4x05Block0Test(uint32_t *wordData) {
-	if (EM4x05ReadWord_ext(0,0,false,wordData) == 1) {
+bool EM4x05Block0Test(pm3_connection* conn, uint32_t *wordData) {
+	if (EM4x05ReadWord_ext(conn, 0,0,false,wordData) == 1) {
 		return true;
 	}
 	return false;
 }
 
-int CmdEM4x05info(const char *Cmd) {
+int CmdEM4x05info(pm3_connection* conn, const char *Cmd) {
 	//uint8_t addr = 0;
 	uint32_t pwd;
 	uint32_t wordData = 0;
@@ -1286,7 +1286,7 @@ int CmdEM4x05info(const char *Cmd) {
 
 	// read word 0 (chip info)
 	// block 0 can be read even without a password.
-	if ( !EM4x05Block0Test(&wordData) )
+	if ( !EM4x05Block0Test(conn, &wordData) ) 
 		return -1;
 
 	uint8_t chipType = (wordData >> 1) & 0xF;
@@ -1295,7 +1295,7 @@ int CmdEM4x05info(const char *Cmd) {
 
 	// read word 1 (serial #) doesn't need pwd
 	wordData = 0;
-	if (EM4x05ReadWord_ext(1, 0, false, &wordData) != 1) {
+	if (EM4x05ReadWord_ext(conn, 1, 0, false, &wordData) != 1) {
 		//failed, but continue anyway...
 	}
 	printEM4x05info(chipType, cap, custCode, wordData);
@@ -1303,7 +1303,7 @@ int CmdEM4x05info(const char *Cmd) {
 	// read word 4 (config block)
 	// needs password if one is set
 	wordData = 0;
-	if ( EM4x05ReadWord_ext(4, pwd, usePwd, &wordData) != 1 ) {
+	if ( EM4x05ReadWord_ext(conn, 4, pwd, usePwd, &wordData) != 1 ) {
 		//failed
 		PrintAndLog("Config block read failed - might be password protected.");
 		return 0;
@@ -1312,13 +1312,13 @@ int CmdEM4x05info(const char *Cmd) {
 
 	// read word 14 and 15 to see which is being used for the protection bits
 	wordData = 0;
-	if ( EM4x05ReadWord_ext(14, pwd, usePwd, &wordData) != 1 ) {
+	if ( EM4x05ReadWord_ext(conn, 14, pwd, usePwd, &wordData) != 1 ) {
 		//failed
 		return 0;
 	}
 	// if status bit says this is not the used protection word
 	if (!(wordData & 0x8000)) {
-		if ( EM4x05ReadWord_ext(15, pwd, usePwd, &wordData) != 1 ) {
+		if ( EM4x05ReadWord_ext(conn, 15, pwd, usePwd, &wordData) != 1 ) {
 			//failed
 			return 0;
 		}
@@ -1351,14 +1351,14 @@ static command_t CommandTable[] =
 	{NULL, NULL, 0, NULL}
 };
 
-int CmdLFEM4X(const char *Cmd)
+int CmdLFEM4X(pm3_connection* conn, const char *Cmd)
 {
-	CmdsParse(CommandTable, Cmd);
+	CmdsParse(conn, CommandTable, Cmd);
 	return 0;
 }
 
-int CmdHelp(const char *Cmd)
+int CmdHelp(pm3_connection* conn, const char *Cmd)
 {
-	CmdsHelp(CommandTable);
+	CmdsHelp(conn, CommandTable);
 	return 0;
 }

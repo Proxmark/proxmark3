@@ -43,7 +43,7 @@
 	sample: 985121004515220  [ 37FF65B88EF94 ]
 */
 
-static int CmdHelp(const char *Cmd);
+static int CmdHelp(pm3_connection* conn, const char *Cmd);
 
 int usage_lf_fdx_clone(void){
 	PrintAndLog("Clone a FDX-B animal tag to a T55x7 tag.");
@@ -133,16 +133,16 @@ int getFDXBits(uint64_t national_id, uint16_t country, uint8_t isanimal, uint8_t
 	return 1;
 }
 
-int CmdFdxDemod(const char *Cmd){
+int CmdFdxDemod(pm3_connection* conn, const char *Cmd){
 
 	//Differential Biphase / di-phase (inverted biphase)
 	//get binary from ask wave
-	if (!ASKbiphaseDemod("0 32 1 0", false)) {
+	if (!ASKbiphaseDemod(conn, "0 32 1 0", false)) {
 		if (g_debugMode) PrintAndLog("DEBUG: Error - FDX-B ASKbiphaseDemod failed");
 		return 0;
 	}
-	size_t size = DemodBufferLen;
-	int preambleIndex = FDXBdemodBI(DemodBuffer, &size);
+	size_t size = conn->DemodBufferLen;
+	int preambleIndex = FDXBdemodBI(conn->DemodBuffer, &size);
 	if (preambleIndex < 0){
 		if (g_debugMode){
 			if (preambleIndex == -1)
@@ -157,12 +157,12 @@ int CmdFdxDemod(const char *Cmd){
 		return 0;
 	}
 
-	// set and leave DemodBuffer intact
-	setDemodBuf(DemodBuffer, 128, preambleIndex);
-	setClockGrid(g_DemodClock, g_DemodStartIdx + (preambleIndex*g_DemodClock));
+	// set and leave conn->DemodBuffer intact
+	setDemodBuf(conn, conn->DemodBuffer, 128, preambleIndex);
+	setClockGrid(conn, conn->g_DemodClock, conn->g_DemodStartIdx + (preambleIndex*conn->g_DemodClock));
 
 	uint8_t bits_no_spacer[117];
-	memcpy(bits_no_spacer, DemodBuffer + 11, 117);
+	memcpy(bits_no_spacer, conn->DemodBuffer + 11, 117);
 
 	// remove marker bits (1's every 9th digit after preamble) (pType = 2)
 	size = removeParity(bits_no_spacer, 0, 9, 2, 117);
@@ -205,12 +205,12 @@ int CmdFdxDemod(const char *Cmd){
 	return 1;
 }
 
-int CmdFdxRead(const char *Cmd) {
-	lf_read(true, 10000);
-	return CmdFdxDemod(Cmd);
+int CmdFdxRead(pm3_connection* conn, const char *Cmd) {
+	lf_read(conn, true, 10000);
+	return CmdFdxDemod(conn, Cmd);
 }
 
-int CmdFdxClone(const char *Cmd) {
+int CmdFdxClone(pm3_connection* conn, const char *Cmd) {
 
 	uint32_t countryid = 0;
 	uint64_t animalid = 0;
@@ -260,9 +260,9 @@ int CmdFdxClone(const char *Cmd) {
 	for (int i = 4; i >= 0; --i) {
 		c.arg[0] = blocks[i];
 		c.arg[1] = i;
-		clearCommandBuffer();
-		SendCommand(&c);
-		if (!WaitForResponseTimeout(CMD_ACK, &resp, T55XX_WRITE_TIMEOUT)){
+		clearCommandBuffer(conn);
+		SendCommand(conn, &c);
+		if (!WaitForResponseTimeout(conn, CMD_ACK, &resp, T55XX_WRITE_TIMEOUT)){
 			PrintAndLog("Error occurred, device did not respond during write operation.");
 			return -1;
 		}
@@ -270,7 +270,7 @@ int CmdFdxClone(const char *Cmd) {
 	return 0;
 }
 
-int CmdFdxSim(const char *Cmd) {
+int CmdFdxSim(pm3_connection* conn, const char *Cmd) {
 	uint32_t countryid = 0;
 	uint64_t animalid = 0;
 
@@ -294,8 +294,8 @@ int CmdFdxSim(const char *Cmd) {
 
 	 //getFDXBits(uint64_t national_id, uint16_t country, uint8_t isanimal, uint8_t isextended, uint32_t extended, uint8_t *bits) 
 	getFDXBits(animalid, countryid, 1, 0, 0, c.d.asBytes);
-	clearCommandBuffer();
-	SendCommand(&c);
+	clearCommandBuffer(conn);
+	SendCommand(conn, &c);
 	return 0;
 }
 
@@ -308,13 +308,13 @@ static command_t CommandTable[] = {
 	{NULL, NULL, 0, NULL}
 };
 
-int CmdLFFdx(const char *Cmd) {
-	clearCommandBuffer();
-	CmdsParse(CommandTable, Cmd);
+int CmdLFFdx(pm3_connection* conn, const char *Cmd) {
+	clearCommandBuffer(conn);
+	CmdsParse(conn, CommandTable, Cmd);
 	return 0;
 }
 
-int CmdHelp(const char *Cmd) {
-	CmdsHelp(CommandTable);
+int CmdHelp(pm3_connection* conn, const char *Cmd) {
+	CmdsHelp(conn, CommandTable);
 	return 0;
 }

@@ -22,7 +22,7 @@
 #include "protocols.h"  // for T55xx config register definitions
 #include "lfdemod.h"    // parityTest
 
-static int CmdHelp(const char *Cmd);
+static int CmdHelp(pm3_connection* conn, const char *Cmd);
 
 int usage_lf_presco_clone(void){
 	PrintAndLog("clone a Presco tag to a T55x7 tag.");
@@ -124,28 +124,28 @@ int GetPrescoBits(uint32_t fullcode, uint8_t *prescoBits) {
 }
 
 //see ASKDemod for what args are accepted
-int CmdPrescoDemod(const char *Cmd) {
-	if (!ASKDemod(Cmd, false, false, 1)) {
+int CmdPrescoDemod(pm3_connection* conn, const char *Cmd) {
+	if (!ASKDemod(conn, Cmd, false, false, 1)) {
 		if (g_debugMode) PrintAndLog("ASKDemod failed");
 		return 0;
 	}
-	size_t size = DemodBufferLen;
+	size_t size = conn->DemodBufferLen;
 	//call lfdemod.c demod for presco
-	int ans = PrescoDemod(DemodBuffer, &size);
+	int ans = PrescoDemod(conn->DemodBuffer, &size);
 	if (ans < 0) {
 		if (g_debugMode) PrintAndLog("Error Presco_Demod %d", ans);
 		return 0;
 	}
 	//got a good demod
-	uint32_t raw1 = bytebits_to_byte(DemodBuffer+ans, 32);
-	uint32_t raw2 = bytebits_to_byte(DemodBuffer+ans+32, 32);
-	uint32_t raw3 = bytebits_to_byte(DemodBuffer+ans+64, 32);
-	uint32_t raw4 = bytebits_to_byte(DemodBuffer+ans+96, 32);
+	uint32_t raw1 = bytebits_to_byte(conn->DemodBuffer+ans, 32);
+	uint32_t raw2 = bytebits_to_byte(conn->DemodBuffer+ans+32, 32);
+	uint32_t raw3 = bytebits_to_byte(conn->DemodBuffer+ans+64, 32);
+	uint32_t raw4 = bytebits_to_byte(conn->DemodBuffer+ans+96, 32);
 	uint32_t cardid = raw4;
 	PrintAndLog("Presco Tag Found: Card ID %08X", cardid);
 	PrintAndLog("Raw: %08X%08X%08X%08X", raw1,raw2,raw3,raw4);
-	setDemodBuf(DemodBuffer, 128, ans);
-	setClockGrid(g_DemodClock, g_DemodStartIdx + (ans*g_DemodClock));
+	setDemodBuf(conn, conn->DemodBuffer, 128, ans);
+	setClockGrid(conn, conn->g_DemodClock, conn->g_DemodStartIdx + (ans*conn->g_DemodClock));
 
 	uint32_t sitecode = 0, usercode = 0, fullcode = 0;
 	bool Q5=false;
@@ -158,18 +158,18 @@ int CmdPrescoDemod(const char *Cmd) {
 }
 
 //see ASKDemod for what args are accepted
-int CmdPrescoRead(const char *Cmd) {
+int CmdPrescoRead(pm3_connection* conn, const char *Cmd) {
 	// Presco Number: 123456789 --> Sitecode 30 | usercode 8665
 
 	// read lf silently
-	lf_read(true, 10000);
+	lf_read(conn, true, 10000);
 	// demod and output Presco ID	
-	return CmdPrescoDemod(Cmd);
+	return CmdPrescoDemod(conn, Cmd);
 }
 
 // takes base 12 ID converts to hex
 // Or takes 8 digit hex ID
-int CmdPrescoClone(const char *Cmd) {
+int CmdPrescoClone(pm3_connection* conn, const char *Cmd) {
 
 	bool Q5 = false;
 	uint32_t sitecode=0, usercode=0, fullcode=0;
@@ -211,9 +211,9 @@ int CmdPrescoClone(const char *Cmd) {
 	for (int i=4; i>=0; i--) {
 		c.arg[0] = blocks[i];
 		c.arg[1] = i;
-		clearCommandBuffer();
-		SendCommand(&c);
-		if (!WaitForResponseTimeout(CMD_ACK, &resp, 1000)){
+		clearCommandBuffer(conn);
+		SendCommand(conn, &c);
+		if (!WaitForResponseTimeout(conn, CMD_ACK, &resp, 1000)){
 			PrintAndLog("Error occurred, device did not respond during write operation.");
 			return -1;
 		}
@@ -223,7 +223,7 @@ int CmdPrescoClone(const char *Cmd) {
 
 // takes base 12 ID converts to hex
 // Or takes 8 digit hex ID
-int CmdPrescoSim(const char *Cmd) {
+int CmdPrescoSim(pm3_connection* conn, const char *Cmd) {
 	uint32_t sitecode=0, usercode=0, fullcode=0;
 	bool Q5=false;
 	// get wiegand from printed number.
@@ -239,8 +239,8 @@ int CmdPrescoSim(const char *Cmd) {
 
 	UsbCommand c = {CMD_ASK_SIM_TAG, {arg1, arg2, size}};
 	GetPrescoBits(fullcode, c.d.asBytes);
-	clearCommandBuffer();
-	SendCommand(&c);
+	clearCommandBuffer(conn);
+	SendCommand(conn, &c);
 	return 0;
 }
 
@@ -252,13 +252,13 @@ static command_t CommandTable[] = {
 	{NULL, NULL, 0, NULL}
 };
 
-int CmdLFPresco(const char *Cmd) {
-	clearCommandBuffer();
-    CmdsParse(CommandTable, Cmd);
+int CmdLFPresco(pm3_connection* conn, const char *Cmd) {
+	clearCommandBuffer(conn);
+    CmdsParse(conn, CommandTable, Cmd);
     return 0;
 }
 
-int CmdHelp(const char *Cmd) {
-    CmdsHelp(CommandTable);
+int CmdHelp(pm3_connection* conn, const char *Cmd) {
+    CmdsHelp(conn, CommandTable);
     return 0;
 }

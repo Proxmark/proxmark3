@@ -11,7 +11,7 @@
 #ifndef CMDHF_H__
 #define CMDHF_H__
 
-int CmdHF(const char *Cmd);
-int CmdHFTune(const char *Cmd);
-int CmdHFList(const char *Cmd);
+int CmdHF(pm3_connection* conn, const char *Cmd);
+int CmdHFTune(pm3_connection* conn, const char *Cmd);
+int CmdHFList(pm3_connection* conn, const char *Cmd);
 #endif

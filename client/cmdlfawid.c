@@ -23,8 +23,9 @@
 #include "cmddata.h"    // for printDemod and demodbuffer commands
 #include "graph.h"      // for getFromGraphBuff cmds
 #include "cmdmain.h"
+#include "comms.h"
 
-static int CmdHelp(const char *Cmd);
+static int CmdHelp(pm3_connection* conn, const char *Cmd);
 
 int usage_lf_awid_read(void) {
 	PrintAndLog("Enables AWID26 compatible reader mode printing details of scanned AWID26 tags.");
@@ -69,23 +70,23 @@ int usage_lf_awid_clone(void) {
 	return 0;
 }
 
-int CmdAWIDReadFSK(const char *Cmd) {
+int CmdAWIDReadFSK(pm3_connection* conn, const char *Cmd) {
 	int findone=0;
 	if (Cmd[0] == 'h' || Cmd[0] == 'H') return usage_lf_awid_read();
 	if (Cmd[0] == '1') findone = 1;
 
 	UsbCommand c = {CMD_AWID_DEMOD_FSK, {findone, 0, 0}};
-	clearCommandBuffer();
-	SendCommand(&c);
+	clearCommandBuffer(conn);
+	SendCommand(conn, &c);
 	return 0;   
 }
 //by marshmellow
 //AWID Prox demod - FSK RF/50 with preamble of 00000001  (always a 96 bit data stream)
 //print full AWID Prox ID and some bit format details if found
-int CmdFSKdemodAWID(const char *Cmd)
+int CmdFSKdemodAWID(pm3_connection* conn, const char *Cmd)
 {
 	uint8_t BitStream[MAX_GRAPH_TRACE_LEN]={0};
-	size_t size = getFromGraphBuf(BitStream);
+	size_t size = getFromGraphBuf(conn, BitStream);
 	if (size==0) return 0;
 
 	int waveIdx = 0;
@@ -126,8 +127,8 @@ int CmdFSKdemodAWID(const char *Cmd)
 	uint32_t rawLo = bytebits_to_byte(BitStream+idx+64,32);
 	uint32_t rawHi = bytebits_to_byte(BitStream+idx+32,32);
 	uint32_t rawHi2 = bytebits_to_byte(BitStream+idx,32);
-	setDemodBuf(BitStream,96,idx);
-	setClockGrid(50, waveIdx + (idx*50));
+	setDemodBuf(conn, BitStream, 96, idx);
+	setClockGrid(conn, 50, waveIdx + (idx*50));
 
 	size = removeParity(BitStream, idx+8, 4, 1, 88);
 	if (size != 66){
@@ -172,7 +173,7 @@ int CmdFSKdemodAWID(const char *Cmd)
 	}
 	if (g_debugMode){
 		PrintAndLog("DEBUG: idx: %d, Len: %d Printing Demod Buffer:", idx, 96);
-		printDemodBuff();
+		printDemodBuff(conn);
 	}
 	//todo - convert hi2, hi, lo to demodbuffer for future sim/clone commands
 	return 1;
@@ -199,7 +200,7 @@ int getAWIDBits(uint32_t fc, uint32_t cn, uint8_t	*AWIDBits) {
 	return 1;
 }
 
-int CmdAWIDSim(const char *Cmd) {
+int CmdAWIDSim(pm3_connection* conn, const char *Cmd) {
 	uint32_t fcode = 0, cnum = 0, fc=0, cn=0;
 	uint8_t BitStream[96];
 	uint8_t *bs = BitStream;
@@ -227,12 +228,12 @@ int CmdAWIDSim(const char *Cmd) {
 	// AWID uses: fcHigh: 10, fcLow: 8, clk: 50, invert: 0
 	UsbCommand c = {CMD_FSK_SIM_TAG, {arg1, arg2, size}};
 	memcpy(c.d.asBytes, bs, size);
-	clearCommandBuffer();
-	SendCommand(&c);
+	clearCommandBuffer(conn);
+	SendCommand(conn, &c);
 	return 0;
 }
 
-int CmdAWIDClone(const char *Cmd) {
+int CmdAWIDClone(pm3_connection* conn, const char *Cmd) {
 	uint32_t blocks[4] = {T55x7_MODULATION_FSK2a | T55x7_BITRATE_RF_50 | 3<<T55x7_MAXBLOCK_SHIFT, 0, 0, 0};
 	uint32_t fc=0,cn=0;
 	uint8_t BitStream[96];
@@ -279,9 +280,9 @@ int CmdAWIDClone(const char *Cmd) {
 		c.arg[0] = blocks[i];
 		c.arg[1] = i;
 		c.arg[2] = 0;
-		clearCommandBuffer();
-		SendCommand(&c);
-		if (!WaitForResponseTimeout(CMD_ACK, &resp, 1000)){
+		clearCommandBuffer(conn);
+		SendCommand(conn, &c);
+		if (!WaitForResponseTimeout(conn, CMD_ACK, &resp, 1000)){
 			PrintAndLog("Error occurred, device did not respond during write operation.");
 			return -1;
 		}
@@ -299,12 +300,12 @@ static command_t CommandTable[] = {
 	{NULL, NULL, 0, NULL}
 };
 
-int CmdLFAWID(const char *Cmd) {
-	CmdsParse(CommandTable, Cmd);
+int CmdLFAWID(pm3_connection* conn, const char *Cmd) {
+	CmdsParse(conn, CommandTable, Cmd);
 	return 0;
 }
 
-int CmdHelp(const char *Cmd) {
-	CmdsHelp(CommandTable);
+int CmdHelp(pm3_connection* conn, const char *Cmd) {
+	CmdsHelp(conn, CommandTable);
 	return 0;
 }

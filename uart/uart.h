@@ -39,7 +39,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-typedef unsigned char byte_t;
+#include "common.h"
 
 /* serial_port is declared as a void*, which you should cast to whatever type
  * makes sense to your connection method. Both the posix and win32
@@ -61,11 +61,11 @@ typedef void* serial_port;
  *
  * On errors, this method returns INVALID_SERIAL_PORT or CLAIMED_SERIAL_PORT.
  */
-serial_port uart_open(const char* pcPortName);
+serial_port* uart_open(const char* pcPortName);
 
 /* Closes the given port.
  */
-void uart_close(const serial_port sp);
+void uart_close(serial_port* sp);
 
 /* Reads from the given serial port for up to 30ms.
  *   pbtRx: A pointer to a buffer for the returned data to be written to.
@@ -78,21 +78,21 @@ void uart_close(const serial_port sp);
  * partial read may have completed into the buffer by the corresponding
  * implementation, so pszRxLen should be checked to see if any data was written. 
  */
-bool uart_receive(const serial_port sp, byte_t* pbtRx, size_t pszMaxRxLen, size_t* pszRxLen);
+bool uart_receive(serial_port* sp, byte_t* pbtRx, size_t pszMaxRxLen, size_t* pszRxLen);
 
 /* Sends a buffer to a given serial port.
  *   pbtTx: A pointer to a buffer containing the data to send.
  *   szTxLen: The amount of data to be sent.
  */
-bool uart_send(const serial_port sp, const byte_t* pbtTx, const size_t szTxLen);
+bool uart_send(serial_port* sp, const byte_t* pbtTx, const size_t szTxLen);
 
 /* Sets the current speed of the serial port, in baud.
  */
-bool uart_set_speed(serial_port sp, const uint32_t uiPortSpeed);
+bool uart_set_speed(serial_port* sp, const uint32_t uiPortSpeed);
 
 /* Gets the current speed of the serial port, in baud.
  */
-uint32_t uart_get_speed(const serial_port sp);
+uint32_t uart_get_speed(serial_port* sp);
 
 #endif // _PM3_UART_H_
 

@@ -19,7 +19,7 @@
 #include "usb_cmd.h"
 #include "cmdmain.h"
 
-static int CmdHelp(const char *Cmd);
+static int CmdHelp(pm3_connection* conn, const char *Cmd);
 
 int usage_lf_cotag_read(void){
 	PrintAndLog("Usage: lf COTAG read [h] <signaldata>");
@@ -37,11 +37,11 @@ int usage_lf_cotag_read(void){
 
 // COTAG demod should be able to use GraphBuffer,
 // when data load samples
-int CmdCOTAGDemod(const char *Cmd) {
+int CmdCOTAGDemod(pm3_connection* conn, const char *Cmd) {
 
 	uint8_t bits[COTAG_BITS] = {0};
 	size_t bitlen = COTAG_BITS;
-	memcpy(bits, DemodBuffer, COTAG_BITS);
+	memcpy(bits, conn->DemodBuffer, COTAG_BITS);
 	
 	uint8_t alignPos = 0;
 	int err = manrawdecode(bits, &bitlen, 1, &alignPos);
@@ -50,7 +50,7 @@ int CmdCOTAGDemod(const char *Cmd) {
 		return -1;
 	}
 
-	setDemodBuf(bits, bitlen, 0);
+	setDemodBuf(conn, bits, bitlen, 0);
 
 	//got a good demod
 	uint16_t cn = bytebits_to_byteLSBF(bits+1, 16);
@@ -76,7 +76,7 @@ int CmdCOTAGDemod(const char *Cmd) {
 // 0 = HIGH/LOW signal - maxlength bigbuff
 // 1 = translation for HI/LO into bytes with manchester 0,1 - length 300
 // 2 = raw signal -  maxlength bigbuff		
-int CmdCOTAGRead(const char *Cmd) {
+int CmdCOTAGRead(pm3_connection* conn, const char *Cmd) {
 	
 	if (Cmd[0] == 'h' || Cmd[0] == 'H') return usage_lf_cotag_read();
 	
@@ -84,9 +84,9 @@ int CmdCOTAGRead(const char *Cmd) {
 	sscanf(Cmd, "%u", &rawsignal);
  
 	UsbCommand c = {CMD_COTAG, {rawsignal, 0, 0}};
-	clearCommandBuffer();
-	SendCommand(&c);
-	if ( !WaitForResponseTimeout(CMD_ACK, NULL, 7000) ) {
+	clearCommandBuffer(conn);
+	SendCommand(conn, &c);
+	if ( !WaitForResponseTimeout(conn, CMD_ACK, NULL, 7000) ) {
 		PrintAndLog("command execution time out");
 		return -1;	
 	}
@@ -94,19 +94,20 @@ int CmdCOTAGRead(const char *Cmd) {
 	switch ( rawsignal ){
 		case 0: 
 		case 2: {
-			CmdPlot("");
-			CmdGrid("384");
-			getSamples(0, true); break;
+			CmdPlot(conn, "");
+			CmdGrid(conn, "384");
+			getSamples(conn, 0, true);
+			break;
 		}
 		case 1: {
-			GetFromBigBuf(DemodBuffer, COTAG_BITS, 0);
-			DemodBufferLen = COTAG_BITS;
+			GetFromBigBuf(conn, conn->DemodBuffer, COTAG_BITS, 0);
+			conn->DemodBufferLen = COTAG_BITS;
 			UsbCommand response;
-			if ( !WaitForResponseTimeout(CMD_ACK, &response, 1000) ) {
+			if ( !WaitForResponseTimeout(conn, CMD_ACK, &response, 1000) ) {
 				PrintAndLog("timeout while waiting for reply.");
 				return -1;
 			}
-			return CmdCOTAGDemod("");
+			return CmdCOTAGDemod(conn, "");
 		}
 	}	
 	return 0;
@@ -119,13 +120,13 @@ static command_t CommandTable[] = {
 	{NULL, NULL, 0, NULL}
 };
 
-int CmdLFCOTAG(const char *Cmd) {
-	clearCommandBuffer();
-	CmdsParse(CommandTable, Cmd);
+int CmdLFCOTAG(pm3_connection* conn, const char *Cmd) {
+	clearCommandBuffer(conn);
+	CmdsParse(conn, CommandTable, Cmd);
 	return 0;
 }
 
-int CmdHelp(const char *Cmd) {
-	CmdsHelp(CommandTable);
+int CmdHelp(pm3_connection* conn, const char *Cmd) {
+	CmdsHelp(conn, CommandTable);
 	return 0;
 }
