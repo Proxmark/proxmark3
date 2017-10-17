@@ -596,7 +596,7 @@ int CmdHF14AMfNested(const char *Cmd)
 		PrintAndLog("      sample3: hf mf nested 1 0 A FFFFFFFFFFFF d ");
 		PrintAndLog("      sample4: hf mf nested o 0 A FFFFFFFFFFFF 4 A");
 		PrintAndLog("      sample5: hf mf nested 1 * t");
-		PrintAndLog("      sample5: hf mf nested 1 * ss");
+		PrintAndLog("      sample6: hf mf nested 1 * ss");
 		return 0;
 	}
 
@@ -616,7 +616,7 @@ int CmdHF14AMfNested(const char *Cmd)
 		parseParamTDS(Cmd, 2, &transferToEml, &createDumpFile, &btimeout14a);
 
 		PrintAndLog("--nested. sectors:%2d, block no:*, eml:%c, dmp=%c checktimeout=%d us", 
-			SectorsCnt, transferToEml?'y':'n', createDumpFile?'y':'n', (int)btimeout14a * 10000 / 106);
+			SectorsCnt, transferToEml?'y':'n', createDumpFile?'y':'n', ((int)btimeout14a * 10000) / 106);
 	} else {
 		blockNo = param_get8(Cmd, 1);
 
@@ -659,7 +659,7 @@ int CmdHF14AMfNested(const char *Cmd)
 		}
 
 		PrintAndLog("--nested. sectors:%2d, block no:%3d, key type:%c, eml:%c, dmp=%c checktimeout=%d us", 
-			SectorsCnt, blockNo, keyType?'B':'A', transferToEml?'y':'n', createDumpFile?'y':'n', (int)btimeout14a * 10000 / 106);
+			SectorsCnt, blockNo, keyType?'B':'A', transferToEml?'y':'n', createDumpFile?'y':'n', ((int)btimeout14a * 10000) / 106);
 	}
 
 	// one-sector nested
