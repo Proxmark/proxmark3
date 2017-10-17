@@ -580,20 +580,23 @@ int CmdHF14AMfNested(const char *Cmd)
 
 	if (strlen(Cmd)<3) {
 		PrintAndLog("Usage:");
-		PrintAndLog(" all sectors:  hf mf nested  <card memory> <block number> <key A/B> <key (12 hex symbols)> [t,d]");
-		PrintAndLog(" all sectors autosearch key:  hf mf nested  <card memory> * [t,d]");
+		PrintAndLog(" all sectors:  hf mf nested  <card memory> <block number> <key A/B> <key (12 hex symbols)> [t|d|s|ss]");
+		PrintAndLog(" all sectors autosearch key:  hf mf nested  <card memory> * [t|d|s|ss]");
 		PrintAndLog(" one sector:   hf mf nested  o <block number> <key A/B> <key (12 hex symbols)>");
 		PrintAndLog("               <target block number> <target key A/B> [t]");
 		PrintAndLog(" ");
 		PrintAndLog("card memory - 0 - MINI(320 bytes), 1 - 1K, 2 - 2K, 4 - 4K, <other> - 1K");
 		PrintAndLog("t - transfer keys to emulator memory");
 		PrintAndLog("d - write keys to binary file dumpkeys.bin");
+		PrintAndLog("s - Slow (1ms) check keys (required by some non standard cards)");
+		PrintAndLog("ss - Very slow (5ms) check keys");
 		PrintAndLog(" ");
 		PrintAndLog("      sample1: hf mf nested 1 0 A FFFFFFFFFFFF ");
 		PrintAndLog("      sample2: hf mf nested 1 0 A FFFFFFFFFFFF t ");
 		PrintAndLog("      sample3: hf mf nested 1 0 A FFFFFFFFFFFF d ");
 		PrintAndLog("      sample4: hf mf nested o 0 A FFFFFFFFFFFF 4 A");
 		PrintAndLog("      sample5: hf mf nested 1 * t");
+		PrintAndLog("      sample5: hf mf nested 1 * ss");
 		return 0;
 	}
 
