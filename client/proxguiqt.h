@@ -21,6 +21,7 @@
 #include <QPainter>
 #include <QtGui>
 
+#include "uart.h"
 #include "ui/ui_overlays.h"
 /**
  * @brief The actual plot, black area were we paint the graph
@@ -123,12 +124,13 @@ class ProxGuiQT : public QObject
 class WorkerThread : public QThread {
 	Q_OBJECT;
 public:
-	WorkerThread(char*, bool);
+	WorkerThread(char*, bool, serial_port*);
 	~WorkerThread();
 	void run();
 private:
 	char *script_cmds_file = NULL;
 	bool usb_present;
+	serial_port *sp = NULL;
 };
 
 #endif // PROXGUI_QT

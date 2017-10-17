@@ -25,80 +25,30 @@
 #include "cmdparser.h"
 #include "cmdhw.h"
 #include "whereami.h"
+#include "comms.h"
 
-
-// a global mutex to prevent interlaced printing from different threads
-pthread_mutex_t print_lock;
-
-static serial_port sp;
-static UsbCommand txcmd;
-volatile static bool txcmd_pending = false;
-
-void SendCommand(UsbCommand *c) {
-	#if 0
-		printf("Sending %d bytes\n", sizeof(UsbCommand));
-	#endif
-
-	if (offline) {
-      PrintAndLog("Sending bytes to proxmark failed - offline");
-      return;
-    }
-  /**
-	The while-loop below causes hangups at times, when the pm3 unit is unresponsive
-	or disconnected. The main console thread is alive, but comm thread just spins here.
-	Not good.../holiman
-	**/
-	while(txcmd_pending);
-	txcmd = *c;
-	txcmd_pending = true;
-}
-
-struct receiver_arg {
-	int run;
-};
-
-byte_t rx[sizeof(UsbCommand)];
-byte_t* prx = rx;
-
-static void *uart_receiver(void *targ) {
-	struct receiver_arg *arg = (struct receiver_arg*)targ;
-	size_t rxlen;
-
-	while (arg->run) {
-		rxlen = 0;
-		if (uart_receive(sp, prx, sizeof(UsbCommand) - (prx-rx), &rxlen)) {
-			prx += rxlen;
-			if (prx-rx < sizeof(UsbCommand)) {
-				continue;
-			}
-			
-			UsbCommandReceived((UsbCommand*)rx);
-		}
-		prx = rx;
-
-		if(txcmd_pending) {
-			if (!uart_send(sp, (byte_t*) &txcmd, sizeof(UsbCommand))) {
-				PrintAndLog("Sending bytes to proxmark failed");
-			}
-			txcmd_pending = false;
-		}
-	}
-
-	pthread_exit(NULL);
-	return NULL;
-}
-
-
-void main_loop(char *script_cmds_file, bool usb_present) {
-	struct receiver_arg rarg;
+void main_loop(char *script_cmds_file, bool usb_present, serial_port* sp) {
+	receiver_arg conn;
 	char *cmd = NULL;
 	pthread_t reader_thread;
+	memset(&conn, 0, sizeof(receiver_arg));
+	pthread_mutex_init(&conn.recv_lock, NULL);
+
+	// TODO: Move this into comms.c
+	PlotGridXdefault = 64;
+	PlotGridYdefault = 64;
+	showDemod = true;
+	CursorScaleFactor = 1;
 
 	if (usb_present) {
-		rarg.run = 1;
-		pthread_create(&reader_thread, NULL, &uart_receiver, &rarg);
+		conn.run = true;
+		SetSerialPort(sp);
+		SetOffline(false);
+		pthread_create(&reader_thread, NULL, &uart_receiver, &conn);
 		// cache Version information now:
 		CmdVersion(NULL);
+	} else {
+		SetOffline(true);
 	}
 
 	FILE *script_file = NULL;
@@ -113,7 +63,7 @@ void main_loop(char *script_cmds_file, bool usb_present) {
 
 	read_history(".history");
 
-	while(1)  {
+	while (1) {
 
 		// If there is a script file
 		if (script_file)
@@ -163,7 +113,7 @@ void main_loop(char *script_cmds_file, bool usb_present) {
 	write_history(".history");
   
 	if (usb_present) {
-		rarg.run = 0;
+		conn.run = false;
 		pthread_join(reader_thread, NULL);
 	}
 	
@@ -172,6 +122,7 @@ void main_loop(char *script_cmds_file, bool usb_present) {
 		script_file = NULL;
 	}
 
+	pthread_mutex_destroy(&conn.recv_lock);
 }
 
 static void dumpAllHelp(int markdown)
@@ -240,19 +191,18 @@ int main(int argc, char* argv[]) {
 	
 	bool usb_present = false;
 	char *script_cmds_file = NULL;
+
+	g_debugMode = 0;
   
-	sp = uart_open(argv[1]);
+	serial_port *sp = uart_open(argv[1]);
 	if (sp == INVALID_SERIAL_PORT) {
 		printf("ERROR: invalid serial port\n");
 		usb_present = false;
-		offline = 1;
 	} else if (sp == CLAIMED_SERIAL_PORT) {
 		printf("ERROR: serial port is claimed by another process\n");
 		usb_present = false;
-		offline = 1;
 	} else {
 		usb_present = true;
-		offline = 0;
 	}
 
 	// If the user passed the filename of the 'script' to execute, get it
@@ -275,23 +225,23 @@ int main(int argc, char* argv[]) {
 
 #ifdef HAVE_GUI
 #ifdef _WIN32
-	InitGraphics(argc, argv, script_cmds_file, usb_present);
+	InitGraphics(argc, argv, script_cmds_file, usb_present, sp);
 	MainGraphics();
 #else
 	char* display = getenv("DISPLAY");
 
 	if (display && strlen(display) > 1)
 	{
-		InitGraphics(argc, argv, script_cmds_file, usb_present);
+		InitGraphics(argc, argv, script_cmds_file, usb_present, sp);
 		MainGraphics();
 	}
 	else
 	{
-		main_loop(script_cmds_file, usb_present);
+		main_loop(script_cmds_file, usb_present, sp);
 	}
 #endif
 #else
-	main_loop(script_cmds_file, usb_present);
+	main_loop(script_cmds_file, usb_present, sp);
 #endif	
 
 	// Clean up the port
