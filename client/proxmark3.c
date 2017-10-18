@@ -23,6 +23,7 @@
 #include "cmdmain.h"
 #include "uart.h"
 #include "ui.h"
+#include "util.h"
 #include "cmdparser.h"
 #include "cmdhw.h"
 #include "whereami.h"
@@ -111,7 +112,7 @@ void main_loop(char *script_cmds_file, char *script_cmd, bool usb_present) {
 
 	// file with script
 	FILE *script_file = NULL;
-	char script_cmd_buf[256];  // iceman, needs lua script the same file_path_buffer as the rest
+	char script_cmd_buf[256] = {0};  // iceman, needs lua script the same file_path_buffer as the rest
 
 	if (script_cmds_file) {
 		script_file = fopen(script_cmds_file, "r");
@@ -130,12 +131,7 @@ void main_loop(char *script_cmds_file, char *script_cmd, bool usb_present) {
 				fclose(script_file);
 				script_file = NULL;
 			} else {
-				char *nl;
-				nl = strrchr(script_cmd_buf, '\r');
-				if (nl) *nl = '\0';
-				
-				nl = strrchr(script_cmd_buf, '\n');
-				if (nl) *nl = '\0';
+				strcleanrn(script_cmd_buf, sizeof(script_cmd_buf));
 
 				if ((cmd = (char*) malloc(strlen(script_cmd_buf) + 1)) != NULL) {
 					memset(cmd, 0, strlen(script_cmd_buf) + 1);
@@ -164,12 +160,7 @@ void main_loop(char *script_cmds_file, char *script_cmd, bool usb_present) {
 						printf("\nStdin end. Exit...\n");
 						break;
 					}
-					char *nl;
-					nl = strrchr(script_cmd_buf, '\r');
-					if (nl) *nl = '\0';
-					
-					nl = strrchr(script_cmd_buf, '\n');
-					if (nl) *nl = '\0';
+					strcleanrn(script_cmd_buf, sizeof(script_cmd_buf));
 
 					if ((cmd = (char*) malloc(strlen(script_cmd_buf) + 1)) != NULL) {
 						memset(cmd, 0, strlen(script_cmd_buf) + 1);
