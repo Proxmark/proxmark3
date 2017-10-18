@@ -79,6 +79,7 @@ extern void rol(uint8_t *data, const size_t len);
 extern void clean_ascii(unsigned char *buf, size_t len);
 void strcleanrn(char *buf, size_t len);
 void strcreplace(char *buf, size_t len, char from, char to);
+char *strmcopy(char *buf);
 
 extern int num_CPUs(void);			// number of logical CPUs
 

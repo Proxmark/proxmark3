@@ -117,7 +117,7 @@ void main_loop(char *script_cmds_file, char *script_cmd, bool usb_present) {
 	if (script_cmds_file) {
 		script_file = fopen(script_cmds_file, "r");
 		if (script_file) {
-			printf("using 'scripting' commands file %s\n", script_cmds_file);
+			printf("executing commands from file: %s\n", script_cmds_file);
 		}
 	}
 	
@@ -133,27 +133,24 @@ void main_loop(char *script_cmds_file, char *script_cmd, bool usb_present) {
 			} else {
 				strcleanrn(script_cmd_buf, sizeof(script_cmd_buf));
 
-				if ((cmd = (char*) malloc(strlen(script_cmd_buf) + 1)) != NULL) {
-					memset(cmd, 0, strlen(script_cmd_buf) + 1);
-					strcpy(cmd, script_cmd_buf);
+				if ((cmd = strmcopy(script_cmd_buf)) != NULL) {
 					printf(PROXPROMPT"%s\n", cmd);
 				}
 			}
 		} else {
 			// If there is a script command
 			if (execCommand){
-				if ((cmd = (char*) malloc(strlen(script_cmd) + 1)) != NULL) {
-					memset(cmd, 0, strlen(script_cmd) + 1);
-					strcpy(cmd, script_cmd);
+				if ((cmd = strmcopy(script_cmd)) != NULL) {
 					printf(PROXPROMPT"%s\n", cmd);
 				}
-				
+
 				execCommand = false;
 			} else {
 				// exit after exec command
 				if (script_cmd)
 					break;
 
+				// if there is a pipe from stdin
 				if (stdinOnPipe) {
 					memset(script_cmd_buf, 0, sizeof(script_cmd_buf));
 					if (!fgets(script_cmd_buf, sizeof(script_cmd_buf), stdin)) {
@@ -162,9 +159,7 @@ void main_loop(char *script_cmds_file, char *script_cmd, bool usb_present) {
 					}
 					strcleanrn(script_cmd_buf, sizeof(script_cmd_buf));
 
-					if ((cmd = (char*) malloc(strlen(script_cmd_buf) + 1)) != NULL) {
-						memset(cmd, 0, strlen(script_cmd_buf) + 1);
-						strcpy(cmd, script_cmd_buf);
+					if ((cmd = strmcopy(script_cmd_buf)) != NULL) {
 						printf(PROXPROMPT"%s\n", cmd);
 					}
 					

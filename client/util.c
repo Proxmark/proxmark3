@@ -637,6 +637,15 @@ void strcreplace(char *buf, size_t len, char from, char to) {
   }
 }
 
+char *strmcopy(char *buf) {
+	char * str = NULL;
+	if ((str = (char*) malloc(strlen(buf) + 1)) != NULL) {
+		memset(str, 0, strlen(buf) + 1);
+		strcpy(str, buf);
+	}	
+	return str;
+}
+
 
 // determine number of logical CPU cores (use for multithreaded functions)
 extern int num_CPUs(void)
