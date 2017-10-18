@@ -26,6 +26,7 @@ This project uses the changelog in accordance with [keepchangelog](http://keepac
 - Added to `hf mf nested` source key check before attack (Merlok)
 - Added to `hf mf nested` after attack it checks all found keys on non-open sectors (Merlok)
 - `hf mf chk` Added setings to set iso14443a operations timeout. default timeout set to 500us (Merlok)
+- Added to `hf mf nested` parameters `s` and `ss` for checking slow cards (Merlok)
 
 ## [3.0.1][2017-06-08]
 

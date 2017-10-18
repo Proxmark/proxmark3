@@ -524,7 +524,35 @@ int CmdHF14AMfRestore(const char *Cmd)
 	return 0;
 }
 
+//----------------------------------------------
+//   Nested
+//----------------------------------------------
 # define NESTED_KEY_COUNT 15
+
+static void parseParamTDS(const char *Cmd, const uint8_t indx, bool *paramT, bool *paramD, uint8_t *timeout) {
+	char ctmp3[3] = {0};
+	int len = param_getlength(Cmd, indx);
+	if (len > 0 && len < 4){
+		param_getstr(Cmd, indx, ctmp3);
+		
+		*paramT |= (ctmp3[0] == 't' || ctmp3[0] == 'T');
+		*paramD |= (ctmp3[0] == 'd' || ctmp3[0] == 'D');
+		bool paramS1 = *paramT || *paramD;
+
+		// slow and very slow
+		if (ctmp3[0] == 's' || ctmp3[0] == 'S' || ctmp3[1] == 's' || ctmp3[1] == 'S') {
+			*timeout = 11; // slow
+		
+			if (!paramS1 && (ctmp3[1] == 's' || ctmp3[1] == 'S')) {
+				*timeout = 53; // very slow
+			}
+			if (paramS1 && (ctmp3[2] == 's' || ctmp3[2] == 'S')) {
+				*timeout = 53; // very slow
+			}
+		}
+	}
+}
+
 int CmdHF14AMfNested(const char *Cmd)
 {
 	int i, j, res, iterations;
@@ -537,6 +565,8 @@ int CmdHF14AMfNested(const char *Cmd)
 	uint8_t key[6] = {0, 0, 0, 0, 0, 0};
 	uint8_t keyBlock[NESTED_KEY_COUNT * 6];
 	uint64_t key64 = 0;
+	// timeout in units. (ms * 106)/10 or us*0.0106
+	uint8_t btimeout14a = MF_CHKKEYS_DEFTIMEOUT; // fast by default
 	
 	bool autosearchKey = false;
 
@@ -550,20 +580,23 @@ int CmdHF14AMfNested(const char *Cmd)
 
 	if (strlen(Cmd)<3) {
 		PrintAndLog("Usage:");
-		PrintAndLog(" all sectors:  hf mf nested  <card memory> <block number> <key A/B> <key (12 hex symbols)> [t,d]");
-		PrintAndLog(" all sectors autosearch key:  hf mf nested  <card memory> * [t,d]");
+		PrintAndLog(" all sectors:  hf mf nested  <card memory> <block number> <key A/B> <key (12 hex symbols)> [t|d|s|ss]");
+		PrintAndLog(" all sectors autosearch key:  hf mf nested  <card memory> * [t|d|s|ss]");
 		PrintAndLog(" one sector:   hf mf nested  o <block number> <key A/B> <key (12 hex symbols)>");
 		PrintAndLog("               <target block number> <target key A/B> [t]");
 		PrintAndLog(" ");
 		PrintAndLog("card memory - 0 - MINI(320 bytes), 1 - 1K, 2 - 2K, 4 - 4K, <other> - 1K");
 		PrintAndLog("t - transfer keys to emulator memory");
 		PrintAndLog("d - write keys to binary file dumpkeys.bin");
+		PrintAndLog("s - Slow (1ms) check keys (required by some non standard cards)");
+		PrintAndLog("ss - Very slow (5ms) check keys");
 		PrintAndLog(" ");
 		PrintAndLog("      sample1: hf mf nested 1 0 A FFFFFFFFFFFF ");
 		PrintAndLog("      sample2: hf mf nested 1 0 A FFFFFFFFFFFF t ");
 		PrintAndLog("      sample3: hf mf nested 1 0 A FFFFFFFFFFFF d ");
 		PrintAndLog("      sample4: hf mf nested o 0 A FFFFFFFFFFFF 4 A");
 		PrintAndLog("      sample5: hf mf nested 1 * t");
+		PrintAndLog("      sample6: hf mf nested 1 * ss");
 		return 0;
 	}
 
@@ -580,11 +613,10 @@ int CmdHF14AMfNested(const char *Cmd)
 	if (param_getchar(Cmd, 1) == '*') {
 		autosearchKey = true;
 
-		ctmp = param_getchar(Cmd, 2);
-		transferToEml |= (ctmp == 't' || ctmp == 'T');
-		createDumpFile |= (ctmp == 'd' || ctmp == 'D');
+		parseParamTDS(Cmd, 2, &transferToEml, &createDumpFile, &btimeout14a);
 
-		PrintAndLog("--nested. sectors:%2d, block no:*, eml:%c, dmp=%c ", SectorsCnt, transferToEml?'y':'n', createDumpFile?'y':'n');
+		PrintAndLog("--nested. sectors:%2d, block no:*, eml:%c, dmp=%c checktimeout=%d us", 
+			SectorsCnt, transferToEml?'y':'n', createDumpFile?'y':'n', ((int)btimeout14a * 10000) / 106);
 	} else {
 		blockNo = param_get8(Cmd, 1);
 
@@ -621,16 +653,13 @@ int CmdHF14AMfNested(const char *Cmd)
 			if (ctmp != 'A' && ctmp != 'a')
 				trgKeyType = 1;
 
-			ctmp = param_getchar(Cmd, 6);
-			transferToEml |= (ctmp == 't' || ctmp == 'T');
-			createDumpFile |= (ctmp == 'd' || ctmp == 'D');
+			parseParamTDS(Cmd, 6, &transferToEml, &createDumpFile, &btimeout14a);
 		} else {
-			ctmp = param_getchar(Cmd, 4);
-			transferToEml |= (ctmp == 't' || ctmp == 'T');
-			createDumpFile |= (ctmp == 'd' || ctmp == 'D');
+			parseParamTDS(Cmd, 4, &transferToEml, &createDumpFile, &btimeout14a);
 		}
 
-		PrintAndLog("--nested. sectors:%2d, block no:%3d, key type:%c, eml:%c, dmp=%c ", SectorsCnt, blockNo, keyType?'B':'A', transferToEml?'y':'n', createDumpFile?'y':'n');
+		PrintAndLog("--nested. sectors:%2d, block no:%3d, key type:%c, eml:%c, dmp=%c checktimeout=%d us", 
+			SectorsCnt, blockNo, keyType?'B':'A', transferToEml?'y':'n', createDumpFile?'y':'n', ((int)btimeout14a * 10000) / 106);
 	}
 
 	// one-sector nested
@@ -684,7 +713,7 @@ int CmdHF14AMfNested(const char *Cmd)
 		}
 
 		PrintAndLog("Testing known keys. Sector count=%d", SectorsCnt);
-		mfCheckKeysSec(SectorsCnt, 2, MF_CHKKEYS_DEFTIMEOUT, true, NESTED_KEY_COUNT, keyBlock, e_sector);
+		mfCheckKeysSec(SectorsCnt, 2, btimeout14a, true, NESTED_KEY_COUNT, keyBlock, e_sector);
 		
 		// get known key from array
 		bool keyFound = false;
@@ -744,7 +773,7 @@ int CmdHF14AMfNested(const char *Cmd)
 						e_sector[sectorNo].Key[trgKeyType] = key64;
 						
 						// try to check this key as a key to the other sectors
-						mfCheckKeysSec(SectorsCnt, 2, MF_CHKKEYS_DEFTIMEOUT, true, 1, keyBlock, e_sector);
+						mfCheckKeysSec(SectorsCnt, 2, btimeout14a, true, 1, keyBlock, e_sector);
 					}
 				}
 			}
