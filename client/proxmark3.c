@@ -127,6 +127,7 @@ void main_loop(char *script_cmds_file, char *script_cmd, bool usb_present) {
 		// If there is a script file
 		if (script_file)
 		{
+			memset(script_cmd_buf, 0, sizeof(script_cmd_buf));
 			if (!fgets(script_cmd_buf, sizeof(script_cmd_buf), script_file)) {
 				fclose(script_file);
 				script_file = NULL;
