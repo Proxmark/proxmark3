@@ -100,6 +100,7 @@ void main_loop(char *script_cmds_file, char *script_cmd, bool usb_present) {
 	char *cmd = NULL;
 	pthread_t reader_thread;
 	bool execCommand = (script_cmd != NULL);
+	bool stdinOnPipe = !isatty(STDIN_FILENO);
 	
 	if (usb_present) {
 		rarg.run = 1;
@@ -137,7 +138,7 @@ void main_loop(char *script_cmds_file, char *script_cmd, bool usb_present) {
 				if (nl) *nl = '\0';
 
 				if ((cmd = (char*) malloc(strlen(script_cmd_buf) + 1)) != NULL) {
-					memset(cmd, 0, strlen(script_cmd_buf));
+					memset(cmd, 0, strlen(script_cmd_buf) + 1);
 					strcpy(cmd, script_cmd_buf);
 					printf(PROXPROMPT"%s\n", cmd);
 				}
@@ -156,9 +157,30 @@ void main_loop(char *script_cmds_file, char *script_cmd, bool usb_present) {
 				// exit after exec command
 				if (script_cmd)
 					break;
-				
-				// read command from command prompt
-				cmd = readline(PROXPROMPT);
+
+				if (stdinOnPipe) {
+					memset(script_cmd_buf, 0, sizeof(script_cmd_buf));
+					if (!fgets(script_cmd_buf, sizeof(script_cmd_buf), stdin)) {
+						printf("\nStdin end. Exit...\n");
+						break;
+					}
+					char *nl;
+					nl = strrchr(script_cmd_buf, '\r');
+					if (nl) *nl = '\0';
+					
+					nl = strrchr(script_cmd_buf, '\n');
+					if (nl) *nl = '\0';
+
+					if ((cmd = (char*) malloc(strlen(script_cmd_buf) + 1)) != NULL) {
+						memset(cmd, 0, strlen(script_cmd_buf) + 1);
+						strcpy(cmd, script_cmd_buf);
+						printf(PROXPROMPT"%s\n", cmd);
+					}
+					
+				} else {		
+					// read command from command prompt
+					cmd = readline(PROXPROMPT);
+				}
 			}
 		}
 		
