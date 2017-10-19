@@ -4,6 +4,13 @@
 # the license.
 #-----------------------------------------------------------------------------
 
+# OS detection
+ifeq ($(OS),Windows_NT)
+    detected_OS := Windows
+else
+    detected_OS := $(shell sh -c 'uname -s 2>/dev/null || echo not')
+endif
+
 CC = gcc
 CXX = g++
 LD = g++
@@ -49,7 +56,11 @@ ifeq ($(QTINCLUDES), )
 	MOC = $(shell pkg-config --variable=moc_location QtCore)
 	UIC = $(shell pkg-config --variable=uic_location QtCore)
 else
-	CXXFLAGS += -std=c++11 -fPIC
+    ifeq ($(detected_OS),Windows)
+	    CXXFLAGS += -std=c++11
+    else
+	    CXXFLAGS += -std=c++11 -fPIC
+    endif
 endif
 ifeq ($(QTINCLUDES), )
 # if both pkg-config commands failed, search in common places
@@ -59,7 +70,11 @@ ifeq ($(QTINCLUDES), )
 		ifneq ($(wildcard $(QTDIR)/include/QtWidgets),)
 			QTINCLUDES += -I$(QTDIR)/include/QtWidgets
 			QTLDLIBS = -L$(QTDIR)/lib -lQt5Widgets -lQt5Gui -lQt5Core
-			CXXFLAGS += -std=c++11 -fPIC
+            ifeq ($(detected_OS),Windows)
+				CXXFLAGS += -std=c++11
+			else
+				CXXFLAGS += -std=c++11 -fPIC
+			endif
 		endif
 		MOC = $(QTDIR)/bin/moc
 		UIC = $(QTDIR)/bin/uic
