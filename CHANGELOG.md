@@ -13,7 +13,7 @@ This project uses the changelog in accordance with [keepchangelog](http://keepac
 - Changed proxmark command line parameter `flush` to `-f` or `-flush` (Merlok)
 
 ### Fixed
-- Changed start sequence in Qt mode (fix: short commands hang main Qt thread) (Merlok)
+- Changed start sequence in Qt mode (fix: short commands hangs main Qt thread) (Merlok)
 
 ### Added
 - Added PAC/Stanley detection to lf search (marshmellow)
