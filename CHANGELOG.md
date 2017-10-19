@@ -10,6 +10,8 @@ This project uses the changelog in accordance with [keepchangelog](http://keepac
 - Deleted wipe functionality from `hf mf csetuid` (Merlok)
 - Changed `hf mf nested` logic (Merlok)
 - Added `hf mf nested` mode: autosearch keys for attack (from well known keys) (Merlok)
+- `hf mf nested` Check keys after they have found (Merlok)
+- `hf mf chk` Move main cycle to arm (Merlok)
 - Changed proxmark command line parameter `flush` to `-f` or `-flush` (Merlok)
 
 ### Fixed
@@ -25,6 +27,8 @@ This project uses the changelog in accordance with [keepchangelog](http://keepac
 - Added `hf mf cwipe` command. It wipes "magic Chinese" card. For 1a generation it uses card's "wipe" command. For gen1a and gen1b it uses a write command. (Merlok)
 - Added to `hf mf nested` source key check before attack (Merlok)
 - Added to `hf mf nested` after attack it checks all found keys on non-open sectors (Merlok)
+- `hf mf chk` Added setings to set iso14443a operations timeout. default timeout set to 500us (Merlok)
+- Added to `hf mf nested` parameters `s` and `ss` for checking slow cards (Merlok)
 - Added to proxmark command line parameters `w` - wait 20s for serial port (Merlok)
 - Added to proxmark command line parameters `c` and `l` - execute command and lua script from command line (Merlok)
 - Added to proxmark ability to execute commands from stdin (pipe) (Merlok)
