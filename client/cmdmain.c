@@ -8,6 +8,9 @@
 // Main command parser entry point
 //-----------------------------------------------------------------------------
 
+#include "cmdmain.h"
+
+#include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -21,7 +24,6 @@
 #include "cmddata.h"
 #include "cmdhw.h"
 #include "cmdlf.h"
-#include "cmdmain.h"
 #include "util.h"
 #include "util_posix.h"
 #include "cmdscript.h"
@@ -41,6 +43,8 @@ static UsbCommand cmdBuffer[CMD_BUFFER_SIZE];
 static int cmd_head;//Starts as 0
 //Points to the position of the last unread command
 static int cmd_tail;//Starts as 0
+// to lock cmdBuffer operations from different threads
+static pthread_mutex_t cmdBufferMutex = PTHREAD_MUTEX_INITIALIZER;
 
 static command_t CommandTable[] = 
 {
@@ -86,7 +90,9 @@ int CmdRev(const char *Cmd)
 void clearCommandBuffer()
 {
     //This is a very simple operation
+	pthread_mutex_lock(&cmdBufferMutex);
     cmd_tail = cmd_head;
+	pthread_mutex_unlock(&cmdBufferMutex);
 }
 
 /**
@@ -95,6 +101,7 @@ void clearCommandBuffer()
  */
 void storeCommand(UsbCommand *command)
 {
+	pthread_mutex_lock(&cmdBufferMutex);
     if( ( cmd_head+1) % CMD_BUFFER_SIZE == cmd_tail)
     {
         //If these two are equal, we're about to overwrite in the
@@ -106,6 +113,7 @@ void storeCommand(UsbCommand *command)
     memcpy(destination, command, sizeof(UsbCommand));
 
     cmd_head = (cmd_head +1) % CMD_BUFFER_SIZE; //increment head and wrap
+	pthread_mutex_unlock(&cmdBufferMutex);
 }
 
 
@@ -116,8 +124,10 @@ void storeCommand(UsbCommand *command)
  */
 int getCommand(UsbCommand* response)
 {
+	pthread_mutex_lock(&cmdBufferMutex);
     //If head == tail, there's nothing to read, or if we just got initialized
     if(cmd_head == cmd_tail){
+		pthread_mutex_unlock(&cmdBufferMutex);
         return 0;
     }
     //Pick out the next unread command
@@ -125,7 +135,7 @@ int getCommand(UsbCommand* response)
     memcpy(response, last_unread, sizeof(UsbCommand));
     //Increment tail - this is a circular buffer, so modulo buffer size
     cmd_tail = (cmd_tail +1 ) % CMD_BUFFER_SIZE;
-
+	pthread_mutex_unlock(&cmdBufferMutex);
     return 1;
 }
 
@@ -147,21 +157,27 @@ bool WaitForResponseTimeoutW(uint32_t cmd, UsbCommand* response, size_t ms_timeo
 		response = &resp;
 	}
 
+	uint64_t start_time = msclock();
+	
 	// Wait until the command is received
-	for(size_t dm_seconds=0; dm_seconds < ms_timeout/10; dm_seconds++) {
+	while (true) {
 		while(getCommand(response)) {
 			if(response->cmd == cmd){
 				return true;
 			}
 		}
-		msleep(10); // XXX ugh
-		if (dm_seconds == 200 && show_warning) { // Two seconds elapsed
+		if (msclock() - start_time > ms_timeout) {
+			break;
+		}
+		if (msclock() - start_time > 2000 && show_warning) {
 			PrintAndLog("Waiting for a response from the proxmark...");
 			PrintAndLog("Don't forget to cancel its operation first by pressing on the button");
+			break;
 		}
 	}
 	return false;
 }
+
 
 bool WaitForResponseTimeout(uint32_t cmd, UsbCommand* response, size_t ms_timeout) {
 	return WaitForResponseTimeoutW(cmd, response, ms_timeout, true);
