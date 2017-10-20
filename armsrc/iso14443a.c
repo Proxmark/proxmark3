@@ -185,7 +185,7 @@ void iso14a_set_trigger(bool enable) {
 }
 
 
-static void iso14a_set_timeout(uint32_t timeout) {
+void iso14a_set_timeout(uint32_t timeout) {
 	iso14a_timeout = timeout;
 	if(MF_DBGLEVEL >= 3) Dbprintf("ISO14443A Timeout set to %ld (%dms)", iso14a_timeout, iso14a_timeout / 106);
 }
