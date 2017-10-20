@@ -232,6 +232,7 @@ void Mifare1ksim(uint8_t flags, uint8_t exitAfterNReads, uint8_t arg2, uint8_t *
 
 		//Now, get data
 		int res = EmGetCmd(receivedCmd, &receivedCmd_len, receivedCmd_par);
+		
 		if (res == 2) { //Field is off!
 			LEDsoff();
 			cardSTATE = MFEMUL_NOFIELD;
@@ -261,7 +262,6 @@ void Mifare1ksim(uint8_t flags, uint8_t exitAfterNReads, uint8_t arg2, uint8_t *
 			case MFEMUL_NOFIELD:
 			case MFEMUL_HALTED:
 			case MFEMUL_IDLE:{
-				EmLogTraceReader();
 				break;
 			}
 			case MFEMUL_SELECT1:{
@@ -286,7 +286,6 @@ void Mifare1ksim(uint8_t flags, uint8_t exitAfterNReads, uint8_t arg2, uint8_t *
 						break;
 					}
 				}
-				EmLogTraceReader();
 				cardSTATE_TO_IDLE();
 				break;
 			}
@@ -308,13 +307,11 @@ void Mifare1ksim(uint8_t flags, uint8_t exitAfterNReads, uint8_t arg2, uint8_t *
 						break;
 					}
 				}
-				EmLogTraceReader();
 				cardSTATE_TO_IDLE();
 				break;
 			}
 			case MFEMUL_WORK:{
 				if (receivedCmd_len != 4) {	// all commands must have exactly 4 bytes
-					EmLogTraceReader();
 					break;
 				}
 				bool encrypted_data = (cardAUTHKEY != 0xFF) ;
@@ -354,7 +351,6 @@ void Mifare1ksim(uint8_t flags, uint8_t exitAfterNReads, uint8_t arg2, uint8_t *
 					break;
 				}
 				if (!encrypted_data) { // all other commands must be encrypted (authenticated)
-					EmLogTraceReader();
 					break;
 				}
 				if(receivedCmd_dec[0] == ISO14443A_CMD_READBLOCK
@@ -424,7 +420,6 @@ void Mifare1ksim(uint8_t flags, uint8_t exitAfterNReads, uint8_t arg2, uint8_t *
 				// halt
 				if (receivedCmd_dec[0] == ISO14443A_CMD_HALT && receivedCmd_dec[1] == 0x00) {
 					if (MF_DBGLEVEL >= 4)	Dbprintf("--> HALTED.");
-					EmLogTraceReader();
 					LED_B_OFF();
 					LED_C_OFF();
 					cardSTATE = MFEMUL_HALTED;
@@ -437,7 +432,6 @@ void Mifare1ksim(uint8_t flags, uint8_t exitAfterNReads, uint8_t arg2, uint8_t *
 			}
 			case MFEMUL_AUTH1:{
 				if (receivedCmd_len != 8) {
-					EmLogTraceReader();
 					cardSTATE_TO_IDLE();
 					break;
 				}
@@ -521,7 +515,6 @@ void Mifare1ksim(uint8_t flags, uint8_t exitAfterNReads, uint8_t arg2, uint8_t *
 					// reader to do a WUPA after a while. /Martin
 					// -- which is the correct response. /piwi
 					cardAUTHKEY = 0xff;	// not authenticated
-					EmLogTraceReader();
 					cardSTATE_TO_IDLE();
 					break;
 				}
@@ -543,7 +536,6 @@ void Mifare1ksim(uint8_t flags, uint8_t exitAfterNReads, uint8_t arg2, uint8_t *
 						break;
 					}
 				}
-				EmLogTraceReader();
 				cardSTATE_TO_IDLE();
 				break;
 			}
@@ -557,7 +549,6 @@ void Mifare1ksim(uint8_t flags, uint8_t exitAfterNReads, uint8_t arg2, uint8_t *
 					}
 					cardINTREG = cardINTREG + ans;
 				}
-				EmLogTraceReader();
 				cardSTATE = MFEMUL_WORK;
 				break;
 			}
@@ -570,7 +561,6 @@ void Mifare1ksim(uint8_t flags, uint8_t exitAfterNReads, uint8_t arg2, uint8_t *
 						break;
 					}
 				}
-				EmLogTraceReader();
 				cardINTREG = cardINTREG - ans;
 				cardSTATE = MFEMUL_WORK;
 				break;
@@ -582,7 +572,6 @@ void Mifare1ksim(uint8_t flags, uint8_t exitAfterNReads, uint8_t arg2, uint8_t *
 					cardSTATE_TO_IDLE();
 					break;
 				}
-				EmLogTraceReader();
 				cardSTATE = MFEMUL_WORK;
 				break;
 			}

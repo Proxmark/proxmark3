@@ -833,6 +833,37 @@ static void Code4bitAnswerAsTag(uint8_t cmd)
 }
 
 
+static uint8_t *LastReaderTraceTime = NULL;
+
+static void EmLogTraceReader(void) {
+	// remember last reader trace start to fix timing info later
+	LastReaderTraceTime = BigBuf_get_addr() + BigBuf_get_traceLen();
+	LogTrace(Uart.output, Uart.len, Uart.startTime*16 - DELAY_AIR2ARM_AS_TAG, Uart.endTime*16 - DELAY_AIR2ARM_AS_TAG, Uart.parity, true);
+}
+
+
+static void FixLastReaderTraceTime(uint32_t tag_StartTime) {
+	uint32_t reader_EndTime = Uart.endTime*16 - DELAY_AIR2ARM_AS_TAG;
+	uint32_t reader_StartTime = Uart.startTime*16 - DELAY_AIR2ARM_AS_TAG;
+	uint16_t reader_modlen = reader_EndTime - reader_StartTime;
+	uint16_t approx_fdt = tag_StartTime - reader_EndTime;
+	uint16_t exact_fdt = (approx_fdt - 20 + 32)/64 * 64 + 20;
+	reader_StartTime = tag_StartTime - exact_fdt - reader_modlen;
+	LastReaderTraceTime[0] = (reader_StartTime >> 0) & 0xff;
+	LastReaderTraceTime[1] = (reader_StartTime >> 8) & 0xff;
+	LastReaderTraceTime[2] = (reader_StartTime >> 16) & 0xff;
+	LastReaderTraceTime[3] = (reader_StartTime >> 24) & 0xff;
+}
+
+	
+static void EmLogTraceTag(uint8_t *tag_data, uint16_t tag_len, uint8_t *tag_Parity, uint32_t ProxToAirDuration) {
+	uint32_t tag_StartTime = LastTimeProxToAirStart*16 + DELAY_ARM2AIR_AS_TAG;
+	uint32_t tag_EndTime = (LastTimeProxToAirStart + ProxToAirDuration)*16 + DELAY_ARM2AIR_AS_TAG;
+	LogTrace(tag_data, tag_len, tag_StartTime, tag_EndTime, tag_Parity, false);
+	FixLastReaderTraceTime(tag_StartTime);
+}
+
+
 //-----------------------------------------------------------------------------
 // Wait for commands from reader
 // Stop when button is pressed
@@ -861,34 +892,11 @@ static int GetIso14443aCommandFromReader(uint8_t *received, uint8_t *parity, int
             b = (uint8_t)AT91C_BASE_SSC->SSC_RHR;
 			if(MillerDecoding(b, 0)) {
 				*len = Uart.len;
+				EmLogTraceReader();
 				return true;
 			}
  		}
     }
-}
-
-
-void EmLogTraceReader(void) {
-	LogTrace(Uart.output, Uart.len, Uart.startTime*16 - DELAY_AIR2ARM_AS_TAG, Uart.endTime*16 - DELAY_AIR2ARM_AS_TAG, Uart.parity, true);
-}
-
-
-static void EmLogTraceReaderAndTag(uint8_t *tag_data, uint16_t tag_len, uint8_t *tag_Parity, uint32_t ProxToAirDuration)
-{
-	// we cannot exactly measure the end and start of a received command from reader. However we know that the delay from
-	// end of the received command to start of the tag's (simulated by us) answer is n*128+20 or n*128+84 resp.
-	// with n >= 9. The start of the tags answer can be measured and therefore the end of the received command be calculated:
-	uint32_t reader_EndTime = Uart.endTime*16 - DELAY_AIR2ARM_AS_TAG;
-	uint32_t reader_StartTime = Uart.startTime*16 - DELAY_AIR2ARM_AS_TAG;
-	uint32_t tag_StartTime = LastTimeProxToAirStart*16 + DELAY_ARM2AIR_AS_TAG;
-	uint32_t tag_EndTime = (LastTimeProxToAirStart + ProxToAirDuration)*16 + DELAY_ARM2AIR_AS_TAG;
-	uint16_t reader_modlen = reader_EndTime - reader_StartTime;
-	uint16_t approx_fdt = tag_StartTime - reader_EndTime;
-	uint16_t exact_fdt = (approx_fdt - 20 + 32)/64 * 64 + 20;
-	reader_EndTime = tag_StartTime - exact_fdt;
-	reader_StartTime = reader_EndTime - reader_modlen;
-	LogTrace(Uart.output, Uart.len, reader_StartTime, reader_EndTime, Uart.parity, true);
-	LogTrace(tag_data, tag_len, tag_StartTime, tag_EndTime, tag_Parity, false);
 }
 
 
@@ -1135,10 +1143,6 @@ void SimulateIso14443aTag(int tagType, int uid_1st, int uid_2nd, byte_t* data)
 			// We already responded, do not send anything with the EmSendCmd14443aRaw() that is called below
 			p_response = NULL;
 		} else if(receivedCmd[0] == 0x50) {	// Received a HALT
-
-			if (tracing) {
-				LogTrace(receivedCmd, Uart.len, Uart.startTime*16 - DELAY_AIR2ARM_AS_TAG, Uart.endTime*16 - DELAY_AIR2ARM_AS_TAG, Uart.parity, true);
-			}
 			p_response = NULL;
 		} else if(receivedCmd[0] == 0x60 || receivedCmd[0] == 0x61) {	// Received an authentication request
 			p_response = &responses[5]; order = 7;
@@ -1150,9 +1154,6 @@ void SimulateIso14443aTag(int tagType, int uid_1st, int uid_2nd, byte_t* data)
 				p_response = &responses[6]; order = 70;
 			}
 		} else if (order == 7 && len == 8) { // Received {nr] and {ar} (part of authentication)
-			if (tracing) {
-				LogTrace(receivedCmd, Uart.len, Uart.startTime*16 - DELAY_AIR2ARM_AS_TAG, Uart.endTime*16 - DELAY_AIR2ARM_AS_TAG, Uart.parity, true);
-			}
 			uint32_t nr = bytes_to_num(receivedCmd,4);
 			uint32_t ar = bytes_to_num(receivedCmd+4,4);
 			Dbprintf("Auth attempt {nr}{ar}: %08x %08x",nr,ar);
@@ -1194,9 +1195,6 @@ void SimulateIso14443aTag(int tagType, int uid_1st, int uid_2nd, byte_t* data)
 
 				default: {
 					// Never seen this command before
-					if (tracing) {
-						LogTrace(receivedCmd, Uart.len, Uart.startTime*16 - DELAY_AIR2ARM_AS_TAG, Uart.endTime*16 - DELAY_AIR2ARM_AS_TAG, Uart.parity, true);
-					}
 					Dbprintf("Received unknown command (len=%d):",len);
 					Dbhexdump(len,receivedCmd,false);
 					// Do not respond
@@ -1214,9 +1212,6 @@ void SimulateIso14443aTag(int tagType, int uid_1st, int uid_2nd, byte_t* data)
         
 				if (prepare_tag_modulation(&dynamic_response_info,DYNAMIC_MODULATION_BUFFER_SIZE) == false) {
 					Dbprintf("Error preparing tag response");
-					if (tracing) {
-						LogTrace(receivedCmd, Uart.len, Uart.startTime*16 - DELAY_AIR2ARM_AS_TAG, Uart.endTime*16 - DELAY_AIR2ARM_AS_TAG, Uart.parity, true);
-					}
 					break;
 				}
 				p_response = &dynamic_response_info;
@@ -1468,6 +1463,7 @@ int EmGetCmd(uint8_t *received, uint16_t *len, uint8_t *parity)
             b = (uint8_t)AT91C_BASE_SSC->SSC_RHR;
 			if(MillerDecoding(b, 0)) {
 				*len = Uart.len;
+				EmLogTraceReader();
 				return 0;
 			}
         }
@@ -1539,7 +1535,7 @@ static int EmSend4bitEx(uint8_t resp, bool correctionNeeded){
 	Code4bitAnswerAsTag(resp);
 	int res = EmSendCmd14443aRaw(ToSend, ToSendMax, correctionNeeded);
 	// do the tracing for the previous reader request and this tag answer:
-	EmLogTraceReaderAndTag(&resp, 1, NULL, LastProxToAirDuration);
+	EmLogTraceTag(&resp, 1, NULL, LastProxToAirDuration);
 	return res;
 }
 
@@ -1553,7 +1549,7 @@ static int EmSendCmdExPar(uint8_t *resp, uint16_t respLen, bool correctionNeeded
 	CodeIso14443aAsTagPar(resp, respLen, par);
 	int res = EmSendCmd14443aRaw(ToSend, ToSendMax, correctionNeeded);
 	// do the tracing for the previous reader request and this tag answer:
-	EmLogTraceReaderAndTag(resp, respLen, par, LastProxToAirDuration);
+	EmLogTraceTag(resp, respLen, par, LastProxToAirDuration);
 	return res;
 }
 
@@ -1580,7 +1576,7 @@ int EmSendCmdPar(uint8_t *resp, uint16_t respLen, uint8_t *par){
 int EmSendPrecompiledCmd(tag_response_info_t *response_info, bool correctionNeeded) {
 	int ret = EmSendCmd14443aRaw(response_info->modulation, response_info->modulation_n, correctionNeeded);
 	// do the tracing for the previous reader request and this tag answer:
-	EmLogTraceReaderAndTag(response_info->response, response_info->response_n, &(response_info->par), response_info->ProxToAirDuration);
+	EmLogTraceTag(response_info->response, response_info->response_n, &(response_info->par), response_info->ProxToAirDuration);
 	return ret;
 }
 

@@ -44,7 +44,6 @@ extern int EmSendCmd(uint8_t *resp, uint16_t respLen);
 extern int EmSendCmdEx(uint8_t *resp, uint16_t respLen, bool correctionNeeded);
 extern int EmSend4bit(uint8_t resp);
 extern int EmSendCmdPar(uint8_t *resp, uint16_t respLen, uint8_t *par);
-extern void EmLogTraceReader(void);
 extern int EmSendPrecompiledCmd(tag_response_info_t *response_info, bool correctionNeeded);
 
 extern bool prepare_allocated_tag_modulation(tag_response_info_t *response_info, uint8_t **buffer, size_t *buffer_size);
