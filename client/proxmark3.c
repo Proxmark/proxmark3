@@ -31,6 +31,8 @@
 
 #ifdef _WIN32
 #define SERIAL_PORT_H	"com3"
+#elif __APPLE__
+#define SERIAL_PORT_H	"/dev/tty.usbmodem*"
 #else
 #define SERIAL_PORT_H	"/dev/ttyACM0"
 #endif
