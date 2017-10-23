@@ -44,6 +44,11 @@
 #define AT91C_EP_OUT_SIZE 0x40
 #define AT91C_EP_IN_SIZE  0x40
 
+// Language must always be 0.
+#define STR_LANGUAGE_CODES 0x00
+#define STR_MANUFACTURER   0x01
+#define STR_PRODUCT        0x02
+
 static const char devDescriptor[] = {
 	/* Device descriptor */
 	0x12,      // bLength
@@ -56,8 +61,8 @@ static const char devDescriptor[] = {
 	0xc4,0x9a, // Vendor ID (0x9ac4 = J. Westhues)
 	0x8f,0x4b, // Product ID (0x4b8f = Proxmark-3 RFID Instrument)
 	0x01,0x00, // Device release number (0001)
-	0x01,      // iManufacturer
-	0x02,      // iProduct
+	STR_MANUFACTURER,  // iManufacturer
+	STR_PRODUCT,       // iProduct
 	0x00,      // iSerialNumber
 	0x01       // bNumConfigs
 };
@@ -157,7 +162,9 @@ static const char StrDescLanguageCodes[] = {
   0x03,			// Type is string
   0x09, 0x04	// supported language Code 0 = 0x0409 (English)
 };
-	
+
+// Note: ModemManager (Linux) ignores Proxmark3 devices by matching the
+// manufacturer string "proxmark.org". Don't change this.
 static const char StrDescManufacturer[] = {
   26,			// Length
   0x03,			// Type is string
@@ -182,20 +189,18 @@ static const char StrDescProduct[] = {
   'M', 0x00,
   '3', 0x00
 };
-	
-static const char* const pStrings[] =
-{
-    StrDescLanguageCodes,
-    StrDescManufacturer,
-	StrDescProduct
-};
 
 const char* getStringDescriptor(uint8_t idx)
 {
-    if(idx >= (sizeof(pStrings) / sizeof(pStrings[0]))) {
-        return(NULL);
-	} else {
-		return(pStrings[idx]);
+	switch (idx) {
+		case STR_LANGUAGE_CODES:
+			return StrDescLanguageCodes;
+		case STR_MANUFACTURER:
+			return StrDescManufacturer;
+		case STR_PRODUCT:
+			return StrDescProduct;
+		default:
+			return NULL;
 	}
 }
 
