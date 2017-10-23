@@ -187,7 +187,9 @@ test_script:
 
       $sb=[scriptblock]::Create("$using:Cmd")
       #execute scriptblock
+      Write-host "Test [$using:Name] job: $using:Cmd"
       $Cond=&$sb
+      Write-host "Result[$using:Name]: $Cond"
 
       if ($Cond -eq $null){
       } Else {
@@ -221,6 +223,7 @@ test_script:
           $res=$true
         }
       } else {
+        Write-host "Test [$Name] timeout" -ForegroundColor Red
         Add-AppveyorTest -Name "$Name" -Framework NUnit -Filename "$File" -Outcome Failed -Duration 40000 -ErrorMessage "timeout"
       }
       Remove-Job -Force $Job
