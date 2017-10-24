@@ -22,7 +22,8 @@ local ISO14A_COMMAND = {
 	ISO14A_APPEND_CRC = 0x20,
 	ISO14A_SET_TIMEOUT = 0x40,
 	ISO14A_NO_SELECT = 0x80,
-	ISO14A_TOPAZMODE = 0x100
+	ISO14A_TOPAZMODE = 0x100,
+	ISO14A_NO_RATS = 0x200
 }
 
 local ISO14443a_TYPES = {}		
@@ -92,15 +93,19 @@ end
 
 -- This function does a connect and retrieves som einfo
 -- @param dont_disconnect - if true, does not disable the field
+-- @param no_rats - if true, skips ISO14443-4 select (RATS)
 -- @return if successfull: an table containing card info
 -- @return if unsuccessfull : nil, error
-local function read14443a(dont_disconnect)
+local function read14443a(dont_disconnect, no_rats)
 	local command, result, info, err, data
 
 	command = Command:new{cmd = cmds.CMD_READER_ISO_14443a, 
 								arg1 = ISO14A_COMMAND.ISO14A_CONNECT}
 	if dont_disconnect then
 		command.arg1 = command.arg1 + ISO14A_COMMAND.ISO14A_NO_DISCONNECT
+	end
+	if no_rats then
+		command.arg1 = command.arg1 + ISO14A_COMMAND.ISO14A_NO_RATS
 	end
 	local result,err = sendToDevice(command)
 	if result then

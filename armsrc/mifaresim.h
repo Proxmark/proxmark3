@@ -1,5 +1,5 @@
 //-----------------------------------------------------------------------------
-// Merlok - June 2011
+// Merlok - June 2011, 2012
 // Gerhard de Koning Gans - May 2008
 // Hagen Fritsch - June 2010
 //
@@ -7,15 +7,14 @@
 // at your option, any later version. See the LICENSE.txt file for the text of
 // the license.
 //-----------------------------------------------------------------------------
-// Routines to support ISO 14443 type B.
+// Mifare Classic Card Simulation
 //-----------------------------------------------------------------------------
 
-#ifndef __ISO14443B_H
-#define __ISO14443B_H
-#include "common.h"
+#ifndef __MIFARESIM_H
+#define __MIFARESIM_H
 
-int iso14443b_apdu(uint8_t const *message, size_t message_length, uint8_t *response);
-void iso14443b_setup();
-int iso14443b_select_card();
+#include <stdint.h>
 
-#endif /* __ISO14443B_H */
+extern void Mifare1ksim(uint8_t flags, uint8_t exitAfterNReads, uint8_t arg2, uint8_t *datain);
+
+#endif
