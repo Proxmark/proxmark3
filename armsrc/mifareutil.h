@@ -12,6 +12,9 @@
 #ifndef __MIFAREUTIL_H
 #define __MIFAREUTIL_H
 
+#include <stdint.h>
+#include <stdbool.h>
+
 #include "crapto1/crapto1.h"
 #include "usb_cdc.h"
 
@@ -75,6 +78,8 @@ uint8_t mf_crypto1_encrypt4bit(struct Crypto1State *pcs, uint8_t data);
 // Mifare memory structure
 uint8_t NumBlocksPerSector(uint8_t sectorNo);
 uint8_t FirstBlockOfSector(uint8_t sectorNo);
+bool IsSectorTrailer(uint8_t blockNo);
+uint8_t SectorTrailer(uint8_t blockNo);
 
 // emulator functions
 void emlClearMem(void);

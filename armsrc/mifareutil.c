@@ -9,13 +9,15 @@
 // Work with mifare cards.
 //-----------------------------------------------------------------------------
 
-#include <string.h>
 #include "mifareutil.h"
+
+#include <string.h>
+#include <stdbool.h>
+
 #include "proxmark3.h"
 #include "apps.h"
 #include "util.h"
 #include "parity.h"
-
 #include "iso14443crc.h"
 #include "iso14443a.h"
 #include "crapto1/crapto1.h"
@@ -585,6 +587,19 @@ uint8_t FirstBlockOfSector(uint8_t sectorNo)
 		
 }
 
+uint8_t SectorTrailer(uint8_t blockNo)
+{
+	if (blockNo < 32*4) {
+		return (blockNo | 0x03);
+	} else {
+		return (blockNo | 0x0f);
+	}
+}
+
+bool IsSectorTrailer(uint8_t blockNo)
+{
+	return (blockNo == SectorTrailer(blockNo));
+}
 
 // work with emulator memory
 void emlSetMem(uint8_t *data, int blockNum, int blocksCount) {
