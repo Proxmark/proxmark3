@@ -1510,6 +1510,16 @@ void MifareCIdent(){
 
 	uint8_t receivedAnswer[MAX_MIFARE_FRAME_SIZE];
 	uint8_t receivedAnswerPar[MAX_MIFARE_PARITY_SIZE];
+	
+	LED_A_ON();
+	LED_B_OFF();
+	LED_C_OFF();
+//	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
+//	SpinDelay(100);
+	iso14443a_setup(FPGA_HF_ISO14443A_READER_LISTEN);
+
+	clear_trace();
+	set_tracing(true);	
 
 	ReaderTransmitBitsPar(wupC1,7,0, NULL);
 	if(ReaderReceive(receivedAnswer, receivedAnswerPar) && (receivedAnswer[0] == 0x0a)) {
@@ -1523,8 +1533,13 @@ void MifareCIdent(){
 
 	// From iceman1001: removed the if,  since some magic tags misbehavies and send an answer to it.
 	mifare_classic_halt(NULL, 0);
-
+	
+	LED_B_ON();
 	cmd_send(CMD_ACK,isOK,0,0,0,0);
+	LED_B_OFF();
+
+	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
+	LEDsoff();	
 }
 
 //

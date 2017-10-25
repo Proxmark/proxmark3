@@ -542,11 +542,12 @@ int mfCSetUID(uint8_t *uid, uint8_t *atqa, uint8_t *sak, uint8_t *oldUID) {
 
 int mfCIdentify()
 {
-	UsbCommand c = {CMD_READER_ISO_14443a, {ISO14A_CONNECT | ISO14A_NO_DISCONNECT, 0, 0}};
-	SendCommand(&c);
+  UsbCommand c;
+//	UsbCommand c = {CMD_READER_ISO_14443a, {ISO14A_CONNECT | ISO14A_NO_DISCONNECT, 0, 0}};
+//	SendCommand(&c);
 
-	UsbCommand resp;
-	WaitForResponse(CMD_ACK,&resp);
+  UsbCommand resp;
+//	WaitForResponse(CMD_ACK,&resp);
 
 	// iso14a_card_select_t card;
 	// memcpy(&card, (iso14a_card_select_t *)resp.d.asBytes, sizeof(iso14a_card_select_t));
@@ -578,11 +579,11 @@ int mfCIdentify()
 	}
 
 	// disconnect
-	c.cmd = CMD_READER_ISO_14443a;
-	c.arg[0] = 0;
-	c.arg[1] = 0;
-	c.arg[2] = 0;
-	SendCommand(&c);
+//	c.cmd = CMD_READER_ISO_14443a;
+//	c.arg[0] = 0;
+//	c.arg[1] = 0;
+//	c.arg[2] = 0;
+//	SendCommand(&c);
 
 	return (int) isGeneration;
 }
