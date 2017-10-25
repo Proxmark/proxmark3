@@ -549,20 +549,20 @@ int mfCIdentify()
   UsbCommand resp;
 //	WaitForResponse(CMD_ACK,&resp);
 
-	// iso14a_card_select_t card;
-	// memcpy(&card, (iso14a_card_select_t *)resp.d.asBytes, sizeof(iso14a_card_select_t));
+	iso14a_card_select_t card;
+	memcpy(&card, (iso14a_card_select_t *)resp.d.asBytes, sizeof(iso14a_card_select_t));
 
-	// uint64_t select_status = resp.arg[0];		// 0: couldn't read, 1: OK, with ATS, 2: OK, no ATS, 3: proprietary Anticollision
+	uint64_t select_status = resp.arg[0];		// 0: couldn't read, 1: OK, with ATS, 2: OK, no ATS, 3: proprietary Anticollision
 
-	// if(select_status != 0) {
-		// uint8_t rats[] = { 0xE0, 0x80 }; // FSDI=8 (FSD=256), CID=0
-		// c.arg[0] = ISO14A_RAW | ISO14A_APPEND_CRC | ISO14A_NO_DISCONNECT;
-		// c.arg[1] = 2;
-		// c.arg[2] = 0;
-		// memcpy(c.d.asBytes, rats, 2);
-		// SendCommand(&c);
-		// WaitForResponse(CMD_ACK,&resp);
-	// }
+	if(select_status != 0) {
+		uint8_t rats[] = { 0xE0, 0x80 }; // FSDI=8 (FSD=256), CID=0
+		c.arg[0] = ISO14A_RAW | ISO14A_APPEND_CRC | ISO14A_NO_DISCONNECT;
+		c.arg[1] = 2;
+		c.arg[2] = 0;
+		memcpy(c.d.asBytes, rats, 2);
+		SendCommand(&c);
+		WaitForResponse(CMD_ACK,&resp);
+	}
 
 	c.cmd = CMD_MIFARE_CIDENT;
 	c.arg[0] = 0;
