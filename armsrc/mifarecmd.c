@@ -1514,8 +1514,6 @@ void MifareCIdent(){
 	LED_A_ON();
 	LED_B_OFF();
 	LED_C_OFF();
-//	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
-//	SpinDelay(100);
 	iso14443a_setup(FPGA_HF_ISO14443A_READER_LISTEN);
 
 	clear_trace();
