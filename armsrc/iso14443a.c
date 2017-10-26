@@ -1698,17 +1698,19 @@ int iso14443a_select_card(byte_t *uid_ptr, iso14a_card_select_t *p_hi14a_card, u
 	int cascade_level = 0;
 	int len;
 
+	// init card struct
+	if(p_hi14a_card) {
+		memcpy(p_hi14a_card->atqa, resp, 2);
+		p_hi14a_card->uidlen = 0;
+		memset(p_hi14a_card->uid,0,10);
+		p_hi14a_card->ats_len = 0;
+	}
+
 	// Broadcast for a card, WUPA (0x52) will force response from all cards in the field
     ReaderTransmitBitsPar(wupa, 7, NULL, NULL);
 	
 	// Receive the ATQA
 	if(!ReaderReceive(resp, resp_par)) return 0;
-
-	if(p_hi14a_card) {
-		memcpy(p_hi14a_card->atqa, resp, 2);
-		p_hi14a_card->uidlen = 0;
-		memset(p_hi14a_card->uid,0,10);
-	}
 
 	if (anticollision) {
 		// clear uid
@@ -1813,7 +1815,6 @@ int iso14443a_select_card(byte_t *uid_ptr, iso14a_card_select_t *p_hi14a_card, u
 
 	if(p_hi14a_card) {
 		p_hi14a_card->sak = sak;
-		p_hi14a_card->ats_len = 0;
 	}
 
 	// non iso14443a compliant tag
@@ -1908,7 +1909,7 @@ void ReaderIso14443a(UsbCommand *c)
 	size_t lenbits = c->arg[1] >> 16;
 	uint32_t timeout = c->arg[2];
 	uint32_t arg0 = 0;
-	byte_t buf[USB_CMD_DATA_SIZE];
+	byte_t buf[USB_CMD_DATA_SIZE] = {0};
 	uint8_t par[MAX_PARITY_SIZE];
   
 	if(param & ISO14A_CONNECT) {
