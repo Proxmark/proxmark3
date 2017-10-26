@@ -1700,9 +1700,8 @@ int iso14443a_select_card(byte_t *uid_ptr, iso14a_card_select_t *p_hi14a_card, u
 
 	// init card struct
 	if(p_hi14a_card) {
-		memcpy(p_hi14a_card->atqa, resp, 2);
 		p_hi14a_card->uidlen = 0;
-		memset(p_hi14a_card->uid,0,10);
+		memset(p_hi14a_card->uid, 0, 10);
 		p_hi14a_card->ats_len = 0;
 	}
 
@@ -1711,6 +1710,10 @@ int iso14443a_select_card(byte_t *uid_ptr, iso14a_card_select_t *p_hi14a_card, u
 	
 	// Receive the ATQA
 	if(!ReaderReceive(resp, resp_par)) return 0;
+
+	if(p_hi14a_card) {
+		memcpy(p_hi14a_card->atqa, resp, 2);
+	}
 
 	if (anticollision) {
 		// clear uid
