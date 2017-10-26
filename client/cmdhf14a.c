@@ -405,27 +405,8 @@ int CmdHF14AReader(const char *Cmd)
 
 	
 	// try to see if card responses to "chinese magic backdoor" commands.
-	c.cmd = CMD_MIFARE_CIDENT;
-	c.arg[0] = 0;
-	c.arg[1] = 0;
-	c.arg[2] = 0;	
-	SendCommand(&c);
-	WaitForResponse(CMD_ACK,&resp);
+	mfCIdentify();
 	
-	uint8_t isGeneration = resp.arg[0] & 0xff;
-	switch( isGeneration ){
-		case 1: PrintAndLog("Answers to chinese magic backdoor commands (GEN 1a): YES"); break;
-		case 2: PrintAndLog("Answers to chinese magic backdoor commands (GEN 1b): YES"); break;
-		default: PrintAndLog("Answers to chinese magic backdoor commands: NO"); break;
-	}
-	
-	// disconnect
-	c.cmd = CMD_READER_ISO_14443a;
-	c.arg[0] = 0;
-	c.arg[1] = 0;
-	c.arg[2] = 0;
-	SendCommand(&c);
-
 	return select_status;
 }
 
