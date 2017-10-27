@@ -284,14 +284,6 @@ test_script:
       Write-Host "Tests [ ERROR ]" -ForegroundColor Red
       throw "Tests error."
     }
-deploy:
-- provider: GitHub
-  auth_token:
-    secure: KZjT7cUmFdoKLAauWthn+eUVqe46uXLYEmLoZ9MiPfPzY2VD7xzKg9cXrwxm0Z4O
-  force_update: true
-  on:
-    branch: master
-    appveyor_repo_tag: true
 on_success:
 - ps: Write-Host "Build success..." -ForegroundColor Green
 on_failure:
