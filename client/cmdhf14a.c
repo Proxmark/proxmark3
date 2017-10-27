@@ -554,6 +554,19 @@ int CmdHF14ASnoop(const char *Cmd) {
 	return 0;
 }
 
+int CmdHF14AAPDU(const char *cmd) {
+	if (strlen(cmd)<2) {
+		PrintAndLog("Usage: hf 14a apdu [-s] [-k] [-t] <APDU (hex)>");
+		PrintAndLog("       -s    activate field and select card");
+		PrintAndLog("       -k    leave the signal field ON after receive response");
+		PrintAndLog("       -t    executes TLV decoder if it possible");
+		return 0;
+	}
+	
+	
+	
+	return 0;
+}
 
 int CmdHF14ACmdRaw(const char *cmd) {
 	UsbCommand c = {CMD_READER_ISO_14443a, {0, 0, 0}};
@@ -759,6 +772,7 @@ static command_t CommandTable[] =
   {"cuids",  CmdHF14ACUIDs,        0, "<n> Collect n>0 ISO14443 Type A UIDs in one go"},
   {"sim",    CmdHF14ASim,          0, "<UID> -- Simulate ISO 14443a tag"},
   {"snoop",  CmdHF14ASnoop,        0, "Eavesdrop ISO 14443 Type A"},
+  {"apdu",   CmdHF14AAPDU,         0, "Send ISO 1443-4 APDU to tag"},
   {"raw",    CmdHF14ACmdRaw,       0, "Send raw hex data to tag"},
   {NULL, NULL, 0, NULL}
 };
