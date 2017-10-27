@@ -555,6 +555,10 @@ int CmdHF14ASnoop(const char *Cmd) {
 }
 
 int CmdHF14AAPDU(const char *cmd) {
+	uint8_t data[USB_CMD_DATA_SIZE];
+	uint16_t datalen = 0;
+	uint8_t cmdc = 0;
+	
 	if (strlen(cmd)<2) {
 		PrintAndLog("Usage: hf 14a apdu [-s] [-k] [-t] <APDU (hex)>");
 		PrintAndLog("       -s    activate field and select card");
@@ -563,7 +567,42 @@ int CmdHF14AAPDU(const char *cmd) {
 		return 0;
 	}
 	
+	cmdc |= ISO14A_CONNECT;
+	cmdc |= ISO14A_NO_DISCONNECT;
 	
+	UsbCommand c = {CMD_READER_ISO_14443a, {cmdc | ISO14A_APDU | ISO14A_SET_TIMEOUT, 0, 100}}; // 100-timeout in iso14a_set_timeout()
+	// Max buffer is USB_CMD_DATA_SIZE (512)
+	c.arg[1] = (datalen & 0xFFFF) | ((uint32_t)numbits << 16);
+
+	uint8_t first, second;
+	ComputeCrc14443(CRC_14443_A, data, datalen, &first, &second);
+	data[datalen++] = first;
+	data[datalen++] = second;
+
+	memcpy(c.d.asBytes,data,datalen);
+
+	SendCommand(&c);
+	
+    if (WaitForResponseTimeout(CMD_ACK,&resp,1500)) {
+        recv = resp.d.asBytes;
+        uint8_t iLen = resp.arg[0];
+        if(!iLen)
+            return;
+        hexout = (char *)malloc(iLen * 3 + 1);
+        if (hexout != NULL) {
+            for (int i = 0; i < iLen; i++) { // data in hex
+                sprintf(&hexout[i * 3], "%02X ", recv[i]);
+            }
+            PrintAndLog("%s", hexout);
+            free(hexout);
+        } else {
+            PrintAndLog("malloc failed...");
+			return 1;
+        }
+    } else {
+        PrintAndLog("timeout while waiting for reply.");
+		return 2;
+    }
 	
 	return 0;
 }
