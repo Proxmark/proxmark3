@@ -21,7 +21,7 @@ LDLIBS = -L/opt/local/lib -L/usr/local/lib -lreadline -lpthread -lm
 LUALIB = ../liblua/liblua.a
 LDFLAGS = $(ENV_LDFLAGS)
 CFLAGS = $(ENV_CFLAGS) -std=c99 -D_ISOC99_SOURCE -I. -I../include -I../common -I../zlib -I../uart -I/opt/local/include -I../liblua -Wall -g -O3
-CXXFLAGS = -I../include -I../uart -Wall -O3
+CXXFLAGS = -I../include -Wall -O3
 
 LUAPLATFORM = generic
 platform = $(shell uname)
@@ -82,10 +82,7 @@ POSTCOMPILE = $(MV) -f $(OBJDIR)/$*.Td $(OBJDIR)/$*.d
 CORESRCS = 	uart_posix.c \
 			uart_win32.c \
 			util.c \
-			util_posix.c \
-			comms.c \
-			data.c \
-			ui.c
+			util_posix.c
 
 CMDSRCS = 	crapto1/crapto1.c\
 			crapto1/crypto1.c\
@@ -105,7 +102,9 @@ CMDSRCS = 	crapto1/crapto1.c\
 			crc64.c \
 			iso14443crc.c \
 			iso15693tools.c \
+			data.c \
 			graph.c \
+			ui.c \
 			cmddata.c \
 			lfdemod.c \
 			cmdhf.c \
@@ -176,7 +175,6 @@ ZLIBFLAGS = -DZ_SOLO -DZ_PREFIX -DNO_GZIP -DZLIB_PM3_TUNED
 #-DDEBUG -Dverbose=1
 
 QTGUISRCS = proxgui.cpp proxguiqt.cpp proxguiqt.moc.cpp guidummy.cpp
-NOGUISRCS = guidummy.cpp
 
 COREOBJS = $(CORESRCS:%.c=$(OBJDIR)/%.o)
 CMDOBJS = $(CMDSRCS:%.c=$(OBJDIR)/%.o)

@@ -21,7 +21,7 @@
 double CursorScaleFactor = 1;
 int PlotGridX=0, PlotGridY=0, PlotGridXdefault= 64, PlotGridYdefault= 64, CursorCPos= 0, CursorDPos= 0;
 int offline;
-bool flushAfterWrite = false;  //buzzy
+int flushAfterWrite = 0;  //buzzy
 int GridOffset = 0;
 bool GridLocked = false;
 bool showDemod = true;
@@ -62,6 +62,7 @@ void PrintAndLog(char *fmt, ...)
 	}
 #else
 	// We are using libedit (OSX), which doesn't support this flag.
+	int need_hack = 0;
 #endif
 	
 	va_start(argptr, fmt);
@@ -71,9 +72,6 @@ void PrintAndLog(char *fmt, ...)
 	va_end(argptr);
 	printf("\n");
 
-	// This needs to be wrapped in ifdefs, as this if optimisation is disabled,
-	// this block won't be removed, and it'll fail at the linker.
-#ifdef RL_STATE_READCMD
 	if (need_hack) {
 		rl_restore_prompt();
 		rl_replace_line(saved_line, 0);
@@ -81,7 +79,6 @@ void PrintAndLog(char *fmt, ...)
 		rl_redisplay();
 		free(saved_line);
 	}
-#endif
 	
 	if (logging && logfile) {
 		vfprintf(logfile, fmt, argptr2);
@@ -103,8 +100,3 @@ void SetLogFilename(char *fn)
 {
   logfilename = fn;
 }
-
-void SetFlushAfterWrite(bool flush_after_write) {
-	flushAfterWrite = flush_after_write;
-}
-
