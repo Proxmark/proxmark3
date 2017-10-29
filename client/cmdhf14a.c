@@ -732,8 +732,17 @@ static void waitCmd(uint8_t iSelect)
 
     if (WaitForResponseTimeout(CMD_ACK,&resp,1500)) {
         recv = resp.d.asBytes;
-        uint8_t iLen = iSelect ? resp.arg[1] : resp.arg[0];
-        PrintAndLog("received %i octets", iLen);
+        uint8_t iLen = resp.arg[0];
+		if (iSelect){
+			iLen = resp.arg[1];
+			if (iLen){
+				PrintAndLog("Card selected. UID[%i]:", iLen);
+			} else {
+				PrintAndLog("Can't select card.");
+			}
+		} else {
+			PrintAndLog("received %i bytes:", iLen);
+		}
         if(!iLen)
             return;
         hexout = (char *)malloc(iLen * 3 + 1);
