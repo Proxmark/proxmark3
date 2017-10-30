@@ -1910,6 +1910,7 @@ void ReaderIso14443a(UsbCommand *c)
 	uint32_t arg0 = 0;
 	byte_t buf[USB_CMD_DATA_SIZE];
 	uint8_t par[MAX_PARITY_SIZE];
+	bool cantSELECT = false;
   
 	if(param & ISO14A_CONNECT) {
 		clear_trace();
@@ -1922,11 +1923,19 @@ void ReaderIso14443a(UsbCommand *c)
 	}
 
 	if(param & ISO14A_CONNECT) {
+		LED_A_ON();
+		clear_trace();
 		iso14443a_setup(FPGA_HF_ISO14443A_READER_LISTEN);
 		if(!(param & ISO14A_NO_SELECT)) {
 			iso14a_card_select_t *card = (iso14a_card_select_t*)buf;
 			arg0 = iso14443a_select_card(NULL, card, NULL, true, 0, param & ISO14A_NO_RATS);
+
+			// if we cant select then we cant send data
+			cantSELECT = (arg0 != 1);
+			
+			LED_B_ON();
 			cmd_send(CMD_ACK,arg0,card->uidlen,0,buf,sizeof(iso14a_card_select_t));
+			LED_B_OFF();
 		}
 	}
 
@@ -1934,12 +1943,14 @@ void ReaderIso14443a(UsbCommand *c)
 		iso14a_set_timeout(timeout);
 	}
 
-	if(param & ISO14A_APDU) {
+	if(param & ISO14A_APDU && !cantSELECT) {
 		arg0 = iso14_apdu(cmd, len, buf);
+		LED_B_ON();
 		cmd_send(CMD_ACK,arg0,0,0,buf,sizeof(buf));
+		LED_B_OFF();
 	}
 
-	if(param & ISO14A_RAW) {
+	if(param & ISO14A_RAW && !cantSELECT) {
 		if(param & ISO14A_APPEND_CRC) {
 			if(param & ISO14A_TOPAZMODE) {
 				AppendCrc14443b(cmd,len);
@@ -1975,7 +1986,10 @@ void ReaderIso14443a(UsbCommand *c)
 			}
 		}
 		arg0 = ReaderReceive(buf, par);
+
+		LED_B_ON();
 		cmd_send(CMD_ACK,arg0,0,0,buf,sizeof(buf));
+		LED_B_OFF();
 	}
 
 	if(param & ISO14A_REQUEST_TRIGGER) {

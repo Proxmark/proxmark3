@@ -29,7 +29,7 @@
 #include "mifarehost.h"
 
 static int CmdHelp(const char *Cmd);
-static void waitCmd(uint8_t iLen);
+static int waitCmd(uint8_t iLen);
 
 // structure and database for uid -> tagtype lookups 
 typedef struct { 
@@ -656,6 +656,8 @@ int CmdHF14AAPDU(const char *cmd) {
 	if (activateField) {
 		if (!WaitForResponseTimeout(CMD_ACK, &resp, 1500)) 
 			return 2;
+		if (resp.arg[0] != 1)
+			return 2;
 	}
 
     if (WaitForResponseTimeout(CMD_ACK, &resp, 1500)) {
@@ -845,17 +847,17 @@ int CmdHF14ACmdRaw(const char *cmd) {
 	SendCommand(&c);
 
 	if (reply) {
-		if(active_select)
-			waitCmd(1);
-		if(datalen>0)
+		int res = 0;
+		if (active_select)
+			res = waitCmd(1);
+		if (!res && datalen > 0)
 			waitCmd(0);
 	} // if reply
 	return 0;
 }
 
 
-static void waitCmd(uint8_t iSelect)
-{
+static int waitCmd(uint8_t iSelect) {
     uint8_t *recv;
     UsbCommand resp;
     char *hexout;
@@ -865,7 +867,7 @@ static void waitCmd(uint8_t iSelect)
         uint8_t iLen = iSelect ? resp.arg[1] : resp.arg[0];
         PrintAndLog("received %i octets", iLen);
         if(!iLen)
-            return;
+            return 1;
         hexout = (char *)malloc(iLen * 3 + 1);
         if (hexout != NULL) {
             for (int i = 0; i < iLen; i++) { // data in hex
@@ -875,10 +877,13 @@ static void waitCmd(uint8_t iSelect)
             free(hexout);
         } else {
             PrintAndLog("malloc failed your client has low memory?");
+			return 2;
         }
     } else {
         PrintAndLog("timeout while waiting for reply.");
+		return 3;
     }
+	return 0;
 }
 
 static command_t CommandTable[] = 
