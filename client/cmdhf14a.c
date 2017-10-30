@@ -558,6 +558,12 @@ int CmdHF14AAPDU(const char *cmd) {
 	uint8_t data[USB_CMD_DATA_SIZE];
 	uint16_t datalen = 0;
 	uint8_t cmdc = 0;
+	char buf[5] = {0};
+	int i = 0;
+	uint32_t temp;
+	bool activateField = false;
+	bool leaveSignalON = false;
+	bool decodeTLV = false;
 	
 	if (strlen(cmd)<2) {
 		PrintAndLog("Usage: hf 14a apdu [-s] [-k] [-t] <APDU (hex)>");
@@ -566,42 +572,114 @@ int CmdHF14AAPDU(const char *cmd) {
 		PrintAndLog("       -t    executes TLV decoder if it possible");
 		return 0;
 	}
-	
-	cmdc |= ISO14A_CONNECT;
-	cmdc |= ISO14A_NO_DISCONNECT;
-	
-	UsbCommand c = {CMD_READER_ISO_14443a, {cmdc | ISO14A_APDU | ISO14A_SET_TIMEOUT, 0, 100}}; // 100-timeout in iso14a_set_timeout()
-	// Max buffer is USB_CMD_DATA_SIZE (512)
-	c.arg[1] = (datalen & 0xFFFF) | ((uint32_t)numbits << 16);
 
-	uint8_t first, second;
-	ComputeCrc14443(CRC_14443_A, data, datalen, &first, &second);
-	data[datalen++] = first;
-	data[datalen++] = second;
+	// strip
+	while (*cmd==' ' || *cmd=='\t') cmd++;
 
-	memcpy(c.d.asBytes,data,datalen);
+	while (cmd[i]!='\0') {
+		if (cmd[i]==' ' || cmd[i]=='\t') { i++; continue; }
+		if (cmd[i]=='-') {
+			switch (cmd[i + 1]) {
+				case 's':
+				case 'S':
+					activateField = true;
+					break;
+				case 'k':
+				case 'K':
+					leaveSignalON = true;
+					break;
+				case 't':
+				case 'T':
+					decodeTLV = true;
+					break;
+				default:
+					PrintAndLog("Invalid option");
+					return 1;
+			}
+			i += 2;
+			continue;
+		}
+		if ((cmd[i] >= '0' && cmd[i] <= '9') ||
+		    (cmd[i] >= 'a' && cmd[i] <= 'f') ||
+		    (cmd[i] >= 'A' && cmd[i] <= 'F') ) {
+			buf[strlen(buf) + 1] = 0x00;
+			buf[strlen(buf)] = cmd[i];
+			i++;
+
+			if (strlen(buf) >= 2) {
+				sscanf(buf, "%x", &temp);
+				data[datalen] = (uint8_t)(temp & 0xff);
+				*buf = 0;
+				if (datalen > sizeof(data) - 2) {
+					PrintAndLog("Buffer is full...");
+					break;
+				} else {
+					datalen++;
+				}
+			}
+			continue;
+		}
+		PrintAndLog("Invalid char on input");
+		return 1;
+	}
+	if (*buf) {
+		PrintAndLog("Hex must have even number of digits. Detected %d symbols.", datalen * 2 + strlen(buf));
+		return 1;
+	}		
+	
+	PrintAndLog("--%s %s %s >>>> %s", activateField ? "sel": "", leaveSignalON ? "keep": "", decodeTLV ? "TLV": "", sprint_hex(data, datalen));
+
+	if (activateField)
+		cmdc |= ISO14A_CONNECT;
+	if (leaveSignalON)
+		cmdc |= ISO14A_NO_DISCONNECT;
+	
+	// "Command APDU" length should be 5+255+1, but javacard's APDU buffer might be smaller - 133 bytes
+	// https://stackoverflow.com/questions/32994936/safe-max-java-card-apdu-data-command-and-respond-size
+	// here length USB_CMD_DATA_SIZE=512
+	// timeout timeout14a * 1.06 / 100, true, size, &keyBlock[6 * c], e_sector); // timeout is (ms * 106)/10 or us*0.0106
+	UsbCommand c = {CMD_READER_ISO_14443a, {ISO14A_APDU | ISO14A_SET_TIMEOUT | cmdc, (datalen & 0xFFFF), 1000 * 1000 * 1.06 / 100}}; 
+
+//	uint8_t first, second;
+//	ComputeCrc14443(CRC_14443_A, data, datalen, &first, &second);
+//	data[datalen++] = first;
+//	data[datalen++] = second;
+
+	memcpy(c.d.asBytes, data, datalen);
 
 	SendCommand(&c);
 	
-    if (WaitForResponseTimeout(CMD_ACK,&resp,1500)) {
+    uint8_t *recv;
+    char *hexout;
+    UsbCommand resp;
+
+	if (activateField) {
+		if (!WaitForResponseTimeout(CMD_ACK, &resp, 1500)) 
+			return 2;
+	}
+
+    if (WaitForResponseTimeout(CMD_ACK, &resp, 1500)) {
         recv = resp.d.asBytes;
         uint8_t iLen = resp.arg[0];
         if(!iLen)
-            return;
+            return 2;
         hexout = (char *)malloc(iLen * 3 + 1);
         if (hexout != NULL) {
             for (int i = 0; i < iLen; i++) { // data in hex
                 sprintf(&hexout[i * 3], "%02X ", recv[i]);
             }
-            PrintAndLog("%s", hexout);
+            PrintAndLog("<<<< %s", hexout);
+			
+			// here TLV decoder...
+			
             free(hexout);
         } else {
             PrintAndLog("malloc failed...");
-			return 1;
+			return 2;
         }
     } else {
-        PrintAndLog("timeout while waiting for reply.");
-		return 2;
+        PrintAndLog("Reply timeout.");
+		return 3;
     }
 	
 	return 0;
