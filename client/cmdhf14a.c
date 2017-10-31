@@ -561,6 +561,7 @@ int CmdHF14AAPDU(const char *cmd) {
 	char buf[5] = {0};
 	int i = 0;
 	uint32_t temp;
+	uint8_t first, second;
 	bool activateField = false;
 	bool leaveSignalON = false;
 	bool decodeTLV = false;
@@ -627,30 +628,31 @@ int CmdHF14AAPDU(const char *cmd) {
 		return 1;
 	}		
 	
-	PrintAndLog("--%s %s %s >>>> %s", activateField ? "sel": "", leaveSignalON ? "keep": "", decodeTLV ? "TLV": "", sprint_hex(data, datalen));
-
 	if (activateField)
 		cmdc |= ISO14A_CONNECT;
 	if (leaveSignalON)
 		cmdc |= ISO14A_NO_DISCONNECT;
+
+	// ISO 14443 APDU frame: PCB [CID] [NAD] APDU CRC PCB=0x02
+	memmove(data + 1, data, datalen);
+	data[0] = 0x02; // bnr,nad,cid,chn=0; i-block(0x00)	
+	datalen++;
+	
+	ComputeCrc14443(CRC_14443_A, data, datalen, &first, &second);
+	data[datalen++] = first;
+	data[datalen++] = second;
+
+	PrintAndLog("--%s %s %s >>>> %s", activateField ? "sel": "", leaveSignalON ? "keep": "", decodeTLV ? "TLV": "", sprint_hex(data, datalen));
 	
 	// "Command APDU" length should be 5+255+1, but javacard's APDU buffer might be smaller - 133 bytes
 	// https://stackoverflow.com/questions/32994936/safe-max-java-card-apdu-data-command-and-respond-size
 	// here length USB_CMD_DATA_SIZE=512
 	// timeout timeout14a * 1.06 / 100, true, size, &keyBlock[6 * c], e_sector); // timeout is (ms * 106)/10 or us*0.0106
-	UsbCommand c = {CMD_READER_ISO_14443a, {ISO14A_APDU | ISO14A_SET_TIMEOUT | cmdc, (datalen & 0xFFFF), 1000 * 1000 * 1.06 / 100}}; 
-
-//	uint8_t first, second;
-//	ComputeCrc14443(CRC_14443_A, data, datalen, &first, &second);
-//	data[datalen++] = first;
-//	data[datalen++] = second;
-
+	UsbCommand c = {CMD_READER_ISO_14443a, {ISO14A_RAW | ISO14A_SET_TIMEOUT | cmdc, (datalen & 0xFFFF), 1000 * 1000 * 1.06 / 100}}; 
 	memcpy(c.d.asBytes, data, datalen);
-
 	SendCommand(&c);
 	
     uint8_t *recv;
-    char *hexout;
     UsbCommand resp;
 
 	if (activateField) {
@@ -665,22 +667,36 @@ int CmdHF14AAPDU(const char *cmd) {
         uint8_t iLen = resp.arg[0];
         if(!iLen)
             return 2;
-        hexout = (char *)malloc(iLen * 3 + 1);
-        if (hexout != NULL) {
-            for (int i = 0; i < iLen; i++) { // data in hex
-                sprintf(&hexout[i * 3], "%02X ", recv[i]);
-            }
-            PrintAndLog("<<<< %s", hexout);
-			
-			// here TLV decoder...
-			
-            free(hexout);
-        } else {
-            PrintAndLog("malloc failed...");
-			return 2;
-        }
+
+		PrintAndLog("<<<< %s", sprint_hex(recv, iLen));
+		
+		// check apdu length
+		if (iLen < 5) {
+			PrintAndLog("ERROR: Small APDU response.");
+			return 3;
+		}
+		
+		// check block
+		if (data[0] != recv[0]) {
+			PrintAndLog("ERROR: Block type mismatch: %02x-%02x", data[0], recv[0]);
+			return 3;
+		}
+		
+		// CRC Check
+		ComputeCrc14443(CRC_14443_A, recv, iLen, &first, &second);
+		if (first || second) {
+			PrintAndLog("ERROR: ISO 14443A CRC error.");
+			return 3;
+		}
+		
+		PrintAndLog("APDU response: %02x %02x", recv[iLen - 4], recv[iLen - 3]); // TODO add APDU descriptions
+		
+		// here TLV decoder...
+		if (decodeTLV) {
+		}
+		
     } else {
-        PrintAndLog("Reply timeout.");
+        PrintAndLog("ERROR: Reply timeout.");
 		return 3;
     }
 	
