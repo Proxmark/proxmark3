@@ -556,17 +556,14 @@ int CmdHF14ASnoop(const char *Cmd) {
 
 int CmdHF14AAPDU(const char *cmd) {
 	uint8_t data[USB_CMD_DATA_SIZE];
-	uint16_t datalen = 0;
+	int datalen = 0;
 	uint8_t cmdc = 0;
-	char buf[5] = {0};
-	int i = 0;
-	uint32_t temp;
 	uint8_t first, second;
 	bool activateField = false;
 	bool leaveSignalON = false;
 	bool decodeTLV = false;
 	
-	if (strlen(cmd)<2) {
+	if (strlen(cmd) < 2) {
 		PrintAndLog("Usage: hf 14a apdu [-s] [-k] [-t] <APDU (hex)>");
 		PrintAndLog("       -s    activate field and select card");
 		PrintAndLog("       -k    leave the signal field ON after receive response");
@@ -574,13 +571,11 @@ int CmdHF14AAPDU(const char *cmd) {
 		return 0;
 	}
 
-	// strip
-	while (*cmd==' ' || *cmd=='\t') cmd++;
-
-	while (cmd[i]!='\0') {
-		if (cmd[i]==' ' || cmd[i]=='\t') { i++; continue; }
-		if (cmd[i]=='-') {
-			switch (cmd[i + 1]) {
+	int cmdp = 0;
+	while(param_getchar(cmd, cmdp) != 0x00) {
+		char c = param_getchar(cmd, cmdp);
+		if ((c == '-') && (param_getlength(cmd, cmdp) == 2))
+			switch (param_getchar_indx(cmd, 1, cmdp)) {
 				case 's':
 				case 'S':
 					activateField = true;
@@ -594,39 +589,29 @@ int CmdHF14AAPDU(const char *cmd) {
 					decodeTLV = true;
 					break;
 				default:
-					PrintAndLog("Invalid option");
+					PrintAndLog("Unknown parameter '%c'", param_getchar_indx(cmd, 1, cmdp));
 					return 1;
 			}
-			i += 2;
-			continue;
-		}
-		if ((cmd[i] >= '0' && cmd[i] <= '9') ||
-		    (cmd[i] >= 'a' && cmd[i] <= 'f') ||
-		    (cmd[i] >= 'A' && cmd[i] <= 'F') ) {
-			buf[strlen(buf) + 1] = 0x00;
-			buf[strlen(buf)] = cmd[i];
-			i++;
-
-			if (strlen(buf) >= 2) {
-				sscanf(buf, "%x", &temp);
-				data[datalen] = (uint8_t)(temp & 0xff);
-				*buf = 0;
-				if (datalen > sizeof(data) - 2) {
-					PrintAndLog("Buffer is full...");
-					break;
-				} else {
-					datalen++;
-				}
+			
+		if (isxdigit(c)) {
+			switch(param_gethex_to_eol(cmd, cmdp, data, sizeof(data), &datalen)) {
+			case 1:
+				PrintAndLog("Invalid HEX value.");
+				return 1;
+			case 2:
+				PrintAndLog("APDU too large.");
+				return 1;
+			case 3:
+				PrintAndLog("Hex must have even number of digits.");
+				return 1;
 			}
-			continue;
+			
+			// we get all the hex to end of line with spaces
+			break;
 		}
-		PrintAndLog("Invalid char on input");
-		return 1;
+		
+		cmdp++;
 	}
-	if (*buf) {
-		PrintAndLog("Hex must have even number of digits. Detected %d symbols.", datalen * 2 + strlen(buf));
-		return 1;
-	}		
 	
 	if (activateField)
 		cmdc |= ISO14A_CONNECT;
