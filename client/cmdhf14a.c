@@ -14,12 +14,6 @@
 static int CmdHelp(const char *Cmd);
 static int waitCmd(uint8_t iLen);
 
-// structure and database for uid -> tagtype lookups 
-typedef struct { 
-	uint8_t uid;
-	char* desc;
-} manufactureName; 
-
 const manufactureName manufactureMapping[] = {
 	// ID,  "Vendor Country"
 	{ 0x01, "Motorola UK" },
@@ -92,7 +86,6 @@ const manufactureName manufactureMapping[] = {
 	{ 0x44, "Gentag Inc (USA) USA" },
 	{ 0x00, "no tag-info available" } // must be the last entry
 };
-
 
 // get a product description based on the UID
 //		uid[8] 	tag uid
