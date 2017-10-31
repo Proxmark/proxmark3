@@ -257,6 +257,7 @@ const APDUCode APDUCodeTable[] = {
 	{"9FXX", 	APDUCODE_TYPE_NONE, 		"Command successfully executed; 'xx' bytes of data are available and can be requested using GET RESPONSE."},
 	{"9xXX", 	APDUCODE_TYPE_NONE, 		"Application related status, (ISO 7816-3)"}
 };
+const size_t APDUCodeTableLen = sizeof(APDUCodeTable)/sizeof(APDUCode);
 
 int CodeCmp(const char *code1, const char *code2) {
 	int xsymb = 0;
@@ -276,15 +277,13 @@ int CodeCmp(const char *code1, const char *code2) {
 	return -1;
 }
 
-APDUCode *GetAPDUCode(uint8_t sw1, uint8_t sw2) {
+const APDUCode* const GetAPDUCode(uint8_t sw1, uint8_t sw2) {
 	char buf[4] = {0};
 	
 	sprintf(&buf[0], "%02X ", sw1);
 	sprintf(&buf[2], "%02X ", sw2);
 	
-		
-	int tableLen = sizeof(APDUCodeTable)/sizeof(APDUCode);
-	for (int i = 0; i < tableLen; i++) {
+	for (int i = 0; i < APDUCodeTableLen; i++) {
 		if (CodeCmp(APDUCodeTable[i].ID, buf) == 0) { // TODO make not so equal comparation... XXXX - not works...
 			return &APDUCodeTable[i];
 		}
@@ -293,12 +292,10 @@ APDUCode *GetAPDUCode(uint8_t sw1, uint8_t sw2) {
 	return NULL;
 }
 
-const char *GetAPDUCodeDescription(uint8_t sw1, uint8_t sw2) {
-	APDUCode *cd = GetAPDUCode(sw1, sw2);
+const char* GetAPDUCodeDescription(uint8_t sw1, uint8_t sw2) {
+	const APDUCode *cd = GetAPDUCode(sw1, sw2);
 	if (cd)
 		return cd->Description;
 	else
 		return APDUCodeTable[0].Description; //empty string
 }
-
-

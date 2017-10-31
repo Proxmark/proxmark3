@@ -618,7 +618,7 @@ int CmdHF14AAPDU(const char *cmd) {
 		PrintAndLog("Usage: hf 14a apdu [-s] [-k] [-t] <APDU (hex)>");
 		PrintAndLog("       -s    activate field and select card");
 		PrintAndLog("       -k    leave the signal field ON after receive response");
-		PrintAndLog("       -t    executes TLV decoder if it possible");
+		PrintAndLog("       -t    executes TLV decoder if it possible. TODO!!!!");
 		return 0;
 	}
 
