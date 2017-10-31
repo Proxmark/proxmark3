@@ -1,5 +1,5 @@
 //-----------------------------------------------------------------------------
-// 2011, Merlok
+// 2011, 2017 Merlok
 // Copyright (C) 2010 iZsh <izsh at fail0verflow.com>, Hagen Fritsch
 //
 // This code is licensed to you under the terms of the GNU GPL, version 2 or,
@@ -685,7 +685,7 @@ int CmdHF14AAPDU(const char *cmd) {
 
 	PrintAndLog("<<<< %s", sprint_hex(data, datalen));
 	
-	PrintAndLog("APDU response: %02x %02x", data[datalen - 2], data[datalen - 1]); // TODO add APDU descriptions
+	PrintAndLog("APDU response: %02x %02x - %s", data[datalen - 2], data[datalen - 1], GetAPDUCodeDescription(data[datalen - 2], data[datalen - 1])); 
 
 	// here TLV decoder...
 	if (decodeTLV) {

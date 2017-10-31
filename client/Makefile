@@ -107,6 +107,7 @@ CMDSRCS = 	crapto1/crapto1.c\
 			ui.c \
 			cmddata.c \
 			lfdemod.c \
+			emv/apduinfo.c\
 			cmdhf.c \
 			cmdhf14a.c \
 			cmdhf14b.c \
