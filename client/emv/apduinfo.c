@@ -279,16 +279,33 @@ int CodeCmp(const char *code1, const char *code2) {
 
 const APDUCode* const GetAPDUCode(uint8_t sw1, uint8_t sw2) {
 	char buf[4] = {0};
+	int res;
+	int mineq = 100;
+	int mineqindx = 0;
 	
 	sprintf(&buf[0], "%02X ", sw1);
 	sprintf(&buf[2], "%02X ", sw2);
 	
 	for (int i = 0; i < APDUCodeTableLen; i++) {
-		if (CodeCmp(APDUCodeTable[i].ID, buf) == 0) { // TODO make not so equal comparation... XXXX - not works...
+		res = CodeCmp(APDUCodeTable[i].ID, buf);
+		
+		// equal
+		if (res == 0) { 
 			return &APDUCodeTable[i];
+		}
+		
+		// with some  'X'
+		if (res > 0 && mineq > res) {
+			mineq = res;
+			mineqindx = i;
 		}
 	}
 
+	// if we have not equal, but with some 'X'
+	if (mineqindx < 100) {
+		return &APDUCodeTable[mineqindx];
+	}
+	
 	return NULL;
 }
 
