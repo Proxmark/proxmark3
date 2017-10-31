@@ -554,11 +554,86 @@ int CmdHF14ASnoop(const char *Cmd) {
 	return 0;
 }
 
+int ExchangeAPDU14a(uint8_t *datain, int datainlen, bool activateField, bool leaveSignalON, uint8_t *dataout, int *dataoutlen) {
+	uint8_t data[USB_CMD_DATA_SIZE];
+	int datalen;
+	uint8_t cmdc = 0;
+	uint8_t first, second;
+	
+	if (activateField)
+		cmdc |= ISO14A_CONNECT;
+	if (leaveSignalON)
+		cmdc |= ISO14A_NO_DISCONNECT;
+
+	// ISO 14443 APDU frame: PCB [CID] [NAD] APDU CRC PCB=0x02
+	memcpy(data + 1, datain, datainlen);
+	data[0] = 0x02; // bnr,nad,cid,chn=0; i-block(0x00)	
+	datalen = datainlen + 1;
+	
+	ComputeCrc14443(CRC_14443_A, data, datalen, &first, &second);
+	data[datalen++] = first;
+	data[datalen++] = second;
+
+	// "Command APDU" length should be 5+255+1, but javacard's APDU buffer might be smaller - 133 bytes
+	// https://stackoverflow.com/questions/32994936/safe-max-java-card-apdu-data-command-and-respond-size
+	// here length USB_CMD_DATA_SIZE=512
+	// timeout timeout14a * 1.06 / 100, true, size, &keyBlock[6 * c], e_sector); // timeout is (ms * 106)/10 or us*0.0106
+	UsbCommand c = {CMD_READER_ISO_14443a, {ISO14A_RAW | ISO14A_SET_TIMEOUT | cmdc, (datalen & 0xFFFF), 1000 * 1000 * 1.06 / 100}}; 
+	memcpy(c.d.asBytes, data, datalen);
+	SendCommand(&c);
+	
+    uint8_t *recv;
+    UsbCommand resp;
+
+	if (activateField) {
+		if (!WaitForResponseTimeout(CMD_ACK, &resp, 1500)) 
+			return 1;
+		if (resp.arg[0] != 1)
+			return 1;
+	}
+
+    if (WaitForResponseTimeout(CMD_ACK, &resp, 1500)) {
+        recv = resp.d.asBytes;
+        uint8_t iLen = resp.arg[0];
+		
+		*dataoutlen = iLen - 1 - 2;
+		if (*dataoutlen < 0)
+			*dataoutlen = 0;
+		memcpy(dataout, recv + 1, *dataoutlen);
+		
+        if(!iLen)
+            return 1;
+
+		// check apdu length
+		if (iLen < 5) {
+			PrintAndLog("APDU ERROR: Small APDU response.");
+			return 2;
+		}
+		
+		// check block
+		if (data[0] != recv[0]) {
+			PrintAndLog("APDU ERROR: Block type mismatch: %02x-%02x", data[0], recv[0]);
+			return 2;
+		}
+		
+		// CRC Check
+		ComputeCrc14443(CRC_14443_A, recv, iLen, &first, &second);
+		if (first || second) {
+			PrintAndLog("APDU ERROR: ISO 14443A CRC error.");
+			return 3;
+		}
+		
+    } else {
+        PrintAndLog("APDU ERROR: Reply timeout.");
+		return 4;
+    }
+	
+	return 0;
+}
+
 int CmdHF14AAPDU(const char *cmd) {
 	uint8_t data[USB_CMD_DATA_SIZE];
 	int datalen = 0;
-	uint8_t cmdc = 0;
-	uint8_t first, second;
 	bool activateField = false;
 	bool leaveSignalON = false;
 	bool decodeTLV = false;
@@ -594,7 +669,8 @@ int CmdHF14AAPDU(const char *cmd) {
 			}
 			
 		if (isxdigit(c)) {
-			switch(param_gethex_to_eol(cmd, cmdp, data, sizeof(data), &datalen)) {
+			// len = data + PCB(1b) + CRC(2b)
+			switch(param_gethex_to_eol(cmd, cmdp, data, sizeof(data) - 1 - 2, &datalen)) {
 			case 1:
 				PrintAndLog("Invalid HEX value.");
 				return 1;
@@ -612,78 +688,33 @@ int CmdHF14AAPDU(const char *cmd) {
 		
 		cmdp++;
 	}
-	
-	if (activateField)
-		cmdc |= ISO14A_CONNECT;
-	if (leaveSignalON)
-		cmdc |= ISO14A_NO_DISCONNECT;
-
-	// ISO 14443 APDU frame: PCB [CID] [NAD] APDU CRC PCB=0x02
-	memmove(data + 1, data, datalen);
-	data[0] = 0x02; // bnr,nad,cid,chn=0; i-block(0x00)	
-	datalen++;
-	
-	ComputeCrc14443(CRC_14443_A, data, datalen, &first, &second);
-	data[datalen++] = first;
-	data[datalen++] = second;
 
 	PrintAndLog("--%s %s %s >>>> %s", activateField ? "sel": "", leaveSignalON ? "keep": "", decodeTLV ? "TLV": "", sprint_hex(data, datalen));
 	
-	// "Command APDU" length should be 5+255+1, but javacard's APDU buffer might be smaller - 133 bytes
-	// https://stackoverflow.com/questions/32994936/safe-max-java-card-apdu-data-command-and-respond-size
-	// here length USB_CMD_DATA_SIZE=512
-	// timeout timeout14a * 1.06 / 100, true, size, &keyBlock[6 * c], e_sector); // timeout is (ms * 106)/10 or us*0.0106
-	UsbCommand c = {CMD_READER_ISO_14443a, {ISO14A_RAW | ISO14A_SET_TIMEOUT | cmdc, (datalen & 0xFFFF), 1000 * 1000 * 1.06 / 100}}; 
-	memcpy(c.d.asBytes, data, datalen);
-	SendCommand(&c);
-	
-    uint8_t *recv;
-    UsbCommand resp;
-
-	if (activateField) {
-		if (!WaitForResponseTimeout(CMD_ACK, &resp, 1500)) 
+	switch(ExchangeAPDU14a(data, datalen, activateField, leaveSignalON, data, &datalen)) {
+		case 0:
+			break;
+		case 1:
+			PrintAndLog("APDU ERROR: Send APDU error.");
+			return 1;
+		case 2:
 			return 2;
-		if (resp.arg[0] != 1)
-			return 2;
+		case 3:
+			return 3;
+		case 4:
+			return 4;
+		default:
+			return 5;
 	}
 
-    if (WaitForResponseTimeout(CMD_ACK, &resp, 1500)) {
-        recv = resp.d.asBytes;
-        uint8_t iLen = resp.arg[0];
-        if(!iLen)
-            return 2;
+	PrintAndLog("<<<< %s", sprint_hex(data, datalen));
+	
+	PrintAndLog("APDU response: %02x %02x", data[datalen - 2], data[datalen - 1]); // TODO add APDU descriptions
 
-		PrintAndLog("<<<< %s", sprint_hex(recv, iLen));
-		
-		// check apdu length
-		if (iLen < 5) {
-			PrintAndLog("ERROR: Small APDU response.");
-			return 3;
-		}
-		
-		// check block
-		if (data[0] != recv[0]) {
-			PrintAndLog("ERROR: Block type mismatch: %02x-%02x", data[0], recv[0]);
-			return 3;
-		}
-		
-		// CRC Check
-		ComputeCrc14443(CRC_14443_A, recv, iLen, &first, &second);
-		if (first || second) {
-			PrintAndLog("ERROR: ISO 14443A CRC error.");
-			return 3;
-		}
-		
-		PrintAndLog("APDU response: %02x %02x", recv[iLen - 4], recv[iLen - 3]); // TODO add APDU descriptions
-		
-		// here TLV decoder...
-		if (decodeTLV) {
-		}
-		
-    } else {
-        PrintAndLog("ERROR: Reply timeout.");
-		return 3;
-    }
+	// here TLV decoder...
+	if (decodeTLV) {
+		PrintAndLog("--- TLV decoded:");
+	}
 	
 	return 0;
 }
