@@ -12,7 +12,24 @@
 #ifndef CMDHF14A_H__
 #define CMDHF14A_H__
 
+#include <stdio.h>
 #include <stdint.h>
+#include <stdlib.h>
+#include <inttypes.h>
+#include <string.h>
+#include <unistd.h>
+#include "util.h"
+#include "util_posix.h"
+#include "iso14443crc.h"
+#include "data.h"
+#include "proxmark3.h"
+#include "ui.h"
+#include "cmdparser.h"
+#include "common.h"
+#include "cmdmain.h"
+#include "mifare.h"
+#include "cmdhfmfu.h"
+#include "mifarehost.h"
 
 int CmdHF14A(const char *Cmd);
 int CmdHF14AList(const char *Cmd);
@@ -21,5 +38,7 @@ int CmdHF14AReader(const char *Cmd);
 int CmdHF14ASim(const char *Cmd);
 int CmdHF14ASnoop(const char *Cmd);
 char* getTagInfo(uint8_t uid);
+
+extern int ExchangeAPDU14a(uint8_t *datain, int datainlen, bool activateField, bool leaveSignalON, uint8_t *dataout, int *dataoutlen);
 
 #endif
