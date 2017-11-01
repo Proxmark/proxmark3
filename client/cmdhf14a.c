@@ -485,10 +485,10 @@ int CmdHF14AInfo(const char *Cmd)
 	if (isMifareClassic) {		
 		switch(DetectClassicPrng()) {
 		case 0:
-			PrintAndLog("Prng detection: WEAK");
+			PrintAndLog("Prng detection: HARDEND (hardnested)");		
 			break;
 		case 1:
-			PrintAndLog("Prng detection: HARDEND (hardnested)");		
+			PrintAndLog("Prng detection: WEAK");
 			break;
 		default:
 			PrintAndLog("Prng detection error.");		

@@ -903,6 +903,32 @@ int tryDecryptWord(uint32_t nt, uint32_t ar_enc, uint32_t at_enc, uint8_t *data,
 	return 0;
 }
 
+/** validate_prng_nonce
+ * Determine if nonce is deterministic. ie: Suspectable to Darkside attack.
+ * returns
+ *   true = weak prng
+ *   false = hardend prng
+ */
+bool validate_prng_nonce(uint32_t nonce) {
+	uint16_t *dist = 0;
+	uint16_t x, i;
+
+	dist = malloc(2 << 16);
+	if(!dist)
+		return -1;
+
+	// init prng table:
+	for (x = i = 1; i; ++i) {
+		dist[(x & 0xff) << 8 | x >> 8] = i;
+		x = x >> 1 | (x ^ x >> 2 ^ x >> 3 ^ x >> 5) << 15;
+	}
+	
+	uint32_t res = (65535 - dist[nonce >> 16] + dist[nonce & 0xffff]) % 65535;
+	
+	free(dist);	
+	return (res == 16);
+}
+
 /* Detect Tag Prng, 
 * function performs a partial AUTH,  where it tries to authenticate against block0, key A, but only collects tag nonce.
 * the tag nonce is check to see if it has a predictable PRNG.
