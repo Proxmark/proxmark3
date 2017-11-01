@@ -14,6 +14,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include "data.h"
+#include "crapto1/crapto1.h"
 
 // defaults
 // timeout in units. (ms * 106)/10 or us*0.0106
@@ -60,5 +61,6 @@ extern int saveTraceCard(void);
 extern int tryDecryptWord(uint32_t nt, uint32_t ar_enc, uint32_t at_enc, uint8_t *data, int len);
 
 extern int mfCIdentify();
+extern int DetectClassicPrng(void);
 
 #endif
