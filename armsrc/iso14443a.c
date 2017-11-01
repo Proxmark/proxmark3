@@ -1821,7 +1821,8 @@ int iso14443a_select_card(byte_t *uid_ptr, iso14a_card_select_t *p_hi14a_card, u
 	}
 
 	// non iso14443a compliant tag
-	if( (sak & 0x20) == 0) return 2; 
+	// https://www.nxp.com/docs/en/application-note/AN10834.pdf page 7
+	if( (sak & 0x20) != 0) return 2; 
 
 	if (!no_rats) {
 		// Request for answer to select
