@@ -14,7 +14,6 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include "data.h"
-#include "crapto1/crapto1.h"
 
 // defaults
 // timeout in units. (ms * 106)/10 or us*0.0106
