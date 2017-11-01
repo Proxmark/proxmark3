@@ -688,8 +688,8 @@ int CmdHF14AAPDU(const char *cmd) {
 	PrintAndLog("APDU response: %02x %02x - %s", data[datalen - 2], data[datalen - 1], GetAPDUCodeDescription(data[datalen - 2], data[datalen - 1])); 
 
 	// here TLV decoder...
-	if (decodeTLV) {
-		PrintAndLog("--- TLV decoded:");
+	if (decodeTLV && datalen > 4) {
+		TLVPrintFromBuffer(data, datalen - 2);
 	}
 	
 	return 0;

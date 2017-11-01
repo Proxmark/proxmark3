@@ -31,6 +31,7 @@
 #include "cmdhfmfu.h"
 #include "mifarehost.h"
 #include "emv/apduinfo.h"
+#include "emv/emvcore.h"
 
 // structure and database for uid -> tagtype lookups 
 typedef struct { 
