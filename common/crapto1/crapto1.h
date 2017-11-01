@@ -20,6 +20,7 @@
 #ifndef CRAPTO1_INCLUDED
 #define CRAPTO1_INCLUDED
 #include <stdint.h>
+#include <stdbool.h>
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -48,6 +49,7 @@ uint8_t lfsr_rollback_bit(struct Crypto1State* s, uint32_t in, int fb);
 uint8_t lfsr_rollback_byte(struct Crypto1State* s, uint32_t in, int fb);
 uint32_t lfsr_rollback_word(struct Crypto1State* s, uint32_t in, int fb);
 int nonce_distance(uint32_t from, uint32_t to);
+extern bool validate_prng_nonce(uint32_t nonce);
 #define FOREACH_VALID_NONCE(N, FILTER, FSIZE)\
 	uint32_t __n = 0,__M = 0, N = 0;\
 	int __i;\
