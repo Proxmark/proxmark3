@@ -1935,7 +1935,10 @@ void ReaderIso14443a(UsbCommand *c)
 			arg0 = iso14443a_select_card(NULL, card, NULL, true, 0, param & ISO14A_NO_RATS);
 
 			// if we cant select then we cant send data
-			cantSELECT = (arg0 != 1);
+			if (arg0 != 1 && arg0 != 2) {
+				// 1 - all is OK with ATS, 2 - without ATS
+				cantSELECT = true;
+			}
 			
 			LED_B_ON();
 			cmd_send(CMD_ACK,arg0,card->uidlen,0,buf,sizeof(iso14a_card_select_t));
