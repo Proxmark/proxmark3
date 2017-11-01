@@ -244,8 +244,10 @@ int CmdHF14AInfo(const char *Cmd)
 	PrintAndLog("ATQA : %02x %02x", card.atqa[1], card.atqa[0]);
 	PrintAndLog(" SAK : %02x [%d]", card.sak, resp.arg[0]);
 
+	bool isMifareClassic = true;
 	switch (card.sak) {
 		case 0x00: 
+			isMifareClassic = false;
 
 			//***************************************test****************
 			// disconnect
@@ -479,6 +481,19 @@ int CmdHF14AInfo(const char *Cmd)
 	
 	// try to see if card responses to "chinese magic backdoor" commands.
 	mfCIdentify();
+	
+	if (isMifareClassic) {		
+		switch(DetectClassicPrng()) {
+		case 0:
+			PrintAndLog("Prng detection: HARDEND (hardnested)");		
+			break;
+		case 1:
+			PrintAndLog("Prng detection: WEAK");
+			break;
+		default:
+			PrintAndLog("Prng detection error.");		
+		}
+	}
 	
 	return select_status;
 }

@@ -60,5 +60,6 @@ extern int saveTraceCard(void);
 extern int tryDecryptWord(uint32_t nt, uint32_t ar_enc, uint32_t at_enc, uint8_t *data, int len);
 
 extern int mfCIdentify();
+extern int DetectClassicPrng(void);
 
 #endif
