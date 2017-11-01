@@ -663,7 +663,7 @@ int CmdHFList(const char *Cmd)
 int CmdHFSearch(const char *Cmd){
 	int ans = 0;
 	PrintAndLog("");
-	ans = CmdHF14AReader("s");
+	ans = CmdHF14AInfo("s");
 	if (ans > 0) {
 		PrintAndLog("\nValid ISO14443A Tag Found - Quiting Search\n");
 		return ans;
