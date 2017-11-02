@@ -14,6 +14,7 @@ This project uses the changelog in accordance with [keepchangelog](http://keepac
 - `hf mf chk` Move main cycle to arm (Merlok)
 - Changed proxmark command line parameter `flush` to `-f` or `-flush` (Merlok)
 - Changed `hf 14a reader` to just reqest-anticilission-select sequence (Merlok)
+- Changed `hf 14a raw` - works with LED's and some exchange logic (Merlok)
 
 ### Fixed
 - Changed start sequence in Qt mode (fix: short commands hangs main Qt thread) (Merlok)
@@ -35,6 +36,8 @@ This project uses the changelog in accordance with [keepchangelog](http://keepac
 - Added to proxmark ability to execute commands from stdin (pipe) (Merlok)
 - Added `hf 14a info` and moved there functionality from `hf 14a reader` (Merlok)
 - Added to `hf 14a info` detection of weak prng from Iceman1001 fork (Merlok)
+- Added to `hf 14a apdu` - exchange apdu via iso1443-4 (Merlok)
+- Added to `hf 14a apdu` - apdu and tlv results parser (Merlok)
 
 ## [3.0.1][2017-06-08]
 
