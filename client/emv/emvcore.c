@@ -19,7 +19,7 @@ static bool print_cb(void *data, const struct tlv *tlv) {
 
 void TLVPrintFromBuffer(uint8_t *data, int datalen) {
 	struct tlvdb *t = NULL;
-	t = tlvdb_parse(data, datalen);
+	t = tlvdb_parse_multi(data, datalen);
 	if (t) {
 		PrintAndLog("TLV decoded:");
 		

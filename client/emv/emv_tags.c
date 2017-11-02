@@ -30,7 +30,6 @@ enum emv_tag_t {
 	EMV_TAG_STRING,
 	EMV_TAG_NUMERIC,
 	EMV_TAG_YYMMDD,
-	EMV_TAG_FCI,
 };
 
 struct emv_tag {
@@ -128,7 +127,7 @@ static const struct emv_tag emv_tags[] = {
 	{ 0x5f30, "Service Code", EMV_TAG_NUMERIC },
 	{ 0x5f34, "Application Primary Account Number (PAN) Sequence Number", EMV_TAG_NUMERIC },
 	{ 0x61  , "Application Template" },
-	{ 0x6f  , "File Control Information (FCI) Template", EMV_TAG_FCI },
+	{ 0x6f  , "File Control Information (FCI) Template" },
 	{ 0x70  , "READ RECORD Response Message Template" },
 	{ 0x77  , "Response Message Template Format 2" },
 	{ 0x80  , "Response Message Template Format 1" },
@@ -266,25 +265,6 @@ static void emv_tag_dump_dol(const struct tlv *tlv, const struct emv_tag *tag, F
 		doltag = emv_get_tag(&doltlv);
 
 		fprintf(f, "\tTag %4hx len %02zx ('%s')\n", doltlv.tag, doltlv.len, doltag->name);
-	}
-}
-
-static void emv_tag_dump_fci(const struct tlv *tlv, const struct emv_tag *tag, FILE *f) {
-	const unsigned char *buf = tlv->value;
-	size_t left = tlv->len;
-
-	while (left) {
-		struct tlv doltlv;
-		const struct emv_tag *doltag;
-
-		if (!tlv_parse_tl(&buf, &left, &doltlv)) {
-			fprintf(f, "Invalid Tag-Len\n");
-			continue;
-		}
-
-		doltag = emv_get_tag(&doltlv);
-
-		fprintf(f, "\t--%2hx[%02zx]'%s'\n", doltlv.tag, doltlv.len, doltag->name);
 	}
 }
 
@@ -470,9 +450,6 @@ bool emv_tag_dump(const struct tlv *tlv, FILE *f)
 		break;
 	case EMV_TAG_YYMMDD:
 		emv_tag_dump_yymmdd(tlv, tag, f);
-		break;
-	case EMV_TAG_FCI:
-		emv_tag_dump_fci(tlv, tag, f);
 		break;
 	};
 
