@@ -426,7 +426,6 @@ int nonce_distance(uint32_t from, uint32_t to)
 	return (65535 + dist[to >> 16] - dist[from >> 16]) % 65535;
 }
 
-
 static uint32_t fastfwd[2][8] = {
 	{ 0, 0x4BC53, 0xECB1, 0x450E2, 0x25E29, 0x6E27A, 0x2B298, 0x60ECB},
 	{ 0, 0x1D962, 0x4BC53, 0x56531, 0xECB1, 0x135D3, 0x450E2, 0x58980}};

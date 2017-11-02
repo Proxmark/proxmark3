@@ -133,7 +133,80 @@ int CmdHF14AList(const char *Cmd)
 	return 0;
 }
 
-int CmdHF14AReader(const char *Cmd)
+int CmdHF14AReader(const char *Cmd) {
+	uint32_t cm = ISO14A_CONNECT;
+	bool disconnectAfter = false;
+	
+	int cmdp = 0;
+	while(param_getchar(Cmd, cmdp) != 0x00) {
+		switch(param_getchar(Cmd, cmdp)) {
+		case 'h':
+		case 'H':
+			PrintAndLog("Usage: hf 14a reader [d] [3]");
+			PrintAndLog("       d    drop the signal field after command executed");
+			PrintAndLog("       x    just drop the signal field");
+			PrintAndLog("       3    ISO14443-3 select only (skip RATS)");
+			return 0;
+		case '3':
+			cm |= ISO14A_NO_RATS; 
+			break;
+		case 'd':
+		case 'D':
+			disconnectAfter = true;
+			break;
+		case 'x':
+		case 'X':
+			disconnectAfter = true;
+			cm = cm - ISO14A_CONNECT;
+			break;
+		default:
+			PrintAndLog("Unknown command.");
+			return 1;
+		}	
+		
+		cmdp++;
+	}
+
+	if (!disconnectAfter)
+		cm |= ISO14A_NO_DISCONNECT; 
+	
+	UsbCommand c = {CMD_READER_ISO_14443a, {cm, 0, 0}};
+	SendCommand(&c);
+
+	if (ISO14A_CONNECT & cm) {
+		UsbCommand resp;
+		WaitForResponse(CMD_ACK,&resp);
+		
+		iso14a_card_select_t card;
+		memcpy(&card, (iso14a_card_select_t *)resp.d.asBytes, sizeof(iso14a_card_select_t));
+
+		uint64_t select_status = resp.arg[0];		// 0: couldn't read, 1: OK, with ATS, 2: OK, no ATS, 3: proprietary Anticollision
+		
+		if(select_status == 0) {
+			PrintAndLog("iso14443a card select failed");
+			return 1;
+		}
+
+		if(select_status == 3) {
+			PrintAndLog("Card doesn't support standard iso14443-3 anticollision");
+			PrintAndLog("ATQA : %02x %02x", card.atqa[1], card.atqa[0]);
+			return 1;
+		}
+
+		PrintAndLog(" UID : %s", sprint_hex(card.uid, card.uidlen));
+		PrintAndLog("ATQA : %02x %02x", card.atqa[1], card.atqa[0]);
+		PrintAndLog(" SAK : %02x [%d]", card.sak, resp.arg[0]);
+		if(card.ats_len >= 3) {			// a valid ATS consists of at least the length byte (TL) and 2 CRC bytes
+			PrintAndLog(" ATS : %s", sprint_hex(card.ats, card.ats_len));
+		}
+		PrintAndLog("Card is selected. You can now start sending commands");
+	} else {
+		PrintAndLog("Field dropped.");
+	}
+	return 0;
+}
+
+int CmdHF14AInfo(const char *Cmd)
 {
 	UsbCommand c = {CMD_READER_ISO_14443a, {ISO14A_CONNECT | ISO14A_NO_DISCONNECT, 0, 0}};
 	SendCommand(&c);
@@ -171,8 +244,10 @@ int CmdHF14AReader(const char *Cmd)
 	PrintAndLog("ATQA : %02x %02x", card.atqa[1], card.atqa[0]);
 	PrintAndLog(" SAK : %02x [%d]", card.sak, resp.arg[0]);
 
+	bool isMifareClassic = true;
 	switch (card.sak) {
 		case 0x00: 
+			isMifareClassic = false;
 
 			//***************************************test****************
 			// disconnect
@@ -405,27 +480,21 @@ int CmdHF14AReader(const char *Cmd)
 
 	
 	// try to see if card responses to "chinese magic backdoor" commands.
-	c.cmd = CMD_MIFARE_CIDENT;
-	c.arg[0] = 0;
-	c.arg[1] = 0;
-	c.arg[2] = 0;	
-	SendCommand(&c);
-	WaitForResponse(CMD_ACK,&resp);
+	mfCIdentify();
 	
-	uint8_t isGeneration = resp.arg[0] & 0xff;
-	switch( isGeneration ){
-		case 1: PrintAndLog("Answers to chinese magic backdoor commands (GEN 1a): YES"); break;
-		case 2: PrintAndLog("Answers to chinese magic backdoor commands (GEN 1b): YES"); break;
-		default: PrintAndLog("Answers to chinese magic backdoor commands: NO"); break;
+	if (isMifareClassic) {		
+		switch(DetectClassicPrng()) {
+		case 0:
+			PrintAndLog("Prng detection: HARDEND (hardnested)");		
+			break;
+		case 1:
+			PrintAndLog("Prng detection: WEAK");
+			break;
+		default:
+			PrintAndLog("Prng detection error.");		
+		}
 	}
 	
-	// disconnect
-	c.cmd = CMD_READER_ISO_14443a;
-	c.arg[0] = 0;
-	c.arg[1] = 0;
-	c.arg[2] = 0;
-	SendCommand(&c);
-
 	return select_status;
 }
 
@@ -751,8 +820,17 @@ static void waitCmd(uint8_t iSelect)
 
     if (WaitForResponseTimeout(CMD_ACK,&resp,1500)) {
         recv = resp.d.asBytes;
-        uint8_t iLen = iSelect ? resp.arg[1] : resp.arg[0];
-        PrintAndLog("received %i octets", iLen);
+        uint8_t iLen = resp.arg[0];
+		if (iSelect){
+			iLen = resp.arg[1];
+			if (iLen){
+				PrintAndLog("Card selected. UID[%i]:", iLen);
+			} else {
+				PrintAndLog("Can't select card.");
+			}
+		} else {
+			PrintAndLog("received %i bytes:", iLen);
+		}
         if(!iLen)
             return;
         hexout = (char *)malloc(iLen * 3 + 1);
@@ -774,7 +852,8 @@ static command_t CommandTable[] =
 {
   {"help",   CmdHelp,              1, "This help"},
   {"list",   CmdHF14AList,         0, "[Deprecated] List ISO 14443a history"},
-  {"reader", CmdHF14AReader,       0, "Act like an ISO14443 Type A reader"},
+  {"reader", CmdHF14AReader,       0, "Start acting like an ISO14443 Type A reader"},
+  {"info",   CmdHF14AInfo,         0, "Reads card and shows information about it"},
   {"cuids",  CmdHF14ACUIDs,        0, "<n> Collect n>0 ISO14443 Type A UIDs in one go"},
   {"sim",    CmdHF14ASim,          0, "<UID> -- Simulate ISO 14443a tag"},
   {"snoop",  CmdHF14ASnoop,        0, "Eavesdrop ISO 14443 Type A"},

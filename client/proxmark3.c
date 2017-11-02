@@ -73,12 +73,11 @@ static void *uart_receiver(void *targ) {
 
 	while (arg->run) {
 		rxlen = 0;
-		if (uart_receive(sp, prx, sizeof(UsbCommand) - (prx-rx), &rxlen)) {
+		if (uart_receive(sp, prx, sizeof(UsbCommand) - (prx-rx), &rxlen) && rxlen) {
 			prx += rxlen;
 			if (prx-rx < sizeof(UsbCommand)) {
 				continue;
 			}
-			
 			UsbCommandReceived((UsbCommand*)rx);
 		}
 		prx = rx;
@@ -356,11 +355,13 @@ int main(int argc, char* argv[]) {
 		sp = uart_open(argv[1]);
 	} else {
 		printf("Waiting for Proxmark to appear on %s ", argv[1]);
+		fflush(stdout);
 		int openCount = 0;
 		do {
 			sp = uart_open(argv[1]);
 			msleep(1000);
 			printf(".");
+			fflush(stdout);
 		} while(++openCount < 20 && (sp == INVALID_SERIAL_PORT || sp == CLAIMED_SERIAL_PORT));
 		printf("\n");
 	}
