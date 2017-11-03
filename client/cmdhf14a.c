@@ -11,8 +11,24 @@
 
 #include "cmdhf14a.h"
 
+#include "util.h"
+#include "util_posix.h"
+#include "iso14443crc.h"
+#include "data.h"
+#include "proxmark3.h"
+#include "ui.h"
+#include "cmdparser.h"
+#include "common.h"
+#include "cmdmain.h"
+#include "mifare.h"
+#include "cmdhfmfu.h"
+#include "mifarehost.h"
+#include "emv/apduinfo.h"
+#include "emv/emvcore.h"
+
 static int CmdHelp(const char *Cmd);
 static int waitCmd(uint8_t iLen);
+
 
 const manufactureName manufactureMapping[] = {
 	// ID,  "Vendor Country"
@@ -621,17 +637,22 @@ int CmdHF14ASnoop(const char *Cmd) {
 int ExchangeAPDU14a(uint8_t *datain, int datainlen, bool activateField, bool leaveSignalON, uint8_t *dataout, int *dataoutlen) {
 	uint8_t data[USB_CMD_DATA_SIZE];
 	int datalen;
-	uint8_t cmdc = 0;
+	uint16_t cmdc = 0;
 	uint8_t first, second;
+	static uint8_t iso14_pcb_blocknum;
 	
-	if (activateField)
-		cmdc |= ISO14A_CONNECT;
+	if (activateField) {
+		cmdc |= ISO14A_CONNECT | ISO14A_CLEAR_TRACE;
+		iso14_pcb_blocknum = 0;
+	}
 	if (leaveSignalON)
 		cmdc |= ISO14A_NO_DISCONNECT;
 
 	// ISO 14443 APDU frame: PCB [CID] [NAD] APDU CRC PCB=0x02
 	memcpy(data + 1, datain, datainlen);
 	data[0] = 0x02; // bnr,nad,cid,chn=0; i-block(0x00)	
+	data[0] += iso14_pcb_blocknum; // add block number (bnr)
+
 	datalen = datainlen + 1;
 	
 	ComputeCrc14443(CRC_14443_A, data, datalen, &first, &second);
@@ -672,6 +693,14 @@ int ExchangeAPDU14a(uint8_t *datain, int datainlen, bool activateField, bool lea
 		if (iLen < 5) {
 			PrintAndLog("APDU ERROR: Small APDU response.");
 			return 2;
+		}
+
+		// invert block number field in PCB byte
+		if ( ((recv[0] & 0xC0) == 0 // I-Block
+			   || (recv[0] & 0xD0) == 0x80) // R-Block with ACK bit set to 0
+			 && (recv[0] & 0x01) == iso14_pcb_blocknum) // equal block numbers
+		{
+			iso14_pcb_blocknum ^= 1;
 		}
 		
 		// check block
@@ -905,7 +934,7 @@ int CmdHF14ACmdRaw(const char *cmd) {
 
 	if(active || active_select)
 	{
-		c.arg[0] |= ISO14A_CONNECT;
+		c.arg[0] |= ISO14A_CONNECT | ISO14A_CLEAR_TRACE;
 		if(active)
 			c.arg[0] |= ISO14A_NO_SELECT;
 	}

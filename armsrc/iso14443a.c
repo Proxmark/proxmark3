@@ -1916,11 +1916,11 @@ void ReaderIso14443a(UsbCommand *c)
 	uint8_t par[MAX_PARITY_SIZE];
 	bool cantSELECT = false;
   
-	if(param & ISO14A_CONNECT) {
+	set_tracing(true);
+	
+	if(param & ISO14A_CLEAR_TRACE) {
 		clear_trace();
 	}
-
-	set_tracing(true);
 
 	if(param & ISO14A_REQUEST_TRIGGER) {
 		iso14a_set_trigger(true);
@@ -1928,7 +1928,6 @@ void ReaderIso14443a(UsbCommand *c)
 
 	if(param & ISO14A_CONNECT) {
 		LED_A_ON();
-		clear_trace();
 		iso14443a_setup(FPGA_HF_ISO14443A_READER_LISTEN);
 		if(!(param & ISO14A_NO_SELECT)) {
 			iso14a_card_select_t *card = (iso14a_card_select_t*)buf;

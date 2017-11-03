@@ -18,20 +18,7 @@
 #include <inttypes.h>
 #include <string.h>
 #include <unistd.h>
-#include "util.h"
-#include "util_posix.h"
-#include "iso14443crc.h"
-#include "data.h"
-#include "proxmark3.h"
-#include "ui.h"
-#include "cmdparser.h"
-#include "common.h"
-#include "cmdmain.h"
-#include "mifare.h"
-#include "cmdhfmfu.h"
-#include "mifarehost.h"
-#include "emv/apduinfo.h"
-#include "emv/emvcore.h"
+#include <stdbool.h>
 
 // structure and database for uid -> tagtype lookups 
 typedef struct { 
