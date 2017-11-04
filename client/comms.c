@@ -32,7 +32,9 @@ static bool offline;
 // flasher, as it means SendCommand is no longer async, and can't be used as a
 // buffer for a pending command when the connection is re-established.
 static UsbCommand txcmd;
-static bool txcmd_pending;
+static bool txcmd_pending = false;
+static pthread_mutex_t txcmd_lock = PTHREAD_MUTEX_INITIALIZER;
+static pthread_cond_t txcmd_sig = PTHREAD_COND_INITIALIZER;
 
 // Used by UsbReceiveCommand as a ring buffer for messages that are yet to be
 // processed by a command handler (WaitForResponse{,Timeout})
@@ -72,17 +74,35 @@ void SendCommand(UsbCommand *c) {
 	#endif
 
 	if (offline) {
-      PrintAndLog("Sending bytes to proxmark failed - offline");
-      return;
-    }
-  /**
-	The while-loop below causes hangups at times, when the pm3 unit is unresponsive
-	or disconnected. The main console thread is alive, but comm thread just spins here.
-	Not good.../holiman
-	**/
-	while(txcmd_pending);
+		PrintAndLog("Sending bytes to proxmark failed - offline");
+		return;
+	}
+
+	if (c->cmd == CMD_FINISH_WRITE) {
+		// We're being called by the flasher (in write_block). The flasher still
+		// runs the comms thread, but when we're in this bootloader mode, there's
+		// no other commands being sent at the same time.
+		if (!uart_send(port, (byte_t*) c, sizeof(UsbCommand))) {
+			PrintAndLog("Sending bytes to proxmark failed");
+		}
+		return;
+	}
+
+	// The while-loop below causes hangups at times, when the pm3 unit is
+	// unresponsive or disconnected. The main console thread is alive, but comm
+	// thread just spins here. Not good.../holiman
+	pthread_mutex_lock(&txcmd_lock);
+	while (txcmd_pending) {
+		// Receiver thread will signal when it is ready for us to continue.
+		pthread_cond_wait(&txcmd_sig, &txcmd_lock);
+	}
+
+	// Send command buffer to receiver thread for processing. This is slower, but
+	// there are many race conditions which would otherwise be triggered.
 	txcmd = *c;
 	txcmd_pending = true;
+
+	pthread_mutex_unlock(&txcmd_lock);
 }
 
 /**
@@ -264,12 +284,17 @@ static void
 
 		// We aren't normally trying to transmit in the flasher when the port would
 		// be reset, so we can just keep going at this point.
+		pthread_mutex_lock(&txcmd_lock);
 		if (txcmd_pending) {
 			if (!uart_send(port, (byte_t*) &txcmd, sizeof(UsbCommand))) {
 				PrintAndLog("Sending bytes to proxmark failed");
 			}
+
 			txcmd_pending = false;
+			// Signal SendCommand to say that we're ready for more.
+			pthread_cond_signal(&txcmd_sig);
 		}
+		pthread_mutex_unlock(&txcmd_lock);
 	}
 
 	pthread_exit(NULL);
