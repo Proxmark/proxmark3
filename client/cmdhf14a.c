@@ -634,86 +634,72 @@ int CmdHF14ASnoop(const char *Cmd) {
 	return 0;
 }
 
+void DropField() {
+	UsbCommand c = {CMD_READER_ISO_14443a, {0, 0, 0}}; 
+	SendCommand(&c);
+}
+
 int ExchangeAPDU14a(uint8_t *datain, int datainlen, bool activateField, bool leaveSignalON, uint8_t *dataout, int *dataoutlen) {
-	uint8_t data[USB_CMD_DATA_SIZE];
-	int datalen;
 	uint16_t cmdc = 0;
-	uint8_t first, second;
-	static uint8_t iso14_pcb_blocknum;
 	
 	if (activateField) {
 		cmdc |= ISO14A_CONNECT | ISO14A_CLEAR_TRACE;
-		iso14_pcb_blocknum = 0;
 	}
 	if (leaveSignalON)
 		cmdc |= ISO14A_NO_DISCONNECT;
-
-	// ISO 14443 APDU frame: PCB [CID] [NAD] APDU CRC PCB=0x02
-	memcpy(data + 1, datain, datainlen);
-	data[0] = 0x02; // bnr,nad,cid,chn=0; i-block(0x00)	
-	data[0] += iso14_pcb_blocknum; // add block number (bnr)
-
-	datalen = datainlen + 1;
-	
-	ComputeCrc14443(CRC_14443_A, data, datalen, &first, &second);
-	data[datalen++] = first;
-	data[datalen++] = second;
 
 	// "Command APDU" length should be 5+255+1, but javacard's APDU buffer might be smaller - 133 bytes
 	// https://stackoverflow.com/questions/32994936/safe-max-java-card-apdu-data-command-and-respond-size
 	// here length USB_CMD_DATA_SIZE=512
 	// timeout timeout14a * 1.06 / 100, true, size, &keyBlock[6 * c], e_sector); // timeout is (ms * 106)/10 or us*0.0106
-	UsbCommand c = {CMD_READER_ISO_14443a, {ISO14A_RAW | ISO14A_SET_TIMEOUT | cmdc, (datalen & 0xFFFF), 1000 * 1000 * 1.06 / 100}}; 
-	memcpy(c.d.asBytes, data, datalen);
+	UsbCommand c = {CMD_READER_ISO_14443a, {ISO14A_APDU | ISO14A_SET_TIMEOUT | cmdc, (datainlen & 0xFFFF), 1000 * 1000 * 1.06 / 100}}; 
+	memcpy(c.d.asBytes, datain, datainlen);
 	SendCommand(&c);
 	
     uint8_t *recv;
     UsbCommand resp;
 
 	if (activateField) {
-		if (!WaitForResponseTimeout(CMD_ACK, &resp, 1500)) 
+		if (!WaitForResponseTimeout(CMD_ACK, &resp, 1500)) {
+			PrintAndLog("APDU ERROR: Proxmark connection timeout.");
 			return 1;
-		if (resp.arg[0] != 1)
+		}
+		if (resp.arg[0] != 1) {
+			PrintAndLog("APDU ERROR: Proxmark error %d.", resp.arg[0]);
 			return 1;
+		}
 	}
 
     if (WaitForResponseTimeout(CMD_ACK, &resp, 1500)) {
         recv = resp.d.asBytes;
-        uint8_t iLen = resp.arg[0];
+        int iLen = resp.arg[0];
 		
-		*dataoutlen = iLen - 1 - 2;
+		*dataoutlen = iLen - 2;
 		if (*dataoutlen < 0)
 			*dataoutlen = 0;
-		memcpy(dataout, recv + 1, *dataoutlen);
+		memcpy(dataout, recv, *dataoutlen);
 		
-        if(!iLen)
+        if(!iLen) {
+			PrintAndLog("APDU ERROR: No APDU response.");
             return 1;
-
-		// check apdu length
-		if (iLen < 5) {
-			PrintAndLog("APDU ERROR: Small APDU response.");
-			return 2;
 		}
 
-		// invert block number field in PCB byte
-		if ( ((recv[0] & 0xC0) == 0 // I-Block
-			   || (recv[0] & 0xD0) == 0x80) // R-Block with ACK bit set to 0
-			 && (recv[0] & 0x01) == iso14_pcb_blocknum) // equal block numbers
-		{
-			iso14_pcb_blocknum ^= 1;
-		}
-		
-		// check block
-		if (data[0] != recv[0]) {
-			PrintAndLog("APDU ERROR: Block type mismatch: %02x-%02x", data[0], recv[0]);
+		// check block TODO
+		if (iLen == -2) {
+			PrintAndLog("APDU ERROR: Block type mismatch.");
 			return 2;
 		}
 		
 		// CRC Check
-		ComputeCrc14443(CRC_14443_A, recv, iLen, &first, &second);
-		if (first || second) {
+		if (iLen == -1) {
 			PrintAndLog("APDU ERROR: ISO 14443A CRC error.");
 			return 3;
+		}
+
+		// check apdu length
+		if (iLen < 4) {
+			PrintAndLog("APDU ERROR: Small APDU response. Len=%d", iLen);
+			return 2;
 		}
 		
     } else {
@@ -782,23 +768,12 @@ int CmdHF14AAPDU(const char *cmd) {
 		cmdp++;
 	}
 
-	PrintAndLog("--%s %s %s >>>> %s", activateField ? "sel": "", leaveSignalON ? "keep": "", decodeTLV ? "TLV": "", sprint_hex(data, datalen));
+	PrintAndLog(">>>>[%s%s%s] %s", activateField ? "sel ": "", leaveSignalON ? "keep ": "", decodeTLV ? "TLV": "", sprint_hex(data, datalen));
 	
-	switch(ExchangeAPDU14a(data, datalen, activateField, leaveSignalON, data, &datalen)) {
-		case 0:
-			break;
-		case 1:
-			PrintAndLog("APDU ERROR: Send APDU error.");
-			return 1;
-		case 2:
-			return 2;
-		case 3:
-			return 3;
-		case 4:
-			return 4;
-		default:
-			return 5;
-	}
+	int res = ExchangeAPDU14a(data, datalen, activateField, leaveSignalON, data, &datalen);
+
+	if (res)
+		return res;
 
 	PrintAndLog("<<<< %s", sprint_hex(data, datalen));
 	
