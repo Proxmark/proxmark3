@@ -387,6 +387,8 @@ int CmdHFEMVExec(const char *cmd) {
 		TLVPrintFromBuffer(buf, len);
 	PrintAndLog("* Selected.");
 	
+PrintAndLog("-----BREAK.");
+return 0;
 	PrintAndLog("\n* Init transaction parameters.");
 
     //9F66:(Terminal Transaction Qualifiers (TTQ)) len:4
