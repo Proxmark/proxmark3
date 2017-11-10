@@ -1217,7 +1217,7 @@ void ReaderHitag(hitag_function htf, hitag_data* htd) {
 	int reset_sof; 
 	int tag_sof;
 	int t_wait = HITAG_T_WAIT_MAX;
-	bool bStop;
+	bool bStop = false;
 	bool bQuitTraceFull = false;
   
 	FpgaDownloadAndGo(FPGA_BITSTREAM_LF);
@@ -1324,7 +1324,6 @@ void ReaderHitag(hitag_function htf, hitag_data* htd) {
 	frame_count = 0;
 	response = 0;
 	lastbit = 1;
-	bStop = false;
 
 	// Tag specific configuration settings (sof, timings, etc.)
 	if (htf < 10){
@@ -1369,46 +1368,46 @@ void ReaderHitag(hitag_function htf, hitag_data* htd) {
 		// By default reset the transmission buffer
 		tx = txbuf;
 		switch(htf) {
-		case RHT2F_PASSWORD: {
-			bStop = !hitag2_password(rx,rxlen,tx,&txlen);
-		} break;
-		case RHT2F_AUTHENTICATE: {
-			bStop = !hitag2_authenticate(rx,rxlen,tx,&txlen);
-		} break;
-		case RHT2F_CRYPTO: {
-			bStop = !hitag2_crypto(rx,rxlen,tx,&txlen, false);
-		} break;
-		case RHT2F_TEST_AUTH_ATTEMPTS: {
-			bStop = !hitag2_test_auth_attempts(rx,rxlen,tx,&txlen);
-		} break;
-		case RHT2F_UID_ONLY: {
-			bStop = !hitag2_read_uid(rx, rxlen, tx, &txlen);
-			attempt_count++; //attempt 3 times to get uid then quit
-			if (!bStop && attempt_count == 3) bStop = true;
-		} break;
-		default: {
-			Dbprintf("Error, unknown function: %d",htf);
-			return;
-		} break;
+			case RHT2F_PASSWORD: {
+				bStop = !hitag2_password(rx,rxlen,tx,&txlen);
+			} break;
+			case RHT2F_AUTHENTICATE: {
+				bStop = !hitag2_authenticate(rx,rxlen,tx,&txlen);
+			} break;
+			case RHT2F_CRYPTO: {
+				bStop = !hitag2_crypto(rx,rxlen,tx,&txlen, false);
+			} break;
+			case RHT2F_TEST_AUTH_ATTEMPTS: {
+				bStop = !hitag2_test_auth_attempts(rx,rxlen,tx,&txlen);
+			} break;
+			case RHT2F_UID_ONLY: {
+				bStop = !hitag2_read_uid(rx, rxlen, tx, &txlen);
+				attempt_count++; //attempt 3 times to get uid then quit
+				if (!bStop && attempt_count == 3) bStop = true;
+			} break;
+			default: {
+				Dbprintf("Error, unknown function: %d",htf);
+				return;
+			} break;
 		}
-		
+
 		// Send and store the reader command
 		// Disable timer 1 with external trigger to avoid triggers during our own modulation
 		AT91C_BASE_TC1->TC_CCR = AT91C_TC_CLKDIS;
-			
+
 		// Wait for HITAG_T_WAIT_2 carrier periods after the last tag bit before transmitting,
 		// Since the clock counts since the last falling edge, a 'one' means that the
 		// falling edge occured halfway the period. with respect to this falling edge,
 		// we need to wait (T_Wait2 + half_tag_period) when the last was a 'one'.
 		// All timer values are in terms of T0 units
 		while(AT91C_BASE_TC0->TC_CV < T0*(t_wait+(HITAG_T_TAG_HALF_PERIOD*lastbit)));
-			
+
 		//Dbprintf("DEBUG: Sending reader frame");
 		
 		// Transmit the reader frame
 		hitag_reader_send_frame(tx,txlen);
 
-                // Enable and reset external trigger in timer for capturing future frames
+		// Enable and reset external trigger in timer for capturing future frames
 		AT91C_BASE_TC1->TC_CCR = AT91C_TC_CLKEN | AT91C_TC_SWTRG;
 
 		// Add transmitted frame to total count
@@ -1521,7 +1520,11 @@ void ReaderHitag(hitag_function htf, hitag_data* htd) {
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
 	//Dbprintf("frame received: %d",frame_count);
 	//DbpString("All done");
-	cmd_send(CMD_ACK,bSuccessful,0,0,(byte_t*)tag.sectors,48);
+	if (bSuccessful)
+		cmd_send(CMD_ACK,bSuccessful,0,0,(byte_t*)tag.sectors,48);
+	else
+		cmd_send(CMD_ACK,bSuccessful,0,0,0,0);
+
 }
 
 void WriterHitag(hitag_function htf, hitag_data* htd, int page) {
