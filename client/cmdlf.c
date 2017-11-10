@@ -945,7 +945,7 @@ int CmdLFfind(const char *Cmd)
 				PrintAndLog("\nValid EM4x05/EM4x69 Chip Found\nUse lf em 4x05readword/dump commands to read\n");
 				return 1;
 			}
-			ans=CmdLFHitagReader("26");
+			ans=CmdLFHitagReader("26"); // 26 = RHT2F_UID_ONLY
 			if (ans==0) {
 				return 1;
 			}

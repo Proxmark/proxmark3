@@ -950,7 +950,6 @@ int EM4x05ReadWord_ext(uint8_t addr, uint32_t pwd, bool usePwd, uint32_t *wordDa
 	}
 	int testLen = (GraphTraceLen < 1000) ? GraphTraceLen : 1000;
 	if (graphJustNoise(GraphBuffer, testLen)) {
-		PrintAndLog("no tag not found");
 		return -1;
 	}
 	//attempt demod:

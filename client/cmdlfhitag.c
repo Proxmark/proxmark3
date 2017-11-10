@@ -239,6 +239,7 @@ int CmdLFHitagReader(const char *Cmd) {
 	c.arg[0] = htf;
 
 	// Send the command to the proxmark
+	clearCommandBuffer();
 	SendCommand(&c);
 
 	UsbCommand resp;
