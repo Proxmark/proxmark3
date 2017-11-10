@@ -13,14 +13,13 @@
  * Lesser General Public License for more details.
  */
 
-#ifndef DUMP_H
-#define DUMP_H
+#ifndef DOL_H
+#define DOL_H
 
-#include <stdio.h>
-#include <string.h>
+#include "emv/tlv.h"
+#include <stddef.h>
 
-void dump_buffer_simple(const unsigned char *ptr, size_t len, FILE *f);
-void dump_buffer(const unsigned char *ptr, size_t len, FILE *f);
-void dump_buffer_tab(const unsigned char *ptr, size_t len, FILE *f, int tabs);
+struct tlv *dol_process(const struct tlv *tlv, const struct tlvdb *tlvdb, tlv_tag_t tag);
+struct tlvdb *dol_parse(const struct tlv *tlv, const unsigned char *buf, size_t len);
 
 #endif

@@ -19,10 +19,7 @@
 
 #include "dump.h"
 
-#include <stdio.h>
-
-void dump_buffer_simple(const unsigned char *ptr, size_t len, FILE *f)
-{
+void dump_buffer_simple(const unsigned char *ptr, size_t len, FILE *f) {
 	int i;
 
 	if (!f)
@@ -32,15 +29,16 @@ void dump_buffer_simple(const unsigned char *ptr, size_t len, FILE *f)
 		fprintf(f, "%s%02hhX", i ? " " : "", ptr[i]);
 }
 
-void dump_buffer(const unsigned char *ptr, size_t len, FILE *f)
-{
+void dump_buffer_tab(const unsigned char *ptr, size_t len, FILE *f, int tabs) {
 	int i, j;
+	char buf[64] = {0};
+	memset(buf, ' ', tabs > 64 ? 64 : tabs);
 
 	if (!f)
 		f = stdout;
 
 	for (i = 0; i < len; i += 16) {
-		fprintf(f, "\t%02x:", i);
+		fprintf(f, "%s%02x:", buf, i);
 		for (j = 0; j < 16; j++) {
 			if (i + j < len)
 				fprintf(f, " %02hhx", ptr[i + j]);
@@ -53,5 +51,9 @@ void dump_buffer(const unsigned char *ptr, size_t len, FILE *f)
 		}
 		fprintf(f, "\n");
 	}
+}
+
+void dump_buffer(const unsigned char *ptr, size_t len, FILE *f) {
+	dump_buffer_tab(ptr, len, f, 4);
 }
 

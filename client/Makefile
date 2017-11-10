@@ -111,7 +111,9 @@ CMDSRCS = 	crapto1/crapto1.c\
 			emv/dump.c\
 			emv/tlv.c\
 			emv/emv_tags.c\
+			emv/dol.c\
 			emv/emvcore.c\
+			emv/cmdemv.c\
 			cmdhf.c \
 			cmdhf14a.c \
 			cmdhf14b.c \
