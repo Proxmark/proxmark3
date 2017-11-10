@@ -132,28 +132,27 @@ int CmdHF14AList(const char *Cmd)
 
 int CmdHF14AReader(const char *Cmd) {
 	uint32_t cm = ISO14A_CONNECT;
-	bool disconnectAfter = false;
+	bool disconnectAfter = true;
 	
 	int cmdp = 0;
 	while(param_getchar(Cmd, cmdp) != 0x00) {
 		switch(param_getchar(Cmd, cmdp)) {
 		case 'h':
 		case 'H':
-			PrintAndLog("Usage: hf 14a reader [d] [3]");
-			PrintAndLog("       d    drop the signal field after command executed");
+			PrintAndLog("Usage: hf 14a reader [k|x] [3]");
+			PrintAndLog("       k    keep the field active after command executed");
 			PrintAndLog("       x    just drop the signal field");
 			PrintAndLog("       3    ISO14443-3 select only (skip RATS)");
 			return 0;
 		case '3':
 			cm |= ISO14A_NO_RATS; 
 			break;
-		case 'd':
-		case 'D':
-			disconnectAfter = true;
+		case 'k':
+		case 'K':
+			disconnectAfter = false;
 			break;
 		case 'x':
 		case 'X':
-			disconnectAfter = true;
 			cm = cm - ISO14A_CONNECT;
 			break;
 		default:
@@ -196,10 +195,15 @@ int CmdHF14AReader(const char *Cmd) {
 		if(card.ats_len >= 3) {			// a valid ATS consists of at least the length byte (TL) and 2 CRC bytes
 			PrintAndLog(" ATS : %s", sprint_hex(card.ats, card.ats_len));
 		}
-		PrintAndLog("Card is selected. You can now start sending commands");
-	} else {
+		if (!disconnectAfter) {
+			PrintAndLog("Card is selected. You can now start sending commands");
+		}
+	}
+
+	if (disconnectAfter) {
 		PrintAndLog("Field dropped.");
 	}
+	
 	return 0;
 }
 
@@ -1009,7 +1013,7 @@ static command_t CommandTable[] =
   {"cuids",  CmdHF14ACUIDs,        0, "<n> Collect n>0 ISO14443 Type A UIDs in one go"},
   {"sim",    CmdHF14ASim,          0, "<UID> -- Simulate ISO 14443a tag"},
   {"snoop",  CmdHF14ASnoop,        0, "Eavesdrop ISO 14443 Type A"},
-  {"apdu",   CmdHF14AAPDU,         0, "Send ISO 1443-4 APDU to tag"},
+  {"apdu",   CmdHF14AAPDU,         0, "Send ISO 14443-4 APDU to tag"},
   {"raw",    CmdHF14ACmdRaw,       0, "Send raw hex data to tag"},
   {NULL, NULL, 0, NULL}
 };
