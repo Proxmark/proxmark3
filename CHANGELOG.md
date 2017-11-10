@@ -15,6 +15,7 @@ This project uses the changelog in accordance with [keepchangelog](http://keepac
 - Changed proxmark command line parameter `flush` to `-f` or `-flush` (Merlok)
 - Changed `hf 14a reader` to just reqest-anticilission-select sequence (Merlok)
 - Changed `hf 14a raw` - works with LED's and some exchange logic (Merlok)
+- Changed TLV parser messages to more convenient (Merlok)
 
 ### Fixed
 - Changed start sequence in Qt mode (fix: short commands hangs main Qt thread) (Merlok)
@@ -38,6 +39,9 @@ This project uses the changelog in accordance with [keepchangelog](http://keepac
 - Added to `hf 14a info` detection of weak prng from Iceman1001 fork (Merlok)
 - Added to `hf 14a apdu` - exchange apdu via iso1443-4 (Merlok)
 - Added to `hf 14a apdu` - apdu and tlv results parser (Merlok)
+- Added `hf emv` group of commands (Merlok)
+- Added `hf emv search` `hf emv pse` - commands for selection of EMV application (Merlok)
+- Added `hf emv select` - command for select EMV application (Merlok)
 
 ## [3.0.1][2017-06-08]
 
