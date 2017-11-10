@@ -520,7 +520,7 @@ int CmdHelp(const char *Cmd);
 static command_t CommandTable[] =  {
 	{"help",	CmdHelp,		1,	"This help"},
 	{"exec",	CmdHFEMVExec,	0,	"Executes EMV contactless transaction."},
-	{"pse",		CmdHFEMVPPSE,	0,	"Execute PPSE. Selects 2PAY.SYS.DDF01 and then error 1PAY.SYS.DDF01."},
+	{"pse",		CmdHFEMVPPSE,	0,	"Execute PPSE. It selects 2PAY.SYS.DDF01 or 1PAY.SYS.DDF01 directory."},
 	{"search",	CmdHFEMVSearch,	0,	"Try to select all applets from applets list and print installed applets."},
 	{"select",	CmdHFEMVSelect,	0,	"Select applet."},
 	{NULL, NULL, 0, NULL}
