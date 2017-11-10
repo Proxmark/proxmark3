@@ -12,10 +12,11 @@
 
 #include "iso14443a.h"
 
+#include <stdio.h>
+#include <string.h>
 #include "proxmark3.h"
 #include "apps.h"
 #include "util.h"
-#include "string.h"
 #include "cmd.h"
 #include "iso14443crc.h"
 #include "crapto1/crapto1.h"
@@ -1873,29 +1874,47 @@ void iso14443a_setup(uint8_t fpga_minor_mode) {
 
 int iso14_apdu(uint8_t *cmd, uint16_t cmd_len, void *data) {
 	uint8_t parity[MAX_PARITY_SIZE];
-	uint8_t real_cmd[cmd_len+4];
-	real_cmd[0] = 0x0a; //I-Block
+	uint8_t real_cmd[cmd_len + 4];
+	
+	// ISO 14443 APDU frame: PCB [CID] [NAD] APDU CRC PCB=0x02
+	real_cmd[0] = 0x02; // bnr,nad,cid,chn=0; i-block(0x00)	
 	// put block number into the PCB
 	real_cmd[0] |= iso14_pcb_blocknum;
-	real_cmd[1] = 0x00; //CID: 0 //FIXME: allow multiple selected cards
-	memcpy(real_cmd+2, cmd, cmd_len);
-	AppendCrc14443a(real_cmd,cmd_len+2);
+	memcpy(real_cmd + 1, cmd, cmd_len);
+	AppendCrc14443a(real_cmd, cmd_len + 1);
  
-	ReaderTransmit(real_cmd, cmd_len+4, NULL);
+	ReaderTransmit(real_cmd, cmd_len + 3, NULL);
+
 	size_t len = ReaderReceive(data, parity);
 	uint8_t *data_bytes = (uint8_t *) data;
-	if (!len)
+
+	if (!len) {
 		return 0; //DATA LINK ERROR
+		
 	// if we received an I- or R(ACK)-Block with a block number equal to the
 	// current block number, toggle the current block number
-	else if (len >= 4 // PCB+CID+CRC = 4 bytes
+	} else{
+		if (len >= 3 // PCB+CRC = 3 bytes
 	         && ((data_bytes[0] & 0xC0) == 0 // I-Block
 	             || (data_bytes[0] & 0xD0) == 0x80) // R-Block with ACK bit set to 0
 	         && (data_bytes[0] & 0x01) == iso14_pcb_blocknum) // equal block numbers
-	{
-		iso14_pcb_blocknum ^= 1;
-	}
+		{
+			iso14_pcb_blocknum ^= 1;
+		}
 
+		// crc check
+		if (len >=3 && !CheckCrc14443(CRC_14443_A, data_bytes, len)) {
+			return -1;
+		}
+		
+	}
+	
+	// cut frame byte
+	len -= 1;
+	// memmove(data_bytes, data_bytes + 1, len);
+	for (int i = 0; i < len; i++)
+		data_bytes[i] = data_bytes[i + 1];
+	
 	return len;
 }
 
@@ -1914,23 +1933,34 @@ void ReaderIso14443a(UsbCommand *c)
 	uint32_t arg0 = 0;
 	byte_t buf[USB_CMD_DATA_SIZE] = {0};
 	uint8_t par[MAX_PARITY_SIZE];
+	bool cantSELECT = false;
   
-	if(param & ISO14A_CONNECT) {
+	set_tracing(true);
+	
+	if(param & ISO14A_CLEAR_TRACE) {
 		clear_trace();
 	}
-
-	set_tracing(true);
 
 	if(param & ISO14A_REQUEST_TRIGGER) {
 		iso14a_set_trigger(true);
 	}
 
 	if(param & ISO14A_CONNECT) {
+		LED_A_ON();
 		iso14443a_setup(FPGA_HF_ISO14443A_READER_LISTEN);
 		if(!(param & ISO14A_NO_SELECT)) {
 			iso14a_card_select_t *card = (iso14a_card_select_t*)buf;
 			arg0 = iso14443a_select_card(NULL, card, NULL, true, 0, param & ISO14A_NO_RATS);
+
+			// if we cant select then we cant send data
+			if (arg0 != 1 && arg0 != 2) {
+				// 1 - all is OK with ATS, 2 - without ATS
+				cantSELECT = true;
+			}
+			
+			LED_B_ON();
 			cmd_send(CMD_ACK,arg0,card->uidlen,0,buf,sizeof(iso14a_card_select_t));
+			LED_B_OFF();
 		}
 	}
 
@@ -1938,12 +1968,14 @@ void ReaderIso14443a(UsbCommand *c)
 		iso14a_set_timeout(timeout);
 	}
 
-	if(param & ISO14A_APDU) {
+	if(param & ISO14A_APDU && !cantSELECT) {
 		arg0 = iso14_apdu(cmd, len, buf);
-		cmd_send(CMD_ACK,arg0,0,0,buf,sizeof(buf));
+		LED_B_ON();
+		cmd_send(CMD_ACK, arg0, 0, 0, buf, sizeof(buf));
+		LED_B_OFF();
 	}
 
-	if(param & ISO14A_RAW) {
+	if(param & ISO14A_RAW && !cantSELECT) {
 		if(param & ISO14A_APPEND_CRC) {
 			if(param & ISO14A_TOPAZMODE) {
 				AppendCrc14443b(cmd,len);
@@ -1979,7 +2011,10 @@ void ReaderIso14443a(UsbCommand *c)
 			}
 		}
 		arg0 = ReaderReceive(buf, par);
+
+		LED_B_ON();
 		cmd_send(CMD_ACK,arg0,0,0,buf,sizeof(buf));
+		LED_B_OFF();
 	}
 
 	if(param & ISO14A_REQUEST_TRIGGER) {

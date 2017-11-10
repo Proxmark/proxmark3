@@ -113,12 +113,6 @@ static void ul_switch_on_field(void) {
 	SendCommand(&c);
 }
 
-void ul_switch_off_field(void) {
-	UsbCommand c = {CMD_READER_ISO_14443a, {0, 0, 0}};
-	clearCommandBuffer();
-	SendCommand(&c);
-}
-
 static int ul_send_cmd_raw( uint8_t *cmd, uint8_t cmdlen, uint8_t *response, uint16_t responseLength ) {
 	UsbCommand c = {CMD_READER_ISO_14443a, {ISO14A_RAW | ISO14A_NO_DISCONNECT | ISO14A_APPEND_CRC, cmdlen, 0}};
 	memcpy(c.d.asBytes, cmd, cmdlen);
