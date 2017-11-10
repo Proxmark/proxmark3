@@ -334,7 +334,7 @@ uint32_t doCotagAcquisitionManchester() {
 	uint16_t sample_counter = 0, period = 0;
 	uint8_t curr = 0, prev = 0;
 	uint16_t noise_counter = 0;
-	while (!BUTTON_PRESS() && !usb_poll_validate_length() && (sample_counter < bufsize) && (noiseCounter < (COTAG_T1<<1)) ) {
+	while (!BUTTON_PRESS() && !usb_poll_validate_length() && (sample_counter < bufsize) && (noise_counter < (COTAG_T1<<1)) ) {
 		WDT_HIT();
 		if (AT91C_BASE_SSC->SSC_SR & AT91C_SSC_TXRDY) {
 			AT91C_BASE_SSC->SSC_THR = 0x43;
