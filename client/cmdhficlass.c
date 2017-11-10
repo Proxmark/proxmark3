@@ -683,7 +683,7 @@ int CmdHFiClassReader_Dump(const char *Cmd) {
 	SendCommand(&c);
 	if (!WaitForResponseTimeout(CMD_ACK, &resp, 4500)) {
 		PrintAndLog("Command execute timeout");
-		ul_switch_off_field();
+		DropField();
 		return 0;
 	}
 	uint8_t readStatus = resp.arg[0] & 0xff;
@@ -691,7 +691,7 @@ int CmdHFiClassReader_Dump(const char *Cmd) {
 
 	if(readStatus == 0){
 		PrintAndLog("No tag found...");
-		ul_switch_off_field();
+		DropField();
 		return 0;
 	}
 	if( readStatus & (FLAG_ICLASS_READER_CSN|FLAG_ICLASS_READER_CONF|FLAG_ICLASS_READER_CC)){
@@ -702,12 +702,12 @@ int CmdHFiClassReader_Dump(const char *Cmd) {
 		// large memory - not able to dump pages currently
 		if (numblks > maxBlk) numblks = maxBlk;
 	}
-	ul_switch_off_field();
+	DropField();
 	// authenticate debit key and get div_key - later store in dump block 3
 	if (!select_and_auth(KEY, MAC, div_key, use_credit_key, elite, rawkey, false)){
 		//try twice - for some reason it sometimes fails the first time...
 		if (!select_and_auth(KEY, MAC, div_key, use_credit_key, elite, rawkey, false)){
-			ul_switch_off_field();
+			DropField();
 			return 0;
 		}
 	}
@@ -718,14 +718,14 @@ int CmdHFiClassReader_Dump(const char *Cmd) {
 	SendCommand(&w);
 	if (!WaitForResponseTimeout(CMD_ACK, &resp, 4500)) {
 		PrintAndLog("Command execute time-out 1");
-		ul_switch_off_field();
+		DropField();
 		return 1;
 	}
 	uint32_t blocksRead = resp.arg[1];
 	uint8_t isOK = resp.arg[0] & 0xff;
 	if (!isOK && !blocksRead) {
 		PrintAndLog("Read Block Failed");
-		ul_switch_off_field();
+		DropField();
 		return 0;
 	}
 	uint32_t startindex = resp.arg[2];
@@ -741,13 +741,13 @@ int CmdHFiClassReader_Dump(const char *Cmd) {
 	// try AA2
 	if (have_credit_key) {
 		//turn off hf field before authenticating with different key
-		ul_switch_off_field();
+		DropField();
 		memset(MAC,0,4);
 		// AA2 authenticate credit key and git c_div_key - later store in dump block 4
 		if (!select_and_auth(CreditKEY, MAC, c_div_key, true, false, false, false)){
 			//try twice - for some reason it sometimes fails the first time...
 			if (!select_and_auth(CreditKEY, MAC, c_div_key, true, false, false, false)){
-				ul_switch_off_field();
+				DropField();
 				return 0;
 			}
 		}
@@ -760,14 +760,14 @@ int CmdHFiClassReader_Dump(const char *Cmd) {
 			SendCommand(&w);
 			if (!WaitForResponseTimeout(CMD_ACK, &resp, 4500)) {
 				PrintAndLog("Command execute timeout 2");
-				ul_switch_off_field();
+				DropField();
 				return 0;
 			}
 			uint8_t isOK = resp.arg[0] & 0xff;
 			blocksRead = resp.arg[1];
 			if (!isOK && !blocksRead) {
 				PrintAndLog("Read Block Failed 2");
-				ul_switch_off_field();
+				DropField();
 				return 0;
 			}		
 
@@ -782,7 +782,7 @@ int CmdHFiClassReader_Dump(const char *Cmd) {
 
 			gotBytes += blocksRead*8;			
 		} else { //field is still on - turn it off...
-			ul_switch_off_field();
+			DropField();
 		}
 	}
 
@@ -930,7 +930,7 @@ int CmdHFiClass_WriteBlock(const char *Cmd) {
 
 	if (cmdp < 6) return usage_hf_iclass_writeblock();
 	int ans = WriteBlock(blockno, bldata, KEY, use_credit_key, elite, rawkey, true);
-	ul_switch_off_field();
+	DropField();
 	return ans;
 }
 
