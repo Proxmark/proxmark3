@@ -901,11 +901,11 @@ static int GetIso14443aCommandFromReader(uint8_t *received, uint8_t *parity, int
 }
 
 
-static int EmSend4bitEx(uint8_t resp, bool correctionNeeded);
+static int EmSend4bitEx(uint8_t resp);
 int EmSend4bit(uint8_t resp);
-static int EmSendCmdExPar(uint8_t *resp, uint16_t respLen, bool correctionNeeded, uint8_t *par);
-int EmSendCmdEx(uint8_t *resp, uint16_t respLen, bool correctionNeeded);
-int EmSendPrecompiledCmd(tag_response_info_t *response_info, bool correctionNeeded);
+static int EmSendCmdExPar(uint8_t *resp, uint16_t respLen, uint8_t *par);
+int EmSendCmdEx(uint8_t *resp, uint16_t respLen);
+int EmSendPrecompiledCmd(tag_response_info_t *response_info);
 
 
 static bool prepare_tag_modulation(tag_response_info_t* response_info, size_t max_buffer_size) {
@@ -1139,7 +1139,7 @@ void SimulateIso14443aTag(int tagType, int uid_1st, int uid_2nd, byte_t* data)
 		} else if(receivedCmd[1] == 0x70 && receivedCmd[0] == 0x95) {	// Received a SELECT (cascade 2)
 			p_response = &responses[4]; order = 30;
 		} else if(receivedCmd[0] == 0x30) {	// Received a (plain) READ
-			EmSendCmdEx(data+(4*receivedCmd[1]),16,false);
+			EmSendCmdEx(data+(4*receivedCmd[1]),16);
 			// Dbprintf("Read request from reader: %x %x",receivedCmd[0],receivedCmd[1]);
 			// We already responded, do not send anything with the EmSendCmd14443aRaw() that is called below
 			p_response = NULL;
@@ -1232,7 +1232,7 @@ void SimulateIso14443aTag(int tagType, int uid_1st, int uid_2nd, byte_t* data)
 		cmdsRecvd++;
 
 		if (p_response != NULL) {
-			EmSendPrecompiledCmd(p_response, receivedCmd[0] == 0x52);
+			EmSendPrecompiledCmd(p_response);
 		}
 		
 		if (!tracing) {
@@ -1414,12 +1414,6 @@ int EmGetCmd(uint8_t *received, uint16_t *len, uint8_t *parity)
 	int analogCnt = 0;
 	int analogAVG = 0;
 
-	// Set FPGA mode to "simulated ISO 14443 tag", no modulation (listen
-	// only, since we are receiving, not transmitting).
-	// Signal field is off with the appropriate LED
-	LED_D_OFF();
-	FpgaWriteConfWord(FPGA_MAJOR_MODE_HF_ISO14443A | FPGA_HF_ISO14443A_TAGSIM_LISTEN);
-
 	// Set ADC to read field strength
 	AT91C_BASE_ADC->ADC_CR = AT91C_ADC_SWRST;
 	AT91C_BASE_ADC->ADC_MR =
@@ -1430,12 +1424,23 @@ int EmGetCmd(uint8_t *received, uint16_t *len, uint8_t *parity)
 	// start ADC
 	AT91C_BASE_ADC->ADC_CR = AT91C_ADC_START;
 	
-	// Now run a 'software UART' on the stream of incoming samples.
+	// Run a 'software UART' on the stream of incoming samples.
 	UartInit(received, parity);
 
-	// Clear RXRDY:
-    uint8_t b = (uint8_t)AT91C_BASE_SSC->SSC_RHR;
-	
+	// Ensure that the FPGA Delay Queue is empty before we switch to TAGSIM_LISTEN
+	do {
+		if(AT91C_BASE_SSC->SSC_SR & (AT91C_SSC_TXRDY)) {
+			AT91C_BASE_SSC->SSC_THR = SEC_F;
+			uint8_t b = (uint8_t)AT91C_BASE_SSC->SSC_RHR; (void) b;
+		}
+	} while (GetCountSspClk() < LastTimeProxToAirStart + LastProxToAirDuration + (FpgaSendQueueDelay>>3));
+
+	// Set FPGA mode to "simulated ISO 14443 tag", no modulation (listen
+	// only, since we are receiving, not transmitting).
+	// Signal field is off with the appropriate LED
+	LED_D_OFF();
+	FpgaWriteConfWord(FPGA_MAJOR_MODE_HF_ISO14443A | FPGA_HF_ISO14443A_TAGSIM_LISTEN);
+
 	for(;;) {
 		WDT_HIT();
 
@@ -1461,7 +1466,7 @@ int EmGetCmd(uint8_t *received, uint16_t *len, uint8_t *parity)
 
 		// receive and test the miller decoding
         if(AT91C_BASE_SSC->SSC_SR & (AT91C_SSC_RXRDY)) {
-            b = (uint8_t)AT91C_BASE_SSC->SSC_RHR;
+            uint8_t b = (uint8_t)AT91C_BASE_SSC->SSC_RHR;
 			if(MillerDecoding(b, 0)) {
 				*len = Uart.len;
 				EmLogTraceReader();
@@ -1473,18 +1478,27 @@ int EmGetCmd(uint8_t *received, uint16_t *len, uint8_t *parity)
 }
 
 
-static int EmSendCmd14443aRaw(uint8_t *resp, uint16_t respLen, bool correctionNeeded)
+static int EmSendCmd14443aRaw(uint8_t *resp, uint16_t respLen)
 {
 	uint8_t b;
 	uint16_t i = 0;
-	
+	bool correctionNeeded;
+
 	// Modulate Manchester
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_HF_ISO14443A | FPGA_HF_ISO14443A_TAGSIM_MOD);
 
 	// include correction bit if necessary
-	if (Uart.parityBits & 0x01) {
-		correctionNeeded = true;
+	if (Uart.bitCount == 7)
+	{
+		// Short tags (7 bits) don't have parity, determine the correct value from MSB
+		correctionNeeded = Uart.output[0] & 0x40;
 	}
+	else
+	{
+		// Look at the last parity bit
+		correctionNeeded = Uart.parity[(Uart.len-1)/8] & (0x80 >> ((Uart.len-1) & 7));
+	}
+
 	if(correctionNeeded) {
 		// 1236, so correction bit needed
 		i = 0;
@@ -1518,23 +1532,13 @@ static int EmSendCmd14443aRaw(uint8_t *resp, uint16_t respLen, bool correctionNe
 		}
 	}
 
-	// Ensure that the FPGA Delay Queue is empty before we switch to TAGSIM_LISTEN again:
-	uint8_t fpga_queued_bits = FpgaSendQueueDelay >> 3;
-	for (i = 0; i < fpga_queued_bits/8; ) {
-		if(AT91C_BASE_SSC->SSC_SR & (AT91C_SSC_TXRDY)) {
-			AT91C_BASE_SSC->SSC_THR = SEC_F;
-			FpgaSendQueueDelay = (uint8_t)AT91C_BASE_SSC->SSC_RHR;
-			i++;
-		}
-	}
-
 	return 0;
 }
 
 
-static int EmSend4bitEx(uint8_t resp, bool correctionNeeded){
+static int EmSend4bitEx(uint8_t resp){
 	Code4bitAnswerAsTag(resp);
-	int res = EmSendCmd14443aRaw(ToSend, ToSendMax, correctionNeeded);
+	int res = EmSendCmd14443aRaw(ToSend, ToSendMax);
 	// do the tracing for the previous reader request and this tag answer:
 	EmLogTraceTag(&resp, 1, NULL, LastProxToAirDuration);
 	return res;
@@ -1542,40 +1546,40 @@ static int EmSend4bitEx(uint8_t resp, bool correctionNeeded){
 
 
 int EmSend4bit(uint8_t resp){
-	return EmSend4bitEx(resp, false);
+	return EmSend4bitEx(resp);
 }
 
 
-static int EmSendCmdExPar(uint8_t *resp, uint16_t respLen, bool correctionNeeded, uint8_t *par){
+static int EmSendCmdExPar(uint8_t *resp, uint16_t respLen, uint8_t *par){
 	CodeIso14443aAsTagPar(resp, respLen, par);
-	int res = EmSendCmd14443aRaw(ToSend, ToSendMax, correctionNeeded);
+	int res = EmSendCmd14443aRaw(ToSend, ToSendMax);
 	// do the tracing for the previous reader request and this tag answer:
 	EmLogTraceTag(resp, respLen, par, LastProxToAirDuration);
 	return res;
 }
 
 
-int EmSendCmdEx(uint8_t *resp, uint16_t respLen, bool correctionNeeded){
+int EmSendCmdEx(uint8_t *resp, uint16_t respLen){
 	uint8_t par[MAX_PARITY_SIZE];
 	GetParity(resp, respLen, par);
-	return EmSendCmdExPar(resp, respLen, correctionNeeded, par);
+	return EmSendCmdExPar(resp, respLen, par);
 }
 
 
 int EmSendCmd(uint8_t *resp, uint16_t respLen){
 	uint8_t par[MAX_PARITY_SIZE];
 	GetParity(resp, respLen, par);
-	return EmSendCmdExPar(resp, respLen, false, par);
+	return EmSendCmdExPar(resp, respLen, par);
 }
 
 
 int EmSendCmdPar(uint8_t *resp, uint16_t respLen, uint8_t *par){
-	return EmSendCmdExPar(resp, respLen, false, par);
+	return EmSendCmdExPar(resp, respLen, par);
 }
 
 
-int EmSendPrecompiledCmd(tag_response_info_t *response_info, bool correctionNeeded) {
-	int ret = EmSendCmd14443aRaw(response_info->modulation, response_info->modulation_n, correctionNeeded);
+int EmSendPrecompiledCmd(tag_response_info_t *response_info) {
+	int ret = EmSendCmd14443aRaw(response_info->modulation, response_info->modulation_n);
 	// do the tracing for the previous reader request and this tag answer:
 	EmLogTraceTag(response_info->response, response_info->response_n, &(response_info->par), response_info->ProxToAirDuration);
 	return ret;
