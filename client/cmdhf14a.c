@@ -11,6 +11,11 @@
 
 #include "cmdhf14a.h"
 
+#include <stdio.h>
+#include <stdlib.h>
+#include <inttypes.h>
+#include <string.h>
+#include <unistd.h>
 #include "util.h"
 #include "util_posix.h"
 #include "iso14443crc.h"

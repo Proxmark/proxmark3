@@ -12,12 +12,7 @@
 #ifndef CMDHF14A_H__
 #define CMDHF14A_H__
 
-#include <stdio.h>
 #include <stdint.h>
-#include <stdlib.h>
-#include <inttypes.h>
-#include <string.h>
-#include <unistd.h>
 #include <stdbool.h>
 
 // structure and database for uid -> tagtype lookups 
