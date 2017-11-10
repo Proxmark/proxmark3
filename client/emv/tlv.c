@@ -317,7 +317,8 @@ void tlvdb_visit(const struct tlvdb *tlvdb, tlv_cb cb, void *data, int level)
 
 	for (; tlvdb; tlvdb = next) {
 		next = tlvdb->next;
-		cb(data, &tlvdb->tag, level);
+		bool is_leaf = (tlvdb->children == NULL);
+		cb(data, &tlvdb->tag, level, is_leaf);
 		tlvdb_visit(tlvdb->children, cb, data, level+1);
 	}
 }

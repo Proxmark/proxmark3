@@ -10,9 +10,11 @@
 
 #include "emvcore.h"
 
-static bool print_cb(void *data, const struct tlv *tlv, int level) {
+static bool print_cb(void *data, const struct tlv *tlv, int level, bool is_leaf) {
 	emv_tag_dump(tlv, stdout, level);
-	dump_buffer(tlv->value, tlv->len, stdout, level);
+	if (is_leaf) {
+		dump_buffer(tlv->value, tlv->len, stdout, level);
+	}
 
 	return true;
 }
