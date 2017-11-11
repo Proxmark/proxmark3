@@ -1875,7 +1875,30 @@ void iso14443a_setup(uint8_t fpga_minor_mode) {
 	iso14a_set_timeout(1060); // 10ms default
 }
 
-
+/* Peter Fillmore 2015
+Added card id field to the function
+ info from ISO14443A standard
+b1 = Block Number
+b2 = RFU (always 1)
+b3 = depends on block
+b4 = Card ID following if set to 1
+b5 = depends on block type
+b6 = depends on block type
+b7,b8 = block type.
+Coding of I-BLOCK:
+b8 b7 b6 b5 b4 b3 b2 b1
+0  0  0  x  x  x  1  x
+b5 = chaining bit
+Coding of R-block:
+b8 b7 b6 b5 b4 b3 b2 b1
+1  0  1  x  x  0  1  x
+b5 = ACK/NACK
+Coding of S-block:
+b8 b7 b6 b5 b4 b3 b2 b1
+1  1  x  x  x  0  1  0 
+b5,b6 = 00 - DESELECT
+        11 - WTX 
+*/    
 int iso14_apdu(uint8_t *cmd, uint16_t cmd_len, void *data) {
 	uint8_t parity[MAX_PARITY_SIZE];
 	uint8_t real_cmd[cmd_len + 4];
