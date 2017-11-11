@@ -703,7 +703,7 @@ int CmdHF14AMfUInfo(const char *Cmd){
 			return usage_hf_mfu_info();
 		case 'k':
 		case 'K':
-			dataLen = param_getstr(Cmd, cmdp+1, tempStr);
+			dataLen = param_getstr(Cmd, cmdp+1, tempStr, sizeof(tempStr));
 			if (dataLen == 32 || dataLen == 8) { //ul-c or ev1/ntag key length
 				errors = param_gethex(tempStr, 0, authenticationkey, dataLen);
 				dataLen /= 2; // handled as bytes from now on
@@ -1238,7 +1238,7 @@ int CmdHF14AMfUDump(const char *Cmd){
 			return usage_hf_mfu_dump();
 		case 'k':
 		case 'K':
-			dataLen = param_getstr(Cmd, cmdp+1, tempStr);
+			dataLen = param_getstr(Cmd, cmdp+1, tempStr, sizeof(tempStr));
 			if (dataLen == 32 || dataLen == 8) { //ul-c or ev1/ntag key length
 				errors = param_gethex(tempStr, 0, authenticationkey, dataLen);
 				dataLen /= 2;
@@ -1256,7 +1256,7 @@ int CmdHF14AMfUDump(const char *Cmd){
 			break;
 		case 'n':
 		case 'N':
-			fileNlen = param_getstr(Cmd, cmdp+1, filename);
+			fileNlen = param_getstr(Cmd, cmdp+1, filename, sizeof(filename));
 			if (!fileNlen) errors = true; 
 			if (fileNlen > FILE_PATH_SIZE-5) fileNlen = FILE_PATH_SIZE-5;
 			cmdp += 2;
