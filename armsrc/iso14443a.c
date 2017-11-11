@@ -1894,10 +1894,23 @@ int iso14_apdu(uint8_t *cmd, uint16_t cmd_len, void *data) {
 
 	if (!len) {
 		return 0; //DATA LINK ERROR
-		
-	// if we received an I- or R(ACK)-Block with a block number equal to the
-	// current block number, toggle the current block number
 	} else{
+		// S-Block WTX 
+		while((data_bytes[0] & 0xF2) == 0xF2) {
+			// Transmit WTX back 
+			// byte1 - WTXM [1..59]. command FWT=FWT*WTXM
+			data_bytes[1] = data_bytes[1] & 0x3f; // 2 high bits mandatory set to 0b
+			// now need to fix CRC.
+			AppendCrc14443a(data_bytes, len - 2);
+			// transmit S-Block
+			ReaderTransmit(data_bytes, len, NULL);
+			// retrieve the result again 
+			len = ReaderReceive(data, parity);
+			data_bytes = data;
+		}
+
+		// if we received an I- or R(ACK)-Block with a block number equal to the
+		// current block number, toggle the current block number
 		if (len >= 3 // PCB+CRC = 3 bytes
 	         && ((data_bytes[0] & 0xC0) == 0 // I-Block
 	             || (data_bytes[0] & 0xD0) == 0x80) // R-Block with ACK bit set to 0
