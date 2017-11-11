@@ -278,7 +278,7 @@ int CmdHFiClassELoad(const char *Cmd) {
 	//File handling and reading
 	FILE *f;
 	char filename[FILE_PATH_SIZE];
-	if(opt == 'f' && param_getstr(Cmd, 1, filename) > 0)
+	if(opt == 'f' && param_getstr(Cmd, 1, filename, sizeof(filename)) > 0)
 	{
 		f = fopen(filename, "rb");
 	}else{
@@ -384,7 +384,7 @@ int CmdHFiClassDecrypt(const char *Cmd) {
 	//Open the tagdump-file
 	FILE *f;
 	char filename[FILE_PATH_SIZE];
-	if(opt == 'f' && param_getstr(Cmd, 1, filename) > 0) {
+	if(opt == 'f' && param_getstr(Cmd, 1, filename, sizeof(filename)) > 0) {
 		f = fopen(filename, "rb");
 		if ( f == NULL ) {
 			PrintAndLog("Could not find file %s", filename);
@@ -605,7 +605,7 @@ int CmdHFiClassReader_Dump(const char *Cmd) {
 		case 'c':
 		case 'C':
 			have_credit_key = true;
-			dataLen = param_getstr(Cmd, cmdp+1, tempStr);
+			dataLen = param_getstr(Cmd, cmdp+1, tempStr, sizeof(tempStr));
 			if (dataLen == 16) {
 				errors = param_gethex(tempStr, 0, CreditKEY, dataLen);
 			} else if (dataLen == 1) {
@@ -629,7 +629,7 @@ int CmdHFiClassReader_Dump(const char *Cmd) {
 			break;
 		case 'f':
 		case 'F':
-			fileNameLen = param_getstr(Cmd, cmdp+1, filename); 
+			fileNameLen = param_getstr(Cmd, cmdp+1, filename, sizeof(filename)); 
 			if (fileNameLen < 1) {
 				PrintAndLog("No filename found after f");
 				errors = true;
@@ -639,7 +639,7 @@ int CmdHFiClassReader_Dump(const char *Cmd) {
 		case 'k':
 		case 'K':
 			have_debit_key = true;
-			dataLen = param_getstr(Cmd, cmdp+1, tempStr);
+			dataLen = param_getstr(Cmd, cmdp+1, tempStr, sizeof(tempStr));
 			if (dataLen == 16) { 
 				errors = param_gethex(tempStr, 0, KEY, dataLen);
 			} else if (dataLen == 1) {
@@ -898,7 +898,7 @@ int CmdHFiClass_WriteBlock(const char *Cmd) {
 			break;
 		case 'k':
 		case 'K':
-			dataLen = param_getstr(Cmd, cmdp+1, tempStr);
+			dataLen = param_getstr(Cmd, cmdp+1, tempStr, sizeof(tempStr));
 			if (dataLen == 16) { 
 				errors = param_gethex(tempStr, 0, KEY, dataLen);
 			} else if (dataLen == 1) {
@@ -992,7 +992,7 @@ int CmdHFiClassCloneTag(const char *Cmd) {
 			break;
 		case 'f':
 		case 'F':
-			fileNameLen = param_getstr(Cmd, cmdp+1, filename); 
+			fileNameLen = param_getstr(Cmd, cmdp+1, filename, sizeof(filename)); 
 			if (fileNameLen < 1) {
 				PrintAndLog("No filename found after f");
 				errors = true;
@@ -1001,7 +1001,7 @@ int CmdHFiClassCloneTag(const char *Cmd) {
 			break;
 		case 'k':
 		case 'K':
-			dataLen = param_getstr(Cmd, cmdp+1, tempStr);
+			dataLen = param_getstr(Cmd, cmdp+1, tempStr, sizeof(tempStr));
 			if (dataLen == 16) { 
 				errors = param_gethex(tempStr, 0, KEY, dataLen);
 			} else if (dataLen == 1) {
@@ -1196,7 +1196,7 @@ int CmdHFiClass_ReadBlock(const char *Cmd) {
 		case 'k':
 		case 'K':
 			auth = true;
-			dataLen = param_getstr(Cmd, cmdp+1, tempStr);
+			dataLen = param_getstr(Cmd, cmdp+1, tempStr, sizeof(tempStr));
 			if (dataLen == 16) { 
 				errors = param_gethex(tempStr, 0, KEY, dataLen);
 			} else if (dataLen == 1) {
@@ -1253,7 +1253,7 @@ int CmdHFiClass_loclass(const char *Cmd) {
 	char fileName[255] = {0};
 	if(opt == 'f')
 	{
-		if(param_getstr(Cmd, 1, fileName) > 0)
+		if(param_getstr(Cmd, 1, fileName, sizeof(fileName)) > 0)
 		{
 			return bruteforceFileNoKeys(fileName);
 		}else
@@ -1318,14 +1318,14 @@ int CmdHFiClassReadTagFile(const char *Cmd) {
 	char tempnum[5];
 	FILE *f;
 	char filename[FILE_PATH_SIZE];
-	if (param_getstr(Cmd, 0, filename) < 1)
+	if (param_getstr(Cmd, 0, filename, sizeof(filename)) < 1)
 		return usage_hf_iclass_readtagfile();
-	if (param_getstr(Cmd,1,(char *)&tempnum) < 1)
+	if (param_getstr(Cmd, 1, tempnum, sizeof(tempnum)) < 1)
 		startblock = 0;
 	else
 		sscanf(tempnum,"%d",&startblock);
 
-	if (param_getstr(Cmd,2,(char *)&tempnum) < 1)
+	if (param_getstr(Cmd,2, tempnum, sizeof(tempnum)) < 1)
 		endblock = 0;
 	else
 		sscanf(tempnum,"%d",&endblock);
@@ -1458,7 +1458,7 @@ int CmdHFiClassCalcNewKey(const char *Cmd) {
 			return usage_hf_iclass_calc_newkey();
 		case 'e':
 		case 'E':
-			dataLen = param_getstr(Cmd, cmdp, tempStr);
+			dataLen = param_getstr(Cmd, cmdp, tempStr, sizeof(tempStr));
 			if (dataLen==2)
 				oldElite = true;
 			elite = true;
@@ -1466,7 +1466,7 @@ int CmdHFiClassCalcNewKey(const char *Cmd) {
 			break;
 		case 'n':
 		case 'N':
-			dataLen = param_getstr(Cmd, cmdp+1, tempStr);
+			dataLen = param_getstr(Cmd, cmdp+1, tempStr, sizeof(tempStr));
 			if (dataLen == 16) { 
 				errors = param_gethex(tempStr, 0, NEWKEY, dataLen);
 			} else if (dataLen == 1) {
@@ -1485,7 +1485,7 @@ int CmdHFiClassCalcNewKey(const char *Cmd) {
 			break;
 		case 'o':
 		case 'O':
-			dataLen = param_getstr(Cmd, cmdp+1, tempStr);
+			dataLen = param_getstr(Cmd, cmdp+1, tempStr, sizeof(tempStr));
 			if (dataLen == 16) { 
 				errors = param_gethex(tempStr, 0, OLDKEY, dataLen);
 			} else if (dataLen == 1) {
@@ -1626,7 +1626,7 @@ int CmdHFiClassManageKeys(const char *Cmd) {
 			return usage_hf_iclass_managekeys();
 		case 'f':
 		case 'F':
-			fileNameLen = param_getstr(Cmd, cmdp+1, filename); 
+			fileNameLen = param_getstr(Cmd, cmdp+1, filename, sizeof(filename)); 
 			if (fileNameLen < 1) {
 				PrintAndLog("No filename found after f");
 				errors = true;
@@ -1645,7 +1645,7 @@ int CmdHFiClassManageKeys(const char *Cmd) {
 		case 'k':
 		case 'K':
 			operation += 3; //set key 
-			dataLen = param_getstr(Cmd, cmdp+1, tempStr);
+			dataLen = param_getstr(Cmd, cmdp+1, tempStr, sizeof(tempStr));
 			if (dataLen == 16) { //ul-c or ev1/ntag key length
 				errors = param_gethex(tempStr, 0, KEY, dataLen);
 			} else {

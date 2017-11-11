@@ -434,9 +434,9 @@ int CmdrevengTestC(const char *Cmd){
 	char result[30];
 	int dataLen;
 	char endian = 0;
-	dataLen = param_getstr(Cmd, cmdp++, inModel);
+	dataLen = param_getstr(Cmd, cmdp++, inModel, sizeof(inModel));
 	if (dataLen < 4) return 0;
-	dataLen = param_getstr(Cmd, cmdp++, inHexStr);
+	dataLen = param_getstr(Cmd, cmdp++, inHexStr, sizeof(inHexStr));
 	if (dataLen < 4) return 0;
 	bool reverse = (param_get8(Cmd, cmdp++)) ? true : false;
 	endian = param_getchar(Cmd, cmdp++); 
@@ -464,7 +464,7 @@ char *SwapEndianStr(const char *inStr, const size_t len, const uint8_t blockSize
 // takes hex string in and searches for a matching result (hex string must include checksum)
 int CmdrevengSearch(const char *Cmd){
 	char inHexStr[50] = {0x00};
-	int dataLen = param_getstr(Cmd, 0, inHexStr);
+	int dataLen = param_getstr(Cmd, 0, inHexStr, sizeof(inHexStr));
 	if (dataLen < 4) return 0;
 
 	char *Models[80];
