@@ -1875,7 +1875,30 @@ void iso14443a_setup(uint8_t fpga_minor_mode) {
 	iso14a_set_timeout(1060); // 10ms default
 }
 
-
+/* Peter Fillmore 2015
+Added card id field to the function
+ info from ISO14443A standard
+b1 = Block Number
+b2 = RFU (always 1)
+b3 = depends on block
+b4 = Card ID following if set to 1
+b5 = depends on block type
+b6 = depends on block type
+b7,b8 = block type.
+Coding of I-BLOCK:
+b8 b7 b6 b5 b4 b3 b2 b1
+0  0  0  x  x  x  1  x
+b5 = chaining bit
+Coding of R-block:
+b8 b7 b6 b5 b4 b3 b2 b1
+1  0  1  x  x  0  1  x
+b5 = ACK/NACK
+Coding of S-block:
+b8 b7 b6 b5 b4 b3 b2 b1
+1  1  x  x  x  0  1  0 
+b5,b6 = 00 - DESELECT
+        11 - WTX 
+*/    
 int iso14_apdu(uint8_t *cmd, uint16_t cmd_len, void *data) {
 	uint8_t parity[MAX_PARITY_SIZE];
 	uint8_t real_cmd[cmd_len + 4];
@@ -1894,10 +1917,23 @@ int iso14_apdu(uint8_t *cmd, uint16_t cmd_len, void *data) {
 
 	if (!len) {
 		return 0; //DATA LINK ERROR
-		
-	// if we received an I- or R(ACK)-Block with a block number equal to the
-	// current block number, toggle the current block number
 	} else{
+		// S-Block WTX 
+		while((data_bytes[0] & 0xF2) == 0xF2) {
+			// Transmit WTX back 
+			// byte1 - WTXM [1..59]. command FWT=FWT*WTXM
+			data_bytes[1] = data_bytes[1] & 0x3f; // 2 high bits mandatory set to 0b
+			// now need to fix CRC.
+			AppendCrc14443a(data_bytes, len - 2);
+			// transmit S-Block
+			ReaderTransmit(data_bytes, len, NULL);
+			// retrieve the result again 
+			len = ReaderReceive(data, parity);
+			data_bytes = data;
+		}
+
+		// if we received an I- or R(ACK)-Block with a block number equal to the
+		// current block number, toggle the current block number
 		if (len >= 3 // PCB+CRC = 3 bytes
 	         && ((data_bytes[0] & 0xC0) == 0 // I-Block
 	             || (data_bytes[0] & 0xD0) == 0x80) // R-Block with ACK bit set to 0
