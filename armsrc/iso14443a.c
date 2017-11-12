@@ -81,6 +81,8 @@ typedef struct {
 } tUart;
 
 static uint32_t iso14a_timeout;
+#define MAX_ISO14A_TIMEOUT 524288
+
 int rsamples = 0;
 uint8_t trigger = 0;
 // the block number for the ISO14443-4 PCB
@@ -1920,6 +1922,9 @@ int iso14_apdu(uint8_t *cmd, uint16_t cmd_len, void *data) {
 	} else{
 		// S-Block WTX 
 		while((data_bytes[0] & 0xF2) == 0xF2) {
+			uint32_t save_iso14a_timeout = iso14a_timeout;
+			// temporarily increase timeout
+			iso14a_timeout = MAX((data_bytes[1] & 0x3f) * iso14a_timeout, MAX_ISO14A_TIMEOUT);
 			// Transmit WTX back 
 			// byte1 - WTXM [1..59]. command FWT=FWT*WTXM
 			data_bytes[1] = data_bytes[1] & 0x3f; // 2 high bits mandatory set to 0b
@@ -1927,9 +1932,11 @@ int iso14_apdu(uint8_t *cmd, uint16_t cmd_len, void *data) {
 			AppendCrc14443a(data_bytes, len - 2);
 			// transmit S-Block
 			ReaderTransmit(data_bytes, len, NULL);
-			// retrieve the result again 
+			// retrieve the result again (with increased timeout) 
 			len = ReaderReceive(data, parity);
 			data_bytes = data;
+			// restore timeout
+			iso14a_timeout = save_iso14a_timeout;
 		}
 
 		// if we received an I- or R(ACK)-Block with a block number equal to the
