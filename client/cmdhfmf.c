@@ -527,7 +527,6 @@ int CmdHF14AMfRestore(const char *Cmd)
 //----------------------------------------------
 //   Nested
 //----------------------------------------------
-# define NESTED_KEY_COUNT 15
 
 static void parseParamTDS(const char *Cmd, const uint8_t indx, bool *paramT, bool *paramD, uint8_t *timeout) {
 	char ctmp3[3] = {0};
@@ -563,7 +562,7 @@ int CmdHF14AMfNested(const char *Cmd)
 	uint8_t trgKeyType = 0;
 	uint8_t SectorsCnt = 0;
 	uint8_t key[6] = {0, 0, 0, 0, 0, 0};
-	uint8_t keyBlock[NESTED_KEY_COUNT * 6];
+	uint8_t keyBlock[MifareDefaultKeysSize * 6];
 	uint64_t key64 = 0;
 	// timeout in units. (ms * 106)/10 or us*0.0106
 	uint8_t btimeout14a = MF_CHKKEYS_DEFTIMEOUT; // fast by default
@@ -713,7 +712,7 @@ int CmdHF14AMfNested(const char *Cmd)
 		}
 
 		PrintAndLog("Testing known keys. Sector count=%d", SectorsCnt);
-		mfCheckKeysSec(SectorsCnt, 2, btimeout14a, true, NESTED_KEY_COUNT, keyBlock, e_sector);
+		mfCheckKeysSec(SectorsCnt, 2, btimeout14a, true, MifareDefaultKeysSize, keyBlock, e_sector);
 		
 		// get known key from array
 		bool keyFound = false;
