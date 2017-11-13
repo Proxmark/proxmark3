@@ -318,10 +318,8 @@ static void emv_tag_dump_dol(const struct tlv *tlv, const struct emv_tag *tag, F
 
 static void emv_tag_dump_string(const struct tlv *tlv, const struct emv_tag *tag, FILE *f, int level)
 {
-	PRINT_INDENT(level);
 	fprintf(f, "\tString value '");
 	fwrite(tlv->value, 1, tlv->len, f);
-	PRINT_INDENT(level);
 	fprintf(f, "'\n");
 }
 
@@ -475,7 +473,7 @@ static void emv_tag_dump_cvm_list(const struct tlv *tlv, const struct emv_tag *t
 	}
 }
 
-static void emv_tag_dump_afl(const struct tlv *tlv, const struct emv_tag *tag, FILE *f){
+static void emv_tag_dump_afl(const struct tlv *tlv, const struct emv_tag *tag, FILE *f, int level){
 	if (tlv->len < 4 || tlv->len % 4) {
 		fprintf(f, "\tINVALID!\n");
 		return;
@@ -496,7 +494,7 @@ bool emv_tag_dump(const struct tlv *tlv, FILE *f, int level)
 	const struct emv_tag *tag = emv_get_tag(tlv);
 
 	PRINT_INDENT(level);
-	fprintf(f, "--%2hx[%02zx] '%s':\n", tlv->tag, tlv->len, tag->name);
+	fprintf(f, "--%2hx[%02zx] '%s':", tlv->tag, tlv->len, tag->name);
 
 	switch (tag->type) {
 	case EMV_TAG_GENERIC:
@@ -513,7 +511,7 @@ bool emv_tag_dump(const struct tlv *tlv, FILE *f, int level)
 		break;
 	case EMV_TAG_AFL:
 		fprintf(f, "\n");
-		emv_tag_dump_afl(tlv, tag, f);
+		emv_tag_dump_afl(tlv, tag, f, level);
 		break;
 	case EMV_TAG_STRING:
 		emv_tag_dump_string(tlv, tag, f, level);
