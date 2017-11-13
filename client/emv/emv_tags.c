@@ -475,12 +475,14 @@ static void emv_tag_dump_cvm_list(const struct tlv *tlv, const struct emv_tag *t
 
 static void emv_tag_dump_afl(const struct tlv *tlv, const struct emv_tag *tag, FILE *f, int level){
 	if (tlv->len < 4 || tlv->len % 4) {
+		PRINT_INDENT(level);
 		fprintf(f, "\tINVALID!\n");
 		return;
 	}
 	
 	for (int i = 0; i < tlv->len / 4; i++) {
-		fprintf(f, "\tSFI[%02x] start:%02x end:%02x offline:%02x\n", tlv->value[i * 4 + 0] >> 3, tlv->value[i * 4 + 1], tlv->value[i * 4 + 2], tlv->value[i * 4 + 3]);
+		PRINT_INDENT(level);
+		fprintf(f, "SFI[%02x] start:%02x end:%02x offline:%02x\n", tlv->value[i * 4 + 0] >> 3, tlv->value[i * 4 + 1], tlv->value[i * 4 + 2], tlv->value[i * 4 + 3]);
 	}
 }
 
