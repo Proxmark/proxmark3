@@ -541,7 +541,7 @@ int param_getstr(const char *line, int paramnum, char * str, size_t buffersize)
 
 	// Prevent out of bounds errors
 	if (en - bg + 1 >= buffersize) {
-		printf("out of bounds error: want %d bytes have %d bytes\n", en - bg + 1 + 1, buffersize);
+		printf("out of bounds error: want %d bytes have %zd bytes\n", en - bg + 1 + 1, buffersize);
 		return 0;
 	}
 	
