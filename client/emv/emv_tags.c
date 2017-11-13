@@ -284,10 +284,11 @@ static void emv_tag_dump_bitmask(const struct tlv *tlv, const struct emv_tag *ta
 		PRINT_INDENT(level);
 		fprintf(f, "\tByte %u (%02x)\n", byte, val);
 		for (bit = 8; bit > 0; bit--, val <<= 1) {
-			if (val & 0x80)
+			if (val & 0x80){
 				PRINT_INDENT(level);
 				fprintf(f, "\t\t%s - '%s'\n", bitstrings[bit - 1],
 						bits->bit == EMV_BIT(byte, bit) ? bits->name : "Unknown");
+			}
 			if (bits->bit == EMV_BIT(byte, bit))
 				bits ++;
 		}
