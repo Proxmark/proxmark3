@@ -107,7 +107,7 @@ void TLVPrintFromTLV(struct tlvdb *tlv) {
 	if (!tlv) 
 		return;
 	
-	tlvdb_visit(tlv, print_cb, NULL);
+	tlvdb_visit(tlv, print_cb, NULL, 0);
 }
 
 void TLVPrintAIDlistFromSelectTLV(struct tlvdb *tlv) {

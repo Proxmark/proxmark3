@@ -19,6 +19,7 @@
 
 #include "dump.h"
 #include <stdio.h>
+#include <string.h>
 
 #define PRINT_INDENT(level) 	{for (int i = 0; i < (level); i++) fprintf(f, "\t");}
 
@@ -36,8 +37,6 @@ void dump_buffer_simple(const unsigned char *ptr, size_t len, FILE *f)
 void dump_buffer(const unsigned char *ptr, size_t len, FILE *f, int level)
 {
 	int i, j;
-	char buf[64] = {0};
-	memset(buf, ' ', tabs > 64 ? 64 : tabs);
 
 	if (!f)
 		f = stdout;
@@ -57,9 +56,5 @@ void dump_buffer(const unsigned char *ptr, size_t len, FILE *f, int level)
 		}
 		fprintf(f, "\n");
 	}
-}
-
-void dump_buffer(const unsigned char *ptr, size_t len, FILE *f) {
-	dump_buffer_tab(ptr, len, f, 4);
 }
 
