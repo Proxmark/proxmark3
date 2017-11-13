@@ -501,12 +501,15 @@ bool emv_tag_dump(const struct tlv *tlv, FILE *f, int level)
 		fprintf(f, "\n");
 		break;
 	case EMV_TAG_BITMASK:
+		fprintf(f, "\n");
 		emv_tag_dump_bitmask(tlv, tag, f, level);
 		break;
 	case EMV_TAG_DOL:
+		fprintf(f, "\n");
 		emv_tag_dump_dol(tlv, tag, f, level);
 		break;
 	case EMV_TAG_CVM_LIST:
+		fprintf(f, "\n");
 		emv_tag_dump_cvm_list(tlv, tag, f, level);
 		break;
 	case EMV_TAG_AFL:
