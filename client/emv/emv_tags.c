@@ -22,6 +22,8 @@
 
 #include <stdlib.h>
 
+#define PRINT_INDENT(level) 	{for (int i = 0; i < (level); i++) fprintf(f, "\t");}
+
 enum emv_tag_t {
 	EMV_TAG_GENERIC,
 	EMV_TAG_BITMASK,
@@ -272,16 +274,18 @@ static const char *bitstrings[] = {
 	"1.......",
 };
 
-static void emv_tag_dump_bitmask(const struct tlv *tlv, const struct emv_tag *tag, FILE *f)
+static void emv_tag_dump_bitmask(const struct tlv *tlv, const struct emv_tag *tag, FILE *f, int level)
 {
 	const struct emv_tag_bit *bits = tag->data;
 	unsigned bit, byte;
 
 	for (byte = 1; byte <= tlv->len; byte ++) {
 		unsigned char val = tlv->value[byte - 1];
+		PRINT_INDENT(level);
 		fprintf(f, "\tByte %u (%02x)\n", byte, val);
 		for (bit = 8; bit > 0; bit--, val <<= 1) {
 			if (val & 0x80)
+				PRINT_INDENT(level);
 				fprintf(f, "\t\t%s - '%s'\n", bitstrings[bit - 1],
 						bits->bit == EMV_BIT(byte, bit) ? bits->name : "Unknown");
 			if (bits->bit == EMV_BIT(byte, bit))
@@ -290,7 +294,7 @@ static void emv_tag_dump_bitmask(const struct tlv *tlv, const struct emv_tag *ta
 	}
 }
 
-static void emv_tag_dump_dol(const struct tlv *tlv, const struct emv_tag *tag, FILE *f)
+static void emv_tag_dump_dol(const struct tlv *tlv, const struct emv_tag *tag, FILE *f, int level)
 {
 	const unsigned char *buf = tlv->value;
 	size_t left = tlv->len;
@@ -300,20 +304,24 @@ static void emv_tag_dump_dol(const struct tlv *tlv, const struct emv_tag *tag, F
 		const struct emv_tag *doltag;
 
 		if (!tlv_parse_tl(&buf, &left, &doltlv)) {
+			PRINT_INDENT(level);
 			fprintf(f, "Invalid Tag-Len\n");
 			continue;
 		}
 
 		doltag = emv_get_tag(&doltlv);
 
+		PRINT_INDENT(level);
 		fprintf(f, "\tTag %4hx len %02zx ('%s')\n", doltlv.tag, doltlv.len, doltag->name);
 	}
 }
 
-static void emv_tag_dump_string(const struct tlv *tlv, const struct emv_tag *tag, FILE *f)
+static void emv_tag_dump_string(const struct tlv *tlv, const struct emv_tag *tag, FILE *f, int level)
 {
+	PRINT_INDENT(level);
 	fprintf(f, "\tString value '");
 	fwrite(tlv->value, 1, tlv->len, f);
+	PRINT_INDENT(level);
 	fprintf(f, "'\n");
 }
 
@@ -348,13 +356,15 @@ static unsigned long emv_value_numeric(const struct tlv *tlv, unsigned start, un
 	return ret;
 }
 
-static void emv_tag_dump_numeric(const struct tlv *tlv, const struct emv_tag *tag, FILE *f)
+static void emv_tag_dump_numeric(const struct tlv *tlv, const struct emv_tag *tag, FILE *f, int level)
 {
+	PRINT_INDENT(level);
 	fprintf(f, "\tNumeric value %lu\n", emv_value_numeric(tlv, 0, tlv->len * 2));
 }
 
-static void emv_tag_dump_yymmdd(const struct tlv *tlv, const struct emv_tag *tag, FILE *f)
+static void emv_tag_dump_yymmdd(const struct tlv *tlv, const struct emv_tag *tag, FILE *f, int level)
 {
+	PRINT_INDENT(level);
 	fprintf(f, "\tDate: 20%02ld.%ld.%ld\n",
 			emv_value_numeric(tlv, 0, 2),
 			emv_value_numeric(tlv, 2, 4),
@@ -366,12 +376,13 @@ static uint32_t emv_get_binary(const unsigned char *S)
 	return (S[0] << 24) | (S[1] << 16) | (S[2] << 8) | (S[3] << 0);
 }
 
-static void emv_tag_dump_cvm_list(const struct tlv *tlv, const struct emv_tag *tag, FILE *f)
+static void emv_tag_dump_cvm_list(const struct tlv *tlv, const struct emv_tag *tag, FILE *f, int level)
 {
 	uint32_t X, Y;
 	int i;
 
 	if (tlv->len < 10 || tlv->len % 2) {
+		PRINT_INDENT(level);
 		fprintf(f, "\tINVALID!\n");
 		return;
 	}
@@ -379,7 +390,9 @@ static void emv_tag_dump_cvm_list(const struct tlv *tlv, const struct emv_tag *t
 	X = emv_get_binary(tlv->value);
 	Y = emv_get_binary(tlv->value + 4);
 
+	PRINT_INDENT(level);
 	fprintf(f, "\tX: %d\n", X);
+	PRINT_INDENT(level);
 	fprintf(f, "\tY: %d\n", Y);
 
 	for (i = 8; i < tlv->len; i+= 2) {
@@ -455,6 +468,7 @@ static void emv_tag_dump_cvm_list(const struct tlv *tlv, const struct emv_tag *t
 			break;
 		}
 
+		PRINT_INDENT(level);
 		fprintf(f, "\t%02x %02x: '%s' '%s' and '%s' if this CVM is unsuccessful\n",
 				tlv->value[i], tlv->value[i+1],
 				method, condition, (tlv->value[i] & 0x40) ? "continue" : "fail");
@@ -472,7 +486,7 @@ static void emv_tag_dump_afl(const struct tlv *tlv, const struct emv_tag *tag, F
 	}
 }
 
-bool emv_tag_dump(const struct tlv *tlv, FILE *f)
+bool emv_tag_dump(const struct tlv *tlv, FILE *f, int level)
 {
 	if (!tlv) {
 		fprintf(f, "NULL\n");
@@ -481,36 +495,34 @@ bool emv_tag_dump(const struct tlv *tlv, FILE *f)
 
 	const struct emv_tag *tag = emv_get_tag(tlv);
 
-	fprintf(f, "%2hx[%02zx] %s: ", tlv->tag, tlv->len, tag->name);
+	PRINT_INDENT(level);
+	fprintf(f, "--%2hx[%02zx] '%s':\n", tlv->tag, tlv->len, tag->name);
 
 	switch (tag->type) {
 	case EMV_TAG_GENERIC:
 		fprintf(f, "\n");
 		break;
 	case EMV_TAG_BITMASK:
-		fprintf(f, "\n");
-		emv_tag_dump_bitmask(tlv, tag, f);
+		emv_tag_dump_bitmask(tlv, tag, f, level);
 		break;
 	case EMV_TAG_DOL:
-		fprintf(f, "\n");
-		emv_tag_dump_dol(tlv, tag, f);
+		emv_tag_dump_dol(tlv, tag, f, level);
 		break;
 	case EMV_TAG_CVM_LIST:
-		fprintf(f, "\n");
-		emv_tag_dump_cvm_list(tlv, tag, f);
+		emv_tag_dump_cvm_list(tlv, tag, f, level);
 		break;
 	case EMV_TAG_AFL:
 		fprintf(f, "\n");
 		emv_tag_dump_afl(tlv, tag, f);
 		break;
 	case EMV_TAG_STRING:
-		emv_tag_dump_string(tlv, tag, f);
+		emv_tag_dump_string(tlv, tag, f, level);
 		break;
 	case EMV_TAG_NUMERIC:
-		emv_tag_dump_numeric(tlv, tag, f);
+		emv_tag_dump_numeric(tlv, tag, f, level);
 		break;
 	case EMV_TAG_YYMMDD:
-		emv_tag_dump_yymmdd(tlv, tag, f);
+		emv_tag_dump_yymmdd(tlv, tag, f, level);
 		break;
 	};
 

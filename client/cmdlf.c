@@ -93,7 +93,7 @@ int CmdLFCommandRead(const char *Cmd)
 			cmdp++;
 			break;
 		case 'c':
-			param_getstr(Cmd, cmdp+1, (char *)&c.d.asBytes);
+			param_getstr(Cmd, cmdp+1, (char *)&c.d.asBytes, sizeof(c.d.asBytes));
 			cmdp+=2;
 			break;
 		case 'd':
@@ -491,7 +491,7 @@ int CmdLFfskSim(const char *Cmd)
 	uint8_t fcHigh=0, fcLow=0, clk=0;
 	uint8_t invert=0;
 	bool errors = false;
-	char hexData[32] = {0x00}; // store entered hex data
+	char hexData[64] = {0x00}; // store entered hex data
 	uint8_t data[255] = {0x00}; 
 	int dataLen = 0;
 	uint8_t cmdp = 0;
@@ -522,7 +522,7 @@ int CmdLFfskSim(const char *Cmd)
 		//  cmdp++;
 		//  break;
 		case 'd':
-			dataLen = param_getstr(Cmd, cmdp+1, hexData);
+			dataLen = param_getstr(Cmd, cmdp+1, hexData, sizeof(hexData));
 			if (dataLen==0) {
 				errors=true; 
 			} else {
@@ -593,7 +593,7 @@ int CmdLFaskSim(const char *Cmd)
 	uint8_t encoding = 1, separator = 0;
 	uint8_t clk=0, invert=0;
 	bool errors = false;
-	char hexData[32] = {0x00}; 
+	char hexData[64] = {0x00}; 
 	uint8_t data[255]= {0x00}; // store entered hex data
 	int dataLen = 0;
 	uint8_t cmdp = 0;
@@ -628,7 +628,7 @@ int CmdLFaskSim(const char *Cmd)
 			cmdp++;
 			break;
 		case 'd':
-			dataLen = param_getstr(Cmd, cmdp+1, hexData);
+			dataLen = param_getstr(Cmd, cmdp+1, hexData, sizeof(hexData));
 			if (dataLen==0) {
 				errors=true; 
 			} else {
@@ -687,7 +687,7 @@ int CmdLFpskSim(const char *Cmd)
 	uint8_t carrier=0, clk=0;
 	uint8_t invert=0;
 	bool errors = false;
-	char hexData[32] = {0x00}; // store entered hex data
+	char hexData[64] = {0x00}; // store entered hex data
 	uint8_t data[255] = {0x00}; 
 	int dataLen = 0;
 	uint8_t cmdp = 0;
@@ -723,7 +723,7 @@ int CmdLFpskSim(const char *Cmd)
 			cmdp++;
 			break;
 		case 'd':
-			dataLen = param_getstr(Cmd, cmdp+1, hexData);
+			dataLen = param_getstr(Cmd, cmdp+1, hexData, sizeof(hexData));
 			if (dataLen==0) {
 				errors=true; 
 			} else {
@@ -945,7 +945,7 @@ int CmdLFfind(const char *Cmd)
 				PrintAndLog("\nValid EM4x05/EM4x69 Chip Found\nUse lf em 4x05readword/dump commands to read\n");
 				return 1;
 			}
-			ans=CmdLFHitagReader("26");
+			ans=CmdLFHitagReader("26"); // 26 = RHT2F_UID_ONLY
 			if (ans==0) {
 				return 1;
 			}

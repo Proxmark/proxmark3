@@ -18,8 +18,12 @@
 #endif
 
 #include "dump.h"
+#include <stdio.h>
 
-void dump_buffer_simple(const unsigned char *ptr, size_t len, FILE *f) {
+#define PRINT_INDENT(level) 	{for (int i = 0; i < (level); i++) fprintf(f, "\t");}
+
+void dump_buffer_simple(const unsigned char *ptr, size_t len, FILE *f)
+{
 	int i;
 
 	if (!f)
@@ -29,7 +33,8 @@ void dump_buffer_simple(const unsigned char *ptr, size_t len, FILE *f) {
 		fprintf(f, "%s%02hhX", i ? " " : "", ptr[i]);
 }
 
-void dump_buffer_tab(const unsigned char *ptr, size_t len, FILE *f, int tabs) {
+void dump_buffer(const unsigned char *ptr, size_t len, FILE *f, int level)
+{
 	int i, j;
 	char buf[64] = {0};
 	memset(buf, ' ', tabs > 64 ? 64 : tabs);
@@ -38,7 +43,8 @@ void dump_buffer_tab(const unsigned char *ptr, size_t len, FILE *f, int tabs) {
 		f = stdout;
 
 	for (i = 0; i < len; i += 16) {
-		fprintf(f, "%s%02x:", buf, i);
+		PRINT_INDENT(level);
+		fprintf(f, "\t%02x:", i);
 		for (j = 0; j < 16; j++) {
 			if (i + j < len)
 				fprintf(f, " %02hhx", ptr[i + j]);

@@ -342,7 +342,8 @@ void tlvdb_add(struct tlvdb *tlvdb, struct tlvdb *other)
 	tlvdb->next = other;
 }
 
-void tlvdb_visit_ex(const struct tlvdb *tlvdb, tlv_cb cb, void *data, int lvl) {
+void tlvdb_visit(const struct tlvdb *tlvdb, tlv_cb cb, void *data, int level)
+{
 	struct tlvdb *next = NULL;
 	lvl++;
 
@@ -351,8 +352,8 @@ void tlvdb_visit_ex(const struct tlvdb *tlvdb, tlv_cb cb, void *data, int lvl) {
 
 	for (; tlvdb; tlvdb = next) {
 		next = tlvdb->next;
-		cb(data, &tlvdb->tag, lvl, (tlvdb->children != NULL));
-		tlvdb_visit_ex(tlvdb->children, cb, data, lvl);
+		cb(data, &tlvdb->tag, level, (tlvdb->children == NULL));
+		tlvdb_visit(tlvdb->children, cb, data, level+1);
 	}
 }
 

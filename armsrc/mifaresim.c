@@ -41,6 +41,132 @@
 
 #define cardSTATE_TO_IDLE() { cardSTATE = MFEMUL_IDLE; LED_B_OFF(); LED_C_OFF(); }
 
+#define AC_DATA_READ             0
+#define AC_DATA_WRITE            1
+#define AC_DATA_INC				 2
+#define AC_DATA_DEC_TRANS_REST	 3
+#define AC_KEYA_READ             0
+#define AC_KEYA_WRITE            1
+#define AC_KEYB_READ             2
+#define AC_KEYB_WRITE            3
+#define AC_AC_READ               4
+#define AC_AC_WRITE              5
+
+#define AUTHKEYA                 0
+#define AUTHKEYB                 1
+#define AUTHKEYNONE              0xff
+
+
+static bool IsTrailerAccessAllowed(uint8_t blockNo, uint8_t keytype, uint8_t action) {
+	uint8_t sector_trailer[16];
+	emlGetMem(sector_trailer, blockNo, 1);
+	uint8_t AC = ((sector_trailer[7] >> 5) & 0x04)
+	           | ((sector_trailer[8] >> 2) & 0x02)
+			   | ((sector_trailer[8] >> 7) & 0x01);
+	switch (action) {
+		case AC_KEYA_READ: {
+			return false;
+			break;
+		}
+		case AC_KEYA_WRITE: {
+			return ((keytype == AUTHKEYA && (AC == 0x00 || AC == 0x01)) 
+			     || (keytype == AUTHKEYB && (AC == 0x04 || AC == 0x03)));
+			break;
+		}
+		case AC_KEYB_READ: {
+			return (keytype == AUTHKEYA && (AC == 0x00 || AC == 0x02 || AC == 0x01));
+			break;
+		}
+		case AC_KEYB_WRITE: {
+			return ((keytype == AUTHKEYA && (AC == 0x00 || AC == 0x04))
+			     || (keytype == AUTHKEYB && (AC == 0x04 || AC == 0x03)));
+			break;
+		}
+		case AC_AC_READ: {
+			return ((keytype == AUTHKEYA)
+			     || (keytype == AUTHKEYB && !(AC == 0x00 || AC == 0x02 || AC == 0x01)));
+			break;
+		}
+		case AC_AC_WRITE: {
+			return ((keytype == AUTHKEYA && (AC == 0x01))
+			     || (keytype == AUTHKEYB && (AC == 0x03 || AC == 0x05)));
+			break;
+		}
+		default: return false;
+	}
+}
+
+
+static bool IsDataAccessAllowed(uint8_t blockNo, uint8_t keytype, uint8_t action)
+{
+	uint8_t sector_trailer[16];
+	emlGetMem(sector_trailer, SectorTrailer(blockNo), 1);
+
+	uint8_t sector_block;
+	if (blockNo < 32*4) {
+		sector_block = blockNo & 0x03;
+	} else {
+		sector_block = (blockNo & 0x0f) / 5;
+	}
+
+	uint8_t AC;
+	switch (sector_block) {
+		case 0x00: {
+			AC = ((sector_trailer[7] >> 2) & 0x04)
+			   | ((sector_trailer[8] << 1) & 0x02)
+			   | ((sector_trailer[8] >> 4) & 0x01);
+			break;
+		}
+		case 0x01: {
+			AC = ((sector_trailer[7] >> 3) & 0x04)
+			   | ((sector_trailer[8] >> 0) & 0x02)
+			   | ((sector_trailer[8] >> 5) & 0x01);
+			break;
+		}
+		case 0x02: {
+			AC = ((sector_trailer[7] >> 4) & 0x04)
+			   | ((sector_trailer[8] >> 1) & 0x02)
+			   | ((sector_trailer[8] >> 6) & 0x01);
+			break;
+		}
+		default: 
+			return false;
+	}
+	
+	switch (action) {
+		case AC_DATA_READ: {
+			return ((keytype == AUTHKEYA && !(AC == 0x03 || AC == 0x05 || AC == 0x07))
+			     || (keytype == AUTHKEYB && !(AC == 0x07)));
+			break;
+		}
+		case AC_DATA_WRITE: {
+			return ((keytype == AUTHKEYA && (AC == 0x00))
+			     || (keytype == AUTHKEYB && (AC == 0x00 || AC == 0x04 || AC == 0x06 || AC == 0x03)));
+			break;
+		}
+		case AC_DATA_INC: {
+			return ((keytype == AUTHKEYA && (AC == 0x00))
+			     || (keytype == AUTHKEYB && (AC == 0x00 || AC == 0x06)));
+			break;
+		}
+		case AC_DATA_DEC_TRANS_REST: {
+			return ((keytype == AUTHKEYA && (AC == 0x00 || AC == 0x06 || AC == 0x01))
+			     || (keytype == AUTHKEYB && (AC == 0x00 || AC == 0x06 || AC == 0x01)));
+			break;
+		}
+	}
+	
+	return false;
+}
+
+
+static bool IsAccessAllowed(uint8_t blockNo, uint8_t keytype, uint8_t action) {
+	if (IsSectorTrailer(blockNo)) {
+		return IsTrailerAccessAllowed(blockNo, keytype, action);
+	} else {
+		return IsDataAccessAllowed(blockNo, keytype, action);
+	}
+}
 
 
 static void MifareSimInit(uint8_t flags, uint8_t *datain, tag_response_info_t **responses, uint32_t *cuid, uint8_t *uid_len) {
@@ -155,7 +281,7 @@ void Mifare1ksim(uint8_t flags, uint8_t exitAfterNReads, uint8_t arg2, uint8_t *
 	uint32_t cuid = 0;
 	uint8_t cardWRBL = 0;
 	uint8_t cardAUTHSC = 0;
-	uint8_t cardAUTHKEY = 0xff;  // no authentication
+	uint8_t cardAUTHKEY = AUTHKEYNONE;  // no authentication
 	uint32_t cardRr = 0;
 	//uint32_t rn_enc = 0;
 	uint32_t ans = 0;
@@ -244,11 +370,11 @@ void Mifare1ksim(uint8_t flags, uint8_t exitAfterNReads, uint8_t arg2, uint8_t *
 
 		// WUPA in HALTED state or REQA or WUPA in any other state
 		if (receivedCmd_len == 1 && ((receivedCmd[0] == ISO14443A_CMD_REQA && cardSTATE != MFEMUL_HALTED) || receivedCmd[0] == ISO14443A_CMD_WUPA)) {
-			EmSendPrecompiledCmd(&responses[ATQA], (receivedCmd[0] == ISO14443A_CMD_WUPA));
+			EmSendPrecompiledCmd(&responses[ATQA]);
 
 			// init crypto block
 			crypto1_destroy(pcs);
-			cardAUTHKEY = 0xff;
+			cardAUTHKEY = AUTHKEYNONE;
 			if (flags & FLAG_RANDOM_NONCE) {
 				nonce = prand();
 			}
@@ -268,7 +394,7 @@ void Mifare1ksim(uint8_t flags, uint8_t exitAfterNReads, uint8_t arg2, uint8_t *
 				// select all - 0x93 0x20
 				if (receivedCmd_len == 2 && (receivedCmd[0] == ISO14443A_CMD_ANTICOLL_OR_SELECT && receivedCmd[1] == 0x20)) {
 					if (MF_DBGLEVEL >= 4)	Dbprintf("SELECT ALL CL1 received");
-					EmSendPrecompiledCmd(&responses[UIDBCC1], false);
+					EmSendPrecompiledCmd(&responses[UIDBCC1]);
 					break;
 				}
 				// select card - 0x93 0x70 ...
@@ -276,12 +402,12 @@ void Mifare1ksim(uint8_t flags, uint8_t exitAfterNReads, uint8_t arg2, uint8_t *
 						(receivedCmd[0] == ISO14443A_CMD_ANTICOLL_OR_SELECT && receivedCmd[1] == 0x70 && memcmp(&receivedCmd[2], responses[UIDBCC1].response, 4) == 0)) {
 					if (MF_DBGLEVEL >= 4) Dbprintf("SELECT CL1 %02x%02x%02x%02x received",receivedCmd[2],receivedCmd[3],receivedCmd[4],receivedCmd[5]);
 					if (uid_len == 4) {
-						EmSendPrecompiledCmd(&responses[SAKfinal], false);
+						EmSendPrecompiledCmd(&responses[SAKfinal]);
 						LED_B_ON();
 						cardSTATE = MFEMUL_WORK;
 						break;
 					} else if (uid_len == 7) {
-						EmSendPrecompiledCmd(&responses[SAK1], false);
+						EmSendPrecompiledCmd(&responses[SAK1]);
 						cardSTATE	= MFEMUL_SELECT2;
 						break;
 					}
@@ -293,7 +419,7 @@ void Mifare1ksim(uint8_t flags, uint8_t exitAfterNReads, uint8_t arg2, uint8_t *
 				// select all cl2 - 0x95 0x20
 				if (receivedCmd_len == 2 && (receivedCmd[0] == ISO14443A_CMD_ANTICOLL_OR_SELECT_2 && receivedCmd[1] == 0x20)) {
 					if (MF_DBGLEVEL >= 4)	Dbprintf("SELECT ALL CL2 received");
-					EmSendPrecompiledCmd(&responses[UIDBCC2], false);
+					EmSendPrecompiledCmd(&responses[UIDBCC2]);
 					break;
 				}
 				// select cl2 card - 0x95 0x70 xxxxxxxxxxxx
@@ -301,7 +427,7 @@ void Mifare1ksim(uint8_t flags, uint8_t exitAfterNReads, uint8_t arg2, uint8_t *
 						(receivedCmd[0] == ISO14443A_CMD_ANTICOLL_OR_SELECT_2 && receivedCmd[1] == 0x70 && memcmp(&receivedCmd[2], responses[UIDBCC2].response, 4) == 0)) {
 					if (uid_len == 7) {
 						if (MF_DBGLEVEL >= 4) Dbprintf("SELECT CL2 %02x%02x%02x%02x received",receivedCmd[2],receivedCmd[3],receivedCmd[4],receivedCmd[5]);
-						EmSendPrecompiledCmd(&responses[SAKfinal], false);
+						EmSendPrecompiledCmd(&responses[SAKfinal]);
 						LED_B_ON();
 						cardSTATE = MFEMUL_WORK;
 						break;
@@ -314,7 +440,7 @@ void Mifare1ksim(uint8_t flags, uint8_t exitAfterNReads, uint8_t arg2, uint8_t *
 				if (receivedCmd_len != 4) {	// all commands must have exactly 4 bytes
 					break;
 				}
-				bool encrypted_data = (cardAUTHKEY != 0xFF) ;
+				bool encrypted_data = (cardAUTHKEY != AUTHKEYNONE) ;
 				if (encrypted_data) {
 					// decrypt seqence
 					mf_crypto1_decryptEx(pcs, receivedCmd, receivedCmd_len, receivedCmd_dec);
@@ -371,10 +497,24 @@ void Mifare1ksim(uint8_t flags, uint8_t exitAfterNReads, uint8_t arg2, uint8_t *
 					}
 				}
 				if (receivedCmd_dec[0] == ISO14443A_CMD_READBLOCK) {
+					uint8_t blockNo = receivedCmd_dec[1];
 					if (MF_DBGLEVEL >= 4) {
-						Dbprintf("Reader reading block %d (0x%02x)",receivedCmd_dec[1],receivedCmd_dec[1]);
+						Dbprintf("Reader reading block %d (0x%02x)", blockNo, blockNo);
 					}
-					emlGetMem(response, receivedCmd_dec[1], 1);
+					emlGetMem(response, blockNo, 1);
+					if (IsSectorTrailer(blockNo)) {
+						memset(response, 0x00, 6); 	// keyA can never be read
+						if (!IsAccessAllowed(blockNo, cardAUTHKEY, AC_KEYB_READ)) {
+							memset(response+10, 0x00, 6); 	// keyB cannot be read
+						}
+						if (!IsAccessAllowed(blockNo, cardAUTHKEY, AC_AC_READ)) {
+							memset(response+6, 0x00, 4); 	// AC bits cannot be read
+						}
+					} else {
+						if (!IsAccessAllowed(blockNo, cardAUTHKEY, AC_DATA_READ)) {
+							memset(response, 0x00, 16);		// datablock cannot be read
+						}
+					}
 					AppendCrc14443a(response, 16);
 					mf_crypto1_encrypt(pcs, response, 18, response_par);
 					EmSendCmdPar(response, 18, response_par);
@@ -386,21 +526,23 @@ void Mifare1ksim(uint8_t flags, uint8_t exitAfterNReads, uint8_t arg2, uint8_t *
 					break;
 				}
 				if (receivedCmd_dec[0] == ISO14443A_CMD_WRITEBLOCK) {
-					if (MF_DBGLEVEL >= 4) Dbprintf("RECV 0xA0 write block %d (%02x)",receivedCmd_dec[1],receivedCmd_dec[1]);
+					uint8_t blockNo = receivedCmd_dec[1];
+					if (MF_DBGLEVEL >= 4) Dbprintf("RECV 0xA0 write block %d (%02x)", blockNo, blockNo);
 					EmSend4bit(mf_crypto1_encrypt4bit(pcs, CARD_ACK));
-					cardWRBL = receivedCmd_dec[1];
+					cardWRBL = blockNo;
 					cardSTATE = MFEMUL_WRITEBL2;
 					break;
 				}
 				if (receivedCmd_dec[0] == MIFARE_CMD_INC || receivedCmd_dec[0] == MIFARE_CMD_DEC || receivedCmd_dec[0] == MIFARE_CMD_RESTORE) {
-					if (MF_DBGLEVEL >= 4) Dbprintf("RECV 0x%02x inc(0xC1)/dec(0xC0)/restore(0xC2) block %d (%02x)",receivedCmd_dec[0],receivedCmd_dec[1],receivedCmd_dec[1]);
-					if (emlCheckValBl(receivedCmd_dec[1])) {
+					uint8_t blockNo = receivedCmd_dec[1];
+					if (MF_DBGLEVEL >= 4) Dbprintf("RECV 0x%02x inc(0xC1)/dec(0xC0)/restore(0xC2) block %d (%02x)",receivedCmd_dec[0], blockNo, blockNo);
+					if (emlCheckValBl(blockNo)) {
 						if (MF_DBGLEVEL >= 2) Dbprintf("Reader tried to operate on block, but emlCheckValBl failed, nacking");
 						EmSend4bit(mf_crypto1_encrypt4bit(pcs, CARD_NACK_NA));
 						break;
 					}
 					EmSend4bit(mf_crypto1_encrypt4bit(pcs, CARD_ACK));
-					cardWRBL = receivedCmd_dec[1];
+					cardWRBL = blockNo;
 					if (receivedCmd_dec[0] == MIFARE_CMD_INC)
 						cardSTATE = MFEMUL_INTREG_INC;
 					if (receivedCmd_dec[0] == MIFARE_CMD_DEC)
@@ -410,7 +552,8 @@ void Mifare1ksim(uint8_t flags, uint8_t exitAfterNReads, uint8_t arg2, uint8_t *
 					break;
 				}
 				if (receivedCmd_dec[0] == MIFARE_CMD_TRANSFER) {
-					if (MF_DBGLEVEL >= 4) Dbprintf("RECV 0x%02x transfer block %d (%02x)",receivedCmd_dec[0],receivedCmd_dec[1],receivedCmd_dec[1]);
+					uint8_t blockNo = receivedCmd_dec[1];
+					if (MF_DBGLEVEL >= 4) Dbprintf("RECV 0x%02x transfer block %d (%02x)",receivedCmd_dec[0], blockNo, blockNo);
 					if (emlSetValBl(cardINTREG, cardINTBLOCK, receivedCmd_dec[1]))
 						EmSend4bit(mf_crypto1_encrypt4bit(pcs, CARD_NACK_NA));
 					else
@@ -508,20 +651,20 @@ void Mifare1ksim(uint8_t flags, uint8_t exitAfterNReads, uint8_t arg2, uint8_t *
 				// test if auth OK
 				if (cardRr != prng_successor(nonce, 64)){
 					if (MF_DBGLEVEL >= 2) Dbprintf("AUTH FAILED for sector %d with key %c. cardRr=%08x, succ=%08x",
-							cardAUTHSC, cardAUTHKEY == 0 ? 'A' : 'B',
+							cardAUTHSC, cardAUTHKEY == AUTHKEYA ? 'A' : 'B',
 							cardRr, prng_successor(nonce, 64));
 					// Shouldn't we respond anything here?
 					// Right now, we don't nack or anything, which causes the
 					// reader to do a WUPA after a while. /Martin
 					// -- which is the correct response. /piwi
-					cardAUTHKEY = 0xff;	// not authenticated
+					cardAUTHKEY = AUTHKEYNONE;	// not authenticated
 					cardSTATE_TO_IDLE();
 					break;
 				}
 				ans = prng_successor(nonce, 96) ^ crypto1_word(pcs, 0, 0);
 				num_to_bytes(ans, 4, rAUTH_AT);
 				EmSendCmd(rAUTH_AT, sizeof(rAUTH_AT));
-				if (MF_DBGLEVEL >= 4)	Dbprintf("AUTH COMPLETED for sector %d with key %c.", cardAUTHSC, cardAUTHKEY == 0 ? 'A' : 'B');
+				if (MF_DBGLEVEL >= 4)	Dbprintf("AUTH COMPLETED for sector %d with key %c.", cardAUTHSC, cardAUTHKEY == AUTHKEYA ? 'A' : 'B');
 				LED_C_ON();
 				cardSTATE = MFEMUL_WORK;
 				break;
@@ -530,8 +673,24 @@ void Mifare1ksim(uint8_t flags, uint8_t exitAfterNReads, uint8_t arg2, uint8_t *
 				if (receivedCmd_len == 18) {
 					mf_crypto1_decryptEx(pcs, receivedCmd, receivedCmd_len, receivedCmd_dec);
 					if (HasValidCRC(receivedCmd_dec, receivedCmd_len)) {
+						if (IsSectorTrailer(cardWRBL)) {
+							emlGetMem(response, cardWRBL, 1);
+							if (!IsAccessAllowed(cardWRBL, cardAUTHKEY, AC_KEYA_WRITE)) {
+								memcpy(receivedCmd_dec, response, 6);	// don't change KeyA
+							}
+							if (!IsAccessAllowed(cardWRBL, cardAUTHKEY, AC_KEYB_WRITE)) {
+								memcpy(receivedCmd_dec+10, response+10, 6);	// don't change KeyA
+							}
+							if (!IsAccessAllowed(cardWRBL, cardAUTHKEY, AC_AC_WRITE)) {
+								memcpy(receivedCmd_dec+6, response+6, 4);	// don't change AC bits
+							}
+						} else {
+							if (!IsAccessAllowed(cardWRBL, cardAUTHKEY, AC_DATA_WRITE)) {
+								memcpy(receivedCmd_dec, response, 16);	// don't change anything
+							}
+						}
 						emlSetMem(receivedCmd_dec, cardWRBL, 1);
-						EmSend4bit(mf_crypto1_encrypt4bit(pcs, CARD_ACK));
+						EmSend4bit(mf_crypto1_encrypt4bit(pcs, CARD_ACK));	// always ACK?
 						cardSTATE = MFEMUL_WORK;
 						break;
 					}

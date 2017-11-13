@@ -81,14 +81,11 @@ void SetAPDULogging(bool logging) {
 	APDULogging = logging;
 }
 
-static bool print_cb(void *data, const struct tlv *tlv, int lvl, bool haveChild) {
-	char buf[64] = {0};
-	memset(buf, '-', lvl > 32 ? 64 : lvl * 2);
-	printf("%s", buf);
-	
-	emv_tag_dump(tlv, stdout);
-	if (!haveChild)
-		dump_buffer_tab(tlv->value, tlv->len, stdout, lvl * 2 + 2);
+static bool print_cb(void *data, const struct tlv *tlv, int level, bool is_leaf) {
+	emv_tag_dump(tlv, stdout, level);
+	if (is_leaf) {
+		dump_buffer(tlv->value, tlv->len, stdout, level);
+	}
 
 	return true;
 }
@@ -99,7 +96,7 @@ void TLVPrintFromBuffer(uint8_t *data, int datalen) {
 	if (t) {
 		PrintAndLog("-------------------- TLV decoded --------------------");
 		
-		tlvdb_visit(t, print_cb, NULL);
+		tlvdb_visit(t, print_cb, NULL, 0);
 		tlvdb_free(t);
 	} else {
 		PrintAndLog("TLV ERROR: Can't parse response as TLV tree.");

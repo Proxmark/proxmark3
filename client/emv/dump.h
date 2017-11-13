@@ -17,10 +17,10 @@
 #define DUMP_H
 
 #include <stdio.h>
-#include <string.h>
+#include <stdbool.h>
 
 void dump_buffer_simple(const unsigned char *ptr, size_t len, FILE *f);
-void dump_buffer(const unsigned char *ptr, size_t len, FILE *f);
+void dump_buffer(const unsigned char *ptr, size_t len, FILE *f, int level);
 void dump_buffer_tab(const unsigned char *ptr, size_t len, FILE *f, int tabs);
 
 #endif

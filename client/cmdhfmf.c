@@ -533,7 +533,7 @@ static void parseParamTDS(const char *Cmd, const uint8_t indx, bool *paramT, boo
 	char ctmp3[3] = {0};
 	int len = param_getlength(Cmd, indx);
 	if (len > 0 && len < 4){
-		param_getstr(Cmd, indx, ctmp3);
+		param_getstr(Cmd, indx, ctmp3, sizeof(ctmp3));
 		
 		*paramT |= (ctmp3[0] == 't' || ctmp3[0] == 'T');
 		*paramD |= (ctmp3[0] == 'd' || ctmp3[0] == 'D');
@@ -1043,7 +1043,7 @@ int CmdHF14AMfChk(const char *Cmd)
 	// double parameters - ts, ds
 	int clen = param_getlength(Cmd, 2);
 	if (clen == 2 || clen == 3){
-		param_getstr(Cmd, 2, ctmp3);
+		param_getstr(Cmd, 2, ctmp3, sizeof(ctmp3));
 		ctmp = ctmp3[1];
 	}
 	//parse
@@ -1075,7 +1075,7 @@ int CmdHF14AMfChk(const char *Cmd)
 			keycnt++;
 		} else {
 			// May be a dic file
-			if ( param_getstr(Cmd, 2 + i,filename) >= FILE_PATH_SIZE ) {
+			if ( param_getstr(Cmd, 2 + i, filename, sizeof(filename)) >= FILE_PATH_SIZE ) {
 				PrintAndLog("File name too long");
 				free(keyBlock);
 				return 2;
@@ -1398,7 +1398,7 @@ int CmdHF14AMf1kSim(const char *Cmd) {
 			break;
 		case 'f':
 		case 'F':
-			len = param_getstr(Cmd, cmdp+1, filename);
+			len = param_getstr(Cmd, cmdp+1, filename, sizeof(filename));
 			if (len < 1) {
 				PrintAndLog("error no filename found");
 				return 0;
@@ -1674,7 +1674,7 @@ int CmdHF14AMfELoad(const char *Cmd)
 		}
 	}
 
-	len = param_getstr(Cmd,nameParamNo,filename);
+	len = param_getstr(Cmd,nameParamNo,filename,sizeof(filename));
 
 	if (len > FILE_PATH_SIZE - 5) len = FILE_PATH_SIZE - 5;
 
@@ -1773,7 +1773,7 @@ int CmdHF14AMfESave(const char *Cmd)
 		}
 	}
 
-	len = param_getstr(Cmd,nameParamNo,filename);
+	len = param_getstr(Cmd,nameParamNo,filename,sizeof(filename));
 
 	if (len > FILE_PATH_SIZE - 5) len = FILE_PATH_SIZE - 5;
 
@@ -2137,7 +2137,7 @@ int CmdHF14AMfCLoad(const char *Cmd)
 		}
 		return 0;
 	} else {
-		param_getstr(Cmd, 0, filename);
+		param_getstr(Cmd, 0, filename, sizeof(filename));
 
 		len = strlen(filename);
 		if (len > FILE_PATH_SIZE - 5) len = FILE_PATH_SIZE - 5;
@@ -2348,7 +2348,7 @@ int CmdHF14AMfCSave(const char *Cmd) {
 		}
 		return 0;
 	} else {
-		param_getstr(Cmd, 0, filename);
+		param_getstr(Cmd, 0, filename, sizeof(filename));
 
 		len = strlen(filename);
 		if (len > FILE_PATH_SIZE - 5) len = FILE_PATH_SIZE - 5;
