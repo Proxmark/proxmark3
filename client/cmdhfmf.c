@@ -26,7 +26,7 @@
 #include "mifare.h"
 #include "mfkey.h"
 
-#define NESTED_SECTOR_RETRY     10			// how often we try mfested() until we give up
+#define NESTED_SECTOR_RETRY     200			// how often we try mfested() until we give up
 
 static int CmdHelp(const char *Cmd);
 
