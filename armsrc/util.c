@@ -422,7 +422,7 @@ void StartCountSspClk()
 	// The high word of the counter (TC2) will not reset until the low word (TC0) overflows. Therefore need to wait quite some time before
 	// we can use the counter.
 	while (AT91C_BASE_TC0->TC_CV < 0xFFFF);
-	// Note: needs two more SSP_CLK cycles (total 2.36 us) until TC2 resets. Don't call GetCountSspClk() that soon.
+	// Note: needs one more SSP_CLK cycle (1.18 us) until TC2 resets. Don't call GetCountSspClk() that soon.
 }
 
 
