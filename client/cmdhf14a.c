@@ -660,8 +660,8 @@ int ExchangeAPDU14a(uint8_t *datain, int datainlen, bool activateField, bool lea
 	// "Command APDU" length should be 5+255+1, but javacard's APDU buffer might be smaller - 133 bytes
 	// https://stackoverflow.com/questions/32994936/safe-max-java-card-apdu-data-command-and-respond-size
 	// here length USB_CMD_DATA_SIZE=512
-	// timeout timeout14a * 1.06 / 100, true, size, &keyBlock[6 * c], e_sector); // timeout is (ms * 106)/10 or us*0.0106
-	UsbCommand c = {CMD_READER_ISO_14443a, {ISO14A_APDU | ISO14A_SET_TIMEOUT | cmdc, (datainlen & 0xFFFF), 1000 * 1000 * 1.06 / 100}}; 
+	// timeout must be authomatically set by "get ATS"
+	UsbCommand c = {CMD_READER_ISO_14443a, {ISO14A_APDU | cmdc, (datainlen & 0xFFFF), 0}}; 
 	memcpy(c.d.asBytes, datain, datainlen);
 	SendCommand(&c);
 	
