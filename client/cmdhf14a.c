@@ -745,7 +745,7 @@ int CmdHF14AAPDU(const char *cmd) {
 		arg_param_end
 	};
 	if (CLParserParseString(cmd, argtable, sizeof(argtable) / sizeof(argtable[0]))){
-		CLParserFree()
+		CLParserFree();
 		return 0;
 	}
 	
@@ -754,7 +754,7 @@ int CmdHF14AAPDU(const char *cmd) {
 	decodeTLV = arg_get_lit(3)->count;
 	// len = data + PCB(1b) + CRC(2b)
 	if (CLParamHexToBuf(arg_get_str(4), data, sizeof(data) - 1 -2, &datalen)) {
-		CLParserFree()
+		CLParserFree();
 		return 1;
 	}
 	
