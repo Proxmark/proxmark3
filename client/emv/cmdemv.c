@@ -10,6 +10,9 @@
 
 #include "cmdemv.h"
 
+#define APDU_RES_LEN 520
+#define APDU_AID_LEN 50
+
 int UsageCmdHFEMVSelect(void) {
 	PrintAndLog("HELP :  Executes select applet command:\n");
 	PrintAndLog("Usage:  hf emv select [-s][-k][-t] <HEX applet AID>\n");
@@ -24,7 +27,7 @@ int UsageCmdHFEMVSelect(void) {
 }
 
 int CmdHFEMVSelect(const char *cmd) {
-	uint8_t data[50] = {0};
+	uint8_t data[APDU_AID_LEN] = {0};
 	int datalen = 0;
 	bool activateField = false;
 	bool leaveSignalON = false;
@@ -85,7 +88,7 @@ int CmdHFEMVSelect(const char *cmd) {
 	}
 	
 	// exec
-	uint8_t buf[200] = {0};
+	uint8_t buf[APDU_RES_LEN] = {0};
 	size_t len = 0;
 	uint16_t sw = 0;
 	int res = EMVSelect(activateField, leaveSignalON, data, datalen, buf, sizeof(buf), &len, &sw, NULL);
@@ -242,7 +245,7 @@ int CmdHFEMVPPSE(const char *cmd) {
 	}
 	
 	// exec
-	uint8_t buf[200] = {0};
+	uint8_t buf[APDU_RES_LEN] = {0};
 	size_t len = 0;
 	uint16_t sw = 0;
 	int res = EMVSelectPSE(activateField, leaveSignalON, PSENum, buf, sizeof(buf), &len, &sw);
@@ -282,10 +285,10 @@ int CmdHFEMVExec(const char *cmd) {
 	bool decodeTLV = false;
 	bool forceSearch = false;
 
-	uint8_t buf[300] = {0};
+	uint8_t buf[APDU_RES_LEN] = {0};
 	size_t len = 0;
 	uint16_t sw = 0;
-	uint8_t AID[50] = {0};
+	uint8_t AID[APDU_AID_LEN] = {0};
 	size_t AIDlen = 0;
 	
 	int res;
