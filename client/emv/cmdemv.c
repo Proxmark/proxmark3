@@ -91,7 +91,7 @@ int CmdHFEMVSelect(const char *cmd) {
 	int res = EMVSelect(activateField, leaveSignalON, data, datalen, buf, sizeof(buf), &len, &sw, NULL);
 
 	if (sw)
-		PrintAndLog("APDU response: %04x - %s", sw, GetAPDUCodeDescription(sw >> 8, sw & 0xff)); 
+		PrintAndLog("APDU response status: %04x - %s", sw, GetAPDUCodeDescription(sw >> 8, sw & 0xff)); 
 	
 	if (res)
 		return res;
