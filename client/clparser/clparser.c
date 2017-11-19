@@ -5,7 +5,7 @@
 // at your option, any later version. See the LICENSE.txt file for the text of
 // the license.
 //-----------------------------------------------------------------------------
-// EMV commands
+// Command line parser core commands
 //-----------------------------------------------------------------------------
 
 #include "clparser.h"
