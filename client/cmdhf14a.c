@@ -737,12 +737,12 @@ int CmdHF14AAPDU(const char *cmd) {
 	void* argtable[] = {ahelp, as, ak, at, astr, aend};
 	*/
 	void* argtable[] = {
-		arg_lit0("hH",  "help",    "print this help and exit"),
+		arg_param_begin,
 		arg_lit0("sS",  "select",  "activate field and select card"),
 		arg_lit0("kK",  "keep",    "leave the signal field ON after receive response"),
 		arg_lit0("tT",  "tlv",     "executes TLV decoder if it possible"),
 		arg_str1(NULL,  NULL,      "<APDU (hex)>", NULL),
-		arg_end(20)
+		arg_param_end
 	};
 	if (CLParserParseString(cmd, argtable, sizeof(argtable) / sizeof(argtable[0])))
 		return 0;
