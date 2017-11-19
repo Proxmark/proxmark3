@@ -155,9 +155,9 @@ int EMVSelect(bool ActivateField, bool LeaveFieldON, uint8_t *AID, size_t AIDLen
 		DropField();
 	
 	if (APDULogging)
-		PrintAndLog(">>>> %s", sprint_hex(data, AIDLen + 5));
+		PrintAndLog(">>>> %s", sprint_hex(data, AIDLen + 6));
 
-	int res = ExchangeAPDU14a(data, AIDLen + 5, ActivateField, LeaveFieldON, Result, (int *)ResultLen);
+	int res = ExchangeAPDU14a(data, AIDLen + 6, ActivateField, LeaveFieldON, Result, (int *)ResultLen);
 	
 	if (APDULogging)
 		PrintAndLog("<<<< %s", sprint_hex(Result, *ResultLen));
