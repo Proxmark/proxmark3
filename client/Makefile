@@ -88,6 +88,8 @@ CMDSRCS = 	crapto1/crapto1.c\
 			crapto1/crypto1.c\
 			polarssl/des.c \
 			polarssl/aes.c\
+			clparser/argtable3.c\
+			clparser/clparser.c\
 			mfkey.c\
 			loclass/cipher.c \
 			loclass/cipherutils.c \
@@ -162,7 +164,7 @@ CMDSRCS = 	crapto1/crapto1.c\
 			reveng/bmpbit.c\
 			reveng/model.c\
 			reveng/poly.c\
-			reveng/getopt.c\
+			#reveng/getopt.c\
 
 cpu_arch = $(shell uname -m)
 ifneq ($(findstring 86, $(cpu_arch)), )

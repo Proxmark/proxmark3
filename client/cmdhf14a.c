@@ -28,6 +28,7 @@
 #include "mifare.h"
 #include "cmdhfmfu.h"
 #include "mifarehost.h"
+#include "clparser/clparser.h"
 #include "emv/apduinfo.h"
 #include "emv/emvcore.h"
 
@@ -725,57 +726,27 @@ int CmdHF14AAPDU(const char *cmd) {
 	bool activateField = false;
 	bool leaveSignalON = false;
 	bool decodeTLV = false;
-	
-	if (strlen(cmd) < 2) {
-		PrintAndLog("Usage: hf 14a apdu [-s] [-k] [-t] <APDU (hex)>");
-		PrintAndLog("       -s    activate field and select card");
-		PrintAndLog("       -k    leave the signal field ON after receive response");
-		PrintAndLog("       -t    executes TLV decoder if it possible. TODO!!!!");
-		return 0;
-	}
 
-	int cmdp = 0;
-	while(param_getchar(cmd, cmdp) != 0x00) {
-		char c = param_getchar(cmd, cmdp);
-		if ((c == '-') && (param_getlength(cmd, cmdp) == 2))
-			switch (param_getchar_indx(cmd, 1, cmdp)) {
-				case 's':
-				case 'S':
-					activateField = true;
-					break;
-				case 'k':
-				case 'K':
-					leaveSignalON = true;
-					break;
-				case 't':
-				case 'T':
-					decodeTLV = true;
-					break;
-				default:
-					PrintAndLog("Unknown parameter '%c'", param_getchar_indx(cmd, 1, cmdp));
-					return 1;
-			}
-			
-		if (isxdigit(c)) {
-			// len = data + PCB(1b) + CRC(2b)
-			switch(param_gethex_to_eol(cmd, cmdp, data, sizeof(data) - 1 - 2, &datalen)) {
-			case 1:
-				PrintAndLog("Invalid HEX value.");
-				return 1;
-			case 2:
-				PrintAndLog("APDU too large.");
-				return 1;
-			case 3:
-				PrintAndLog("Hex must have even number of digits.");
-				return 1;
-			}
-			
-			// we get all the hex to end of line with spaces
-			break;
-		}
-		
-		cmdp++;
-	}
+	CLParserInit("hf 14a apdu", "Send ISO 14443-4 APDU to tag");
+	struct arg_lit *ahelp  = arg_lit0("hH",  "help",    "print this help and exit");
+	struct arg_lit *as     = arg_lit0("sS",  "select",  "activate field and select card");
+	struct arg_lit *ak     = arg_lit0("kK",  "keep",    "leave the signal field ON after receive response");
+	struct arg_lit *at     = arg_lit0("tT",  "tlv",     "executes TLV decoder if it possible");
+	struct arg_str *astr   = arg_str1(NULL,  NULL,      "<APDU (hex)>", NULL);
+	struct arg_end *aend   = arg_end(20);
+	void* argtable[] = {ahelp, as, ak, at, astr, aend};
+	if (CLParserParseString(cmd, argtable, sizeof(argtable) / sizeof(argtable[0])))
+		return 0;
+	
+	activateField = as->count;
+	leaveSignalON = ak->count;
+	decodeTLV = at->count;
+	// len = data + PCB(1b) + CRC(2b)
+	if (CLParamHexToBuf(astr, data, sizeof(data) - 1 -2, &datalen))
+		return 1;
+	
+	CLParserFree();
+//	PrintAndLog("---str [%d] %s", astr->count, astr->sval[0]);
 
 	PrintAndLog(">>>>[%s%s%s] %s", activateField ? "sel ": "", leaveSignalON ? "keep ": "", decodeTLV ? "TLV": "", sprint_hex(data, datalen));
 	

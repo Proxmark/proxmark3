@@ -98,7 +98,7 @@ int reveng_main(int argc, char *argv[]) {
 
 	SETBMP();
 	
-	pos=0;
+	//pos=0;
 	optind=1;
 	do {
 		c=getopt(argc, argv, "?A:BDFLMP:SVXa:bcdefhi:k:lm:p:q:rstuvw:x:yz");
