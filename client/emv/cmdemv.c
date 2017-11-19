@@ -248,7 +248,7 @@ int CmdHFEMVPPSE(const char *cmd) {
 	int res = EMVSelectPSE(activateField, leaveSignalON, PSENum, buf, sizeof(buf), &len, &sw);
 	
 	if (sw)
-		PrintAndLog("APDU response: %04x - %s", sw, GetAPDUCodeDescription(sw >> 8, sw & 0xff)); 
+		PrintAndLog("APDU response status: %04x - %s", sw, GetAPDUCodeDescription(sw >> 8, sw & 0xff)); 
 
 	if (res)
 		return res;
