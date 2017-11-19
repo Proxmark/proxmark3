@@ -12,7 +12,7 @@
 
 int UsageCmdHFEMVSelect(void) {
 	PrintAndLog("HELP :  Executes select applet command:\n");
-	PrintAndLog("Usage:  hf emv select [-s][-k][-1][-2][-t] <HEX applet AID>\n");
+	PrintAndLog("Usage:  hf emv select [-s][-k][-t] <HEX applet AID>\n");
 	PrintAndLog("  Options:");
 	PrintAndLog("  -s       : select card");
 	PrintAndLog("  -k       : keep field for next command");
@@ -187,9 +187,9 @@ int UsageCmdHFEMVPPSE(void) {
 	PrintAndLog("  -2       : pse (2PAY.SYS.DDF01)");
 	PrintAndLog("  -t       : TLV decode results\n");
 	PrintAndLog("Samples:");
-	PrintAndLog(" hf emv pse -s 1 -> select, get pse");
-	PrintAndLog(" hf emv pse -s -k 2 -> select, get ppse, keep field");
-	PrintAndLog(" hf emv pse -s -t 2 -> select, get ppse, show result in TLV");
+	PrintAndLog(" hf emv pse -s -1 -> select, get pse");
+	PrintAndLog(" hf emv pse -s -k -2 -> select, get ppse, keep field");
+	PrintAndLog(" hf emv pse -s -t -2 -> select, get ppse, show result in TLV");
 	return 0;
 }
 
