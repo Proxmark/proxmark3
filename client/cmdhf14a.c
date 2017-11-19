@@ -728,21 +728,30 @@ int CmdHF14AAPDU(const char *cmd) {
 	bool decodeTLV = false;
 
 	CLParserInit("hf 14a apdu", "Send ISO 14443-4 APDU to tag");
-	struct arg_lit *ahelp  = arg_lit0("hH",  "help",    "print this help and exit");
+	/*struct arg_lit *ahelp  = arg_lit0("hH",  "help",    "print this help and exit");
 	struct arg_lit *as     = arg_lit0("sS",  "select",  "activate field and select card");
 	struct arg_lit *ak     = arg_lit0("kK",  "keep",    "leave the signal field ON after receive response");
 	struct arg_lit *at     = arg_lit0("tT",  "tlv",     "executes TLV decoder if it possible");
 	struct arg_str *astr   = arg_str1(NULL,  NULL,      "<APDU (hex)>", NULL);
 	struct arg_end *aend   = arg_end(20);
 	void* argtable[] = {ahelp, as, ak, at, astr, aend};
+	*/
+	void* argtable[] = {
+		arg_lit0("hH",  "help",    "print this help and exit"),
+		arg_lit0("sS",  "select",  "activate field and select card"),
+		arg_lit0("kK",  "keep",    "leave the signal field ON after receive response"),
+		arg_lit0("tT",  "tlv",     "executes TLV decoder if it possible"),
+		arg_str1(NULL,  NULL,      "<APDU (hex)>", NULL),
+		arg_end(20)
+	};
 	if (CLParserParseString(cmd, argtable, sizeof(argtable) / sizeof(argtable[0])))
 		return 0;
 	
-	activateField = as->count;
-	leaveSignalON = ak->count;
-	decodeTLV = at->count;
+	activateField = arg_get_lit(1)->count;
+	leaveSignalON = arg_get_lit(2)->count;
+	decodeTLV = arg_get_lit(3)->count;
 	// len = data + PCB(1b) + CRC(2b)
-	if (CLParamHexToBuf(astr, data, sizeof(data) - 1 -2, &datalen))
+	if (CLParamHexToBuf(arg_get_str(4), data, sizeof(data) - 1 -2, &datalen))
 		return 1;
 	
 	CLParserFree();

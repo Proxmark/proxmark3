@@ -11,6 +11,9 @@
 #include "argtable3.h"
 #include "util.h"
 
+#define arg_get_lit(n)(((struct arg_lit*)argtable[n]))
+#define arg_get_str(n)(((struct arg_str*)argtable[n]))
+
 extern int CLParserInit(char *vprogramName, char *vprogramHint);
 extern int CLParserParseString(const char* str, void* argtable[], size_t vargtableLen);
 extern int CLParserParseArg(int argc, char **argv, void* argtable[], size_t vargtableLen);
