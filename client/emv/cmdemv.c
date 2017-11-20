@@ -12,10 +12,11 @@
 
 int UsageCmdHFEMVSelect(void) {
 	PrintAndLog("HELP :  Executes select applet command:\n");
-	PrintAndLog("Usage:  hf emv select [-s][-k][-t] <HEX applet AID>\n");
+	PrintAndLog("Usage:  hf emv select [-s][-k][-a][-t] <HEX applet AID>\n");
 	PrintAndLog("  Options:");
 	PrintAndLog("  -s       : select card");
 	PrintAndLog("  -k       : keep field for next command");
+	PrintAndLog("  -a       : show APDU reqests and responses\n");
 	PrintAndLog("  -t       : TLV decode results\n");
 	PrintAndLog("Samples:");
 	PrintAndLog(" hf emv select -s a00000000101 -> select card, select applet");
@@ -35,7 +36,7 @@ int CmdHFEMVSelect(const char *cmd) {
 		return 0;
 	}
 	
-	SetAPDULogging(true);
+	SetAPDULogging(false);
 	
 	int cmdp = 0;
 	while(param_getchar(cmd, cmdp) != 0x00) {
@@ -53,6 +54,10 @@ int CmdHFEMVSelect(const char *cmd) {
 				case 'k':
 				case 'K':
 					leaveSignalON = true;
+					break;
+				case 'a':
+				case 'A':
+					SetAPDULogging(true);
 					break;
 				case 't':
 				case 'T':
@@ -104,10 +109,11 @@ int CmdHFEMVSelect(const char *cmd) {
 
 int UsageCmdHFEMVSearch(void) {
 	PrintAndLog("HELP :  Tries to select all applets from applet list:\n");
-	PrintAndLog("Usage:  hf emv search [-s][-k][-t]\n");
+	PrintAndLog("Usage:  hf emv search [-s][-k][-a][-t]\n");
 	PrintAndLog("  Options:");
 	PrintAndLog("  -s       : select card");
 	PrintAndLog("  -k       : keep field for next command");
+	PrintAndLog("  -a       : show APDU reqests and responses\n");
 	PrintAndLog("  -t       : TLV decode results of selected applets\n");
 	PrintAndLog("Samples:");
 	PrintAndLog(" hf emv search -s -> select card and search");
@@ -145,6 +151,10 @@ int CmdHFEMVSearch(const char *cmd) {
 				case 'K':
 					leaveSignalON = true;
 					break;
+				case 'a':
+				case 'A':
+					SetAPDULogging(true);
+					break;
 				case 't':
 				case 'T':
 					decodeTLV = true;
@@ -179,12 +189,13 @@ int CmdHFEMVSearch(const char *cmd) {
 
 int UsageCmdHFEMVPPSE(void) {
 	PrintAndLog("HELP :  Executes PSE/PPSE select command. It returns list of applet on the card:\n");
-	PrintAndLog("Usage:  hf emv pse [-s][-k][-1][-2][-t]\n");
+	PrintAndLog("Usage:  hf emv pse [-s][-k][-1][-2][-a][-t]\n");
 	PrintAndLog("  Options:");
 	PrintAndLog("  -s       : select card");
 	PrintAndLog("  -k       : keep field for next command");
 	PrintAndLog("  -1       : ppse (1PAY.SYS.DDF01)");
 	PrintAndLog("  -2       : pse (2PAY.SYS.DDF01)");
+	PrintAndLog("  -a       : show APDU reqests and responses\n");
 	PrintAndLog("  -t       : TLV decode results\n");
 	PrintAndLog("Samples:");
 	PrintAndLog(" hf emv pse -s -1 -> select, get pse");
@@ -205,7 +216,7 @@ int CmdHFEMVPPSE(const char *cmd) {
 		return 0;
 	}
 
-	SetAPDULogging(true);
+	SetAPDULogging(false);
 	
 	int cmdp = 0;
 	while(param_getchar(cmd, cmdp) != 0x00) {
@@ -223,6 +234,10 @@ int CmdHFEMVPPSE(const char *cmd) {
 				case 'k':
 				case 'K':
 					leaveSignalON = true;
+					break;
+				case 'a':
+				case 'A':
+					SetAPDULogging(true);
 					break;
 				case 't':
 				case 'T':
