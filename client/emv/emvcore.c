@@ -138,7 +138,7 @@ void TLVPrintAIDlistFromSelectTLV(struct tlvdb *tlv) {
 
 
 int EMVSelect(bool ActivateField, bool LeaveFieldON, uint8_t *AID, size_t AIDLen, uint8_t *Result, size_t MaxResultLen, size_t *ResultLen, uint16_t *sw, struct tlvdb *tlv) {
-	uint8_t data[260] = {0};
+	uint8_t data[APDU_RES_LEN] = {0};
 	*ResultLen = 0;
 	if (sw)	*sw = 0;
 	uint16_t isw = 0;
@@ -192,7 +192,7 @@ int EMVSelect(bool ActivateField, bool LeaveFieldON, uint8_t *AID, size_t AIDLen
 }
 
 int EMVSelectPSE(bool ActivateField, bool LeaveFieldON, uint8_t PSENum, uint8_t *Result, size_t MaxResultLen, size_t *ResultLen, uint16_t *sw) {
-	uint8_t buf[50] = {0};
+	uint8_t buf[APDU_AID_LEN] = {0};
 	*ResultLen = 0;
 	int len = 0;
 	int res = 0;
@@ -214,7 +214,7 @@ int EMVSelectPSE(bool ActivateField, bool LeaveFieldON, uint8_t PSENum, uint8_t 
 }
 
 int EMVSearchPSE(bool ActivateField, bool LeaveFieldON, bool decodeTLV, struct tlvdb *tlv) {
-	uint8_t data[260] = {0};
+	uint8_t data[APDU_RES_LEN] = {0};
 	size_t datalen = 0;
 	uint16_t sw = 0;
 	int res;
@@ -282,9 +282,9 @@ int EMVSearchPSE(bool ActivateField, bool LeaveFieldON, bool decodeTLV, struct t
 }
 
 int EMVSearch(bool ActivateField, bool LeaveFieldON, bool decodeTLV, struct tlvdb *tlv) {
-	uint8_t aidbuf[50] = {0};
+	uint8_t aidbuf[APDU_AID_LEN] = {0};
 	int aidlen = 0;
-	uint8_t data[260] = {0};
+	uint8_t data[APDU_RES_LEN] = {0};
 	size_t datalen = 0;
 	uint16_t sw = 0;
 	
@@ -363,7 +363,7 @@ int EMVSelectApplication(struct tlvdb *tlv, uint8_t *AID, size_t *AIDlen) {
 }
 
 int EMVGPO(bool LeaveFieldON, uint8_t *PDOL, size_t PDOLLen, uint8_t *Result, size_t MaxResultLen, size_t *ResultLen, uint16_t *sw, struct tlvdb *tlv) {
-	uint8_t data[260] = {0};
+	uint8_t data[APDU_RES_LEN] = {0};
 	*ResultLen = 0;
 	if (sw)	*sw = 0;
 	uint16_t isw = 0;

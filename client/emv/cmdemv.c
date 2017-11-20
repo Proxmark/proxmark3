@@ -10,9 +10,6 @@
 
 #include "cmdemv.h"
 
-#define APDU_RES_LEN 520
-#define APDU_AID_LEN 50
-
 int UsageCmdHFEMVSelect(void) {
 	PrintAndLog("HELP :  Executes select applet command:\n");
 	PrintAndLog("Usage:  hf emv select [-s][-k][-t] <HEX applet AID>\n");

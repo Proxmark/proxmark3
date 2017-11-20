@@ -26,6 +26,9 @@
 #include "emv/dump.h"
 #include "emv/emv_tags.h"
 
+#define APDU_RES_LEN 260
+#define APDU_AID_LEN 50
+
 extern void TLVPrintFromBuffer(uint8_t *data, int datalen);
 extern void TLVPrintFromTLV(struct tlvdb *tlv);
 extern void TLVPrintAIDlistFromSelectTLV(struct tlvdb *tlv);
