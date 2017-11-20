@@ -157,7 +157,7 @@ int EMVSelect(bool ActivateField, bool LeaveFieldON, uint8_t *AID, size_t AIDLen
 	if (APDULogging)
 		PrintAndLog(">>>> %s", sprint_hex(data, AIDLen + 6));
 
-	int res = ExchangeAPDU14a(data, AIDLen + 6, ActivateField, LeaveFieldON, Result, (int *)ResultLen);
+	int res = ExchangeAPDU14a(data, AIDLen + 6, ActivateField, LeaveFieldON, Result, (int)MaxResultLen, (int *)ResultLen);
 	
 	if (APDULogging)
 		PrintAndLog("<<<< %s", sprint_hex(Result, *ResultLen));
@@ -381,7 +381,7 @@ int EMVGPO(bool LeaveFieldON, uint8_t *PDOL, size_t PDOLLen, uint8_t *Result, si
 	if (APDULogging)
 		PrintAndLog(">>>> %s", sprint_hex(data, PDOLLen + 5));
 
-	int res = ExchangeAPDU14a(data, PDOLLen + 5, false, LeaveFieldON, Result, (int *)ResultLen);
+	int res = ExchangeAPDU14a(data, PDOLLen + 5, false, LeaveFieldON, Result, (int)MaxResultLen, (int *)ResultLen);
 	
 	if (APDULogging)
 		PrintAndLog("<<<< %s", sprint_hex(Result, *ResultLen));
@@ -431,7 +431,7 @@ int EMVReadRecord(bool LeaveFieldON, uint8_t SFI, uint8_t SFIrec, uint8_t *Resul
 	if (APDULogging)
 		PrintAndLog(">>>> %s", sprint_hex(data, 5));
 
-	int res = ExchangeAPDU14a(data, 5, false, LeaveFieldON, Result, (int *)ResultLen);
+	int res = ExchangeAPDU14a(data, 5, false, LeaveFieldON, Result, (int)MaxResultLen, (int *)ResultLen);
 	
 	if (APDULogging)
 		PrintAndLog("<<<< %s", sprint_hex(Result, *ResultLen));

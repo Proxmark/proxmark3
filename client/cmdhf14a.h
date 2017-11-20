@@ -31,6 +31,6 @@ int CmdHF14ASnoop(const char *Cmd);
 char* getTagInfo(uint8_t uid);
 
 extern void DropField();
-extern int ExchangeAPDU14a(uint8_t *datain, int datainlen, bool activateField, bool leaveSignalON, uint8_t *dataout, int *dataoutlen);
+extern int ExchangeAPDU14a(uint8_t *datain, int datainlen, bool activateField, bool leaveSignalON, uint8_t *dataout, int maxdataoutlen, int *dataoutlen);
 
 #endif
