@@ -92,13 +92,14 @@ void SendCommand(UsbCommand *c) {
 	// unresponsive or disconnected. The main console thread is alive, but comm
 	// thread just spins here. Not good.../holiman
 	pthread_mutex_lock(&txcmd_lock);
-	while (txcmd_pending) {
+	if (txcmd_pending) {
 		// Receiver thread will signal when it is ready for us to continue.
 		pthread_cond_wait(&txcmd_sig, &txcmd_lock);
 	}
 
 	// Send command buffer to receiver thread for processing. This is slower, but
-	// there are many race conditions which would otherwise be triggered.
+	// there may be race conditions which would otherwise be triggered.
+	// Introduced in https://github.com/Proxmark/proxmark3/commit/f0ba634
 	txcmd = *c;
 	txcmd_pending = true;
 
