@@ -629,23 +629,12 @@ int CmdHFEMVExec(const char *cmd) {
 					PrintAndLog("ERROR: can't create UDOL TLV.");
 					return 4;
 				}
-				
-				size_t udol_data_tlv_data_len;
-				unsigned char *udol_data_tlv_data = tlv_encode(udol_data_tlv, &udol_data_tlv_data_len);
-				if (!udol_data_tlv_data) {
-					PrintAndLog("ERROR: can't create UDOL data.");
-					return 4;
-				}
 
-				// eliminate fake tag
-				udol_data_tlv_data_len -= 2;
-				udol_data_tlv_data += 2;
-				
-				PrintAndLog("UDOL data[%d]: %s", udol_data_tlv_data_len, sprint_hex(udol_data_tlv_data, udol_data_tlv_data_len));
+				PrintAndLog("UDOL data[%d]: %s", udol_data_tlv->len, sprint_hex(udol_data_tlv->value, udol_data_tlv->len));
 				
 				PrintAndLog("\n* Mastercard compute cryptographic checksum(UDOL)");
 				
-				res = MSCComputeCryptoChecksum(true, udol_data_tlv_data, udol_data_tlv_data_len, buf, sizeof(buf), &len, &sw, tlvRoot);
+				res = MSCComputeCryptoChecksum(true, (uint8_t *)udol_data_tlv->value, udol_data_tlv->len, buf, sizeof(buf), &len, &sw, tlvRoot);
 				if (res) {
 					PrintAndLog("ERROR Compute Crypto Checksum. APDU error %4x", sw);
 					return 5;
