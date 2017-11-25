@@ -405,8 +405,8 @@ int CmdHFEMVExec(const char *cmd) {
 	PrintAndLog("\n* Init transaction parameters.");
 
     //9F66:(Terminal Transaction Qualifiers (TTQ)) len:4
-//	TLV_ADD(0x9F66, "\x86\x00\x00\x00"); // MSD
-	TLV_ADD(0x9F66, "\x26\x00\x00\x00"); // qVSDC
+	TLV_ADD(0x9F66, "\x86\x00\x00\x00"); // MSD
+//	TLV_ADD(0x9F66, "\x26\x00\x00\x00"); // qVSDC
 //	TLV_ADD(0x9F66, "\x8e\x00\x00\x00"); // CDA
     //9F02:(Amount, Authorised (Numeric)) len:6
 	TLV_ADD(0x9F02, "\x00\x00\x00\x00\x01\x00");
