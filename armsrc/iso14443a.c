@@ -189,32 +189,14 @@ void iso14a_set_trigger(bool enable) {
 
 
 void iso14a_set_timeout(uint32_t timeout) {
-	iso14a_timeout = timeout;
-	if(MF_DBGLEVEL >= 3) Dbprintf("ISO14443A Timeout set to %ld (%dms)", iso14a_timeout, iso14a_timeout / 106);
+	iso14a_timeout = timeout - (DELAY_AIR2ARM_AS_READER + DELAY_ARM2AIR_AS_READER)/(16*8);
+	if(MF_DBGLEVEL >= 3) Dbprintf("ISO14443A Timeout set to %ld (%dms)", timeout, timeout / 106);
 }
 
 
-static void iso14a_set_ATS_timeout(uint8_t *ats) {
-
-	uint8_t tb1;
-	uint8_t fwi; 
-	uint32_t fwt;
-	
-	if (ats[0] > 1) {							// there is a format byte T0
-		if ((ats[1] & 0x20) == 0x20) {			// there is an interface byte TB(1)
-			if ((ats[1] & 0x10) == 0x10) {		// there is an interface byte TA(1) preceding TB(1)
-				tb1 = ats[3];
-			} else {
-				tb1 = ats[2];
-			}
-			fwi = (tb1 & 0xf0) >> 4;			// frame waiting indicator (FWI)
-			fwt = 256 * 16 * (1 << fwi);		// frame waiting time (FWT) in 1/fc
-			
-			iso14a_set_timeout(fwt/(8*16));
-		}
-	}
+uint32_t iso14a_get_timeout(void) {
+	return iso14a_timeout + (DELAY_AIR2ARM_AS_READER + DELAY_ARM2AIR_AS_READER)/(16*8);
 }
-
 
 //-----------------------------------------------------------------------------
 // Generate the parity value for a byte sequence
@@ -1277,7 +1259,7 @@ static void PrepareDelayedTransfer(uint16_t delay)
 // Transmit the command (to the tag) that was placed in ToSend[].
 // Parameter timing:
 // if NULL: transfer at next possible time, taking into account
-// 			request guard time and frame delay time
+// 			request guard time, startup frame guard time and frame delay time
 // if == 0:	transfer immediately and return time of transfer
 // if != 0: delay transfer until time specified
 //-------------------------------------------------------------------------------------
@@ -1685,6 +1667,59 @@ int ReaderReceive(uint8_t *receivedAnswer, uint8_t *parity)
 	return Demod.len;
 }
 
+
+static void iso14a_set_ATS_times(uint8_t *ats) {
+
+	uint8_t tb1;
+	uint8_t fwi, sfgi; 
+	uint32_t fwt, sfgt;
+	
+	if (ats[0] > 1) {							// there is a format byte T0
+		if ((ats[1] & 0x20) == 0x20) {			// there is an interface byte TB(1)
+			if ((ats[1] & 0x10) == 0x10) {		// there is an interface byte TA(1) preceding TB(1)
+				tb1 = ats[3];
+			} else {
+				tb1 = ats[2];
+			}
+			fwi = (tb1 & 0xf0) >> 4;			// frame waiting time integer (FWI)
+			if (fwi != 15) {
+				fwt = 256 * 16 * (1 << fwi);	// frame waiting time (FWT) in 1/fc
+				iso14a_set_timeout(fwt/(8*16));
+			}
+			sfgi = tb1 & 0x0f;					// startup frame guard time integer (SFGI)
+			if (sfgi != 0 && sfgi != 15) {
+				sfgt = 256 * 16 * (1 << sfgi);	// startup frame guard time (SFGT) in 1/fc
+				NextTransferTime = MAX(NextTransferTime, Demod.endTime + (sfgt - DELAY_AIR2ARM_AS_READER - DELAY_ARM2AIR_AS_READER)/16);
+			}
+		}
+	}
+}
+
+
+static int GetATQA(uint8_t *resp, uint8_t *resp_par) {
+
+#define WUPA_RETRY_TIMEOUT	10	// 10ms
+	uint8_t wupa[]       = { 0x52 };  // 0x26 - REQA  0x52 - WAKE-UP
+
+	uint32_t save_iso14a_timeout = iso14a_get_timeout();
+	iso14a_set_timeout(1236/(16*8)+1);		// response to WUPA is expected at exactly 1236/fc. No need to wait longer.
+	
+	uint32_t start_time = GetTickCount();
+	int len;
+	
+	// we may need several tries if we did send an unknown command or a wrong authentication before...
+	do {
+		// Broadcast for a card, WUPA (0x52) will force response from all cards in the field
+		ReaderTransmitBitsPar(wupa, 7, NULL, NULL);
+		// Receive the ATQA
+		len = ReaderReceive(resp, resp_par);
+	} while (len == 0 && GetTickCount() <= start_time + WUPA_RETRY_TIMEOUT);
+			
+	iso14a_set_timeout(save_iso14a_timeout);
+	return len;
+}
+
+
 // performs iso14443a anticollision (optional) and card select procedure
 // fills the uid and cuid pointer unless NULL
 // fills the card info record unless NULL
@@ -1692,7 +1727,6 @@ int ReaderReceive(uint8_t *receivedAnswer, uint8_t *parity)
 // and num_cascades must be set (1: 4 Byte UID, 2: 7 Byte UID, 3: 10 Byte UID)
 // requests ATS unless no_rats is true
 int iso14443a_select_card(byte_t *uid_ptr, iso14a_card_select_t *p_hi14a_card, uint32_t *cuid_ptr, bool anticollision, uint8_t num_cascades, bool no_rats) {
-	uint8_t wupa[]       = { 0x52 };  // 0x26 - REQA  0x52 - WAKE-UP
 	uint8_t sel_all[]    = { 0x93,0x20 };
 	uint8_t sel_uid[]    = { 0x93,0x70,0x00,0x00,0x00,0x00,0x00,0x00,0x00};
 	uint8_t rats[]       = { 0xE0,0x80,0x00,0x00 }; // FSD=256, FSDI=8, CID=0
@@ -1712,11 +1746,9 @@ int iso14443a_select_card(byte_t *uid_ptr, iso14a_card_select_t *p_hi14a_card, u
 		p_hi14a_card->ats_len = 0;
 	}
 
-	// Broadcast for a card, WUPA (0x52) will force response from all cards in the field
-    ReaderTransmitBitsPar(wupa, 7, NULL, NULL);
-	
-	// Receive the ATQA
-	if(!ReaderReceive(resp, resp_par)) return 0;
+	if (!GetATQA(resp, resp_par)) {
+		return 0;
+	}
 
 	if(p_hi14a_card) {
 		memcpy(p_hi14a_card->atqa, resp, 2);
@@ -1845,8 +1877,9 @@ int iso14443a_select_card(byte_t *uid_ptr, iso14a_card_select_t *p_hi14a_card, u
 		// reset the PCB block number
 		iso14_pcb_blocknum = 0;
 
-		// set default timeout based on ATS
-		iso14a_set_ATS_timeout(resp);
+		// set default timeout and delay next transfer based on ATS
+		iso14a_set_ATS_times(resp);
+		
 	}
 	return 1;	
 }
