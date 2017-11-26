@@ -1,56 +1,37 @@
-NOTICE:
-(2014-03-26)
-This is now the official Proxmark repository!
-
-INTRODUCTION:
+# proxmark3: the official Proxmark repository!
 
 The proxmark3 is a powerful general purpose RFID tool, the size of a deck
 of cards, designed to snoop, listen and emulate everything from
-Low Frequency (125kHz) to High Frequency (13.56MHz) tags.
+**Low Frequency (125kHz)** to **High Frequency (13.56MHz)** tags.
 
 This repository contains enough software, logic (for the FPGA), and design
 documentation for the hardware that you could, at least in theory,
 do something useful with a proxmark3.
 
-RESOURCES:
+## Resources
 
-   * This repository!
-      https://github.com/Proxmark/proxmark3
-      
-   * The Wiki
-      https://github.com/Proxmark/proxmark3/wiki
-      
-   * The GitHub page
-      http://proxmark.github.io/proxmark3/
-      
-   * The Forum
-      http://www.proxmark.org/forum
-      
-   * The IRC chanel
-       irc.freenode.org #proxmark3
-       -or-
-       http://webchat.freenode.net/?channels=#proxmark3
-       
-   * The Homebrew formula repository
-      https://github.com/Proxmark/homebrew-proxmark3
+* [This repository!](https://github.com/Proxmark/proxmark3)
+* [The Wiki](https://github.com/Proxmark/proxmark3/wiki)
+* [The GitHub Pages website](http://proxmark.github.io/proxmark3/)
+* [The Forum](http://www.proxmark.org/forum)
+* The IRC channel: irc.freenode.org #proxmark3 ([chat in your browser](http://webchat.freenode.net/?channels=#proxmark3))
+* [The Homebrew formula repository](https://github.com/Proxmark/homebrew-proxmark3)
    
-DEVELOPMENT:
+## Development
 
 The tools required to build  or run the project will vary depending on
-your operating system. Please refer to the Wiki for details.
+your operating system. Please refer to [the wiki](https://github.com/Proxmark/proxmark3/wiki) for details.
 
-   * https://github.com/Proxmark/proxmark3/wiki
-
-OBTAINING HARDWARE:
+## Obtaining hardware
 
 The Proxmark3 is available for purchase (assembled and tested) from the
 following locations:
 
-   * https://proxmark3.com/  - RyscCorp (us)
-   * http://www.elechouse.com/  - Elechouse (HK)
-   * https://lab401.com/ - Lab401 (FR)
-   * http://www.rfxsecure.com/  - RFxSecure (SG)
-   * http://proxmark3.tictail.com/ - IceSQL (SE)
+* [RyscCorp](https://proxmark3.com/) (US)
+* [Elechouse](http://www.elechouse.com/) (HK)
+* [Lab401](https://lab401.com/) (FR)
+* [RFxSecure](http://www.rfxsecure.com/) (SG)
+* [IceSQL](http://proxmark3.tictail.com/) (SE)
    
 Most of the ultra-low-volume contract assemblers could put
 something like this together with a reasonable yield. A run of around
@@ -70,7 +51,7 @@ The printed circuit board artwork is also available, as Gerbers and an
 Excellon drill file.
 
 
-LICENSING:
+## License
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
