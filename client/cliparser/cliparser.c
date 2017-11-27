@@ -28,7 +28,7 @@ int CLIParserInit(char *vprogramName, char *vprogramHint) {
 	return 0;
 }
 
-int CLIParserParseArg(int argc, char **argv, void* vargtable[], size_t vargtableLen) { 
+int CLIParserParseArg(int argc, char **argv, void* vargtable[], size_t vargtableLen, bool allowEmptyExec) { 
 	int nerrors;
 	
 	argtable = vargtable;
@@ -44,7 +44,7 @@ int CLIParserParseArg(int argc, char **argv, void* vargtable[], size_t vargtable
 	nerrors = arg_parse(argc, argv, argtable);
 	
 	/* special case: '--help' takes precedence over error reporting */
-	if (argc < 2 ||((struct arg_lit *)argtable[0])->count > 0) { // help must be the first record  
+	if ((argc < 2 && !allowEmptyExec) ||((struct arg_lit *)argtable[0])->count > 0) { // help must be the first record  
 		printf("Usage: %s", programName);
 		arg_print_syntaxv(stdout, argtable, "\n");
 		if (programHint)
@@ -75,7 +75,7 @@ enum ParserState {
 
 #define isSpace(c)(c == ' ' || c == '\t')
 
-int CLIParserParseString(const char* str, void* vargtable[], size_t vargtableLen) {
+int CLIParserParseString(const char* str, void* vargtable[], size_t vargtableLen, bool allowEmptyExec) {
 	int argc = 0;
 	char *argv[200] = {NULL};
 	
@@ -132,7 +132,7 @@ int CLIParserParseString(const char* str, void* vargtable[], size_t vargtableLen
 		}
 	}
 
-	return CLIParserParseArg(argc, argv, vargtable, vargtableLen);
+	return CLIParserParseArg(argc, argv, vargtable, vargtableLen, allowEmptyExec);
 }
 
 void CLIParserFree() {

@@ -133,38 +133,32 @@ int CmdHF14AList(const char *Cmd)
 
 int CmdHF14AReader(const char *Cmd) {
 	uint32_t cm = ISO14A_CONNECT;
-	bool disconnectAfter = true;
+	bool leaveSignalON = false;
 	
-	int cmdp = 0;
-	while(param_getchar(Cmd, cmdp) != 0x00) {
-		switch(param_getchar(Cmd, cmdp)) {
-		case 'h':
-		case 'H':
-			PrintAndLog("Usage: hf 14a reader [k|x] [3]");
-			PrintAndLog("       k    keep the field active after command executed");
-			PrintAndLog("       x    just drop the signal field");
-			PrintAndLog("       3    ISO14443-3 select only (skip RATS)");
-			return 0;
-		case '3':
-			cm |= ISO14A_NO_RATS; 
-			break;
-		case 'k':
-		case 'K':
-			disconnectAfter = false;
-			break;
-		case 'x':
-		case 'X':
-			cm = cm - ISO14A_CONNECT;
-			break;
-		default:
-			PrintAndLog("Unknown command.");
-			return 1;
-		}	
-		
-		cmdp++;
+	CLIParserInit("hf 14a reader", "Executes ISO1443A anticollision-select group of commands.");
+	void* argtable[] = {
+		arg_param_begin,
+		arg_lit0("kK",  "keep",    "keep the field active after command executed"),
+		arg_lit0("xX",  "drop",    "just drop the signal field"),
+		arg_lit0("3",   NULL,      "ISO14443-3 select only (skip RATS)"),
+		arg_param_end
+	};
+	if (CLIParserParseString(Cmd, argtable, sizeof(argtable) / sizeof(argtable[0]), true)){
+		CLIParserFree();
+		return 0;
 	}
-
-	if (!disconnectAfter)
+	
+	leaveSignalON = arg_get_lit(1)->count;
+	if (arg_get_lit(2)->count) {
+		cm = cm - ISO14A_CONNECT;
+	}
+	if (arg_get_lit(3)->count) {
+		cm |= ISO14A_NO_RATS;
+	}
+	
+	CLIParserFree();
+	
+	if (leaveSignalON)
 		cm |= ISO14A_NO_DISCONNECT; 
 	
 	UsbCommand c = {CMD_READER_ISO_14443a, {cm, 0, 0}};
@@ -196,12 +190,12 @@ int CmdHF14AReader(const char *Cmd) {
 		if(card.ats_len >= 3) {			// a valid ATS consists of at least the length byte (TL) and 2 CRC bytes
 			PrintAndLog(" ATS : %s", sprint_hex(card.ats, card.ats_len));
 		}
-		if (!disconnectAfter) {
+		if (leaveSignalON) {
 			PrintAndLog("Card is selected. You can now start sending commands");
 		}
 	}
 
-	if (disconnectAfter) {
+	if (!leaveSignalON) {
 		PrintAndLog("Field dropped.");
 	}
 	
@@ -744,7 +738,7 @@ int CmdHF14AAPDU(const char *cmd) {
 		arg_str1(NULL,  NULL,      "<APDU (hex)>", NULL),
 		arg_param_end
 	};
-	if (CLIParserParseString(cmd, argtable, sizeof(argtable) / sizeof(argtable[0]))){
+	if (CLIParserParseString(cmd, argtable, sizeof(argtable) / sizeof(argtable[0]), false)){
 		CLIParserFree();
 		return 0;
 	}
