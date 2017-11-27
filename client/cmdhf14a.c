@@ -28,7 +28,7 @@
 #include "mifare.h"
 #include "cmdhfmfu.h"
 #include "mifarehost.h"
-#include "clparser/clparser.h"
+#include "cliparser/cliparser.h"
 #include "emv/apduinfo.h"
 #include "emv/emvcore.h"
 
@@ -727,7 +727,7 @@ int CmdHF14AAPDU(const char *cmd) {
 	bool leaveSignalON = false;
 	bool decodeTLV = false;
 
-	CLParserInit("hf 14a apdu", "Send ISO 14443-4 APDU to tag");
+	CLIParserInit("hf 14a apdu", "Send ISO 14443-4 APDU to tag");
 	/*struct arg_lit *ahelp  = arg_lit0("hH",  "help",    "print this help and exit");
 	struct arg_lit *as     = arg_lit0("sS",  "select",  "activate field and select card");
 	struct arg_lit *ak     = arg_lit0("kK",  "keep",    "leave the signal field ON after receive response");
@@ -744,8 +744,8 @@ int CmdHF14AAPDU(const char *cmd) {
 		arg_str1(NULL,  NULL,      "<APDU (hex)>", NULL),
 		arg_param_end
 	};
-	if (CLParserParseString(cmd, argtable, sizeof(argtable) / sizeof(argtable[0]))){
-		CLParserFree();
+	if (CLIParserParseString(cmd, argtable, sizeof(argtable) / sizeof(argtable[0]))){
+		CLIParserFree();
 		return 0;
 	}
 	
@@ -753,12 +753,12 @@ int CmdHF14AAPDU(const char *cmd) {
 	leaveSignalON = arg_get_lit(2)->count;
 	decodeTLV = arg_get_lit(3)->count;
 	// len = data + PCB(1b) + CRC(2b)
-	if (CLParamHexToBuf(arg_get_str(4), data, sizeof(data) - 1 -2, &datalen)) {
-		CLParserFree();
+	if (CLIParamHexToBuf(arg_get_str(4), data, sizeof(data) - 1 -2, &datalen)) {
+		CLIParserFree();
 		return 1;
 	}
 	
-	CLParserFree();
+	CLIParserFree();
 //	PrintAndLog("---str [%d] %s", astr->count, astr->sval[0]);
 
 	PrintAndLog(">>>>[%s%s%s] %s", activateField ? "sel ": "", leaveSignalON ? "keep ": "", decodeTLV ? "TLV": "", sprint_hex(data, datalen));

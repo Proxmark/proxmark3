@@ -88,8 +88,8 @@ CMDSRCS = 	crapto1/crapto1.c\
 			crapto1/crypto1.c\
 			polarssl/des.c \
 			polarssl/aes.c\
-			clparser/argtable3.c\
-			clparser/clparser.c\
+			cliparser/argtable3.c\
+			cliparser/cliparser.c\
 			mfkey.c\
 			loclass/cipher.c \
 			loclass/cipherutils.c \

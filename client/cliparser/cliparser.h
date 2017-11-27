@@ -17,9 +17,9 @@
 #define arg_get_lit(n)(((struct arg_lit*)argtable[n]))
 #define arg_get_str(n)(((struct arg_str*)argtable[n]))
 
-extern int CLParserInit(char *vprogramName, char *vprogramHint);
-extern int CLParserParseString(const char* str, void* argtable[], size_t vargtableLen);
-extern int CLParserParseArg(int argc, char **argv, void* argtable[], size_t vargtableLen);
-extern void CLParserFree();
+extern int CLIParserInit(char *vprogramName, char *vprogramHint);
+extern int CLIParserParseString(const char* str, void* argtable[], size_t vargtableLen);
+extern int CLIParserParseArg(int argc, char **argv, void* argtable[], size_t vargtableLen);
+extern void CLIParserFree();
 
-extern int CLParamHexToBuf(struct arg_str *argstr, uint8_t *data, int maxdatalen, int *datalen);
+extern int CLIParamHexToBuf(struct arg_str *argstr, uint8_t *data, int maxdatalen, int *datalen);

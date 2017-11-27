@@ -8,7 +8,7 @@
 // Command line parser core commands
 //-----------------------------------------------------------------------------
 
-#include "clparser.h"
+#include "cliparser.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -18,7 +18,7 @@ char *programName = NULL;
 char *programHint = NULL;
 char buf[500] = {0};
 
-int CLParserInit(char *vprogramName, char *vprogramHint) {
+int CLIParserInit(char *vprogramName, char *vprogramHint) {
 	argtable = NULL;
 	argtableLen = 0;
 	programName = vprogramName;
@@ -28,7 +28,7 @@ int CLParserInit(char *vprogramName, char *vprogramHint) {
 	return 0;
 }
 
-int CLParserParseArg(int argc, char **argv, void* vargtable[], size_t vargtableLen) { 
+int CLIParserParseArg(int argc, char **argv, void* vargtable[], size_t vargtableLen) { 
 	int nerrors;
 	
 	argtable = vargtable;
@@ -75,7 +75,7 @@ enum ParserState {
 
 #define isSpace(c)(c == ' ' || c == '\t')
 
-int CLParserParseString(const char* str, void* vargtable[], size_t vargtableLen) {
+int CLIParserParseString(const char* str, void* vargtable[], size_t vargtableLen) {
 	int argc = 0;
 	char *argv[200] = {NULL};
 	
@@ -132,10 +132,10 @@ int CLParserParseString(const char* str, void* vargtable[], size_t vargtableLen)
 		}
 	}
 
-	return CLParserParseArg(argc, argv, vargtable, vargtableLen);
+	return CLIParserParseArg(argc, argv, vargtable, vargtableLen);
 }
 
-void CLParserFree() {
+void CLIParserFree() {
 	arg_freetable(argtable, argtableLen);
 	argtable = NULL;
 	
@@ -143,7 +143,7 @@ void CLParserFree() {
 }
 
 // convertors
-int CLParamHexToBuf(struct arg_str *argstr, uint8_t *data, int maxdatalen, int *datalen) {
+int CLIParamHexToBuf(struct arg_str *argstr, uint8_t *data, int maxdatalen, int *datalen) {
 	switch(param_gethex_to_eol(argstr->sval[0], 0, data, maxdatalen, datalen)) {
 	case 1:
 		printf("Parameter error: Invalid HEX value.\n");
