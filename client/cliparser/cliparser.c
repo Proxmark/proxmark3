@@ -16,13 +16,15 @@ void **argtable = NULL;
 size_t argtableLen = 0;
 char *programName = NULL;
 char *programHint = NULL;
+char *programHelp = NULL;
 char buf[500] = {0};
 
-int CLIParserInit(char *vprogramName, char *vprogramHint) {
+int CLIParserInit(char *vprogramName, char *vprogramHint, char *vprogramHelp) {
 	argtable = NULL;
 	argtableLen = 0;
 	programName = vprogramName;
 	programHint = vprogramHint;
+	programHelp = vprogramHelp;
 	memset(buf, 0x00, 500);
 	
 	return 0;
@@ -49,8 +51,10 @@ int CLIParserParseArg(int argc, char **argv, void* vargtable[], size_t vargtable
 		arg_print_syntaxv(stdout, argtable, "\n");
 		if (programHint)
 			printf("%s\n\n", programHint);
-		arg_print_glossary(stdout, argtable, "    %-19s %s\n");
+		arg_print_glossary(stdout, argtable, "    %-20s %s\n");
 		printf("\n");
+		if (programHelp)
+			printf("%s \n", programHelp);
 		
 		return 1;
 	}

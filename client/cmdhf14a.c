@@ -135,7 +135,7 @@ int CmdHF14AReader(const char *Cmd) {
 	uint32_t cm = ISO14A_CONNECT;
 	bool leaveSignalON = false;
 	
-	CLIParserInit("hf 14a reader", "Executes ISO1443A anticollision-select group of commands.");
+	CLIParserInit("hf 14a reader", "Executes ISO1443A anticollision-select group of commands.", NULL);
 	void* argtable[] = {
 		arg_param_begin,
 		arg_lit0("kK",  "keep",    "keep the field active after command executed"),
@@ -721,15 +721,8 @@ int CmdHF14AAPDU(const char *cmd) {
 	bool leaveSignalON = false;
 	bool decodeTLV = false;
 
-	CLIParserInit("hf 14a apdu", "Send ISO 14443-4 APDU to tag");
-	/*struct arg_lit *ahelp  = arg_lit0("hH",  "help",    "print this help and exit");
-	struct arg_lit *as     = arg_lit0("sS",  "select",  "activate field and select card");
-	struct arg_lit *ak     = arg_lit0("kK",  "keep",    "leave the signal field ON after receive response");
-	struct arg_lit *at     = arg_lit0("tT",  "tlv",     "executes TLV decoder if it possible");
-	struct arg_str *astr   = arg_str1(NULL,  NULL,      "<APDU (hex)>", NULL);
-	struct arg_end *aend   = arg_end(20);
-	void* argtable[] = {ahelp, as, ak, at, astr, aend};
-	*/
+	CLIParserInit("hf 14a apdu", "Send ISO 14443-4 APDU to tag", "Sample:\n\thf 14a apdu -st 00A404000E325041592E5359532E444446303100\n");
+
 	void* argtable[] = {
 		arg_param_begin,
 		arg_lit0("sS",  "select",  "activate field and select card"),
@@ -790,7 +783,10 @@ int CmdHF14ACmdRaw(const char *cmd) {
 	int datalen = 0;
 
 	// extract parameters
-	CLIParserInit("hf 14a raw", "Send raw hex data to tag");
+	CLIParserInit("hf 14a raw", "Send raw hex data to tag", 
+		"Sample:\n"\
+		"\thf 14a raw -pa -b7 -t1000 52  -- execute WUPA\n"\
+		"\thf 14a raw -p 9320            -- anticollision\n");
 	void* argtable[] = {
 		arg_param_begin,
 		arg_lit0("rR",  "nreply",  "do not read response"),
