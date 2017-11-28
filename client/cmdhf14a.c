@@ -786,102 +786,53 @@ int CmdHF14ACmdRaw(const char *cmd) {
 	bool bTimeout = false;
 	uint32_t timeout = 0;
 	bool topazmode = false;
-	char buf[5]="";
-	int i = 0;
 	uint8_t data[USB_CMD_DATA_SIZE];
-	uint16_t datalen = 0;
-	uint32_t temp;
+	int datalen = 0;
 
-	if (strlen(cmd)<2) {
-		PrintAndLog("Usage: hf 14a raw [-r] [-c] [-p] [-f] [-b] [-t] <number of bits> <0A 0B 0C ... hex>");
-		PrintAndLog("       -r    do not read response");
-		PrintAndLog("       -c    calculate and append CRC");
-		PrintAndLog("       -p    leave the signal field ON after receive");
-		PrintAndLog("       -a    active signal field ON without select");
-		PrintAndLog("       -s    active signal field ON with select");
-		PrintAndLog("       -b    number of bits to send. Useful for send partial byte");
-		PrintAndLog("       -t    timeout in ms");
-		PrintAndLog("       -T    use Topaz protocol to send command");
-		PrintAndLog("       -3    ISO14443-3 select only (skip RATS)");
+	// extract parameters
+	CLIParserInit("hf 14a raw", "Send raw hex data to tag");
+	void* argtable[] = {
+		arg_param_begin,
+		arg_lit0("rR",  "nreply",  "do not read response"),
+		arg_lit0("cC",  "crc",     "calculate and append CRC"),
+		arg_lit0("pP",  "power",   "leave the signal field ON after receive"),
+		arg_lit0("aA",  "active",  "active signal field ON without select"),
+		arg_lit0("sS",  "actives", "active signal field ON with select"),
+		arg_int0("bB",  "bits",    NULL, "number of bits to send. Useful for send partial byte"),
+		arg_int0("t",   "timeout", NULL, "timeout in ms"),
+		arg_lit0("T",   "topaz",   "use Topaz protocol to send command"),
+		arg_lit0("3",   NULL,      "ISO14443-3 select only (skip RATS)"),
+		arg_str1(NULL,  NULL,      "<data (hex)>", NULL),
+		arg_param_end
+	};
+	// defaults
+	arg_get_int(6)->ival[0] = 0;
+	arg_get_int(7)->ival[0] = 0;
+	
+	if (CLIParserParseString(cmd, argtable, sizeof(argtable) / sizeof(argtable[0]), false)){
+		CLIParserFree();
 		return 0;
 	}
-
-
-	// strip
-	while (*cmd==' ' || *cmd=='\t') cmd++;
-
-	while (cmd[i]!='\0') {
-		if (cmd[i]==' ' || cmd[i]=='\t') { i++; continue; }
-		if (cmd[i]=='-') {
-			switch (cmd[i+1]) {
-				case 'r': 
-					reply = false;
-					break;
-				case 'c':
-					crc = true;
-					break;
-				case 'p':
-					power = true;
-					break;
-				case 'a':
-					active = true;
-					break;
-				case 's':
-					active_select = true;
-					break;
-				case 'b': 
-					sscanf(cmd+i+2,"%d",&temp);
-					numbits = temp & 0xFFFF;
-					i+=3;
-					while(cmd[i]!=' ' && cmd[i]!='\0') { i++; }
-					i-=2;
-					break;
-				case 't':
-					bTimeout = true;
-					sscanf(cmd+i+2,"%d",&temp);
-					timeout = temp;
-					i+=3;
-					while(cmd[i]!=' ' && cmd[i]!='\0') { i++; }
-					i-=2;
-					break;
-				case 'T':
-					topazmode = true;
-					break;
-				case '3':
-					no_rats = true;
-					break;
-				default:
-					PrintAndLog("Invalid option");
-					return 0;
-			}
-			i+=2;
-			continue;
-		}
-		if ((cmd[i]>='0' && cmd[i]<='9') ||
-		    (cmd[i]>='a' && cmd[i]<='f') ||
-		    (cmd[i]>='A' && cmd[i]<='F') ) {
-			buf[strlen(buf)+1]=0;
-			buf[strlen(buf)]=cmd[i];
-			i++;
-
-			if (strlen(buf)>=2) {
-				sscanf(buf,"%x",&temp);
-				data[datalen]=(uint8_t)(temp & 0xff);
-				*buf=0;
-				if (datalen > sizeof(data)-1) {
-					if (crc)
-						PrintAndLog("Buffer is full, we can't add CRC to your data");
-					break;
-				} else {
-					datalen++;
-				}
-			}
-			continue;
-		}
-		PrintAndLog("Invalid char on input");
-		return 0;
+	
+	reply = !arg_get_lit(1)->count;
+	crc = arg_get_lit(2)->count;
+	power = arg_get_lit(3)->count;
+	active = arg_get_lit(4)->count;
+	active_select = arg_get_lit(5)->count;
+	numbits = arg_get_int(6)->ival[0] & 0xFFFF;
+	timeout = arg_get_int(7)->ival[0];
+	bTimeout = (timeout > 0);	
+	topazmode = arg_get_lit(8)->count;
+	no_rats = arg_get_lit(9)->count;
+	// len = data + CRC(2b)
+	if (CLIParamHexToBuf(arg_get_str(10), data, sizeof(data) -2, &datalen)) {
+		CLIParserFree();
+		return 1;
 	}
-
+	
+	CLIParserFree();	
+	
+	// logic 
 	if(crc && datalen>0 && datalen<sizeof(data)-2)
 	{
 		uint8_t first, second;

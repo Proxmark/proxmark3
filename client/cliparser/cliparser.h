@@ -17,6 +17,7 @@
 
 #define arg_get_lit(n)(((struct arg_lit*)argtable[n]))
 #define arg_get_str(n)(((struct arg_str*)argtable[n]))
+#define arg_get_int(n)(((struct arg_int*)argtable[n]))
 
 extern int CLIParserInit(char *vprogramName, char *vprogramHint);
 extern int CLIParserParseString(const char* str, void* argtable[], size_t vargtableLen, bool allowEmptyExec);
