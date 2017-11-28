@@ -643,7 +643,7 @@ void DropField() {
 	SendCommand(&c);
 }
 
-int ExchangeAPDU14a(uint8_t *datain, int datainlen, bool activateField, bool leaveSignalON, uint8_t *dataout, int *dataoutlen) {
+int ExchangeAPDU14a(uint8_t *datain, int datainlen, bool activateField, bool leaveSignalON, uint8_t *dataout, int maxdataoutlen, int *dataoutlen) {
 	uint16_t cmdc = 0;
 	
 	if (activateField) {
@@ -681,6 +681,12 @@ int ExchangeAPDU14a(uint8_t *datain, int datainlen, bool activateField, bool lea
 		*dataoutlen = iLen - 2;
 		if (*dataoutlen < 0)
 			*dataoutlen = 0;
+		
+		if (maxdataoutlen && *dataoutlen > maxdataoutlen) {
+			PrintAndLog("APDU ERROR: Buffer too small(%d). Needs %d bytes", *dataoutlen, maxdataoutlen);
+			return 2;
+		}
+		
 		memcpy(dataout, recv, *dataoutlen);
 		
         if(!iLen) {
@@ -750,7 +756,7 @@ int CmdHF14AAPDU(const char *cmd) {
 
 	PrintAndLog(">>>>[%s%s%s] %s", activateField ? "sel ": "", leaveSignalON ? "keep ": "", decodeTLV ? "TLV": "", sprint_hex(data, datalen));
 	
-	int res = ExchangeAPDU14a(data, datalen, activateField, leaveSignalON, data, &datalen);
+	int res = ExchangeAPDU14a(data, datalen, activateField, leaveSignalON, data, USB_CMD_DATA_SIZE, &datalen);
 
 	if (res)
 		return res;
