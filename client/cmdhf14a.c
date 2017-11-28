@@ -786,7 +786,8 @@ int CmdHF14ACmdRaw(const char *cmd) {
 	CLIParserInit("hf 14a raw", "Send raw hex data to tag", 
 		"Sample:\n"\
 		"\thf 14a raw -pa -b7 -t1000 52  -- execute WUPA\n"\
-		"\thf 14a raw -p 9320            -- anticollision\n");
+		"\thf 14a raw -p 9320            -- anticollision\n"\
+		"\thf 14a raw -psc 60 00         -- select and mifare AUTH\n");
 	void* argtable[] = {
 		arg_param_begin,
 		arg_lit0("rR",  "nreply",  "do not read response"),
