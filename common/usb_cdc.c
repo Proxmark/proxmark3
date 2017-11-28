@@ -77,8 +77,8 @@ static const char cfgDescriptor[] = {
 	0x02,   // CbNumInterfaces
 	0x01,   // CbConfigurationValue
 	0x00,   // CiConfiguration
-	0xC0,   // CbmAttributes 0xA0
-	0xFA,   // CMaxPower
+	0x80,   // CbmAttributes (Bus Powered)
+	0x4B,   // CMaxPower (150mA max current drawn from bus)
 
 	/* Interface 0 Descriptor: Communication Class Interface */
 	0x09, // bLength
