@@ -744,9 +744,9 @@ int CmdHF14AAPDU(const char *cmd) {
 		CLIParserFree();
 		return 1;
 	}
-	
+
 	CLIParserFree();
-//	PrintAndLog("---str [%d] %s", astr->count, astr->sval[0]);
+//	PrintAndLog("---str [%d] %s", arg_get_str(4)->count, arg_get_str(4)->sval[0]);
 
 	PrintAndLog(">>>>[%s%s%s] %s", activateField ? "sel ": "", leaveSignalON ? "keep ": "", decodeTLV ? "TLV": "", sprint_hex(data, datalen));
 	

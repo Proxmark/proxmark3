@@ -498,8 +498,10 @@ int param_gethex_to_eol(const char *line, int paramnum, uint8_t * data, int maxd
 	
 	int indx = bg;
 	while (line[indx]) {
-		if (line[indx] == '\t' || line[indx] == ' ') 
+		if (line[indx] == '\t' || line[indx] == ' ') {
+			indx++;
 			continue;
+		}
 		
 		if (isxdigit(line[indx])) {
 			buf[strlen(buf) + 1] = 0x00;
