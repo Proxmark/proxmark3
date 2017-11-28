@@ -15,6 +15,7 @@ This project uses the changelog in accordance with [keepchangelog](http://keepac
 - Changed proxmark command line parameter `flush` to `-f` or `-flush` (Merlok)
 - Changed `hf 14a reader` to just reqest-anticilission-select sequence (Merlok)
 - Changed `hf 14a raw` - works with LED's and some exchange logic (Merlok)
+- `hf 14a` commands works via argtable3 commandline parsing library (Merlok)
 
 ### Fixed
 - Changed start sequence in Qt mode (fix: short commands hangs main Qt thread) (Merlok)
