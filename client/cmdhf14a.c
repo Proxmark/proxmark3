@@ -720,6 +720,7 @@ int ExchangeAPDU14a(uint8_t *datain, int datainlen, bool activateField, bool lea
 	return 0;
 }
 
+// ISO14443-4. 7. Half-duplex block transmission protocol
 int CmdHF14AAPDU(const char *cmd) {
 	uint8_t data[USB_CMD_DATA_SIZE];
 	int datalen = 0;
@@ -727,7 +728,7 @@ int CmdHF14AAPDU(const char *cmd) {
 	bool leaveSignalON = false;
 	bool decodeTLV = false;
 
-	CLIParserInit("hf 14a apdu", "Send ISO 14443-4 APDU to tag", "Sample:\n\thf 14a apdu -st 00A404000E325041592E5359532E444446303100\n");
+	CLIParserInit("hf 14a apdu", "Sends an ISO 7816-4 APDU via ISO 14443-4 block transmission protocol (T=CL)", "Sample:\n\thf 14a apdu -st 00A404000E325041592E5359532E444446303100\n");
 
 	void* argtable[] = {
 		arg_param_begin,
@@ -739,6 +740,7 @@ int CmdHF14AAPDU(const char *cmd) {
 	};
 	if (CLIParserParseString(cmd, argtable, sizeof(argtable) / sizeof(argtable[0]), false)){
 		CLIParserFree();
+
 		return 0;
 	}
 	
@@ -945,7 +947,7 @@ static command_t CommandTable[] =
   {"cuids",  CmdHF14ACUIDs,        0, "<n> Collect n>0 ISO14443 Type A UIDs in one go"},
   {"sim",    CmdHF14ASim,          0, "<UID> -- Simulate ISO 14443a tag"},
   {"snoop",  CmdHF14ASnoop,        0, "Eavesdrop ISO 14443 Type A"},
-  {"apdu",   CmdHF14AAPDU,         0, "Send ISO 14443-4 APDU to tag"},
+  {"apdu",   CmdHF14AAPDU,         0, "Send an ISO 7816-4 APDU via ISO 14443-4 block transmission protocol"},
   {"raw",    CmdHF14ACmdRaw,       0, "Send raw hex data to tag"},
   {NULL, NULL, 0, NULL}
 };
