@@ -1397,7 +1397,7 @@ void  __attribute__((noreturn)) AppMain(void)
 	LED_A_OFF();
 
 	// Init USB device
-  usb_enable();
+	usb_enable();
 
 	// The FPGA gets its clock from us from PCK0 output, so set that up.
 	AT91C_BASE_PIOA->PIO_BSR = GPIO_PCK0;
@@ -1416,7 +1416,9 @@ void  __attribute__((noreturn)) AppMain(void)
 	// Load the FPGA image, which we have stored in our flash.
 	// (the HF version by default)
 	FpgaDownloadAndGo(FPGA_BITSTREAM_HF);
-
+	// turn off antenna
+	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
+	
 	StartTickCount();
   	
 #ifdef WITH_LCD
