@@ -1,4 +1,5 @@
 # Travis-CI config
+# variable REPOSITORY_EP must be filled with repository name. as sample: "merlokk/proxmark3"
 language: c
 
 compiler: gcc
@@ -27,7 +28,7 @@ before_install:
     sudo apt-get install -y gcc-arm-none-eabi;
   elif [[ "$TRAVIS_OS_NAME" == "osx" ]]; then
     brew update;
-    brew tap pwpiwi/proxmark3;
+    brew tap "$REPOSITORY_EP";
   fi
 
 install:
