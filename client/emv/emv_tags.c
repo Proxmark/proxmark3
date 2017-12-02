@@ -35,6 +35,7 @@ enum emv_tag_t {
 	EMV_TAG_NUMERIC,
 	EMV_TAG_YYMMDD,
 	EMV_TAG_CVR,
+	EMV_TAG_CID,
 };
 
 struct emv_tag {
@@ -59,7 +60,7 @@ static const struct emv_tag_bit EMV_AIP[] = {
 	{ EMV_BIT(1, 4), "Terminal risk management is to be performed" },
 	{ EMV_BIT(1, 3), "Issuer authentication is supported" },
 	{ EMV_BIT(1, 2), "Reserved for use by the EMV Contactless Specifications" },
-	{ EMV_BIT(1, 1), "CDA supported" },
+	{ EMV_BIT(1, 1), "CDA supported (Combined Dynamic Data Authentication / Application Cryptogram Generation)" },
 	{ EMV_BIT(2, 8), "MSD is supported (Magnetic Stripe Data)" },
 	{ EMV_BIT(2, 7), "Reserved for use by the EMV Contactless Specifications" },
 	{ EMV_BIT(2, 6), "Reserved for use by the EMV Contactless Specifications" },
@@ -233,7 +234,7 @@ static const struct emv_tag emv_tags[] = {
 	{ 0x9f1f, "Track 1 Discretionary Data", EMV_TAG_STRING },
 	{ 0x9f21, "Transaction Time" },
 	{ 0x9f26, "Application Cryptogram" },
-	{ 0x9f27, "Cryptogram Information Data" },
+	{ 0x9f27, "Cryptogram Information Data", EMV_TAG_CID },
 	{ 0x9f2a, "Kernel Identifier" },
 	{ 0x9f2d, "ICC PIN Encipherment Public Key Certificate" },
 	{ 0x9f2e, "ICC PIN Encipherment Public Key Exponent" },
@@ -471,6 +472,50 @@ static void emv_tag_dump_cvr(const struct tlv *tlv, const struct emv_tag *tag, F
 	return;
 }
 
+// EMV Book 3
+static void emv_tag_dump_cid(const struct tlv *tlv, const struct emv_tag *tag, FILE *f, int level) {
+	if (!tlv || tlv->len < 1) {
+		PRINT_INDENT(level);
+		fprintf(f, "\tINVALID!\n");
+		return;
+	}
+	
+	PRINT_INDENT(level);
+	if ((tlv->value[0] & 0xC0) == 0x00)	fprintf(f, "\tAC1: AAC (Transaction declined)\n");
+	if ((tlv->value[0] & 0xC0) == 0x40)	fprintf(f, "\tAC1: TC (Transaction approved)\n");
+	if ((tlv->value[0] & 0xC0) == 0x80)	fprintf(f, "\tAC1: ARQC (Online authorisation requested)\n");
+	if ((tlv->value[0] & 0xC0) == 0xC0)	fprintf(f, "\tAC1: RFU\n");
+
+	if ((tlv->value[0] & 0x08) != 0x00) {
+		PRINT_INDENT(level);
+		fprintf(f, "\tAdvice required!\n");
+	}
+
+	if ((tlv->value[0] & 0x07) != 0x00) {
+		PRINT_INDENT(level);
+		fprintf(f, "\tReason/advice/referral code: ");
+		switch((tlv->value[0] & 0x07)) {
+			case 0:
+				fprintf(f, "No information given\n");
+				break;
+			case 1:
+				fprintf(f, "Service not allowed\n");
+				break;
+			case 2:
+				fprintf(f, "PIN Try Limit exceeded\n");
+				break;
+			case 3:
+				fprintf(f, "Issuer authentication failed\n");
+				break;
+			default:
+				fprintf(f, "\tRFU: %2x\n", (tlv->value[0] & 0x07));
+				break;
+		}
+	}
+
+	return;
+}
+
 static void emv_tag_dump_cvm_list(const struct tlv *tlv, const struct emv_tag *tag, FILE *f, int level)
 {
 	uint32_t X, Y;
@@ -627,6 +672,10 @@ bool emv_tag_dump(const struct tlv *tlv, FILE *f, int level)
 	case EMV_TAG_CVR:
 		fprintf(f, "\n");
 		emv_tag_dump_cvr(tlv, tag, f, level);
+		break;
+	case EMV_TAG_CID:
+		fprintf(f, "\n");
+		emv_tag_dump_cid(tlv, tag, f, level);
 		break;
 	};
 
