@@ -33,6 +33,7 @@ before_install:
 
 install:
   if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then 
+    brew info proxmark3;
     brew install -v --HEAD proxmark3;
   elif [[ "$TRAVIS_OS_NAME" == "linux" ]]; then 
     make all;
