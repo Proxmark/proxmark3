@@ -28,7 +28,11 @@ before_install:
     sudo apt-get install -y gcc-arm-none-eabi;
   elif [[ "$TRAVIS_OS_NAME" == "osx" ]]; then
     brew update;
-    brew tap "$REPOSITORY_EP";
+	if [[ "$REPOSITORY_EP" == "" ]]; then
+      brew tap proxmark/proxmark3;
+	else
+      brew tap "$REPOSITORY_EP";
+	fi
   fi
 
 install:
