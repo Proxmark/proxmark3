@@ -42,6 +42,8 @@ This project uses the changelog in accordance with [keepchangelog](http://keepac
 - Added `hf emv` group of commands (Merlok)
 - Added `hf emv search` `hf emv pse` - commands for selection of EMV application (Merlok)
 - Added `hf emv select` - command for select EMV application (Merlok)
+- Added `hf emv exec` - command for execute EMV transaction (Merlok)
+- Added to `hf emv exec` MSD path for VISA and Mastercard and some other compatible EMV cards (Merlok)
 
 ## [3.0.1][2017-06-08]
 

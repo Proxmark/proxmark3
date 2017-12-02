@@ -12,6 +12,7 @@
 #define UTIL_H__
 
 #include <stdint.h>
+#include <stdbool.h>
 #include <stddef.h>
 
 #ifndef ROTR
@@ -34,6 +35,9 @@ extern void AddLogHex(char *fileName, char *extData, const uint8_t * data, const
 extern void AddLogUint64(char *fileName, char *extData, const uint64_t data);
 extern void AddLogCurrentDT(char *fileName);
 extern void FillFileNameByUID(char *fileName, uint8_t * uid, char *ext, int byteCount);
+
+extern void hex_to_buffer(const uint8_t *buf, const uint8_t *hex_data, const size_t hex_len, 
+	const size_t hex_max_len, const size_t min_str_len, const size_t spaces_between, bool uppercase);
 
 extern void print_hex(const uint8_t * data, const size_t len);
 extern char *sprint_hex(const uint8_t * data, const size_t len);
