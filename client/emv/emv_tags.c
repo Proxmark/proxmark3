@@ -222,6 +222,7 @@ static const struct emv_tag emv_tags[] = {
 	{ 0x9f06, "Application Identifier (AID), Terminal. ISO 7816-5" },
 	{ 0x9f07, "Application Usage Control", EMV_TAG_BITMASK, &EMV_AUC },
 	{ 0x9f08, "Application Version Number" },
+	{ 0x9f0a, "Application Selection Registered Proprietary Data" }, // https://blog.ul-ts.com/posts/electronic-card-identifier-one-more-step-for-mif-compliance/
 	{ 0x9f0d, "Issuer Action Code - Default", EMV_TAG_BITMASK, &EMV_TVR },
 	{ 0x9f0e, "Issuer Action Code - Denial", EMV_TAG_BITMASK, &EMV_TVR },
 	{ 0x9f0f, "Issuer Action Code - Online", EMV_TAG_BITMASK, &EMV_TVR },
