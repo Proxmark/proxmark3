@@ -271,6 +271,7 @@ static const struct emv_tag emv_tags[] = {
 	{ 0x9f6c, "Card Transaction Qualifiers (CTQ)", EMV_TAG_BITMASK, &EMV_CTQ },
 	{ 0xa5  , "File Control Information (FCI) Proprietary Template" },
 	{ 0xbf0c, "File Control Information (FCI) Issuer Discretionary Data" },
+	{ 0xdf20, "Issuer Proprietary Bitmap (IPB)" },
 };
 
 static int emv_sort_tag(tlv_tag_t tag)
