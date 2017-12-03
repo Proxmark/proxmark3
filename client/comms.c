@@ -342,7 +342,7 @@ bool WaitForResponseTimeoutW(uint64_t cmd, UsbCommand* response, size_t ms_timeo
 			// 2 seconds elapsed (but this doesn't mean the timeout was exceeded)
 			PrintAndLog("Waiting for a response from the proxmark...");
 			PrintAndLog("Don't forget to cancel its operation first by pressing on the button");
-			break;
+			show_warning = false;
 		}
 	}
 	return false;
