@@ -43,14 +43,14 @@ static void crypto_hash_polarssl_close(struct crypto_hash *_ch)
 
 static void crypto_hash_polarssl_write(struct crypto_hash *_ch, const unsigned char *buf, size_t len)
 {
-//	struct crypto_hash_polarssl *ch = container_of(_ch, struct crypto_hash_libgcrypt, ch);
+//	struct crypto_hash_polarssl *ch = (struct crypto_hash_polarssl *)_ch;
 
 //	gcry_md_write(ch->md, buf, len);
 }
 
 static unsigned char *crypto_hash_polarssl_read(struct crypto_hash *_ch)
 {
-//	struct crypto_hash_polarssl *ch = container_of(_ch, struct crypto_hash_libgcrypt, ch);
+//	struct crypto_hash_polarssl *ch = (struct crypto_hash_polarssl *)_ch;
 
 //	return gcry_md_read(ch->md, 0);
 return NULL;
