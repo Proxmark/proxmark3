@@ -30,61 +30,48 @@
 
 struct crypto_hash_polarssl {
 	struct crypto_hash ch;
-	rsa_context *ctx;
+	sha1_context ctx;
 };
 
 static void crypto_hash_polarssl_close(struct crypto_hash *_ch)
 {
 	struct crypto_hash_polarssl *ch = (struct crypto_hash_polarssl *)_ch;
 
-	rsa_free(ch->ctx);
 	free(ch);
 }
 
 static void crypto_hash_polarssl_write(struct crypto_hash *_ch, const unsigned char *buf, size_t len)
 {
-//	struct crypto_hash_polarssl *ch = (struct crypto_hash_polarssl *)_ch;
+	struct crypto_hash_polarssl *ch = (struct crypto_hash_polarssl *)_ch;
 
-//	gcry_md_write(ch->md, buf, len);
+	sha1_update(&(ch->ctx), buf, len);
 }
 
 static unsigned char *crypto_hash_polarssl_read(struct crypto_hash *_ch)
 {
-//	struct crypto_hash_polarssl *ch = (struct crypto_hash_polarssl *)_ch;
+	struct crypto_hash_polarssl *ch = (struct crypto_hash_polarssl *)_ch;
 
-//	return gcry_md_read(ch->md, 0);
-return NULL;
+	static unsigned char sha1sum[20];
+	sha1_finish(&(ch->ctx), sha1sum);
+	return sha1sum;
 }
 
 static size_t crypto_hash_polarssl_get_size(const struct crypto_hash *ch)
 {
-/*	int algo = GCRY_MD_NONE;
-
 	if (ch->algo == HASH_SHA_1)
-		algo = GCRY_MD_SHA1;*/
-
-//	return gcry_md_get_algo_dlen(algo);
-return 0;
+		return 20;
+	else
+		return 0;
 }
 
 static struct crypto_hash *crypto_hash_polarssl_open(enum crypto_algo_hash hash)
 {
 	struct crypto_hash_polarssl *ch = malloc(sizeof(*ch));
-/*	gcry_error_t err;
-	int algo = GCRY_MD_NONE;
 
-	if (hash == HASH_SHA_1)
-		algo = GCRY_MD_SHA1;
-
-	err = gcry_md_open(&ch->md, algo, 0);
-	if (err) {
-		fprintf(stderr, "LibGCrypt error %s/%s\n",
-				gcry_strsource (err),
-				gcry_strerror (err));
-		free(ch);
-
+	if (hash != HASH_SHA_1)
 		return NULL;
-	}*/
+	
+	sha1_starts(&(ch->ctx));
 
 	ch->ch.write = crypto_hash_polarssl_write;
 	ch->ch.read = crypto_hash_polarssl_read;
@@ -96,7 +83,7 @@ static struct crypto_hash *crypto_hash_polarssl_open(enum crypto_algo_hash hash)
 
 struct crypto_pk_polarssl {
 	struct crypto_pk cp;
-//	gcry_sexp_t pk;
+	rsa_context ctx;
 };
 
 static struct crypto_pk *crypto_pk_polarssl_open_rsa(va_list vl)
