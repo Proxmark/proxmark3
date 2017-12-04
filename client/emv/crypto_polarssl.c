@@ -89,21 +89,23 @@ struct crypto_pk_polarssl {
 static struct crypto_pk *crypto_pk_polarssl_open_rsa(va_list vl)
 {
 	struct crypto_pk_polarssl *cp = malloc(sizeof(*cp));
-	//gcry_error_t err;
-/*	char *mod = va_arg(vl, char *);
+
+	char *mod = va_arg(vl, char *);  // N
 	int modlen = va_arg(vl, size_t);
-	char *exp = va_arg(vl, char *);
+	char *exp = va_arg(vl, char *);  // E
 	int explen = va_arg(vl, size_t);
-*/
-/*	err = gcry_sexp_build(&cp->pk, NULL, "(public-key (rsa (n %b) (e %b)))",
-			modlen, mod, explen, exp);
-	if (err) {
-		fprintf(stderr, "LibGCrypt error %s/%s\n",
-				gcry_strsource (err),
-				gcry_strerror (err));
-		free(cp);
-		return NULL;
-	}*/
+
+	rsa_init(&(cp->ctx), RSA_PKCS_V15, 0);
+	
+    cp->ctx.len = modlen * 2; // size(N) in chars
+	mpi_read_binary(&cp->ctx.N, (const unsigned char *)mod, modlen);
+	mpi_read_binary(&cp->ctx.E, (const unsigned char *)exp, explen);
+	
+	if(rsa_check_privkey(&(cp->ctx)) != 0) {
+		fprintf(stderr, "PolarSSL key error.\n");
+
+        return NULL;
+    }
 
 	return &cp->cp;
 }
