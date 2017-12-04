@@ -30,15 +30,15 @@
 
 struct crypto_hash_polarssl {
 	struct crypto_hash ch;
-//	gcry_md_hd_t md;
+	rsa_context *ctx;
 };
 
 static void crypto_hash_polarssl_close(struct crypto_hash *_ch)
 {
-//	struct crypto_hash_polarssl *ch = container_of(_ch, struct crypto_hash_libgcrypt, ch);
+	struct crypto_hash_polarssl *ch = (struct crypto_hash_polarssl *)_ch;
 
-//	gcry_md_close(ch->md);
-//	free(ch);
+	rsa_free(ch->ctx);
+	free(ch);
 }
 
 static void crypto_hash_polarssl_write(struct crypto_hash *_ch, const unsigned char *buf, size_t len)
