@@ -88,6 +88,9 @@ CMDSRCS = 	crapto1/crapto1.c\
 			crapto1/crypto1.c\
 			polarssl/des.c \
 			polarssl/aes.c\
+			polarssl/bignum.c\
+			polarssl/rsa.c\
+			polarssl/sha1.c\
 			mfkey.c\
 			loclass/cipher.c \
 			loclass/cipherutils.c \
@@ -157,7 +160,6 @@ CMDSRCS = 	crapto1/crapto1.c\
 			pm3_binlib.c\
 			pm3_bitlib.c\
 			protocols.c\
-			sha1.c\
 			cmdcrc.c\
 			reveng/reveng.c\
 			reveng/cli.c\
