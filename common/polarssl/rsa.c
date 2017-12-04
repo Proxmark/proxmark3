@@ -29,7 +29,7 @@
  *  http://www.cacr.math.uwaterloo.ca/hac/about/chap8.pdf
  */
 
-#include "config.h"
+#include "polarssl_config.h"
 
 #if defined(POLARSSL_RSA_C)
 

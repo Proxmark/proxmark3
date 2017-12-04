@@ -20,7 +20,7 @@ OBJDIR = obj
 LDLIBS = -L/opt/local/lib -L/usr/local/lib -lreadline -lpthread -lm
 LUALIB = ../liblua/liblua.a
 LDFLAGS = $(ENV_LDFLAGS)
-CFLAGS = $(ENV_CFLAGS) -std=c99 -D_ISOC99_SOURCE -I. -I../include -I../common -I../zlib -I../uart -I/opt/local/include -I../liblua -Wall -g -O3
+CFLAGS = $(ENV_CFLAGS) -std=c99 -D_ISOC99_SOURCE -I. -I../include -I../common -I../common/polarssl -I../zlib -I../uart -I/opt/local/include -I../liblua -Wall -g -O3
 CXXFLAGS = -I../include -Wall -O3
 
 LUAPLATFORM = generic
