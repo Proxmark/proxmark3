@@ -9,6 +9,7 @@
 //-----------------------------------------------------------------------------
 
 #include "cmdemv.h"
+#include "sda_test.h"
 
 int UsageCmdHFEMVSelect(void) {
 	PrintAndLog("HELP :  Executes select applet command:\n");
@@ -780,6 +781,18 @@ int CmdHFEMVExec(const char *cmd) {
 }
 
 int CmdHFEMVTest(const char *cmd) {
+	int res;
+	bool TestFail = false;
+	
+	res = exec_sda_test();
+	if (res) TestFail = true;
+	
+	PrintAndLog("--------------------------");
+	
+	if (TestFail)
+		PrintAndLog("One of tests is FAILED.");
+	else
+		PrintAndLog("Tests is PASSED.");
 	
 	return 0;
 }
