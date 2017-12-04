@@ -322,7 +322,7 @@ int CmdHFEMVExec(const char *cmd) {
 			switch (param_getchar_indx(cmd, 1, cmdp)) {
 				case 'h':
 				case 'H':
-					UsageCmdHFEMVPPSE();
+					UsageCmdHFEMVExec();
 					return 0;
 				case 's':
 				case 'S':

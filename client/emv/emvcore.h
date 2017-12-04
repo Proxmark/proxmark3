@@ -29,13 +29,6 @@
 #define APDU_RES_LEN 260
 #define APDU_AID_LEN 50
 
-// AC
-# define EMVAC_AC_MASK 0xC0
-# define EMVAC_AAC     0x00
-# define EMVAC_TC      0x40
-# define EMVAC_ARQC    0x80
-# define EMVAC_CDAREQ  0x10
-
 enum TransactionType {
 	TT_MSD,
 	TT_VSDC,        // not standart for contactless!!!!

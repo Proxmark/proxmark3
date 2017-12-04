@@ -483,20 +483,20 @@ static void emv_tag_dump_cid(const struct tlv *tlv, const struct emv_tag *tag, F
 	}
 	
 	PRINT_INDENT(level);
-	if ((tlv->value[0] & 0xC0) == 0x00)	fprintf(f, "\tAC1: AAC (Transaction declined)\n");
-	if ((tlv->value[0] & 0xC0) == 0x40)	fprintf(f, "\tAC1: TC (Transaction approved)\n");
-	if ((tlv->value[0] & 0xC0) == 0x80)	fprintf(f, "\tAC1: ARQC (Online authorisation requested)\n");
-	if ((tlv->value[0] & 0xC0) == 0xC0)	fprintf(f, "\tAC1: RFU\n");
+	if ((tlv->value[0] & EMVAC_AC_MASK) == EMVAC_AAC)		fprintf(f, "\tAC1: AAC (Transaction declined)\n");
+	if ((tlv->value[0] & EMVAC_AC_MASK) == EMVAC_TC)		fprintf(f, "\tAC1: TC (Transaction approved)\n");
+	if ((tlv->value[0] & EMVAC_AC_MASK) == EMVAC_ARQC)		fprintf(f, "\tAC1: ARQC (Online authorisation requested)\n");
+	if ((tlv->value[0] & EMVAC_AC_MASK) == EMVAC_AC_MASK)	fprintf(f, "\tAC1: RFU\n");
 
-	if ((tlv->value[0] & 0x08) != 0x00) {
+	if (tlv->value[0] & EMVCID_ADVICE) {
 		PRINT_INDENT(level);
 		fprintf(f, "\tAdvice required!\n");
 	}
 
-	if ((tlv->value[0] & 0x07) != 0x00) {
+	if (tlv->value[0] & EMVCID_REASON_MASK) {
 		PRINT_INDENT(level);
 		fprintf(f, "\tReason/advice/referral code: ");
-		switch((tlv->value[0] & 0x07)) {
+		switch((tlv->value[0] & EMVCID_REASON_MASK)) {
 			case 0:
 				fprintf(f, "No information given\n");
 				break;
@@ -510,7 +510,7 @@ static void emv_tag_dump_cid(const struct tlv *tlv, const struct emv_tag *tag, F
 				fprintf(f, "Issuer authentication failed\n");
 				break;
 			default:
-				fprintf(f, "\tRFU: %2x\n", (tlv->value[0] & 0x07));
+				fprintf(f, "\tRFU: %2x\n", (tlv->value[0] & EMVCID_REASON_MASK));
 				break;
 		}
 	}
