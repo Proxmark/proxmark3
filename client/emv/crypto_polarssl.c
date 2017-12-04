@@ -95,14 +95,14 @@ static struct crypto_pk *crypto_pk_polarssl_open_rsa(va_list vl)
 	char *exp = va_arg(vl, char *);  // E
 	int explen = va_arg(vl, size_t);
 
-	rsa_init(&(cp->ctx), RSA_PKCS_V15, 0);
+	rsa_init(&cp->ctx, RSA_PKCS_V15, 0);
 	
     cp->ctx.len = modlen * 2; // size(N) in chars
 	mpi_read_binary(&cp->ctx.N, (const unsigned char *)mod, modlen);
 	mpi_read_binary(&cp->ctx.E, (const unsigned char *)exp, explen);
 	
-	if(rsa_check_privkey(&(cp->ctx)) != 0) {
-		fprintf(stderr, "PolarSSL key error.\n");
+	if(rsa_check_pubkey(&cp->ctx) != 0) {
+		fprintf(stderr, "PolarSSL key error exp=%d mod=%d.\n", explen, modlen);
 
         return NULL;
     }
@@ -221,10 +221,10 @@ static struct crypto_pk *crypto_pk_polarssl_genkey_rsa(va_list vl)
 
 static void crypto_pk_polarssl_close(struct crypto_pk *_cp)
 {
-//	struct crypto_pk_polarssl *cp = container_of(_cp, struct crypto_pk_libgcrypt, cp);
+	struct crypto_pk_polarssl *cp = malloc(sizeof(*cp));
 
-//	gcry_sexp_release(cp->pk);
-//	free(cp);
+	rsa_free(&cp->ctx);
+	free(cp);
 }
 
 static unsigned char *crypto_pk_polarssl_encrypt(const struct crypto_pk *_cp, const unsigned char *buf, size_t len, size_t *clen)
