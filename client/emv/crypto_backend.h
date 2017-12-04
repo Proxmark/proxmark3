@@ -45,4 +45,6 @@ struct crypto_backend {
 	struct crypto_pk *(*pk_genkey)(enum crypto_algo_pk pk, va_list vl);
 };
 
+struct crypto_backend *crypto_polarssl_init(void);
+
 #endif

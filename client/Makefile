@@ -110,6 +110,7 @@ CMDSRCS = 	crapto1/crapto1.c\
 			ui.c \
 			cmddata.c \
 			lfdemod.c \
+			emv/crypto_polarssl.c\
 			emv/crypto.c\
 			emv/emv_pk.c\
 			emv/emv_pki.c\

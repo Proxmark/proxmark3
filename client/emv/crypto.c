@@ -26,12 +26,10 @@ static struct crypto_backend *crypto_backend;
 
 static bool crypto_init(void)
 {
-	//const char *driver;
-
 	if (crypto_backend)
 		return true;
 
-	//	crypto_backend = crypto_nettle_init(); TODO!!!!!
+	crypto_backend = crypto_polarssl_init(); 
 
 	if (!crypto_backend)
 		return false;
