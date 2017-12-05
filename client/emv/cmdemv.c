@@ -781,7 +781,7 @@ int CmdHFEMVExec(const char *cmd) {
 }
 
 int CmdHFEMVTest(const char *cmd) {
-	return ExecuteCryptoTests();
+	return ExecuteCryptoTests(true);
 }
 
 int CmdHelp(const char *Cmd);

@@ -10,4 +10,4 @@
 
 #include <stdbool.h>
 
-extern int ExecuteCryptoTests();
+extern int ExecuteCryptoTests(bool verbose);

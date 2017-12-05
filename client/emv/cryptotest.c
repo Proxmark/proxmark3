@@ -10,6 +10,7 @@
 
 #include "cryptotest.h"
 #include "util.h"
+#include "ui.h"
 
 #include "sda_test.h"
 #include "bignum.h"
@@ -19,26 +20,26 @@
 #include "sha1.h"
 
 
-int ExecuteCryptoTests() {
+int ExecuteCryptoTests(bool verbose) {
 	int res;
 	bool TestFail = false;
 	
-	res = mpi_self_test(true);
+	res = mpi_self_test(verbose);
 	if (res) TestFail = true;
 	
-	res = aes_self_test(true);
+	res = aes_self_test(verbose);
 	if (res) TestFail = true;
 	
-	res = des_self_test(true);
+	res = des_self_test(verbose);
 	if (res) TestFail = true;
 	
-	res = sha1_self_test(true);
+	res = sha1_self_test(verbose);
 	if (res) TestFail = true;
 	
-	res = rsa_self_test(true);
+	res = rsa_self_test(verbose);
 	if (res) TestFail = true;
 	
-	res = exec_sda_test();
+	res = exec_sda_test(verbose);
 	if (res) TestFail = true;
 	
 	PrintAndLog("--------------------------");

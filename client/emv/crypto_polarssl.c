@@ -89,6 +89,7 @@ struct crypto_pk_polarssl {
 static struct crypto_pk *crypto_pk_polarssl_open_rsa(va_list vl)
 {
 	struct crypto_pk_polarssl *cp = malloc(sizeof(*cp));
+	memset(cp, 0x00, sizeof(*cp));
 
 	char *mod = va_arg(vl, char *);	 // N
 	int modlen = va_arg(vl, size_t);
@@ -97,12 +98,13 @@ static struct crypto_pk *crypto_pk_polarssl_open_rsa(va_list vl)
 
 	rsa_init(&cp->ctx, RSA_PKCS_V15, 0);
 	
-	cp->ctx.len = modlen * 2; // size(N) in chars
+	cp->ctx.len = modlen; // size(N) in bytes
 	mpi_read_binary(&cp->ctx.N, (const unsigned char *)mod, modlen);
 	mpi_read_binary(&cp->ctx.E, (const unsigned char *)exp, explen);
 	
-	if(rsa_check_pubkey(&cp->ctx) != 0) {
-		fprintf(stderr, "PolarSSL key error exp=%d mod=%d.\n", explen, modlen);
+	int res = rsa_check_pubkey(&cp->ctx);
+	if(res != 0) {
+		fprintf(stderr, "PolarSSL key error res=%x exp=%d mod=%d.\n", res * -1, explen, modlen);
 
 		return NULL;
 	}
@@ -227,24 +229,13 @@ static void crypto_pk_polarssl_close(struct crypto_pk *_cp)
 	free(cp);
 }
 
-static int myrand(void *rng_state, unsigned char *output, size_t len) {
-	size_t i;
-
-	if(rng_state != NULL)
-		rng_state = NULL;
-
-	for(i = 0; i < len; ++i)
-		output[i] = rand();
-	
-	return 0;
-}
-
 static unsigned char *crypto_pk_polarssl_encrypt(const struct crypto_pk *_cp, const unsigned char *buf, size_t len, size_t *clen)
 {
 	struct crypto_pk_polarssl *cp = (struct crypto_pk_polarssl *)_cp;
 	int res;
 	unsigned char *result;
 	
+	*clen = 0;
 	size_t keylen = mpi_size(&cp->ctx.N);
 
 	result = malloc(keylen);
@@ -252,11 +243,10 @@ static unsigned char *crypto_pk_polarssl_encrypt(const struct crypto_pk *_cp, co
 		printf("RSA encrypt failed. Can't allocate result memory.\n");
 		return NULL;
 	}
-printf("## RSA len %d\n", keylen);
-	res = rsa_pkcs1_encrypt(&cp->ctx, &myrand, NULL, RSA_PUBLIC, len, buf, result);
-	if(res) {
-		printf("RSA encrypt failed. Error: %x\n", res * -1);
 
+	res = rsa_public(&cp->ctx, buf, result);
+	if(res) {
+		printf("RSA encrypt failed. Error: %x data len: %d key len: %d\n", res * -1, len, keylen);
 		return NULL;
 	}
 	
@@ -267,131 +257,56 @@ printf("## RSA len %d\n", keylen);
 
 static unsigned char *crypto_pk_polarssl_decrypt(const struct crypto_pk *_cp, const unsigned char *buf, size_t len, size_t *clen)
 {
-//	struct crypto_pk_polarssl *ch = (struct crypto_pk_polarssl *)_ch;
-	/*struct crypto_pk_polarssl *cp = container_of(_cp, struct crypto_pk_libgcrypt, cp);
-	gcry_error_t err;
-	int blen = len;
-	gcry_sexp_t esexp, dsexp;
-	gcry_mpi_t tmpi;
-	size_t templen;
-	size_t keysize;
+	struct crypto_pk_polarssl *cp = (struct crypto_pk_polarssl *)_cp;
+	int res;
 	unsigned char *result;
+	
+	*clen = 0;
+	size_t keylen = mpi_size(&cp->ctx.N);
 
-	 XXX: RSA-only! 
-	err = gcry_sexp_build(&esexp, NULL, "(enc-val (flags) (rsa (a %b)))",
-			blen, buf);
-	if (err) {
-		fprintf(stderr, "LibGCrypt error %s/%s\n",
-				gcry_strsource (err),
-				gcry_strerror (err));
-		return NULL;
-	}
-
-	err = gcry_pk_decrypt(&dsexp, esexp, cp->pk);
-	gcry_sexp_release(esexp);
-	if (err) {
-		fprintf(stderr, "LibGCrypt error %s/%s\n",
-				gcry_strsource (err),
-				gcry_strerror (err));
-		return NULL;
-	}
-
-	tmpi = gcry_sexp_nth_mpi(dsexp, 1, GCRYMPI_FMT_USG);
-	gcry_sexp_release(dsexp);
-	if (!tmpi)
-		return NULL;
-
-	keysize = (gcry_pk_get_nbits(cp->pk) + 7) / 8;
-	result = malloc(keysize);
+	result = malloc(keylen);
 	if (!result) {
-		gcry_mpi_release(tmpi);
+		printf("RSA encrypt failed. Can't allocate result memory.\n");
 		return NULL;
 	}
 
-	err = gcry_mpi_print(GCRYMPI_FMT_USG, NULL, keysize, &templen, tmpi);
-	if (err) {
-		fprintf(stderr, "LibGCrypt error %s/%s\n",
-				gcry_strsource (err),
-				gcry_strerror (err));
-		gcry_mpi_release(tmpi);
-		free(result);
+	res = rsa_private(&cp->ctx, buf, result); // CHECK???
+	if(res) {
+		printf("RSA decrypt failed. Error: %x data len: %d key len: %d\n", res * -1, len, keylen);
 		return NULL;
 	}
-
-	err = gcry_mpi_print(GCRYMPI_FMT_USG, result + keysize - templen, templen, &templen, tmpi);
-	if (err) {
-		fprintf(stderr, "LibGCrypt error %s/%s\n",
-				gcry_strsource (err),
-				gcry_strerror (err));
-		gcry_mpi_release(tmpi);
-		free(result);
-		return NULL;
-	}
-	memset(result, 0, keysize - templen);
-
-	*clen = keysize;
-	gcry_mpi_release(tmpi);
-
-	return result;*/
-	return NULL;
+	
+	*clen = keylen;
+	
+	return result;
 }
 
 static size_t crypto_pk_polarssl_get_nbits(const struct crypto_pk *_cp)
 {
-//	struct crypto_pk_polarssl *ch = (struct crypto_pk_polarssl *)_ch;
+	struct crypto_pk_polarssl *cp = (struct crypto_pk_polarssl *)_cp;
 
-//	return gcry_pk_get_nbits(cp->pk);
+	return cp->ctx.len * 8;
 return 0;
 }
 
 static unsigned char *crypto_pk_polarssl_get_parameter(const struct crypto_pk *_cp, unsigned param, size_t *plen)
 {
-	/*struct crypto_pk_polarssl *cp = container_of(_cp, struct crypto_pk_libgcrypt, cp);
-	gcry_error_t err;
-	gcry_sexp_t psexp;
-	gcry_mpi_t tmpi;
-	size_t parameter_size;
-	unsigned char *result;
-	const char *name;
-
-	 XXX: RSA-only! 
-	if (param == 0)
-		name = "n";
-	else if (param == 1)
-		name = "e";
-	else
-		return NULL;
-
-	psexp = gcry_sexp_find_token(cp->pk, name, 1);
-	if (!psexp)
-		return NULL;
-
-	tmpi = gcry_sexp_nth_mpi(psexp, 1, GCRYMPI_FMT_USG);
-	gcry_sexp_release(psexp);
-	if (!tmpi)
-		return NULL;
-
-	parameter_size = (gcry_mpi_get_nbits(tmpi) + 7) / 8;
-	result = malloc(parameter_size);
-	if (!result) {
-		gcry_mpi_release(tmpi);
-		return NULL;
+	struct crypto_pk_polarssl *cp = (struct crypto_pk_polarssl *)_cp;
+	// TODO!!!!!!
+	switch(param){
+		// mod
+		case 0:
+			*plen = mpi_size(&cp->ctx.N);
+			break;
+		// exp
+		case 1:
+			*plen = mpi_size(&cp->ctx.E);
+			break;
+		default:
+			printf("Error get parameter. Param=%d", param);
+			break;
 	}
-
-	err = gcry_mpi_print(GCRYMPI_FMT_USG, result, parameter_size, NULL, tmpi);
-	if (err) {
-		fprintf(stderr, "LibGCrypt error %s/%s\n",
-				gcry_strsource (err),
-				gcry_strerror (err));
-		gcry_mpi_release(tmpi);
-		free(result);
-		return NULL;
-	}
-
-	*plen = parameter_size;
-	gcry_mpi_release(tmpi);
-
-	return result;*/
+	
 	return NULL;
 }
 

@@ -98,7 +98,7 @@ const unsigned char pan[] = {
 	0x42, 0x76, 0x55, 0x00, 0x00, 0x00, 0x00, 0x00,
 };
 
-static int sda_test_raw(void)
+static int sda_test_raw(bool verbose)
 {
 	const struct emv_pk *pk = &vsdc_01;
 
@@ -107,7 +107,7 @@ static int sda_test_raw(void)
 			pk->exp, pk->elen);
 	if (!kcp)
 		return 1;
-printf("--open\n");
+
 	unsigned char *ipk_data;
 	size_t ipk_data_len;
 	ipk_data = crypto_pk_encrypt(kcp, issuer_cert, sizeof(issuer_cert), &ipk_data_len);
@@ -115,9 +115,11 @@ printf("--open\n");
 
 	if (!ipk_data)
 		return 1;
-printf("--ipk_data\n");
 
-	dump_buffer(ipk_data, ipk_data_len, stdout, 0);
+	if (verbose) {
+		printf("issuer cert:\n");
+		dump_buffer(ipk_data, ipk_data_len, stdout, 0);
+	}
 
 	size_t ipk_pk_len = ipk_data[13];
 	unsigned char *ipk_pk = malloc(ipk_pk_len);
@@ -131,7 +133,6 @@ printf("--ipk_data\n");
 		free(ipk_data);
 		return 1;
 	}
-printf("--crypto_hash_open\n");
 
 	crypto_hash_write(ch, ipk_data + 1, 14);
 	crypto_hash_write(ch, ipk_pk, ipk_pk_len);
@@ -144,9 +145,11 @@ printf("--crypto_hash_open\n");
 		free(ipk_data);
 		return 1;
 	}
-printf("--crypto_hash_read\n");
 
-	dump_buffer(h, 20, stdout, 0);
+	if (verbose) {
+		printf("crypto hash:\n");
+		dump_buffer(h, 20, stdout, 0);
+	}
 
 	if (memcmp(ipk_data + ipk_data_len - 21, h, 20)) {
 		crypto_hash_close(ch);
@@ -163,23 +166,23 @@ printf("--crypto_hash_read\n");
 	free(ipk_pk);
 	if (!ikcp)
 		return 1;
-printf("--crypto_pk_open\n");
 
 	size_t ssad_len;
 	unsigned char *ssad = crypto_pk_encrypt(ikcp, ssad_cr, sizeof(ssad_cr), &ssad_len);
 	crypto_pk_close(ikcp);
 	if (!ssad)
 		return 1;
-printf("--crypto_pk_encrypt\n");
 
-	dump_buffer(ssad, ssad_len, stdout, 0);
+	if (verbose) {
+		printf("ssad:\n");
+		dump_buffer(ssad, ssad_len, stdout, 0);
+	}
 
 	ch = crypto_hash_open(HASH_SHA_1);
 	if (!ch) {
 		free(ssad);
 		return 1;
 	}
-printf("--crypto_hash_open2\n");
 
 	crypto_hash_write(ch, ssad + 1, ssad_len - 22);
 	crypto_hash_write(ch, ssd1, sizeof(ssd1));
@@ -190,19 +193,20 @@ printf("--crypto_hash_open2\n");
 		free(ssad);
 		return 1;
 	}
-printf("--crypto_hash_read2\n");
 
-	dump_buffer(h2, 20, stdout, 0);
+	if (verbose) {
+		printf("crypto hash2:\n");
+		dump_buffer(h2, 20, stdout, 0);
+	}
 
 	crypto_hash_close(ch);
 
 	free(ssad);
-printf("--done\n");
 
 	return 0;
 }
 
-static int sda_test_pk(void)
+static int sda_test_pk(bool verbose)
 {
 	const struct emv_pk *pk = &vsdc_01;
 	struct tlvdb *db;
@@ -238,7 +242,10 @@ static int sda_test_pk(void)
 		return 2;
 	}
 
-	dump_buffer(dac->value, dac->len, stdout, 0);
+	if (verbose) {
+		printf("dac:\n");
+		dump_buffer(dac->value, dac->len, stdout, 0);
+	}
 
 	tlvdb_free(dacdb);
 	emv_pk_free(ipk);
@@ -247,25 +254,23 @@ static int sda_test_pk(void)
 	return 0;
 }
 
-int exec_sda_test(void)
+int exec_sda_test(bool verbose)
 {
 	int ret;
 
-	fprintf(stdout, "SDA raw test: ");
-	ret = sda_test_raw();
+	ret = sda_test_raw(verbose);
 	if (ret) {
-		fprintf(stderr, "[ERROR]\n");
+		fprintf(stderr, "SDA raw test: failed\n");
 		return ret;
 	}
-	fprintf(stdout, "[OK]\n");
+	fprintf(stdout, "SDA raw test: passed\n");
 
-	fprintf(stdout, "SDA test pk: ");
-	ret = sda_test_pk();
+	ret = sda_test_pk(verbose);
 	if (ret) {
-		fprintf(stdout, "SDA raw test: ");
+		fprintf(stderr, "SDA test pk: failed\n");
 		return ret;
 	}
-	fprintf(stdout, "[OK]\n");
+	fprintf(stdout, "SDA test pk: passed\n");
 
 	return 0;
 }
