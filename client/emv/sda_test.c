@@ -257,6 +257,7 @@ static int sda_test_pk(bool verbose)
 int exec_sda_test(bool verbose)
 {
 	int ret;
+	fprintf(stdout, "\n");
 
 	ret = sda_test_raw(verbose);
 	if (ret) {

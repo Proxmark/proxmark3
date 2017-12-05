@@ -20,6 +20,7 @@
 
 #include "sda_test.h"
 #include "dda_test.h"
+#include "cda_test.h"
 
 int ExecuteCryptoTests(bool verbose) {
 	int res;
@@ -46,6 +47,9 @@ int ExecuteCryptoTests(bool verbose) {
 	res = exec_dda_test(verbose);
 	if (res) TestFail = true;
 	
+	res = exec_cda_test(verbose);
+	if (res) TestFail = true;
+
 	PrintAndLog("--------------------------");
 	
 	if (TestFail)
