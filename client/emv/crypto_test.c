@@ -19,9 +19,11 @@
 
 #include "crypto.h"
 #include "dump.h"
+#include "util_posix.h"
 
 #include <stdlib.h>
 #include <string.h>
+#include <inttypes.h>
 
 static int test_genkey(unsigned int keylength, unsigned char *msg, size_t msg_len, bool verbose)
 {
@@ -30,28 +32,41 @@ static int test_genkey(unsigned int keylength, unsigned char *msg, size_t msg_le
 	unsigned char *tmp, *tmp2;
 	struct crypto_pk *pk;
 
-	printf("Testing key length %u\n", keylength);
+	printf("Testing key length %u ", keylength);
+	uint64_t ms = msclock();
 
 	pk = crypto_pk_genkey(PK_RSA, 1, keylength, 3);
-	if (!pk)
+	if (!pk) {
+		fprintf(stderr, "ERROR: key generation error.\n");
 		goto out;
+	}
 
 	tmp_len = crypto_pk_get_nbits(pk);
-	if (tmp_len != keylength)
+	if (tmp_len != keylength) {
+		fprintf(stderr, "ERROR: crypto_pk_get_nbits.\n");
 		goto close;
+	}
 
 	tmp = crypto_pk_decrypt(pk, msg, msg_len, &tmp_len);
-	if (!tmp)
+	if (!tmp) {
+		fprintf(stderr, "ERROR: crypto_pk_decrypt.\n");
 		goto close;
+	}
 
 	tmp2 = crypto_pk_encrypt(pk, tmp, tmp_len, &tmp2_len);
-	if (!tmp2)
+	if (!tmp2) {
+		fprintf(stderr, "ERROR: crypto_pk_encrypt.\n");
 		goto free_tmp;
+	}
 
-	if (tmp2_len == msg_len && !memcmp(tmp2, msg, tmp2_len))
+	if (tmp2_len == msg_len && !memcmp(tmp2, msg, tmp2_len)) {
 		ret = 0;
+	} else {
+		fprintf(stderr, "ERROR: encrypt-decrypt sequence length or data error.\n");
+	}
 
 	free(tmp2);
+	printf("passed. (%"PRIu64" ms) \n", msclock() - ms);
 free_tmp:
 	free(tmp);
 close:
@@ -287,7 +302,7 @@ close_pub:
 
 int exec_crypto_test(bool verbose)
 {
-	unsigned int keylengths[] = {1024, 1152, 1408, 1984, 2048/*, 3072, 4096*/};
+	unsigned int keylengths[] = {1024, 1152, 1408, 1984, 2048, 3072, 4096};
 	int i;
 	int ret;
 	fprintf(stdout, "\n");
@@ -297,7 +312,7 @@ int exec_crypto_test(bool verbose)
 		fprintf(stderr, "Crypto raw test: failed\n");
 		return ret;
 	}
-	fprintf(stdout, "Crypto raw test: passed\n");
+	fprintf(stdout, "Crypto raw test: passed\n\n");
 
 	for (i = 0; i < sizeof(keylengths) / sizeof(keylengths[0]); i++) {
 		unsigned int kl = keylengths[i];

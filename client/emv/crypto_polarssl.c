@@ -150,12 +150,24 @@ static struct crypto_pk *crypto_pk_polarssl_open_priv_rsa(va_list vl)
 	int res = rsa_check_privkey(&cp->ctx);
 	if(res != 0) {
 		fprintf(stderr, "PolarSSL private key error res=%x exp=%d mod=%d.\n", res * -1, explen, modlen);
-
 		return NULL;
 	}
 
 	return &cp->cp;
 }
+
+static int myrand(void *rng_state, unsigned char *output, size_t len) {
+    size_t i;
+
+    if(rng_state != NULL)
+        rng_state = NULL;
+
+    for( i = 0; i < len; ++i )
+        output[i] = rand();
+    
+    return 0;
+}
+
 
 static struct crypto_pk *crypto_pk_polarssl_genkey_rsa(va_list vl)
 {
@@ -166,35 +178,12 @@ static struct crypto_pk *crypto_pk_polarssl_genkey_rsa(va_list vl)
 	unsigned int nbits = va_arg(vl, unsigned int);
 	unsigned int exp = va_arg(vl, unsigned int);
 
-	
-	
-	
-	
-	
-	
-/*	err = gcry_sexp_build(&params, NULL,
-			transient ?
-			"(genkey (rsa (nbits %u) (rsa-use-e %u) (flags transient-key)))":
-			"(genkey (rsa (nbits %u) (rsa-use-e %u)))",
-			nbits, exp);
-	if (err) {
-		fprintf(stderr, "LibGCrypt error %s/%s\n",
-				gcry_strsource (err),
-				gcry_strerror (err));
-		free(cp);
+	int res = rsa_gen_key(&cp->ctx, &myrand, NULL, nbits, exp);
+	if (res) {
+		fprintf(stderr, "PolarSSL private key generation error res=%x exp=%d nbits=%d.\n", res * -1, exp, nbits);
 		return NULL;
 	}
-
-	err = gcry_pk_genkey(&cp->pk, params);
-	gcry_sexp_release(params);
-	if (err) {
-		fprintf(stderr, "LibGCrypt error %s/%s\n",
-				gcry_strsource (err),
-				gcry_strerror (err));
-		free(cp);
-		return NULL;
-	}*/
-
+	
 	return &cp->cp;
 }
 
