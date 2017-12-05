@@ -10,7 +10,7 @@
  *
  * This library is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.	 See the GNU
  * Lesser General Public License for more details.
  */
 
@@ -90,22 +90,22 @@ static struct crypto_pk *crypto_pk_polarssl_open_rsa(va_list vl)
 {
 	struct crypto_pk_polarssl *cp = malloc(sizeof(*cp));
 
-	char *mod = va_arg(vl, char *);  // N
+	char *mod = va_arg(vl, char *);	 // N
 	int modlen = va_arg(vl, size_t);
-	char *exp = va_arg(vl, char *);  // E
+	char *exp = va_arg(vl, char *);	 // E
 	int explen = va_arg(vl, size_t);
 
 	rsa_init(&cp->ctx, RSA_PKCS_V15, 0);
 	
-    cp->ctx.len = modlen * 2; // size(N) in chars
+	cp->ctx.len = modlen * 2; // size(N) in chars
 	mpi_read_binary(&cp->ctx.N, (const unsigned char *)mod, modlen);
 	mpi_read_binary(&cp->ctx.E, (const unsigned char *)exp, explen);
 	
 	if(rsa_check_pubkey(&cp->ctx) != 0) {
 		fprintf(stderr, "PolarSSL key error exp=%d mod=%d.\n", explen, modlen);
 
-        return NULL;
-    }
+		return NULL;
+	}
 
 	return &cp->cp;
 }
@@ -221,88 +221,53 @@ static struct crypto_pk *crypto_pk_polarssl_genkey_rsa(va_list vl)
 
 static void crypto_pk_polarssl_close(struct crypto_pk *_cp)
 {
-	struct crypto_pk_polarssl *cp = malloc(sizeof(*cp));
+	struct crypto_pk_polarssl *cp = (struct crypto_pk_polarssl *)_cp;
 
 	rsa_free(&cp->ctx);
 	free(cp);
 }
 
+static int myrand(void *rng_state, unsigned char *output, size_t len) {
+	size_t i;
+
+	if(rng_state != NULL)
+		rng_state = NULL;
+
+	for(i = 0; i < len; ++i)
+		output[i] = rand();
+	
+	return 0;
+}
+
 static unsigned char *crypto_pk_polarssl_encrypt(const struct crypto_pk *_cp, const unsigned char *buf, size_t len, size_t *clen)
 {
-	/*struct crypto_pk_polarssl *cp = container_of(_cp, struct crypto_pk_libgcrypt, cp);
-	gcry_error_t err;
-	int blen = len;
-	gcry_sexp_t dsexp, esexp, asexp;
-	gcry_mpi_t tmpi;
-	size_t templen;
-	size_t keysize;
+	struct crypto_pk_polarssl *cp = (struct crypto_pk_polarssl *)_cp;
+	int res;
 	unsigned char *result;
+	
+	size_t keylen = mpi_size(&cp->ctx.N);
 
-	err = gcry_sexp_build(&dsexp, NULL, "(data (flags raw) (value %b))",
-			blen, buf);
-	if (err) {
-		fprintf(stderr, "LibGCrypt error %s/%s\n",
-				gcry_strsource (err),
-				gcry_strerror (err));
-		return NULL;
-	}
-
-	err = gcry_pk_encrypt(&esexp, dsexp, cp->pk);
-	gcry_sexp_release(dsexp);
-	if (err) {
-		fprintf(stderr, "LibGCrypt error %s/%s\n",
-				gcry_strsource (err),
-				gcry_strerror (err));
-		return NULL;
-	}
-
-	asexp = gcry_sexp_find_token(esexp, "a", 1);
-	gcry_sexp_release(esexp);
-	if (!asexp)
-		return NULL;
-
-	tmpi = gcry_sexp_nth_mpi(asexp, 1, GCRYMPI_FMT_USG);
-	gcry_sexp_release(asexp);
-	if (!tmpi)
-		return NULL;
-
-	keysize = (gcry_pk_get_nbits(cp->pk) + 7) / 8;
-	result = malloc(keysize);
+	result = malloc(keylen);
 	if (!result) {
-		gcry_mpi_release(tmpi);
+		printf("RSA encrypt failed. Can't allocate result memory.\n");
 		return NULL;
 	}
+printf("## RSA len %d\n", keylen);
+	res = rsa_pkcs1_encrypt(&cp->ctx, &myrand, NULL, RSA_PUBLIC, len, buf, result);
+	if(res) {
+		printf("RSA encrypt failed. Error: %x\n", res * -1);
 
-	err = gcry_mpi_print(GCRYMPI_FMT_USG, NULL, keysize, &templen, tmpi);
-	if (err) {
-		fprintf(stderr, "LibGCrypt error %s/%s\n",
-				gcry_strsource (err),
-				gcry_strerror (err));
-		gcry_mpi_release(tmpi);
-		free(result);
 		return NULL;
 	}
-
-	err = gcry_mpi_print(GCRYMPI_FMT_USG, result + keysize - templen, templen, &templen, tmpi);
-	if (err) {
-		fprintf(stderr, "LibGCrypt error %s/%s\n",
-				gcry_strsource (err),
-				gcry_strerror (err));
-		gcry_mpi_release(tmpi);
-		free(result);
-		return NULL;
-	}
-	memset(result, 0, keysize - templen);
-
-	*clen = keysize;
-	gcry_mpi_release(tmpi);
-
-	return result;*/
-	return NULL;
+	
+	*clen = keylen;
+	
+	return result;
 }
 
 static unsigned char *crypto_pk_polarssl_decrypt(const struct crypto_pk *_cp, const unsigned char *buf, size_t len, size_t *clen)
 {
+//	struct crypto_pk_polarssl *ch = (struct crypto_pk_polarssl *)_ch;
 	/*struct crypto_pk_polarssl *cp = container_of(_cp, struct crypto_pk_libgcrypt, cp);
 	gcry_error_t err;
 	int blen = len;
@@ -373,7 +338,7 @@ static unsigned char *crypto_pk_polarssl_decrypt(const struct crypto_pk *_cp, co
 
 static size_t crypto_pk_polarssl_get_nbits(const struct crypto_pk *_cp)
 {
-//	struct crypto_pk_polarssl *cp = container_of(_cp, struct crypto_pk_libgcrypt, cp);
+//	struct crypto_pk_polarssl *ch = (struct crypto_pk_polarssl *)_ch;
 
 //	return gcry_pk_get_nbits(cp->pk);
 return 0;

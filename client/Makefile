@@ -115,6 +115,7 @@ CMDSRCS = 	crapto1/crapto1.c\
 			emv/emv_pk.c\
 			emv/emv_pki.c\
 			emv/emv_pki_priv.c\
+			emv/cryptotest.c\
 			emv/apduinfo.c\
 			emv/dump.c\
 			emv/tlv.c\

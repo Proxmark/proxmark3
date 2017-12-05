@@ -9,12 +9,7 @@
 //-----------------------------------------------------------------------------
 
 #include "cmdemv.h"
-#include "sda_test.h"
-#include "bignum.h"
-#include "aes.h"
-#include "des.h"
-#include "rsa.h"
-#include "sha1.h"
+#include "cryptotest.h"
 
 int UsageCmdHFEMVSelect(void) {
 	PrintAndLog("HELP :  Executes select applet command:\n");
@@ -786,35 +781,7 @@ int CmdHFEMVExec(const char *cmd) {
 }
 
 int CmdHFEMVTest(const char *cmd) {
-	int res;
-	bool TestFail = false;
-	
-	res = mpi_self_test(true);
-	if (res) TestFail = true;
-	
-	res = aes_self_test(true);
-	if (res) TestFail = true;
-	
-//	res = des_self_test(true);
-//	if (res) TestFail = true;
-	
-	res = sha1_self_test(true);
-	if (res) TestFail = true;
-	
-	res = rsa_self_test(true);
-	if (res) TestFail = true;
-	
-	res = exec_sda_test();
-	if (res) TestFail = true;
-	
-	PrintAndLog("--------------------------");
-	
-	if (TestFail)
-		PrintAndLog("One of tests is FAILED.");
-	else
-		PrintAndLog("Tests is PASSED.");
-	
-	return 0;
+	return ExecuteCryptoTests();
 }
 
 int CmdHelp(const char *Cmd);
