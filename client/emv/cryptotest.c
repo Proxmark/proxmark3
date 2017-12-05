@@ -12,13 +12,14 @@
 #include "util.h"
 #include "ui.h"
 
-#include "sda_test.h"
 #include "bignum.h"
 #include "aes.h"
 #include "des.h"
 #include "rsa.h"
 #include "sha1.h"
 
+#include "sda_test.h"
+#include "dda_test.h"
 
 int ExecuteCryptoTests(bool verbose) {
 	int res;
@@ -40,6 +41,9 @@ int ExecuteCryptoTests(bool verbose) {
 	if (res) TestFail = true;
 	
 	res = exec_sda_test(verbose);
+	if (res) TestFail = true;
+
+	res = exec_dda_test(verbose);
 	if (res) TestFail = true;
 	
 	PrintAndLog("--------------------------");
