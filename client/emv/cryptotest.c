@@ -18,6 +18,7 @@
 #include "rsa.h"
 #include "sha1.h"
 
+#include "crypto_test.h"
 #include "sda_test.h"
 #include "dda_test.h"
 #include "cda_test.h"
@@ -48,6 +49,9 @@ int ExecuteCryptoTests(bool verbose) {
 	if (res) TestFail = true;
 	
 	res = exec_cda_test(verbose);
+	if (res) TestFail = true;
+
+	res = exec_crypto_test(verbose);
 	if (res) TestFail = true;
 
 	PrintAndLog("--------------------------");

@@ -122,6 +122,7 @@ CMDSRCS = 	crapto1/crapto1.c\
 			emv/emv_tags.c\
 			emv/dol.c\
 			emv/emvcore.c\
+			emv/crypto_test.c\
 			emv/sda_test.c\
 			emv/dda_test.c\
 			emv/cda_test.c\

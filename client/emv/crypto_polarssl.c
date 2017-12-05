@@ -104,7 +104,7 @@ static struct crypto_pk *crypto_pk_polarssl_open_rsa(va_list vl)
 	
 	int res = rsa_check_pubkey(&cp->ctx);
 	if(res != 0) {
-		fprintf(stderr, "PolarSSL key error res=%x exp=%d mod=%d.\n", res * -1, explen, modlen);
+		fprintf(stderr, "PolarSSL public key error res=%x exp=%d mod=%d.\n", res * -1, explen, modlen);
 
 		return NULL;
 	}
@@ -115,8 +115,8 @@ static struct crypto_pk *crypto_pk_polarssl_open_rsa(va_list vl)
 static struct crypto_pk *crypto_pk_polarssl_open_priv_rsa(va_list vl)
 {
 	struct crypto_pk_polarssl *cp = malloc(sizeof(*cp));
-	//gcry_error_t err;
-/*	char *mod = va_arg(vl, char *);
+	memset(cp, 0x00, sizeof(*cp));
+	char *mod = va_arg(vl, char *);
 	int modlen = va_arg(vl, size_t);
 	char *exp = va_arg(vl, char *);
 	int explen = va_arg(vl, size_t);
@@ -124,77 +124,54 @@ static struct crypto_pk *crypto_pk_polarssl_open_priv_rsa(va_list vl)
 	int dlen = va_arg(vl, size_t);
 	char *p = va_arg(vl, char *);
 	int plen = va_arg(vl, size_t);
-//	gcry_mpi_t pmpi;
 	char *q = va_arg(vl, char *);
 	int qlen = va_arg(vl, size_t);
-//	gcry_mpi_t qmpi;
-	(void) va_arg(vl, char *);
-	(void) va_arg(vl, size_t);
-	(void) va_arg(vl, char *);
-	(void) va_arg(vl, size_t);
-	char *inv = va_arg(vl, char *);
-	int invlen = va_arg(vl, size_t);*/
-	/*gcry_mpi_t invmpi;
+	char *dp = va_arg(vl, char *);
+	int dplen = va_arg(vl, size_t);
+	char *dq = va_arg(vl, char *);
+	int dqlen = va_arg(vl, size_t);
+	// calc QP via Q and P
+//	char *inv = va_arg(vl, char *);
+//	int invlen = va_arg(vl, size_t);	
+	
+	rsa_init(&cp->ctx, RSA_PKCS_V15, 0);
+	
+	cp->ctx.len = modlen; // size(N) in bytes
+	mpi_read_binary(&cp->ctx.N,  (const unsigned char *)mod, modlen);
+	mpi_read_binary(&cp->ctx.E,  (const unsigned char *)exp, explen);
 
-	err = gcry_mpi_scan(&pmpi, GCRYMPI_FMT_USG, p, plen, NULL);
-	if (err)
-		goto err_p;
+	mpi_read_binary(&cp->ctx.D,  (const unsigned char *)d, dlen);
+	mpi_read_binary(&cp->ctx.P,  (const unsigned char *)p, plen);
+	mpi_read_binary(&cp->ctx.Q,  (const unsigned char *)q, qlen);
+	mpi_read_binary(&cp->ctx.DP, (const unsigned char *)dp, dplen);
+	mpi_read_binary(&cp->ctx.DQ, (const unsigned char *)dq, dqlen);
+	mpi_inv_mod(&cp->ctx.QP, &cp->ctx.Q, &cp->ctx.P);
+	
+	int res = rsa_check_privkey(&cp->ctx);
+	if(res != 0) {
+		fprintf(stderr, "PolarSSL private key error res=%x exp=%d mod=%d.\n", res * -1, explen, modlen);
 
-	err = gcry_mpi_scan(&qmpi, GCRYMPI_FMT_USG, q, qlen, NULL);
-	if (err)
-		goto err_q;
-
-	err = gcry_mpi_scan(&invmpi, GCRYMPI_FMT_USG, inv, invlen, NULL);
-	if (err)
-		goto err_inv;
-
-	if (gcry_mpi_cmp (pmpi, qmpi) > 0) {
-		gcry_mpi_swap (pmpi, qmpi);
-		gcry_mpi_invm (invmpi, pmpi, qmpi);
+		return NULL;
 	}
 
-	err = gcry_sexp_build(&cp->pk, NULL, "(private-key (rsa (n %b) (e %b) (d %b) (p %M) (q %M) (u %M)))",
-			modlen, mod, explen, exp, dlen, d,
-			pmpi, qmpi, invmpi);
-	if (err)
-		goto err_sexp;
-
-	err = gcry_pk_testkey(cp->pk);
-	if (err)
-		goto err_test;
-
-	gcry_mpi_release(invmpi);
-	gcry_mpi_release(qmpi);
-	gcry_mpi_release(pmpi);
-
 	return &cp->cp;
-
-err_test:
-	gcry_sexp_release(cp->pk);
-err_sexp:
-	gcry_mpi_release(invmpi);
-err_inv:
-	gcry_mpi_release(qmpi);
-err_q:
-	gcry_mpi_release(pmpi);
-err_p:
-	free(cp);
-
-	fprintf(stderr, "LibGCrypt error %s/%s\n",
-			gcry_strsource (err),
-			gcry_strerror (err));*/
-	return NULL;
 }
 
 static struct crypto_pk *crypto_pk_polarssl_genkey_rsa(va_list vl)
 {
 	struct crypto_pk_polarssl *cp = malloc(sizeof(*cp));
-//	gcry_error_t err;
-//	gcry_sexp_t params;
-/*	int transient = va_arg(vl, int);
+	memset(cp, 0x00, sizeof(*cp));
+	
+	int transient = va_arg(vl, int);
 	unsigned int nbits = va_arg(vl, unsigned int);
 	unsigned int exp = va_arg(vl, unsigned int);
-*/
+
+	
+	
+	
+	
+	
+	
 /*	err = gcry_sexp_build(&params, NULL,
 			transient ?
 			"(genkey (rsa (nbits %u) (rsa-use-e %u) (flags transient-key)))":
@@ -292,22 +269,28 @@ return 0;
 static unsigned char *crypto_pk_polarssl_get_parameter(const struct crypto_pk *_cp, unsigned param, size_t *plen)
 {
 	struct crypto_pk_polarssl *cp = (struct crypto_pk_polarssl *)_cp;
-	// TODO!!!!!!
+	unsigned char *result = NULL;
 	switch(param){
 		// mod
 		case 0:
 			*plen = mpi_size(&cp->ctx.N);
+			result = malloc(*plen);
+			memset(result, 0x00, *plen);
+			mpi_write_binary(&cp->ctx.N, result, *plen);
 			break;
 		// exp
 		case 1:
 			*plen = mpi_size(&cp->ctx.E);
+			result = malloc(*plen);
+			memset(result, 0x00, *plen);
+			mpi_write_binary(&cp->ctx.E, result, *plen);
 			break;
 		default:
 			printf("Error get parameter. Param=%d", param);
 			break;
 	}
 	
-	return NULL;
+	return result;
 }
 
 static struct crypto_pk *crypto_pk_polarssl_open(enum crypto_algo_pk pk, va_list vl)

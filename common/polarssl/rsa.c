@@ -453,8 +453,8 @@ int rsa_rsaes_pkcs1_v15_encrypt( rsa_context *ctx,
 
     olen = ctx->len;
 
-//    if( olen < ilen + 11 )
-//        return( POLARSSL_ERR_RSA_BAD_INPUT_DATA );
+    if( olen < ilen + 11 )
+        return( POLARSSL_ERR_RSA_BAD_INPUT_DATA );
 
     nb_pad = olen - 3 - ilen;
 
