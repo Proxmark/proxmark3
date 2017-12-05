@@ -308,6 +308,8 @@ int CmdHFEMVExec(const char *cmd) {
 	uint16_t sw = 0;
 	uint8_t AID[APDU_AID_LEN] = {0};
 	size_t AIDlen = 0;
+	uint8_t ODAiList[4096];
+	size_t ODAiListLen = 0;
 	
 	int res;
 	
@@ -568,15 +570,36 @@ int CmdHFEMVExec(const char *cmd) {
 					PrintAndLog("");
 				}
 				
+				// Build Input list for Offline Data Authentication
+				// EMV 4.3 book3 10.3, page 96
 				if (SFIoffline) {
-					// here will be offline records storing...
-					// dont foget: if (sfi < 11)
+					if (SFI < 11) {
+						const unsigned char *abuf = buf;
+						size_t elmlen = len;
+						struct tlv e;
+						if (tlv_parse_tl(&abuf, &elmlen, &e)) {
+							memcpy(&ODAiList[ODAiListLen], &buf[len - elmlen], elmlen);
+							ODAiListLen += elmlen;
+						} else {
+							PrintAndLog("ERROR SFI[%02x]. Creating input list for Offline Data Authentication error.", SFI);
+						}
+					} else {
+						memcpy(&ODAiList[ODAiListLen], buf, len);
+						ODAiListLen += len;
+					}
 				}
 			}
 		}
 		
 		break;
 	}	
+	
+	// copy Input list for Offline Data Authentication
+	if (ODAiListLen) {
+		struct tlvdb *oda = tlvdb_fixed(0x21, ODAiListLen, ODAiList); // not a standard tag
+		tlvdb_add(tlvRoot, oda); 
+		PrintAndLog("* Input list for Offline Data Authentication added to TLV. len=%d \n", ODAiListLen);
+	}
 	
 	// get AIP
 	const struct tlv *AIPtlv = tlvdb_get(tlvRoot, 0x82, NULL);	
