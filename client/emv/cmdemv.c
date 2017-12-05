@@ -592,7 +592,7 @@ int CmdHFEMVExec(const char *cmd) {
 	// DDA
 	if (AIP & 0x0020) {
 		PrintAndLog("\n* DDA");
-		
+		trDDA(AID, AIDlen, tlvRoot);
 	}	
 	
 	// transaction check

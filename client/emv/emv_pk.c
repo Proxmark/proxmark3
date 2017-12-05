@@ -399,7 +399,7 @@ static struct emv_pk *emv_pk_get_ca_pk_from_file(const char *fname,
 	}
 
 	while (!feof(f)) {
-		char buf[BUFSIZ];
+		char buf[2048];
 		if (fgets(buf, sizeof(buf), f) == NULL)
 			break;
 
@@ -472,7 +472,7 @@ struct emv_pk *emv_pk_get_ca_pk(const unsigned char *rid, unsigned char idx)
 {
 	struct emv_pk *pk = NULL;
 
-	if (!pk) {
+/*	if (!pk) {
 		char *fname = emv_pk_get_ca_pk_file(NULL, rid, idx);
 		if (fname) {
 			pk = emv_pk_get_ca_pk_from_file(fname, rid, idx);
@@ -487,14 +487,9 @@ struct emv_pk *emv_pk_get_ca_pk(const unsigned char *rid, unsigned char idx)
 			free(fname);
 		}
 	}
-
+*/
 	if (!pk) {
-		const char *fname = "capk.txt"; //openemv_config_get_str("capk.file", NULL);
-		if (!fname) {
-			fprintf(stderr, "No CA PK file specified!\n");
-			return NULL;
-		}
-
+		const char *fname = "emv/capk.txt"; 
 		pk = emv_pk_get_ca_pk_from_file(fname, rid, idx);
 	}
 	if (!pk)

@@ -177,6 +177,7 @@ static const struct emv_tag emv_tags[] = {
 	{ 0x01  , "", EMV_TAG_STRING }, // string for headers
 	{ 0x02  , "Raw data", }, // data
 	{ 0x20  , "Cardholder Verification Results (CVR)", EMV_TAG_CVR }, // not standard!
+	{ 0x21  , "SDA data" }, // not standard! data for offline authentication from read records command
 
 	// EMV
 	{ 0x41  , "Country code and national data" },

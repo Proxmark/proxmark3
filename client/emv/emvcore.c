@@ -469,27 +469,127 @@ int MSCComputeCryptoChecksum(bool LeaveFieldON, uint8_t *UDOL, uint8_t UDOLlen, 
 }
 
 // Authentication 
+static struct emv_pk *get_ca_pk(struct tlvdb *db) {
+	const struct tlv *df_tlv = tlvdb_get(db, 0x84, NULL);
+	const struct tlv *caidx_tlv = tlvdb_get(db, 0x8f, NULL);
+
+	if (!df_tlv || !caidx_tlv || df_tlv->len < 6 || caidx_tlv->len != 1)
+		return NULL;
+
+	PrintAndLog("CA public key index 0x%0x", caidx_tlv->value[0]);
+	return emv_pk_get_ca_pk(df_tlv->value, caidx_tlv->value[0]);
+}
+
 int trSDA(uint8_t *AID, size_t AIDlen, struct tlvdb *tlv) {
 	if (AIDlen < 5) 
 		return 1;
+
+	struct emv_pk *pk = get_ca_pk(tlv);
+	if (!pk) {
+		PrintAndLog("ERROR: Key not found. Exit.");
+		return 2;
+	}
 	
-	// Get public key index (0x8F)
-	//int PubKeyIndx = 0; 
+	struct emv_pk *issuer_pk = emv_pki_recover_issuer_cert(pk, tlv);
+	if (!issuer_pk) {
+		PrintAndLog("ERROR: Issuer certificate found. Exit.");
+		return 2;
+	}
+
+	PrintAndLog("Issuer PK recovered. RID %02hhx:%02hhx:%02hhx:%02hhx:%02hhx IDX %02hhx CSN %02hhx:%02hhx:%02hhx",
+		issuer_pk->rid[0],
+		issuer_pk->rid[1],
+		issuer_pk->rid[2],
+		issuer_pk->rid[3],
+		issuer_pk->rid[4],
+		issuer_pk->index,
+		issuer_pk->serial[0],
+		issuer_pk->serial[1],
+		issuer_pk->serial[2]
+		);
+
+	const struct tlv *sda_tlv = tlvdb_get(tlv, 0x21, NULL);
+	if (!sda_tlv || sda_tlv->len < 1) {
+		PrintAndLog("ERROR: Can't find dynamic authentication data. Exit.");
+		return 3;
+	}
 	
-	// Get public key from key storage
-	// GetPublicKey(AID(0..5), PubKeyIndx)
-	
-	// Processing of Issuer Public Key Certificate (0x90)
-	//Certificate = 
-	
-	// check issuer public key certificate
-	
-	// Verification of Signed Static Application Data (SSAD) (0x93)
-	
-	// get 9F4A Static Data Authentication Tag List
-	
-	// set Data Auth Code (9F45) from SSAD 
+	struct tlvdb *dac_db = emv_pki_recover_dac(issuer_pk, tlv, sda_tlv);
+	if (dac_db) {
+		const struct tlv *dac_tlv = tlvdb_get(dac_db, 0x9f45, NULL);
+		PrintAndLog("SDA verified OK (%02hhx:%02hhx)!\n", dac_tlv->value[0], dac_tlv->value[1]);
+		tlvdb_add(tlv, dac_db);
+	} else {
+		PrintAndLog("ERROR: SSAD verify error");
+	}
 	
 	return 0;
 }
 
+int trDDA(uint8_t *AID, size_t AIDlen, struct tlvdb *tlv) {
+	if (AIDlen < 5) 
+		return 1;
+
+	struct emv_pk *pk = get_ca_pk(tlv);
+	if (!pk) {
+		PrintAndLog("ERROR: Key not found. Exit.");
+		return 2;
+	}
+
+	const struct tlv *sda_tlv = tlvdb_get(tlv, 0x21, NULL);
+	if (!sda_tlv || sda_tlv->len < 1) {
+		PrintAndLog("ERROR: Can't find dynamic authentication data. Exit.");
+		return 3;
+	}
+
+	struct emv_pk *issuer_pk = emv_pki_recover_issuer_cert(pk, tlv);
+	if (issuer_pk)
+		printf("Issuer PK recovered! RID %02hhx:%02hhx:%02hhx:%02hhx:%02hhx IDX %02hhx CSN %02hhx:%02hhx:%02hhx\n",
+				issuer_pk->rid[0],
+				issuer_pk->rid[1],
+				issuer_pk->rid[2],
+				issuer_pk->rid[3],
+				issuer_pk->rid[4],
+				issuer_pk->index,
+				issuer_pk->serial[0],
+				issuer_pk->serial[1],
+				issuer_pk->serial[2]
+				);
+				
+	struct emv_pk *icc_pk = emv_pki_recover_icc_cert(issuer_pk, tlv, sda_tlv);
+	if (icc_pk)
+		printf("ICC PK recovered! RID %02hhx:%02hhx:%02hhx:%02hhx:%02hhx IDX %02hhx CSN %02hhx:%02hhx:%02hhx\n",
+				icc_pk->rid[0],
+				icc_pk->rid[1],
+				icc_pk->rid[2],
+				icc_pk->rid[3],
+				icc_pk->rid[4],
+				icc_pk->index,
+				icc_pk->serial[0],
+				icc_pk->serial[1],
+				icc_pk->serial[2]
+				);
+	struct emv_pk *icc_pe_pk = emv_pki_recover_icc_pe_cert(issuer_pk, tlv);
+	if (icc_pe_pk)
+		printf("ICC PE PK recovered! RID %02hhx:%02hhx:%02hhx:%02hhx:%02hhx IDX %02hhx CSN %02hhx:%02hhx:%02hhx\n",
+				icc_pe_pk->rid[0],
+				icc_pe_pk->rid[1],
+				icc_pe_pk->rid[2],
+				icc_pe_pk->rid[3],
+				icc_pe_pk->rid[4],
+				icc_pe_pk->index,
+				icc_pe_pk->serial[0],
+				icc_pe_pk->serial[1],
+				icc_pe_pk->serial[2]
+				);
+	struct tlvdb *dac_db = emv_pki_recover_dac(issuer_pk, tlv, sda_tlv);
+	if (dac_db) {
+		const struct tlv *dac_tlv = tlvdb_get(dac_db, 0x9f45, NULL);
+		printf("SDA verified OK (%02hhx:%02hhx)!\n", dac_tlv->value[0], dac_tlv->value[1]);
+		tlvdb_add(tlv, dac_db);
+	}
+	
+	
+	
+	return 0;
+}
