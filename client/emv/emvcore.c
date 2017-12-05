@@ -464,6 +464,10 @@ int EMVGenerateChallenge(bool LeaveFieldON, uint8_t *Result, size_t MaxResultLen
 	return EMVExchange(LeaveFieldON, (sAPDU){0x00, 0x84, 0x00, 0x00, 0x00, NULL}, Result, MaxResultLen, ResultLen, sw, tlv);
 }
 
+int EMVInternalAuthenticate(bool LeaveFieldON, uint8_t *DDOL, size_t DDOLLen, uint8_t *Result, size_t MaxResultLen, size_t *ResultLen, uint16_t *sw, struct tlvdb *tlv) {
+	return EMVExchange(LeaveFieldON, (sAPDU){0x00, 0x88, 0x00, 0x00, DDOLLen, DDOL}, Result, MaxResultLen, ResultLen, sw, tlv);
+}
+
 int MSCComputeCryptoChecksum(bool LeaveFieldON, uint8_t *UDOL, uint8_t UDOLlen, uint8_t *Result, size_t MaxResultLen, size_t *ResultLen, uint16_t *sw, struct tlvdb *tlv) {
 	return EMVExchange(LeaveFieldON, (sAPDU){0x80, 0x2a, 0x8e, 0x80, UDOLlen, UDOL}, Result, MaxResultLen, ResultLen, sw, tlv);
 }
@@ -480,9 +484,7 @@ static struct emv_pk *get_ca_pk(struct tlvdb *db) {
 	return emv_pk_get_ca_pk(df_tlv->value, caidx_tlv->value[0]);
 }
 
-int trSDA(uint8_t *AID, size_t AIDlen, struct tlvdb *tlv) {
-	if (AIDlen < 5) 
-		return 1;
+int trSDA(struct tlvdb *tlv) {
 
 	struct emv_pk *pk = get_ca_pk(tlv);
 	if (!pk) {
@@ -521,14 +523,64 @@ int trSDA(uint8_t *AID, size_t AIDlen, struct tlvdb *tlv) {
 		tlvdb_add(tlv, dac_db);
 	} else {
 		PrintAndLog("ERROR: SSAD verify error");
+		return 4;
 	}
 	
 	return 0;
 }
 
-int trDDA(uint8_t *AID, size_t AIDlen, struct tlvdb *tlv) {
-	if (AIDlen < 5) 
-		return 1;
+static const unsigned char default_ddol_value[] = {0x9f, 0x37, 0x04};
+static struct tlv default_ddol_tlv = {.tag = 0x9f49, .len = 3, .value = default_ddol_value };
+/*
+static struct tlvdb *ExecDDA(const struct emv_pk *pk, const struct tlvdb *db)
+{
+	const struct tlv *ddol_tlv = tlvdb_get(db, 0x9f49, NULL);
+
+	if (!pk)
+		return NULL;
+
+	if (!ddol_tlv)
+		ddol_tlv = &default_ddol_tlv;
+
+	struct tlv *ddol_data_tlv = dol_process(ddol_tlv, db, 0);
+	if (!ddol_data_tlv)
+		return NULL;
+
+	int res = EMVInternalAuthenticate(true, ddol_data_tlv->value, ddol_data_tlv->len, buf, sizeof(buf), &len, &sw, db) {
+	if (res) {	
+		PrintAndLog("Internal Authenticate error(%d): %4x. Exit...", res, sw);
+		return 5;
+	}
+
+	if (decodeTLV)
+		TLVPrintFromBuffer(buf, len);
+
+
+	
+	
+	struct tlvdb *dda_db = emv_internal_authenticate(sc, ddol_data_tlv);
+	if (!dda_db) {
+		free(ddol_data_tlv);
+
+		return NULL;
+	}
+
+	struct tlvdb *idn_db = emv_pki_recover_idn(pk, dda_db, ddol_data_tlv);
+	free(ddol_data_tlv);
+	if (!idn_db) {
+		tlvdb_free(dda_db);
+		return NULL;
+	}
+
+	tlvdb_add(dda_db, idn_db);
+
+	return dda_db;
+}*/
+
+int trDDA(bool decodeTLV, struct tlvdb *tlv) {
+	uint8_t buf[APDU_RES_LEN] = {0};
+	size_t len = 0;
+	uint16_t sw = 0;
 
 	struct emv_pk *pk = get_ca_pk(tlv);
 	if (!pk) {
@@ -560,20 +612,26 @@ int trDDA(uint8_t *AID, size_t AIDlen, struct tlvdb *tlv) {
 			);
 				
 	struct emv_pk *icc_pk = emv_pki_recover_icc_cert(issuer_pk, tlv, sda_tlv);
-	if (icc_pk)
-		printf("ICC PK recovered. RID %02hhx:%02hhx:%02hhx:%02hhx:%02hhx IDX %02hhx CSN %02hhx:%02hhx:%02hhx\n",
-				icc_pk->rid[0],
-				icc_pk->rid[1],
-				icc_pk->rid[2],
-				icc_pk->rid[3],
-				icc_pk->rid[4],
-				icc_pk->index,
-				icc_pk->serial[0],
-				icc_pk->serial[1],
-				icc_pk->serial[2]
-				);
+	if (!icc_pk) {
+		PrintAndLog("ERROR: ICC setrificate not found. Exit.");
+		return 2;
+	}
+	printf("ICC PK recovered. RID %02hhx:%02hhx:%02hhx:%02hhx:%02hhx IDX %02hhx CSN %02hhx:%02hhx:%02hhx\n",
+			icc_pk->rid[0],
+			icc_pk->rid[1],
+			icc_pk->rid[2],
+			icc_pk->rid[3],
+			icc_pk->rid[4],
+			icc_pk->index,
+			icc_pk->serial[0],
+			icc_pk->serial[1],
+			icc_pk->serial[2]
+			);
+
 	struct emv_pk *icc_pe_pk = emv_pki_recover_icc_pe_cert(issuer_pk, tlv);
-	if (icc_pe_pk)
+	if (!icc_pe_pk) {
+		PrintAndLog("WARNING: ICC PE PK recover error. ");
+	} else {
 		printf("ICC PE PK recovered. RID %02hhx:%02hhx:%02hhx:%02hhx:%02hhx IDX %02hhx CSN %02hhx:%02hhx:%02hhx\n",
 				icc_pe_pk->rid[0],
 				icc_pe_pk->rid[1],
@@ -585,14 +643,88 @@ int trDDA(uint8_t *AID, size_t AIDlen, struct tlvdb *tlv) {
 				icc_pe_pk->serial[1],
 				icc_pe_pk->serial[2]
 				);
+	}
+
 	struct tlvdb *dac_db = emv_pki_recover_dac(issuer_pk, tlv, sda_tlv);
 	if (dac_db) {
 		const struct tlv *dac_tlv = tlvdb_get(dac_db, 0x9f45, NULL);
 		printf("SDA verified OK. (%02hhx:%02hhx)\n", dac_tlv->value[0], dac_tlv->value[1]);
 		tlvdb_add(tlv, dac_db);
+	} else {
+		PrintAndLog("ERROR: SSAD verify error");
+		return 4;
+	}
+
+	PrintAndLog("\n* Calc DDOL");
+	const struct tlv *ddol_tlv = tlvdb_get(tlv, 0x9f49, NULL);
+	if (!ddol_tlv) {
+		ddol_tlv = &default_ddol_tlv;
+		PrintAndLog("DDOL [9f49] not found. Using default DDOL");
+	}
+
+	struct tlv *ddol_data_tlv = dol_process(ddol_tlv, tlv, 0);
+	if (!ddol_data_tlv) {
+		PrintAndLog("ERROR: Can't create DDOL TLV");
+		return 5;
+	}
+
+	PrintAndLog("DDOL data[%d]: %s", ddol_data_tlv->len, sprint_hex(ddol_data_tlv->value, ddol_data_tlv->len));
+	
+	PrintAndLog("\n* Internal Authenticate");
+	int res = EMVInternalAuthenticate(true, (uint8_t *)ddol_data_tlv->value, ddol_data_tlv->len, buf, sizeof(buf), &len, &sw, NULL);
+	if (res) {	
+		PrintAndLog("Internal Authenticate error(%d): %4x. Exit...", res, sw);
+		return 6;
+	}
+
+	struct tlvdb *dda_db = NULL;
+	if (buf[0] == 0x80) {
+		if (decodeTLV){
+			PrintAndLog("Internal Authenticate format1:");
+			TLVPrintFromBuffer(buf, len);
+		}
+		
+		if (len < 3 ) {
+			PrintAndLog("ERROR: Internal Authenticate format1 parsing error. length=%d", len);
+		} else {
+			// AIP
+			dda_db = tlvdb_fixed(0x9F4B, len - 2, buf + 2);
+			tlvdb_add(tlv, dda_db);
+			if (decodeTLV){
+				PrintAndLog("\n* * Decode response format 1:");
+				TLVPrintFromTLV(dda_db);
+			}
+		}
+	} else {
+		dda_db = tlvdb_parse_multi(buf, len);
+		if(!dda_db) {
+			PrintAndLog("ERROR: Can't parse Internal Authenticate result as TLV");
+			return 7;
+		}
+		tlvdb_add(tlv, dda_db);
+		
+		if (decodeTLV)
+			TLVPrintFromTLV(dda_db);
 	}
 	
-	
+	struct tlvdb *idn_db = emv_pki_recover_idn(pk, dda_db, ddol_data_tlv);
+	free(ddol_data_tlv);
+	if (!idn_db) {
+		PrintAndLog("ERROR: Can't recover IDN");
+		tlvdb_free(dda_db);
+		return 8;
+	}
+
+	tlvdb_add(dda_db, idn_db);
+
+	const struct tlv *idn_tlv = tlvdb_get(idn_db, 0x9f4c, NULL);
+	if(idn_tlv) {
+		printf("DDA verified OK. (IDN %zu bytes long)\n", idn_tlv->len);
+		tlvdb_add(tlv, idn_db);
+	} else {
+		PrintAndLog("ERROR: DDA verify error");
+		return 9;
+	}
 	
 	return 0;
 }

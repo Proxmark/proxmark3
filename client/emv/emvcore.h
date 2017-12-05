@@ -88,11 +88,13 @@ extern int EMVReadRecord(bool LeaveFieldON, uint8_t SFI, uint8_t SFIrec, uint8_t
 // AC
 extern int EMVGenerateChallenge(bool LeaveFieldON, uint8_t *Result, size_t MaxResultLen, size_t *ResultLen, uint16_t *sw, struct tlvdb *tlv);
 extern int EMVAC(bool LeaveFieldON, uint8_t RefControl, uint8_t *CDOL, size_t CDOLLen, uint8_t *Result, size_t MaxResultLen, size_t *ResultLen, uint16_t *sw, struct tlvdb *tlv);
+// DDA
+extern int EMVInternalAuthenticate(bool LeaveFieldON, uint8_t *DDOL, size_t DDOLLen, uint8_t *Result, size_t MaxResultLen, size_t *ResultLen, uint16_t *sw, struct tlvdb *tlv);
 // Mastercard
 int MSCComputeCryptoChecksum(bool LeaveFieldON, uint8_t *UDOL, uint8_t UDOLlen, uint8_t *Result, size_t MaxResultLen, size_t *ResultLen, uint16_t *sw, struct tlvdb *tlv);
 // Auth
-extern int trSDA(uint8_t *AID, size_t AIDlen, struct tlvdb *tlv);
-extern int trDDA(uint8_t *AID, size_t AIDlen, struct tlvdb *tlv);
+extern int trSDA(struct tlvdb *tlv);
+extern int trDDA(bool decodeTLV, struct tlvdb *tlv);
 
 #endif
 

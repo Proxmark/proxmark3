@@ -609,13 +609,13 @@ int CmdHFEMVExec(const char *cmd) {
 	// SDA
 	if (AIP & 0x0040) {
 		PrintAndLog("\n* SDA");
-		trSDA(AID, AIDlen, tlvRoot);
+		trSDA(tlvRoot);
 	}
 
 	// DDA
 	if (AIP & 0x0020) {
 		PrintAndLog("\n* DDA");
-		trDDA(AID, AIDlen, tlvRoot);
+		trDDA(decodeTLV, tlvRoot);
 	}	
 	
 	// transaction check
