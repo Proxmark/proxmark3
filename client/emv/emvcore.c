@@ -697,12 +697,21 @@ int trDDA(bool decodeTLV, struct tlvdb *tlv) {
 	// 9f4c ICC Dynamic Number
 	const struct tlv *idn_tlv = tlvdb_get(idn_db, 0x9f4c, NULL);
 	if(idn_tlv) {
-		PrintAndLog("\nIDN (ICC Dynamic Number) [%zu] %s", idn_tlv->len, sprint_hex_inrow(idn_tlv->value, idn_tlv->len));
-		PrintAndLog("DDA verified OK.");
+		if(sdad_tlv) { // fDDA
+			PrintAndLog("\nATC (Application Transaction Counter) [%zu] %s", idn_tlv->len, sprint_hex_inrow(idn_tlv->value, idn_tlv->len));
+			PrintAndLog("fDDA (fast DDA) verified OK.");
+		} else {       // DDA
+			PrintAndLog("\nIDN (ICC Dynamic Number) [%zu] %s", idn_tlv->len, sprint_hex_inrow(idn_tlv->value, idn_tlv->len));
+			PrintAndLog("DDA verified OK.");
+		}
 		tlvdb_add(tlv, idn_db);
 		tlvdb_free(idn_db);
 	} else {
-		PrintAndLog("\nERROR: DDA verify error");
+		if(sdad_tlv) { // fDDA
+			PrintAndLog("\nERROR: fDDA (fast DDA) verify error");
+		} else {       // DDA
+			PrintAndLog("\nERROR: DDA verify error");
+		}
 		tlvdb_free(idn_db);
 		return 9;
 	}
