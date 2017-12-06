@@ -115,17 +115,17 @@ CMDSRCS = 	crapto1/crapto1.c\
 			emv/emv_pk.c\
 			emv/emv_pki.c\
 			emv/emv_pki_priv.c\
-			emv/cryptotest.c\
+			emv/test/cryptotest.c\
 			emv/apduinfo.c\
 			emv/dump.c\
 			emv/tlv.c\
 			emv/emv_tags.c\
 			emv/dol.c\
 			emv/emvcore.c\
-			emv/crypto_test.c\
-			emv/sda_test.c\
-			emv/dda_test.c\
-			emv/cda_test.c\
+			emv/test/crypto_test.c\
+			emv/test/sda_test.c\
+			emv/test/dda_test.c\
+			emv/test/cda_test.c\
 			emv/cmdemv.c\
 			cmdhf.c \
 			cmdhf14a.c \

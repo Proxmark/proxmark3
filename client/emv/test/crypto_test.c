@@ -17,8 +17,8 @@
 #include <config.h>
 #endif
 
-#include "crypto.h"
-#include "dump.h"
+#include "../crypto.h"
+#include "../dump.h"
 #include "util_posix.h"
 
 #include <stdlib.h>

@@ -17,19 +17,17 @@
 #include <config.h>
 #endif
 
-#include "dda_test.h"
-
-#include "emv_pk.h"
-#include "crypto.h"
-#include "dump.h"
-#include "tlv.h"
-#include "emv_pki.h"
+#include "../emv_pk.h"
+#include "../crypto.h"
+#include "../dump.h"
+#include "../tlv.h"
+#include "../emv_pki.h"
 
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
 
-struct emv_pk mchip_05 = {
+struct emv_pk c_mchip_05 = {
 	.rid = { 0xa0, 0x00, 0x00, 0x00, 0x04, },
 	.index = 5,
 	.hash_algo = HASH_SHA_1,
@@ -58,7 +56,7 @@ struct emv_pk mchip_05 = {
 	},
 };
 
-const unsigned char d_issuer_cert[] = {
+const unsigned char c_issuer_cert[] = {
 		0x17, 0x14, 0x28, 0x4f, 0x76, 0x3b, 0x85, 0x86, 0xee, 0x6d, 0x31, 0x99, 0x51, 0xf7, 0xe6, 0x3f,
 		0xa2, 0x50, 0x76, 0xe5, 0x0d, 0xc9, 0xd3, 0x20, 0x0b, 0xa9, 0x98, 0xd3, 0xa0, 0x52, 0xad, 0xba,
 		0x9a, 0xb6, 0x9a, 0xc6, 0xad, 0x6a, 0xdd, 0x3c, 0xe0, 0x9f, 0x02, 0x78, 0xf4, 0x07, 0x4e, 0xc4,
@@ -72,17 +70,17 @@ const unsigned char d_issuer_cert[] = {
 		0xee, 0x45, 0x5d, 0x12, 0x14, 0x6e, 0xa6, 0xf0, 0x2e, 0x8b, 0x01, 0xec, 0x2f, 0xa7, 0xa1, 0x15,
 };
 
-const unsigned char d_issuer_rem[] = {
+const unsigned char c_issuer_rem[] = {
 		0x6e, 0x63, 0xb7, 0xbc, 0x70, 0xab, 0xdd, 0x09, 0x34, 0x1b, 0x34, 0xc0, 0x32, 0x86, 0xba, 0x9b,
 		0xd8, 0x3b, 0xa7, 0x93, 0x6c, 0x5b, 0x77, 0x98, 0xfb, 0x22, 0xc5, 0xe5, 0x3f, 0xf2, 0x40, 0xa2,
 		0x6d, 0xbd, 0x64, 0x15,
 };
 
-const unsigned char d_issuer_exp[] = {
+const unsigned char c_issuer_exp[] = {
 		0x03,
 };
 
-const unsigned char d_icc_cert[] = {
+const unsigned char c_icc_cert[] = {
 		0xa4, 0x2f, 0xbe, 0xb1, 0x56, 0xb9, 0x8d, 0xcb, 0x05, 0x54, 0xda, 0x06, 0x2a, 0xdc, 0xa5, 0x30,
 		0x9a, 0x91, 0xf0, 0x4f, 0xa2, 0xc7, 0xbd, 0x71, 0x02, 0xa8, 0xd7, 0x3f, 0x16, 0xa3, 0xcf, 0xad,
 		0xe8, 0xaa, 0xdf, 0x4f, 0x3f, 0xe2, 0xa2, 0x12, 0x5c, 0xcd, 0xd7, 0x7c, 0x6b, 0x9f, 0x78, 0xb5,
@@ -96,21 +94,22 @@ const unsigned char d_icc_cert[] = {
 		0x39, 0xc1, 0xec, 0xd3, 0x99, 0xe4, 0x60, 0x74, 0xb9, 0x96, 0xd9, 0x3a, 0x88, 0xe0, 0x1e, 0x0a,
 };
 
-const unsigned char d_icc_exp[] = {
+const unsigned char c_icc_exp[] = {
 		0x03,
 };
 
-const unsigned char d_sdad_cr[] = {
-	0x3d, 0x87, 0xf3, 0x10, 0x56, 0x10, 0x2d, 0x25, 0x12, 0xcf, 0xde, 0x30, 0x90, 0x06, 0x27, 0xc1,
-	0x26, 0x3a, 0x76, 0xd1, 0xda, 0xa8, 0x21, 0xf5, 0x08, 0x31, 0xe6, 0x06, 0xc5, 0x45, 0x44, 0xc2,
-	0x58, 0x13, 0x1e, 0xae, 0xbe, 0x87, 0x4d, 0xcb, 0x1a, 0x28, 0xcf, 0x82, 0xd3, 0xff, 0x91, 0x11,
-	0x82, 0x60, 0xbc, 0x91, 0x11, 0x37, 0x11, 0xd3, 0xb2, 0x89, 0xfa, 0x41, 0xbe, 0x69, 0xc7, 0xa7,
-	0xb5, 0xc7, 0x83, 0xe6, 0xf8, 0xf9, 0x7f, 0xce, 0x13, 0xf0, 0x8b, 0x13, 0xfa, 0x44, 0x18, 0x3e,
-	0x37, 0x18, 0xce, 0xbf, 0x0c, 0x41, 0x47, 0x3d, 0x2b, 0x0f, 0xf4, 0xde, 0x44, 0xb6, 0xa0, 0x2d,
-	0x75, 0xad, 0xb6, 0xd4, 0x96, 0x23, 0x93, 0xff, 0xdf, 0x4e, 0x69, 0x02, 0x6c, 0xdf, 0x38, 0xff,
+const unsigned char c_sdad_cr[] = {
+	0x1c, 0x00, 0x9f, 0xc4, 0x86, 0x79, 0x15, 0x7d, 0xbf, 0xf4, 0x5f, 0x65, 0xd3, 0x3f, 0xf7, 0x8d,
+	0x4f, 0xcb, 0xf0, 0xcf, 0x5e, 0xa4, 0x20, 0x8d, 0x10, 0x7a, 0xe9, 0x5a, 0xa3, 0x8c, 0x54, 0x6d,
+	0x0e, 0x5a, 0x18, 0xb8, 0x74, 0x03, 0xa1, 0x2b, 0xd4, 0x47, 0xa8, 0xbb, 0xfc, 0x1e, 0x49, 0xce,
+	0x0b, 0x2e, 0x25, 0x13, 0x89, 0x20, 0x57, 0x03, 0xc9, 0xbb, 0x1a, 0x88, 0xcc, 0x79, 0xf1, 0xdd,
+	0xc2, 0xf9, 0x84, 0x1e, 0xad, 0xf0, 0x7c, 0xe0, 0x7b, 0x62, 0x51, 0x1d, 0xdc, 0x93, 0xdf, 0x59,
+	0xf2, 0x8f, 0x0e, 0x91, 0xf9, 0x23, 0x32, 0xd2, 0x9c, 0xde, 0xf2, 0xbc, 0xcb, 0x10, 0x08, 0x85,
+	0x05, 0x00, 0xef, 0x3e, 0x47, 0x0a, 0x4c, 0xb1, 0x8c, 0xd9, 0x1a, 0xa5, 0xc1, 0xa1, 0x08, 0xf3,
+
 };
 
-const unsigned char d_ssd1[] = {
+const unsigned char c_ssd1[] = {
 	0x5f, 0x25, 0x03, 0x14, 0x05, 0x01, 0x5f, 0x24, 0x03, 0x15, 0x06, 0x30, 0x5a, 0x08, 0x52, 0x85,
 	0x88, 0x12, 0x54, 0x34, 0x56, 0x53, 0x5f, 0x34, 0x01, 0x01, 0x8e, 0x0c, 0x00, 0x00, 0x00, 0x00,
 	0x00, 0x00, 0x00, 0x00, 0x1e, 0x03, 0x1f, 0x03, 0x9f, 0x07, 0x02, 0xff, 0x00, 0x9f, 0x0d, 0x05,
@@ -122,25 +121,36 @@ const unsigned char d_ssd1[] = {
 	0x39, 0x00,
 };
 static const struct tlv ssd1_tlv = {
-	.len = sizeof(d_ssd1),
-	.value = d_ssd1,
+	.len = sizeof(c_ssd1),
+	.value = c_ssd1,
 };
 
-const unsigned char d_pan[] = {
+const unsigned char c_pan[] = {
 	0x52, 0x85, 0x88, 0x12, 0x54, 0x34, 0x56, 0x53,
 };
 
-const unsigned char d_dd1[] = {
-	0x00, 0x00, 0x00, 0x00,
-};
-static const struct tlv dd1_tlv = {
-	.len = sizeof(d_dd1),
-	.value = d_dd1,
+const unsigned char c_dd1[] = {
+	0x12, 0x34, 0x57, 0x79,
 };
 
-static int dda_test_raw(bool verbose)
+const unsigned char c_dd2[] = {
+	0x9f, 0x27, 0x01, 0x40, 0x9f, 0x36, 0x02, 0x00, 0x10, 0x9f, 0x10, 0x12, 0x00, 0x10, 0x90, 0x40,
+	0x01, 0x22, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff,
+};
+
+const unsigned char c_crm1[] = {
+	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x06, 0x43, 0x00, 0x00,
+	0x00, 0x00, 0x00, 0x06, 0x43, 0x14, 0x09, 0x25, 0x50, 0x12, 0x34, 0x57, 0x79, 0x23, 0x00, 0x00,
+	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x1e, 0x03, 0x00,
+};
+static const struct tlv crm1_tlv = {
+	.len = sizeof(c_crm1),
+	.value = c_crm1,
+};
+
+static int cda_test_raw(bool verbose)
 {
-	const struct emv_pk *pk = &mchip_05;
+	const struct emv_pk *pk = &c_mchip_05;
 
 	struct crypto_pk *kcp = crypto_pk_open(PK_RSA,
 			pk->modulus, pk->mlen,
@@ -150,7 +160,7 @@ static int dda_test_raw(bool verbose)
 
 	unsigned char *ipk_data;
 	size_t ipk_data_len;
-	ipk_data = crypto_pk_encrypt(kcp, d_issuer_cert, sizeof(d_issuer_cert), &ipk_data_len);
+	ipk_data = crypto_pk_encrypt(kcp, c_issuer_cert, sizeof(c_issuer_cert), &ipk_data_len);
 	crypto_pk_close(kcp);
 
 	if (!ipk_data)
@@ -164,7 +174,7 @@ static int dda_test_raw(bool verbose)
 	size_t ipk_pk_len = ipk_data[13];
 	unsigned char *ipk_pk = malloc(ipk_pk_len);
 	memcpy(ipk_pk, ipk_data + 15, ipk_data_len - 36);
-	memcpy(ipk_pk + ipk_data_len - 36, d_issuer_rem, sizeof(d_issuer_rem));
+	memcpy(ipk_pk + ipk_data_len - 36, c_issuer_rem, sizeof(c_issuer_rem));
 
 	struct crypto_hash *ch;
 	ch = crypto_hash_open(HASH_SHA_1);
@@ -176,7 +186,7 @@ static int dda_test_raw(bool verbose)
 
 	crypto_hash_write(ch, ipk_data + 1, 14);
 	crypto_hash_write(ch, ipk_pk, ipk_pk_len);
-	crypto_hash_write(ch, d_issuer_exp, sizeof(d_issuer_exp));
+	crypto_hash_write(ch, c_issuer_exp, sizeof(c_issuer_exp));
 
 	unsigned char *h = crypto_hash_read(ch);
 	if (!h) {
@@ -202,14 +212,14 @@ static int dda_test_raw(bool verbose)
 	free(ipk_data);
 
 	struct crypto_pk *ikcp = crypto_pk_open(PK_RSA, ipk_pk, (int) ipk_pk_len,
-			d_issuer_exp, (int) sizeof(d_issuer_exp));
+			c_issuer_exp, (int) sizeof(c_issuer_exp));
 	free(ipk_pk);
 	if (!ikcp)
 		return 1;
 
 	unsigned char *iccpk_data;
 	size_t iccpk_data_len;
-	iccpk_data = crypto_pk_encrypt(ikcp, d_icc_cert, sizeof(d_icc_cert), &iccpk_data_len);
+	iccpk_data = crypto_pk_encrypt(ikcp, c_icc_cert, sizeof(c_icc_cert), &iccpk_data_len);
 	crypto_pk_close(ikcp);
 
 	if (!iccpk_data)
@@ -233,8 +243,8 @@ static int dda_test_raw(bool verbose)
 	}
 
 	crypto_hash_write(ch, iccpk_data + 1, iccpk_data_len - 22);
-	crypto_hash_write(ch, d_icc_exp, sizeof(d_icc_exp));
-	crypto_hash_write(ch, d_ssd1, sizeof(d_ssd1));
+	crypto_hash_write(ch, c_icc_exp, sizeof(c_icc_exp));
+	crypto_hash_write(ch, c_ssd1, sizeof(c_ssd1));
 
 	h = crypto_hash_read(ch);
 	if (!h) {
@@ -260,19 +270,19 @@ static int dda_test_raw(bool verbose)
 	free(iccpk_data);
 
 	struct crypto_pk *icckcp = crypto_pk_open(PK_RSA, iccpk_pk, (int) iccpk_pk_len,
-			d_issuer_exp, (int) sizeof(d_issuer_exp));
+			c_issuer_exp, (int) sizeof(c_issuer_exp));
 	free(iccpk_pk);
 	if (!icckcp)
 		return 1;
 
 	size_t sdad_len;
-	unsigned char *sdad = crypto_pk_encrypt(icckcp, d_sdad_cr, sizeof(d_sdad_cr), &sdad_len);
+	unsigned char *sdad = crypto_pk_encrypt(icckcp, c_sdad_cr, sizeof(c_sdad_cr), &sdad_len);
 	crypto_pk_close(icckcp);
 	if (!sdad)
 		return 1;
 
 	if (verbose) {
-		printf("sdad:\n");
+		printf("SDAD:\n");
 		dump_buffer(sdad, sdad_len, stdout, 0);
 	}
 
@@ -283,7 +293,7 @@ static int dda_test_raw(bool verbose)
 	}
 
 	crypto_hash_write(ch, sdad + 1, sdad_len - 22);
-	crypto_hash_write(ch, d_dd1, sizeof(d_dd1));
+	crypto_hash_write(ch, c_dd1, sizeof(c_dd1));
 
 	unsigned char *h2 = crypto_hash_read(ch);
 	if (!h2) {
@@ -299,20 +309,49 @@ static int dda_test_raw(bool verbose)
 
 	crypto_hash_close(ch);
 
+	ch =  crypto_hash_open(HASH_SHA_1);
+	if (!ch) {
+		free(sdad);
+		return 1;
+	}
+
+	crypto_hash_write(ch, c_crm1, sizeof(c_crm1));
+	crypto_hash_write(ch, c_dd2, sizeof(c_dd2));
+
+	h = crypto_hash_read(ch);
+	if (!h) {
+		crypto_hash_close(ch);
+		free(sdad);
+		return 1;
+	}
+
+	if (verbose) {
+		printf("crypto hash2.1:\n");
+		dump_buffer(h, 20, stdout, 0);
+	}
+
+	if (memcmp(sdad + 5 + 8 + 1 + 8, h, 20)) {
+		crypto_hash_close(ch);
+		free(sdad);
+		return 1;
+	}
+
+	crypto_hash_close(ch);
+
 	free(sdad);
 
 	return 0;
 }
 
-static int dda_test_pk(bool verbose)
+static int cda_test_pk(bool verbose)
 {
-	const struct emv_pk *pk = &mchip_05;
+	const struct emv_pk *pk = &c_mchip_05;
 	struct tlvdb *db;
 
-	db = tlvdb_external(0x90, sizeof(d_issuer_cert), d_issuer_cert);
-	tlvdb_add(db, tlvdb_external(0x9f32, sizeof(d_issuer_exp), d_issuer_exp));
-	tlvdb_add(db, tlvdb_external(0x92, sizeof(d_issuer_rem), d_issuer_rem));
-	tlvdb_add(db, tlvdb_external(0x5a, sizeof(d_pan), d_pan));
+	db = tlvdb_external(0x90, sizeof(c_issuer_cert), c_issuer_cert);
+	tlvdb_add(db, tlvdb_external(0x9f32, sizeof(c_issuer_exp), c_issuer_exp));
+	tlvdb_add(db, tlvdb_external(0x92, sizeof(c_issuer_rem), c_issuer_rem));
+	tlvdb_add(db, tlvdb_external(0x5a, sizeof(c_pan), c_pan));
 
 	struct emv_pk *ipk = emv_pki_recover_issuer_cert(pk, db);
 	if (!ipk) {
@@ -321,9 +360,9 @@ static int dda_test_pk(bool verbose)
 		return 2;
 	}
 
-	tlvdb_add(db, tlvdb_external(0x9f46, sizeof(d_icc_cert), d_icc_cert));
-	tlvdb_add(db, tlvdb_external(0x9f47, sizeof(d_icc_exp), d_icc_exp));
-	/*tlvdb_add(db, tlvdb_external(0x9f48, sizeof(d_issuer_rem), d_issuer_rem));*/
+	tlvdb_add(db, tlvdb_external(0x9f46, sizeof(c_icc_cert), c_icc_cert));
+	tlvdb_add(db, tlvdb_external(0x9f47, sizeof(c_icc_exp), c_icc_exp));
+	/*tlvdb_add(db, tlvdb_external(0x9f48, sizeof(issuer_rem), issuer_rem));*/
 
 	struct emv_pk *iccpk = emv_pki_recover_icc_cert(ipk, db, &ssd1_tlv);
 	if (!iccpk) {
@@ -333,11 +372,22 @@ static int dda_test_pk(bool verbose)
 		return 2;
 	}
 
-	tlvdb_add(db, tlvdb_external(0x9f4b, sizeof(d_sdad_cr), d_sdad_cr));
+	tlvdb_add(db, tlvdb_fixed(0x9f37, sizeof(c_dd1), c_dd1));
 
-	struct tlvdb *idndb = emv_pki_recover_idn(iccpk, db, &dd1_tlv);
+	struct tlvdb *cda_db;
+	cda_db = tlvdb_fixed(0x9f27, 1, (unsigned char[]){ 0x40 });
+	tlvdb_add(cda_db, tlvdb_fixed(0x9f36, 2, (unsigned char[]) { 0x00, 0x10 }));
+	tlvdb_add(cda_db, tlvdb_external(0x9f4b, sizeof(c_sdad_cr), c_sdad_cr));
+	tlvdb_add(cda_db, tlvdb_fixed(0x9f10, 0x12,
+			(unsigned char[]) { 0x00, 0x10, 0x90, 0x40, 0x01, 0x22, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff}));
+
+	struct tlvdb *idndb = emv_pki_perform_cda(iccpk, db, cda_db,
+			NULL,
+			&crm1_tlv,
+			NULL);
 	if (!idndb) {
 		fprintf(stderr, "Could not recover IDN!\n");
+		tlvdb_free(cda_db);
 		emv_pk_free(iccpk);
 		emv_pk_free(ipk);
 		tlvdb_free(db);
@@ -348,6 +398,7 @@ static int dda_test_pk(bool verbose)
 	if (!idn) {
 		fprintf(stderr, "IDN not found!\n");
 		tlvdb_free(idndb);
+		tlvdb_free(cda_db);
 		emv_pk_free(iccpk);
 		emv_pk_free(ipk);
 		tlvdb_free(db);
@@ -360,6 +411,7 @@ static int dda_test_pk(bool verbose)
 	}
 
 	tlvdb_free(idndb);
+	tlvdb_free(cda_db);
 	emv_pk_free(iccpk);
 	emv_pk_free(ipk);
 	tlvdb_free(db);
@@ -367,24 +419,24 @@ static int dda_test_pk(bool verbose)
 	return 0;
 }
 
-int exec_dda_test(bool verbose)
+int exec_cda_test(bool verbose)
 {
 	int ret;
 	fprintf(stdout, "\n");
-
-	ret = dda_test_raw(verbose);
+	
+	ret = cda_test_raw(verbose);
 	if (ret) {
-		fprintf(stderr, "DDA raw test: failed\n");
+		fprintf(stderr, "CDA raw test: failed\n");
 		return ret;
 	}
-	fprintf(stdout, "DDA raw test: passed\n");
+	fprintf(stdout, "CDA raw test: passed\n");
 
-	ret = dda_test_pk(verbose);
+	ret = cda_test_pk(verbose);
 	if (ret) {
-		fprintf(stderr, "DDA test pk: failed\n");
+		fprintf(stderr, "CDA test pk: failed\n");
 		return ret;
 	}
-	fprintf(stdout, "DDA test pk: passed\n");
+	fprintf(stdout, "CDA test pk: passed\n");
 
 	return 0;
 }

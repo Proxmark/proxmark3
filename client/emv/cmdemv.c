@@ -9,7 +9,7 @@
 //-----------------------------------------------------------------------------
 
 #include "cmdemv.h"
-#include "cryptotest.h"
+#include "test/cryptotest.h"
 
 int UsageCmdHFEMVSelect(void) {
 	PrintAndLog("HELP :  Executes select applet command:\n");
@@ -437,7 +437,7 @@ int CmdHFEMVExec(const char *cmd) {
 			TLV_ADD(0x9F66, "\x26\x00\x00\x00"); // qVSDC
 			break;
 		case TT_CDA:
-			TLV_ADD(0x9F66, "\x86\x80\x00\x00"); // CDA
+			TLV_ADD(0x9F66, "\x26\x80\x00\x00"); // CDA
 			break;
 		default:
 			TLV_ADD(0x9F66, "\x26\x00\x00\x00"); // qVSDC

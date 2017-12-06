@@ -178,6 +178,9 @@ static struct crypto_pk *crypto_pk_polarssl_genkey_rsa(va_list vl)
 	unsigned int nbits = va_arg(vl, unsigned int);
 	unsigned int exp = va_arg(vl, unsigned int);
 
+	if (transient) {
+	}
+	
 	int res = rsa_gen_key(&cp->ctx, &myrand, NULL, nbits, exp);
 	if (res) {
 		fprintf(stderr, "PolarSSL private key generation error res=%x exp=%d nbits=%d.\n", res * -1, exp, nbits);

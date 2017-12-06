@@ -17,11 +17,11 @@
 #include <config.h>
 #endif
 
-#include "emv_pk.h"
-#include "crypto.h"
-#include "dump.h"
-#include "tlv.h"
-#include "emv_pki.h"
+#include "../emv_pk.h"
+#include "../crypto.h"
+#include "../dump.h"
+#include "../tlv.h"
+#include "../emv_pki.h"
 
 #include <stdio.h>
 #include <string.h>
