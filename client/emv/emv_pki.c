@@ -65,6 +65,11 @@ static unsigned char *emv_pki_decode_message(const struct emv_pk *enc_pk,
 	data = crypto_pk_encrypt(kcp, cert_tlv->value, cert_tlv->len, &data_len);
 	crypto_pk_close(kcp);
 
+/*	if (true){
+		printf("Recovered data:\n");
+		dump_buffer(data, data_len, stdout, 0);
+	}*/
+	
 	if (data[data_len-1] != 0xbc || data[0] != 0x6a || data[1] != msgtype) {
 		printf("ERROR: Certificate format\n");
 		free(data);
@@ -101,6 +106,8 @@ static unsigned char *emv_pki_decode_message(const struct emv_pk *enc_pk,
 
 	if (memcmp(data + data_len - 1 - hash_len, crypto_hash_read(ch), hash_len)) {
 		printf("ERROR: Calculated wrong hash\n");
+		printf("decoded:    %s\n",sprint_hex(data + data_len - 1 - hash_len, hash_len));
+		printf("calculated: %s\n",sprint_hex(crypto_hash_read(ch), hash_len));
 		crypto_hash_close(ch);
 		free(data);
 		return NULL;
@@ -341,6 +348,11 @@ struct tlvdb *emv_pki_recover_idn_ex(const struct emv_pk *enc_pk, const struct t
 		return NULL;
 	}
 
+	if (showData){
+		printf("Recovered data:\n");
+		dump_buffer(data, data_len, stdout, 0);
+	}
+
 	size_t idn_len = data[4];
 	if (idn_len > data[3] - 1) {
 		free(data);
@@ -350,11 +362,6 @@ struct tlvdb *emv_pki_recover_idn_ex(const struct emv_pk *enc_pk, const struct t
 	// 9f4c ICC Dynamic Number
 	struct tlvdb *idn_db = tlvdb_fixed(0x9f4c, idn_len, data + 5);
 	
-	if (showData){
-		printf("Recovered data:\n");
-		dump_buffer(data, data_len, stdout, 0);
-	}
-
 	free(data);
 
 	return idn_db;
