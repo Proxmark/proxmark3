@@ -295,7 +295,7 @@ struct emv_pk *emv_pki_recover_icc_pe_cert(const struct emv_pk *pk, struct tlvdb
 			NULL);
 }
 
-struct tlvdb *emv_pki_recover_dac(const struct emv_pk *enc_pk, const struct tlvdb *db, const struct tlv *sda_tlv)
+struct tlvdb *emv_pki_recover_dac_ex(const struct emv_pk *enc_pk, const struct tlvdb *db, const struct tlv *sda_tlv, bool showData)
 {
 	size_t data_len;
 	unsigned char *data = emv_pki_decode_message(enc_pk, 3, &data_len,
@@ -306,11 +306,19 @@ struct tlvdb *emv_pki_recover_dac(const struct emv_pk *enc_pk, const struct tlvd
 	if (!data || data_len < 5)
 		return NULL;
 
+	if (showData){
+		printf("Recovered data:\n");
+		dump_buffer(data, data_len, stdout, 0);
+	}
+
 	struct tlvdb *dac_db = tlvdb_fixed(0x9f45, 2, data+3);
 
 	free(data);
 
 	return dac_db;
+}
+struct tlvdb *emv_pki_recover_dac(const struct emv_pk *enc_pk, const struct tlvdb *db, const struct tlv *sda_tlv) {
+	return emv_pki_recover_dac_ex(enc_pk, db, sda_tlv, false);
 }
 
 struct tlvdb *emv_pki_recover_idn(const struct emv_pk *enc_pk, const struct tlvdb *db, const struct tlv *dyn_tlv) {
