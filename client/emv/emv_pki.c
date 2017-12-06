@@ -19,6 +19,7 @@
 
 #include "emv_pki.h"
 #include "crypto.h"
+#include "dump.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -49,7 +50,7 @@ static unsigned char *emv_pki_decode_message(const struct emv_pk *enc_pk,
 		return NULL;
 
 	if (cert_tlv->len != enc_pk->mlen) {
-		printf("Certificate length (%d) not equal key length (%d)", cert_tlv->len, enc_pk->mlen);
+		printf("ERROR: Certificate length (%d) not equal key length (%d)\n", cert_tlv->len, enc_pk->mlen);
 		return NULL;
 	}
 	kcp = crypto_pk_open(enc_pk->pk_algo,
@@ -62,12 +63,14 @@ static unsigned char *emv_pki_decode_message(const struct emv_pk *enc_pk,
 	crypto_pk_close(kcp);
 
 	if (data[data_len-1] != 0xbc || data[0] != 0x6a || data[1] != msgtype) {
+		printf("ERROR: Certificate format\n");
 		free(data);
 		return NULL;
 	}
 
 	size_t hash_pos = emv_pki_hash_psn[msgtype];
 	if (hash_pos == 0 || hash_pos > data_len){
+		printf("ERROR: Cant get hash position in the certificate\n");
 		free(data);
 		return NULL;
 	}
@@ -75,6 +78,7 @@ static unsigned char *emv_pki_decode_message(const struct emv_pk *enc_pk,
 	struct crypto_hash *ch;
 	ch = crypto_hash_open(data[hash_pos]);
 	if (!ch) {
+		printf("ERROR: Cant do hash\n");
 		free(data);
 		return NULL;
 	}
@@ -93,6 +97,7 @@ static unsigned char *emv_pki_decode_message(const struct emv_pk *enc_pk,
 	va_end(vl);
 
 	if (memcmp(data + data_len - 1 - hash_len, crypto_hash_read(ch), hash_len)) {
+		printf("ERROR: Calculated wrong hash\n");
 		crypto_hash_close(ch);
 		free(data);
 		return NULL;
@@ -279,7 +284,11 @@ struct tlvdb *emv_pki_recover_dac(const struct emv_pk *enc_pk, const struct tlvd
 	return dac_db;
 }
 
-struct tlvdb *emv_pki_recover_idn(const struct emv_pk *enc_pk, const struct tlvdb *db, const struct tlv *dyn_tlv)
+struct tlvdb *emv_pki_recover_idn(const struct emv_pk *enc_pk, const struct tlvdb *db, const struct tlv *dyn_tlv) {
+	return emv_pki_recover_idn_ex(enc_pk, db, dyn_tlv, false);
+}
+
+struct tlvdb *emv_pki_recover_idn_ex(const struct emv_pk *enc_pk, const struct tlvdb *db, const struct tlv *dyn_tlv, bool showData)
 {
 	size_t data_len;
 	unsigned char *data = emv_pki_decode_message(enc_pk, 5, &data_len,
@@ -303,6 +312,12 @@ struct tlvdb *emv_pki_recover_idn(const struct emv_pk *enc_pk, const struct tlvd
 
 	// 9f4c ICC Dynamic Number
 	struct tlvdb *idn_db = tlvdb_fixed(0x9f4c, idn_len, data + 5);
+	
+	if (showData){
+		printf("Recovered data:\n");
+		dump_buffer(data, data_len, stdout, 0);
+	}
+
 	free(data);
 
 	return idn_db;

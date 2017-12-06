@@ -532,6 +532,14 @@ int trSDA(struct tlvdb *tlv) {
 static const unsigned char default_ddol_value[] = {0x9f, 0x37, 0x04};
 static struct tlv default_ddol_tlv = {.tag = 0x9f49, .len = 3, .value = default_ddol_value };
 
+static const unsigned char default_fdda_ddol_value[] = 
+		{0x9f, 0x37, 0x04,
+		0x9f, 0x02, 0x06,
+		0x5f, 0x2A, 0x02,
+		0x9f, 0x69, 0x07, // 9f69[07] Card Authentication Related Data
+		};
+static struct tlv default_fdda_ddol_tlv = {.tag = 0x9f49, .len = 12, .value = default_fdda_ddol_value };
+
 int trDDA(bool decodeTLV, struct tlvdb *tlv) {
 	uint8_t buf[APDU_RES_LEN] = {0};
 	size_t len = 0;
@@ -600,40 +608,51 @@ int trDDA(bool decodeTLV, struct tlvdb *tlv) {
 				);
 	}
 
-	struct tlvdb *dac_db = emv_pki_recover_dac(issuer_pk, tlv, sda_tlv);
-	if (dac_db) {
-		const struct tlv *dac_tlv = tlvdb_get(dac_db, 0x9f45, NULL);
-		printf("SDA verified OK. (%02hhx:%02hhx)\n", dac_tlv->value[0], dac_tlv->value[1]);
-		tlvdb_add(tlv, dac_db);
-	} else {
-		PrintAndLog("ERROR: SSAD verify error");
-		return 4;
-	}
-	
-	PrintAndLog("\n* Calc DDOL");
-	const struct tlv *ddol_tlv = tlvdb_get(tlv, 0x9f49, NULL);
-	if (!ddol_tlv) {
-		ddol_tlv = &default_ddol_tlv;
-		PrintAndLog("DDOL [9f49] not found. Using default DDOL");
-	}
-
-	struct tlv *ddol_data_tlv = dol_process(ddol_tlv, tlv, 0);
-	if (!ddol_data_tlv) {
-		PrintAndLog("ERROR: Can't create DDOL TLV");
-		return 5;
-	}
-
-	PrintAndLog("DDOL data[%d]: %s", ddol_data_tlv->len, sprint_hex(ddol_data_tlv->value, ddol_data_tlv->len));
-
 	struct tlvdb *dda_db = NULL;
+	struct tlv *ddol_data_tlv = NULL;
 	// 9F4B: Signed Dynamic Application Data
 	const struct tlv *sdad_tlv = tlvdb_get(tlv, 0x9f4b, NULL);
 	// DDA with internal authenticate OR fDDA with filled 0x9F4B tag (GPO result)
 	// EMV kernel3 v2.4, contactless book C-3, C.1., page 147
 	if (sdad_tlv) {
-		PrintAndLog("\n* * * * Got Signed Dynamic Application Data (9F4B) form GPO. Maybe fDDA...");
+		PrintAndLog("\n* * Got Signed Dynamic Application Data (9F4B) form GPO. Maybe fDDA...");
 		dda_db = tlv;
+
+		PrintAndLog("\n* Calc fDDA hash");
+		ddol_data_tlv = dol_process(&default_fdda_ddol_tlv, tlv, 0);
+		if (!ddol_data_tlv) {
+			PrintAndLog("ERROR: Can't create fDDA hash TLV");
+			return 5;
+		}
+
+		PrintAndLog("fDDA hash data[%d]: %s", ddol_data_tlv->len, sprint_hex(ddol_data_tlv->value, ddol_data_tlv->len));
+		
 	} else {
+		struct tlvdb *dac_db = emv_pki_recover_dac(issuer_pk, tlv, sda_tlv);
+		if (dac_db) {
+			const struct tlv *dac_tlv = tlvdb_get(dac_db, 0x9f45, NULL);
+			printf("SDA verified OK. (%02hhx:%02hhx)\n", dac_tlv->value[0], dac_tlv->value[1]);
+			tlvdb_add(tlv, dac_db);
+		} else {
+			PrintAndLog("ERROR: SSAD verify error");
+			return 4;
+		}
+		
+		PrintAndLog("\n* Calc DDOL");
+		const struct tlv *ddol_tlv = tlvdb_get(tlv, 0x9f49, NULL);
+		if (!ddol_tlv) {
+			ddol_tlv = &default_ddol_tlv;
+			PrintAndLog("DDOL [9f49] not found. Using default DDOL");
+		}
+
+		ddol_data_tlv = dol_process(ddol_tlv, tlv, 0);
+		if (!ddol_data_tlv) {
+			PrintAndLog("ERROR: Can't create DDOL TLV");
+			return 5;
+		}
+
+		PrintAndLog("DDOL data[%d]: %s", ddol_data_tlv->len, sprint_hex(ddol_data_tlv->value, ddol_data_tlv->len));
+
 		PrintAndLog("\n* Internal Authenticate");
 		int res = EMVInternalAuthenticate(true, (uint8_t *)ddol_data_tlv->value, ddol_data_tlv->len, buf, sizeof(buf), &len, &sw, NULL);
 		if (res) {	
@@ -666,7 +685,7 @@ int trDDA(bool decodeTLV, struct tlvdb *tlv) {
 		}
 	}
 	
-	struct tlvdb *idn_db = emv_pki_recover_idn(icc_pk, dda_db, ddol_data_tlv);
+	struct tlvdb *idn_db = emv_pki_recover_idn_ex(icc_pk, dda_db, ddol_data_tlv, true);
 	free(ddol_data_tlv);
 	if (!idn_db) {
 		PrintAndLog("ERROR: Can't recover IDN (ICC Dynamic Number)");
@@ -678,7 +697,8 @@ int trDDA(bool decodeTLV, struct tlvdb *tlv) {
 	// 9f4c ICC Dynamic Number
 	const struct tlv *idn_tlv = tlvdb_get(idn_db, 0x9f4c, NULL);
 	if(idn_tlv) {
-		PrintAndLog("\nDDA verified OK. IDN (ICC Dynamic Number) %zu bytes long\n", idn_tlv->len);
+		PrintAndLog("\nIDN (ICC Dynamic Number) [%zu] %s", idn_tlv->len, sprint_hex_inrow(idn_tlv->value, idn_tlv->len));
+		PrintAndLog("DDA verified OK.");
 		tlvdb_add(tlv, idn_db);
 		tlvdb_free(idn_db);
 	} else {
