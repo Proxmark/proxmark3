@@ -20,6 +20,7 @@
 #include "emv_pki.h"
 #include "crypto.h"
 
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdarg.h>
@@ -47,9 +48,10 @@ static unsigned char *emv_pki_decode_message(const struct emv_pk *enc_pk,
 	if (!cert_tlv)
 		return NULL;
 
-	if (cert_tlv->len != enc_pk->mlen)
+	if (cert_tlv->len != enc_pk->mlen) {
+		printf("Certificate length (%d) not equal key length (%d)", cert_tlv->len, enc_pk->mlen);
 		return NULL;
-
+	}
 	kcp = crypto_pk_open(enc_pk->pk_algo,
 			enc_pk->modulus, enc_pk->mlen,
 			enc_pk->exp, enc_pk->elen);
@@ -299,6 +301,7 @@ struct tlvdb *emv_pki_recover_idn(const struct emv_pk *enc_pk, const struct tlvd
 		return NULL;
 	}
 
+	// 9f4c ICC Dynamic Number
 	struct tlvdb *idn_db = tlvdb_fixed(0x9f4c, idn_len, data + 5);
 	free(data);
 

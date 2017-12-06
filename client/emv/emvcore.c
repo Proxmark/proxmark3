@@ -531,51 +531,6 @@ int trSDA(struct tlvdb *tlv) {
 
 static const unsigned char default_ddol_value[] = {0x9f, 0x37, 0x04};
 static struct tlv default_ddol_tlv = {.tag = 0x9f49, .len = 3, .value = default_ddol_value };
-/*
-static struct tlvdb *ExecDDA(const struct emv_pk *pk, const struct tlvdb *db)
-{
-	const struct tlv *ddol_tlv = tlvdb_get(db, 0x9f49, NULL);
-
-	if (!pk)
-		return NULL;
-
-	if (!ddol_tlv)
-		ddol_tlv = &default_ddol_tlv;
-
-	struct tlv *ddol_data_tlv = dol_process(ddol_tlv, db, 0);
-	if (!ddol_data_tlv)
-		return NULL;
-
-	int res = EMVInternalAuthenticate(true, ddol_data_tlv->value, ddol_data_tlv->len, buf, sizeof(buf), &len, &sw, db) {
-	if (res) {	
-		PrintAndLog("Internal Authenticate error(%d): %4x. Exit...", res, sw);
-		return 5;
-	}
-
-	if (decodeTLV)
-		TLVPrintFromBuffer(buf, len);
-
-
-	
-	
-	struct tlvdb *dda_db = emv_internal_authenticate(sc, ddol_data_tlv);
-	if (!dda_db) {
-		free(ddol_data_tlv);
-
-		return NULL;
-	}
-
-	struct tlvdb *idn_db = emv_pki_recover_idn(pk, dda_db, ddol_data_tlv);
-	free(ddol_data_tlv);
-	if (!idn_db) {
-		tlvdb_free(dda_db);
-		return NULL;
-	}
-
-	tlvdb_add(dda_db, idn_db);
-
-	return dda_db;
-}*/
 
 int trDDA(bool decodeTLV, struct tlvdb *tlv) {
 	uint8_t buf[APDU_RES_LEN] = {0};
@@ -654,7 +609,7 @@ int trDDA(bool decodeTLV, struct tlvdb *tlv) {
 		PrintAndLog("ERROR: SSAD verify error");
 		return 4;
 	}
-
+	
 	PrintAndLog("\n* Calc DDOL");
 	const struct tlv *ddol_tlv = tlvdb_get(tlv, 0x9f49, NULL);
 	if (!ddol_tlv) {
@@ -669,60 +624,66 @@ int trDDA(bool decodeTLV, struct tlvdb *tlv) {
 	}
 
 	PrintAndLog("DDOL data[%d]: %s", ddol_data_tlv->len, sprint_hex(ddol_data_tlv->value, ddol_data_tlv->len));
-	
-	PrintAndLog("\n* Internal Authenticate");
-	int res = EMVInternalAuthenticate(true, (uint8_t *)ddol_data_tlv->value, ddol_data_tlv->len, buf, sizeof(buf), &len, &sw, NULL);
-	if (res) {	
-		PrintAndLog("Internal Authenticate error(%d): %4x. Exit...", res, sw);
-		return 6;
-	}
 
 	struct tlvdb *dda_db = NULL;
-	if (buf[0] == 0x80) {
-		if (decodeTLV){
-			PrintAndLog("Internal Authenticate format1:");
-			TLVPrintFromBuffer(buf, len);
-		}
-		
-		if (len < 3 ) {
-			PrintAndLog("ERROR: Internal Authenticate format1 parsing error. length=%d", len);
-		} else {
-			// AIP
-			dda_db = tlvdb_fixed(0x9F4B, len - 2, buf + 2);
-			tlvdb_add(tlv, dda_db);
-			if (decodeTLV){
-				PrintAndLog("\n* * Decode response format 1:");
-				TLVPrintFromTLV(dda_db);
-			}
-		}
+	// 9F4B: Signed Dynamic Application Data
+	const struct tlv *sdad_tlv = tlvdb_get(tlv, 0x9f4b, NULL);
+	// DDA with internal authenticate OR fDDA with filled 0x9F4B tag (GPO result)
+	// EMV kernel3 v2.4, contactless book C-3, C.1., page 147
+	if (sdad_tlv) {
+		PrintAndLog("\n* * * * Got Signed Dynamic Application Data (9F4B) form GPO. Maybe fDDA...");
+		dda_db = tlv;
 	} else {
-		dda_db = tlvdb_parse_multi(buf, len);
-		if(!dda_db) {
-			PrintAndLog("ERROR: Can't parse Internal Authenticate result as TLV");
-			return 7;
+		PrintAndLog("\n* Internal Authenticate");
+		int res = EMVInternalAuthenticate(true, (uint8_t *)ddol_data_tlv->value, ddol_data_tlv->len, buf, sizeof(buf), &len, &sw, NULL);
+		if (res) {	
+			PrintAndLog("Internal Authenticate error(%d): %4x. Exit...", res, sw);
+			return 6;
 		}
-		tlvdb_add(tlv, dda_db);
-		
-		if (decodeTLV)
-			TLVPrintFromTLV(dda_db);
+
+		if (buf[0] == 0x80) {
+			if (len < 3 ) {
+				PrintAndLog("ERROR: Internal Authenticate format1 parsing error. length=%d", len);
+			} else {
+				// 9f4b Signed Dynamic Application Data
+				dda_db = tlvdb_fixed(0x9f4b, len - 2, buf + 2);
+				tlvdb_add(tlv, dda_db);
+				if (decodeTLV){
+					PrintAndLog("* * Decode response format 1:");
+					TLVPrintFromTLV(dda_db);
+				}
+			}
+		} else {
+			dda_db = tlvdb_parse_multi(buf, len);
+			if(!dda_db) {
+				PrintAndLog("ERROR: Can't parse Internal Authenticate result as TLV");
+				return 7;
+			}
+			tlvdb_add(tlv, dda_db);
+			
+			if (decodeTLV)
+				TLVPrintFromTLV(dda_db);
+		}
 	}
 	
-	struct tlvdb *idn_db = emv_pki_recover_idn(pk, dda_db, ddol_data_tlv);
+	struct tlvdb *idn_db = emv_pki_recover_idn(icc_pk, dda_db, ddol_data_tlv);
 	free(ddol_data_tlv);
 	if (!idn_db) {
-		PrintAndLog("ERROR: Can't recover IDN");
+		PrintAndLog("ERROR: Can't recover IDN (ICC Dynamic Number)");
 		tlvdb_free(dda_db);
 		return 8;
 	}
+	tlvdb_free(dda_db);
 
-	tlvdb_add(dda_db, idn_db);
-
+	// 9f4c ICC Dynamic Number
 	const struct tlv *idn_tlv = tlvdb_get(idn_db, 0x9f4c, NULL);
 	if(idn_tlv) {
-		printf("DDA verified OK. (IDN %zu bytes long)\n", idn_tlv->len);
+		PrintAndLog("\nDDA verified OK. IDN (ICC Dynamic Number) %zu bytes long\n", idn_tlv->len);
 		tlvdb_add(tlv, idn_db);
+		tlvdb_free(idn_db);
 	} else {
-		PrintAndLog("ERROR: DDA verify error");
+		PrintAndLog("\nERROR: DDA verify error");
+		tlvdb_free(idn_db);
 		return 9;
 	}
 	
