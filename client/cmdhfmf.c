@@ -1985,8 +1985,8 @@ int CmdHF14AMfCWipe(const char *Cmd)
 	bool fillCard = false;
 	
 	if (strlen(Cmd) < 1 || param_getchar(Cmd, 0) == 'h') {
-		PrintAndLog("Usage:  hf mf cwipe [card size] [w] [p]");
-		PrintAndLog("sample:  hf mf cwipe 1 w s");
+		PrintAndLog("Usage:  hf mf cwipe [card size] [w] [f]");
+		PrintAndLog("sample:  hf mf cwipe 1 w f");
 		PrintAndLog("[card size]: 0 = 320 bytes (Mifare Mini), 1 = 1K (default), 2 = 2K, 4 = 4K");
 		PrintAndLog("w - Wipe magic Chinese card (only works with gen:1a cards)");
 		PrintAndLog("f - Fill the card with default data and keys (works with gen:1a and gen:1b cards only)");
