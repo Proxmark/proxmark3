@@ -480,7 +480,7 @@ int CmdHFEMVExec(const char *cmd) {
 	res = EMVGPO(true, pdol_data_tlv_data, pdol_data_tlv_data_len, buf, sizeof(buf), &len, &sw, tlvRoot);
 	
 	free(pdol_data_tlv_data);
-	free(pdol_data_tlv);
+	//free(pdol_data_tlv);
 	
 	if (res) {	
 		PrintAndLog("GPO error(%d): %4x. Exit...", res, sw);
@@ -695,7 +695,7 @@ int CmdHFEMVExec(const char *cmd) {
 			// EMVAC_TC + EMVAC_CDAREQ --- to get SDAD
 			res = EMVAC(true, (TrType == TT_CDA) ? EMVAC_TC + EMVAC_CDAREQ : EMVAC_TC, (uint8_t *)cdol_data_tlv->value, cdol_data_tlv->len, buf, sizeof(buf), &len, &sw, tlvRoot);
 			
-			free(cdol_data_tlv);
+			//free(cdol_data_tlv);
 			
 			if (res) {	
 				PrintAndLog("AC1 error(%d): %4x. Exit...", res, sw);
@@ -705,7 +705,16 @@ int CmdHFEMVExec(const char *cmd) {
 			if (decodeTLV)
 				TLVPrintFromBuffer(buf, len);
 			
-			PrintAndLog("* M/Chip transaction result:");
+			// CDA
+			PrintAndLog("\n* CDA:");
+			struct tlvdb *ac_tlv = tlvdb_parse_multi(buf, len);
+			res = trCDA(tlvRoot, ac_tlv, pdol_data_tlv, cdol_data_tlv);
+			if (res) {	
+				PrintAndLog("CDA error (%d)", res);
+			}
+			free(ac_tlv);
+			
+			PrintAndLog("\n* M/Chip transaction result:");
 			// 9F27: Cryptogram Information Data (CID)
 			const struct tlv *CID = tlvdb_get(tlvRoot, 0x9F27, NULL);
 			if (CID) {

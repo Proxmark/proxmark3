@@ -95,6 +95,7 @@ int MSCComputeCryptoChecksum(bool LeaveFieldON, uint8_t *UDOL, uint8_t UDOLlen, 
 // Auth
 extern int trSDA(struct tlvdb *tlv);
 extern int trDDA(bool decodeTLV, struct tlvdb *tlv);
+extern int trCDA(struct tlvdb *tlv, struct tlvdb *ac_tlv, struct tlv *pdol_data_tlv, struct tlv *ac_data_tlv);
 
 #endif
 

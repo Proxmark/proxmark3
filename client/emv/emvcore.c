@@ -709,3 +709,80 @@ int trDDA(bool decodeTLV, struct tlvdb *tlv) {
 	
 	return 0;
 }
+
+int trCDA(struct tlvdb *tlv, struct tlvdb *ac_tlv, struct tlv *pdol_data_tlv, struct tlv *ac_data_tlv) {
+
+	struct emv_pk *pk = get_ca_pk(tlv);
+	if (!pk) {
+		PrintAndLog("ERROR: Key not found. Exit.");
+		return 2;
+	}
+
+	const struct tlv *sda_tlv = tlvdb_get(tlv, 0x21, NULL);
+	if (!sda_tlv || sda_tlv->len < 1) {
+		PrintAndLog("ERROR: Can't find input list for Offline Data Authentication. Exit.");
+		return 3;
+	}
+
+	struct emv_pk *issuer_pk = emv_pki_recover_issuer_cert(pk, tlv);
+	if (!issuer_pk) {
+		PrintAndLog("ERROR: Issuer certificate not found. Exit.");
+		return 2;
+	}
+	printf("Issuer PK recovered. RID %02hhx:%02hhx:%02hhx:%02hhx:%02hhx IDX %02hhx CSN %02hhx:%02hhx:%02hhx\n",
+			issuer_pk->rid[0],
+			issuer_pk->rid[1],
+			issuer_pk->rid[2],
+			issuer_pk->rid[3],
+			issuer_pk->rid[4],
+			issuer_pk->index,
+			issuer_pk->serial[0],
+			issuer_pk->serial[1],
+			issuer_pk->serial[2]
+			);
+				
+	struct emv_pk *icc_pk = emv_pki_recover_icc_cert(issuer_pk, tlv, sda_tlv);
+	if (!icc_pk) {
+		PrintAndLog("ERROR: ICC setrificate not found. Exit.");
+		return 2;
+	}
+	printf("ICC PK recovered. RID %02hhx:%02hhx:%02hhx:%02hhx:%02hhx IDX %02hhx CSN %02hhx:%02hhx:%02hhx\n",
+			icc_pk->rid[0],
+			icc_pk->rid[1],
+			icc_pk->rid[2],
+			icc_pk->rid[3],
+			icc_pk->rid[4],
+			icc_pk->index,
+			icc_pk->serial[0],
+			icc_pk->serial[1],
+			icc_pk->serial[2]
+			);
+
+	struct tlvdb *dac_db = emv_pki_recover_dac(issuer_pk, tlv, sda_tlv);
+	if (dac_db) {
+		const struct tlv *dac_tlv = tlvdb_get(dac_db, 0x9f45, NULL);
+		PrintAndLog("SSAD verified OK. (%02hhx:%02hhx)", dac_tlv->value[0], dac_tlv->value[1]);
+		tlvdb_add(tlv, dac_db);
+	} else {
+		PrintAndLog("ERROR: SSAD verify error");
+		return 4;
+	}
+	
+	PrintAndLog("\n* * Check Signed Dynamic Application Data (SDAD)");
+	struct tlvdb *idn_db = emv_pki_perform_cda_ex(icc_pk, tlv, ac_tlv,
+			pdol_data_tlv, // pdol
+			ac_data_tlv,   // cdol1
+			NULL,          // cdol2 
+			true);
+	if (idn_db) {
+		const struct tlv *idn_tlv = tlvdb_get(idn_db, 0x9f4c, NULL);
+		PrintAndLog("\nIDN (ICC Dynamic Number) [%zu] %s", idn_tlv->len, sprint_hex_inrow(idn_tlv->value, idn_tlv->len));
+		PrintAndLog("CDA verified OK.");
+		tlvdb_add(tlv, idn_db);
+	} else {
+		PrintAndLog("\nERROR: CDA verify error");
+	}
+
+	
+	return 0;
+}

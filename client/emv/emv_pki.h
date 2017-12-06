@@ -33,5 +33,11 @@ struct tlvdb *emv_pki_perform_cda(const struct emv_pk *enc_pk, const struct tlvd
 		const struct tlv *pdol_data_tlv,
 		const struct tlv *crm1_tlv,
 		const struct tlv *crm2_tlv);
+struct tlvdb *emv_pki_perform_cda_ex(const struct emv_pk *enc_pk, const struct tlvdb *db,
+		const struct tlvdb *this_db,
+		const struct tlv *pdol_data_tlv,
+		const struct tlv *crm1_tlv,
+		const struct tlv *crm2_tlv,
+		bool showData);
 
 #endif
