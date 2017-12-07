@@ -45,6 +45,7 @@ This project uses the changelog in accordance with [keepchangelog](http://keepac
 - Added `hf emv exec` - command for execute EMV transaction (Merlok)
 - Added to `hf emv exec` MSD path for VISA and Mastercard and some other compatible EMV cards (Merlok)
 - Added to `hf emv exec` SDA, DDA, fast DDA, CDA calculations for VISA and Mastercard and some other compatible EMV cards (Merlok)
+- Added `hf emv test` - crypto tests for DES, AES, SHA, RSA, SDA, DDA, CDA and some other crypto functions (Merlok)
 
 ## [3.0.1][2017-06-08]
 
