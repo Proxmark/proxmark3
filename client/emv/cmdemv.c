@@ -296,6 +296,7 @@ int UsageCmdHFEMVExec(void) {
 }
 
 #define TLV_ADD(tag, value)( tlvdb_add(tlvRoot, tlvdb_fixed(tag, sizeof(value) - 1, (const unsigned char *)value)) )
+#define dreturn(n) do{DropField();return n;}while(0)
 
 int CmdHFEMVExec(const char *cmd) {
 	bool activateField = false;
@@ -395,7 +396,7 @@ int CmdHFEMVExec(const char *cmd) {
 		SetAPDULogging(false);
 		if (EMVSearch(activateField, true, decodeTLV, tlvSelect)) {
 			tlvdb_free(tlvSelect);
-			return 2;
+			dreturn(2);
 		}
 
 		// check search and select application id
@@ -411,7 +412,7 @@ int CmdHFEMVExec(const char *cmd) {
 	// check if we found EMV application on card
 	if (!AIDlen) {
 		PrintAndLog("Can't select AID. EMV AID not found");
-		return 2;
+		dreturn(2);
 	}
 	
 	// Select
@@ -421,7 +422,7 @@ int CmdHFEMVExec(const char *cmd) {
 	
 	if (res) {	
 		PrintAndLog("Can't select AID (%d). Exit...", res);
-		return 3;
+		dreturn(3);
 	}
 	
 	if (decodeTLV)
@@ -476,14 +477,14 @@ int CmdHFEMVExec(const char *cmd) {
 	struct tlv *pdol_data_tlv = dol_process(tlvdb_get(tlvRoot, 0x9f38, NULL), tlvRoot, 0x83);
 	if (!pdol_data_tlv){
 		PrintAndLog("ERROR: can't create PDOL TLV.");
-		return 4;
+		dreturn(4);
 	}
 	
 	size_t pdol_data_tlv_data_len;
 	unsigned char *pdol_data_tlv_data = tlv_encode(pdol_data_tlv, &pdol_data_tlv_data_len);
 	if (!pdol_data_tlv_data) {
 		PrintAndLog("ERROR: can't create PDOL data.");
-		return 4;
+		dreturn(4);
 	}
 	PrintAndLog("PDOL data[%d]: %s", pdol_data_tlv_data_len, sprint_hex(pdol_data_tlv_data, pdol_data_tlv_data_len));
 
@@ -495,7 +496,7 @@ int CmdHFEMVExec(const char *cmd) {
 	
 	if (res) {	
 		PrintAndLog("GPO error(%d): %4x. Exit...", res, sw);
-		return 5;
+		dreturn(5);
 	}
 
 	// process response template format 1 [id:80  2b AIP + x4b AFL] and format 2 [id:77 TLV]
@@ -679,11 +680,11 @@ int CmdHFEMVExec(const char *cmd) {
 			res = EMVGenerateChallenge(true, buf, sizeof(buf), &len, &sw, tlvRoot);
 			if (res) {
 				PrintAndLog("ERROR GetChallenge. APDU error %4x", sw);
-				return 5;
+				dreturn(6);
 			}
 			if (len < 4) {
 				PrintAndLog("ERROR GetChallenge. Wrong challenge length %d", len);
-				return 5;
+				dreturn(6);
 			}
 			
 			// ICC Dynamic Number
@@ -698,7 +699,7 @@ int CmdHFEMVExec(const char *cmd) {
 			struct tlv *cdol_data_tlv = dol_process(tlvdb_get(tlvRoot, 0x8c, NULL), tlvRoot, 0x01); // 0x01 - dummy tag
 			if (!cdol_data_tlv){
 				PrintAndLog("ERROR: can't create CDOL1 TLV.");
-				return 4;
+				dreturn(6);
 			}
 			PrintAndLog("CDOL1 data[%d]: %s", cdol_data_tlv->len, sprint_hex(cdol_data_tlv->value, cdol_data_tlv->len));
 			
@@ -708,7 +709,7 @@ int CmdHFEMVExec(const char *cmd) {
 			
 			if (res) {	
 				PrintAndLog("AC1 error(%d): %4x. Exit...", res, sw);
-				return 5;
+				dreturn(7);
 			}
 			
 			if (decodeTLV)
@@ -786,7 +787,7 @@ int CmdHFEMVExec(const char *cmd) {
 				struct tlv *udol_data_tlv = dol_process(UDOL ? UDOL : &defUDOL, tlvRoot, 0x01); // 0x01 - dummy tag
 				if (!udol_data_tlv){
 					PrintAndLog("ERROR: can't create UDOL TLV.");
-					return 4;
+					dreturn(8);
 				}
 
 				PrintAndLog("UDOL data[%d]: %s", udol_data_tlv->len, sprint_hex(udol_data_tlv->value, udol_data_tlv->len));
@@ -796,7 +797,7 @@ int CmdHFEMVExec(const char *cmd) {
 				res = MSCComputeCryptoChecksum(true, (uint8_t *)udol_data_tlv->value, udol_data_tlv->len, buf, sizeof(buf), &len, &sw, tlvRoot);
 				if (res) {
 					PrintAndLog("ERROR Compute Crypto Checksum. APDU error %4x", sw);
-					return 5;
+					dreturn(9);
 				}
 				
 				if (decodeTLV) {
@@ -809,7 +810,7 @@ int CmdHFEMVExec(const char *cmd) {
 			PrintAndLog("ERROR MSD: Track2 data not found.");
 		}
 	}
-	
+
 	// DropField
 	DropField();
 	
