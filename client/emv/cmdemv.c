@@ -287,6 +287,7 @@ int UsageCmdHFEMVExec(void) {
 	PrintAndLog("  -v       : transaction type - qVSDC or M/Chip.\n");
 	PrintAndLog("  -c       : transaction type - qVSDC or M/Chip plus CDA (SDAD generation).\n");
 	PrintAndLog("  -x       : transaction type - VSDC. For test only. Not a standart behavior.\n");
+	PrintAndLog("  -g       : VISA. generate AC from GPO\n");
 	PrintAndLog("By default : transaction type - MSD.\n");
 	PrintAndLog("Samples:");
 	PrintAndLog(" hf emv pse -s -> select card");
@@ -302,6 +303,7 @@ int CmdHFEMVExec(const char *cmd) {
 	bool decodeTLV = false;
 	bool forceSearch = false;
 	enum TransactionType TrType = TT_MSD;
+	bool GenACGPO = false;
 
 	uint8_t buf[APDU_RES_LEN] = {0};
 	size_t len = 0;
@@ -354,6 +356,10 @@ int CmdHFEMVExec(const char *cmd) {
 				case 'c':
 				case 'C':
 					TrType = TT_CDA;
+					break;
+				case 'g':
+				case 'G':
+					GenACGPO = true;
 					break;
 				default:
 					PrintAndLog("Unknown parameter '%c'", param_getchar_indx(cmd, 1, cmdp));
@@ -425,6 +431,10 @@ int CmdHFEMVExec(const char *cmd) {
 	PrintAndLog("\n* Init transaction parameters.");
 
     //9F66:(Terminal Transaction Qualifiers (TTQ)) len:4
+	char *qVSDC = "\x26\x00\x00\x00";
+	if (GenACGPO) {
+		qVSDC = "\x26\x80\x00\x00";
+	}
 	switch(TrType) {
 		case TT_MSD:
 			TLV_ADD(0x9F66, "\x86\x00\x00\x00"); // MSD
@@ -434,15 +444,16 @@ int CmdHFEMVExec(const char *cmd) {
 			TLV_ADD(0x9F66, "\x46\x00\x00\x00"); // VSDC
 			break;
 		case TT_QVSDCMCHIP:
-			TLV_ADD(0x9F66, "\x26\x00\x00\x00"); // qVSDC
+			TLV_ADD(0x9F66, qVSDC); // qVSDC
 			break;
 		case TT_CDA:
-			TLV_ADD(0x9F66, "\x26\x80\x00\x00"); // CDA
+			TLV_ADD(0x9F66, qVSDC); // qVSDC (VISA CDA not enabled)
 			break;
 		default:
 			TLV_ADD(0x9F66, "\x26\x00\x00\x00"); // qVSDC
 			break;
 	}
+	
     //9F02:(Amount, Authorised (Numeric)) len:6
 	TLV_ADD(0x9F02, "\x00\x00\x00\x00\x01\x00");
     //9F1A:(Terminal Country Code) len:2
@@ -480,7 +491,7 @@ int CmdHFEMVExec(const char *cmd) {
 	res = EMVGPO(true, pdol_data_tlv_data, pdol_data_tlv_data_len, buf, sizeof(buf), &len, &sw, tlvRoot);
 	
 	free(pdol_data_tlv_data);
-	//free(pdol_data_tlv);
+	//free(pdol_data_tlv); --- free on exit.
 	
 	if (res) {	
 		PrintAndLog("GPO error(%d): %4x. Exit...", res, sw);
@@ -695,8 +706,6 @@ int CmdHFEMVExec(const char *cmd) {
 			// EMVAC_TC + EMVAC_CDAREQ --- to get SDAD
 			res = EMVAC(true, (TrType == TT_CDA) ? EMVAC_TC + EMVAC_CDAREQ : EMVAC_TC, (uint8_t *)cdol_data_tlv->value, cdol_data_tlv->len, buf, sizeof(buf), &len, &sw, tlvRoot);
 			
-			//free(cdol_data_tlv);
-			
 			if (res) {	
 				PrintAndLog("AC1 error(%d): %4x. Exit...", res, sw);
 				return 5;
@@ -713,6 +722,7 @@ int CmdHFEMVExec(const char *cmd) {
 				PrintAndLog("CDA error (%d)", res);
 			}
 			free(ac_tlv);
+			free(cdol_data_tlv);
 			
 			PrintAndLog("\n* M/Chip transaction result:");
 			// 9F27: Cryptogram Information Data (CID)
@@ -804,6 +814,7 @@ int CmdHFEMVExec(const char *cmd) {
 	DropField();
 	
 	// Destroy TLV's
+	free(pdol_data_tlv);
 	tlvdb_free(tlvSelect);
 	tlvdb_free(tlvRoot);
 

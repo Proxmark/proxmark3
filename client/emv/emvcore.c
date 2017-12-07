@@ -532,14 +532,6 @@ int trSDA(struct tlvdb *tlv) {
 static const unsigned char default_ddol_value[] = {0x9f, 0x37, 0x04};
 static struct tlv default_ddol_tlv = {.tag = 0x9f49, .len = 3, .value = default_ddol_value };
 
-static const unsigned char default_fdda_ddol_value[] = 
-		{0x9f, 0x37, 0x04,
-		0x9f, 0x02, 0x06,
-		0x5f, 0x2A, 0x02,
-		0x9f, 0x69, 0x07, // 9f69[07] Card Authentication Related Data
-		};
-static struct tlv default_fdda_ddol_tlv = {.tag = 0x9f49, .len = 12, .value = default_fdda_ddol_value };
-
 int trDDA(bool decodeTLV, struct tlvdb *tlv) {
 	uint8_t buf[APDU_RES_LEN] = {0};
 	size_t len = 0;
@@ -608,7 +600,6 @@ int trDDA(bool decodeTLV, struct tlvdb *tlv) {
 				);
 	}
 
-	struct tlvdb *dda_db = NULL;
 	struct tlv *ddol_data_tlv = NULL;
 	// 9F4B: Signed Dynamic Application Data
 	const struct tlv *sdad_tlv = tlvdb_get(tlv, 0x9f4b, NULL);
@@ -616,17 +607,30 @@ int trDDA(bool decodeTLV, struct tlvdb *tlv) {
 	// EMV kernel3 v2.4, contactless book C-3, C.1., page 147
 	if (sdad_tlv) {
 		PrintAndLog("\n* * Got Signed Dynamic Application Data (9F4B) form GPO. Maybe fDDA...");
-		dda_db = tlv;
 
-		PrintAndLog("\n* Calc fDDA hash");
-		ddol_data_tlv = dol_process(&default_fdda_ddol_tlv, tlv, 0);
-		if (!ddol_data_tlv) {
-			PrintAndLog("ERROR: Can't create fDDA hash TLV");
-			return 5;
+		const struct tlvdb *atc_db = emv_pki_recover_atc_ex(icc_pk, tlv, true);
+		free(ddol_data_tlv);
+		if (!atc_db) {
+			PrintAndLog("ERROR: Can't recover IDN (ICC Dynamic Number)");
+			return 8;
 		}
 
-		PrintAndLog("fDDA hash data[%d]: %s", ddol_data_tlv->len, sprint_hex(ddol_data_tlv->value, ddol_data_tlv->len));
-		
+		// 9f36 Application Transaction Counter (ATC)
+		const struct tlv *atc_tlv = tlvdb_get(atc_db, 0x9f36, NULL);
+		if(atc_tlv) {
+			PrintAndLog("\nATC (Application Transaction Counter) [%zu] %s", atc_tlv->len, sprint_hex_inrow(atc_tlv->value, atc_tlv->len));
+			
+			const struct tlv *core_atc_tlv = tlvdb_get(tlv, 0x9f36, NULL);
+			if(tlv_equal(core_atc_tlv, atc_tlv)) {
+				PrintAndLog("ATC check OK.");
+				PrintAndLog("fDDA (fast DDA) verified OK.");
+			} else {
+				PrintAndLog("ERROR: fDDA verified, but ATC in the certificate and ATC in the record not the same.");
+			}
+		} else {
+			PrintAndLog("\nERROR: fDDA (fast DDA) verify error");
+			return 9;
+		}
 	} else {
 		struct tlvdb *dac_db = emv_pki_recover_dac(issuer_pk, tlv, sda_tlv);
 		if (dac_db) {
@@ -660,6 +664,7 @@ int trDDA(bool decodeTLV, struct tlvdb *tlv) {
 			return 6;
 		}
 
+		struct tlvdb *dda_db = NULL;
 		if (buf[0] == 0x80) {
 			if (len < 3 ) {
 				PrintAndLog("ERROR: Internal Authenticate format1 parsing error. length=%d", len);
@@ -683,37 +688,28 @@ int trDDA(bool decodeTLV, struct tlvdb *tlv) {
 			if (decodeTLV)
 				TLVPrintFromTLV(dda_db);
 		}
-	}
-	
-	struct tlvdb *idn_db = emv_pki_recover_idn_ex(icc_pk, dda_db, ddol_data_tlv, true);
-	free(ddol_data_tlv);
-	if (!idn_db) {
-		PrintAndLog("ERROR: Can't recover IDN (ICC Dynamic Number)");
-		tlvdb_free(dda_db);
-		return 8;
-	}
-	tlvdb_free(dda_db);
 
-	// 9f4c ICC Dynamic Number
-	const struct tlv *idn_tlv = tlvdb_get(idn_db, 0x9f4c, NULL);
-	if(idn_tlv) {
-		if(sdad_tlv) { // fDDA
-			PrintAndLog("\nATC (Application Transaction Counter) [%zu] %s", idn_tlv->len, sprint_hex_inrow(idn_tlv->value, idn_tlv->len));
-			PrintAndLog("fDDA (fast DDA) verified OK.");
-		} else {       // DDA
+		struct tlvdb *idn_db = emv_pki_recover_idn_ex(icc_pk, dda_db, ddol_data_tlv, true);
+		free(ddol_data_tlv);
+		if (!idn_db) {
+			PrintAndLog("ERROR: Can't recover IDN (ICC Dynamic Number)");
+			tlvdb_free(dda_db);
+			return 8;
+		}
+		tlvdb_free(dda_db);
+
+		// 9f4c ICC Dynamic Number
+		const struct tlv *idn_tlv = tlvdb_get(idn_db, 0x9f4c, NULL);
+		if(idn_tlv) {
 			PrintAndLog("\nIDN (ICC Dynamic Number) [%zu] %s", idn_tlv->len, sprint_hex_inrow(idn_tlv->value, idn_tlv->len));
 			PrintAndLog("DDA verified OK.");
-		}
-		tlvdb_add(tlv, idn_db);
-		tlvdb_free(idn_db);
-	} else {
-		if(sdad_tlv) { // fDDA
-			PrintAndLog("\nERROR: fDDA (fast DDA) verify error");
-		} else {       // DDA
+			tlvdb_add(tlv, idn_db);
+			tlvdb_free(idn_db);
+		} else {
 			PrintAndLog("\nERROR: DDA verify error");
+			tlvdb_free(idn_db);
+			return 9;
 		}
-		tlvdb_free(idn_db);
-		return 9;
 	}
 	
 	return 0;

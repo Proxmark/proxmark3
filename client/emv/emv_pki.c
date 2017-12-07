@@ -367,6 +367,44 @@ struct tlvdb *emv_pki_recover_idn_ex(const struct emv_pk *enc_pk, const struct t
 	return idn_db;
 }
 
+struct tlvdb *emv_pki_recover_atc_ex(const struct emv_pk *enc_pk, const struct tlvdb *db, bool showData)
+{
+	size_t data_len;
+	unsigned char *data = emv_pki_decode_message(enc_pk, 5, &data_len,
+			tlvdb_get(db, 0x9f4b, NULL),
+			tlvdb_get(db, 0x9f37, NULL),
+			tlvdb_get(db, 0x9f02, NULL),
+			tlvdb_get(db, 0x5f2a, NULL),
+			tlvdb_get(db, 0x9f69, NULL),
+			NULL);
+
+	if (!data || data_len < 3)
+		return NULL;
+
+	if (data[3] < 2 || data[3] > data_len - 3) {
+		free(data);
+		return NULL;
+	}
+
+	if (showData){
+		printf("Recovered data:\n");
+		dump_buffer(data, data_len, stdout, 0);
+	}
+
+	size_t idn_len = data[4];
+	if (idn_len > data[3] - 1) {
+		free(data);
+		return NULL;
+	}
+
+	// 9f36 Application Transaction Counter (ATC)
+	struct tlvdb *atc_db = tlvdb_fixed(0x9f36, idn_len, data + 5);
+	
+	free(data);
+
+	return atc_db;
+}
+
 static bool tlv_hash(void *data, const struct tlv *tlv, int level, bool is_leaf)
 {
 	struct crypto_hash *ch = data;
