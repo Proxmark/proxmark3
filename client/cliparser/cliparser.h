@@ -20,6 +20,9 @@
 #define arg_get_int(n)(((struct arg_int*)argtable[n])->ival[0])
 #define arg_get_str(n)((struct arg_str*)argtable[n])
 
+#define CLIExecWithReturn(cmd,atbl,ifempty) if (CLIParserParseString(cmd, atbl, arg_getsize(atbl), ifempty)){CLIParserFree();return 0;}
+#define CLIGetStrWithReturn(paramnum, data, datalen, delta) if (CLIParamHexToBuf(arg_get_str(paramnum), data, sizeof(data) - (delta), datalen)) {CLIParserFree();return 1;}
+
 extern int CLIParserInit(char *vprogramName, char *vprogramHint, char *vprogramHelp);
 extern int CLIParserParseString(const char* str, void* argtable[], size_t vargtableLen, bool allowEmptyExec);
 extern int CLIParserParseArg(int argc, char **argv, void* argtable[], size_t vargtableLen, bool allowEmptyExec);

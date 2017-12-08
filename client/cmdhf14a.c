@@ -740,20 +740,13 @@ int CmdHF14AAPDU(const char *cmd) {
 		arg_str1(NULL,  NULL,      "<APDU (hex)>", NULL),
 		arg_param_end
 	};
-	if (CLIParserParseString(cmd, argtable, arg_getsize(argtable), false)){
-		CLIParserFree();
-
-		return 0;
-	}
+	CLIExecWithReturn(cmd, argtable, false);
 	
 	activateField = arg_get_lit(1);
 	leaveSignalON = arg_get_lit(2);
 	decodeTLV = arg_get_lit(3);
 	// len = data + PCB(1b) + CRC(2b)
-	if (CLIParamHexToBuf(arg_get_str(4), data, sizeof(data) - 1 -2, &datalen)) {
-		CLIParserFree();
-		return 1;
-	}
+	CLIGetStrWithReturn(4, data, &datalen, 1 + 2);
 
 	CLIParserFree();
 //	PrintAndLog("---str [%d] %s", arg_get_str(4)->count, arg_get_str(4)->sval[0]);
