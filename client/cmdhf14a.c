@@ -728,7 +728,9 @@ int CmdHF14AAPDU(const char *cmd) {
 	bool leaveSignalON = false;
 	bool decodeTLV = false;
 
-	CLIParserInit("hf 14a apdu", "Sends an ISO 7816-4 APDU via ISO 14443-4 block transmission protocol (T=CL)", "Sample:\n\thf 14a apdu -st 00A404000E325041592E5359532E444446303100\n");
+	CLIParserInit("hf 14a apdu", 
+		"Sends an ISO 7816-4 APDU via ISO 14443-4 block transmission protocol (T=CL)", 
+		"Sample:\n\thf 14a apdu -st 00A404000E325041592E5359532E444446303100\n");
 
 	void* argtable[] = {
 		arg_param_begin,
