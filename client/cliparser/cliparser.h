@@ -15,9 +15,10 @@
 #define arg_param_begin arg_lit0("hH",  "help",    "print this help and exit")
 #define arg_param_end arg_end(20)
 
-#define arg_get_lit(n)(((struct arg_lit*)argtable[n]))
-#define arg_get_str(n)(((struct arg_str*)argtable[n]))
-#define arg_get_int(n)(((struct arg_int*)argtable[n]))
+#define arg_getsize(a) (sizeof(a) / sizeof(a[0]))
+#define arg_get_lit(n)(((struct arg_lit*)argtable[n])->count)
+#define arg_get_int(n)(((struct arg_int*)argtable[n])->ival[0])
+#define arg_get_str(n)((struct arg_str*)argtable[n])
 
 extern int CLIParserInit(char *vprogramName, char *vprogramHint, char *vprogramHelp);
 extern int CLIParserParseString(const char* str, void* argtable[], size_t vargtableLen, bool allowEmptyExec);

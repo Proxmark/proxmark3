@@ -143,16 +143,16 @@ int CmdHF14AReader(const char *Cmd) {
 		arg_lit0("3",   NULL,      "ISO14443-3 select only (skip RATS)"),
 		arg_param_end
 	};
-	if (CLIParserParseString(Cmd, argtable, sizeof(argtable) / sizeof(argtable[0]), true)){
+	if (CLIParserParseString(Cmd, argtable, arg_getsize(argtable), true)){
 		CLIParserFree();
 		return 0;
 	}
 	
-	leaveSignalON = arg_get_lit(1)->count;
-	if (arg_get_lit(2)->count) {
+	leaveSignalON = arg_get_lit(1);
+	if (arg_get_lit(2)) {
 		cm = cm - ISO14A_CONNECT;
 	}
-	if (arg_get_lit(3)->count) {
+	if (arg_get_lit(3)) {
 		cm |= ISO14A_NO_RATS;
 	}
 	
@@ -738,15 +738,15 @@ int CmdHF14AAPDU(const char *cmd) {
 		arg_str1(NULL,  NULL,      "<APDU (hex)>", NULL),
 		arg_param_end
 	};
-	if (CLIParserParseString(cmd, argtable, sizeof(argtable) / sizeof(argtable[0]), false)){
+	if (CLIParserParseString(cmd, argtable, arg_getsize(argtable), false)){
 		CLIParserFree();
 
 		return 0;
 	}
 	
-	activateField = arg_get_lit(1)->count;
-	leaveSignalON = arg_get_lit(2)->count;
-	decodeTLV = arg_get_lit(3)->count;
+	activateField = arg_get_lit(1);
+	leaveSignalON = arg_get_lit(2);
+	decodeTLV = arg_get_lit(3);
 	// len = data + PCB(1b) + CRC(2b)
 	if (CLIParamHexToBuf(arg_get_str(4), data, sizeof(data) - 1 -2, &datalen)) {
 		CLIParserFree();
@@ -811,24 +811,24 @@ int CmdHF14ACmdRaw(const char *cmd) {
 		arg_param_end
 	};
 	// defaults
-	arg_get_int(6)->ival[0] = 0;
-	arg_get_int(7)->ival[0] = 0;
+	arg_get_int(6) = 0;
+	arg_get_int(7) = 0;
 	
-	if (CLIParserParseString(cmd, argtable, sizeof(argtable) / sizeof(argtable[0]), false)){
+	if (CLIParserParseString(cmd, argtable, arg_getsize(argtable), false)){
 		CLIParserFree();
 		return 0;
 	}
 	
-	reply = !arg_get_lit(1)->count;
-	crc = arg_get_lit(2)->count;
-	power = arg_get_lit(3)->count;
-	active = arg_get_lit(4)->count;
-	active_select = arg_get_lit(5)->count;
-	numbits = arg_get_int(6)->ival[0] & 0xFFFF;
-	timeout = arg_get_int(7)->ival[0];
+	reply = !arg_get_lit(1);
+	crc = arg_get_lit(2);
+	power = arg_get_lit(3);
+	active = arg_get_lit(4);
+	active_select = arg_get_lit(5);
+	numbits = arg_get_int(6) & 0xFFFF;
+	timeout = arg_get_int(7);
 	bTimeout = (timeout > 0);	
-	topazmode = arg_get_lit(8)->count;
-	no_rats = arg_get_lit(9)->count;
+	topazmode = arg_get_lit(8);
+	no_rats = arg_get_lit(9);
 	// len = data + CRC(2b)
 	if (CLIParamHexToBuf(arg_get_str(10), data, sizeof(data) -2, &datalen)) {
 		CLIParserFree();
