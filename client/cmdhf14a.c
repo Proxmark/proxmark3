@@ -746,7 +746,7 @@ int CmdHF14AAPDU(const char *cmd) {
 	leaveSignalON = arg_get_lit(2);
 	decodeTLV = arg_get_lit(3);
 	// len = data + PCB(1b) + CRC(2b)
-	CLIGetStrWithReturn(4, data, &datalen, 1 + 2);
+	CLIGetStrBLessWithReturn(4, data, &datalen, 1 + 2);
 
 	CLIParserFree();
 //	PrintAndLog("---str [%d] %s", arg_get_str(4)->count, arg_get_str(4)->sval[0]);
