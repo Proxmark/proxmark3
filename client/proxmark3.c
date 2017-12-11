@@ -95,7 +95,7 @@ static void *uart_receiver(void *targ) {
 			PrintAndLog("Proxmark reconnected!");
 			need_reconnect = false;
 			offline = 0;
-			//CmdVersionW(NULL, true);
+			//CmdVersionC(NULL, true);
 			clearCommandBuffer();
 			uart_send(sp, (byte_t*) &version_cmd, sizeof(UsbCommand)); // request it from the HW
 			request_version = true;
@@ -114,7 +114,7 @@ static void *uart_receiver(void *targ) {
 				if( request_version && ((UsbCommand*)rx)->cmd == CMD_ACK)
 				{
 					request_version = false;
-					CmdVersionW(NULL, true);
+					CmdVersionC(NULL, true);
 				}
 			}
 		}
