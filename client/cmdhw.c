@@ -405,10 +405,18 @@ int CmdTune(const char *Cmd)
 
 int CmdVersion(const char *Cmd)
 {
+	return CmdVersionC(Cmd, false);
+}
 
-	clearCommandBuffer();
+int CmdVersionC(const char *Cmd, const bool no_cache)
+{
 	UsbCommand c = {CMD_VERSION};
 	static UsbCommand resp = {0, {0, 0, 0}};
+
+	if( no_cache )
+		memset( &resp, 0, sizeof(resp) );
+	else
+		clearCommandBuffer();
 
 	if (resp.arg[0] == 0 && resp.arg[1] == 0) { // no cached information available
 		SendCommand(&c);
