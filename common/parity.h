@@ -14,7 +14,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-extern const uint8_t OddByteParity[256];
+const uint8_t OddByteParity[256];
 
 
 static inline bool oddparity8(const uint8_t x) {

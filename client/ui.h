@@ -21,11 +21,11 @@ void RepaintGraphWindow(void);
 void PrintAndLog(char *fmt, ...);
 void SetLogFilename(char *fn);
 
-extern double CursorScaleFactor;
-extern int PlotGridX, PlotGridY, PlotGridXdefault, PlotGridYdefault, CursorCPos, CursorDPos, GridOffset;
-extern int offline;
-extern int flushAfterWrite;   //buzzy
-extern bool GridLocked;
-extern bool showDemod;
+double CursorScaleFactor;
+int PlotGridX, PlotGridY, PlotGridXdefault, PlotGridYdefault, CursorCPos, CursorDPos, GridOffset;
+int offline;
+int flushAfterWrite;   //buzzy
+bool GridLocked;
+bool showDemod;
 
 #endif

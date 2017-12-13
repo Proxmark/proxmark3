@@ -20,6 +20,6 @@
     Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 */
 
-extern char *optarg;
-extern int optind, opterr, optopt, pos;
+char *optarg;
+int optind, opterr, optopt, pos;
 int getopt(int argc, char *argv[], const char *optstring);

@@ -24,18 +24,18 @@ typedef struct crc {
 /* Initialize a crc structure. order is the order of the polynom, e.g. 32 for a CRC-32
  * polynom is the CRC polynom. initial_value is the initial value of a clean state.
  * final_xor is XORed onto the state before returning it from crc_result(). */
-extern void crc_init(crc_t *crc, int order, uint32_t polynom, uint32_t initial_value, uint32_t final_xor);
+void crc_init(crc_t *crc, int order, uint32_t polynom, uint32_t initial_value, uint32_t final_xor);
 
 /* Update the crc state. data is the data of length data_width bits (only the
  * data_width lower-most bits are used).
  */
-extern void crc_update(crc_t *crc, uint32_t data, int data_width);
+void crc_update(crc_t *crc, uint32_t data, int data_width);
 
 /* Clean the crc state, e.g. reset it to initial_value */
-extern void crc_clear(crc_t *crc);
+void crc_clear(crc_t *crc);
 
 /* Get the result of the crc calculation */
-extern uint32_t crc_finish(crc_t *crc);
+uint32_t crc_finish(crc_t *crc);
 
 // Calculate CRC-8/Maxim checksum
 uint32_t CRC8Maxim(uint8_t *buff, size_t size  );

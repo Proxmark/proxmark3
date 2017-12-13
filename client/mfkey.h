@@ -17,8 +17,8 @@
 #include <stdbool.h>
 #include "mifare.h"
 
-extern bool mfkey32(nonces_t data, uint64_t *outputkey);
-extern bool mfkey32_moebius(nonces_t data, uint64_t *outputkey);
-extern int mfkey64(nonces_t data, uint64_t *outputkey);
+bool mfkey32(nonces_t data, uint64_t *outputkey);
+bool mfkey32_moebius(nonces_t data, uint64_t *outputkey);
+int mfkey64(nonces_t data, uint64_t *outputkey);
 
 #endif

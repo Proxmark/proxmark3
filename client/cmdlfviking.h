@@ -8,9 +8,9 @@
 //-----------------------------------------------------------------------------
 #ifndef CMDLFVIKING_H__
 #define CMDLFVIKING_H__
-extern int CmdLFViking(const char *Cmd);
-extern int CmdVikingDemod(const char *Cmd);
-extern int CmdVikingRead(const char *Cmd);
-extern int CmdVikingClone(const char *Cmd);
-extern int CmdVikingSim(const char *Cmd);
+int CmdLFViking(const char *Cmd);
+int CmdVikingDemod(const char *Cmd);
+int CmdVikingRead(const char *Cmd);
+int CmdVikingClone(const char *Cmd);
+int CmdVikingSim(const char *Cmd);
 #endif

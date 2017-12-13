@@ -4,8 +4,8 @@
 #ifndef CMDLFIO_H__
 #define CMDLFIO_H__
 
-extern int CmdLFIO(const char *Cmd);
-extern int CmdFSKdemodIO(const char *Cmd);
-extern int CmdIOReadFSK(const char *Cmd);
+int CmdLFIO(const char *Cmd);
+int CmdFSKdemodIO(const char *Cmd);
+int CmdIOReadFSK(const char *Cmd);
 
 #endif

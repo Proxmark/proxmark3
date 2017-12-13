@@ -8,7 +8,7 @@
 //-----------------------------------------------------------------------------
 #ifndef CMDLFNEXWATCH_H__
 #define CMDLFNEXWATCH_H__
-extern int CmdLFNexWatch(const char *Cmd);
-extern int CmdPSKNexWatch(const char *Cmd);
-extern int CmdNexWatchRead(const char *Cmd);
+int CmdLFNexWatch(const char *Cmd);
+int CmdPSKNexWatch(const char *Cmd);
+int CmdNexWatchRead(const char *Cmd);
 #endif

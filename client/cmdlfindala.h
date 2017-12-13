@@ -10,9 +10,9 @@
 #ifndef CMDLFINDALA_H__
 #define CMDLFINDALA_H__
 
-extern int CmdLFINDALA(const char *Cmd);
-extern int CmdIndalaDecode(const char *Cmd);
-extern int CmdIndalaRead(const char *Cmd);
-extern int CmdIndalaClone(const char *Cmd);
+int CmdLFINDALA(const char *Cmd);
+int CmdIndalaDecode(const char *Cmd);
+int CmdIndalaRead(const char *Cmd);
+int CmdIndalaClone(const char *Cmd);
 
 #endif

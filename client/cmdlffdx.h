@@ -9,9 +9,9 @@
 #ifndef CMDLFFDX_H__
 #define CMDLFFDX_H__
 
-extern int CmdLFFdx(const char *Cmd);
-extern int CmdFdxClone(const char *Cmd);
-extern int CmdFdxSim(const char *Cmd);
-extern int CmdFdxRead(const char *Cmd);
-extern int CmdFdxDemod(const char *Cmd);
+int CmdLFFdx(const char *Cmd);
+int CmdFdxClone(const char *Cmd);
+int CmdFdxSim(const char *Cmd);
+int CmdFdxRead(const char *Cmd);
+int CmdFdxDemod(const char *Cmd);
 #endif

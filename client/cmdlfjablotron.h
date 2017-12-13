@@ -9,11 +9,11 @@
 #ifndef CMDLFJABLOTRON_H__
 #define CMDLFJABLOTRON_H__
 
-extern int CmdLFJablotron(const char *Cmd);
-extern int CmdJablotronClone(const char *Cmd);
-extern int CmdJablotronSim(const char *Cmd);
-extern int CmdJablotronRead(const char *Cmd);
-extern int CmdJablotronDemod(const char *Cmd);
+int CmdLFJablotron(const char *Cmd);
+int CmdJablotronClone(const char *Cmd);
+int CmdJablotronSim(const char *Cmd);
+int CmdJablotronRead(const char *Cmd);
+int CmdJablotronDemod(const char *Cmd);
 
 #endif
 
