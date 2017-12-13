@@ -496,7 +496,7 @@ int param_gethex(const char *line, int paramnum, uint8_t * data, int hexcnt)
 		return 1;
 
 	for(i = 0; i < hexcnt; i += 2) {
-		if (!(isxdigit(line[bg + i]) && isxdigit(line[bg + i + 1])) )	return 1;
+		if (!(isxdigit((unsigned char)line[bg + i]) && isxdigit((unsigned char)line[bg + i + 1])) )	return 1;
 		
 		sscanf((char[]){line[bg + i], line[bg + i + 1], 0}, "%X", &temp);
 		data[i / 2] = temp & 0xff;
@@ -518,7 +518,7 @@ int param_gethex_ex(const char *line, int paramnum, uint8_t * data, int *hexcnt)
 		return 1;
 
 	for(i = 0; i < *hexcnt; i += 2) {
-		if (!(isxdigit(line[bg + i]) && isxdigit(line[bg + i + 1])) )	return 1;
+		if (!(isxdigit((unsigned char)line[bg + i]) && isxdigit((unsigned char)line[bg + i + 1])) )	return 1;
 		
 		sscanf((char[]){line[bg + i], line[bg + i + 1], 0}, "%X", &temp);
 		data[i / 2] = temp & 0xff;
@@ -543,7 +543,7 @@ int param_gethex_to_eol(const char *line, int paramnum, uint8_t * data, int maxd
 			continue;
 		}
 		
-		if (isxdigit(line[indx])) {
+		if (isxdigit((unsigned char)line[indx])) {
 			buf[strlen(buf) + 1] = 0x00;
 			buf[strlen(buf)] = line[indx];
 		} else {

@@ -16,6 +16,7 @@
 #include <inttypes.h>
 #include <string.h>
 #include <unistd.h>
+#include <ctype.h>
 #include "util.h"
 #include "util_posix.h"
 #include "iso14443crc.h"
@@ -764,7 +765,7 @@ int CmdHF14AAPDU(const char *cmd) {
 					return 1;
 			}
 			
-		if (isxdigit(c)) {
+		if (isxdigit((unsigned char)c)) {
 			// len = data + PCB(1b) + CRC(2b)
 			switch(param_gethex_to_eol(cmd, cmdp, data, sizeof(data) - 1 - 2, &datalen)) {
 			case 1:

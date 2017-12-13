@@ -8,6 +8,7 @@
 // EMV commands
 //-----------------------------------------------------------------------------
 
+#include <ctype.h>
 #include "cmdemv.h"
 
 int UsageCmdHFEMVSelect(void) {
@@ -68,7 +69,7 @@ int CmdHFEMVSelect(const char *cmd) {
 					return 1;
 		}
 
-		if (isxdigit(c)) {
+		if (isxdigit((unsigned char)c)) {
 			switch(param_gethex_to_eol(cmd, cmdp, data, sizeof(data), &datalen)) {
 			case 1:
 				PrintAndLog("Invalid HEX value.");
