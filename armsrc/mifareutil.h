@@ -42,7 +42,7 @@
 #define MF_DBG_ALL           2
 #define MF_DBG_EXTENDED      4
 
-extern int MF_DBGLEVEL;
+int MF_DBGLEVEL;
 
 //functions
 int mifare_sendcmd(uint8_t cmd, uint8_t *data, uint8_t data_size, uint8_t* answer, uint8_t *answer_parity, uint32_t *timing);

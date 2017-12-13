@@ -9,11 +9,11 @@
 #ifndef CMDLFVISA2000_H__
 #define CMDLFVISA2000_H__
 #include <inttypes.h>
-extern int CmdLFVisa2k(const char *Cmd);
-extern int CmdVisa2kClone(const char *Cmd);
-extern int CmdVisa2kSim(const char *Cmd);
-extern int CmdVisa2kRead(const char *Cmd);
-extern int CmdVisa2kDemod(const char *Cmd);
+int CmdLFVisa2k(const char *Cmd);
+int CmdVisa2kClone(const char *Cmd);
+int CmdVisa2kSim(const char *Cmd);
+int CmdVisa2kRead(const char *Cmd);
+int CmdVisa2kDemod(const char *Cmd);
 
 #endif
 

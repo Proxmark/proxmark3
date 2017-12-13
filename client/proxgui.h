@@ -23,31 +23,31 @@ void InitGraphics(int argc, char **argv, char *script_cmds_file, char *script_cm
 void ExitGraphics(void);
 
 #define MAX_GRAPH_TRACE_LEN (40000*8)
-extern int GraphBuffer[MAX_GRAPH_TRACE_LEN];
-extern int GraphTraceLen;
-extern int s_Buff[MAX_GRAPH_TRACE_LEN];
+int GraphBuffer[MAX_GRAPH_TRACE_LEN];
+int GraphTraceLen;
+int s_Buff[MAX_GRAPH_TRACE_LEN];
 
-extern double CursorScaleFactor;
-extern int PlotGridX, PlotGridY, PlotGridXdefault, PlotGridYdefault, CursorCPos, CursorDPos, GridOffset;
-extern int CommandFinished;
-extern int offline;
-extern bool GridLocked;
+double CursorScaleFactor;
+int PlotGridX, PlotGridY, PlotGridXdefault, PlotGridYdefault, CursorCPos, CursorDPos, GridOffset;
+int CommandFinished;
+int offline;
+bool GridLocked;
 
 //Operations defined in data_operations
 //extern int autoCorr(const int* in, int *out, size_t len, int window);
-extern int AskEdgeDetect(const int *in, int *out, int len, int threshold);
-extern int AutoCorrelate(const int *in, int *out, size_t len, int window, bool SaveGrph, bool verbose);
-extern int directionalThreshold(const int* in, int *out, size_t len, int8_t up, int8_t down);
-extern void save_restoreGB(uint8_t saveOpt);
+int AskEdgeDetect(const int *in, int *out, int len, int threshold);
+int AutoCorrelate(const int *in, int *out, size_t len, int window, bool SaveGrph, bool verbose);
+int directionalThreshold(const int* in, int *out, size_t len, int8_t up, int8_t down);
+void save_restoreGB(uint8_t saveOpt);
 
 #define GRAPH_SAVE 1
 #define GRAPH_RESTORE 0
 #define MAX_DEMOD_BUF_LEN (1024*128)
-extern uint8_t DemodBuffer[MAX_DEMOD_BUF_LEN];
-extern size_t DemodBufferLen;
-extern size_t g_DemodStartIdx;
-extern bool showDemod;
-extern uint8_t g_debugMode;
+uint8_t DemodBuffer[MAX_DEMOD_BUF_LEN];
+size_t DemodBufferLen;
+size_t g_DemodStartIdx;
+bool showDemod;
+uint8_t g_debugMode;
 
 #ifdef __cplusplus
 }

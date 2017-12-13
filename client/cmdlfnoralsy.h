@@ -9,11 +9,11 @@
 #ifndef CMDLFNORALSY_H__
 #define CMDLFNORALSY_H__
 
-extern int CmdLFNoralsy(const char *Cmd);
-extern int CmdNoralsyClone(const char *Cmd);
-extern int CmdNoralsySim(const char *Cmd);
-extern int CmdNoralsyRead(const char *Cmd);
-extern int CmdNoralsyDemod(const char *Cmd);
+int CmdLFNoralsy(const char *Cmd);
+int CmdNoralsyClone(const char *Cmd);
+int CmdNoralsySim(const char *Cmd);
+int CmdNoralsyRead(const char *Cmd);
+int CmdNoralsyDemod(const char *Cmd);
 
 #endif
 

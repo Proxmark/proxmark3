@@ -8,7 +8,7 @@
 //-----------------------------------------------------------------------------
 #ifndef CMDLFPARADOX_H__
 #define CMDLFPARADOX_H__
-extern int CmdLFParadox(const char *Cmd);
-extern int CmdFSKdemodParadox(const char *Cmd);
-extern int CmdParadoxRead(const char *Cmd);
+int CmdLFParadox(const char *Cmd);
+int CmdFSKdemodParadox(const char *Cmd);
+int CmdParadoxRead(const char *Cmd);
 #endif

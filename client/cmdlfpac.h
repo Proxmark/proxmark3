@@ -9,9 +9,9 @@
 #ifndef CMDLFPAC_H__
 #define CMDLFPAC_H__
 
-extern int CmdLFPac(const char *Cmd);
-extern int CmdPacRead(const char *Cmd);
-extern int CmdPacDemod(const char *Cmd);
+int CmdLFPac(const char *Cmd);
+int CmdPacRead(const char *Cmd);
+int CmdPacDemod(const char *Cmd);
 
 #endif
 

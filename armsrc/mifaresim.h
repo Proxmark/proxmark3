@@ -15,6 +15,6 @@
 
 #include <stdint.h>
 
-extern void Mifare1ksim(uint8_t flags, uint8_t exitAfterNReads, uint8_t arg2, uint8_t *datain);
+void Mifare1ksim(uint8_t flags, uint8_t exitAfterNReads, uint8_t arg2, uint8_t *datain);
 
 #endif

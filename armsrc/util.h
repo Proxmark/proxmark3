@@ -61,13 +61,13 @@ void StartCountSspClk();
 void ResetSspClk(void);
 uint32_t RAMFUNC GetCountSspClk();
 
-extern void StartTicks(void);
-extern void WaitTicks(uint32_t ticks);
-extern void WaitUS(uint16_t us);
-extern void WaitMS(uint16_t ms);
-extern void ResetTicks();
-extern void ResetTimer(AT91PS_TC timer);
-extern void StopTicks(void);
+void StartTicks(void);
+void WaitTicks(uint32_t ticks);
+void WaitUS(uint16_t us);
+void WaitMS(uint16_t ms);
+void ResetTicks();
+void ResetTimer(AT91PS_TC timer);
+void StopTicks(void);
 // end iceman's ticks.h
 
 uint32_t prand();
