@@ -278,7 +278,7 @@ int CmdHFEMVPPSE(const char *cmd) {
 
 int UsageCmdHFEMVExec(void) {
 	PrintAndLog("HELP :  Executes EMV contactless transaction:\n");
-	PrintAndLog("Usage:  hf emv exec [-s][-a][-t]\n");
+	PrintAndLog("Usage:  hf emv exec [-s][-a][-t][-f][-v][-c][-x][-g]\n");
 	PrintAndLog("  Options:");
 	PrintAndLog("  -s       : select card");
 	PrintAndLog("  -a       : show APDU reqests and responses\n");
