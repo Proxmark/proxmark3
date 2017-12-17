@@ -296,7 +296,7 @@ int UsageCmdHFEMVExec(void) {
 }
 
 #define TLV_ADD(tag, value)( tlvdb_add(tlvRoot, tlvdb_fixed(tag, sizeof(value) - 1, (const unsigned char *)value)) )
-#define dreturn(n) {DropField();return n;}
+#define dreturn(n) {free(pdol_data_tlv);tlvdb_free(tlvSelect);tlvdb_free(tlvRoot);DropField();return n;}
 
 int CmdHFEMVExec(const char *cmd) {
 	bool activateField = false;
@@ -316,6 +316,10 @@ int CmdHFEMVExec(const char *cmd) {
 	
 	int res;
 	
+	struct tlvdb *tlvSelect = NULL;
+	struct tlvdb *tlvRoot = NULL;
+	struct tlv *pdol_data_tlv = NULL;
+
 	if (strlen(cmd) < 1) {
 		UsageCmdHFEMVExec();
 		return 0;
@@ -371,7 +375,6 @@ int CmdHFEMVExec(const char *cmd) {
 
 	
 	// init applets list tree
-	struct tlvdb *tlvSelect = NULL;
 	const char *al = "Applets list";
 	tlvSelect = tlvdb_fixed(1, strlen(al), (const unsigned char *)al);
 
@@ -395,7 +398,6 @@ int CmdHFEMVExec(const char *cmd) {
 		PrintAndLog("\n* Search AID in list.");
 		SetAPDULogging(false);
 		if (EMVSearch(activateField, true, decodeTLV, tlvSelect)) {
-			tlvdb_free(tlvSelect);
 			dreturn(2);
 		}
 
@@ -405,7 +407,6 @@ int CmdHFEMVExec(const char *cmd) {
 	}
 	
 	// Init TLV tree
-	struct tlvdb *tlvRoot = NULL;
 	const char *alr = "Root terminal TLV tree";
 	tlvRoot = tlvdb_fixed(1, strlen(alr), (const unsigned char *)alr);
 	
@@ -474,7 +475,7 @@ int CmdHFEMVExec(const char *cmd) {
 	TLVPrintFromTLV(tlvRoot); // TODO delete!!!
 	
 	PrintAndLog("\n* Calc PDOL.");
-	struct tlv *pdol_data_tlv = dol_process(tlvdb_get(tlvRoot, 0x9f38, NULL), tlvRoot, 0x83);
+	pdol_data_tlv = dol_process(tlvdb_get(tlvRoot, 0x9f38, NULL), tlvRoot, 0x83);
 	if (!pdol_data_tlv){
 		PrintAndLog("ERROR: can't create PDOL TLV.");
 		dreturn(4);
