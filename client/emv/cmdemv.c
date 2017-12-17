@@ -290,8 +290,8 @@ int UsageCmdHFEMVExec(void) {
 	PrintAndLog("  -g       : VISA. generate AC from GPO\n");
 	PrintAndLog("By default : transaction type - MSD.\n");
 	PrintAndLog("Samples:");
-	PrintAndLog(" hf emv pse -s -> select card");
-	PrintAndLog(" hf emv pse -s -t -a -> select card, show responses in TLV, show APDU");
+	PrintAndLog(" hf emv exec -s -a -t -> execute MSD transaction");
+	PrintAndLog(" hf emv exec -s -a -t -c -> execute CDA transaction");
 	return 0;
 }
 
@@ -440,7 +440,7 @@ int CmdHFEMVExec(const char *cmd) {
 		case TT_MSD:
 			TLV_ADD(0x9F66, "\x86\x00\x00\x00"); // MSD
 			break;
-		// not standart for contactless. just for test.
+		// not standard for contactless. just for test.
 		case TT_VSDC:  
 			TLV_ADD(0x9F66, "\x46\x00\x00\x00"); // VSDC
 			break;
@@ -455,7 +455,7 @@ int CmdHFEMVExec(const char *cmd) {
 			break;
 	}
 	
-    //9F02:(Amount, Authorised (Numeric)) len:6
+    //9F02:(Amount, authorized (Numeric)) len:6
 	TLV_ADD(0x9F02, "\x00\x00\x00\x00\x01\x00");
     //9F1A:(Terminal Country Code) len:2
 	TLV_ADD(0x9F1A, "ru");
