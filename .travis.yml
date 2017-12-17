@@ -23,7 +23,7 @@ before_install:
 ## Install ARM toolchain on Linux.
 ## add our homebrew tap for MacOS
 ## Note: all dependencies on MacOS should be resolved by the brew install command
-  echo REPOSITORY_EP;
+  echo $REPOSITORY_EP;
   if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then 
     sudo apt-get update -qq;
     sudo apt-get install -y gcc-arm-none-eabi;
