@@ -296,7 +296,7 @@ int UsageCmdHFEMVExec(void) {
 }
 
 #define TLV_ADD(tag, value)( tlvdb_add(tlvRoot, tlvdb_fixed(tag, sizeof(value) - 1, (const unsigned char *)value)) )
-#define dreturn(n) do{DropField();return n;}while(0)
+#define dreturn(n) {DropField();return n;}
 
 int CmdHFEMVExec(const char *cmd) {
 	bool activateField = false;
