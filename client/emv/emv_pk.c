@@ -19,6 +19,7 @@
 
 #include "emv_pk.h"
 #include "crypto.h"
+#include <proxmark3.h>
 
 /* For asprintf */
 #define _GNU_SOURCE
@@ -489,7 +490,12 @@ struct emv_pk *emv_pk_get_ca_pk(const unsigned char *rid, unsigned char idx)
 	}
 */
 	if (!pk) {
-		const char *fname = "emv/capk.txt"; 
+		const char *relfname = "emv/capk.txt"; 
+
+		char fname[strlen(get_my_executable_directory()) + strlen(relfname) + 1];
+		strcpy(fname, get_my_executable_directory());
+		strcat(fname, relfname);
+
 		pk = emv_pk_get_ca_pk_from_file(fname, rid, idx);
 	}
 	if (!pk)
