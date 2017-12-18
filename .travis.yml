@@ -32,7 +32,7 @@ before_install:
     if [[ "$REPOSITORY_EP" == "" ]]; then
       brew tap proxmark/proxmark3;
     else
-      brew tap "$REPOSITORY_EP";
+      brew tap "$REPOSITORY_EP" --env=std;
     fi
   fi
 
