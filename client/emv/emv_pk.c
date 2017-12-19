@@ -19,7 +19,7 @@
 
 #include "emv_pk.h"
 #include "crypto.h"
-#include <proxmark3.h>
+#include "proxmark3.h"
 
 /* For asprintf */
 #define _GNU_SOURCE
@@ -27,6 +27,7 @@
 #include <stdbool.h>
 #include <string.h>
 #include <stdlib.h>
+#include <sys/types.h>
 
 #define BCD(c) (((c) >= '0' && (c) <= '9') ? ((c) - '0') : \
 		-1)
