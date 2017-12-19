@@ -66,11 +66,11 @@ static size_t crypto_hash_polarssl_get_size(const struct crypto_hash *ch)
 
 static struct crypto_hash *crypto_hash_polarssl_open(enum crypto_algo_hash hash)
 {
-	struct crypto_hash_polarssl *ch = malloc(sizeof(*ch));
-
 	if (hash != HASH_SHA_1)
 		return NULL;
-	
+
+	struct crypto_hash_polarssl *ch = malloc(sizeof(*ch));
+
 	sha1_starts(&(ch->ctx));
 
 	ch->ch.write = crypto_hash_polarssl_write;

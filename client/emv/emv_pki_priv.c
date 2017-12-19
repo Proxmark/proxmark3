@@ -57,8 +57,10 @@ struct emv_pk *emv_pki_make_ca(const struct crypto_pk *cp,
 	free(exp);
 
 	struct crypto_hash *ch = crypto_hash_open(pk->hash_algo);
-	if (!ch)
+	if (!ch) {
+		emv_pk_free(pk);
 		return false;
+	}
 
 	crypto_hash_write(ch, pk->rid, sizeof(pk->rid));
 	crypto_hash_write(ch, &pk->index, 1);
