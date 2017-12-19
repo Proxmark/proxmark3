@@ -17,13 +17,14 @@
 #include <config.h>
 #endif
 
+/* For asprintf */
+#define _GNU_SOURCE
+#include <stdio.h>
+
 #include "emv_pk.h"
 #include "crypto.h"
 #include "proxmark3.h"
 
-/* For asprintf */
-#define _GNU_SOURCE
-#include <stdio.h>
 #include <stdbool.h>
 #include <string.h>
 #include <stdlib.h>
