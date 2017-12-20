@@ -798,6 +798,7 @@ int CmdHFEMVExec(const char *cmd) {
 				res = MSCComputeCryptoChecksum(true, (uint8_t *)udol_data_tlv->value, udol_data_tlv->len, buf, sizeof(buf), &len, &sw, tlvRoot);
 				if (res) {
 					PrintAndLog("ERROR Compute Crypto Checksum. APDU error %4x", sw);
+					free(udol_data_tlv);
 					dreturn(9);
 				}
 				
@@ -805,6 +806,7 @@ int CmdHFEMVExec(const char *cmd) {
 					TLVPrintFromBuffer(buf, len);
 					PrintAndLog("");
 				}
+				free(udol_data_tlv);
 
 			}
 		} else {
