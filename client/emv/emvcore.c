@@ -16,7 +16,7 @@ static const char *PSElist [] = {
 	"325041592E5359532E4444463031", // 2PAY.SYS.DDF01 - Visa Proximity Payment System Environment - PPSE
 	"315041592E5359532E4444463031"  // 1PAY.SYS.DDF01 - Visa Payment System Environment - PSE
 };
-static const size_t PSElistLen = sizeof(PSElist)/sizeof(char*);
+//static const size_t PSElistLen = sizeof(PSElist)/sizeof(char*);
 
 typedef struct {
 	enum CardPSVendor vendor;
