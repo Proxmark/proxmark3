@@ -153,8 +153,10 @@ uint32_t DoAcquisition(uint8_t decimation, uint32_t bits_per_sample, bool averag
 			LED_D_OFF();
 			// threshold either high or low values 128 = center 0.  if trigger = 178 
 			if ((trigger_threshold > 0) && (sample < (trigger_threshold+128)) && (sample > (128-trigger_threshold))) { // 
-				if (cancel_after > 0) cancel_counter++;
-				if (cancel_after == cancel_counter) break;
+				if (cancel_after > 0) {
+					cancel_counter++;
+					if (cancel_after == cancel_counter) break;
+				}
 				continue;
 			}
 			trigger_threshold = 0;
