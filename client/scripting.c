@@ -23,8 +23,8 @@
 #include "iso14443crc.h"
 #include "../common/crc16.h"
 #include "../common/crc64.h"
-#include "../common/sha1.h"
-#include "polarssl/aes.h"
+#include "../common/polarssl/sha1.h"
+#include "../common/polarssl/aes.h"
 #include "cmdcrc.h"
 /**
  * The following params expected:

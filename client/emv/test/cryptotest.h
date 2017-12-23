@@ -5,28 +5,9 @@
 // at your option, any later version. See the LICENSE.txt file for the text of
 // the license.
 //-----------------------------------------------------------------------------
-// EMV commands
+// Crypto algorithms testing
 //-----------------------------------------------------------------------------
 
-#ifndef CMDEMV_H__
-#define CMDEMV_H__
+#include <stdbool.h>
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <inttypes.h>
-#include <string.h>
-#include <ctype.h>
-#include "proxmark3.h"
-#include "ui.h"
-#include "cmdparser.h"
-#include "common.h"
-#include "util.h"
-#include "util_posix.h"
-#include "cmdmain.h"
-#include "emvcore.h"
-#include "apduinfo.h"
-
-int CmdHFEMV(const char *Cmd);
-
-
-#endif
+extern int ExecuteCryptoTests(bool verbose);
