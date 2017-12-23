@@ -694,10 +694,9 @@ void MifareAcquireEncryptedNonces(uint32_t arg0, uint32_t arg1, uint32_t flags, 
 			continue;
 		}
 
-		// send a dummy byte as reader response in order to trigger the cards authentication timeout
-		uint8_t dummy_answer = 0;
-		ReaderTransmit(&dummy_answer, 1, NULL);
-		timeout = GetCountSspClk() + AUTHENTICATION_TIMEOUT;
+		// send a dummy response in order to trigger the cards authentication failure timeout
+		uint8_t dummy_answer[8] = {0};
+		ReaderTransmit(dummy_answer, 8, NULL);
 
 		num_nonces++;
 		if (num_nonces % 2) {
@@ -709,9 +708,6 @@ void MifareAcquireEncryptedNonces(uint32_t arg0, uint32_t arg1, uint32_t flags, 
 			memcpy(buf+i+8, &nt_par_enc, 1);
 			i += 9;
 		}
-
-		// wait for the card to become ready again
-		while(GetCountSspClk() < timeout);
 
 	}
 

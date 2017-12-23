@@ -20,7 +20,7 @@ OBJDIR = obj
 LDLIBS = -L/opt/local/lib -L/usr/local/lib -lreadline -lpthread -lm
 LUALIB = ../liblua/liblua.a
 LDFLAGS = $(ENV_LDFLAGS)
-CFLAGS = $(ENV_CFLAGS) -std=c99 -D_ISOC99_SOURCE -I. -I../include -I../common -I../zlib -I../uart -I/opt/local/include -I../liblua -Wall -g -O3
+CFLAGS = $(ENV_CFLAGS) -std=c99 -D_ISOC99_SOURCE -I. -I../include -I../common -I../common/polarssl -I../zlib -I../uart -I/opt/local/include -I../liblua -Wall -g -O3
 CXXFLAGS = -I../include -Wall -O3
 
 LUAPLATFORM = generic
@@ -88,6 +88,9 @@ CMDSRCS = 	crapto1/crapto1.c\
 			crapto1/crypto1.c\
 			polarssl/des.c \
 			polarssl/aes.c\
+			polarssl/bignum.c\
+			polarssl/rsa.c\
+			polarssl/sha1.c\
 			cliparser/argtable3.c\
 			cliparser/cliparser.c\
 			mfkey.c\
@@ -109,12 +112,22 @@ CMDSRCS = 	crapto1/crapto1.c\
 			ui.c \
 			cmddata.c \
 			lfdemod.c \
+			emv/crypto_polarssl.c\
+			emv/crypto.c\
+			emv/emv_pk.c\
+			emv/emv_pki.c\
+			emv/emv_pki_priv.c\
+			emv/test/cryptotest.c\
 			emv/apduinfo.c\
 			emv/dump.c\
 			emv/tlv.c\
 			emv/emv_tags.c\
 			emv/dol.c\
 			emv/emvcore.c\
+			emv/test/crypto_test.c\
+			emv/test/sda_test.c\
+			emv/test/dda_test.c\
+			emv/test/cda_test.c\
 			emv/cmdemv.c\
 			cmdhf.c \
 			cmdhf14a.c \
@@ -159,7 +172,6 @@ CMDSRCS = 	crapto1/crapto1.c\
 			pm3_binlib.c\
 			pm3_bitlib.c\
 			protocols.c\
-			sha1.c\
 			cmdcrc.c\
 			reveng/reveng.c\
 			reveng/cli.c\
@@ -194,14 +206,7 @@ MULTIARCHOBJS = $(MULTIARCHSRCS:%.c=$(OBJDIR)/%_NOSIMD.o) \
 			$(MULTIARCHSRCS:%.c=$(OBJDIR)/%_AVX.o) \
 			$(MULTIARCHSRCS:%.c=$(OBJDIR)/%_AVX2.o)
 
-GCC_VERSION := $(shell gcc --version | awk '/gcc/{print $$NF;}' | sed -e 's/\.\([0-9][0-9]\)/\1/g' -e 's/\.\([0-9]\)/0\1/g' -e 's/^[0-9]\{3,4\}$$/&00/')
-CLANG_VERSION := $(shell gcc --version | awk '/Apple LLVM version/{print $$4;}' | sed -e 's/\.\([0-9][0-9]\)/\1/g' -e 's/\.\([0-9]\)/0\1/g' -e 's/^[0-9]\{3,4\}$$/&00/')
-ifneq ($(CLANG_VERSION), )
-	SUPPORTS_AVX512 :=  $(shell [ $(CLANG_VERSION) -ge 80000 ] && echo "True" )
-endif
-ifneq ($(GCC_VERSION), )
-	SUPPORTS_AVX512 :=  $(shell [ $(GCC_VERSION) -ge 40900 ] && echo "True" )
-endif
+SUPPORTS_AVX512 :=  $(shell echo | gcc -E -mavx512f - > /dev/null 2>&1 && echo "True" )
 HARD_SWITCH_NOSIMD = -mno-mmx -mno-sse2 -mno-avx -mno-avx2
 HARD_SWITCH_MMX = -mmmx -mno-sse2 -mno-avx -mno-avx2
 HARD_SWITCH_SSE2 = -mmmx -msse2 -mno-avx -mno-avx2

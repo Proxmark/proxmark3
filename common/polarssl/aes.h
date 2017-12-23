@@ -125,7 +125,6 @@ int aes_crypt_ecb( aes_context *ctx,
                     int mode,
                     const unsigned char input[16],
                     unsigned char output[16] );
-
 #if defined(POLARSSL_CIPHER_MODE_CBC)
 /**
  * \brief          AES-CBC buffer encryption/decryption

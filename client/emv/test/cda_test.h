@@ -1,6 +1,6 @@
 /*
- * libopenemv - a library to work with EMV family of smart cards
- * Copyright (C) 2015 Dmitry Eremin-Solenikov
+ * emv-tools - a set of tools to work with EMV family of smart cards
+ * Copyright (C) 2012, 2015 Dmitry Eremin-Solenikov
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -13,23 +13,6 @@
  * Lesser General Public License for more details.
  */
 
-#ifndef TAGS_H
-#define TAGS_H
-
-#include "tlv.h"
-#include <stdio.h>
-
-// AC
-# define EMVAC_AC_MASK   0xC0
-# define EMVAC_AAC       0x00
-# define EMVAC_TC        0x40
-# define EMVAC_ARQC      0x80
-# define EMVAC_CDAREQ    0x10
-
-// CID
-# define EMVCID_ADVICE       0x08
-# define EMVCID_REASON_MASK  0x07
-
-bool emv_tag_dump(const struct tlv *tlv, FILE *f, int level);
-
-#endif
+#include <stdbool.h> 
+ 
+extern int exec_cda_test(bool verbose);

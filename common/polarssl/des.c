@@ -29,7 +29,7 @@
  *  http://csrc.nist.gov/publications/fips/fips46-3/fips46-3.pdf
  */
 
-//#include "polarssl/config.h"
+#include "polarssl_config.h"
 #define POLARSSL_DES_C
 
 #if defined(POLARSSL_DES_C)
