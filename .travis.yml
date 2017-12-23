@@ -12,9 +12,9 @@ matrix:
     - os: osx
       osx_image: xcode8.3   # OS X 10.12
     - os: osx
-      osx_image: xcode9     # OS X 10.13
+      osx_image: xcode9     # OS X 10.12
     - os: osx
-      osx_image: xcode9.1   # OS X 10.13.1
+      osx_image: xcode9.2   # OS X 10.12
     - os: linux
       dist: trusty
       sudo: required
@@ -23,6 +23,7 @@ before_install:
 ## Install ARM toolchain on Linux.
 ## add our homebrew tap for MacOS
 ## Note: all dependencies on MacOS should be resolved by the brew install command
+  echo $REPOSITORY_EP;
   if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then 
     sudo apt-get update -qq;
     sudo apt-get install -y gcc-arm-none-eabi;
@@ -31,7 +32,7 @@ before_install:
     if [[ "$REPOSITORY_EP" == "" ]]; then
       brew tap proxmark/proxmark3;
     else
-      brew tap "$REPOSITORY_EP";
+      brew tap "$REPOSITORY_EP" --env=std;
     fi
   fi
 
