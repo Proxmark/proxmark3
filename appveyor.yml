@@ -277,6 +277,7 @@ test_script:
 
     ExecTest "hf mf hardnested" "hf mf hardnested" {bash -lc "cd ~/client;proxmark3 comx -c 'hf mf hardnested t 1 000000000000'"} "found:"
 
+    ExecTest "hf emv test" "hf emv test" {bash -lc "cd ~/client;proxmark3 comx -c 'hf emv test'"} "[OK]"
 
     if ($global:TestsPassed) {
       Write-Host "Tests [ OK ]" -ForegroundColor Green
