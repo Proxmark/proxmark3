@@ -770,7 +770,7 @@ int CmdHF14AAPDU(const char *cmd) {
 					return 1;
 			}
 			
-		if (isxdigit(c)) {
+		if (isxdigit((unsigned char)c)) {
 			// len = data + PCB(1b) + CRC(2b)
 			switch(param_gethex_to_eol(cmd, cmdp, data, sizeof(data) - 1 - 2, &datalen)) {
 			case 1:

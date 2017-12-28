@@ -40,14 +40,14 @@ int split(char *str, char *arr[MAX_ARGS]){
 	int wordCnt = 0;
 
 	while(1){
-		while(isspace(str[beginIndex])){
+		while(isspace((unsigned char)str[beginIndex])){
 			++beginIndex;
 		}
 		if(str[beginIndex] == '\0') {
 			break;
 		}
 		endIndex = beginIndex;
-		while (str[endIndex] && !isspace(str[endIndex])){
+		while (str[endIndex] && !isspace((unsigned char)str[endIndex])){
 			++endIndex;
 		}
 		int len = endIndex - beginIndex;
