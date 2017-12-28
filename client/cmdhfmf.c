@@ -1089,7 +1089,7 @@ int CmdHF14AMfChk(const char *Cmd)
 
 					if( buf[0]=='#' ) continue;	//The line start with # is comment, skip
 
-					if (!isxdigit(buf[0])){
+					if (!isxdigit((unsigned char)buf[0])){
 						PrintAndLog("File content error. '%s' must include 12 HEX symbols",buf);
 						continue;
 					}
