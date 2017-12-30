@@ -987,6 +987,7 @@ int CmdHF14AMfChk(const char *Cmd)
 	int i, res;
 	int	keycnt = 0;
 	char ctmp	= 0x00;
+	int clen = 0;
 	char ctmp3[3]	= {0x00};
 	uint8_t blockNo = 0;
 	uint8_t SectorsCnt = 0;
@@ -1015,32 +1016,36 @@ int CmdHF14AMfChk(const char *Cmd)
 		blockNo = param_get8(Cmd, 0);
 
 	ctmp = param_getchar(Cmd, 1);
-	switch (ctmp) {
-	case 'a': case 'A':
-		keyType = 0;
-		break;
-	case 'b': case 'B':
-		keyType = 1;
-		break;
-	case '?':
-		keyType = 2;
-		break;
-	default:
-		PrintAndLog("Key type must be A , B or ?");
-		free(keyBlock);
-		return 1;
-	};
+	clen = param_getlength(Cmd, 1);
+	if (clen == 1) {
+		switch (ctmp) {
+		case 'a': case 'A':
+			keyType = 0;
+			break;
+		case 'b': case 'B':
+			keyType = 1;
+			break;
+		case '?':
+			keyType = 2;
+			break;
+		default:
+			PrintAndLog("Key type must be A , B or ?");
+			free(keyBlock);
+			return 1;
+		};
+	}
 
 	// transfer to emulator & create dump file
 	ctmp = param_getchar(Cmd, 2);
-	if (ctmp == 't' || ctmp == 'T') transferToEml = 1;
-	if (ctmp == 'd' || ctmp == 'D') createDumpFile = 1;
+	clen = param_getlength(Cmd, 2);
+	if (clen == 1 && (ctmp == 't' || ctmp == 'T')) transferToEml = 1;
+	if (clen == 1 && (ctmp == 'd' || ctmp == 'D')) createDumpFile = 1;
 	
 	param3InUse = transferToEml | createDumpFile;
 	
 	timeout14a = 500; // fast by default
 	// double parameters - ts, ds
-	int clen = param_getlength(Cmd, 2);
+	clen = param_getlength(Cmd, 2);
 	if (clen == 2 || clen == 3){
 		param_getstr(Cmd, 2, ctmp3, sizeof(ctmp3));
 		ctmp = ctmp3[1];
