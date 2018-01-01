@@ -739,17 +739,15 @@ int readKeyFile(uint8_t key[8])
 	FILE *f;
 	int retval = 1;
 	f = fopen("iclass_key.bin", "rb");
-	if (f)
-	{
-		if(fread(key, sizeof(uint8_t), 8, f) == 1) 
-	 	{
-	 		retval = 0;	
-	 	}
-		fclose(f);
+	if (!f)
+		return retval;
+	
+	if (fread(key, sizeof(uint8_t), 8, f) == 8) {
+		retval = 0;
 	}
+	fclose(f);	
 	return retval;
 }
-
 
 int doKeyTests(uint8_t debuglevel)
 {
