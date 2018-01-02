@@ -32,6 +32,7 @@
 #include "crapto1/crapto1.h"
 #include "parity.h"
 #include "hardnested/hardnested_bruteforce.h"
+#include "hardnested/hardnested_bf_core.h"
 #include "hardnested/hardnested_bitarray_core.h"
 #include "zlib.h"
 
@@ -71,27 +72,32 @@ static float brute_force_per_second;
 
 
 static void get_SIMD_instruction_set(char* instruction_set) {
-#if defined (__i386__) || defined (__x86_64__)	
-	#if !defined(__APPLE__) || (defined(__APPLE__) && (__clang_major__ > 8 || __clang_major__ == 8 && __clang_minor__ >= 1))
-		#if (__GNUC__ >= 5) && (__GNUC__ > 5 || __GNUC_MINOR__ > 2)
-	if (__builtin_cpu_supports("avx512f")) strcpy(instruction_set, "AVX512F");
-	else if (__builtin_cpu_supports("avx2")) strcpy(instruction_set, "AVX2");
-		#else 
-	if (__builtin_cpu_supports("avx2")) strcpy(instruction_set, "AVX2");
-		#endif
-	else if (__builtin_cpu_supports("avx")) strcpy(instruction_set, "AVX");
-	else if (__builtin_cpu_supports("sse2")) strcpy(instruction_set, "SSE2");
-	else if (__builtin_cpu_supports("mmx")) strcpy(instruction_set, "MMX");
-	else 
-	#endif
-#endif
-		strcpy(instruction_set, "no");
+	switch(GetSIMDInstrAuto()) {
+		case SIMD_AVX512:
+			strcpy(instruction_set, "AVX512F");
+			break;
+		case SIMD_AVX2:
+			strcpy(instruction_set, "AVX2");
+			break;
+		case SIMD_AVX:
+			strcpy(instruction_set, "AVX");
+			break;
+		case SIMD_SSE2:
+			strcpy(instruction_set, "SSE2");
+			break;
+		case SIMD_MMX:
+			strcpy(instruction_set, "MMX");
+			break;
+		default:
+			strcpy(instruction_set, "no");
+			break;
+	}	
 }
 
 
 static void print_progress_header(void) {
 	char progress_text[80];
-	char instr_set[12] = "";
+	char instr_set[12] = {0};
 	get_SIMD_instruction_set(instr_set);
 	sprintf(progress_text, "Start using %d threads and %s SIMD core", num_CPUs(), instr_set);
 	PrintAndLog("\n\n");
@@ -2528,6 +2534,8 @@ static void set_test_state(uint8_t byte)
 int mfnestedhard(uint8_t blockNo, uint8_t keyType, uint8_t *key, uint8_t trgBlockNo, uint8_t trgKeyType, uint8_t *trgkey, bool nonce_file_read, bool nonce_file_write, bool slow, int tests) 
 {
 	char progress_text[80];
+	
+	SetSIMDInstr(SIMD_NONE);
 
 	srand((unsigned) time(NULL));
 	brute_force_per_second = brute_force_benchmark();
