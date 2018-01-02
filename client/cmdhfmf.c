@@ -25,6 +25,7 @@
 #include "mifarehost.h"
 #include "mifare.h"
 #include "mfkey.h"
+#include "hardnested/hardnested_bf_core.h"
 
 #define NESTED_SECTOR_RETRY     10			// how often we try mfested() until we give up
 
@@ -862,6 +863,13 @@ int CmdHF14AMfNestedHard(const char *Cmd)
 		PrintAndLog("      w: Acquire nonces and write them to binary file nonces.bin");
 		PrintAndLog("      s: Slower acquisition (required by some non standard cards)");
 		PrintAndLog("      r: Read nonces.bin and start attack");
+		PrintAndLog("      iX: set type of SIMD instructions. Without this flag programs autodetect it.");
+		PrintAndLog("        i5: AVX512");
+		PrintAndLog("        i2: AVX2");
+		PrintAndLog("        ia: AVX");
+		PrintAndLog("        is: SSE2");
+		PrintAndLog("        im: MMX");
+		PrintAndLog("        in: none (use CPU regular instruction set)");
 		PrintAndLog(" ");
 		PrintAndLog("      sample1: hf mf hardnested 0 A FFFFFFFFFFFF 4 A");
 		PrintAndLog("      sample2: hf mf hardnested 0 A FFFFFFFFFFFF 4 A w");
@@ -880,15 +888,20 @@ int CmdHF14AMfNestedHard(const char *Cmd)
 	int tests = 0;
 
 
+	uint16_t iindx = 0;
 	if (ctmp == 'R' || ctmp == 'r') {
 		nonce_file_read = true;
+		iindx = 1;
 		if (!param_gethex(Cmd, 1, trgkey, 12)) {
 			know_target_key = true;
+			iindx = 2;
 		}
 	} else if (ctmp == 'T' || ctmp == 't') {
 		tests = param_get32ex(Cmd, 1, 100, 10);
+		iindx = 2;
 		if (!param_gethex(Cmd, 2, trgkey, 12)) {
 			know_target_key = true;
+			iindx = 3;
 		}
 	} else {
 		blockNo = param_get8(Cmd, 0);
@@ -922,18 +935,53 @@ int CmdHF14AMfNestedHard(const char *Cmd)
 			know_target_key = true;
 			i++;
 		}
+		iindx = i;
 
 		while ((ctmp = param_getchar(Cmd, i))) {
 			if (ctmp == 's' || ctmp == 'S') {
 				slow = true;
 			} else if (ctmp == 'w' || ctmp == 'W') {
 				nonce_file_write = true;
+			} else if (param_getlength(Cmd, i) == 2 && ctmp == 'i') {
+				iindx = i;
 			} else {
-				PrintAndLog("Possible options are w and/or s");
+				PrintAndLog("Possible options are w , s and/or iX");
 				return 1;
 			}
 			i++;
 		}
+	}
+	
+	SetSIMDInstr(SIMD_AUTO);
+	if (iindx > 0) {
+		while ((ctmp = param_getchar(Cmd, iindx))) {
+			if (param_getlength(Cmd, iindx) == 2 && ctmp == 'i') {
+				switch(param_getchar_indx(Cmd, 1, iindx)) {
+					case '5':
+						SetSIMDInstr(SIMD_AVX512);
+						break;
+					case '2':
+						SetSIMDInstr(SIMD_AVX2);
+						break;
+					case 'a':
+						SetSIMDInstr(SIMD_AVX);
+						break;
+					case 's':
+						SetSIMDInstr(SIMD_SSE2);
+						break;
+					case 'm':
+						SetSIMDInstr(SIMD_MMX);
+						break;
+					case 'n':
+						SetSIMDInstr(SIMD_NONE);
+						break;
+					default:
+						PrintAndLog("Unknown SIMD type. %c", param_getchar_indx(Cmd, 1, iindx));
+						return 1;
+				}
+			}
+			iindx++;
+		}	
 	}
 
 	PrintAndLog("--target block no:%3d, target key type:%c, known target key: 0x%02x%02x%02x%02x%02x%02x%s, file action: %s, Slow: %s, Tests: %d ",

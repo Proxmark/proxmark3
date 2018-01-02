@@ -2535,7 +2535,6 @@ int mfnestedhard(uint8_t blockNo, uint8_t keyType, uint8_t *key, uint8_t trgBloc
 {
 	char progress_text[80];
 	
-	SetSIMDInstr(SIMD_NONE);
 	char instr_set[12] = {0};
 	get_SIMD_instruction_set(instr_set);
 	PrintAndLog("Using %s SIMD core.", instr_set);
