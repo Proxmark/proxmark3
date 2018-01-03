@@ -16,6 +16,7 @@
 #include <inttypes.h>
 #include <string.h>
 #include <unistd.h>
+#include <ctype.h>
 #include "util.h"
 #include "util_posix.h"
 #include "iso14443crc.h"
@@ -748,9 +749,9 @@ int CmdHF14AAPDU(const char *cmd) {
 	// len = data + PCB(1b) + CRC(2b)
 	CLIGetStrBLessWithReturn(4, data, &datalen, 1 + 2);
 
+
 	CLIParserFree();
 //	PrintAndLog("---str [%d] %s", arg_get_str(4)->count, arg_get_str(4)->sval[0]);
-
 	PrintAndLog(">>>>[%s%s%s] %s", activateField ? "sel ": "", leaveSignalON ? "keep ": "", decodeTLV ? "TLV": "", sprint_hex(data, datalen));
 	
 	int res = ExchangeAPDU14a(data, datalen, activateField, leaveSignalON, data, USB_CMD_DATA_SIZE, &datalen);

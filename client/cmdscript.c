@@ -76,8 +76,11 @@ int CmdList(const char *Cmd)
 {
     DIR *dp;
     struct dirent *ep;
-	char script_directory_path[strlen(get_my_executable_directory()) + strlen(LUA_SCRIPTS_DIRECTORY) + 1];
-	strcpy(script_directory_path, get_my_executable_directory());
+	char const * exedir = get_my_executable_directory();
+	if (exedir == NULL)
+	    return 0;
+	char script_directory_path[strlen(exedir) + strlen(LUA_SCRIPTS_DIRECTORY) + 1];
+	strcpy(script_directory_path, exedir);
 	strcat(script_directory_path, LUA_SCRIPTS_DIRECTORY);
     dp = opendir(script_directory_path);
 

@@ -9,12 +9,14 @@
 // UI utilities
 //-----------------------------------------------------------------------------
 
-#include <stdarg.h>
+#include <stdbool.h>
+#ifndef EXTERNAL_PRINTANDLOG
 #include <stdlib.h>
 #include <stdio.h>
-#include <stdbool.h>
+#include <stdarg.h>
 #include <readline/readline.h>
 #include <pthread.h>
+#endif
 
 #include "ui.h"
 
@@ -26,9 +28,11 @@ int GridOffset = 0;
 bool GridLocked = false;
 bool showDemod = true;
 
-extern pthread_mutex_t print_lock;
-
 static char *logfilename = "proxmark3.log";
+
+#ifndef EXTERNAL_PRINTANDLOG
+// Declared in proxmark3.c
+extern pthread_mutex_t print_lock;
 
 void PrintAndLog(char *fmt, ...)
 {
@@ -94,7 +98,7 @@ void PrintAndLog(char *fmt, ...)
 	//release lock
 	pthread_mutex_unlock(&print_lock);  
 }
-
+#endif
 
 void SetLogFilename(char *fn)
 {
