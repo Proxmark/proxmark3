@@ -22,7 +22,7 @@
  *
  * This is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as published
- * by the Free Software Foundation.
+ * by the Free Software Foundation, or, at your option, any later version. 
  *
  * This file is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -31,7 +31,6 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with loclass.  If not, see <http://www.gnu.org/licenses/>.
- * 
  * 
  * 
  ****************************************************************************/
@@ -740,17 +739,15 @@ int readKeyFile(uint8_t key[8])
 	FILE *f;
 	int retval = 1;
 	f = fopen("iclass_key.bin", "rb");
-	if (f)
-	{
-		if(fread(key, sizeof(uint8_t), 8, f) == 1) 
-	 	{
-	 		retval = 0;	
-	 	}
-		fclose(f);
+	if (!f)
+		return retval;
+	
+	if (fread(key, sizeof(uint8_t), 8, f) == 8) {
+		retval = 0;
 	}
+	fclose(f);	
 	return retval;
 }
-
 
 int doKeyTests(uint8_t debuglevel)
 {

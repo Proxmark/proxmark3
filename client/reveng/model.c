@@ -596,7 +596,7 @@ mbynam(model_t *dest, const char *key) {
 		uerror("cannot allocate memory for comparison string");
 	akey.name = uptr = ukey;
 	do
-		*uptr++ = toupper(*key);
+		*uptr++ = toupper((unsigned char)*key);
 	while(*key++);
 
 	aptr = bsearch(&akey, aliases, NALIASES, sizeof(struct malias), (int (*)(const void *, const void *)) &acmp);

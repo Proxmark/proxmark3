@@ -111,6 +111,31 @@ void FillFileNameByUID(char *fileName, uint8_t * uid, char *ext, int byteCount) 
 	sprintf(fnameptr, "%s", ext); 
 }
 
+void hex_to_buffer(const uint8_t *buf, const uint8_t *hex_data, const size_t hex_len, const size_t hex_max_len, 
+	const size_t min_str_len, const size_t spaces_between, bool uppercase) {
+		
+	char *tmp = (char *)buf;
+	size_t i;
+
+	int maxLen = ( hex_len > hex_max_len) ? hex_max_len : hex_len;
+
+	for (i = 0; i < maxLen; ++i, tmp += 2 + spaces_between) {
+		sprintf(tmp, (uppercase) ? "%02X" : "%02x", (unsigned int) hex_data[i]); 
+		
+		for (int j = 0; j < spaces_between; j++)
+			sprintf(tmp + 2 + j, " ");
+	}
+	
+	i *= (2 + spaces_between);
+	int minStrLen = min_str_len > i ? min_str_len : 0;
+	if (minStrLen > hex_max_len)
+		minStrLen = hex_max_len;
+	for(; i < minStrLen; i++, tmp += 1) 
+		sprintf(tmp, " ");
+
+	return;
+}
+
 // printing and converting functions
 
 void print_hex(const uint8_t * data, const size_t len)
@@ -141,33 +166,17 @@ void print_hex_break(const uint8_t *data, const size_t len, uint8_t breaks) {
 }
 
 char *sprint_hex(const uint8_t *data, const size_t len) {
+	static char buf[1025] = {0};
 	
-	int maxLen = ( len > 1024/3) ? 1024/3 : len;
-	static char buf[1024];
-	memset(buf, 0x00, 1024);
-	char *tmp = buf;
-	size_t i;
-
-	for (i=0; i < maxLen; ++i, tmp += 3)
-		sprintf(tmp, "%02x ", (unsigned int) data[i]);
+	hex_to_buffer((uint8_t *)buf, data, len, sizeof(buf) - 1, 0, 1, false);
 
 	return buf;
 }
 
 char *sprint_hex_inrow_ex(const uint8_t *data, const size_t len, const size_t min_str_len) {
-	
-	int maxLen = ( len > 1024/2) ? 1024/2 : len;
-	static char buf[1024] = {0};
-	char *tmp = buf;
-	size_t i;
+	static char buf[1025] = {0};
 
-	for (i = 0; i < maxLen; ++i, tmp += 2)
-		sprintf(tmp, "%02x", (unsigned int) data[i]);
-	
-	i *= 2;
-	int minStrLen = min_str_len > i ? min_str_len : 0;
-	for(; i < minStrLen; i++, tmp += 1) 
-		sprintf(tmp, " ");
+	hex_to_buffer((uint8_t *)buf, data, len, sizeof(buf) - 1, min_str_len, 0, false);
 
 	return buf;
 }
@@ -487,7 +496,7 @@ int param_gethex(const char *line, int paramnum, uint8_t * data, int hexcnt)
 		return 1;
 
 	for(i = 0; i < hexcnt; i += 2) {
-		if (!(isxdigit(line[bg + i]) && isxdigit(line[bg + i + 1])) )	return 1;
+		if (!(isxdigit((unsigned char)line[bg + i]) && isxdigit((unsigned char)line[bg + i + 1])) )	return 1;
 		
 		sscanf((char[]){line[bg + i], line[bg + i + 1], 0}, "%X", &temp);
 		data[i / 2] = temp & 0xff;
@@ -509,7 +518,7 @@ int param_gethex_ex(const char *line, int paramnum, uint8_t * data, int *hexcnt)
 		return 1;
 
 	for(i = 0; i < *hexcnt; i += 2) {
-		if (!(isxdigit(line[bg + i]) && isxdigit(line[bg + i + 1])) )	return 1;
+		if (!(isxdigit((unsigned char)line[bg + i]) && isxdigit((unsigned char)line[bg + i + 1])) )	return 1;
 		
 		sscanf((char[]){line[bg + i], line[bg + i + 1], 0}, "%X", &temp);
 		data[i / 2] = temp & 0xff;
@@ -534,7 +543,7 @@ int param_gethex_to_eol(const char *line, int paramnum, uint8_t * data, int maxd
 			continue;
 		}
 		
-		if (isxdigit(line[indx])) {
+		if (isxdigit((unsigned char)line[indx])) {
 			buf[strlen(buf) + 1] = 0x00;
 			buf[strlen(buf)] = line[indx];
 		} else {
@@ -611,7 +620,7 @@ int hextobinarray(char *target, char *source)
         else if (x >= 'A' && x <= 'F')
             x -= 'A' - 10;
         else {
-        	printf("Discovered unknown character %c %d at idx %d of %s\n", x, x, source - start, start);
+        	printf("Discovered unknown character %c %d at idx %tu of %s\n", x, x, source - start, start);
             return 0;
         }
         // output

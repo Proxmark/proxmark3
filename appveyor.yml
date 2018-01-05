@@ -232,8 +232,8 @@ test_script:
     #--- end Job
 
       [bool]$res=$false
-      # Wait 40 sec timeout for Job
-      if(Wait-Job $Job -Timeout 40){
+      # Wait 120 sec timeout for Job
+      if(Wait-Job $Job -Timeout 120){
         $Results = $Job | Receive-Job
         if($Results -like "true"){
           $res=$true
@@ -276,6 +276,11 @@ test_script:
     ExecTest "hf mf offline text" "hf mf" {bash -lc "cd ~/client;proxmark3 comx -c 'hf mf'"} "at_enc"
 
     ExecTest "hf mf hardnested" "hf mf hardnested" {bash -lc "cd ~/client;proxmark3 comx -c 'hf mf hardnested t 1 000000000000'"} "found:"
+
+
+    #proxmark crypto tests
+
+    ExecTest "hf emv test" "hf emv test" {bash -lc "cd ~/client;proxmark3 comx -c 'hf emv test'"} "Tests ?OK"
 
 
     if ($global:TestsPassed) {
