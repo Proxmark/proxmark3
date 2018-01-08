@@ -27,14 +27,12 @@
 #include "util.h"
 #include "util_posix.h"
 #include "cmdscript.h"
-#include "cmdcrc.h"
 
 
 unsigned int current_command = CMD_UNKNOWN;
 
 static int CmdHelp(const char *Cmd);
 static int CmdQuit(const char *Cmd);
-static int CmdRev(const char *Cmd);
 
 //For storing command that are received from the device
 #define CMD_BUFFER_SIZE 50
@@ -53,7 +51,6 @@ static command_t CommandTable[] =
   {"hf",    CmdHF,    1, "{ High Frequency commands... }"},
   {"hw",    CmdHW,    1, "{ Hardware commands... }"},
   {"lf",    CmdLF,    1, "{ Low Frequency commands... }"},
-  {"reveng",CmdRev,   1, "Crc calculations from the software reveng1-30"},
   {"script",CmdScript,1, "{ Scripting commands }"},
   {"quit",  CmdQuit,  1, "Exit program"},
   {"exit",  CmdQuit,  1, "Exit program"},
@@ -73,12 +70,6 @@ int CmdHelp(const char *Cmd)
 int CmdQuit(const char *Cmd)
 {
   return 99;
-}
-
-int CmdRev(const char *Cmd)
-{
-  CmdCrc(Cmd);
-  return 0;
 }
 
 /**
