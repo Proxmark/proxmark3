@@ -135,15 +135,7 @@ void Dbhexdump(int len, uint8_t *d, bool bAsci) {
 // return that.
 //-----------------------------------------------------------------------------
 static int ReadAdc(int ch)
-{
-	uint32_t d;
-
-	AT91C_BASE_ADC->ADC_CR = AT91C_ADC_SWRST;
-	AT91C_BASE_ADC->ADC_MR =
-		ADC_MODE_PRESCALE(63  /* was 32 */) |							// ADC_CLK = MCK / ((63+1) * 2) = 48MHz / 128 = 375kHz
-		ADC_MODE_STARTUP_TIME(1  /* was 16 */) |						// Startup Time = (1+1) * 8 / ADC_CLK = 16 / 375kHz = 42,7us     Note: must be > 20us
-		ADC_MODE_SAMPLE_HOLD_TIME(15  /* was 8 */); 					// Sample & Hold Time SHTIM = 15 / ADC_CLK = 15 / 375kHz = 40us
-
+{	
 	// Note: ADC_MODE_PRESCALE and ADC_MODE_SAMPLE_HOLD_TIME are set to the maximum allowed value. 
 	// Both AMPL_LO and AMPL_HI are very high impedance (10MOhm) outputs, the input capacitance of the ADC is 12pF (typical). This results in a time constant
 	// of RC = 10MOhm * 12pF = 120us. Even after the maximum configurable sample&hold time of 40us the input capacitor will not be fully charged. 
@@ -154,16 +146,19 @@ static int ReadAdc(int ch)
 	//       v_cap = v_in * (1 - exp(-RC/SHTIM))  =   v_in * (1 - exp(-3))  =  v_in * 0,95                   (i.e. an error of 5%)
 	// 
 	// Note: with the "historic" values in the comments above, the error was 34%  !!!
-	
-	AT91C_BASE_ADC->ADC_CHER = ADC_CHANNEL(ch);
 
+	AT91C_BASE_ADC->ADC_CR = AT91C_ADC_SWRST;
+	AT91C_BASE_ADC->ADC_MR =
+		ADC_MODE_PRESCALE(63  /* was 32 */) |							// ADC_CLK = MCK / ((63+1) * 2) = 48MHz / 128 = 375kHz
+		ADC_MODE_STARTUP_TIME(1  /* was 16 */) |						// Startup Time = (1+1) * 8 / ADC_CLK = 16 / 375kHz = 42,7us     Note: must be > 20us
+		ADC_MODE_SAMPLE_HOLD_TIME(15  /* was 8 */); 					// Sample & Hold Time SHTIM = 15 / ADC_CLK = 15 / 375kHz = 40us
+
+	AT91C_BASE_ADC->ADC_CHER = ADC_CHANNEL(ch);
 	AT91C_BASE_ADC->ADC_CR = AT91C_ADC_START;
 
-	while(!(AT91C_BASE_ADC->ADC_SR & ADC_END_OF_CONVERSION(ch)))
-		;
-	d = AT91C_BASE_ADC->ADC_CDR[ch];
-
-	return d;
+	while(!(AT91C_BASE_ADC->ADC_SR & ADC_END_OF_CONVERSION(ch))) {};
+	
+	return AT91C_BASE_ADC->ADC_CDR[ch];
 }
 
 int AvgAdc(int ch) // was static - merlok
@@ -180,7 +175,8 @@ int AvgAdc(int ch) // was static - merlok
 
 void MeasureAntennaTuningLfOnly(int *vLf125, int *vLf134, int *peakf, int *peakv, uint8_t LF_Results[])
 {
-	int i, adcval = 0, peak = 0;
+	uint8_t i;
+	int adcval = 0, peak = 0;
 
 /*
  * Sweeps the useful LF range of the proxmark from
@@ -193,6 +189,8 @@ void MeasureAntennaTuningLfOnly(int *vLf125, int *vLf134, int *peakf, int *peakv
 
 	FpgaDownloadAndGo(FPGA_BITSTREAM_LF);
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_LF_ADC | FPGA_LF_ADC_READER_FIELD);
+	SpinDelay(50);
+	
 	for (i=255; i>=19; i--) {
 		WDT_HIT();
 		FpgaSendCommand(FPGA_CMD_SET_DIVISOR, i);
@@ -201,7 +199,7 @@ void MeasureAntennaTuningLfOnly(int *vLf125, int *vLf134, int *peakf, int *peakv
 		if (i==95) *vLf125 = adcval; // voltage at 125Khz
 		if (i==89) *vLf134 = adcval; // voltage at 134Khz
 
-		LF_Results[i] = adcval>>8; // scale int to fit in byte for graphing purposes
+		LF_Results[i] = adcval >> 9; // scale int to fit in byte for graphing purposes
 		if(LF_Results[i] > peak) {
 			*peakv = adcval;
 			peak = LF_Results[i];
