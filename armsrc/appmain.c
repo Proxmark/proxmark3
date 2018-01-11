@@ -137,21 +137,19 @@ void Dbhexdump(int len, uint8_t *d, bool bAsci) {
 static int ReadAdc(int ch)
 {	
 	// Note: ADC_MODE_PRESCALE and ADC_MODE_SAMPLE_HOLD_TIME are set to the maximum allowed value. 
-	// Both AMPL_LO and AMPL_HI are very high impedance (10MOhm) outputs, the input capacitance of the ADC is 12pF (typical). This results in a time constant
-	// of RC = 10MOhm * 12pF = 120us. Even after the maximum configurable sample&hold time of 40us the input capacitor will not be fully charged. 
+	// AMPL_HI is are high impedance (10MOhm || 1MOhm) output, the input capacitance of the ADC is 12pF (typical). This results in a time constant
+	// of RC = (0.91MOhm) * 12pF = 10.9us. Even after the maximum configurable sample&hold time of 40us the input capacitor will not be fully charged. 
 	// 
 	// The maths are:
 	// If there is a voltage v_in at the input, the voltage v_cap at the capacitor (this is what we are measuring) will be
 	//
-	//       v_cap = v_in * (1 - exp(-RC/SHTIM))  =   v_in * (1 - exp(-3))  =  v_in * 0,95                   (i.e. an error of 5%)
-	// 
-	// Note: with the "historic" values in the comments above, the error was 34%  !!!
+	//       v_cap = v_in * (1 - exp(-SHTIM/RC))  =   v_in * (1 - exp(-40us/10.9us))  =  v_in * 0,97                   (i.e. an error of 3%)
 
 	AT91C_BASE_ADC->ADC_CR = AT91C_ADC_SWRST;
 	AT91C_BASE_ADC->ADC_MR =
-		ADC_MODE_PRESCALE(63  /* was 32 */) |							// ADC_CLK = MCK / ((63+1) * 2) = 48MHz / 128 = 375kHz
-		ADC_MODE_STARTUP_TIME(1  /* was 16 */) |						// Startup Time = (1+1) * 8 / ADC_CLK = 16 / 375kHz = 42,7us     Note: must be > 20us
-		ADC_MODE_SAMPLE_HOLD_TIME(15  /* was 8 */); 					// Sample & Hold Time SHTIM = 15 / ADC_CLK = 15 / 375kHz = 40us
+		ADC_MODE_PRESCALE(63) |							// ADC_CLK = MCK / ((63+1) * 2) = 48MHz / 128 = 375kHz
+		ADC_MODE_STARTUP_TIME(1) |						// Startup Time = (1+1) * 8 / ADC_CLK = 16 / 375kHz = 42,7us     Note: must be > 20us
+		ADC_MODE_SAMPLE_HOLD_TIME(15); 					// Sample & Hold Time SHTIM = 15 / ADC_CLK = 15 / 375kHz = 40us
 
 	AT91C_BASE_ADC->ADC_CHER = ADC_CHANNEL(ch);
 	AT91C_BASE_ADC->ADC_CR = AT91C_ADC_START;
@@ -175,8 +173,7 @@ int AvgAdc(int ch) // was static - merlok
 
 void MeasureAntennaTuningLfOnly(int *vLf125, int *vLf134, int *peakf, int *peakv, uint8_t LF_Results[])
 {
-	uint8_t i;
-	int adcval = 0, peak = 0;
+	int i, adcval = 0, peak = 0;
 
 /*
  * Sweeps the useful LF range of the proxmark from
