@@ -2527,14 +2527,13 @@ int CmdHF14AMfSniff(const char *Cmd){
 		}
 
 		UsbCommand resp;
-		if (WaitForResponseTimeout(CMD_ACK,&resp,2000)) {
+		if (WaitForResponseTimeoutW(CMD_ACK, &resp, 2000, false)) {
 			res = resp.arg[0] & 0xff;
 			uint16_t traceLen = resp.arg[1];
 			len = resp.arg[2];
 
 			if (res == 0) {								// we are done
-				free(buf);
-				return 0;
+				break;
 			}
 
 			if (res == 1) {								// there is (more) data to be transferred
@@ -2610,6 +2609,9 @@ int CmdHF14AMfSniff(const char *Cmd){
 	} // while (true)
 
 	free(buf);
+	
+	msleep(300); // wait for exiting arm side.
+	PrintAndLog("Done.");
 	return 0;
 }
 
