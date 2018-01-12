@@ -2482,7 +2482,7 @@ void RAMFUNC SniffMifare(uint8_t param) {
 	for(uint32_t sniffCounter = 0; true; ) {
 	
 		if(BUTTON_PRESS()) {
-			DbpString("cancelled by button");
+			DbpString("Canceled by button.");
 			break;
 		}
 
@@ -2576,7 +2576,7 @@ void RAMFUNC SniffMifare(uint8_t param) {
 
 	} // main cycle
 
-	DbpString("COMMAND FINISHED");
+	DbpString("COMMAND FINISHED.");
 
 	FpgaDisableSscDma();
 	MfSniffEnd();
