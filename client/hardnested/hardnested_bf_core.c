@@ -590,9 +590,13 @@ SIMDExecInstr GetSIMDInstrAuto() {
 // determine the available instruction set at runtime and call the correct function
 const uint64_t crack_states_bitsliced_dispatch(uint32_t cuid, uint8_t *best_first_bytes, statelist_t *p, uint32_t *keys_found, uint64_t *num_keys_tested, uint32_t nonces_to_bruteforce, uint8_t *bf_test_nonce_2nd_byte, noncelist_t *nonces) {
 	switch(GetSIMDInstrAuto()) {
+#if defined (__i386__) || defined (__x86_64__)
+#if !defined(__APPLE__) || (defined(__APPLE__) && (__clang_major__ > 8 || __clang_major__ == 8 && __clang_minor__ >= 1))
+#if (__GNUC__ >= 5) && (__GNUC__ > 5 || __GNUC_MINOR__ > 2) 
 		case SIMD_AVX512:
 			crack_states_bitsliced_function_p = &crack_states_bitsliced_AVX512;
 			break;
+#endif
 		case SIMD_AVX2:
 			crack_states_bitsliced_function_p = &crack_states_bitsliced_AVX2;
 			break;
@@ -605,6 +609,8 @@ const uint64_t crack_states_bitsliced_dispatch(uint32_t cuid, uint8_t *best_firs
 		case SIMD_MMX:
 			crack_states_bitsliced_function_p = &crack_states_bitsliced_MMX;
 			break;
+#endif
+#endif
 		default:
 			crack_states_bitsliced_function_p = &crack_states_bitsliced_NOSIMD;
 			break;
@@ -616,9 +622,13 @@ const uint64_t crack_states_bitsliced_dispatch(uint32_t cuid, uint8_t *best_firs
 
 void bitslice_test_nonces_dispatch(uint32_t nonces_to_bruteforce, uint32_t *bf_test_nonce, uint8_t *bf_test_nonce_par) {
 	switch(GetSIMDInstrAuto()) {
+#if defined (__i386__) || defined (__x86_64__)
+#if !defined(__APPLE__) || (defined(__APPLE__) && (__clang_major__ > 8 || __clang_major__ == 8 && __clang_minor__ >= 1))
+#if (__GNUC__ >= 5) && (__GNUC__ > 5 || __GNUC_MINOR__ > 2) 
 		case SIMD_AVX512:
 			bitslice_test_nonces_function_p = &bitslice_test_nonces_AVX512;
 			break;
+#endif
 		case SIMD_AVX2:
 			bitslice_test_nonces_function_p = &bitslice_test_nonces_AVX2;
 			break;
@@ -631,6 +641,8 @@ void bitslice_test_nonces_dispatch(uint32_t nonces_to_bruteforce, uint32_t *bf_t
 		case SIMD_MMX:
 			bitslice_test_nonces_function_p = &bitslice_test_nonces_MMX;
 			break;
+#endif
+#endif
 		default:
 			bitslice_test_nonces_function_p = &bitslice_test_nonces_NOSIMD;
 			break;
