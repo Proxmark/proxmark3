@@ -20,6 +20,9 @@
 #include "parity.h"
 #include "crc.h"
 
+#define HARDNESTED_AUTHENTICATION_TIMEOUT 848			// card times out 1ms after wrong authentication (according to NXP documentation)
+#define HARDNESTED_PRE_AUTHENTICATION_LEADTIME 400		// some (non standard) cards need a pause after select before they are ready for first authentication 
+
 // the block number for the ISO14443-4 PCB
 static uint8_t pcb_blocknum = 0;
 // Deselect card by sending a s-block. the crc is precalced for speed
@@ -677,7 +680,7 @@ void MifareAcquireEncryptedNonces(uint32_t arg0, uint32_t arg1, uint32_t flags, 
 		}
 
 		if (slow) {
-			timeout = GetCountSspClk() + PRE_AUTHENTICATION_LEADTIME;
+			timeout = GetCountSspClk() + HARDNESTED_PRE_AUTHENTICATION_LEADTIME;
 			while(GetCountSspClk() < timeout);
 		}
 
@@ -694,10 +697,12 @@ void MifareAcquireEncryptedNonces(uint32_t arg0, uint32_t arg1, uint32_t flags, 
 			continue;
 		}
 
-		// send a dummy response in order to trigger the cards authentication failure timeout
-		uint8_t dummy_answer[8] = {0};
-		ReaderTransmit(dummy_answer, 8, NULL);
+		// send an incomplete dummy response in order to trigger the card's authentication failure timeout
+		uint8_t dummy_answer[1] = {0};
+		ReaderTransmit(dummy_answer, 1, NULL);
 
+		timeout = GetCountSspClk() + HARDNESTED_AUTHENTICATION_TIMEOUT;
+		
 		num_nonces++;
 		if (num_nonces % 2) {
 			memcpy(buf+i, receivedAnswer, 4);
@@ -708,6 +713,9 @@ void MifareAcquireEncryptedNonces(uint32_t arg0, uint32_t arg1, uint32_t flags, 
 			memcpy(buf+i+8, &nt_par_enc, 1);
 			i += 9;
 		}
+
+		// wait for the card to become ready again
+		while(GetCountSspClk() < timeout);
 
 	}
 

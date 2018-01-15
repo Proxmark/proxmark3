@@ -24,8 +24,6 @@
 #define CRYPT_REQUEST 2
 #define AUTH_FIRST    0	
 #define AUTH_NESTED   2
-#define AUTHENTICATION_TIMEOUT 848			// card times out 1ms after wrong authentication (according to NXP documentation)
-#define PRE_AUTHENTICATION_LEADTIME 400		// some (non standard) cards need a pause after select before they are ready for first authentication
 
 // mifare 4bit card answers
 #define CARD_ACK      0x0A  // 1010 - ACK
