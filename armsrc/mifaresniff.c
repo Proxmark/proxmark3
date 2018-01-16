@@ -70,9 +70,17 @@ bool RAMFUNC MfSniffLogic(const uint8_t *data, uint16_t len, uint8_t *parity, ui
 			}
 			break;
 		}
-		case SNF_ATQA:{
+		case SNF_ATQA:
+		case SNF_UID1:{
+			// SNF_ATQA
 			if ((reader) && (len == 2) && (data[0] == 0x93) && (data[1] == 0x20)) { // Select ALL from reader
 				sniffState = SNF_ANTICOL1;
+			}
+			
+			// SNF_UID1
+			if ((reader) && (len == 9) && (data[0] == 0x93) && (data[1] == 0x70) && (CheckCrc14443(CRC_14443_A, data, 9))) {   // Select 4 Byte UID from reader
+				memcpy(sniffUID + 3, &data[2], 4);
+				sniffState = SNF_SAK;
 			}
 			break;
 		}
@@ -83,18 +91,14 @@ bool RAMFUNC MfSniffLogic(const uint8_t *data, uint16_t len, uint8_t *parity, ui
 			}
 			break;
 		}
-		case SNF_UID1:{
-			if ((reader) && (len == 9) && (data[0] == 0x93) && (data[1] == 0x70) && (CheckCrc14443(CRC_14443_A, data, 9))) {   // Select 4 Byte UID from reader
-				sniffState = SNF_SAK;
-			}
-			break;
-		}
 		case SNF_SAK:{
 			if ((!reader) && (len == 3) && (CheckCrc14443(CRC_14443_A, data, 3))) { // SAK from card?
 				sniffSAK = data[0];
-				if (sniffUID[3] == 0x88) {			// CL2 UID part to be expected
-					sniffState = SNF_ANTICOL2;
-				} else {							// select completed
+				if ((sniffUID[3] == 0x88) && (sniffUIDType == SNF_UID_4)) {			// CL2 UID part to be expected
+					sniffUIDType = SNF_UID_7;
+					memcpy(sniffUID, sniffUID + 4, 3);
+					sniffState = SNF_UID2;
+				} else {															// select completed
 					sniffState = SNF_CARD_IDLE;
 				}
 			}
@@ -102,15 +106,18 @@ bool RAMFUNC MfSniffLogic(const uint8_t *data, uint16_t len, uint8_t *parity, ui
 		}
 		case SNF_ANTICOL2:{
 			if ((!reader) && (len == 5) && ((data[0] ^ data[1] ^ data[2] ^ data[3]) == data[4])) { // CL2 UID 
-				memcpy(sniffUID, sniffUID+4, 3);
-				memcpy(sniffUID+3, data, 4);
-				sniffUIDType = SNF_UID_7;
+				memcpy(sniffUID + 3, data, 4);
 				sniffState = SNF_UID2;
 			}
 			break;
 		}
 		case SNF_UID2:{
-			if ((reader) && (len == 9) && (data[0] == 0x95) && (data[1] == 0x70) && (CheckCrc14443(CRC_14443_A, data, 9))) {	// Select 2nd part of 7 Byte UID
+			if ((reader) && (len == 2) && (data[0] == 0x95) && (data[1] == 0x20)) {
+				sniffState = SNF_ANTICOL2;
+			}
+			
+			if ((reader) && (len == 9) && (data[0] == 0x95) && (data[1] == 0x70) && (CheckCrc14443(CRC_14443_A, data, 9))) {
+				memcpy(sniffUID + 3, &data[2], 4);
 				sniffState = SNF_SAK;
 			}
 			break;
