@@ -71,19 +71,9 @@ bool RAMFUNC MfSniffLogic(const uint8_t *data, uint16_t len, uint8_t *parity, ui
 			break;
 		}
 		case SNF_UID1:{
-			if ((reader) && (len == 2) && (data[0] == 0x93) && (data[1] == 0x20)) { // Select ALL from reader
-				sniffState = SNF_ANTICOL1;
-			}
-			
 			if ((reader) && (len == 9) && (data[0] == 0x93) && (data[1] == 0x70) && (CheckCrc14443(CRC_14443_A, data, 9))) {   // Select 4 Byte UID from reader
 				memcpy(sniffUID + 3, &data[2], 4);
 				sniffState = SNF_SAK;
-			}
-			break;
-		}
-		case SNF_ANTICOL1:{
-			if ((!reader) && (len == 5) && ((data[0] ^ data[1] ^ data[2] ^ data[3]) == data[4])) {  // UID from tag (CL1) 
-				sniffState = SNF_UID1;
 			}
 			break;
 		}
@@ -100,17 +90,7 @@ bool RAMFUNC MfSniffLogic(const uint8_t *data, uint16_t len, uint8_t *parity, ui
 			}
 			break;
 		}
-		case SNF_ANTICOL2:{
-			if ((!reader) && (len == 5) && ((data[0] ^ data[1] ^ data[2] ^ data[3]) == data[4])) { // CL2 UID 
-				sniffState = SNF_UID2;
-			}
-			break;
-		}
 		case SNF_UID2:{
-			if ((reader) && (len == 2) && (data[0] == 0x95) && (data[1] == 0x20)) {
-				sniffState = SNF_ANTICOL2;
-			}
-			
 			if ((reader) && (len == 9) && (data[0] == 0x95) && (data[1] == 0x70) && (CheckCrc14443(CRC_14443_A, data, 9))) {
 				memcpy(sniffUID + 3, &data[2], 4);
 				sniffState = SNF_SAK;
