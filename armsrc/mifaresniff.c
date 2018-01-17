@@ -60,9 +60,16 @@ bool RAMFUNC MfSniffLogic(const uint8_t *data, uint16_t len, uint8_t *parity, ui
 				memset(sniffATQA, 0x00, 2);
 				sniffSAK = 0;
 				sniffState = SNF_ATQA;
+				if (data[0] == 0x40) 
+					sniffState = SNF_MAGIC_WUPC2;
 			}
 			break;
 		}
+		case SNF_MAGIC_WUPC2:
+			if ((len == 1) && (reader) && (data[0] == 0x43) ) {  
+				sniffState = SNF_CARD_IDLE;
+			}
+			break;
 		case SNF_ATQA:{
 			if ((!reader) && (len == 2)) { 		// ATQA from tag
 				memcpy(sniffATQA, data, 2);
