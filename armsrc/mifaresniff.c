@@ -86,7 +86,6 @@ bool RAMFUNC MfSniffLogic(const uint8_t *data, uint16_t len, uint8_t *parity, ui
 		}
 		case SNF_ANTICOL1:{
 			if ((!reader) && (len == 5) && ((data[0] ^ data[1] ^ data[2] ^ data[3]) == data[4])) {  // UID from tag (CL1) 
-				memcpy(sniffUID + 3, data, 4);
 				sniffState = SNF_UID1;
 			}
 			break;
@@ -106,7 +105,6 @@ bool RAMFUNC MfSniffLogic(const uint8_t *data, uint16_t len, uint8_t *parity, ui
 		}
 		case SNF_ANTICOL2:{
 			if ((!reader) && (len == 5) && ((data[0] ^ data[1] ^ data[2] ^ data[3]) == data[4])) { // CL2 UID 
-				memcpy(sniffUID + 3, data, 4);
 				sniffState = SNF_UID2;
 			}
 			break;
