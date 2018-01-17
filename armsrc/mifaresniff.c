@@ -59,25 +59,22 @@ bool RAMFUNC MfSniffLogic(const uint8_t *data, uint16_t len, uint8_t *parity, ui
 				memset(sniffUID, 0x00, 8);
 				memset(sniffATQA, 0x00, 2);
 				sniffSAK = 0;
-				sniffState = SNF_WUPREQ;
-			}
-			break;
-		}
-		case SNF_WUPREQ:{
-			if ((!reader) && (len == 2)) { 		// ATQA from tag
-				memcpy(sniffATQA, data, 2);
 				sniffState = SNF_ATQA;
 			}
 			break;
 		}
-		case SNF_ATQA:
+		case SNF_ATQA:{
+			if ((!reader) && (len == 2)) { 		// ATQA from tag
+				memcpy(sniffATQA, data, 2);
+				sniffState = SNF_UID1;
+			}
+			break;
+		}
 		case SNF_UID1:{
-			// SNF_ATQA
 			if ((reader) && (len == 2) && (data[0] == 0x93) && (data[1] == 0x20)) { // Select ALL from reader
 				sniffState = SNF_ANTICOL1;
 			}
 			
-			// SNF_UID1
 			if ((reader) && (len == 9) && (data[0] == 0x93) && (data[1] == 0x70) && (CheckCrc14443(CRC_14443_A, data, 9))) {   // Select 4 Byte UID from reader
 				memcpy(sniffUID + 3, &data[2], 4);
 				sniffState = SNF_SAK;
