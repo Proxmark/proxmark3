@@ -827,20 +827,30 @@ int mfTraceDecode(uint8_t *data_src, int len, bool wantSaveToEmlFile) {
 		if (len ==4) {
 			traceState = TRACE_IDLE;
 
-			at_enc = bytes_to_num(data, 4);
+			if (!traceCrypto1) {
+				at_enc = bytes_to_num(data, 4);
 
-			//  decode key here)
-			ks2 = ar_enc ^ prng_successor(nt, 64);
-			ks3 = at_enc ^ prng_successor(nt, 96);
-			revstate = lfsr_recovery64(ks2, ks3);
-			lfsr_rollback_word(revstate, 0, 0);
-			lfsr_rollback_word(revstate, 0, 0);
-			lfsr_rollback_word(revstate, nr_enc, 1);
-			lfsr_rollback_word(revstate, uid ^ nt, 0);
+				//  decode key here)
+				ks2 = ar_enc ^ prng_successor(nt, 64);
+				ks3 = at_enc ^ prng_successor(nt, 96);
+				revstate = lfsr_recovery64(ks2, ks3);
+				lfsr_rollback_word(revstate, 0, 0);
+				lfsr_rollback_word(revstate, 0, 0);
+				lfsr_rollback_word(revstate, nr_enc, 1);
+				lfsr_rollback_word(revstate, uid ^ nt, 0);
 
-			crypto1_get_lfsr(revstate, &lfsr);
-			printf("key> %x%x\n", (unsigned int)((lfsr & 0xFFFFFFFF00000000) >> 32), (unsigned int)(lfsr & 0xFFFFFFFF));
-			AddLogUint64(logHexFileName, "key> ", lfsr);
+				crypto1_get_lfsr(revstate, &lfsr);
+				printf("key> %x%x\n", (unsigned int)((lfsr & 0xFFFFFFFF00000000) >> 32), (unsigned int)(lfsr & 0xFFFFFFFF));
+				AddLogUint64(logHexFileName, "key> ", lfsr);
+			} else {
+				printf("key> nested not implemented!\n");
+				at_enc = bytes_to_num(data, 4);
+				
+				crypto1_destroy(traceCrypto1);
+
+				// not implemented
+				traceState = TRACE_ERROR;
+			}
 
 			int blockShift = ((traceCurBlock & 0xFC) + 3) * 16;
 			if (isBlockEmpty((traceCurBlock & 0xFC) + 3)) memcpy(traceCard + blockShift + 6, trailerAccessBytes, 4);
@@ -858,15 +868,6 @@ int mfTraceDecode(uint8_t *data_src, int len, bool wantSaveToEmlFile) {
 
 			// set cryptosystem state
 			traceCrypto1 = lfsr_recovery64(ks2, ks3);
-
-//	nt = crypto1_word(traceCrypto1, nt ^ uid, 1) ^ nt;
-
-	/*	traceCrypto1 = crypto1_create(lfsr); // key in lfsr
-		crypto1_word(traceCrypto1, nt ^ uid, 0);
-		crypto1_word(traceCrypto1, ar, 1);
-		crypto1_word(traceCrypto1, 0, 0);
-		crypto1_word(traceCrypto1, 0, 0);*/
-
 			return 0;
 		} else {
 			traceState = TRACE_ERROR;
