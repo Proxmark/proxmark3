@@ -609,7 +609,8 @@ int saveTraceCard(void) {
 	for (int i = 0; i < 64; i++) {  // blocks
 		for (int j = 0; j < 16; j++)  // bytes
 			fprintf(f, "%02x", *(traceCard + i * 16 + j));
-		fprintf(f,"\n");
+		if (i < 63)
+			fprintf(f,"\n");
 	}
 	fclose(f);
 	return 0;
