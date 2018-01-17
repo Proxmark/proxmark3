@@ -2551,7 +2551,6 @@ void RAMFUNC SniffMifare(uint8_t param) {
 					DemodReset();
 				}
 				ReaderIsActive = (Uart.state != STATE_UNSYNCD);
-				TagIsActive = !ReaderIsActive;
 			}
 			
 			if(!ReaderIsActive) {		// no need to try decoding tag data if the reader is sending
@@ -2568,7 +2567,6 @@ void RAMFUNC SniffMifare(uint8_t param) {
 					UartInit(receivedCmd, receivedCmdPar);
 				}
 				TagIsActive = (Demod.state != DEMOD_UNSYNCD);
-				ReaderIsActive = !TagIsActive;
 			}
 		}
 
