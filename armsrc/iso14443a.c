@@ -2539,7 +2539,9 @@ void RAMFUNC SniffMifare(uint8_t param) {
 			if(!TagIsActive) {		// no need to try decoding tag data if the reader is sending
 				uint8_t readerdata = (previous_data & 0xF0) | (*data >> 4);
 				if(MillerDecoding(readerdata, (sniffCounter-1)*4)) {
-					LED_C_INV();
+					LED_B_ON();
+					LED_C_OFF();
+
 					if (MfSniffLogic(receivedCmd, Uart.len, Uart.parity, Uart.bitCount, true)) break;
 
 					/* And ready to receive another command. */
@@ -2554,7 +2556,8 @@ void RAMFUNC SniffMifare(uint8_t param) {
 			if(!ReaderIsActive) {		// no need to try decoding tag data if the reader is sending
 				uint8_t tagdata = (previous_data << 4) | (*data & 0x0F);
 				if(ManchesterDecoding(tagdata, 0, (sniffCounter-1)*4)) {
-					LED_C_INV();
+					LED_B_OFF();
+					LED_C_ON();
 
 					if (MfSniffLogic(receivedResponse, Demod.len, Demod.parity, Demod.bitCount, false)) break;
 
