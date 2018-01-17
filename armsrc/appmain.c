@@ -244,7 +244,7 @@ void MeasureAntennaTuning(int mode)
 		}
 	}
 
-	cmd_send(CMD_MEASURED_ANTENNA_TUNING, vLf125 | (vLf134<<16), vHf, peakf | (peakv<<16), LF_Results, 256);
+	cmd_send(CMD_MEASURED_ANTENNA_TUNING, vLf125>>1 | (vLf134>>1<<16), vHf, peakf | (peakv>>1<<16), LF_Results, 256);
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
 	LED_B_OFF();
 	return;
