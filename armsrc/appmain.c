@@ -205,7 +205,7 @@ void MeasureAntennaTuningLfOnly(int *vLf125, int *vLf134, int *peakf, int *peakv
 		}
 	}
 
-	for (i=18; i >= 0; i--) LF_Results[i] = 0;
+	for (i=0; i <= 18; i++) LF_Results[i] = 0;
 
 	return;
 }
