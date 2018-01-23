@@ -2473,6 +2473,7 @@ int CmdHF14AMfSniff(const char *Cmd){
 	//var
 	int res = 0;
 	int len = 0;
+	int parlen = 0;
 	int blockLen = 0;
 	int pckNum = 0;
 	int num = 0;
@@ -2575,6 +2576,7 @@ int CmdHF14AMfSniff(const char *Cmd){
 					} else {
 						isTag = false;
 					}
+					parlen = (len - 1) / 8 + 1;
 					bufPtr += 2;
 					if ((len == 14) && (bufPtr[0] == 0xff) && (bufPtr[1] == 0xff) && (bufPtr[12] == 0xff) && (bufPtr[13] == 0xff)) {
 						memcpy(uid, bufPtr + 2, 7);
@@ -2594,6 +2596,7 @@ int CmdHF14AMfSniff(const char *Cmd){
 							mfTraceInit(uid, atqa, sak, wantSaveToEmlFile);
 					} else {
 						PrintAndLog("%s(%d):%s", isTag ? "TAG":"RDR", num, sprint_hex(bufPtr, len));
+						PrintAndLog("p:[%d %d]%s", len, parlen, sprint_hex(bufPtr + len, parlen));
 						if (wantLogToFile)
 							AddLogHex(logHexFileName, isTag ? "TAG: ":"RDR: ", bufPtr, len);
 						if (wantDecrypt)
@@ -2601,7 +2604,7 @@ int CmdHF14AMfSniff(const char *Cmd){
 						num++;
 					}
 					bufPtr += len;
-					bufPtr += ((len-1)/8+1);	// ignore parity
+					bufPtr += parlen;	// ignore parity
 				}
 				pckNum = 0;
 			}
