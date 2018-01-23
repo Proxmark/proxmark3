@@ -832,8 +832,8 @@ int mfTraceDecode(uint8_t *data_src, int len, bool wantSaveToEmlFile) {
 		if (len ==4) {
 			traceState = TRACE_IDLE;
 
+			at_enc = bytes_to_num(data, 4);
 			if (!traceCrypto1) {
-				at_enc = bytes_to_num(data, 4);
 
 				//  decode key here)
 				ks2 = ar_enc ^ prng_successor(nt, 64);
@@ -854,7 +854,6 @@ int mfTraceDecode(uint8_t *data_src, int len, bool wantSaveToEmlFile) {
 				}
 			} else {
 				if (validate_prng_nonce(nt)) {
-					at_enc = bytes_to_num(data, 4);
 					
 
 
@@ -863,7 +862,6 @@ int mfTraceDecode(uint8_t *data_src, int len, bool wantSaveToEmlFile) {
 					traceState = TRACE_ERROR;
 				} else {				
 					printf("key> hardnested not implemented!\n");
-					at_enc = bytes_to_num(data, 4);
 				
 					crypto1_destroy(traceCrypto1);
 
