@@ -842,6 +842,11 @@ int mfTraceDecode(uint8_t *data_src, int len, bool wantSaveToEmlFile) {
 				crypto1_get_lfsr(revstate, &lfsr);
 				printf("key> %x%x\n", (unsigned int)((lfsr & 0xFFFFFFFF00000000) >> 32), (unsigned int)(lfsr & 0xFFFFFFFF));
 				AddLogUint64(logHexFileName, "key> ", lfsr);
+				if (validate_prng_nonce(nt)) {
+					printf("key> Prng: WEAK\n");
+				} else {
+					printf("key> Prng: HARDEND\n");
+				}
 			} else {
 				printf("key> nested not implemented!\n");
 				at_enc = bytes_to_num(data, 4);

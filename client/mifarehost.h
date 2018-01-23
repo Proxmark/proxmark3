@@ -61,5 +61,6 @@ extern int tryDecryptWord(uint32_t nt, uint32_t ar_enc, uint32_t at_enc, uint8_t
 
 extern int mfCIdentify();
 extern int DetectClassicPrng(void);
+extern bool validate_prng_nonce(uint32_t nonce);
 
 #endif
