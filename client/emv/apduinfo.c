@@ -132,7 +132,7 @@ const APDUCode APDUCodeTable[] = {
 	{"6EXX", 	APDUCODE_TYPE_ERROR,		"Instruction class not supported (procedure byte), (ISO 7816-3)"},
 	{"6F--", 	APDUCODE_TYPE_ERROR,		"Internal exception"},
 	{"6F00", 	APDUCODE_TYPE_ERROR,		"Command aborted - more exact diagnosis not possible (e.g., operating system error)."},
-	{"6FFF", 	APDUCODE_TYPE_ERROR,		"Card dead (overuse, …)"},
+	{"6FFF", 	APDUCODE_TYPE_ERROR,		"Card dead (overuse, ...)"},
 	{"6FXX", 	APDUCODE_TYPE_ERROR,		"No precise diagnosis (procedure byte), (ISO 7816-3)"},
 	{"9---", 	APDUCODE_TYPE_NONE, 		""},
 	{"9000", 	APDUCODE_TYPE_INFO,			"Command successfully executed (OK)."},
