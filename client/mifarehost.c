@@ -579,6 +579,7 @@ uint32_t ks3;
 
 uint32_t uid;     // serial number
 uint32_t nt;      // tag challenge
+uint32_t nt_enc;  // encrypted tag challenge
 uint32_t nr_enc;  // encrypted reader challenge
 uint32_t ar_enc;  // encrypted reader response
 uint32_t at_enc;  // encrypted tag response
@@ -802,7 +803,11 @@ int mfTraceDecode(uint8_t *data_src, int len, bool wantSaveToEmlFile) {
 	case TRACE_AUTH1:
 		if (len == 4) {
 			traceState = TRACE_AUTH2;
-			nt = bytes_to_num(data, 4);
+			if (!traceCrypto1) {
+				nt = bytes_to_num(data, 4);
+			} else {
+				nt_enc = bytes_to_num(data, 4);
+			}
 			return 0;
 		} else {
 			traceState = TRACE_ERROR;
@@ -848,13 +853,23 @@ int mfTraceDecode(uint8_t *data_src, int len, bool wantSaveToEmlFile) {
 					printf("key> Prng: HARDEND\n");
 				}
 			} else {
-				printf("key> nested not implemented!\n");
-				at_enc = bytes_to_num(data, 4);
-				
-				crypto1_destroy(traceCrypto1);
+				if (validate_prng_nonce(nt)) {
+					at_enc = bytes_to_num(data, 4);
+					
 
-				// not implemented
-				traceState = TRACE_ERROR;
+
+					printf("key> nested... TBD\n");
+					crypto1_destroy(traceCrypto1);
+					traceState = TRACE_ERROR;
+				} else {				
+					printf("key> hardnested not implemented!\n");
+					at_enc = bytes_to_num(data, 4);
+				
+					crypto1_destroy(traceCrypto1);
+
+					// not implemented
+					traceState = TRACE_ERROR;
+				}
 			}
 
 			int blockShift = ((traceCurBlock & 0xFC) + 3) * 16;
