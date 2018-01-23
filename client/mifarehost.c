@@ -845,13 +845,10 @@ int mfTraceDecode(uint8_t *data_src, int len, bool wantSaveToEmlFile) {
 				lfsr_rollback_word(revstate, uid ^ nt, 0);
 
 				crypto1_get_lfsr(revstate, &lfsr);
-				printf("key> %x%x\n", (unsigned int)((lfsr & 0xFFFFFFFF00000000) >> 32), (unsigned int)(lfsr & 0xFFFFFFFF));
+				printf("key> %x%x Prng:%s\n", 
+					(unsigned int)((lfsr & 0xFFFFFFFF00000000) >> 32), (unsigned int)(lfsr & 0xFFFFFFFF), 
+					validate_prng_nonce(nt) ? "WEAK": "HARDEND");
 				AddLogUint64(logHexFileName, "key> ", lfsr);
-				if (validate_prng_nonce(nt)) {
-					printf("key> Prng: WEAK\n");
-				} else {
-					printf("key> Prng: HARDEND\n");
-				}
 			} else {
 				if (validate_prng_nonce(nt)) {
 					
