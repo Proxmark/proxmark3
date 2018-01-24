@@ -169,14 +169,7 @@ CMDSRCS = 	crapto1/crapto1.c\
 			cmdscript.c\
 			pm3_binlib.c\
 			pm3_bitlib.c\
-			protocols.c\
-			cmdcrc.c\
-			reveng/reveng.c\
-			reveng/cli.c\
-			reveng/bmpbit.c\
-			reveng/model.c\
-			reveng/poly.c\
-			reveng/getopt.c\
+			protocols.c
 
 cpu_arch = $(shell uname -m)
 ifneq ($(findstring 86, $(cpu_arch)), )
