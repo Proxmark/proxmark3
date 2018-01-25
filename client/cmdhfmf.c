@@ -18,6 +18,7 @@
 #include "proxmark3.h"
 #include "cmdmain.h"
 #include "cmdhfmfhard.h"
+#include "parity.h"
 #include "util.h"
 #include "util_posix.h"
 #include "usb_cmd.h"
@@ -2485,6 +2486,7 @@ int CmdHF14AMfSniff(const char *Cmd){
 	uint8_t *buf = NULL;
 	uint16_t bufsize = 0;
 	uint8_t *bufPtr = NULL;
+	uint8_t parity[16];
 
 	char ctmp = param_getchar(Cmd, 0);
 	if ( ctmp == 'h' || ctmp == 'H' ) {
@@ -2595,8 +2597,9 @@ int CmdHF14AMfSniff(const char *Cmd){
 						if (wantDecrypt)
 							mfTraceInit(uid, atqa, sak, wantSaveToEmlFile);
 					} else {
-						PrintAndLog("%s(%d):%s", isTag ? "TAG":"RDR", num, sprint_hex(bufPtr, len));
-						PrintAndLog("p:[%d %d]%s", len, parlen, sprint_hex(bufPtr + len, parlen));
+						oddparitybuf(bufPtr, len, parity);
+						PrintAndLog("%s(%d):%s [%s] c[%s]", isTag ? "TAG":"RDR", num, sprint_hex(bufPtr, len), printBitsPar(bufPtr + len, len), printBitsPar(parity, len));
+						PrintAndLog("p:%s %s", sprint_hex(bufPtr + len, parlen), sprint_hex(parity, parlen));
 						if (wantLogToFile)
 							AddLogHex(logHexFileName, isTag ? "TAG: ":"RDR: ", bufPtr, len);
 						if (wantDecrypt)

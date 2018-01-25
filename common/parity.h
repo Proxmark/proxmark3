@@ -21,6 +21,10 @@ static inline bool oddparity8(const uint8_t x) {
 	return OddByteParity[x];
 }
 
+static inline void oddparitybuf(const uint8_t *x, size_t len, uint8_t *parity) {
+	for (int i = 0; i < len; i++) 
+		parity[i / 8] ^= oddparity8(*x >>  ((i % 8) * 8) & 0xff) << (i % 8);
+}
 
 static inline bool evenparity8(const uint8_t x) {
 	return !OddByteParity[x];

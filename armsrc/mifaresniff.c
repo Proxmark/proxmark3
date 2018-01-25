@@ -116,7 +116,7 @@ bool RAMFUNC MfSniffLogic(const uint8_t *data, uint16_t len, uint8_t *parity, ui
 			sniffState = SNF_CARD_CMD;
 		}	// intentionally no break;
 		case SNF_CARD_CMD:{	
-			LogTrace(data, len, 0, 0, NULL, reader);
+			LogTrace(data, len, 0, 0, parity, reader);
 			timerData = GetTickCount();
 			break;
 		}
