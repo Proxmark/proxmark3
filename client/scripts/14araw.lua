@@ -106,7 +106,7 @@ function main(args)
 		dbg("doconnect")
 		-- We reuse the connect functionality from a 
 		-- common library
-		info, err = lib14a.read1443a(true, no_rats)
+		info, err = lib14a.read14443a(true, no_rats)
 
 		if err then return oops(err) end
 		print(("Connected to card, uid = %s"):format(info.uid))

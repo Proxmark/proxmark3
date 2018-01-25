@@ -170,7 +170,7 @@ local function main( args)
 
 	print(desc);
 
-	result, err = reader.read1443a(false, true)
+	result, err = reader.read14443a(false, true)
 	if not result then
 		print(err)
 		return

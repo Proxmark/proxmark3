@@ -56,7 +56,7 @@ end
 -- @return if unsuccessfull : nil, error
 function wait_for_mifare()
 	while not core.ukbhit() do
-		res, err = reader.read1443a(false, true)
+		res, err = reader.read14443a(false, true)
 		if res then return res end
 		-- err means that there was no response from card
 	end
