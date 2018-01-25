@@ -85,7 +85,7 @@ local function displayresults(results)
 	for sector,_ in pairs(results) do
 		blockNo, keyA, keyB = unpack(_)
 
-		print(("| %3d  | %3d |%s|%s|"):format(sector, blockNo, keyA, keyB ))
+		print(("| %3d  | %3d |%12s|%12s|"):format(sector, blockNo, keyA, keyB))
 	end
 	print("|--------------------------------------|")
 
