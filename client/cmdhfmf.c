@@ -1907,7 +1907,7 @@ int CmdHF14AMfECFill(const char *Cmd)
 		default:   numSectors = 16;
 	}
 
-	printf("--params: numSectors: %d, keyType:%d", numSectors, keyType);
+	printf("--params: numSectors: %d, keyType:%d\n", numSectors, keyType);
 	UsbCommand c = {CMD_MIFARE_EML_CARDLOAD, {numSectors, keyType, 0}};
 	SendCommand(&c);
 	return 0;
