@@ -14,49 +14,15 @@ local cmds = require('commands')
 local keys = require('mf_default_keys')
 -- Ability to read what card is there
 local reader = require('read14a')
+-- Asks the user for input
+local utils = require('utils')
 
 
-local desc = 
-("This script implements check keys. It utilises a large list of default keys (currently %d keys).\
+local desc = ("This script implements check keys. \
+It utilises a large list of default keys (currently %d keys).\
 If you want to add more, just put them inside mf_default_keys.lua. "):format(#keys)
 
 local TIMEOUT = 10000 -- 10 seconds
-	
---[[This may be moved to a separate library at some point]]
-local utils = 
-{
-	--- 
-	-- Asks the user for Yes or No
-	confirm = function(message, ...)
-		local answer
-		message = message .. " [y]/[n] ?"
-		repeat
-			io.write(message)
-			io.flush()
-			answer=io.read()
-			if answer == 'Y' or answer == "y" then
-				return true
-			elseif answer == 'N' or answer == 'n' then 
-				return false
-			end
-		until false
-	end,
-	---
-	-- Asks the user for input
-	input = function (message , default)
-		local answer
-		if default ~= nil then
-			message = message .. " (default: ".. default.. " )"
-		end
-		message = message .." \n > "
-		io.write(message)
-		io.flush()
-		answer=io.read()
-		if answer == '' then answer = default end
-
-		return answer
-	end,
-}
 
 
 local function checkCommand(command)
