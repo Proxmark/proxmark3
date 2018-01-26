@@ -683,9 +683,9 @@ int CmdHF14AMfNested(const char *Cmd)
 			if (transferToEml) {
 				uint8_t sectortrailer;
 				if (trgBlockNo < 32*4) { 	// 4 block sector
-					sectortrailer = (trgBlockNo & ~0x03) + 3;
+					sectortrailer = trgBlockNo | 0x03;
 				} else {					// 16 block sector
-					sectortrailer = (trgBlockNo & ~0x0f) + 15;
+					sectortrailer = trgBlockNo | 0x0f;
 				}
 				mfEmlGetMem(keyBlock, sectortrailer, 1);
 
