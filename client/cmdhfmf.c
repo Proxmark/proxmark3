@@ -1685,10 +1685,7 @@ int CmdHF14AMfESet(const char *Cmd)
 	}
 
 	//  1 - blocks count
-	UsbCommand c = {CMD_MIFARE_EML_MEMSET, {blockNo, 1, 0}};
-	memcpy(c.d.asBytes, memBlock, 16);
-	SendCommand(&c);
-	return 0;
+	return mfEmlSetMem(memBlock, blockNo, 1);
 }
 
 
