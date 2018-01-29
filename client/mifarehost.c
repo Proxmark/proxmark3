@@ -20,6 +20,7 @@
 #include "usb_cmd.h"
 #include "cmdmain.h"
 #include "ui.h"
+#include "parity.h"
 #include "util.h"
 #include "iso14443crc.h"
 
@@ -714,7 +715,9 @@ int mfTraceDecode(uint8_t *data_src, int len, bool wantSaveToEmlFile) {
 	memcpy(data, data_src, len);
 	if ((traceCrypto1) && ((traceState == TRACE_IDLE) || (traceState > TRACE_AUTH_OK))) {
 		mf_crypto1_decrypt(traceCrypto1, data, len, 0);
-		PrintAndLog("dec> %s", sprint_hex(data, len));
+		uint8_t parity[16];
+		oddparitybuf(data, len, parity);
+		PrintAndLog("dec> %s [%s]", sprint_hex(data, len), printBitsPar(parity, len));
 		AddLogHex(logHexFileName, "dec> ", data, len);
 	}
 

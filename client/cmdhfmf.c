@@ -2599,7 +2599,6 @@ int CmdHF14AMfSniff(const char *Cmd){
 					} else {
 						oddparitybuf(bufPtr, len, parity);
 						PrintAndLog("%s(%d):%s [%s] c[%s]", isTag ? "TAG":"RDR", num, sprint_hex(bufPtr, len), printBitsPar(bufPtr + len, len), printBitsPar(parity, len));
-						PrintAndLog("p:%s %s", sprint_hex(bufPtr + len, parlen), sprint_hex_inrow(parity, parlen));
 						if (wantLogToFile)
 							AddLogHex(logHexFileName, isTag ? "TAG: ":"RDR: ", bufPtr, len);
 						if (wantDecrypt)
