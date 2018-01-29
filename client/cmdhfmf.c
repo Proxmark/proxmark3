@@ -2598,7 +2598,13 @@ int CmdHF14AMfSniff(const char *Cmd){
 							mfTraceInit(uid, atqa, sak, wantSaveToEmlFile);
 					} else {
 						oddparitybuf(bufPtr, len, parity);
-						PrintAndLog("%s(%d):%s [%s] c[%s]", isTag ? "TAG":"RDR", num, sprint_hex(bufPtr, len), printBitsPar(bufPtr + len, len), printBitsPar(parity, len));
+						PrintAndLog("%s(%d):%s [%s] c[%s]%c", 
+							isTag ? "TAG":"RDR", 
+							num, 
+							sprint_hex(bufPtr, len), 
+							printBitsPar(bufPtr + len, len), 
+							printBitsPar(parity, len),
+							memcmp(bufPtr + len, parity, len / 8 + 1) ? '!' : ' ');
 						if (wantLogToFile)
 							AddLogHex(logHexFileName, isTag ? "TAG: ":"RDR: ", bufPtr, len);
 						if (wantDecrypt)
