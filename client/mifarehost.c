@@ -295,7 +295,13 @@ typedef
 
 
 // wrapper function for multi-threaded lfsr_recovery32
-void* nested_worker_thread(void *arg)
+void
+#ifdef __has_attribute
+#if __has_attribute(force_align_arg_pointer)
+__attribute__((force_align_arg_pointer)) 
+#endif
+#endif
+*nested_worker_thread(void *arg)
 {
 	struct Crypto1State *p1;
 	StateList_t *statelist = arg;
@@ -308,6 +314,7 @@ void* nested_worker_thread(void *arg)
 
 	return statelist->head.slhead;
 }
+
 
 int mfnested(uint8_t blockNo, uint8_t keyType, uint8_t *key, uint8_t trgBlockNo, uint8_t trgKeyType, uint8_t *resultKey, bool calibrate)
 {

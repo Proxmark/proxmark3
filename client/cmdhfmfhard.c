@@ -1158,7 +1158,13 @@ static bool timeout(void)
 }
 
 
-static void *check_for_BitFlipProperties_thread(void *args)
+static void 
+#ifdef __has_attribute
+#if __has_attribute(force_align_arg_pointer)
+__attribute__((force_align_arg_pointer)) 
+#endif
+#endif
+*check_for_BitFlipProperties_thread(void *args)
 {
 	uint8_t first_byte = ((uint8_t *)args)[0];
 	uint8_t last_byte = ((uint8_t *)args)[1];
@@ -1906,7 +1912,13 @@ static void init_book_of_work(void)
 }
 
 
-static void *generate_candidates_worker_thread(void *args)
+static void 
+#ifdef __has_attribute
+#if __has_attribute(force_align_arg_pointer)
+__attribute__((force_align_arg_pointer)) 
+#endif
+#endif
+*generate_candidates_worker_thread(void *args)
 {
 	uint16_t *sum_args = (uint16_t *)args;
 	uint16_t sum_a0 = sums[sum_args[0]];
