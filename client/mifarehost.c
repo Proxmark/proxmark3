@@ -579,13 +579,15 @@ uint64_t ui64Key;
 uint32_t ks2;
 uint32_t ks3;
 
-uint32_t uid;     // serial number
-uint32_t nt;      // tag challenge
-uint32_t nt_enc;  // encrypted tag challenge
-uint8_t nt_enc_par;
-uint32_t nr_enc;  // encrypted reader challenge
-uint32_t ar_enc;  // encrypted reader response
-uint32_t at_enc;  // encrypted tag response
+uint32_t uid;       // serial number
+uint32_t nt;        // tag challenge
+uint32_t nt_enc;    // encrypted tag challenge
+uint8_t nt_enc_par; // encrypted tag challenge parity
+uint32_t nr_enc;    // encrypted reader challenge
+uint32_t ar_enc;    // encrypted reader response
+uint8_t ar_enc_par; // encrypted reader response parity
+uint32_t at_enc;    // encrypted tag response
+uint8_t at_enc_par; // encrypted tag response parity
 
 int isTraceCardEmpty(void) {
 	return ((traceCard[0] == 0) && (traceCard[1] == 0) && (traceCard[2] == 0) && (traceCard[3] == 0));
@@ -827,6 +829,7 @@ int mfTraceDecode(uint8_t *data_src, int len, uint8_t parity, bool wantSaveToEml
 
 			nr_enc = bytes_to_num(data, 4);
 			ar_enc = bytes_to_num(data + 4, 4);
+			ar_enc_par = parity;
 			return 0;
 		} else {
 			traceState = TRACE_ERROR;
@@ -839,6 +842,7 @@ int mfTraceDecode(uint8_t *data_src, int len, uint8_t parity, bool wantSaveToEml
 			traceState = TRACE_IDLE;
 
 			at_enc = bytes_to_num(data, 4);
+			at_enc_par = parity;
 			if (!traceCrypto1) {
 
 				//  decode key here)
