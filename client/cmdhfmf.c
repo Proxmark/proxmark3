@@ -2608,7 +2608,7 @@ int CmdHF14AMfSniff(const char *Cmd){
 						if (wantLogToFile)
 							AddLogHex(logHexFileName, isTag ? "TAG: ":"RDR: ", bufPtr, len);
 						if (wantDecrypt)
-							mfTraceDecode(bufPtr, len, wantSaveToEmlFile);
+							mfTraceDecode(bufPtr, len, bufPtr[len], wantSaveToEmlFile);
 						num++;
 					}
 					bufPtr += len;

@@ -582,6 +582,7 @@ uint32_t ks3;
 uint32_t uid;     // serial number
 uint32_t nt;      // tag challenge
 uint32_t nt_enc;  // encrypted tag challenge
+uint8_t nt_enc_par;
 uint32_t nr_enc;  // encrypted reader challenge
 uint32_t ar_enc;  // encrypted reader response
 uint32_t at_enc;  // encrypted tag response
@@ -704,7 +705,7 @@ void mf_crypto1_decrypt(struct Crypto1State *pcs, uint8_t *data, int len, bool i
 }
 
 
-int mfTraceDecode(uint8_t *data_src, int len, bool wantSaveToEmlFile) {
+int mfTraceDecode(uint8_t *data_src, int len, uint8_t parity, bool wantSaveToEmlFile) {
 	uint8_t data[64];
 
 	if (traceState == TRACE_ERROR) return 1;
@@ -811,6 +812,7 @@ int mfTraceDecode(uint8_t *data_src, int len, bool wantSaveToEmlFile) {
 				nt = bytes_to_num(data, 4);
 			} else {
 				nt_enc = bytes_to_num(data, 4);
+				nt_enc_par = parity;
 			}
 			return 0;
 		} else {
@@ -865,8 +867,14 @@ int mfTraceDecode(uint8_t *data_src, int len, bool wantSaveToEmlFile) {
 					uint32_t nr1 = crypto1_word(pcs, nr_enc, 1) ^ nr_enc;
 					uint32_t ar1 = crypto1_word(pcs, 0, 0) ^ ar_enc;
 					uint32_t at1 = crypto1_word(pcs, 0, 0) ^ at_enc;
-					printf("key> nr1: %08x ar1: %08x at1: %08x\n", nr1, ar1, at1);
+					printf("key> nr1: %08x ar1: %08x at1: %08x nt_parity: %s\n", nr1, ar1, at1, printBitsPar(&nt_enc_par, 4));
 
+					bool check = false;
+					check = oddparity8(nt1 >> 8 & 0xff) ^ (nt1 & 0x01) ^ ((nt_enc_par >> 1) & 0x01) ^ (nt_enc & 0x01);
+					if (check)
+						printf("check1 error\n");
+					
+					
 
 					ks2 = ar_enc ^ prng_successor(nt1, 64);
 					ks3 = at_enc ^ prng_successor(nt1, 96);

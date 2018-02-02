@@ -50,7 +50,7 @@ extern int mfCSetBlock(uint8_t blockNo, uint8_t *data, uint8_t *uid, bool wantWi
 extern int mfCGetBlock(uint8_t blockNo, uint8_t *data, uint8_t params);
 
 extern int mfTraceInit(uint8_t *tuid, uint8_t *atqa, uint8_t sak, bool wantSaveToEmlFile);
-extern int mfTraceDecode(uint8_t *data_src, int len, bool wantSaveToEmlFile);
+extern int mfTraceDecode(uint8_t *data_src, int len, uint8_t parity, bool wantSaveToEmlFile);
 
 extern int isTraceCardEmpty(void);
 extern int isBlockEmpty(int blockN);
