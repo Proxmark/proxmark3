@@ -870,7 +870,7 @@ int mfTraceDecode(uint8_t *data_src, int len, uint8_t parity, bool wantSaveToEml
 					printf("key> nr1: %08x ar1: %08x at1: %08x nt_parity: %s\n", nr1, ar1, at1, printBitsPar(&nt_enc_par, 4));
 
 					bool check = false;
-					check = oddparity8(nt1 >> 8 & 0xff) ^ (nt1 & 0x01) ^ ((nt_enc_par >> 6) & 0x01) ^ (nt_enc & 0x01);
+					check = oddparity8(nt1 >> 8 & 0xff) ^ (nt1 & 0x01) ^ ((nt_enc_par >> 5) & 0x01) ^ (nt_enc & 0x01);
 					if (check)
 						printf("check1 error\n");
 					
