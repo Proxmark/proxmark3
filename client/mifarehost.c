@@ -575,6 +575,7 @@ struct Crypto1State *traceCrypto1 = NULL;
 
 struct Crypto1State *revstate;
 uint64_t lfsr;
+uint64_t ui64Key;
 uint32_t ks2;
 uint32_t ks3;
 
@@ -848,18 +849,27 @@ int mfTraceDecode(uint8_t *data_src, int len, bool wantSaveToEmlFile) {
 				lfsr_rollback_word(revstate, uid ^ nt, 0);
 
 				crypto1_get_lfsr(revstate, &lfsr);
+				ui64Key = lfsr;
 				printf("key> %x%x Prng:%s\n", 
 					(unsigned int)((lfsr & 0xFFFFFFFF00000000) >> 32), (unsigned int)(lfsr & 0xFFFFFFFF), 
 					validate_prng_nonce(nt) ? "WEAK": "HARDEND");
 				AddLogUint64(logHexFileName, "key> ", lfsr);
 			} else {
 				if (validate_prng_nonce(nt)) {
-					
+					struct Crypto1State *pcs;
+					pcs = crypto1_create(ui64Key);
+					uint32_t nt1 = crypto1_word(pcs, nt_enc ^ uid, 1) ^ nt_enc;
+					uint32_t ar = prng_successor(nt1, 64);
+					uint32_t at = prng_successor(nt1, 96);
+					printf("key> nested auth uid: %08x nt: %08x ar: %08x at: %08x\n", uid, nt1, ar, at);
+					uint32_t nr1 = crypto1_word(pcs, nr_enc, 1) ^ nr_enc;
+					uint32_t ar1 = crypto1_word(pcs, 0, 0) ^ ar_enc;
+					uint32_t at1 = crypto1_word(pcs, 0, 0) ^ at_enc;
+					printf("key> nr1: %08x ar1: %08x at1: %08x\n", nr1, ar1, at1);
 
 
-					printf("key> nested... TBD\n");
-					crypto1_destroy(traceCrypto1);
-					traceState = TRACE_ERROR;
+					ks2 = ar_enc ^ prng_successor(nt1, 64);
+					ks3 = at_enc ^ prng_successor(nt1, 96);
 				} else {				
 					printf("key> hardnested not implemented!\n");
 				
