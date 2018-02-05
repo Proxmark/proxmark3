@@ -706,6 +706,34 @@ void mf_crypto1_decrypt(struct Crypto1State *pcs, uint8_t *data, int len, bool i
 	return;
 }
 
+bool NTParityCheck(uint32_t ntx) {
+	if (
+		(oddparity8(ntx >> 8 & 0xff) ^ (ntx & 0x01) ^ ((nt_enc_par >> 5) & 0x01) ^ (nt_enc & 0x01)) ||
+		(oddparity8(ntx >> 16 & 0xff) ^ (ntx >> 8 & 0x01) ^ ((nt_enc_par >> 6) & 0x01) ^ (nt_enc >> 8 & 0x01)) ||
+		(oddparity8(ntx >> 24 & 0xff) ^ (ntx >> 16 & 0x01) ^ ((nt_enc_par >> 7) & 0x01) ^ (nt_enc >> 16 & 0x01))
+		)
+		return false;
+	
+	uint32_t ar = prng_successor(ntx, 64);
+	if (
+		(oddparity8(ar >> 8 & 0xff) ^ (ar & 0x01) ^ ((ar_enc_par >> 5) & 0x01) ^ (ar_enc & 0x01)) ||
+		(oddparity8(ar >> 16 & 0xff) ^ (ar >> 8 & 0x01) ^ ((ar_enc_par >> 6) & 0x01) ^ (ar_enc >> 8 & 0x01)) ||
+		(oddparity8(ar >> 24 & 0xff) ^ (ar >> 16 & 0x01) ^ ((ar_enc_par >> 7) & 0x01) ^ (ar_enc >> 16 & 0x01))
+		)
+		return false;
+
+	uint32_t at = prng_successor(ntx, 96);
+	if (
+		(oddparity8(ar & 0xff) ^ (at >> 24 & 0x01) ^ ((ar_enc_par >> 4) & 0x01) ^ (at_enc >> 24 & 0x01)) ||
+		(oddparity8(at >> 8 & 0xff) ^ (at & 0x01) ^ ((at_enc_par >> 5) & 0x01) ^ (at_enc & 0x01)) ||
+		(oddparity8(at >> 16 & 0xff) ^ (at >> 8 & 0x01) ^ ((at_enc_par >> 6) & 0x01) ^ (at_enc >> 8 & 0x01)) ||
+		(oddparity8(at >> 24 & 0xff) ^ (at >> 16 & 0x01) ^ ((at_enc_par >> 7) & 0x01) ^ (at_enc >> 16 & 0x01))
+		)
+		return false;
+		
+	return true;
+}
+
 
 int mfTraceDecode(uint8_t *data_src, int len, uint8_t parity, bool wantSaveToEmlFile) {
 	uint8_t data[64];
@@ -867,37 +895,42 @@ int mfTraceDecode(uint8_t *data_src, int len, uint8_t parity, bool wantSaveToEml
 					uint32_t nt1 = crypto1_word(pcs, nt_enc ^ uid, 1) ^ nt_enc;
 					uint32_t ar = prng_successor(nt1, 64);
 					uint32_t at = prng_successor(nt1, 96);
-					printf("key> nested auth uid: %08x nt: %08x ar: %08x at: %08x\n", uid, nt1, ar, at);
+					printf("key> nested auth uid: %08x nt: %08x nt_parity: %s ar: %08x at: %08x\n", uid, nt1, printBitsPar(&nt_enc_par, 4), ar, at);
 					uint32_t nr1 = crypto1_word(pcs, nr_enc, 1) ^ nr_enc;
 					uint32_t ar1 = crypto1_word(pcs, 0, 0) ^ ar_enc;
 					uint32_t at1 = crypto1_word(pcs, 0, 0) ^ at_enc;
-					printf("key> nr1: %08x ar1: %08x at1: %08x nt_parity: %s\n", nr1, ar1, at1, printBitsPar(&nt_enc_par, 4));
+					printf("key> the same key test. nr1: %08x ar1: %08x at1: %08x \n", nr1, ar1, at1);
 
-					if (
-						(oddparity8(nt1 >> 8 & 0xff) ^ (nt1 & 0x01) ^ ((nt_enc_par >> 5) & 0x01) ^ (nt_enc & 0x01)) ||
-						(oddparity8(nt1 >> 16 & 0xff) ^ (nt1 >> 8 & 0x01) ^ ((nt_enc_par >> 6) & 0x01) ^ (nt_enc >> 8 & 0x01)) ||
-						(oddparity8(nt1 >> 24 & 0xff) ^ (nt1 >> 16 & 0x01) ^ ((nt_enc_par >> 7) & 0x01) ^ (nt_enc >> 16 & 0x01))
-						)
-						printf("check nt error\n");
+					if (NTParityCheck(nt1))
+						printf("key> the same key test OK. key=%x%x\n", (unsigned int)((ui64Key & 0xFFFFFFFF00000000) >> 32), (unsigned int)(ui64Key & 0xFFFFFFFF));
+					else
+						printf("key> the same key test. check nt parity error.\n");
 					
-					if (
-						(oddparity8(ar >> 8 & 0xff) ^ (ar & 0x01) ^ ((ar_enc_par >> 5) & 0x01) ^ (ar_enc & 0x01)) ||
-						(oddparity8(ar >> 16 & 0xff) ^ (ar >> 8 & 0x01) ^ ((ar_enc_par >> 6) & 0x01) ^ (ar_enc >> 8 & 0x01)) ||
-						(oddparity8(ar >> 24 & 0xff) ^ (ar >> 16 & 0x01) ^ ((ar_enc_par >> 7) & 0x01) ^ (ar_enc >> 16 & 0x01))
-						)
-						printf("check ar error\n");
-
-					if (
-						(oddparity8(ar & 0xff) ^ (at >> 24 & 0x01) ^ ((ar_enc_par >> 4) & 0x01) ^ (at_enc >> 24 & 0x01)) ||
-						(oddparity8(at >> 8 & 0xff) ^ (at & 0x01) ^ ((at_enc_par >> 5) & 0x01) ^ (at_enc & 0x01)) ||
-						(oddparity8(at >> 16 & 0xff) ^ (at >> 8 & 0x01) ^ ((at_enc_par >> 6) & 0x01) ^ (at_enc >> 8 & 0x01)) ||
-						(oddparity8(at >> 24 & 0xff) ^ (at >> 16 & 0x01) ^ ((at_enc_par >> 7) & 0x01) ^ (at_enc >> 16 & 0x01))
-						)
-						printf("check at error\n");
+					uint32_t ntx = prng_successor(nt, 90);
+					for (int i = 0; i < 16383; i++) {
+						ntx = prng_successor(ntx, 1);
+						if (NTParityCheck(ntx)){
+							printf("key> nt candidate=%08x nonce distance=%d\n", ntx, nonce_distance(nt, ntx));
+							break;
+						}						
+					}
 					
+					nt = ntx;
+					ks2 = ar_enc ^ prng_successor(ntx, 64);
+					ks3 = at_enc ^ prng_successor(ntx, 96);
 
-					ks2 = ar_enc ^ prng_successor(nt1, 64);
-					ks3 = at_enc ^ prng_successor(nt1, 96);
+					// decode key
+					revstate = lfsr_recovery64(ks2, ks3);
+					lfsr_rollback_word(revstate, 0, 0);
+					lfsr_rollback_word(revstate, 0, 0);
+					lfsr_rollback_word(revstate, nr_enc, 1);
+					lfsr_rollback_word(revstate, uid ^ nt, 0);
+
+					crypto1_get_lfsr(revstate, &lfsr);
+					ui64Key = lfsr;
+					printf("key> %x%x\n", 
+						(unsigned int)((lfsr & 0xFFFFFFFF00000000) >> 32), (unsigned int)(lfsr & 0xFFFFFFFF));
+					AddLogUint64(logHexFileName, "key> ", lfsr);
 				} else {				
 					printf("key> hardnested not implemented!\n");
 				
