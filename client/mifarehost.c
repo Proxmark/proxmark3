@@ -829,7 +829,7 @@ int mfTraceDecode(uint8_t *data_src, int len, uint8_t parity, bool wantSaveToEml
 
 			nr_enc = bytes_to_num(data, 4);
 			ar_enc = bytes_to_num(data + 4, 4);
-			ar_enc_par = parity;
+			ar_enc_par = parity << 4;
 			return 0;
 		} else {
 			traceState = TRACE_ERROR;
@@ -873,14 +873,26 @@ int mfTraceDecode(uint8_t *data_src, int len, uint8_t parity, bool wantSaveToEml
 					uint32_t at1 = crypto1_word(pcs, 0, 0) ^ at_enc;
 					printf("key> nr1: %08x ar1: %08x at1: %08x nt_parity: %s\n", nr1, ar1, at1, printBitsPar(&nt_enc_par, 4));
 
-					bool check = false;
-					check = oddparity8(nt1 >> 8 & 0xff) ^ (nt1 & 0x01) ^ ((nt_enc_par >> 5) & 0x01) ^ (nt_enc & 0x01);
-					if (check) printf("check1 error\n");
-					check = oddparity8(nt1 >> 16 & 0xff) ^ (nt1 >> 8 & 0x01) ^ ((nt_enc_par >> 6) & 0x01) ^ (nt_enc >> 8 & 0x01);
-					if (check) printf("check2 error\n");
-					check = oddparity8(nt1 >> 24 & 0xff) ^ (nt1 >> 16 & 0x01) ^ ((nt_enc_par >> 7) & 0x01) ^ (nt_enc >> 16 & 0x01);
-					if (check) printf("check3 error\n");
+					if (
+						(oddparity8(nt1 >> 8 & 0xff) ^ (nt1 & 0x01) ^ ((nt_enc_par >> 5) & 0x01) ^ (nt_enc & 0x01)) ||
+						(oddparity8(nt1 >> 16 & 0xff) ^ (nt1 >> 8 & 0x01) ^ ((nt_enc_par >> 6) & 0x01) ^ (nt_enc >> 8 & 0x01)) ||
+						(oddparity8(nt1 >> 24 & 0xff) ^ (nt1 >> 16 & 0x01) ^ ((nt_enc_par >> 7) & 0x01) ^ (nt_enc >> 16 & 0x01))
+						)
+						printf("check nt error\n");
 					
+					if (
+						(oddparity8(ar >> 8 & 0xff) ^ (ar & 0x01) ^ ((ar_enc_par >> 5) & 0x01) ^ (ar_enc & 0x01)) ||
+						(oddparity8(ar >> 16 & 0xff) ^ (ar >> 8 & 0x01) ^ ((ar_enc_par >> 6) & 0x01) ^ (ar_enc >> 8 & 0x01)) ||
+						(oddparity8(ar >> 24 & 0xff) ^ (ar >> 16 & 0x01) ^ ((ar_enc_par >> 7) & 0x01) ^ (ar_enc >> 16 & 0x01))
+						)
+						printf("check ar error\n");
+
+					if (
+						(oddparity8(at >> 8 & 0xff) ^ (at & 0x01) ^ ((at_enc_par >> 5) & 0x01) ^ (at_enc & 0x01)) ||
+						(oddparity8(at >> 16 & 0xff) ^ (at >> 8 & 0x01) ^ ((at_enc_par >> 6) & 0x01) ^ (at_enc >> 8 & 0x01)) ||
+						(oddparity8(at >> 24 & 0xff) ^ (at >> 16 & 0x01) ^ ((at_enc_par >> 7) & 0x01) ^ (at_enc >> 16 & 0x01))
+						)
+						printf("check at error\n");
 					
 
 					ks2 = ar_enc ^ prng_successor(nt1, 64);
