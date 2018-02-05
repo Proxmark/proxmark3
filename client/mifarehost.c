@@ -888,6 +888,7 @@ int mfTraceDecode(uint8_t *data_src, int len, uint8_t parity, bool wantSaveToEml
 						printf("check ar error\n");
 
 					if (
+						(oddparity8(ar & 0xff) ^ (at >> 24 & 0x01) ^ ((ar_enc_par >> 4) & 0x01) ^ (at_enc >> 24 & 0x01)) ||
 						(oddparity8(at >> 8 & 0xff) ^ (at & 0x01) ^ ((at_enc_par >> 5) & 0x01) ^ (at_enc & 0x01)) ||
 						(oddparity8(at >> 16 & 0xff) ^ (at >> 8 & 0x01) ^ ((at_enc_par >> 6) & 0x01) ^ (at_enc >> 8 & 0x01)) ||
 						(oddparity8(at >> 24 & 0xff) ^ (at >> 16 & 0x01) ^ ((at_enc_par >> 7) & 0x01) ^ (at_enc >> 16 & 0x01))
