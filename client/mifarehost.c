@@ -178,12 +178,14 @@ int mfDarkside(uint64_t *key)
 			continue;
 		}
 
-		qsort(keylist, keycount, sizeof(*keylist), compare_uint64);
-		keycount = intersection(last_keylist, keylist);
-		if (keycount == 0) {
-			free(last_keylist);
-			last_keylist = keylist;
-			continue;
+		if (par_list == 0) {
+			qsort(keylist, keycount, sizeof(*keylist), compare_uint64);
+			keycount = intersection(last_keylist, keylist);
+			if (keycount == 0) {
+				free(last_keylist);
+				last_keylist = keylist;
+				continue;
+			}
 		}
 
 		if (keycount > 1) {
@@ -198,10 +200,10 @@ int mfDarkside(uint64_t *key)
 		for (int i = 0; i < keycount; i += max_keys) {
 			int size = keycount - i > max_keys ? max_keys : keycount - i;
 			for (int j = 0; j < size; j++) {
-				if (last_keylist == NULL) {
-					num_to_bytes(keylist[i*max_keys + j], 6, keyBlock);
-				} else {
+				if (par_list == 0) {
 					num_to_bytes(last_keylist[i*max_keys + j], 6, keyBlock);
+				} else {
+					num_to_bytes(keylist[i*max_keys + j], 6, keyBlock);
 				}
 			}
 			if (!mfCheckKeys(0, 0, false, size, keyBlock, key)) {
