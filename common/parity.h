@@ -13,7 +13,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
-#include <string.h>
+#include "string.h"
 
 extern const uint8_t OddByteParity[256];
 
