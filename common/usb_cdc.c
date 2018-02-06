@@ -156,6 +156,28 @@ static const char cfgDescriptor[] = {
 	0x00,
 	0x00    // bInterval
 };
+const char BOSDescriptor[] = {
+	// BOS descriptor header
+	0x05, 0x0F, 0x39, 0x00, 0x02,
+
+	// Microsoft OS 2.0 Platform Capability Descriptor
+	0x1C,  // Descriptor size (28 bytes)
+	0x10,  // Descriptor type (Device Capability)
+	0x05,  // Capability type (Platform)
+	0x00,  // Reserved
+
+	// MS OS 2.0 Platform Capability ID (D8DD60DF-4589-4CC7-9CD2-659D9E648A9F)
+	0xDF, 0x60, 0xDD, 0xD8,
+	0x89, 0x45,
+	0xC7, 0x4C,
+	0x9C, 0xD2,
+	0x65, 0x9D, 0x9E, 0x64, 0x8A, 0x9F,
+
+	0x00, 0x00, 0x03, 0x06,    // Windows version (8.1) (0x06030000)
+	0x1e, 0x00,
+	252,	// Vendor-assigned bMS_VendorCode
+	0x00	// Doesn’t support alternate enumeration
+};
 
 static const char StrDescLanguageCodes[] = {
   4,			// Length
@@ -550,6 +572,10 @@ void AT91F_CDC_Enumerate() {
 			AT91F_USB_SendData(pUdp, devDescriptor, MIN(sizeof(devDescriptor), wLength));
 		else if (wValue == 0x200)  // Return Configuration Descriptor
 			AT91F_USB_SendData(pUdp, cfgDescriptor, MIN(sizeof(cfgDescriptor), wLength));
+		else if ((wValue & 0xF00) == 0xF00)  // Return BOS Descriptor
+			AT91F_USB_SendData(pUdp, BOSDescriptor, MIN(sizeof(BOSDescriptor), wLength));
+		else if ((wValue & 0x300) == 0x300)  // Return Manufacturer Descriptor - this is needed by Android
+			AT91F_USB_SendData(pUdp, StrDescManufacturer, MIN(sizeof(StrDescManufacturer), wLength));
 		else if ((wValue & 0xF00) == 0x300) { // Return String Descriptor
 			const char *strDescriptor = getStringDescriptor(wValue & 0xff);
 			if (strDescriptor != NULL) {
