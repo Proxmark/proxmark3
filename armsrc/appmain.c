@@ -1408,6 +1408,12 @@ void  __attribute__((noreturn)) AppMain(void)
 	// Reset SSC
 	AT91C_BASE_SSC->SSC_CR = AT91C_SSC_SWRST;
 
+	// set pins LOW
+	LOW(GPIO_MUXSEL_HIPKD);
+	LOW(GPIO_MUXSEL_LOPKD);
+	LOW(GPIO_MUXSEL_HIRAW);
+	LOW(GPIO_MUXSEL_LORAW);
+
 	// Load the FPGA image, which we have stored in our flash.
 	// (the HF version by default)
 	FpgaDownloadAndGo(FPGA_BITSTREAM_HF);
