@@ -183,7 +183,7 @@ static const char StrDescManufacturer[] = {
 };
 
 static const char StrDescProduct[] = {
-  8,			// Length
+  4,			// Length
   0x03,			// Type is string
   'P', 0x00,
   'M', 0x00,
@@ -550,16 +550,15 @@ void AT91F_CDC_Enumerate() {
 			AT91F_USB_SendData(pUdp, devDescriptor, MIN(sizeof(devDescriptor), wLength));
 		else if (wValue == 0x200)  // Return Configuration Descriptor
 			AT91F_USB_SendData(pUdp, cfgDescriptor, MIN(sizeof(cfgDescriptor), wLength));
-		else if ((wValue & 0x300) == 0x300)  // Return Manufacturer Descriptor - this is needed by Android
-			AT91F_USB_SendData(pUdp, StrDescManufacturer, MIN(sizeof(StrDescManufacturer), wLength));
 		else if ((wValue & 0xF00) == 0x300) { // Return String Descriptor
 			const char *strDescriptor = getStringDescriptor(wValue & 0xff);
 			if (strDescriptor != NULL) {
 				AT91F_USB_SendData(pUdp, strDescriptor, MIN(strDescriptor[0], wLength));
 			} else {
-				AT91F_USB_SendStall(pUdp);
+				AT91F_USB_SendData(pUdp, StrDescManufacturer, MIN(sizeof(StrDescManufacturer), wLength));
 			}
 		}
+		
 		else
 			AT91F_USB_SendStall(pUdp);
 		break;
