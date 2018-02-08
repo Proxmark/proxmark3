@@ -183,12 +183,17 @@ static const char StrDescManufacturer[] = {
 };
 
 static const char StrDescProduct[] = {
-  9,			// Length
+  20,			// Length
   0x03,			// Type is string
-  'P', 0x00,
-  'M', 0x00,
-  '3', 0x00,
-   0x00
+  'p', 0x00,
+  'r', 0x00,
+  'o', 0x00,
+  'x', 0x00,
+  'm', 0x00,
+  'a', 0x00,
+  'r', 0x00,
+  'k', 0x00,
+  '3', 0x00
 };
 
 const char* getStringDescriptor(uint8_t idx)
