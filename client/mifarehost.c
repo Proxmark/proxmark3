@@ -883,10 +883,13 @@ int mfTraceDecode(uint8_t *data_src, int len, uint8_t parity, bool wantSaveToEml
 				lfsr_rollback_word(revstate, uid ^ nt, 0);
 
 				crypto1_get_lfsr(revstate, &lfsr);
+				crypto1_destroy(revstate);
 				ui64Key = lfsr;
-				printf("key> %x%x Prng:%s\n", 
+				printf("key> probable key:%x%x Prng:%s ks2:%08x ks3:%08x\n", 
 					(unsigned int)((lfsr & 0xFFFFFFFF00000000) >> 32), (unsigned int)(lfsr & 0xFFFFFFFF), 
-					validate_prng_nonce(nt) ? "WEAK": "HARDEND");
+					validate_prng_nonce(nt) ? "WEAK": "HARDEND",
+					ks2,
+					ks3);
 				AddLogUint64(logHexFileName, "key> ", lfsr);
 			} else {
 				if (validate_prng_nonce(nt)) {
@@ -927,9 +930,12 @@ int mfTraceDecode(uint8_t *data_src, int len, uint8_t parity, bool wantSaveToEml
 					lfsr_rollback_word(revstate, uid ^ nt, 0);
 
 					crypto1_get_lfsr(revstate, &lfsr);
+					crypto1_destroy(revstate);
 					ui64Key = lfsr;
-					printf("key> %x%x\n", 
-						(unsigned int)((lfsr & 0xFFFFFFFF00000000) >> 32), (unsigned int)(lfsr & 0xFFFFFFFF));
+					printf("key> probable key:%x%x  ks2:%08x ks3:%08x\n", 
+						(unsigned int)((lfsr & 0xFFFFFFFF00000000) >> 32), (unsigned int)(lfsr & 0xFFFFFFFF),
+						ks2,
+						ks3);
 					AddLogUint64(logHexFileName, "key> ", lfsr);
 				} else {				
 					printf("key> hardnested not implemented!\n");
