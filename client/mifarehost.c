@@ -201,9 +201,9 @@ int mfDarkside(uint64_t *key)
 			int size = keycount - i > max_keys ? max_keys : keycount - i;
 			for (int j = 0; j < size; j++) {
 				if (par_list == 0) {
-					num_to_bytes(last_keylist[i*max_keys + j], 6, keyBlock);
+					num_to_bytes(last_keylist[i*max_keys + j], 6, keyBlock+(j*6));
 				} else {
-					num_to_bytes(keylist[i*max_keys + j], 6, keyBlock);
+					num_to_bytes(keylist[i*max_keys + j], 6, keyBlock+(j*6));
 				}
 			}
 			if (!mfCheckKeys(0, 0, false, size, keyBlock, key)) {
