@@ -73,13 +73,12 @@ static uint32_t intersection(uint64_t *list1, uint64_t *list2)
 
 
 // Darkside attack (hf mf mifare)
-static uint32_t nonce2key(uint32_t uid, uint32_t nt, uint32_t nr, uint64_t par_info, uint64_t ks_info, uint64_t **keys) {
+static uint32_t nonce2key(uint32_t uid, uint32_t nt, uint32_t nr, uint32_t ar, uint64_t par_info, uint64_t ks_info, uint64_t **keys) {
 	struct Crypto1State *states;
-	uint32_t i, pos, rr; //nr_diff;
+	uint32_t i, pos;
 	uint8_t bt, ks3x[8], par[8][8];
 	uint64_t key_recovered;
-	static uint64_t *keylist;
-	rr = 0;
+	uint64_t *keylist;
 
 	// Reset the last three significant bits of the reader nonce
 	nr &= 0xffffff1f;
@@ -92,7 +91,7 @@ static uint32_t nonce2key(uint32_t uid, uint32_t nt, uint32_t nr, uint64_t par_i
 		}
 	}
 
-	states = lfsr_common_prefix(nr, rr, ks3x, par, (par_info == 0));
+	states = lfsr_common_prefix(nr, ar, ks3x, par, (par_info == 0));
 
 	if (states == NULL) {
 		*keys = NULL;
@@ -116,7 +115,7 @@ static uint32_t nonce2key(uint32_t uid, uint32_t nt, uint32_t nr, uint64_t par_i
 int mfDarkside(uint64_t *key)
 {
 	uint32_t uid = 0;
-	uint32_t nt = 0, nr = 0;
+	uint32_t nt = 0, nr = 0, ar = 0;
 	uint64_t par_list = 0, ks_list = 0;
 	uint64_t *keylist = NULL, *last_keylist = NULL;
 	uint32_t keycount = 0;
@@ -159,18 +158,18 @@ int mfDarkside(uint64_t *key)
 				nt =  (uint32_t)bytes_to_num(resp.d.asBytes +  4, 4);
 				par_list = bytes_to_num(resp.d.asBytes +  8, 8);
 				ks_list = bytes_to_num(resp.d.asBytes +  16, 8);
-				nr = bytes_to_num(resp.d.asBytes + 24, 4);
+				nr = (uint32_t)bytes_to_num(resp.d.asBytes + 24, 4);
+				ar = (uint32_t)bytes_to_num(resp.d.asBytes + 28, 4);
 				break;
 			}
 		}
 
 		if (par_list == 0 && c.arg[0] == true) {
 			PrintAndLog("Parity is all zero. Most likely this card sends NACK on every failed authentication.");
-			PrintAndLog("Attack will take a few seconds longer because we need two consecutive successful runs.");
 		}
 		c.arg[0] = false;
 
-		keycount = nonce2key(uid, nt, nr, par_list, ks_list, &keylist);
+		keycount = nonce2key(uid, nt, nr, ar, par_list, ks_list, &keylist);
 
 		if (keycount == 0) {
 			PrintAndLog("Key not found (lfsr_common_prefix list is null). Nt=%08x", nt);
