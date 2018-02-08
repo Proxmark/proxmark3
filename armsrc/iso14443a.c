@@ -2151,9 +2151,7 @@ void ReaderMifare(bool first_try)
 	uint8_t receivedAnswer[MAX_MIFARE_FRAME_SIZE];
 	uint8_t receivedAnswerPar[MAX_MIFARE_PARITY_SIZE];
 
-	if (first_try) { 
-		iso14443a_setup(FPGA_HF_ISO14443A_READER_MOD);
-	}
+	iso14443a_setup(FPGA_HF_ISO14443A_READER_MOD);
 	
 	// free eventually allocated BigBuf memory. We want all for tracing.
 	BigBuf_free();
@@ -2161,9 +2159,9 @@ void ReaderMifare(bool first_try)
 	clear_trace();
 	set_tracing(true);
 
-	byte_t nt_diff = 0;
+	uint8_t nt_diff = 0;
 	uint8_t par[1] = {0};	// maximum 8 Bytes to be sent here, 1 byte parity is therefore enough
-	static byte_t par_low = 0;
+	static uint8_t par_low = 0;
 	bool led_on = true;
 	uint8_t uid[10]  ={0};
 	uint32_t cuid;
@@ -2171,11 +2169,11 @@ void ReaderMifare(bool first_try)
 	uint32_t nt = 0;
 	uint32_t previous_nt = 0;
 	static uint32_t nt_attacked = 0;
-	byte_t par_list[8] = {0x00};
-	byte_t ks_list[8] = {0x00};
+	uint8_t par_list[8] = {0x00};
+	uint8_t ks_list[8] = {0x00};
 
 	#define PRNG_SEQUENCE_LENGTH  (1 << 16);
-	static uint32_t sync_time;
+	uint32_t sync_time = GetCountSspClk() & 0xfffffff8;
 	static int32_t sync_cycles;
 	int catch_up_cycles = 0;
 	int last_catch_up = 0;
@@ -2185,10 +2183,9 @@ void ReaderMifare(bool first_try)
 
 	if (first_try) { 
 		mf_nr_ar3 = 0;
-		sync_time = GetCountSspClk() & 0xfffffff8;
+		par[0] = par_low = 0;
 		sync_cycles = PRNG_SEQUENCE_LENGTH;							// theory: Mifare Classic's random generator repeats every 2^16 cycles (and so do the tag nonces).
 		nt_attacked = 0;
-		par[0] = 0;
 	}
 	else {
 		// we were unsuccessful on a previous call. Try another READER nonce (first 3 parity bits remain the same)
@@ -2204,6 +2201,7 @@ void ReaderMifare(bool first_try)
 
 	#define MAX_UNEXPECTED_RANDOM	4		// maximum number of unexpected (i.e. real) random numbers when trying to sync. Then give up.
 	#define MAX_SYNC_TRIES			32
+	#define SYNC_TIME_BUFFER		16		// if there is only SYNC_TIME_BUFFER left before next planned sync, wait for next PRNG cycle
 	#define NUM_DEBUG_INFOS			8		// per strategy
 	#define MAX_STRATEGY			3
 	uint16_t unexpected_random = 0;
@@ -2253,8 +2251,8 @@ void ReaderMifare(bool first_try)
 			sync_time = (sync_time & 0xfffffff8) + sync_cycles + catch_up_cycles;
 			catch_up_cycles = 0;
 
-			// if we missed the sync time already, advance to the next nonce repeat
-			while(GetCountSspClk() > sync_time) {
+			// if we missed the sync time already or are about to miss it, advance to the next nonce repeat
+			while(sync_time < GetCountSspClk() + SYNC_TIME_BUFFER) {
 				elapsed_prng_sequences++;
 				sync_time = (sync_time & 0xfffffff8) + sync_cycles;
 			}
@@ -2410,14 +2408,14 @@ void ReaderMifare(bool first_try)
 		}
 	}
 	
-	byte_t buf[28];
+	uint8_t buf[32];
 	memcpy(buf + 0,  uid, 4);
 	num_to_bytes(nt, 4, buf + 4);
 	memcpy(buf + 8,  par_list, 8);
 	memcpy(buf + 16, ks_list, 8);
-	memcpy(buf + 24, mf_nr_ar, 4);
+	memcpy(buf + 24, mf_nr_ar, 8);
 		
-	cmd_send(CMD_ACK, isOK, 0, 0, buf, 28);
+	cmd_send(CMD_ACK, isOK, 0, 0, buf, 32);
 
 	// Thats it...
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
