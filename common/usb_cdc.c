@@ -555,10 +555,9 @@ void AT91F_CDC_Enumerate() {
 			if (strDescriptor != NULL) {
 				AT91F_USB_SendData(pUdp, strDescriptor, MIN(strDescriptor[0], wLength));
 			} else {
-				AT91F_USB_SendData(pUdp, StrDescManufacturer, MIN(sizeof(StrDescManufacturer), wLength));
+				AT91F_USB_SendStall(pUdp);
 			}
 		}
-		
 		else
 			AT91F_USB_SendStall(pUdp);
 		break;
