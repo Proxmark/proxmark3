@@ -18,6 +18,7 @@
 #include "proxmark3.h"
 #include "cmdmain.h"
 #include "cmdhfmfhard.h"
+#include "parity.h"
 #include "util.h"
 #include "util_posix.h"
 #include "usb_cmd.h"
@@ -2470,6 +2471,7 @@ int CmdHF14AMfSniff(const char *Cmd){
 	//var
 	int res = 0;
 	int len = 0;
+	int parlen = 0;
 	int blockLen = 0;
 	int pckNum = 0;
 	int num = 0;
@@ -2481,6 +2483,7 @@ int CmdHF14AMfSniff(const char *Cmd){
 	uint8_t *buf = NULL;
 	uint16_t bufsize = 0;
 	uint8_t *bufPtr = NULL;
+	uint8_t parity[16];
 
 	char ctmp = param_getchar(Cmd, 0);
 	if ( ctmp == 'h' || ctmp == 'H' ) {
@@ -2572,6 +2575,7 @@ int CmdHF14AMfSniff(const char *Cmd){
 					} else {
 						isTag = false;
 					}
+					parlen = (len - 1) / 8 + 1;
 					bufPtr += 2;
 					if ((len == 14) && (bufPtr[0] == 0xff) && (bufPtr[1] == 0xff) && (bufPtr[12] == 0xff) && (bufPtr[13] == 0xff)) {
 						memcpy(uid, bufPtr + 2, 7);
@@ -2590,15 +2594,22 @@ int CmdHF14AMfSniff(const char *Cmd){
 						if (wantDecrypt)
 							mfTraceInit(uid, atqa, sak, wantSaveToEmlFile);
 					} else {
-						PrintAndLog("%s(%d):%s", isTag ? "TAG":"RDR", num, sprint_hex(bufPtr, len));
+						oddparitybuf(bufPtr, len, parity);
+						PrintAndLog("%s(%d):%s [%s] c[%s]%c", 
+							isTag ? "TAG":"RDR", 
+							num, 
+							sprint_hex(bufPtr, len), 
+							printBitsPar(bufPtr + len, len), 
+							printBitsPar(parity, len),
+							memcmp(bufPtr + len, parity, len / 8 + 1) ? '!' : ' ');
 						if (wantLogToFile)
 							AddLogHex(logHexFileName, isTag ? "TAG: ":"RDR: ", bufPtr, len);
 						if (wantDecrypt)
-							mfTraceDecode(bufPtr, len, wantSaveToEmlFile);
+							mfTraceDecode(bufPtr, len, bufPtr[len], wantSaveToEmlFile);
 						num++;
 					}
 					bufPtr += len;
-					bufPtr += ((len-1)/8+1);	// ignore parity
+					bufPtr += parlen;	// ignore parity
 				}
 				pckNum = 0;
 			}

@@ -20,6 +20,7 @@
 #include "usb_cmd.h"
 #include "cmdmain.h"
 #include "ui.h"
+#include "parity.h"
 #include "util.h"
 #include "iso14443crc.h"
 
@@ -582,14 +583,19 @@ struct Crypto1State *traceCrypto1 = NULL;
 
 struct Crypto1State *revstate;
 uint64_t lfsr;
+uint64_t ui64Key;
 uint32_t ks2;
 uint32_t ks3;
 
-uint32_t uid;     // serial number
-uint32_t nt;      // tag challenge
-uint32_t nr_enc;  // encrypted reader challenge
-uint32_t ar_enc;  // encrypted reader response
-uint32_t at_enc;  // encrypted tag response
+uint32_t uid;       // serial number
+uint32_t nt;        // tag challenge
+uint32_t nt_enc;    // encrypted tag challenge
+uint8_t nt_enc_par; // encrypted tag challenge parity
+uint32_t nr_enc;    // encrypted reader challenge
+uint32_t ar_enc;    // encrypted reader response
+uint8_t ar_enc_par; // encrypted reader response parity
+uint32_t at_enc;    // encrypted tag response
+uint8_t at_enc_par; // encrypted tag response parity
 
 int isTraceCardEmpty(void) {
 	return ((traceCard[0] == 0) && (traceCard[1] == 0) && (traceCard[2] == 0) && (traceCard[3] == 0));
@@ -708,8 +714,36 @@ void mf_crypto1_decrypt(struct Crypto1State *pcs, uint8_t *data, int len, bool i
 	return;
 }
 
+bool NTParityCheck(uint32_t ntx) {
+	if (
+		(oddparity8(ntx >> 8 & 0xff) ^ (ntx & 0x01) ^ ((nt_enc_par >> 5) & 0x01) ^ (nt_enc & 0x01)) ||
+		(oddparity8(ntx >> 16 & 0xff) ^ (ntx >> 8 & 0x01) ^ ((nt_enc_par >> 6) & 0x01) ^ (nt_enc >> 8 & 0x01)) ||
+		(oddparity8(ntx >> 24 & 0xff) ^ (ntx >> 16 & 0x01) ^ ((nt_enc_par >> 7) & 0x01) ^ (nt_enc >> 16 & 0x01))
+		)
+		return false;
+	
+	uint32_t ar = prng_successor(ntx, 64);
+	if (
+		(oddparity8(ar >> 8 & 0xff) ^ (ar & 0x01) ^ ((ar_enc_par >> 5) & 0x01) ^ (ar_enc & 0x01)) ||
+		(oddparity8(ar >> 16 & 0xff) ^ (ar >> 8 & 0x01) ^ ((ar_enc_par >> 6) & 0x01) ^ (ar_enc >> 8 & 0x01)) ||
+		(oddparity8(ar >> 24 & 0xff) ^ (ar >> 16 & 0x01) ^ ((ar_enc_par >> 7) & 0x01) ^ (ar_enc >> 16 & 0x01))
+		)
+		return false;
 
-int mfTraceDecode(uint8_t *data_src, int len, bool wantSaveToEmlFile) {
+	uint32_t at = prng_successor(ntx, 96);
+	if (
+		(oddparity8(ar & 0xff) ^ (at >> 24 & 0x01) ^ ((ar_enc_par >> 4) & 0x01) ^ (at_enc >> 24 & 0x01)) ||
+		(oddparity8(at >> 8 & 0xff) ^ (at & 0x01) ^ ((at_enc_par >> 5) & 0x01) ^ (at_enc & 0x01)) ||
+		(oddparity8(at >> 16 & 0xff) ^ (at >> 8 & 0x01) ^ ((at_enc_par >> 6) & 0x01) ^ (at_enc >> 8 & 0x01)) ||
+		(oddparity8(at >> 24 & 0xff) ^ (at >> 16 & 0x01) ^ ((at_enc_par >> 7) & 0x01) ^ (at_enc >> 16 & 0x01))
+		)
+		return false;
+		
+	return true;
+}
+
+
+int mfTraceDecode(uint8_t *data_src, int len, uint8_t parity, bool wantSaveToEmlFile) {
 	uint8_t data[64];
 
 	if (traceState == TRACE_ERROR) return 1;
@@ -721,7 +755,9 @@ int mfTraceDecode(uint8_t *data_src, int len, bool wantSaveToEmlFile) {
 	memcpy(data, data_src, len);
 	if ((traceCrypto1) && ((traceState == TRACE_IDLE) || (traceState > TRACE_AUTH_OK))) {
 		mf_crypto1_decrypt(traceCrypto1, data, len, 0);
-		PrintAndLog("dec> %s", sprint_hex(data, len));
+		uint8_t parity[16];
+		oddparitybuf(data, len, parity);
+		PrintAndLog("dec> %s [%s]", sprint_hex(data, len), printBitsPar(parity, len));
 		AddLogHex(logHexFileName, "dec> ", data, len);
 	}
 
@@ -810,7 +846,12 @@ int mfTraceDecode(uint8_t *data_src, int len, bool wantSaveToEmlFile) {
 	case TRACE_AUTH1:
 		if (len == 4) {
 			traceState = TRACE_AUTH2;
-			nt = bytes_to_num(data, 4);
+			if (!traceCrypto1) {
+				nt = bytes_to_num(data, 4);
+			} else {
+				nt_enc = bytes_to_num(data, 4);
+				nt_enc_par = parity;
+			}
 			return 0;
 		} else {
 			traceState = TRACE_ERROR;
@@ -824,6 +865,7 @@ int mfTraceDecode(uint8_t *data_src, int len, bool wantSaveToEmlFile) {
 
 			nr_enc = bytes_to_num(data, 4);
 			ar_enc = bytes_to_num(data + 4, 4);
+			ar_enc_par = parity << 4;
 			return 0;
 		} else {
 			traceState = TRACE_ERROR;
@@ -835,8 +877,9 @@ int mfTraceDecode(uint8_t *data_src, int len, bool wantSaveToEmlFile) {
 		if (len ==4) {
 			traceState = TRACE_IDLE;
 
+			at_enc = bytes_to_num(data, 4);
+			at_enc_par = parity;
 			if (!traceCrypto1) {
-				at_enc = bytes_to_num(data, 4);
 
 				//  decode key here)
 				ks2 = ar_enc ^ prng_successor(nt, 64);
@@ -848,16 +891,75 @@ int mfTraceDecode(uint8_t *data_src, int len, bool wantSaveToEmlFile) {
 				lfsr_rollback_word(revstate, uid ^ nt, 0);
 
 				crypto1_get_lfsr(revstate, &lfsr);
-				printf("key> %x%x\n", (unsigned int)((lfsr & 0xFFFFFFFF00000000) >> 32), (unsigned int)(lfsr & 0xFFFFFFFF));
+				crypto1_destroy(revstate);
+				ui64Key = lfsr;
+				printf("key> probable key:%x%x Prng:%s ks2:%08x ks3:%08x\n", 
+					(unsigned int)((lfsr & 0xFFFFFFFF00000000) >> 32), (unsigned int)(lfsr & 0xFFFFFFFF), 
+					validate_prng_nonce(nt) ? "WEAK": "HARDEND",
+					ks2,
+					ks3);
 				AddLogUint64(logHexFileName, "key> ", lfsr);
 			} else {
-				printf("key> nested not implemented!\n");
-				at_enc = bytes_to_num(data, 4);
-				
-				crypto1_destroy(traceCrypto1);
+				if (validate_prng_nonce(nt)) {
+					struct Crypto1State *pcs;
+					pcs = crypto1_create(ui64Key);
+					uint32_t nt1 = crypto1_word(pcs, nt_enc ^ uid, 1) ^ nt_enc;
+					uint32_t ar = prng_successor(nt1, 64);
+					uint32_t at = prng_successor(nt1, 96);
+					printf("key> nested auth uid: %08x nt: %08x nt_parity: %s ar: %08x at: %08x\n", uid, nt1, printBitsPar(&nt_enc_par, 4), ar, at);
+					uint32_t nr1 = crypto1_word(pcs, nr_enc, 1) ^ nr_enc;
+					uint32_t ar1 = crypto1_word(pcs, 0, 0) ^ ar_enc;
+					uint32_t at1 = crypto1_word(pcs, 0, 0) ^ at_enc;
+					printf("key> the same key test. nr1: %08x ar1: %08x at1: %08x \n", nr1, ar1, at1);
 
-				// not implemented
-				traceState = TRACE_ERROR;
+					if (NTParityCheck(nt1))
+						printf("key> the same key test OK. key=%x%x\n", (unsigned int)((ui64Key & 0xFFFFFFFF00000000) >> 32), (unsigned int)(ui64Key & 0xFFFFFFFF));
+					else
+						printf("key> the same key test. check nt parity error.\n");
+					
+					uint32_t ntc = prng_successor(nt, 90);
+					uint32_t ntx = 0;
+					int ntcnt = 0;
+					for (int i = 0; i < 16383; i++) {
+						ntc = prng_successor(ntc, 1);
+						if (NTParityCheck(ntc)){
+							if (!ntcnt)
+								ntx = ntc;
+							ntcnt++;
+						}						
+					}
+					if (ntcnt)
+						printf("key> nt candidate=%08x nonce distance=%d candidates count=%d\n", ntx, nonce_distance(nt, ntx), ntcnt);
+					else
+						printf("key> don't have any nt candidate( \n");
+
+					nt = ntx;
+					ks2 = ar_enc ^ prng_successor(ntx, 64);
+					ks3 = at_enc ^ prng_successor(ntx, 96);
+
+					// decode key
+					revstate = lfsr_recovery64(ks2, ks3);
+					lfsr_rollback_word(revstate, 0, 0);
+					lfsr_rollback_word(revstate, 0, 0);
+					lfsr_rollback_word(revstate, nr_enc, 1);
+					lfsr_rollback_word(revstate, uid ^ nt, 0);
+
+					crypto1_get_lfsr(revstate, &lfsr);
+					crypto1_destroy(revstate);
+					ui64Key = lfsr;
+					printf("key> probable key:%x%x  ks2:%08x ks3:%08x\n", 
+						(unsigned int)((lfsr & 0xFFFFFFFF00000000) >> 32), (unsigned int)(lfsr & 0xFFFFFFFF),
+						ks2,
+						ks3);
+					AddLogUint64(logHexFileName, "key> ", lfsr);
+				} else {				
+					printf("key> hardnested not implemented!\n");
+				
+					crypto1_destroy(traceCrypto1);
+
+					// not implemented
+					traceState = TRACE_ERROR;
+				}
 			}
 
 			int blockShift = ((traceCurBlock & 0xFC) + 3) * 16;

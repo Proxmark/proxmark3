@@ -356,6 +356,23 @@ char * printBits(size_t const size, void const * const ptr)
 	return buf;
 }
 
+char * printBitsPar(const uint8_t *b, size_t len) {
+	static char buf1[512] = {0};
+	static char buf2[512] = {0};
+	static char *buf;
+	if (buf != buf1)
+		buf = buf1;
+	else
+		buf = buf2;
+	memset(buf, 0x00, 512);
+
+	for (int i = 0; i < len; i++) {
+		buf[i] = ((b[i / 8] << (i % 8)) & 0x80) ? '1':'0';
+	}
+	return buf;
+}
+
+
 //  -------------------------------------------------------------------------
 //  string parameters lib
 //  -------------------------------------------------------------------------
