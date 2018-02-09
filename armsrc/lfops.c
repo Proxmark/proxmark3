@@ -29,6 +29,7 @@
 void ModThenAcquireRawAdcSamples125k(uint32_t delay_off, uint32_t period_0, uint32_t period_1, uint8_t *command)
 {
 
+	StartTicks();
 	int divisor_used = 95; // 125 KHz
 	// see if 'h' was specified
 
@@ -43,36 +44,82 @@ void ModThenAcquireRawAdcSamples125k(uint32_t delay_off, uint32_t period_0, uint
 	/* Make sure the tag is reset */
 	FpgaDownloadAndGo(FPGA_BITSTREAM_LF);
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
-	SpinDelay(2500);
+	WaitMS(2500);
 
+	//power on
 	LFSetupFPGAForADC(sc.divisor, 1);
 
 	// And a little more time for the tag to fully power up
-	SpinDelay(2000);
-
+	WaitMS(2000);
+	// if delay_off = 0 then just bitbang 1 = antenna on 0 = off for respective periods.
+	bool bitbang = delay_off == 0;
 	// now modulate the reader field
-	while(*command != '\0' && *command != ' ') {
+
+	if (bitbang) {
+		//HACK it appears my loop and if statements take up about 7 us so adjust waits accordingly...
+		uint8_t hack_cnt = 7;
+		if (period_0 < hack_cnt || period_1 < hack_cnt) {
+			DbpString("Warning periods cannot be less than 7 in bit bang mode");
+			FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
+			LED_D_OFF();
+			return;
+		}
+		//prime cmd_len to save time comparing strings while modulating
+		int cmd_len = 0;
+		while(command[cmd_len] != '\0' && command[cmd_len] != ' ')
+			cmd_len++;
+
+		int counter = 0;
+		bool off = false;
+		for (counter = 0; counter < cmd_len; counter++) {
+		//while(*command != '\0' && *command != ' ') {
+			// if cmd = 0 then turn field off
+			if (command[counter] == '0') {
+				// if field already off leave alone (affects timing otherwise)
+				if (off == false) {
+					FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
+					LED_D_OFF();
+					off = true;
+				}
+				// note we appear to take about 6us to switch over (or run the if statements/loop...)
+				WaitUS(period_0-hack_cnt);
+			// else if cmd = 1 then turn field on
+			} else {
+				// if field already on leave alone (affects timing otherwise)
+				if (off) {
+					FpgaWriteConfWord(FPGA_MAJOR_MODE_LF_ADC | FPGA_LF_ADC_READER_FIELD);				
+					LED_D_ON();
+					off = false;
+				}
+				// note we appear to take about 6us to switch over (or run the if statements/loop...)
+				WaitUS(period_1-hack_cnt);
+			}
+		}
+	} else { // old mode of cmd read using delay as off period
+		while(*command != '\0' && *command != ' ') {
+			FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
+			LED_D_OFF();
+			WaitUS(delay_off);
+			FpgaSendCommand(FPGA_CMD_SET_DIVISOR, sc.divisor);
+			FpgaWriteConfWord(FPGA_MAJOR_MODE_LF_ADC | FPGA_LF_ADC_READER_FIELD);
+			LED_D_ON();
+			if(*(command++) == '0') {
+				WaitUS(period_0);
+			} else {
+				WaitUS(period_1);
+			}
+		}
 		FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
 		LED_D_OFF();
-		SpinDelayUs(delay_off);
+		WaitUS(delay_off);
 		FpgaSendCommand(FPGA_CMD_SET_DIVISOR, sc.divisor);
-
-		FpgaWriteConfWord(FPGA_MAJOR_MODE_LF_ADC | FPGA_LF_ADC_READER_FIELD);
-		LED_D_ON();
-		if(*(command++) == '0')
-			SpinDelayUs(period_0);
-		else
-			SpinDelayUs(period_1);
 	}
-	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
-	LED_D_OFF();
-	SpinDelayUs(delay_off);
-	FpgaSendCommand(FPGA_CMD_SET_DIVISOR, sc.divisor);
 
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_LF_ADC | FPGA_LF_ADC_READER_FIELD);
 
 	// now do the read
 	DoAcquisition_config(false, 0);
+	// note leaves field on...  (for future commands?)
 }
 
 /* blank r/w tag data stream
