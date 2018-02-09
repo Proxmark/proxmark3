@@ -909,15 +909,22 @@ int mfTraceDecode(uint8_t *data_src, int len, uint8_t parity, bool wantSaveToEml
 					else
 						printf("key> the same key test. check nt parity error.\n");
 					
-					uint32_t ntx = prng_successor(nt, 90);
+					uint32_t ntc = prng_successor(nt, 90);
+					uint32_t ntx = 0;
+					int ntcnt = 0;
 					for (int i = 0; i < 16383; i++) {
-						ntx = prng_successor(ntx, 1);
-						if (NTParityCheck(ntx)){
-							printf("key> nt candidate=%08x nonce distance=%d\n", ntx, nonce_distance(nt, ntx));
-							break;
+						ntc = prng_successor(ntc, 1);
+						if (NTParityCheck(ntc)){
+							if (!ntcnt)
+								ntx = ntc;
+							ntcnt++;
 						}						
 					}
-					
+					if (ntcnt)
+						printf("key> nt candidate=%08x nonce distance=%d candidates count=%d\n", ntx, nonce_distance(nt, ntx), ntcnt);
+					else
+						printf("key> don't have any nt candidate( \n");
+
 					nt = ntx;
 					ks2 = ar_enc ^ prng_successor(ntx, 64);
 					ks3 = at_enc ^ prng_successor(ntx, 96);
