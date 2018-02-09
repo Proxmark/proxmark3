@@ -70,7 +70,6 @@ uint8_t mifare_CRC_check(bool isResponse, uint8_t* data, uint8_t len)
 		default:
 			return 2;
 	}
-
 }
 
 void annotateIso14443a(char *exp, size_t size, uint8_t* cmd, uint8_t cmdsize)
@@ -173,22 +172,33 @@ void annotateIso14443a(char *exp, size_t size, uint8_t* cmd, uint8_t cmdsize)
 }
 
 void annotateMifare(char *exp, size_t size, uint8_t* cmd, uint8_t cmdsize, bool isResponse) {
+//	uint32_t uid;       // UID
+	static uint32_t nt;        // tag challenge
+//	uint32_t nt_enc;    // encrypted tag challenge
+//	uint8_t nt_enc_par; // encrypted tag challenge parity
+	static uint32_t nr_enc;    // encrypted reader challenge
+	static uint32_t ar_enc;    // encrypted reader response
+//	uint8_t ar_enc_par; // encrypted reader response parity
+	static uint32_t at_enc;    // encrypted tag response
+//	uint8_t at_enc_par; // encrypted tag response parity
+
 	switch(MifareAuthState) {
 		case masNt:
 			if (cmdsize == 4) {
-				snprintf(exp,size,"AUTH: nt");
+				snprintf(exp,size,"AUTH: nt %s", (MifareAuthState == masData) ? "(enc)" : "");
 				MifareAuthState = masNrAr;
-				printf("--ntok\n");
+				nt = bytes_to_num(cmd, cmdsize);
 				return;
 			} else {
 				MifareAuthState = masError;
-				printf("--err %d\n", cmdsize);
 			}
 			break;
 		case masNrAr:
 			if (cmdsize == 8) {
-				snprintf(exp,size,"AUTH: nr ar");
+				snprintf(exp,size,"AUTH: nr ar (enc)");
 				MifareAuthState = masAt;
+				nr_enc = bytes_to_num(cmd, cmdsize);
+				ar_enc = bytes_to_num(&cmd[3], cmdsize);
 				return;
 			} else {
 				MifareAuthState = masError;
@@ -196,8 +206,9 @@ void annotateMifare(char *exp, size_t size, uint8_t* cmd, uint8_t cmdsize, bool 
 			break;
 		case masAt:
 			if (cmdsize == 4) {
-				snprintf(exp,size,"AUTH: at");
+				snprintf(exp,size,"AUTH: at (enc)");
 				MifareAuthState = masData;
+				at_enc = bytes_to_num(cmd, cmdsize);
 				return;
 			} else {
 				MifareAuthState = masError;
