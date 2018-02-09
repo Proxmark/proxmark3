@@ -43,99 +43,6 @@ int CmdHFTune(const char *Cmd)
   return 0;
 }
 
-
-void annotateIso14443a(char *exp, size_t size, uint8_t* cmd, uint8_t cmdsize)
-{
-	switch(cmd[0])
-	{
-	case ISO14443A_CMD_WUPA:        snprintf(exp,size,"WUPA"); break;
-	case ISO14443A_CMD_ANTICOLL_OR_SELECT:{
-		// 93 20 = Anticollision (usage: 9320 - answer: 4bytes UID+1byte UID-bytes-xor)
-		// 93 70 = Select (usage: 9370+5bytes 9320 answer - answer: 1byte SAK)
-		if(cmd[1] == 0x70)
-		{
-			snprintf(exp,size,"SELECT_UID"); break;
-		}else
-		{
-			snprintf(exp,size,"ANTICOLL"); break;
-		}
-	}
-	case ISO14443A_CMD_ANTICOLL_OR_SELECT_2:{
-		//95 20 = Anticollision of cascade level2
-		//95 70 = Select of cascade level2
-		if(cmd[2] == 0x70)
-		{
-			snprintf(exp,size,"SELECT_UID-2"); break;
-		}else
-		{
-			snprintf(exp,size,"ANTICOLL-2"); break;
-		}
-	}
-	case ISO14443A_CMD_REQA:		snprintf(exp,size,"REQA"); break;
-	case ISO14443A_CMD_READBLOCK:	snprintf(exp,size,"READBLOCK(%d)",cmd[1]); break;
-	case ISO14443A_CMD_WRITEBLOCK:	snprintf(exp,size,"WRITEBLOCK(%d)",cmd[1]); break;
-	case ISO14443A_CMD_HALT:		snprintf(exp,size,"HALT"); break;
-	case ISO14443A_CMD_RATS:		snprintf(exp,size,"RATS"); break;
-	case MIFARE_CMD_INC:			snprintf(exp,size,"INC(%d)",cmd[1]); break;
-	case MIFARE_CMD_DEC:			snprintf(exp,size,"DEC(%d)",cmd[1]); break;
-	case MIFARE_CMD_RESTORE:		snprintf(exp,size,"RESTORE(%d)",cmd[1]); break;
-	case MIFARE_CMD_TRANSFER:		snprintf(exp,size,"TRANSFER(%d)",cmd[1]); break;
-	case MIFARE_AUTH_KEYA:{
-		if ( cmdsize > 3)
-			snprintf(exp,size,"AUTH-A(%d)",cmd[1]); 
-		else
-			//	case MIFARE_ULEV1_VERSION :  both 0x60.
-			snprintf(exp,size,"EV1 VERSION");
-		break;
-	}
-	case MIFARE_AUTH_KEYB:			snprintf(exp,size,"AUTH-B(%d)",cmd[1]); break;
-	case MIFARE_MAGICWUPC1:			snprintf(exp,size,"MAGIC WUPC1"); break;
-	case MIFARE_MAGICWUPC2:			snprintf(exp,size,"MAGIC WUPC2"); break;
-	case MIFARE_MAGICWIPEC:			snprintf(exp,size,"MAGIC WIPEC"); break;
-	case MIFARE_ULC_AUTH_1:		snprintf(exp,size,"AUTH "); break;
-	case MIFARE_ULC_AUTH_2:		snprintf(exp,size,"AUTH_ANSW"); break;
-	case MIFARE_ULEV1_AUTH:
-		if ( cmdsize == 7 )
-			snprintf(exp,size,"PWD-AUTH KEY: 0x%02x%02x%02x%02x", cmd[1], cmd[2], cmd[3], cmd[4] );
-		else
-			snprintf(exp,size,"PWD-AUTH");
-		break;
-	case MIFARE_ULEV1_FASTREAD:{
-		if ( cmdsize >=3 && cmd[2] <= 0xE6)
-			snprintf(exp,size,"READ RANGE (%d-%d)",cmd[1],cmd[2]); 
-		else
-			snprintf(exp,size,"?");
-		break;
-	}
-	case MIFARE_ULC_WRITE:{
-		if ( cmd[1] < 0x21 )
-			snprintf(exp,size,"WRITEBLOCK(%d)",cmd[1]); 
-		else
-			snprintf(exp,size,"?");
-		break;
-	}
-	case MIFARE_ULEV1_READ_CNT:{
-		if ( cmd[1] < 5 )
-			snprintf(exp,size,"READ CNT(%d)",cmd[1]);
-		else
-			snprintf(exp,size,"?");
-		break;
-	}
-	case MIFARE_ULEV1_INCR_CNT:{
-		if ( cmd[1] < 5 )
-			snprintf(exp,size,"INCR(%d)",cmd[1]);
-		else
-			snprintf(exp,size,"?");
-		break;
-	}
-	case MIFARE_ULEV1_READSIG:		snprintf(exp,size,"READ_SIG"); break;
-	case MIFARE_ULEV1_CHECKTEAR:	snprintf(exp,size,"CHK_TEARING(%d)",cmd[1]); break;
-	case MIFARE_ULEV1_VCSL:		snprintf(exp,size,"VCSL"); break;
-	default:						snprintf(exp,size,"?"); break;
-	}
-	return;
-}
-
 void annotateIclass(char *exp, size_t size, uint8_t* cmd, uint8_t cmdsize)
 {
 	switch(cmd[0])
@@ -245,33 +152,6 @@ void annotateIso14443b(char *exp, size_t size, uint8_t* cmd, uint8_t cmdsize)
 	}
 
 }
-
-/**
- * @brief iso14443A_CRC_check Checks CRC in command or response
- * @param isResponse
- * @param data
- * @param len
- * @return  0 : CRC-command, CRC not ok
- *          1 : CRC-command, CRC ok
- *          2 : Not crc-command
- */
-
-uint8_t iso14443A_CRC_check(bool isResponse, uint8_t* data, uint8_t len)
-{
-	uint8_t b1,b2;
-
-	if(len <= 2) return 2;
-
-	if(isResponse & (len < 6)) return 2;
-	
-	ComputeCrc14443(CRC_14443_A, data, len-2, &b1, &b2);
-	if (b1 != data[len-2] || b2 != data[len-1]) {
-		return 0;
-	} else {
-		return 1;
-	}
-}
-
 
 /**
  * @brief iso14443B_CRC_check Checks CRC in command or response
@@ -469,6 +349,8 @@ uint16_t printTraceLine(uint16_t tracepos, uint16_t traceLen, uint8_t *trace, ui
 				crcStatus = iso14443B_CRC_check(isResponse, frame, data_len); 
 				break;
 			case PROTO_MIFARE:
+				crcStatus = mifare_CRC_check(isResponse, frame, data_len);
+				break;
 			case ISO_14443A:
 				crcStatus = iso14443A_CRC_check(isResponse, frame, data_len);
 				break;
@@ -517,11 +399,13 @@ uint16_t printTraceLine(uint16_t tracepos, uint16_t traceLen, uint8_t *trace, ui
 
 	EndOfTransmissionTimestamp = timestamp + duration;
 
+	if (protocol == PROTO_MIFARE)
+		annotateMifare(explanation, sizeof(explanation), frame, data_len, isResponse);
+	
 	if(!isResponse)
 	{
 		switch(protocol) {
 			case ICLASS:		annotateIclass(explanation,sizeof(explanation),frame,data_len); break;
-			case PROTO_MIFARE:
 			case ISO_14443A:	annotateIso14443a(explanation,sizeof(explanation),frame,data_len); break;
 			case ISO_14443B:	annotateIso14443b(explanation,sizeof(explanation),frame,data_len); break;
 			case TOPAZ:			annotateTopaz(explanation,sizeof(explanation),frame,data_len); break;
