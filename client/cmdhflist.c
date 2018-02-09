@@ -184,8 +184,8 @@ void annotateMifare(char *exp, size_t size, uint8_t* cmd, uint8_t cmdsize, bool 
 
 	switch(MifareAuthState) {
 		case masNt:
-			if (cmdsize == 4) {
-				snprintf(exp,size,"AUTH: nt %s", (MifareAuthState == masData) ? "(enc)" : "");
+			if (cmdsize == 4 && isResponse) {
+				snprintf(exp,size,"AUTH: nt %s", (nt) ? "(enc)" : "");
 				MifareAuthState = masNrAr;
 				nt = bytes_to_num(cmd, cmdsize);
 				return;
@@ -194,7 +194,7 @@ void annotateMifare(char *exp, size_t size, uint8_t* cmd, uint8_t cmdsize, bool 
 			}
 			break;
 		case masNrAr:
-			if (cmdsize == 8) {
+			if (cmdsize == 8 && !isResponse) {
 				snprintf(exp,size,"AUTH: nr ar (enc)");
 				MifareAuthState = masAt;
 				nr_enc = bytes_to_num(cmd, cmdsize);
@@ -205,7 +205,7 @@ void annotateMifare(char *exp, size_t size, uint8_t* cmd, uint8_t cmdsize, bool 
 			}
 			break;
 		case masAt:
-			if (cmdsize == 4) {
+			if (cmdsize == 4 && isResponse) {
 				snprintf(exp,size,"AUTH: at (enc)");
 				MifareAuthState = masData;
 				at_enc = bytes_to_num(cmd, cmdsize);
