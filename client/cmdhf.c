@@ -1,5 +1,6 @@
 //-----------------------------------------------------------------------------
 // Copyright (C) 2010 iZsh <izsh at fail0verflow.com>
+// Merlok - 2017
 //
 // This code is licensed to you under the terms of the GNU GPL, version 2 or,
 // at your option, any later version. See the LICENSE.txt file for the text of
@@ -31,6 +32,7 @@
 #include "cmdhftopaz.h"
 #include "protocols.h"
 #include "emv/cmdemv.h"
+#include "cmdhflist.h"
 
 static int CmdHelp(const char *Cmd);
 
@@ -466,6 +468,7 @@ uint16_t printTraceLine(uint16_t tracepos, uint16_t traceLen, uint8_t *trace, ui
 			case TOPAZ:
 				crcStatus = iso14443B_CRC_check(isResponse, frame, data_len); 
 				break;
+			case PROTO_MIFARE:
 			case ISO_14443A:
 				crcStatus = iso14443A_CRC_check(isResponse, frame, data_len);
 				break;
@@ -518,6 +521,7 @@ uint16_t printTraceLine(uint16_t tracepos, uint16_t traceLen, uint8_t *trace, ui
 	{
 		switch(protocol) {
 			case ICLASS:		annotateIclass(explanation,sizeof(explanation),frame,data_len); break;
+			case PROTO_MIFARE:
 			case ISO_14443A:	annotateIso14443a(explanation,sizeof(explanation),frame,data_len); break;
 			case ISO_14443B:	annotateIso14443b(explanation,sizeof(explanation),frame,data_len); break;
 			case TOPAZ:			annotateTopaz(explanation,sizeof(explanation),frame,data_len); break;
@@ -583,6 +587,8 @@ int CmdHFList(const char *Cmd)
 	if(!errors) {
 		if(strcmp(type, "iclass") == 0)	{
 			protocol = ICLASS;
+		} else if(strcmp(type, "mf") == 0) {
+			protocol = PROTO_MIFARE;
 		} else if(strcmp(type, "14a") == 0) {
 			protocol = ISO_14443A;
 		} else if(strcmp(type, "14b") == 0)	{
@@ -604,6 +610,7 @@ int CmdHFList(const char *Cmd)
 		PrintAndLog("Supported <protocol> values:");
 		PrintAndLog("    raw    - just show raw data without annotations");
 		PrintAndLog("    14a    - interpret data as iso14443a communications");
+		PrintAndLog("    mf     - interpret data as iso14443a communications and decrypt crypto1 stream");
 		PrintAndLog("    14b    - interpret data as iso14443b communications");
 		PrintAndLog("    iclass - interpret data as iclass communications");
 		PrintAndLog("    topaz  - interpret data as topaz communications");
