@@ -30,9 +30,9 @@ enum MifareAuthSeq {
 	masNt,
 	masNrAr,
 	masAt,
+	masAuthComplete,
 	masFirstData,
 	masData,
-	masDataNested,
 	masError,
 };
 static enum MifareAuthSeq MifareAuthState;
@@ -73,9 +73,6 @@ uint8_t mifare_CRC_check(bool isResponse, uint8_t* data, uint8_t len)
 {
 	switch(MifareAuthState) {
 		case masNone:
-		case masFirstData:
-		case masData:
-		case masDataNested:
 		case masError:
 			return iso14443A_CRC_check(isResponse, data, len);
 		default:
@@ -231,7 +228,7 @@ void annotateMifare(char *exp, size_t size, uint8_t* cmd, uint8_t cmdsize, uint8
 		case masAt:
 			if (cmdsize == 4 && isResponse) {
 				snprintf(exp,size,"AUTH: at (enc)");
-				MifareAuthState = masFirstData;
+				MifareAuthState = masAuthComplete;
 				AuthData.at_enc = bytes_to_num(cmd, 4);
 				AuthData.at_enc_par = parity[0];
 				return;
@@ -243,13 +240,25 @@ void annotateMifare(char *exp, size_t size, uint8_t* cmd, uint8_t cmdsize, uint8
 			break;
 	}
 	
-	if (!isResponse)
+	if (!isResponse && ((MifareAuthState == masNone) || (MifareAuthState == masError)))
 		annotateIso14443a(exp, size, cmd, cmdsize);
 	
 }
 
 bool DecodeMifareData(uint8_t *cmd, uint8_t cmdsize, bool isResponse, uint8_t *mfData, size_t *mfDataLen) {
+	static struct Crypto1State *traceCrypto1;	
+	uint64_t mfLastKey;
+	
 	*mfDataLen = 0;
+	
+	if (MifareAuthState == masAuthComplete) {
+		if (traceCrypto1) {
+			crypto1_destroy(traceCrypto1);
+		}
+
+		MifareAuthState = masFirstData;
+		return false;
+	}
 	
 	if (cmdsize > 32)
 		return false;
@@ -267,7 +276,7 @@ bool DecodeMifareData(uint8_t *cmd, uint8_t cmdsize, bool isResponse, uint8_t *m
 			uint64_t lfsr = 0;
 			crypto1_get_lfsr(revstate, &lfsr);
 			crypto1_destroy(revstate);
-//			LastKey = lfsr;
+			mfLastKey = lfsr;
 			PrintAndLog("            |          * | key | probable key:%x%x Prng:%s   ks2:%08x ks3:%08x |     |", 
 				(unsigned int)((lfsr & 0xFFFFFFFF00000000) >> 32), (unsigned int)(lfsr & 0xFFFFFFFF), 
 				validate_prng_nonce(AuthData.nt) ? "WEAK": "HARD",
@@ -275,17 +284,34 @@ bool DecodeMifareData(uint8_t *cmd, uint8_t cmdsize, bool isResponse, uint8_t *m
 				ks3);
 			
 			AuthData.first_auth = false;
+
+			traceCrypto1 = lfsr_recovery64(ks2, ks3);
 		} else {
 			printf("uid:%x nt:%x ar_enc:%x at_enc:%x\n", AuthData.uid, AuthData.nt, AuthData.ar_enc, AuthData.at_enc);
+			
+			// check last used key
+			if (mfLastKey) {
+				
+			}
+			
+			// check default keys
+			
+			// nested
+			if (validate_prng_nonce(AuthData.nt)) {
+			}
+			
+			//hardnested
 		}
 		
 		
 		
 		MifareAuthState = masData;
-		return true;
 	}
 	
-	if (MifareAuthState == masData) {
+	if (MifareAuthState == masData && traceCrypto1) {
+		memcpy(mfData, cmd, cmdsize);
+		mf_crypto1_decrypt(traceCrypto1, mfData, cmdsize, 0);
+		*mfDataLen = cmdsize;
 	}
 	
 	return *mfDataLen > 0;

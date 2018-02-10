@@ -434,11 +434,15 @@ uint16_t printTraceLine(uint16_t tracepos, uint16_t traceLen, uint8_t *trace, ui
 	}
 	
 	if (DecodeMifareData(frame, data_len, isResponse, mfData, &mfDataLen)) {
-		annotateIso14443a(explanation, sizeof(explanation), mfData, mfDataLen);
-		
+		memset(explanation, 0x00, sizeof(explanation));
+		if (!isResponse) {
+			explanation[0] = '>';
+			annotateIso14443a(&explanation[1], sizeof(explanation) - 1, mfData, mfDataLen);
+		}
+		uint8_t crcc = iso14443A_CRC_check(isResponse, mfData, mfDataLen);
 		PrintAndLog("            |          * | dec |%-64s | %-4s| %s",
 			sprint_hex(mfData, mfDataLen),
-			"",
+			(crcc == 0 ? "!crc" : (crcc == 1 ? " ok " : "    ")),
 			(true) ? explanation : "");
 	};
 
