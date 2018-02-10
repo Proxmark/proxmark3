@@ -300,6 +300,8 @@ uint16_t printTraceLine(uint16_t tracepos, uint16_t traceLen, uint8_t *trace, ui
 	uint8_t topaz_reader_command[9];
 	uint32_t timestamp, first_timestamp, EndOfTransmissionTimestamp;
 	char explanation[30] = {0};
+	uint8_t mfData[32] = {0};
+	size_t mfDataLen = 0;
 
 	if (tracepos + sizeof(uint32_t) + sizeof(uint16_t) + sizeof(uint16_t) > traceLen) return traceLen;
 	
@@ -431,8 +433,12 @@ uint16_t printTraceLine(uint16_t tracepos, uint16_t traceLen, uint8_t *trace, ui
 		}
 	}
 	
-//	if (DecodeMifareData(frame, data_len, isResponse)) {
-//	};
+	if (DecodeMifareData(frame, data_len, isResponse, mfData, &mfDataLen)) {
+		PrintAndLog("            |            |     |%-64s | %s| %s",
+			sprint_hex(mfData, mfDataLen),
+			"",
+			(false) ? explanation : "");
+	};
 
 	if (is_last_record(tracepos, trace, traceLen)) return traceLen;
 	

@@ -32,6 +32,6 @@ extern uint8_t iso14443A_CRC_check(bool isResponse, uint8_t* data, uint8_t len);
 extern uint8_t mifare_CRC_check(bool isResponse, uint8_t* data, uint8_t len);
 extern void annotateIso14443a(char *exp, size_t size, uint8_t* cmd, uint8_t cmdsize);
 extern void annotateMifare(char *exp, size_t size, uint8_t* cmd, uint8_t cmdsize, uint8_t* parity, uint8_t paritysize, bool isResponse);
-
+extern bool DecodeMifareData(uint8_t *cmd, uint8_t cmdsize, bool isResponse, uint8_t *mfData, size_t *mfDataLen);
 
 #endif // CMDHFLIST

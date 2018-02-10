@@ -21,6 +21,8 @@
 #include "iso14443crc.h"
 #include "parity.h"
 #include "protocols.h"
+#include "crapto1/crapto1.h"
+#include "mifarehost.h"
 
 
 enum MifareAuthSeq {
@@ -39,7 +41,7 @@ static TAuthData AuthData;
 void ClearAuthData() {
 	AuthData.uid = 0;
 	AuthData.nt = 0;
-	AuthData.first_auth = false;
+	AuthData.first_auth = true;
 }
 
 /**
@@ -189,11 +191,11 @@ void annotateIso14443a(char *exp, size_t size, uint8_t* cmd, uint8_t cmdsize)
 void annotateMifare(char *exp, size_t size, uint8_t* cmd, uint8_t cmdsize, uint8_t* parity, uint8_t paritysize, bool isResponse) {
 	// get UID
 	if (MifareAuthState == masNone) {
-		if (cmdsize == 7 && cmd[0] == ISO14443A_CMD_ANTICOLL_OR_SELECT && cmd[1] == 0x70) {
+		if (cmdsize == 9 && cmd[0] == ISO14443A_CMD_ANTICOLL_OR_SELECT && cmd[1] == 0x70) {
 			ClearAuthData();
 			AuthData.uid = bytes_to_num(&cmd[2], 4);
 		}
-		if (cmdsize == 7 && cmd[0] == ISO14443A_CMD_ANTICOLL_OR_SELECT_2 && cmd[1] == 0x70) {
+		if (cmdsize == 9 && cmd[0] == ISO14443A_CMD_ANTICOLL_OR_SELECT_2 && cmd[1] == 0x70) {
 			ClearAuthData();
 			AuthData.uid = bytes_to_num(&cmd[2], 4);
 		}
@@ -205,9 +207,9 @@ void annotateMifare(char *exp, size_t size, uint8_t* cmd, uint8_t cmdsize, uint8
 				snprintf(exp,size,"AUTH: nt %s", (AuthData.first_auth) ? "" : "(enc)");
 				MifareAuthState = masNrAr;
 				if (AuthData.first_auth)
-					AuthData.nt = bytes_to_num(cmd, cmdsize);
+					AuthData.nt = bytes_to_num(cmd, 4);
 				else
-					AuthData.nt_enc = bytes_to_num(cmd, cmdsize);
+					AuthData.nt_enc = bytes_to_num(cmd, 4);
 					AuthData.nt_enc_par = parity[0];
 				return;
 			} else {
@@ -218,8 +220,8 @@ void annotateMifare(char *exp, size_t size, uint8_t* cmd, uint8_t cmdsize, uint8
 			if (cmdsize == 8 && !isResponse) {
 				snprintf(exp,size,"AUTH: nr ar (enc)");
 				MifareAuthState = masAt;
-				AuthData.nr_enc = bytes_to_num(cmd, cmdsize);
-				AuthData.ar_enc = bytes_to_num(&cmd[3], cmdsize);
+				AuthData.nr_enc = bytes_to_num(cmd, 4);
+				AuthData.ar_enc = bytes_to_num(&cmd[4], 4);
 				AuthData.ar_enc_par = parity[0] << 4;
 				return;
 			} else {
@@ -230,7 +232,7 @@ void annotateMifare(char *exp, size_t size, uint8_t* cmd, uint8_t cmdsize, uint8
 			if (cmdsize == 4 && isResponse) {
 				snprintf(exp,size,"AUTH: at (enc)");
 				MifareAuthState = masFirstData;
-				AuthData.at_enc = bytes_to_num(cmd, cmdsize);
+				AuthData.at_enc = bytes_to_num(cmd, 4);
 				AuthData.at_enc_par = parity[0];
 				return;
 			} else {
@@ -245,3 +247,47 @@ void annotateMifare(char *exp, size_t size, uint8_t* cmd, uint8_t cmdsize, uint8
 		annotateIso14443a(exp, size, cmd, cmdsize);
 	
 }
+
+bool DecodeMifareData(uint8_t *cmd, uint8_t cmdsize, bool isResponse, uint8_t *mfData, size_t *mfDataLen) {
+	*mfDataLen = 0;
+	
+	if (cmdsize > 32)
+		return false;
+	
+	if (MifareAuthState == masFirstData) {
+		if (AuthData.first_auth) {
+			uint32_t ks2 = AuthData.ar_enc ^ prng_successor(AuthData.nt, 64);
+			uint32_t ks3 = AuthData.at_enc ^ prng_successor(AuthData.nt, 96);
+			struct Crypto1State *revstate = lfsr_recovery64(ks2, ks3);
+			lfsr_rollback_word(revstate, 0, 0);
+			lfsr_rollback_word(revstate, 0, 0);
+			lfsr_rollback_word(revstate, AuthData.nr_enc, 1);
+			lfsr_rollback_word(revstate, AuthData.uid ^ AuthData.nt, 0);
+
+			uint64_t lfsr = 0;
+			crypto1_get_lfsr(revstate, &lfsr);
+			crypto1_destroy(revstate);
+//			LastKey = lfsr;
+			printf("uid:%x nt:%x ar_enc:%x at_enc:%x\n", AuthData.uid, AuthData.nt, AuthData.ar_enc, AuthData.at_enc);
+			printf("AUTH: probable key:%x%x Prng:%s ks2:%08x ks3:%08x\n", 
+				(unsigned int)((lfsr & 0xFFFFFFFF00000000) >> 32), (unsigned int)(lfsr & 0xFFFFFFFF), 
+				validate_prng_nonce(AuthData.nt) ? "WEAK": "HARDEND",
+				ks2,
+				ks3);
+			
+			AuthData.first_auth = false;
+		} else {
+		}
+		
+		
+		
+		MifareAuthState = masData;
+		return true;
+	}
+	
+	if (MifareAuthState == masData) {
+	}
+	
+	return *mfDataLen > 0;
+}
+
