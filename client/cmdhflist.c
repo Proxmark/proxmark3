@@ -377,5 +377,7 @@ bool NestedCheckKey(uint64_t key, TAuthData *ad, uint8_t *cmd, uint8_t cmdsize) 
 	memcpy(buf, cmd, cmdsize);
 	mf_crypto1_decrypt(pcs, buf, cmdsize, 0);
 	
+	crypto1_destroy(pcs);
+	
 	return CheckCrc14443(CRC_14443_A, buf, cmdsize);
 }
