@@ -297,18 +297,44 @@ bool DecodeMifareData(uint8_t *cmd, uint8_t cmdsize, bool isResponse, uint8_t *m
 			}
 			
 			// check default keys
-			for (int defaultKeyCounter = 0; defaultKeyCounter < MifareDefaultKeysSize; defaultKeyCounter++){
-				if (NestedCheckKey(MifareDefaultKeys[defaultKeyCounter], &AuthData, cmd, cmdsize)) {
-					
-					break;
-				};
+			if (!traceCrypto1) {
+				for (int defaultKeyCounter = 0; defaultKeyCounter < MifareDefaultKeysSize; defaultKeyCounter++){
+					if (NestedCheckKey(MifareDefaultKeys[defaultKeyCounter], &AuthData, cmd, cmdsize)) {
+						
+						break;
+					};
+				}
 			}
 			
 			// nested
-			if (validate_prng_nonce(AuthData.nt)) {
+			if (!traceCrypto1 && validate_prng_nonce(AuthData.nt)) {
+				uint32_t ntx = prng_successor(AuthData.nt, 90);
+				for (int i = 0; i < 16383; i++) {
+					ntx = prng_successor(ntx, 1);
+					if (NTParityChk(&AuthData, ntx)){
+
+						uint32_t ks2 = AuthData.ar_enc ^ prng_successor(ntx, 64);
+						uint32_t ks3 = AuthData.at_enc ^ prng_successor(ntx, 96);
+						struct Crypto1State *pcs = lfsr_recovery64(ks2, ks3);
+						memcpy(mfData, cmd, cmdsize);
+						mf_crypto1_decrypt(pcs, mfData, cmdsize, 0);
+				
+						crypto1_destroy(pcs);
+						if (CheckCrc14443(CRC_14443_A, mfData, cmdsize)) {
+							traceCrypto1 = lfsr_recovery64(ks2, ks3);
+							break;
+						}
+					}						
+				}
+				if (traceCrypto1)
+					printf("key> nt=%08x nonce distance=%d \n", ntx, nonce_distance(AuthData.nt, ntx));
+				else
+					printf("key> don't have any valid nt( \n");					
 			}
 			
 			//hardnested
+			if (!traceCrypto1) {
+			}
 		}
 		
 		
