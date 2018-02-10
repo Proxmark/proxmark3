@@ -248,7 +248,7 @@ void annotateMifare(char *exp, size_t size, uint8_t* cmd, uint8_t cmdsize, uint8
 
 bool DecodeMifareData(uint8_t *cmd, uint8_t cmdsize, bool isResponse, uint8_t *mfData, size_t *mfDataLen) {
 	static struct Crypto1State *traceCrypto1;	
-	uint64_t mfLastKey;
+	static uint64_t mfLastKey;
 	
 	*mfDataLen = 0;
 	
@@ -325,6 +325,57 @@ bool DecodeMifareData(uint8_t *cmd, uint8_t cmdsize, bool isResponse, uint8_t *m
 	return *mfDataLen > 0;
 }
 
+bool NTParityChk(TAuthData *ad, uint32_t ntx) {
+	if (
+		(oddparity8(ntx >> 8 & 0xff) ^ (ntx & 0x01) ^ ((ad->nt_enc_par >> 5) & 0x01) ^ (ad->nt_enc & 0x01)) ||
+		(oddparity8(ntx >> 16 & 0xff) ^ (ntx >> 8 & 0x01) ^ ((ad->nt_enc_par >> 6) & 0x01) ^ (ad->nt_enc >> 8 & 0x01)) ||
+		(oddparity8(ntx >> 24 & 0xff) ^ (ntx >> 16 & 0x01) ^ ((ad->nt_enc_par >> 7) & 0x01) ^ (ad->nt_enc >> 16 & 0x01))
+		)
+		return false;
+	
+	uint32_t ar = prng_successor(ntx, 64);
+	if (
+		(oddparity8(ar >> 8 & 0xff) ^ (ar & 0x01) ^ ((ad->ar_enc_par >> 5) & 0x01) ^ (ad->ar_enc & 0x01)) ||
+		(oddparity8(ar >> 16 & 0xff) ^ (ar >> 8 & 0x01) ^ ((ad->ar_enc_par >> 6) & 0x01) ^ (ad->ar_enc >> 8 & 0x01)) ||
+		(oddparity8(ar >> 24 & 0xff) ^ (ar >> 16 & 0x01) ^ ((ad->ar_enc_par >> 7) & 0x01) ^ (ad->ar_enc >> 16 & 0x01))
+		)
+		return false;
+
+	uint32_t at = prng_successor(ntx, 96);
+	if (
+		(oddparity8(ar & 0xff) ^ (at >> 24 & 0x01) ^ ((ad->ar_enc_par >> 4) & 0x01) ^ (ad->at_enc >> 24 & 0x01)) ||
+		(oddparity8(at >> 8 & 0xff) ^ (at & 0x01) ^ ((ad->at_enc_par >> 5) & 0x01) ^ (ad->at_enc & 0x01)) ||
+		(oddparity8(at >> 16 & 0xff) ^ (at >> 8 & 0x01) ^ ((ad->at_enc_par >> 6) & 0x01) ^ (ad->at_enc >> 8 & 0x01)) ||
+		(oddparity8(at >> 24 & 0xff) ^ (at >> 16 & 0x01) ^ ((ad->at_enc_par >> 7) & 0x01) ^ (ad->at_enc >> 16 & 0x01))
+		)
+		return false;
+		
+	return true;
+}
+
 bool NestedCheckKey(uint64_t key, TAuthData *ad, uint8_t *cmd, uint8_t cmdsize) {
-	return false;
+	uint8_t buf[32] = {0};
+	struct Crypto1State *pcs;
+	
+	pcs = crypto1_create(key);
+	uint32_t nt1 = crypto1_word(pcs, ad->nt_enc ^ ad->uid, 1) ^ ad->nt_enc;
+	uint32_t ar = prng_successor(nt1, 64);
+	uint32_t at = prng_successor(nt1, 96);
+	printf("key> nested auth uid: %08x nt: %08x nt_parity: %s ar: %08x at: %08x\n", ad->uid, nt1, printBitsPar(&ad->nt_enc_par, 4), ar, at);
+	uint32_t nr1 = crypto1_word(pcs, ad->nr_enc, 1) ^ ad->nr_enc;
+	uint32_t ar1 = crypto1_word(pcs, 0, 0) ^ ad->ar_enc;
+	uint32_t at1 = crypto1_word(pcs, 0, 0) ^ ad->at_enc;
+	printf("key> the same key test. nr1: %08x ar1: %08x at1: %08x \n", nr1, ar1, at1);
+
+	if (NTParityChk(ad, nt1))
+		printf("key> the same key test OK. key=%x%x\n", (unsigned int)((key & 0xFFFFFFFF00000000) >> 32), (unsigned int)(key & 0xFFFFFFFF));
+	else {
+		printf("key> the same key test. check nt parity error.\n");
+		return false;
+	}
+
+	memcpy(buf, cmd, cmdsize);
+	mf_crypto1_decrypt(pcs, buf, cmdsize, 0);
+	
+	return CheckCrc14443(CRC_14443_A, buf, cmdsize);
 }
