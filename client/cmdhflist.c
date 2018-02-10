@@ -43,6 +43,8 @@ void ClearAuthData() {
 	AuthData.uid = 0;
 	AuthData.nt = 0;
 	AuthData.first_auth = true;
+	AuthData.ks2 = 0;
+	AuthData.ks3 = 0;
 }
 
 /**
@@ -266,9 +268,9 @@ bool DecodeMifareData(uint8_t *cmd, uint8_t cmdsize, bool isResponse, uint8_t *m
 	
 	if (MifareAuthState == masFirstData) {
 		if (AuthData.first_auth) {
-			uint32_t ks2 = AuthData.ar_enc ^ prng_successor(AuthData.nt, 64);
-			uint32_t ks3 = AuthData.at_enc ^ prng_successor(AuthData.nt, 96);
-			struct Crypto1State *revstate = lfsr_recovery64(ks2, ks3);
+			AuthData.ks2 = AuthData.ar_enc ^ prng_successor(AuthData.nt, 64);
+			AuthData.ks3 = AuthData.at_enc ^ prng_successor(AuthData.nt, 96);
+			struct Crypto1State *revstate = lfsr_recovery64(AuthData.ks2, AuthData.ks3);
 			lfsr_rollback_word(revstate, 0, 0);
 			lfsr_rollback_word(revstate, 0, 0);
 			lfsr_rollback_word(revstate, AuthData.nr_enc, 1);
@@ -281,12 +283,12 @@ bool DecodeMifareData(uint8_t *cmd, uint8_t cmdsize, bool isResponse, uint8_t *m
 			PrintAndLog("            |          * | key | probable key:%x%x Prng:%s   ks2:%08x ks3:%08x |     |", 
 				(unsigned int)((lfsr & 0xFFFFFFFF00000000) >> 32), (unsigned int)(lfsr & 0xFFFFFFFF), 
 				validate_prng_nonce(AuthData.nt) ? "WEAK": "HARD",
-				ks2,
-				ks3);
+				AuthData.ks2,
+				AuthData.ks3);
 			
 			AuthData.first_auth = false;
 
-			traceCrypto1 = lfsr_recovery64(ks2, ks3);
+			traceCrypto1 = lfsr_recovery64(AuthData.ks2, AuthData.ks3);
 		} else {
 			printf("uid:%x nt:%x ar_enc:%x at_enc:%x\n", AuthData.uid, AuthData.nt, AuthData.ar_enc, AuthData.at_enc);
 			
@@ -321,7 +323,9 @@ bool DecodeMifareData(uint8_t *cmd, uint8_t cmdsize, bool isResponse, uint8_t *m
 				
 						crypto1_destroy(pcs);
 						if (CheckCrc14443(CRC_14443_A, mfData, cmdsize)) {
-							traceCrypto1 = lfsr_recovery64(ks2, ks3);
+							AuthData.ks2 = ks2;
+							AuthData.ks3 = ks3;
+							traceCrypto1 = lfsr_recovery64(AuthData.ks2, AuthData.ks3);
 							break;
 						}
 					}						

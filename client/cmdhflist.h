@@ -25,6 +25,8 @@ typedef struct {
 	uint32_t at_enc;    // encrypted tag response
 	uint8_t at_enc_par; // encrypted tag response parity
 	bool first_auth;    // is first authentication
+	uint32_t ks2;		// ar ^ ar_enc
+	uint32_t ks3;       // at ^ at_enc
 } TAuthData;
 extern void ClearAuthData();
 
