@@ -23,6 +23,7 @@
 #include "protocols.h"
 #include "crapto1/crapto1.h"
 #include "mifarehost.h"
+#include "mifaredefault.h"
 
 
 enum MifareAuthSeq {
@@ -291,10 +292,17 @@ bool DecodeMifareData(uint8_t *cmd, uint8_t cmdsize, bool isResponse, uint8_t *m
 			
 			// check last used key
 			if (mfLastKey) {
-				
+				if (NestedCheckKey(mfLastKey, &AuthData, cmd, cmdsize)) {
+				};
 			}
 			
 			// check default keys
+			for (int defaultKeyCounter = 0; defaultKeyCounter < MifareDefaultKeysSize; defaultKeyCounter++){
+				if (NestedCheckKey(MifareDefaultKeys[defaultKeyCounter], &AuthData, cmd, cmdsize)) {
+					
+					break;
+				};
+			}
 			
 			// nested
 			if (validate_prng_nonce(AuthData.nt)) {
@@ -317,3 +325,6 @@ bool DecodeMifareData(uint8_t *cmd, uint8_t cmdsize, bool isResponse, uint8_t *m
 	return *mfDataLen > 0;
 }
 
+bool NestedCheckKey(uint64_t key, TAuthData *ad, uint8_t *cmd, uint8_t cmdsize) {
+	return false;
+}
