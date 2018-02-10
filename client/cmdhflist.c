@@ -186,7 +186,7 @@ void annotateIso14443a(char *exp, size_t size, uint8_t* cmd, uint8_t cmdsize)
 	return;
 }
 
-void annotateMifare(char *exp, size_t size, uint8_t* cmd, uint8_t cmdsize, bool isResponse) {
+void annotateMifare(char *exp, size_t size, uint8_t* cmd, uint8_t cmdsize, uint8_t* parity, uint8_t paritysize, bool isResponse) {
 	// get UID
 	if (MifareAuthState == masNone) {
 		if (cmdsize == 7 && cmd[0] == ISO14443A_CMD_ANTICOLL_OR_SELECT && cmd[1] == 0x70) {
@@ -208,6 +208,7 @@ void annotateMifare(char *exp, size_t size, uint8_t* cmd, uint8_t cmdsize, bool 
 					AuthData.nt = bytes_to_num(cmd, cmdsize);
 				else
 					AuthData.nt_enc = bytes_to_num(cmd, cmdsize);
+					AuthData.nt_enc_par = parity[0];
 				return;
 			} else {
 				MifareAuthState = masError;
@@ -219,6 +220,7 @@ void annotateMifare(char *exp, size_t size, uint8_t* cmd, uint8_t cmdsize, bool 
 				MifareAuthState = masAt;
 				AuthData.nr_enc = bytes_to_num(cmd, cmdsize);
 				AuthData.ar_enc = bytes_to_num(&cmd[3], cmdsize);
+				AuthData.ar_enc_par = parity[0] << 4;
 				return;
 			} else {
 				MifareAuthState = masError;
@@ -229,6 +231,7 @@ void annotateMifare(char *exp, size_t size, uint8_t* cmd, uint8_t cmdsize, bool 
 				snprintf(exp,size,"AUTH: at (enc)");
 				MifareAuthState = masFirstData;
 				AuthData.at_enc = bytes_to_num(cmd, cmdsize);
+				AuthData.at_enc_par = parity[0];
 				return;
 			} else {
 				MifareAuthState = masError;

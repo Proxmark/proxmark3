@@ -400,7 +400,7 @@ uint16_t printTraceLine(uint16_t tracepos, uint16_t traceLen, uint8_t *trace, ui
 	EndOfTransmissionTimestamp = timestamp + duration;
 
 	if (protocol == PROTO_MIFARE)
-		annotateMifare(explanation, sizeof(explanation), frame, data_len, isResponse);
+		annotateMifare(explanation, sizeof(explanation), frame, data_len, parityBytes, parity_len, isResponse);
 	
 	if(!isResponse)
 	{
@@ -430,6 +430,9 @@ uint16_t printTraceLine(uint16_t tracepos, uint16_t traceLen, uint8_t *trace, ui
 				(j == num_lines-1) ? explanation : "");
 		}
 	}
+	
+//	if (DecodeMifareData(frame, data_len, isResponse)) {
+//	};
 
 	if (is_last_record(tracepos, trace, traceLen)) return traceLen;
 	
