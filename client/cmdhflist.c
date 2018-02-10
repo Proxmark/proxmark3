@@ -85,7 +85,10 @@ void annotateIso14443a(char *exp, size_t size, uint8_t* cmd, uint8_t cmdsize)
 {
 	switch(cmd[0])
 	{
-	case ISO14443A_CMD_WUPA:        snprintf(exp,size,"WUPA"); break;
+	case ISO14443A_CMD_WUPA:        
+		snprintf(exp,size,"WUPA"); 
+		MifareAuthState = masNone;
+		break;
 	case ISO14443A_CMD_ANTICOLL_OR_SELECT:{
 		// 93 20 = Anticollision (usage: 9320 - answer: 4bytes UID+1byte UID-bytes-xor)
 		// 93 70 = Select (usage: 9370+5bytes 9320 answer - answer: 1byte SAK)
@@ -108,7 +111,10 @@ void annotateIso14443a(char *exp, size_t size, uint8_t* cmd, uint8_t cmdsize)
 			snprintf(exp,size,"ANTICOLL-2"); break;
 		}
 	}
-	case ISO14443A_CMD_REQA:		snprintf(exp,size,"REQA"); break;
+	case ISO14443A_CMD_REQA:		
+		snprintf(exp,size,"REQA"); 
+		MifareAuthState = masNone;
+		break;
 	case ISO14443A_CMD_READBLOCK:	snprintf(exp,size,"READBLOCK(%d)",cmd[1]); break;
 	case ISO14443A_CMD_WRITEBLOCK:	snprintf(exp,size,"WRITEBLOCK(%d)",cmd[1]); break;
 	case ISO14443A_CMD_HALT:		
