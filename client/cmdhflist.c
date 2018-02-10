@@ -295,6 +295,7 @@ bool DecodeMifareData(uint8_t *cmd, uint8_t cmdsize, bool isResponse, uint8_t *m
 			// check last used key
 			if (mfLastKey) {
 				if (NestedCheckKey(mfLastKey, &AuthData, cmd, cmdsize)) {
+					traceCrypto1 = lfsr_recovery64(AuthData.ks2, AuthData.ks3);
 				};
 			}
 			
@@ -302,7 +303,7 @@ bool DecodeMifareData(uint8_t *cmd, uint8_t cmdsize, bool isResponse, uint8_t *m
 			if (!traceCrypto1) {
 				for (int defaultKeyCounter = 0; defaultKeyCounter < MifareDefaultKeysSize; defaultKeyCounter++){
 					if (NestedCheckKey(MifareDefaultKeys[defaultKeyCounter], &AuthData, cmd, cmdsize)) {
-						
+						traceCrypto1 = lfsr_recovery64(AuthData.ks2, AuthData.ks3);
 						break;
 					};
 				}
@@ -409,5 +410,11 @@ bool NestedCheckKey(uint64_t key, TAuthData *ad, uint8_t *cmd, uint8_t cmdsize) 
 	
 	crypto1_destroy(pcs);
 	
-	return CheckCrc14443(CRC_14443_A, buf, cmdsize);
+	if(CheckCrc14443(CRC_14443_A, buf, cmdsize)) {
+		AuthData.ks2 = AuthData.ar_enc ^ ar;
+		AuthData.ks3 = AuthData.at_enc ^ at;
+		return true;
+	} else {
+		return false;
+	}
 }
