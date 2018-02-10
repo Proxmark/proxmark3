@@ -4,7 +4,7 @@
 // the license.
 //-----------------------------------------------------------------------------
 // Miscellaneous routines for low frequency tag operations.
-// Tags supported here so far are Texas Instruments (TI), HID
+// Tags supported here so far are Texas Instruments (TI), HID, EM4x05, EM410x
 // Also routines for raw mode reading/simulating of LF waveform
 //-----------------------------------------------------------------------------
 
@@ -28,17 +28,12 @@
  */
 void ModThenAcquireRawAdcSamples125k(uint32_t delay_off, uint32_t period_0, uint32_t period_1, uint8_t *command)
 {
-
+	// start timer
 	StartTicks();
-	int divisor_used = 95; // 125 KHz
-	// see if 'h' was specified
 
-	if (command[strlen((char *) command) - 1] == 'h')
-		divisor_used = 88; // 134.8 KHz
-
-	sample_config sc = { 0,0,1, divisor_used, 0};
-	setSamplingConfig(&sc);
-	//clear read buffer
+	// use lf config settings
+	sample_config *sc = getSamplingConfig();
+	// clear read buffer
 	BigBuf_Clear_keep_EM();
 
 	/* Make sure the tag is reset */
@@ -46,8 +41,8 @@ void ModThenAcquireRawAdcSamples125k(uint32_t delay_off, uint32_t period_0, uint
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
 	WaitMS(2500);
 
-	//power on
-	LFSetupFPGAForADC(sc.divisor, 1);
+	// power on
+	LFSetupFPGAForADC(sc->divisor, 1);
 
 	// And a little more time for the tag to fully power up
 	WaitMS(2000);
@@ -56,15 +51,21 @@ void ModThenAcquireRawAdcSamples125k(uint32_t delay_off, uint32_t period_0, uint
 	// now modulate the reader field
 
 	if (bitbang) {
-		//HACK it appears my loop and if statements take up about 7 us so adjust waits accordingly...
+		// HACK it appears the loop and if statements take up about 7us so adjust waits accordingly...
 		uint8_t hack_cnt = 7;
 		if (period_0 < hack_cnt || period_1 < hack_cnt) {
-			DbpString("Warning periods cannot be less than 7 in bit bang mode");
+			DbpString("Warning periods cannot be less than 7us in bit bang mode");
 			FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
 			LED_D_OFF();
 			return;
 		}
-		//prime cmd_len to save time comparing strings while modulating
+
+		// hack2 needed---  it appears to take about 8-16us to turn the antenna back on 
+		// leading to ~ 1 to 2 125khz samples extra in every off period 
+		// so we should test for last 0 before next 1 and reduce period_0 by this extra amount...
+		// but is this time different for every antenna or other hw builds???  more testing needed
+
+		// prime cmd_len to save time comparing strings while modulating
 		int cmd_len = 0;
 		while(command[cmd_len] != '\0' && command[cmd_len] != ' ')
 			cmd_len++;
@@ -72,7 +73,6 @@ void ModThenAcquireRawAdcSamples125k(uint32_t delay_off, uint32_t period_0, uint
 		int counter = 0;
 		bool off = false;
 		for (counter = 0; counter < cmd_len; counter++) {
-		//while(*command != '\0' && *command != ' ') {
 			// if cmd = 0 then turn field off
 			if (command[counter] == '0') {
 				// if field already off leave alone (affects timing otherwise)
@@ -81,17 +81,17 @@ void ModThenAcquireRawAdcSamples125k(uint32_t delay_off, uint32_t period_0, uint
 					LED_D_OFF();
 					off = true;
 				}
-				// note we appear to take about 6us to switch over (or run the if statements/loop...)
+				// note we appear to take about 7us to switch over (or run the if statements/loop...)
 				WaitUS(period_0-hack_cnt);
 			// else if cmd = 1 then turn field on
 			} else {
 				// if field already on leave alone (affects timing otherwise)
 				if (off) {
-					FpgaWriteConfWord(FPGA_MAJOR_MODE_LF_ADC | FPGA_LF_ADC_READER_FIELD);				
+					FpgaWriteConfWord(FPGA_MAJOR_MODE_LF_ADC | FPGA_LF_ADC_READER_FIELD);
 					LED_D_ON();
 					off = false;
 				}
-				// note we appear to take about 6us to switch over (or run the if statements/loop...)
+				// note we appear to take about 7us to switch over (or run the if statements/loop...)
 				WaitUS(period_1-hack_cnt);
 			}
 		}
@@ -100,7 +100,7 @@ void ModThenAcquireRawAdcSamples125k(uint32_t delay_off, uint32_t period_0, uint
 			FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
 			LED_D_OFF();
 			WaitUS(delay_off);
-			FpgaSendCommand(FPGA_CMD_SET_DIVISOR, sc.divisor);
+			FpgaSendCommand(FPGA_CMD_SET_DIVISOR, sc->divisor);
 			FpgaWriteConfWord(FPGA_MAJOR_MODE_LF_ADC | FPGA_LF_ADC_READER_FIELD);
 			LED_D_ON();
 			if(*(command++) == '0') {
@@ -112,14 +112,18 @@ void ModThenAcquireRawAdcSamples125k(uint32_t delay_off, uint32_t period_0, uint
 		FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
 		LED_D_OFF();
 		WaitUS(delay_off);
-		FpgaSendCommand(FPGA_CMD_SET_DIVISOR, sc.divisor);
+		FpgaSendCommand(FPGA_CMD_SET_DIVISOR, sc->divisor);
 	}
 
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_LF_ADC | FPGA_LF_ADC_READER_FIELD);
 
 	// now do the read
 	DoAcquisition_config(false, 0);
-	// note leaves field on...  (for future commands?)
+
+	// Turn off antenna
+	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
+	// tell client we are done
+	cmd_send(CMD_ACK,0,0,0,0,0);
 }
 
 /* blank r/w tag data stream
