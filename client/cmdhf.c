@@ -543,6 +543,7 @@ int CmdHFList(const char *Cmd)
 	PrintAndLog("      Start |        End | Src | Data (! denotes parity error)                                   | CRC | Annotation         |");
 	PrintAndLog("------------|------------|-----|-----------------------------------------------------------------|-----|--------------------|");
 
+	ClearAuthData();
 	while(tracepos < traceLen)
 	{
 		tracepos = printTraceLine(tracepos, traceLen, trace, protocol, showWaitCycles, markCRCBytes);
