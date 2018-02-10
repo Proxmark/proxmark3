@@ -434,10 +434,12 @@ uint16_t printTraceLine(uint16_t tracepos, uint16_t traceLen, uint8_t *trace, ui
 	}
 	
 	if (DecodeMifareData(frame, data_len, isResponse, mfData, &mfDataLen)) {
-		PrintAndLog("            |            |     |%-64s | %s| %s",
+		annotateIso14443a(explanation, sizeof(explanation), mfData, mfDataLen);
+		
+		PrintAndLog("            |          * | dec |%-64s | %-4s| %s",
 			sprint_hex(mfData, mfDataLen),
 			"",
-			(false) ? explanation : "");
+			(true) ? explanation : "");
 	};
 
 	if (is_last_record(tracepos, trace, traceLen)) return traceLen;

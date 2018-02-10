@@ -268,15 +268,15 @@ bool DecodeMifareData(uint8_t *cmd, uint8_t cmdsize, bool isResponse, uint8_t *m
 			crypto1_get_lfsr(revstate, &lfsr);
 			crypto1_destroy(revstate);
 //			LastKey = lfsr;
-			printf("uid:%x nt:%x ar_enc:%x at_enc:%x\n", AuthData.uid, AuthData.nt, AuthData.ar_enc, AuthData.at_enc);
-			printf("AUTH: probable key:%x%x Prng:%s ks2:%08x ks3:%08x\n", 
+			PrintAndLog("            |          * | key | probable key:%x%x Prng:%s   ks2:%08x ks3:%08x |     |", 
 				(unsigned int)((lfsr & 0xFFFFFFFF00000000) >> 32), (unsigned int)(lfsr & 0xFFFFFFFF), 
-				validate_prng_nonce(AuthData.nt) ? "WEAK": "HARDEND",
+				validate_prng_nonce(AuthData.nt) ? "WEAK": "HARD",
 				ks2,
 				ks3);
 			
 			AuthData.first_auth = false;
 		} else {
+			printf("uid:%x nt:%x ar_enc:%x at_enc:%x\n", AuthData.uid, AuthData.nt, AuthData.ar_enc, AuthData.at_enc);
 		}
 		
 		
