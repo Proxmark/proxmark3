@@ -558,7 +558,8 @@ void SetAdcMuxFor(uint32_t whichGpio)
 	LOW(GPIO_MUXSEL_LORAW);
 	LOW(GPIO_MUXSEL_LOPKD);
 
-	HIGH(whichGpio);
+	if (whichGpio > 0)
+		HIGH(whichGpio);
 }
 
 void Fpga_print_status(void) {

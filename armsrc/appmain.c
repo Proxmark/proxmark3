@@ -1408,6 +1408,9 @@ void  __attribute__((noreturn)) AppMain(void)
 	// Reset SSC
 	AT91C_BASE_SSC->SSC_CR = AT91C_SSC_SWRST;
 
+	// Configure MUX
+	SetAdcMuxFor(0);
+
 	// Load the FPGA image, which we have stored in our flash.
 	// (the HF version by default)
 	FpgaDownloadAndGo(FPGA_BITSTREAM_HF);
