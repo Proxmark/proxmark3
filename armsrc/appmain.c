@@ -1409,23 +1409,7 @@ void  __attribute__((noreturn)) AppMain(void)
 	AT91C_BASE_SSC->SSC_CR = AT91C_SSC_SWRST;
 
 	// Configure MUX
-	AT91C_BASE_PIOA->PIO_OER =
-		GPIO_MUXSEL_HIPKD |
-		GPIO_MUXSEL_LOPKD |
-		GPIO_MUXSEL_LORAW |
-		GPIO_MUXSEL_HIRAW;
-
-	AT91C_BASE_PIOA->PIO_PER =
-		GPIO_MUXSEL_HIPKD |
-		GPIO_MUXSEL_LOPKD |
-		GPIO_MUXSEL_LORAW |
-		GPIO_MUXSEL_HIRAW;
-	
-	// set pins LOW
-	LOW(GPIO_MUXSEL_HIPKD);
-	LOW(GPIO_MUXSEL_LOPKD);
-	LOW(GPIO_MUXSEL_HIRAW);
-	LOW(GPIO_MUXSEL_LORAW);
+	SetAdcMuxFor(0);
 
 	// Load the FPGA image, which we have stored in our flash.
 	// (the HF version by default)
