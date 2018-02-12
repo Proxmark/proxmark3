@@ -89,7 +89,6 @@ void annotateIso14443a(char *exp, size_t size, uint8_t* cmd, uint8_t cmdsize)
 	{
 	case ISO14443A_CMD_WUPA:        
 		snprintf(exp,size,"WUPA"); 
-		MifareAuthState = masNone;
 		break;
 	case ISO14443A_CMD_ANTICOLL_OR_SELECT:{
 		// 93 20 = Anticollision (usage: 9320 - answer: 4bytes UID+1byte UID-bytes-xor)
@@ -115,7 +114,6 @@ void annotateIso14443a(char *exp, size_t size, uint8_t* cmd, uint8_t cmdsize)
 	}
 	case ISO14443A_CMD_REQA:		
 		snprintf(exp,size,"REQA"); 
-		MifareAuthState = masNone;
 		break;
 	case ISO14443A_CMD_READBLOCK:	snprintf(exp,size,"READBLOCK(%d)",cmd[1]); break;
 	case ISO14443A_CMD_WRITEBLOCK:	snprintf(exp,size,"WRITEBLOCK(%d)",cmd[1]); break;
@@ -189,6 +187,17 @@ void annotateIso14443a(char *exp, size_t size, uint8_t* cmd, uint8_t cmdsize)
 }
 
 void annotateMifare(char *exp, size_t size, uint8_t* cmd, uint8_t cmdsize, uint8_t* parity, uint8_t paritysize, bool isResponse) {
+	if (!isResponse && cmdsize == 1) {
+		switch(cmd[0]) {
+			case ISO14443A_CMD_WUPA:        
+			case ISO14443A_CMD_REQA:		
+				MifareAuthState = masNone;
+				break;
+			default:
+				break;
+		}
+	}
+	
 	// get UID
 	if (MifareAuthState == masNone) {
 		if (cmdsize == 9 && cmd[0] == ISO14443A_CMD_ANTICOLL_OR_SELECT && cmd[1] == 0x70) {
@@ -248,7 +257,7 @@ void annotateMifare(char *exp, size_t size, uint8_t* cmd, uint8_t cmdsize, uint8
 	
 }
 
-bool DecodeMifareData(uint8_t *cmd, uint8_t cmdsize, bool isResponse, uint8_t *mfData, size_t *mfDataLen) {
+bool DecodeMifareData(uint8_t *cmd, uint8_t cmdsize, uint8_t *parity, bool isResponse, uint8_t *mfData, size_t *mfDataLen) {
 	static struct Crypto1State *traceCrypto1;	
 	static uint64_t mfLastKey;
 	
@@ -281,7 +290,8 @@ bool DecodeMifareData(uint8_t *cmd, uint8_t cmdsize, bool isResponse, uint8_t *m
 			crypto1_destroy(revstate);
 			mfLastKey = lfsr;
 			PrintAndLog("            |          * | key | probable key:%x%x Prng:%s   ks2:%08x ks3:%08x |     |", 
-				(unsigned int)((lfsr & 0xFFFFFFFF00000000) >> 32), (unsigned int)(lfsr & 0xFFFFFFFF), 
+				(unsigned int)((lfsr & 0xFFFFFFFF00000000) >> 32), 
+				(unsigned int)(lfsr & 0xFFFFFFFF), 
 				validate_prng_nonce(AuthData.nt) ? "WEAK": "HARD",
 				AuthData.ks2,
 				AuthData.ks3);
@@ -290,19 +300,29 @@ bool DecodeMifareData(uint8_t *cmd, uint8_t cmdsize, bool isResponse, uint8_t *m
 
 			traceCrypto1 = lfsr_recovery64(AuthData.ks2, AuthData.ks3);
 		} else {
-			printf("uid:%x nt:%x ar_enc:%x at_enc:%x\n", AuthData.uid, AuthData.nt, AuthData.ar_enc, AuthData.at_enc);
-			
 			// check last used key
 			if (mfLastKey) {
-				if (NestedCheckKey(mfLastKey, &AuthData, cmd, cmdsize)) {
-					traceCrypto1 = lfsr_recovery64(AuthData.ks2, AuthData.ks3);
+				if (NestedCheckKey(mfLastKey, &AuthData, cmd, cmdsize, parity)) {
+					PrintAndLog("            |          * | key | last used key:%x%x            ks2:%08x ks3:%08x |     |", 
+						(unsigned int)((mfLastKey & 0xFFFFFFFF00000000) >> 32), 
+						(unsigned int)(mfLastKey & 0xFFFFFFFF),
+						AuthData.ks2,
+						AuthData.ks3);
+
+				traceCrypto1 = lfsr_recovery64(AuthData.ks2, AuthData.ks3);
 				};
 			}
 			
 			// check default keys
 			if (!traceCrypto1) {
 				for (int defaultKeyCounter = 0; defaultKeyCounter < MifareDefaultKeysSize; defaultKeyCounter++){
-					if (NestedCheckKey(MifareDefaultKeys[defaultKeyCounter], &AuthData, cmd, cmdsize)) {
+					if (NestedCheckKey(MifareDefaultKeys[defaultKeyCounter], &AuthData, cmd, cmdsize, parity)) {
+						PrintAndLog("            |          * | key | default key:%x%x              ks2:%08x ks3:%08x |     |", 
+							(unsigned int)((MifareDefaultKeys[defaultKeyCounter] & 0xFFFFFFFF00000000) >> 32), 
+							(unsigned int)(MifareDefaultKeys[defaultKeyCounter] & 0xFFFFFFFF),
+							AuthData.ks2,
+							AuthData.ks3);
+
 						traceCrypto1 = lfsr_recovery64(AuthData.ks2, AuthData.ks3);
 						break;
 					};
@@ -311,6 +331,7 @@ bool DecodeMifareData(uint8_t *cmd, uint8_t cmdsize, bool isResponse, uint8_t *m
 			
 			// nested
 			if (!traceCrypto1 && validate_prng_nonce(AuthData.nt)) {
+printf("nested. uid:%x nt:%x ar_enc:%x at_enc:%x\n", AuthData.uid, AuthData.nt, AuthData.ar_enc, AuthData.at_enc);
 				uint32_t ntx = prng_successor(AuthData.nt, 90);
 				for (int i = 0; i < 16383; i++) {
 					ntx = prng_successor(ntx, 1);
@@ -339,6 +360,7 @@ bool DecodeMifareData(uint8_t *cmd, uint8_t cmdsize, bool isResponse, uint8_t *m
 			
 			//hardnested
 			if (!traceCrypto1) {
+				printf("hardnested not implemented. uid:%x nt:%x ar_enc:%x at_enc:%x\n", AuthData.uid, AuthData.nt, AuthData.ar_enc, AuthData.at_enc);
 			}
 		}
 		
@@ -384,37 +406,55 @@ bool NTParityChk(TAuthData *ad, uint32_t ntx) {
 	return true;
 }
 
-bool NestedCheckKey(uint64_t key, TAuthData *ad, uint8_t *cmd, uint8_t cmdsize) {
+bool NestedCheckKey(uint64_t key, TAuthData *ad, uint8_t *cmd, uint8_t cmdsize, uint8_t *parity) {
 	uint8_t buf[32] = {0};
 	struct Crypto1State *pcs;
 	
+	AuthData.ks2 = 0;
+	AuthData.ks3 = 0;
+
 	pcs = crypto1_create(key);
 	uint32_t nt1 = crypto1_word(pcs, ad->nt_enc ^ ad->uid, 1) ^ ad->nt_enc;
 	uint32_t ar = prng_successor(nt1, 64);
 	uint32_t at = prng_successor(nt1, 96);
-	printf("key> nested auth uid: %08x nt: %08x nt_parity: %s ar: %08x at: %08x\n", ad->uid, nt1, printBitsPar(&ad->nt_enc_par, 4), ar, at);
-	uint32_t nr1 = crypto1_word(pcs, ad->nr_enc, 1) ^ ad->nr_enc;
+
+	crypto1_word(pcs, ad->nr_enc, 1);
+//	uint32_t nr1 = crypto1_word(pcs, ad->nr_enc, 1) ^ ad->nr_enc;  // if needs deciphered nr
 	uint32_t ar1 = crypto1_word(pcs, 0, 0) ^ ad->ar_enc;
 	uint32_t at1 = crypto1_word(pcs, 0, 0) ^ ad->at_enc;
-	printf("key> the same key test. nr1: %08x ar1: %08x at1: %08x \n", nr1, ar1, at1);
 
-	if (NTParityChk(ad, nt1))
-		printf("key> the same key test OK. key=%x%x\n", (unsigned int)((key & 0xFFFFFFFF00000000) >> 32), (unsigned int)(key & 0xFFFFFFFF));
-	else {
-		printf("key> the same key test. check nt parity error.\n");
+	if (!(ar == ar1 && at == at1 && NTParityChk(ad, nt1)))
 		return false;
-	}
 
 	memcpy(buf, cmd, cmdsize);
 	mf_crypto1_decrypt(pcs, buf, cmdsize, 0);
 	
 	crypto1_destroy(pcs);
 	
-	if(CheckCrc14443(CRC_14443_A, buf, cmdsize)) {
-		AuthData.ks2 = AuthData.ar_enc ^ ar;
-		AuthData.ks3 = AuthData.at_enc ^ at;
-		return true;
-	} else {
+	if(!CheckCrc14443(CRC_14443_A, buf, cmdsize)) 
 		return false;
+	
+	if (!CheckCrypto1Parity(cmd, cmdsize, buf, parity))
+		return false;
+
+	AuthData.ks2 = AuthData.ar_enc ^ ar;
+	AuthData.ks3 = AuthData.at_enc ^ at;
+
+	return true;
+}
+
+bool CheckCrypto1Parity(uint8_t *cmd, uint8_t cmdsize, uint8_t *cmd_enc, uint8_t *parity_enc) {
+	printf("parity check. size=%d\n", cmdsize);
+	printf("cmd    =%s\n", sprint_hex(cmd, cmdsize));
+	printf("cmd_enc=%s\n", sprint_hex(cmd_enc, cmdsize));
+	printf("parity=%s\n", printBitsPar(parity_enc, cmdsize));
+//	(oddparity8(ntx >> 8 & 0xff) ^ (ntx & 0x01) ^ ((ad->nt_enc_par >> 5) & 0x01) ^ (ad->nt_enc & 0x01)) ||
+	for (int i = 0; i < cmdsize - 1; i++) {
+		bool b = oddparity8(cmd[i]) ^ (cmd[i + 1] & 0x01) ^ ((parity_enc[i / 8] >> (6 - i % 8)) & 0x01) ^ (cmd_enc[i + 1] & 0x01);
+		printf("i=%d b=%d\n", i, b);
+		if (b)
+			return false;
 	}
+	
+	return true;
 }

@@ -34,8 +34,9 @@ extern uint8_t iso14443A_CRC_check(bool isResponse, uint8_t* data, uint8_t len);
 extern uint8_t mifare_CRC_check(bool isResponse, uint8_t* data, uint8_t len);
 extern void annotateIso14443a(char *exp, size_t size, uint8_t* cmd, uint8_t cmdsize);
 extern void annotateMifare(char *exp, size_t size, uint8_t* cmd, uint8_t cmdsize, uint8_t* parity, uint8_t paritysize, bool isResponse);
-extern bool DecodeMifareData(uint8_t *cmd, uint8_t cmdsize, bool isResponse, uint8_t *mfData, size_t *mfDataLen);
+extern bool DecodeMifareData(uint8_t *cmd, uint8_t cmdsize, uint8_t *parity, bool isResponse, uint8_t *mfData, size_t *mfDataLen);
 extern bool NTParityChk(TAuthData *ad, uint32_t ntx);
-extern bool NestedCheckKey(uint64_t key, TAuthData *ad, uint8_t *cmd, uint8_t cmdsize);
+extern bool NestedCheckKey(uint64_t key, TAuthData *ad, uint8_t *cmd, uint8_t cmdsize, uint8_t *parity);
+extern bool CheckCrypto1Parity(uint8_t *cmd, uint8_t cmdsize, uint8_t *cmd_enc, uint8_t *parity_enc);
 
 #endif // CMDHFLIST

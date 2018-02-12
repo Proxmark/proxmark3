@@ -433,7 +433,7 @@ uint16_t printTraceLine(uint16_t tracepos, uint16_t traceLen, uint8_t *trace, ui
 		}
 	}
 	
-	if (DecodeMifareData(frame, data_len, isResponse, mfData, &mfDataLen)) {
+	if (DecodeMifareData(frame, data_len, parityBytes, isResponse, mfData, &mfDataLen)) {
 		memset(explanation, 0x00, sizeof(explanation));
 		if (!isResponse) {
 			explanation[0] = '>';
