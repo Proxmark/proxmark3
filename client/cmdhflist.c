@@ -298,7 +298,7 @@ bool DecodeMifareData(uint8_t *cmd, uint8_t cmdsize, uint8_t *parity, bool isRes
 			}
 
 			// check last used key
-			if (false && mfLastKey) {
+			if (mfLastKey) {
 				if (NestedCheckKey(mfLastKey, &AuthData, cmd, cmdsize, parity)) {
 					PrintAndLog("            |          * | key | last used key:%010"PRIx64"            ks2:%08x ks3:%08x |     |", 
 						mfLastKey,
@@ -310,7 +310,7 @@ bool DecodeMifareData(uint8_t *cmd, uint8_t cmdsize, uint8_t *parity, bool isRes
 			}
 			
 			// check default keys
-			if (false && !traceCrypto1) {
+			if (!traceCrypto1) {
 				for (int defaultKeyCounter = 0; defaultKeyCounter < MifareDefaultKeysSize; defaultKeyCounter++){
 					if (NestedCheckKey(MifareDefaultKeys[defaultKeyCounter], &AuthData, cmd, cmdsize, parity)) {
 						PrintAndLog("            |          * | key | default key:%010"PRIx64"              ks2:%08x ks3:%08x |     |", 
@@ -360,6 +360,33 @@ bool DecodeMifareData(uint8_t *cmd, uint8_t cmdsize, uint8_t *parity, bool isRes
 			//hardnested
 			if (!traceCrypto1) {
 				printf("hardnested not implemented. uid:%x nt:%x ar_enc:%x at_enc:%x\n", AuthData.uid, AuthData.nt, AuthData.ar_enc, AuthData.at_enc);
+				MifareAuthState = masError;
+
+				/* TOO SLOW( needs to have more strong filter. with this filter - aprox 4 mln tests
+				uint32_t t = msclock();
+				uint32_t t1 = t;
+				int n = 0;
+				for (uint32_t i = 0; i < 0xFFFFFFFF; i++) {
+					if (NTParityChk(&AuthData, i)){
+
+						uint32_t ks2 = AuthData.ar_enc ^ prng_successor(i, 64);
+						uint32_t ks3 = AuthData.at_enc ^ prng_successor(i, 96);
+						struct Crypto1State *pcs = lfsr_recovery64(ks2, ks3);
+
+
+
+
+						n++;
+
+						if (!(n % 100000)) {
+							printf("delta=%d n=%d ks2=%x ks3=%x \n", msclock() - t1 , n, ks2, ks3);
+							t1 = msclock();
+						}
+
+					}
+				}
+				printf("delta=%d n=%d\n", msclock() - t, n);
+				*/
 			}
 		}
 		
