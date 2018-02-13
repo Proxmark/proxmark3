@@ -83,6 +83,116 @@ uint8_t mifare_CRC_check(bool isResponse, uint8_t* data, uint8_t len)
 	}
 }
 
+void annotateIclass(char *exp, size_t size, uint8_t* cmd, uint8_t cmdsize)
+{
+	switch(cmd[0])
+	{
+	case ICLASS_CMD_ACTALL:      snprintf(exp,size,"ACTALL"); break;
+	case ICLASS_CMD_READ_OR_IDENTIFY:{
+		if(cmdsize > 1){
+			snprintf(exp,size,"READ(%d)",cmd[1]);
+		}else{
+			snprintf(exp,size,"IDENTIFY");
+		}
+		break;
+	}
+	case ICLASS_CMD_SELECT:      snprintf(exp,size,"SELECT"); break;
+	case ICLASS_CMD_PAGESEL:     snprintf(exp,size,"PAGESEL(%d)", cmd[1]); break;
+	case ICLASS_CMD_READCHECK_KC:snprintf(exp,size,"READCHECK[Kc](%d)", cmd[1]); break;
+	case ICLASS_CMD_READCHECK_KD:snprintf(exp,size,"READCHECK[Kd](%d)", cmd[1]); break;
+	case ICLASS_CMD_CHECK:       snprintf(exp,size,"CHECK"); break;
+	case ICLASS_CMD_DETECT:      snprintf(exp,size,"DETECT"); break;
+	case ICLASS_CMD_HALT:        snprintf(exp,size,"HALT"); break;
+	case ICLASS_CMD_UPDATE:      snprintf(exp,size,"UPDATE(%d)",cmd[1]); break;
+	case ICLASS_CMD_ACT:         snprintf(exp,size,"ACT"); break;
+	case ICLASS_CMD_READ4:       snprintf(exp,size,"READ4(%d)",cmd[1]); break;
+	default:                     snprintf(exp,size,"?"); break;
+	}
+	return;
+}
+
+void annotateIso15693(char *exp, size_t size, uint8_t* cmd, uint8_t cmdsize)
+{
+
+	if(cmd[0] == 0x26)
+	{
+		switch(cmd[1]){
+		case ISO15693_INVENTORY           :snprintf(exp, size, "INVENTORY");break;
+		case ISO15693_STAYQUIET           :snprintf(exp, size, "STAY_QUIET");break;
+		default:                     snprintf(exp,size,"?"); break;
+
+		}
+	}else if(cmd[0] == 0x02)
+	{
+		switch(cmd[1])
+		{
+		case ISO15693_READBLOCK            :snprintf(exp, size, "READBLOCK");break;
+		case ISO15693_WRITEBLOCK           :snprintf(exp, size, "WRITEBLOCK");break;
+		case ISO15693_LOCKBLOCK            :snprintf(exp, size, "LOCKBLOCK");break;
+		case ISO15693_READ_MULTI_BLOCK     :snprintf(exp, size, "READ_MULTI_BLOCK");break;
+		case ISO15693_SELECT               :snprintf(exp, size, "SELECT");break;
+		case ISO15693_RESET_TO_READY       :snprintf(exp, size, "RESET_TO_READY");break;
+		case ISO15693_WRITE_AFI            :snprintf(exp, size, "WRITE_AFI");break;
+		case ISO15693_LOCK_AFI             :snprintf(exp, size, "LOCK_AFI");break;
+		case ISO15693_WRITE_DSFID          :snprintf(exp, size, "WRITE_DSFID");break;
+		case ISO15693_LOCK_DSFID           :snprintf(exp, size, "LOCK_DSFID");break;
+		case ISO15693_GET_SYSTEM_INFO      :snprintf(exp, size, "GET_SYSTEM_INFO");break;
+		case ISO15693_READ_MULTI_SECSTATUS :snprintf(exp, size, "READ_MULTI_SECSTATUS");break;
+		default:                            snprintf(exp,size,"?"); break;
+		}
+	}
+}
+
+
+void annotateTopaz(char *exp, size_t size, uint8_t* cmd, uint8_t cmdsize)
+{
+	switch(cmd[0]) {
+		case TOPAZ_REQA						:snprintf(exp, size, "REQA");break;
+		case TOPAZ_WUPA						:snprintf(exp, size, "WUPA");break;
+		case TOPAZ_RID						:snprintf(exp, size, "RID");break;
+		case TOPAZ_RALL						:snprintf(exp, size, "RALL");break;
+		case TOPAZ_READ						:snprintf(exp, size, "READ");break;
+		case TOPAZ_WRITE_E					:snprintf(exp, size, "WRITE-E");break;
+		case TOPAZ_WRITE_NE					:snprintf(exp, size, "WRITE-NE");break;
+		case TOPAZ_RSEG						:snprintf(exp, size, "RSEG");break;
+		case TOPAZ_READ8					:snprintf(exp, size, "READ8");break;
+		case TOPAZ_WRITE_E8					:snprintf(exp, size, "WRITE-E8");break;
+		case TOPAZ_WRITE_NE8				:snprintf(exp, size, "WRITE-NE8");break;
+		default:                            snprintf(exp,size,"?"); break;
+	}
+}
+
+
+/**
+06 00 = INITIATE
+0E xx = SELECT ID (xx = Chip-ID)
+0B = Get UID
+08 yy = Read Block (yy = block number)
+09 yy dd dd dd dd = Write Block (yy = block number; dd dd dd dd = data to be written)
+0C = Reset to Inventory
+0F = Completion
+0A 11 22 33 44 55 66 = Authenticate (11 22 33 44 55 66 = data to authenticate)
+**/
+
+void annotateIso14443b(char *exp, size_t size, uint8_t* cmd, uint8_t cmdsize)
+{
+	switch(cmd[0]){
+	case ISO14443B_REQB   : snprintf(exp,size,"REQB");break;
+	case ISO14443B_ATTRIB : snprintf(exp,size,"ATTRIB");break;
+	case ISO14443B_HALT   : snprintf(exp,size,"HALT");break;
+	case ISO14443B_INITIATE     : snprintf(exp,size,"INITIATE");break;
+	case ISO14443B_SELECT       : snprintf(exp,size,"SELECT(%d)",cmd[1]);break;
+	case ISO14443B_GET_UID      : snprintf(exp,size,"GET UID");break;
+	case ISO14443B_READ_BLK     : snprintf(exp,size,"READ_BLK(%d)", cmd[1]);break;
+	case ISO14443B_WRITE_BLK    : snprintf(exp,size,"WRITE_BLK(%d)",cmd[1]);break;
+	case ISO14443B_RESET        : snprintf(exp,size,"RESET");break;
+	case ISO14443B_COMPLETION   : snprintf(exp,size,"COMPLETION");break;
+	case ISO14443B_AUTHENTICATE : snprintf(exp,size,"AUTHENTICATE");break;
+	default                     : snprintf(exp,size ,"?");break;
+	}
+
+}
+
 void annotateIso14443a(char *exp, size_t size, uint8_t* cmd, uint8_t cmdsize)
 {
 	switch(cmd[0])
