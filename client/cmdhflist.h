@@ -37,6 +37,6 @@ extern void annotateMifare(char *exp, size_t size, uint8_t* cmd, uint8_t cmdsize
 extern bool DecodeMifareData(uint8_t *cmd, uint8_t cmdsize, uint8_t *parity, bool isResponse, uint8_t *mfData, size_t *mfDataLen);
 extern bool NTParityChk(TAuthData *ad, uint32_t ntx);
 extern bool NestedCheckKey(uint64_t key, TAuthData *ad, uint8_t *cmd, uint8_t cmdsize, uint8_t *parity);
-extern bool CheckCrypto1Parity(uint8_t *cmd, uint8_t cmdsize, uint8_t *cmd_enc, uint8_t *parity_enc);
+extern bool CheckCrypto1Parity(uint8_t *cmd_enc, uint8_t cmdsize, uint8_t *cmd, uint8_t *parity_enc);
 
 #endif // CMDHFLIST

@@ -431,29 +431,32 @@ bool NestedCheckKey(uint64_t key, TAuthData *ad, uint8_t *cmd, uint8_t cmdsize, 
 	
 	crypto1_destroy(pcs);
 	
-	if(!CheckCrc14443(CRC_14443_A, buf, cmdsize)) 
-		return false;
-	
 	if (!CheckCrypto1Parity(cmd, cmdsize, buf, parity))
 		return false;
 
+	if(!CheckCrc14443(CRC_14443_A, buf, cmdsize)) 
+		return false;
+	
 	AuthData.ks2 = AuthData.ar_enc ^ ar;
 	AuthData.ks3 = AuthData.at_enc ^ at;
 
 	return true;
 }
 
-bool CheckCrypto1Parity(uint8_t *cmd, uint8_t cmdsize, uint8_t *cmd_enc, uint8_t *parity_enc) {
+bool CheckCrypto1Parity(uint8_t *cmd_enc, uint8_t cmdsize, uint8_t *cmd, uint8_t *parity_enc) {
+	uint8_t parity[16];
+	oddparitybuf(cmd, cmdsize, parity);
 	printf("parity check. size=%d\n", cmdsize);
 	printf("cmd    =%s\n", sprint_hex(cmd, cmdsize));
 	printf("cmd_enc=%s\n", sprint_hex(cmd_enc, cmdsize));
-	printf("parity=%s\n", printBitsPar(parity_enc, cmdsize));
+	printf("parity    =%s\n", printBitsPar(parity, cmdsize));
+	printf("parity_enc=%s\n", printBitsPar(parity_enc, cmdsize));
 //	(oddparity8(ntx >> 8 & 0xff) ^ (ntx & 0x01) ^ ((ad->nt_enc_par >> 5) & 0x01) ^ (ad->nt_enc & 0x01)) ||
+//	(oddparity8(ntx >> 24 & 0xff) ^ (ntx >> 16 & 0x01) ^ ((ad->nt_enc_par >> 7) & 0x01) ^ (ad->nt_enc >> 16 & 0x01))
 	for (int i = 0; i < cmdsize - 1; i++) {
-		bool b = oddparity8(cmd[i]) ^ (cmd[i + 1] & 0x01) ^ ((parity_enc[i / 8] >> (6 - i % 8)) & 0x01) ^ (cmd_enc[i + 1] & 0x01);
-		printf("i=%d b=%d\n", i, b);
+		bool b = oddparity8(cmd[i]) ^ (cmd[i + 1] & 0x01) ^ ((parity_enc[i / 8] >> (7 - i % 8)) & 0x01) ^ (cmd_enc[i + 1] & 0x01);
 		if (b)
-			return false;
+			printf("!!! i=%d \n", i);
 	}
 	
 	return true;
