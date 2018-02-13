@@ -38,5 +38,6 @@ extern bool DecodeMifareData(uint8_t *cmd, uint8_t cmdsize, uint8_t *parity, boo
 extern bool NTParityChk(TAuthData *ad, uint32_t ntx);
 extern bool NestedCheckKey(uint64_t key, TAuthData *ad, uint8_t *cmd, uint8_t cmdsize, uint8_t *parity);
 extern bool CheckCrypto1Parity(uint8_t *cmd_enc, uint8_t cmdsize, uint8_t *cmd, uint8_t *parity_enc);
+extern uint64_t GetCrypto1ProbableKey(TAuthData *ad);
 
 #endif // CMDHFLIST
