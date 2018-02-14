@@ -325,11 +325,12 @@ void annotateMifare(char *exp, size_t size, uint8_t* cmd, uint8_t cmdsize, uint8
 			if (cmdsize == 4 && isResponse) {
 				snprintf(exp,size,"AUTH: nt %s", (AuthData.first_auth) ? "" : "(enc)");
 				MifareAuthState = masNrAr;
-				if (AuthData.first_auth)
+				if (AuthData.first_auth) {
 					AuthData.nt = bytes_to_num(cmd, 4);
-				else
+				} else {
 					AuthData.nt_enc = bytes_to_num(cmd, 4);
 					AuthData.nt_enc_par = parity[0];
+				}
 				return;
 			} else {
 				MifareAuthState = masError;
