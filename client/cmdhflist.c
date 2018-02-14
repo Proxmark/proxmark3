@@ -456,7 +456,7 @@ bool DecodeMifareData(uint8_t *cmd, uint8_t cmdsize, uint8_t *parity, bool isRes
 
 							AuthData.nt = ntx;
 							mfLastKey = GetCrypto1ProbableKey(&AuthData);
-							PrintAndLog("            |          * | key | nested probable key:%010"PRIx64"      ks2:%08x ks3:%08x |     |", 
+							PrintAndLog("            |          * | key | nested probable key:%012"PRIx64"      ks2:%08x ks3:%08x |     |", 
 								mfLastKey,
 								AuthData.ks2,
 								AuthData.ks3);
