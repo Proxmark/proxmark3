@@ -54,26 +54,24 @@ static int CmdHelp(const char *Cmd);
 
 int usage_lf_cmdread(void)
 {
-	PrintAndLog("Usage: lf cmdread d <delay period> z <zero period> o <one period> c <cmdbytes> [H] ");
+	PrintAndLog("Usage: lf cmdread d <delay period> z <zero period> o <one period> c <cmdbytes> ");
 	PrintAndLog("Options:        ");
 	PrintAndLog("       h             This help");
-	PrintAndLog("       L             Low frequency (125 KHz)");
-	PrintAndLog("       H             High frequency (134 KHz)");
-	PrintAndLog("       d <delay>     delay OFF period");
-	PrintAndLog("       z <zero>      time period ZERO");
-	PrintAndLog("       o <one>       time period ONE");
+	PrintAndLog("       d <delay>     delay OFF period between bits (0 for bitbang mode)");
+	PrintAndLog("       z <zero>      time period ZERO (antenna off in bitbang mode)");
+	PrintAndLog("       o <one>       time period ONE (antenna on in bitbang mode)");
 	PrintAndLog("       c <cmd>       Command bytes");
 	PrintAndLog("       ************* All periods in microseconds");
+	PrintAndLog("       ************* Use lf config to configure options.");
 	PrintAndLog("Examples:");
 	PrintAndLog("      lf cmdread d 80 z 100 o 200 c 11000");
-	PrintAndLog("      lf cmdread d 80 z 100 o 100 c 11000 H");
+	PrintAndLog("      lf cmdread d 80 z 100 o 100 c 11000");
 	return 0;
 }
 
 /* send a command before reading */
 int CmdLFCommandRead(const char *Cmd)
 {
-	static char dummy[3] = {0x20,0x00,0x00};
 	UsbCommand c = {CMD_MOD_THEN_ACQUIRE_RAW_ADC_SAMPLES_125K};
 	bool errors = false;
 	//uint8_t divisor = 95; //125khz
@@ -84,14 +82,6 @@ int CmdLFCommandRead(const char *Cmd)
 		{
 		case 'h':
 			return usage_lf_cmdread();
-		case 'H':
-			//divisor = 88;
-			dummy[1]='h';
-			cmdp++;
-			break;
-		case 'L':
-			cmdp++;
-			break;
 		case 'c':
 			param_getstr(Cmd, cmdp+1, (char *)&c.d.asBytes, sizeof(c.d.asBytes));
 			cmdp+=2;
@@ -121,11 +111,13 @@ int CmdLFCommandRead(const char *Cmd)
 	//Validations
 	if(errors) return usage_lf_cmdread();
 	
-	// in case they specified 'H'
-	strcpy((char *)&c.d.asBytes + strlen((char *)c.d.asBytes), dummy);
-
 	clearCommandBuffer();
 	SendCommand(&c);
+
+	WaitForResponse(CMD_ACK,NULL);
+	getSamples(0, true);
+
+
 	return 0;
 }
 

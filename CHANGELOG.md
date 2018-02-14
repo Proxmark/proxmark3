@@ -6,6 +6,7 @@ This project uses the changelog in accordance with [keepchangelog](http://keepac
 ## [unreleased][unreleased]
 
 ### Changed
+- Adjusted `lf cmdread` to respond to client when complete and the client will then automatically call `data samples`
 - Improved backdoor detection missbehaving magic s50/1k tag (Fl0-0)
 - Deleted wipe functionality from `hf mf csetuid` (Merlok)
 - Changed `hf mf nested` logic (Merlok)
@@ -21,6 +22,7 @@ This project uses the changelog in accordance with [keepchangelog](http://keepac
 - Changed start sequence in Qt mode (fix: short commands hangs main Qt thread) (Merlok)
 
 ### Added
+- Added a bitbang mode to `lf cmdread` if delay is 0 the cmd bits turn off and on the antenna with 0 and 1 respectively (marshmellow)
 - Added PAC/Stanley detection to lf search (marshmellow)
 - Added lf pac demod and lf pac read - extracts the raw blocks from a PAC/Stanley tag (marshmellow)
 - Added hf mf c* commands compatibity for 4k and gen1b backdoor (Fl0-0)
