@@ -1,5 +1,6 @@
 //-----------------------------------------------------------------------------
 // Copyright (C) 2010 iZsh <izsh at fail0verflow.com>
+// Merlok - 2017
 //
 // This code is licensed to you under the terms of the GNU GPL, version 2 or,
 // at your option, any later version. See the LICENSE.txt file for the text of
@@ -31,6 +32,7 @@
 #include "cmdhftopaz.h"
 #include "protocols.h"
 #include "emv/cmdemv.h"
+#include "cmdhflist.h"
 
 static int CmdHelp(const char *Cmd);
 
@@ -40,236 +42,6 @@ int CmdHFTune(const char *Cmd)
   SendCommand(&c);
   return 0;
 }
-
-
-void annotateIso14443a(char *exp, size_t size, uint8_t* cmd, uint8_t cmdsize)
-{
-	switch(cmd[0])
-	{
-	case ISO14443A_CMD_WUPA:        snprintf(exp,size,"WUPA"); break;
-	case ISO14443A_CMD_ANTICOLL_OR_SELECT:{
-		// 93 20 = Anticollision (usage: 9320 - answer: 4bytes UID+1byte UID-bytes-xor)
-		// 93 70 = Select (usage: 9370+5bytes 9320 answer - answer: 1byte SAK)
-		if(cmd[1] == 0x70)
-		{
-			snprintf(exp,size,"SELECT_UID"); break;
-		}else
-		{
-			snprintf(exp,size,"ANTICOLL"); break;
-		}
-	}
-	case ISO14443A_CMD_ANTICOLL_OR_SELECT_2:{
-		//95 20 = Anticollision of cascade level2
-		//95 70 = Select of cascade level2
-		if(cmd[2] == 0x70)
-		{
-			snprintf(exp,size,"SELECT_UID-2"); break;
-		}else
-		{
-			snprintf(exp,size,"ANTICOLL-2"); break;
-		}
-	}
-	case ISO14443A_CMD_REQA:		snprintf(exp,size,"REQA"); break;
-	case ISO14443A_CMD_READBLOCK:	snprintf(exp,size,"READBLOCK(%d)",cmd[1]); break;
-	case ISO14443A_CMD_WRITEBLOCK:	snprintf(exp,size,"WRITEBLOCK(%d)",cmd[1]); break;
-	case ISO14443A_CMD_HALT:		snprintf(exp,size,"HALT"); break;
-	case ISO14443A_CMD_RATS:		snprintf(exp,size,"RATS"); break;
-	case MIFARE_CMD_INC:			snprintf(exp,size,"INC(%d)",cmd[1]); break;
-	case MIFARE_CMD_DEC:			snprintf(exp,size,"DEC(%d)",cmd[1]); break;
-	case MIFARE_CMD_RESTORE:		snprintf(exp,size,"RESTORE(%d)",cmd[1]); break;
-	case MIFARE_CMD_TRANSFER:		snprintf(exp,size,"TRANSFER(%d)",cmd[1]); break;
-	case MIFARE_AUTH_KEYA:{
-		if ( cmdsize > 3)
-			snprintf(exp,size,"AUTH-A(%d)",cmd[1]); 
-		else
-			//	case MIFARE_ULEV1_VERSION :  both 0x60.
-			snprintf(exp,size,"EV1 VERSION");
-		break;
-	}
-	case MIFARE_AUTH_KEYB:			snprintf(exp,size,"AUTH-B(%d)",cmd[1]); break;
-	case MIFARE_MAGICWUPC1:			snprintf(exp,size,"MAGIC WUPC1"); break;
-	case MIFARE_MAGICWUPC2:			snprintf(exp,size,"MAGIC WUPC2"); break;
-	case MIFARE_MAGICWIPEC:			snprintf(exp,size,"MAGIC WIPEC"); break;
-	case MIFARE_ULC_AUTH_1:		snprintf(exp,size,"AUTH "); break;
-	case MIFARE_ULC_AUTH_2:		snprintf(exp,size,"AUTH_ANSW"); break;
-	case MIFARE_ULEV1_AUTH:
-		if ( cmdsize == 7 )
-			snprintf(exp,size,"PWD-AUTH KEY: 0x%02x%02x%02x%02x", cmd[1], cmd[2], cmd[3], cmd[4] );
-		else
-			snprintf(exp,size,"PWD-AUTH");
-		break;
-	case MIFARE_ULEV1_FASTREAD:{
-		if ( cmdsize >=3 && cmd[2] <= 0xE6)
-			snprintf(exp,size,"READ RANGE (%d-%d)",cmd[1],cmd[2]); 
-		else
-			snprintf(exp,size,"?");
-		break;
-	}
-	case MIFARE_ULC_WRITE:{
-		if ( cmd[1] < 0x21 )
-			snprintf(exp,size,"WRITEBLOCK(%d)",cmd[1]); 
-		else
-			snprintf(exp,size,"?");
-		break;
-	}
-	case MIFARE_ULEV1_READ_CNT:{
-		if ( cmd[1] < 5 )
-			snprintf(exp,size,"READ CNT(%d)",cmd[1]);
-		else
-			snprintf(exp,size,"?");
-		break;
-	}
-	case MIFARE_ULEV1_INCR_CNT:{
-		if ( cmd[1] < 5 )
-			snprintf(exp,size,"INCR(%d)",cmd[1]);
-		else
-			snprintf(exp,size,"?");
-		break;
-	}
-	case MIFARE_ULEV1_READSIG:		snprintf(exp,size,"READ_SIG"); break;
-	case MIFARE_ULEV1_CHECKTEAR:	snprintf(exp,size,"CHK_TEARING(%d)",cmd[1]); break;
-	case MIFARE_ULEV1_VCSL:		snprintf(exp,size,"VCSL"); break;
-	default:						snprintf(exp,size,"?"); break;
-	}
-	return;
-}
-
-void annotateIclass(char *exp, size_t size, uint8_t* cmd, uint8_t cmdsize)
-{
-	switch(cmd[0])
-	{
-	case ICLASS_CMD_ACTALL:      snprintf(exp,size,"ACTALL"); break;
-	case ICLASS_CMD_READ_OR_IDENTIFY:{
-		if(cmdsize > 1){
-			snprintf(exp,size,"READ(%d)",cmd[1]);
-		}else{
-			snprintf(exp,size,"IDENTIFY");
-		}
-		break;
-	}
-	case ICLASS_CMD_SELECT:      snprintf(exp,size,"SELECT"); break;
-	case ICLASS_CMD_PAGESEL:     snprintf(exp,size,"PAGESEL(%d)", cmd[1]); break;
-	case ICLASS_CMD_READCHECK_KC:snprintf(exp,size,"READCHECK[Kc](%d)", cmd[1]); break;
-	case ICLASS_CMD_READCHECK_KD:snprintf(exp,size,"READCHECK[Kd](%d)", cmd[1]); break;
-	case ICLASS_CMD_CHECK:       snprintf(exp,size,"CHECK"); break;
-	case ICLASS_CMD_DETECT:      snprintf(exp,size,"DETECT"); break;
-	case ICLASS_CMD_HALT:        snprintf(exp,size,"HALT"); break;
-	case ICLASS_CMD_UPDATE:      snprintf(exp,size,"UPDATE(%d)",cmd[1]); break;
-	case ICLASS_CMD_ACT:         snprintf(exp,size,"ACT"); break;
-	case ICLASS_CMD_READ4:       snprintf(exp,size,"READ4(%d)",cmd[1]); break;
-	default:                     snprintf(exp,size,"?"); break;
-	}
-	return;
-}
-
-void annotateIso15693(char *exp, size_t size, uint8_t* cmd, uint8_t cmdsize)
-{
-
-	if(cmd[0] == 0x26)
-	{
-		switch(cmd[1]){
-		case ISO15693_INVENTORY           :snprintf(exp, size, "INVENTORY");break;
-		case ISO15693_STAYQUIET           :snprintf(exp, size, "STAY_QUIET");break;
-		default:                     snprintf(exp,size,"?"); break;
-
-		}
-	}else if(cmd[0] == 0x02)
-	{
-		switch(cmd[1])
-		{
-		case ISO15693_READBLOCK            :snprintf(exp, size, "READBLOCK");break;
-		case ISO15693_WRITEBLOCK           :snprintf(exp, size, "WRITEBLOCK");break;
-		case ISO15693_LOCKBLOCK            :snprintf(exp, size, "LOCKBLOCK");break;
-		case ISO15693_READ_MULTI_BLOCK     :snprintf(exp, size, "READ_MULTI_BLOCK");break;
-		case ISO15693_SELECT               :snprintf(exp, size, "SELECT");break;
-		case ISO15693_RESET_TO_READY       :snprintf(exp, size, "RESET_TO_READY");break;
-		case ISO15693_WRITE_AFI            :snprintf(exp, size, "WRITE_AFI");break;
-		case ISO15693_LOCK_AFI             :snprintf(exp, size, "LOCK_AFI");break;
-		case ISO15693_WRITE_DSFID          :snprintf(exp, size, "WRITE_DSFID");break;
-		case ISO15693_LOCK_DSFID           :snprintf(exp, size, "LOCK_DSFID");break;
-		case ISO15693_GET_SYSTEM_INFO      :snprintf(exp, size, "GET_SYSTEM_INFO");break;
-		case ISO15693_READ_MULTI_SECSTATUS :snprintf(exp, size, "READ_MULTI_SECSTATUS");break;
-		default:                            snprintf(exp,size,"?"); break;
-		}
-	}
-}
-
-
-void annotateTopaz(char *exp, size_t size, uint8_t* cmd, uint8_t cmdsize)
-{
-	switch(cmd[0]) {
-		case TOPAZ_REQA						:snprintf(exp, size, "REQA");break;
-		case TOPAZ_WUPA						:snprintf(exp, size, "WUPA");break;
-		case TOPAZ_RID						:snprintf(exp, size, "RID");break;
-		case TOPAZ_RALL						:snprintf(exp, size, "RALL");break;
-		case TOPAZ_READ						:snprintf(exp, size, "READ");break;
-		case TOPAZ_WRITE_E					:snprintf(exp, size, "WRITE-E");break;
-		case TOPAZ_WRITE_NE					:snprintf(exp, size, "WRITE-NE");break;
-		case TOPAZ_RSEG						:snprintf(exp, size, "RSEG");break;
-		case TOPAZ_READ8					:snprintf(exp, size, "READ8");break;
-		case TOPAZ_WRITE_E8					:snprintf(exp, size, "WRITE-E8");break;
-		case TOPAZ_WRITE_NE8				:snprintf(exp, size, "WRITE-NE8");break;
-		default:                            snprintf(exp,size,"?"); break;
-	}
-}
-
-
-/**
-06 00 = INITIATE
-0E xx = SELECT ID (xx = Chip-ID)
-0B = Get UID
-08 yy = Read Block (yy = block number)
-09 yy dd dd dd dd = Write Block (yy = block number; dd dd dd dd = data to be written)
-0C = Reset to Inventory
-0F = Completion
-0A 11 22 33 44 55 66 = Authenticate (11 22 33 44 55 66 = data to authenticate)
-**/
-
-void annotateIso14443b(char *exp, size_t size, uint8_t* cmd, uint8_t cmdsize)
-{
-	switch(cmd[0]){
-	case ISO14443B_REQB   : snprintf(exp,size,"REQB");break;
-	case ISO14443B_ATTRIB : snprintf(exp,size,"ATTRIB");break;
-	case ISO14443B_HALT   : snprintf(exp,size,"HALT");break;
-	case ISO14443B_INITIATE     : snprintf(exp,size,"INITIATE");break;
-	case ISO14443B_SELECT       : snprintf(exp,size,"SELECT(%d)",cmd[1]);break;
-	case ISO14443B_GET_UID      : snprintf(exp,size,"GET UID");break;
-	case ISO14443B_READ_BLK     : snprintf(exp,size,"READ_BLK(%d)", cmd[1]);break;
-	case ISO14443B_WRITE_BLK    : snprintf(exp,size,"WRITE_BLK(%d)",cmd[1]);break;
-	case ISO14443B_RESET        : snprintf(exp,size,"RESET");break;
-	case ISO14443B_COMPLETION   : snprintf(exp,size,"COMPLETION");break;
-	case ISO14443B_AUTHENTICATE : snprintf(exp,size,"AUTHENTICATE");break;
-	default                     : snprintf(exp,size ,"?");break;
-	}
-
-}
-
-/**
- * @brief iso14443A_CRC_check Checks CRC in command or response
- * @param isResponse
- * @param data
- * @param len
- * @return  0 : CRC-command, CRC not ok
- *          1 : CRC-command, CRC ok
- *          2 : Not crc-command
- */
-
-uint8_t iso14443A_CRC_check(bool isResponse, uint8_t* data, uint8_t len)
-{
-	uint8_t b1,b2;
-
-	if(len <= 2) return 2;
-
-	if(isResponse & (len < 6)) return 2;
-	
-	ComputeCrc14443(CRC_14443_A, data, len-2, &b1, &b2);
-	if (b1 != data[len-2] || b2 != data[len-1]) {
-		return 0;
-	} else {
-		return 1;
-	}
-}
-
 
 /**
  * @brief iso14443B_CRC_check Checks CRC in command or response
@@ -418,6 +190,8 @@ uint16_t printTraceLine(uint16_t tracepos, uint16_t traceLen, uint8_t *trace, ui
 	uint8_t topaz_reader_command[9];
 	uint32_t timestamp, first_timestamp, EndOfTransmissionTimestamp;
 	char explanation[30] = {0};
+	uint8_t mfData[32] = {0};
+	size_t mfDataLen = 0;
 
 	if (tracepos + sizeof(uint32_t) + sizeof(uint16_t) + sizeof(uint16_t) > traceLen) return traceLen;
 	
@@ -465,6 +239,9 @@ uint16_t printTraceLine(uint16_t tracepos, uint16_t traceLen, uint8_t *trace, ui
 			case ISO_14443B:
 			case TOPAZ:
 				crcStatus = iso14443B_CRC_check(isResponse, frame, data_len); 
+				break;
+			case PROTO_MIFARE:
+				crcStatus = mifare_CRC_check(isResponse, frame, data_len);
 				break;
 			case ISO_14443A:
 				crcStatus = iso14443A_CRC_check(isResponse, frame, data_len);
@@ -514,6 +291,9 @@ uint16_t printTraceLine(uint16_t tracepos, uint16_t traceLen, uint8_t *trace, ui
 
 	EndOfTransmissionTimestamp = timestamp + duration;
 
+	if (protocol == PROTO_MIFARE)
+		annotateMifare(explanation, sizeof(explanation), frame, data_len, parityBytes, parity_len, isResponse);
+	
 	if(!isResponse)
 	{
 		switch(protocol) {
@@ -542,6 +322,19 @@ uint16_t printTraceLine(uint16_t tracepos, uint16_t traceLen, uint8_t *trace, ui
 				(j == num_lines-1) ? explanation : "");
 		}
 	}
+	
+	if (DecodeMifareData(frame, data_len, parityBytes, isResponse, mfData, &mfDataLen)) {
+		memset(explanation, 0x00, sizeof(explanation));
+		if (!isResponse) {
+			explanation[0] = '>';
+			annotateIso14443a(&explanation[1], sizeof(explanation) - 1, mfData, mfDataLen);
+		}
+		uint8_t crcc = iso14443A_CRC_check(isResponse, mfData, mfDataLen);
+		PrintAndLog("            |          * | dec |%-64s | %-4s| %s",
+			sprint_hex(mfData, mfDataLen),
+			(crcc == 0 ? "!crc" : (crcc == 1 ? " ok " : "    ")),
+			(true) ? explanation : "");
+	};
 
 	if (is_last_record(tracepos, trace, traceLen)) return traceLen;
 	
@@ -583,6 +376,8 @@ int CmdHFList(const char *Cmd)
 	if(!errors) {
 		if(strcmp(type, "iclass") == 0)	{
 			protocol = ICLASS;
+		} else if(strcmp(type, "mf") == 0) {
+			protocol = PROTO_MIFARE;
 		} else if(strcmp(type, "14a") == 0) {
 			protocol = ISO_14443A;
 		} else if(strcmp(type, "14b") == 0)	{
@@ -604,6 +399,7 @@ int CmdHFList(const char *Cmd)
 		PrintAndLog("Supported <protocol> values:");
 		PrintAndLog("    raw    - just show raw data without annotations");
 		PrintAndLog("    14a    - interpret data as iso14443a communications");
+		PrintAndLog("    mf     - interpret data as iso14443a communications and decrypt crypto1 stream");
 		PrintAndLog("    14b    - interpret data as iso14443b communications");
 		PrintAndLog("    iclass - interpret data as iclass communications");
 		PrintAndLog("    topaz  - interpret data as topaz communications");
@@ -652,6 +448,7 @@ int CmdHFList(const char *Cmd)
 	PrintAndLog("      Start |        End | Src | Data (! denotes parity error)                                   | CRC | Annotation         |");
 	PrintAndLog("------------|------------|-----|-----------------------------------------------------------------|-----|--------------------|");
 
+	ClearAuthData();
 	while(tracepos < traceLen)
 	{
 		tracepos = printTraceLine(tracepos, traceLen, trace, protocol, showWaitCycles, markCRCBytes);

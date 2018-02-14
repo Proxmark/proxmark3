@@ -128,6 +128,7 @@ CMDSRCS = 	crapto1/crapto1.c\
 			emv/test/cda_test.c\
 			emv/cmdemv.c\
 			cmdhf.c \
+			cmdhflist.c \
 			cmdhf14a.c \
 			cmdhf14b.c \
 			cmdhf15.c \
