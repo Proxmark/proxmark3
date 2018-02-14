@@ -393,7 +393,7 @@ bool DecodeMifareData(uint8_t *cmd, uint8_t cmdsize, uint8_t *parity, bool isRes
 			AuthData.ks3 = AuthData.at_enc ^ prng_successor(AuthData.nt, 96);
 
 			mfLastKey = GetCrypto1ProbableKey(&AuthData);
-			PrintAndLog("            |          * | key | probable key:%010"PRIx64" Prng:%s   ks2:%08x ks3:%08x |     |", 
+			PrintAndLog("            |          * | key | probable key:%012"PRIx64" Prng:%s   ks2:%08x ks3:%08x |     |", 
 				mfLastKey,
 				validate_prng_nonce(AuthData.nt) ? "WEAK": "HARD",
 				AuthData.ks2,
@@ -411,7 +411,7 @@ bool DecodeMifareData(uint8_t *cmd, uint8_t cmdsize, uint8_t *parity, bool isRes
 			// check last used key
 			if (mfLastKey) {
 				if (NestedCheckKey(mfLastKey, &AuthData, cmd, cmdsize, parity)) {
-					PrintAndLog("            |          * | key | last used key:%010"PRIx64"            ks2:%08x ks3:%08x |     |", 
+					PrintAndLog("            |          * | key | last used key:%012"PRIx64"            ks2:%08x ks3:%08x |     |", 
 						mfLastKey,
 						AuthData.ks2,
 						AuthData.ks3);
@@ -424,7 +424,7 @@ bool DecodeMifareData(uint8_t *cmd, uint8_t cmdsize, uint8_t *parity, bool isRes
 			if (!traceCrypto1) {
 				for (int defaultKeyCounter = 0; defaultKeyCounter < MifareDefaultKeysSize; defaultKeyCounter++){
 					if (NestedCheckKey(MifareDefaultKeys[defaultKeyCounter], &AuthData, cmd, cmdsize, parity)) {
-						PrintAndLog("            |          * | key | default key:%010"PRIx64"              ks2:%08x ks3:%08x |     |", 
+						PrintAndLog("            |          * | key | default key:%012"PRIx64"              ks2:%08x ks3:%08x |     |", 
 							MifareDefaultKeys[defaultKeyCounter],
 							AuthData.ks2,
 							AuthData.ks3);
