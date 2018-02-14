@@ -33,13 +33,14 @@ void ModThenAcquireRawAdcSamples125k(uint32_t delay_off, uint32_t period_0, uint
 
 	// use lf config settings
 	sample_config *sc = getSamplingConfig();
-	// clear read buffer
-	BigBuf_Clear_keep_EM();
 
-	/* Make sure the tag is reset */
+	// Make sure the tag is reset
 	FpgaDownloadAndGo(FPGA_BITSTREAM_LF);
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
 	WaitMS(2500);
+
+	// clear read buffer (after fpga bitstream loaded...)
+	BigBuf_Clear_keep_EM();
 
 	// power on
 	LFSetupFPGAForADC(sc->divisor, 1);
