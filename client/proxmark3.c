@@ -44,7 +44,6 @@ __attribute__((force_align_arg_pointer))
 #endif
 #endif
 main_loop(char *script_cmds_file, char *script_cmd, bool usb_present, serial_port* sp) {
-	struct receiver_arg rarg;
 	receiver_arg conn;
 	char *cmd = NULL;
 	pthread_t reader_thread;

@@ -35,7 +35,15 @@ void SetOffline(bool new_offline);
 bool IsOffline();
 
 void SendCommand(UsbCommand *c);
-void *uart_receiver(void *targ);
+
+void
+#ifdef __has_attribute
+#	if __has_attribute(force_align_arg_pointer)
+		__attribute__((force_align_arg_pointer))
+#	endif
+#endif
+*uart_receiver(void *targ);
+
 void UsbCommandReceived(UsbCommand *UC);
 void clearCommandBuffer();
 bool WaitForResponseTimeoutW(uint64_t cmd, UsbCommand* response, size_t ms_timeout, bool show_warning);

@@ -242,7 +242,7 @@ bool ReceiveCommand(receiver_arg* conn, UsbCommand* command) {
 }
 
 // Worker thread for processing incoming events from the PM3
-static void
+void
 #ifdef __has_attribute
 #	if __has_attribute(force_align_arg_pointer)
 		__attribute__((force_align_arg_pointer))
