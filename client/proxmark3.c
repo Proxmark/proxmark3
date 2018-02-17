@@ -73,7 +73,6 @@ static void *uart_receiver(void *targ) {
 	size_t rxlen;
 	bool need_reconnect = false;
 	UsbCommand version_cmd = {CMD_VERSION};
-	static bool request_version = false;
 
 	while (arg->run) {
 		if( need_reconnect ) {
@@ -81,24 +80,22 @@ static void *uart_receiver(void *targ) {
 
 			if( sp == INVALID_SERIAL_PORT || sp == CLAIMED_SERIAL_PORT )
 			{
-				PrintAndLog("Reconnect failed, retrying...");
+				//PrintAndLog("Reconnect failed, retrying...");
 
 				if( txcmd_pending ) {
 					PrintAndLog("Cannot send bytes to offline proxmark");
 					txcmd_pending = false;
 				}
 
-				sleep(2);
+				sleep(1);
 				continue;
 			}
 
 			PrintAndLog("Proxmark reconnected!");
 			need_reconnect = false;
 			offline = 0;
-			//CmdVersionC(NULL, true);
 			clearCommandBuffer();
-			uart_send(sp, (byte_t*) &version_cmd, sizeof(UsbCommand)); // request it from the HW
-			request_version = true;
+			CmdVersionClearCache();
 		}
 
 		rxlen = 0;
@@ -110,12 +107,6 @@ static void *uart_receiver(void *targ) {
 				}
 
 				UsbCommandReceived((UsbCommand*)rx);
-
-				if( request_version && ((UsbCommand*)rx)->cmd == CMD_ACK)
-				{
-					request_version = false;
-					CmdVersionC(NULL, true);
-				}
 			}
 		}
 		else {

@@ -408,15 +408,22 @@ int CmdVersion(const char *Cmd)
 	return CmdVersionC(Cmd, false);
 }
 
-int CmdVersionC(const char *Cmd, const bool no_cache)
+int CmdVersionClearCache()
+{
+	return CmdVersionC(NULL, true);
+}
+
+int CmdVersionC(const char *Cmd, const bool clear_cache)
 {
 	UsbCommand c = {CMD_VERSION};
 	static UsbCommand resp = {0, {0, 0, 0}};
 
-	if( no_cache )
+	if (clear_cache) {
 		memset( &resp, 0, sizeof(resp) );
-	else
-		clearCommandBuffer();
+		return 0;
+	}
+
+	clearCommandBuffer();
 
 	if (resp.arg[0] == 0 && resp.arg[1] == 0) { // no cached information available
 		SendCommand(&c);
