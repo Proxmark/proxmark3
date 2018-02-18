@@ -23,7 +23,5 @@ int CmdSetDivisor(const char *Cmd);
 int CmdSetMux(const char *Cmd);
 int CmdTune(const char *Cmd);
 int CmdVersion(const char *Cmd);
-int CmdVersionClearCache();
-int CmdVersionC(const char *Cmd, const bool clear_cache);
 
 #endif

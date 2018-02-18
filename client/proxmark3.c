@@ -72,7 +72,6 @@ static void *uart_receiver(void *targ) {
 	struct receiver_arg *arg = (struct receiver_arg*)targ;
 	size_t rxlen;
 	bool need_reconnect = false;
-	UsbCommand version_cmd = {CMD_VERSION};
 
 	while (arg->run) {
 		if( need_reconnect ) {
@@ -95,7 +94,6 @@ static void *uart_receiver(void *targ) {
 			need_reconnect = false;
 			offline = 0;
 			clearCommandBuffer();
-			CmdVersionClearCache();
 		}
 
 		rxlen = 0;
@@ -145,7 +143,7 @@ void main_loop(char *script_cmds_file, char *script_cmd, bool usb_present) {
 		rarg.run = 1;
 		pthread_create(&reader_thread, NULL, &uart_receiver, &rarg);
 		// cache Version information now:
-		CmdVersion(NULL);
+		CmdVersion("nocache");
 	}
 
 	// file with script
