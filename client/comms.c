@@ -341,7 +341,7 @@ bool WaitForResponseTimeoutW(uint64_t cmd, UsbCommand* response, size_t ms_timeo
 		if (msclock() - start_time > 2000 && show_warning) {
 			// 2 seconds elapsed (but this doesn't mean the timeout was exceeded)
 			PrintAndLog("Waiting for a response from the proxmark...");
-			PrintAndLog("Don't forget to cancel its operation first by pressing on the button");
+			PrintAndLog("You can cancel this operation by pressing the pm3 button");
 			show_warning = false;
 		}
 	}
