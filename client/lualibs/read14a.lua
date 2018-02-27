@@ -80,6 +80,7 @@ end
 
 local function sendToDevice(command, ignoreresponse)
 	core.clearCommandBuffer()
+	print("Sent a UsbCommand via read14a.lua.")
 	local err = core.SendCommand(command:getBytes())
 	if err then
 		print(err)
@@ -88,13 +89,14 @@ local function sendToDevice(command, ignoreresponse)
 	if ignoreresponse then return nil,nil end
 
 	local response = core.WaitForResponseTimeout(cmds.CMD_ACK,TIMEOUT)
+	print("Received a UsbCommand packet in read14a.lua.")
 	return response,nil
 end
 
--- This function does a connect and retrieves som einfo
+-- This function does a connect and retrieves some info
 -- @param dont_disconnect - if true, does not disable the field
 -- @param no_rats - if true, skips ISO14443-4 select (RATS)
--- @return if successfull: an table containing card info
+-- @return if successfull: a table containing card info
 -- @return if unsuccessfull : nil, error
 local function read14443a(dont_disconnect, no_rats)
 	local command, result, info, err, data
@@ -109,6 +111,7 @@ local function read14443a(dont_disconnect, no_rats)
 	end
 	local result,err = sendToDevice(command)
 	if result then
+		print("Currently trying to decode the UsbCommand packet just received (an ACK of the connection).")
 		local count,cmd,arg0,arg1,arg2 = bin.unpack('LLLL',result)
 		if arg0 == 0 then
 			return nil, "iso14443a card select failed"
@@ -143,6 +146,8 @@ end
 local library = {
 	read14443a = read14443a,
 	read = read14443a,
+	read14443a = read14443a,
+	read 	= read14443a,
 	waitFor14443a = waitFor14443a,
 	parse14443a = parse14443a,
 	sendToDevice = sendToDevice,

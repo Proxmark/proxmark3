@@ -102,6 +102,38 @@ static int l_WaitForResponseTimeout(lua_State *L){
 
 	if(WaitForResponseTimeout(cmd, &response, ms_timeout))
 	{
+		//BEGIN ADDED CODE
+		uint8_t *recv;
+    	char *hexout;
+		recv = response.d.asBytes;
+        uint8_t iLen = response.arg[0];
+		if (0){
+			iLen = response.arg[1];
+			if (iLen){
+				PrintAndLog("Card selected. UID[%i]:", iLen);
+			} else {
+				PrintAndLog("Can't select card.");
+			}
+		} else {
+			PrintAndLog("received %i bytes:", iLen);
+		}
+        if(!iLen)
+            return 1;
+        hexout = (char *)malloc(iLen * 3 + 1);
+        if (hexout != NULL) {
+            for (int i = 0; i < iLen; i++) { // data in hex
+                sprintf(&hexout[i * 3], "%02X ", recv[i]);
+            }
+            PrintAndLog("%s", hexout);
+            free(hexout);
+        } else {
+            PrintAndLog("malloc failed your client has low memory?");
+			return 2;
+        }
+        printf("Command response just sent back to Lua script with the bytes which were just printed. Should get sent to read14a.lua.\n");
+        //END ADDED CODE
+
+
 		//Push it as a string
 		lua_pushlstring(L,(const char *)&response,sizeof(UsbCommand));
 
@@ -109,6 +141,7 @@ static int l_WaitForResponseTimeout(lua_State *L){
 	}else{
 		//Push a Nil instead
 		lua_pushnil(L);
+		printf("Nil pushed back to Lua script - no response received.\n");
 		return 1;// one return value
 	}
 }
