@@ -8,21 +8,36 @@ function oops(err)
 	print("ERROR: ",err)
 end
 
-function sendRaw(rawdata, crc)
-	print(">> ", rawdata)
+---
+-- Used to send raw data to the firmware to subsequently forward the data to the card.
+function sendRaw(rawdata, crc, power)
+	print((">> 	  %s"):format(rawdata))
 
-	--get rid of the ISO14A_APPEND_CRC flag if we don't want a CRC to be appended to the raw bytes.
-	local flags = lib14a.ISO14A_COMMAND.ISO14A_NO_DISCONNECT + lib14a.ISO14A_COMMAND.ISO14A_RAW + lib14a.ISO14A_COMMAND.ISO14A_APPEND_CRC
+	local flags = lib14a.ISO14A_COMMAND.ISO14A_RAW
+	if crc then
+		flags = flags + lib14a.ISO14A_COMMAND.ISO14A_APPEND_CRC
+	end
+	if power then
+		flags = flags + lib14a.ISO14A_COMMAND.ISO14A_NO_DISCONNECT
+	end
 
 	local command = Command:new{cmd = cmds.CMD_READER_ISO_14443a, 
 								arg1 = flags, -- Send raw
 								arg2 = string.len(rawdata) / 2, -- arg2 contains the length, which is half the length of the ASCII-string rawdata
 								data = rawdata}
 	local ignore_response = false
-	return lib14a.sendToDevice(command, ignore_response)
+	local result, err = lib14a.sendToDevice(command, ignore_response)
+	if result then
+		--unpack the first 4 parts of the result as longs, and the last as an extremely long string to later be cut down based on arg1, the number of bytes returned
+		local count,cmd,arg1,arg2,arg3,data = bin.unpack('LLLLH512',result)
+		print(("<< %s"):format(string.sub(data, 1, arg1 * 2))) -- need to multiply by 2 because the hex digits are actually two bytes when they are strings
+	else
+		err = "Error sending the card raw data."
+		oops(err)
+	end
 end
 
---- 
+---
 -- The main entry point
 function main(args)
 
@@ -34,17 +49,17 @@ function main(args)
 	end
 
 	-- Now that the card is initialized, attempt to send raw data and read the response.
-	getvers = "0360" -- 0x0360 begins the "get version" commands
+	GETVERS_INIT = "0360" -- Begins the GetVersion command
+	GETVERS_CONT = "03AF" -- Continues the GetVersion command
+	POWEROFF = "OFF"
 
-	local result,err = sendRaw(getvers, true)
-	if result then
-		print("Currently trying to decode raw UsbCommand packet received.")
-		local count,cmd,arg1,arg2,arg3,data = bin.unpack('LLLLH512',result)
-		print(data)
-	else
-		err = "No response from sending the card raw data."
-		oops(err)
-	end
+	sendRaw(GETVERS_INIT, true, true)
+	sendRaw(GETVERS_CONT, true, true)
+	sendRaw(GETVERS_CONT, true, true)
+
+	sendRaw(POWEROFF, false, false) --power off the Proxmark
+
+
 
 end
 

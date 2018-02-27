@@ -80,7 +80,6 @@ end
 
 local function sendToDevice(command, ignoreresponse)
 	core.clearCommandBuffer()
-	print("Sent a UsbCommand via read14a.lua.")
 	local err = core.SendCommand(command:getBytes())
 	if err then
 		print(err)
@@ -89,7 +88,6 @@ local function sendToDevice(command, ignoreresponse)
 	if ignoreresponse then return nil,nil end
 
 	local response = core.WaitForResponseTimeout(cmds.CMD_ACK,TIMEOUT)
-	print("Received a UsbCommand packet in read14a.lua.")
 	return response,nil
 end
 
