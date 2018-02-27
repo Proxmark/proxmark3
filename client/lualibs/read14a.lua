@@ -111,7 +111,6 @@ local function read14443a(dont_disconnect, no_rats)
 	end
 	local result,err = sendToDevice(command)
 	if result then
-		print("Currently trying to decode the UsbCommand packet just received (an ACK of the connection).")
 		local count,cmd,arg0,arg1,arg2 = bin.unpack('LLLL',result)
 		if arg0 == 0 then
 			return nil, "iso14443a card select failed"
