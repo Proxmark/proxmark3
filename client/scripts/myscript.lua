@@ -5,6 +5,7 @@ GETVERS_INIT = "0360" -- Begins the GetVersion command
 GETVERS_CONT = "03AF" -- Continues the GetVersion command
 POWEROFF = "OFF"
 WRITEPERSO = "03A8"
+COMMITPERSO = "03AA"
 AUTH_FIRST = "0370"
 AUTH_CONT = "0372"
 AUTH_NONFIRST = "0376"
@@ -113,18 +114,30 @@ function writeBlock(blocknum, data)
 	-- The block numbers sent to the card need to be in little endian format (i.e. block 0x0001 is sent as 0x1000)
 	blocknum_little_endian = string.sub(blocknum, 3, 4) .. string.sub(blocknum, 1, 2)
 	commandString = WRITEPERSO .. blocknum_little_endian .. data --Write 16 bytes (32 hex chars).
-	local response = sendRaw(commandString, true, true) --0x90 is returned upon success
+	response = sendRaw(commandString, true, true) --0x90 is returned upon success
 	if string.sub(response, 3, 4) ~= "90" then
 		oops(("error occurred while trying to write to block %s"):format(blocknum))
 	end
 end
 
 function authenticateAES()
-	-- Used to try to authenticate with the AES keys we programmed into the card, to ensure the authentication works correctly while still in SL0.
+	-- Used to try to authenticate with the AES keys we programmed into the card, to ensure the authentication works correctly.
 	commandString = AUTH_FIRST
 	commandString = commandString .. ""
+end
 
+function getVersion()
+	sendRaw(GETVERS_INIT, true, true)
+	sendRaw(GETVERS_CONT, true, true)
+	sendRaw(GETVERS_CONT, true, true)
+end
 
+function commitPerso()
+	commandString = COMMITPERSO .. "01" --switch to SL1
+	response = sendRaw(commandString, true, true) --0x90 is returned upon success
+	if string.sub(response, 3, 4) ~= "90" then
+		oops("error occurred while trying to switch security level")
+	end
 end
 
 ---
@@ -138,15 +151,14 @@ function main(args)
 		else print(("Connected to card with a UID of %s"):format(info.uid))
 	end
 
-	-- Now that the card is initialized, attempt to send raw data and read the response.
+	-- Now, the card is initialized and we can do more interesting things.
 
-	--sendRaw(GETVERS_INIT, true, true)
-	--sendRaw(GETVERS_CONT, true, true)
-	--sendRaw(GETVERS_CONT, true, true)
+	--writePerso()
+	commitPerso()
 
-	writePerso()
 
-	sendRaw(POWEROFF, false, false) --power off the Proxmark
+	-- Power off the Proxmark
+	sendRaw(POWEROFF, false, false)
 
 
 
