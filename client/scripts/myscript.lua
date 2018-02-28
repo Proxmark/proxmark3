@@ -9,6 +9,9 @@ COMMITPERSO = "03AA"
 AUTH_FIRST = "0370"
 AUTH_CONT = "0372"
 AUTH_NONFIRST = "0376"
+PREPAREPC = "03F0"
+PROXIMITYCHECK = "03F2"
+VERIFYPC = "03FD"
 
 --- 
 -- This is only meant to be used when errors occur
@@ -140,22 +143,39 @@ function commitPerso()
 	end
 end
 
+function proximityCheck()
+	commandString = PREPAREPC
+	response = sendRaw(commandString, true, true) --0x90 is returned upon success
+
+	commandString = PROXIMITYCHECK
+
+	commandString = VERIFYPC
+
+end
+
 ---
 -- The main entry point
 function main(args)
 
 	-- Initialize the card using the read14a library
-	info,err = lib14a.read14443a(true, no_rats)
-	if err
-		then oops(err)
-		else print(("Connected to card with a UID of %s"):format(info.uid))
+	info,err = lib14a.read14443a(true, false)
+	if err then
+		oops(err)
+	else
+		print(("Connected to card with a UID of %s"):format(info.uid))
 	end
 
 	-- Now, the card is initialized and we can do more interesting things.
 
 	--writePerso()
-	commitPerso()
+	--commitPerso()
+	--getVersion()
+	--proximityCheck()
+	sendRaw("e050", true, true)
+	sendRaw("D01100", true, true)
 
+	sendRaw("0360", true, true)
+	
 
 	-- Power off the Proxmark
 	sendRaw(POWEROFF, false, false)
