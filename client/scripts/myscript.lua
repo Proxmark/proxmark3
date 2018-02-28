@@ -145,7 +145,7 @@ end
 
 function proximityCheck()
 	commandString = PREPAREPC
-	response = sendRaw(commandString, true, true) --0x90 is returned upon success
+	response = sendRaw(commandString, true, true)
 
 	commandString = PROXIMITYCHECK
 
@@ -159,22 +159,23 @@ function main(args)
 
 	-- Initialize the card using the read14a library
 	info,err = lib14a.read14443a(true, false)
+	--Perform PPS (Protocol and Parameter Selection) check to finish the ISO 14443-4 protocol.
+	sendRaw("e050", true, true)
+	sendRaw("D01100", true, true)
 	if err then
 		oops(err)
 	else
-		print(("Connected to card with a UID of %s"):format(info.uid))
+		print(("Connected to card with a UID of %s."):format(info.uid))
 	end
+
 
 	-- Now, the card is initialized and we can do more interesting things.
 
 	--writePerso()
 	--commitPerso()
 	--getVersion()
-	--proximityCheck()
-	sendRaw("e050", true, true)
-	sendRaw("D01100", true, true)
+	proximityCheck()
 
-	sendRaw("0360", true, true)
 	
 
 	-- Power off the Proxmark
