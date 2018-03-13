@@ -1,6 +1,8 @@
 local cmds = require('commands')
 local lib14a = require('read14a')
 
+SIXTEEN_BYTES_ZEROS = "00000000000000000000000000000000"
+
 GETVERS_INIT = "0360" -- Begins the GetVersion command
 GETVERS_CONT = "03AF" -- Continues the GetVersion command
 POWEROFF = "OFF"
@@ -12,6 +14,7 @@ AUTH_NONFIRST = "0376"
 PREPAREPC = "03F0"
 PROXIMITYCHECK = "03F2"
 VERIFYPC = "03FD"
+READPLAINNOMACUNMACED = "0336"
 
 --- 
 -- This is only meant to be used when errors occur
@@ -63,7 +66,6 @@ function writePerso()
 	--		0x0B - command invalid
 	--		0x0C - unexpected command length
 	
-	SIXTEEN_BYTES_ZEROS = "00000000000000000000000000000000"
 
 	-- First, set all the data in the card (4kB of data) to zeros. The keys, stored in the sector trailer block, are also set to zeros.
 	-- The only block which cannot be explicitly set is block 0x0000, the manufacturer block.
@@ -147,7 +149,8 @@ function proximityCheck()
 	commandString = PREPAREPC
 	response = sendRaw(commandString, true, true)
 
-	commandString = PROXIMITYCHECK
+	commandString = PROXIMITYCHECK .. "08" .. "0001020304050607"
+	response = sendRaw(commandString, true, true)
 
 	commandString = VERIFYPC
 
@@ -174,9 +177,15 @@ function main(args)
 	--writePerso()
 	--commitPerso()
 	--getVersion()
-	proximityCheck()
+	--proximityCheck()
 
-	
+	-- attempt to read VCProximityKey at block A001
+	-- commandString = READPLAINNOMACUNMACED .. "01A0" .. "01"
+	-- response = sendRaw(commandString, true, true)
+
+	-- authenticate with CardConfigurationKey
+	commandString = AUTH_FIRST .. "0190" .. "00"
+	response = sendRaw(commandString, true, true)
 
 	-- Power off the Proxmark
 	sendRaw(POWEROFF, false, false)
