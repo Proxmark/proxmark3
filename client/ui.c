@@ -53,8 +53,11 @@ void PrintAndLog(char *fmt, ...)
 		}
 	}
 
+	// If there is an incoming message from the hardware (eg: lf hid read) in
+	// the background (while the prompt is displayed and accepting user input),
+	// stash the prompt and bring it back later.
 #ifdef RL_STATE_READCMD
-	// We are using GNU readline.
+	// We are using GNU readline. libedit (OSX) doesn't support this flag.
 	int need_hack = (rl_readline_state & RL_STATE_READCMD) > 0;
 
 	if (need_hack) {
@@ -64,9 +67,6 @@ void PrintAndLog(char *fmt, ...)
 		rl_replace_line("", 0);
 		rl_redisplay();
 	}
-#else
-	// We are using libedit (OSX), which doesn't support this flag.
-	int need_hack = 0;
 #endif
 	
 	va_start(argptr, fmt);
@@ -76,6 +76,8 @@ void PrintAndLog(char *fmt, ...)
 	va_end(argptr);
 	printf("\n");
 
+#ifdef RL_STATE_READCMD
+	// We are using GNU readline. libedit (OSX) doesn't support this flag.
 	if (need_hack) {
 		rl_restore_prompt();
 		rl_replace_line(saved_line, 0);
@@ -83,6 +85,7 @@ void PrintAndLog(char *fmt, ...)
 		rl_redisplay();
 		free(saved_line);
 	}
+#endif
 	
 	if (logging && logfile) {
 		vfprintf(logfile, fmt, argptr2);

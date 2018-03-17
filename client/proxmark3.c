@@ -132,7 +132,7 @@ main_loop(char *script_cmds_file, char *script_cmd, bool usb_present) {
 			printf("executing commands from file: %s\n", script_cmds_file);
 		}
 	}
-	
+
 	read_history(".history");
 
 	while(1)  {
@@ -287,6 +287,9 @@ int main(int argc, char* argv[]) {
 	bool addLuaExec = false;
 	char *script_cmds_file = NULL;
 	char *script_cmd = NULL;
+
+	// Must be before the first PrintAndLog call, for rl_redisplay
+	rl_initialize();
   
 	if (argc < 2) {
 		show_help(true, argv[0]);
