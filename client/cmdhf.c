@@ -461,24 +461,24 @@ int CmdHFList(const char *Cmd)
 
 
 	uint8_t *trace;
-	uint16_t tracepos = 0;
-	uint16_t traceLen = 0;
+	uint32_t tracepos = 0;
+	uint32_t traceLen = 0;
 	
 	if (loadFromFile) {
 		FILE *tracefile = NULL;
 		size_t bytes_read;
-		uint8_t buf[2];
+		uint8_t buf[4];
 		if ((tracefile = fopen(filename,"rb")) == NULL) { 
 			PrintAndLog("Could not open file %s", filename);
 			return 0;
 		}
-		bytes_read = fread(buf, 1, 2, tracefile);
-		if (bytes_read != 2) {
+		bytes_read = fread(buf, 1, 4, tracefile);
+		if (bytes_read != 4) {
 			PrintAndLog("File reading error.");
 			fclose(tracefile);
 			return 1;
 		}
-		traceLen = bytes_to_num(buf, 2); // little endian in file
+		traceLen = bytes_to_num(buf, 4); // little endian in file
 		trace = malloc(traceLen+2);
 		if (trace == NULL) {
 			PrintAndLog("Cannot allocate memory for trace");
@@ -512,13 +512,13 @@ int CmdHFList(const char *Cmd)
 
 	if (saveToFile) {
 		FILE *traceFile = NULL;
-		uint8_t buf[2];
+		uint8_t buf[4];
 		if ((traceFile = fopen(filename,"wb")) == NULL) { 
 			PrintAndLog("Could not create file %s", filename);
 			return 1;
 		}
-		num_to_bytes(traceLen, 2, buf);
-		fwrite(buf, 1, 2, traceFile);
+		num_to_bytes(traceLen, 4, buf);
+		fwrite(buf, 1, 4, traceFile);
 		fwrite(trace, 1, traceLen, traceFile);
 		PrintAndLog("Recorded Activity (TraceLen = %d bytes) written to file %s", traceLen, filename);
 	} else {
