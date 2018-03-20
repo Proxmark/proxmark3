@@ -162,14 +162,68 @@ function commitPerso()
 	end
 end
 
+function calculateMAC(MAC_input)
+	-- Pad the input if it is not a multiple of 16 bytes (32 nibbles). 
+	if(string.len(MAC_input) % 32 != 0) then
+		MAC_input = MAC_input .. "80"
+	end
+	while(string.len(MAC_input) % 32 != 0) do
+		MAC_input = MAC_input .. "0"
+	end
+	print("Padded MAC Input = " .. MAC_input .. ", length = " .. string.len(MAC_input))
+
+	--The MAC would actually be calculated here, and the output stored in raw_output
+	raw_output = "00010203040506070001020304050607" -- Dummy filler for now of 16-byte output. To be filled with actual MAC for testing purposes.
+
+	-- The final 8-byte MAC output is a concatenation of every 2nd byte starting from the second MSB.
+	final_output = ""
+	j = 3
+	for i = 1,8 do
+		final_output = final_output .. string.sub(RndR, j, j + 1) .. string.sub(RndC, j, j + 1)
+		j = j + 4
+	end
+	return final_output
+end
+
 function proximityCheck()
 	commandString = PREPAREPC
 	response = sendRaw(commandString, true, true)
+	OPT = string.sub(response, 5, 6)
+	if(tonumber(OPT) == 1) then
+		pps_present = true
+	else
+		pps_present = false
+	end
+	pubRespTime = string.sub(response, 7, 10)
+	if(pps_present == true) then
+		pps = string.sub(response, 11, 12)
+	else
+		pps = nil
+	end
+	print("OPT = " .. OPT .. " pubRespTime = " .. pubRespTime .. " pps = " .. pps)
 
-	commandString = PROXIMITYCHECK .. "08" .. "0001020304050607"
+	RndC = "0001020304050607" --Random Challenge
+	commandString = PROXIMITYCHECK .. "08" .. RndC
 	response = sendRaw(commandString, true, true)
+	RndR = string.sub(response, 3, 18)
+	print("RndC = " .. RndC .. " RndR = " .. RndR)
 
 	commandString = VERIFYPC
+	MAC_input = "FD" .. OPT .. pubRespTime
+	if(pps_present == true) then
+		MAC_input = MAC_input .. pps
+	end
+	concat = ""
+	j = 1
+	for i = 1,8 do
+		concat = concat .. string.sub(RndR, j, j + 1) .. string.sub(RndC, j, j + 1)
+		j = j + 2
+	end
+	MAC_input = MAC_input .. concat
+	print("concat = " .. concat .. " MAC_input = " .. MAC_input)
+
+	MAC_tag = calculateMAC(MAC_input)
+	print(MAC_tag)
 
 end
 
