@@ -25,7 +25,7 @@ end
 ---
 -- Used to send raw data to the firmware to subsequently forward the data to the card.
 function sendRaw(rawdata, crc, power)
-	print((">> 	  %s"):format(rawdata))
+	print(("<sent>: 	  %s"):format(rawdata))
 
 	local flags = lib14a.ISO14A_COMMAND.ISO14A_RAW
 	if crc then
@@ -45,7 +45,7 @@ function sendRaw(rawdata, crc, power)
 		--unpack the first 4 parts of the result as longs, and the last as an extremely long string to later be cut down based on arg1, the number of bytes returned
 		local count,cmd,arg1,arg2,arg3,data = bin.unpack('LLLLH512',result)
 		returned_bytes = string.sub(data, 1, arg1 * 2)
-		print(("<< %s"):format(returned_bytes)) -- need to multiply by 2 because the hex digits are actually two bytes when they are strings
+		print(("<recvd>: %s"):format(returned_bytes)) -- need to multiply by 2 because the hex digits are actually two bytes when they are strings
 		return returned_bytes
 	else
 		err = "Error sending the card raw data."
@@ -164,13 +164,13 @@ end
 
 function calculateMAC(MAC_input)
 	-- Pad the input if it is not a multiple of 16 bytes (32 nibbles). 
-	if(string.len(MAC_input) % 32 != 0) then
+	if(string.len(MAC_input) % 32 ~= 0) then
 		MAC_input = MAC_input .. "80"
 	end
-	while(string.len(MAC_input) % 32 != 0) do
+	while(string.len(MAC_input) % 32 ~= 0) do
 		MAC_input = MAC_input .. "0"
 	end
-	print("Padded MAC Input = " .. MAC_input .. ", length = " .. string.len(MAC_input))
+	print("Padded MAC Input = " .. MAC_input .. ", length (bytes) = " .. string.len(MAC_input) / 2)
 
 	--The MAC would actually be calculated here, and the output stored in raw_output
 	raw_output = "00010203040506070001020304050607" -- Dummy filler for now of 16-byte output. To be filled with actual MAC for testing purposes.
@@ -208,22 +208,30 @@ function proximityCheck()
 	RndR = string.sub(response, 3, 18)
 	print("RndC = " .. RndC .. " RndR = " .. RndR)
 
-	commandString = VERIFYPC
+
 	MAC_input = "FD" .. OPT .. pubRespTime
 	if(pps_present == true) then
 		MAC_input = MAC_input .. pps
 	end
-	concat = ""
+	rnum_concat = ""
 	j = 1
 	for i = 1,8 do
-		concat = concat .. string.sub(RndR, j, j + 1) .. string.sub(RndC, j, j + 1)
+		rnum_concat = rnum_concat .. string.sub(RndR, j, j + 1) .. string.sub(RndC, j, j + 1)
 		j = j + 2
 	end
-	MAC_input = MAC_input .. concat
-	print("concat = " .. concat .. " MAC_input = " .. MAC_input)
-
+	MAC_input = MAC_input .. rnum_concat
+	print("Concatenation of random numbers = " .. rnum_concat)
+	print("Final PCD concatenation before input into MAC function = " .. MAC_input)
 	MAC_tag = calculateMAC(MAC_input)
-	print(MAC_tag)
+	print("8-byte PCD MAC_tag (placeholder - currently incorrect) = " .. MAC_tag)
+	commandString = VERIFYPC .. MAC_tag
+	response = sendRaw(commandString, true, true)
+	PICC_MAC = string.sub(response, 5, 20)
+	print("8-byte MAC returned by PICC = " .. PICC_MAC)
+	MAC_input = "90" .. string.sub(MAC_input, 3)
+	print("Final PICC concatenation before input into MAC function = " .. MAC_input)
+	MAC_tag = calculateMAC(MAC_input)
+	print("8-byte PICC MAC_tag (placeholder - currently incorrect) = " .. MAC_tag)
 
 end
 
@@ -249,6 +257,10 @@ function main(args)
 	--commitPerso()
 	--getVersion()
 	proximityCheck()
+
+	--commandString = VERIFYPC .. "186EFDE8DDC7D30B"
+	-- MAC = f5180d6e 40fdeae8 e9dd6ac7 bcd3350b
+	-- response = sendRaw(commandString, true, true)
 
 	-- attempt to read VCProximityKey at block A001
 	-- commandString = READPLAINNOMACUNMACED .. "01A0" .. "01"
