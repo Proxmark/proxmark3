@@ -109,6 +109,22 @@ function writePerso()
 	--L1L3MixSectorSwitchKey
 	blocknum = "9007"
 	writeBlock(blocknum, SIXTEEN_BYTES_ZEROS)
+	--VC Keys
+	--VCProximityKey
+	blocknum = "A001"
+	writeBlock(blocknum, SIXTEEN_BYTES_ZEROS)
+	--VCSelectENCKey
+	blocknum = "A080"
+	writeBlock(blocknum, SIXTEEN_BYTES_ZEROS)
+	--VCSelectMACKey
+	blocknum = "A081"
+	writeBlock(blocknum, SIXTEEN_BYTES_ZEROS)
+	--TransactionMACKey1
+	blocknum = "C000"
+	writeBlock(blocknum, SIXTEEN_BYTES_ZEROS)
+	--TransactionMACConfKey1
+	blocknum = "C001"
+	writeBlock(blocknum, SIXTEEN_BYTES_ZEROS)
 	print("Finished setting misc keys.")
 
 	print("WritePerso finished! Card is ready to move into new security level.")
@@ -138,7 +154,8 @@ function getVersion()
 end
 
 function commitPerso()
-	commandString = COMMITPERSO .. "01" --switch to SL1
+	-- commandString = COMMITPERSO .. "01" --switch to SL1
+	commandString = COMMITPERSO .. "03" --switch to SL3
 	response = sendRaw(commandString, true, true) --0x90 is returned upon success
 	if string.sub(response, 3, 4) ~= "90" then
 		oops("error occurred while trying to switch security level")
@@ -177,15 +194,15 @@ function main(args)
 	--writePerso()
 	--commitPerso()
 	--getVersion()
-	--proximityCheck()
+	proximityCheck()
 
 	-- attempt to read VCProximityKey at block A001
 	-- commandString = READPLAINNOMACUNMACED .. "01A0" .. "01"
 	-- response = sendRaw(commandString, true, true)
 
 	-- authenticate with CardConfigurationKey
-	commandString = AUTH_FIRST .. "0190" .. "00"
-	response = sendRaw(commandString, true, true)
+	-- commandString = AUTH_FIRST .. "0190" .. "00"
+	-- response = sendRaw(commandString, true, true)
 
 	-- Power off the Proxmark
 	sendRaw(POWEROFF, false, false)
