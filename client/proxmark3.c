@@ -29,14 +29,6 @@
 #include "whereami.h"
 #include "comms.h"
 
-#ifdef _WIN32
-#define SERIAL_PORT_H	"com3"
-#elif __APPLE__
-#define SERIAL_PORT_H	"/dev/tty.usbmodem*"
-#else
-#define SERIAL_PORT_H	"/dev/ttyACM0"
-#endif
-
 void
 #ifdef __has_attribute
 #if __has_attribute(force_align_arg_pointer)
@@ -208,8 +200,7 @@ static void set_my_executable_path(void)
 
 static void show_help(bool showFullHelp, char *command_line){
 	printf("syntax: %s <port> [-h|-help|-m|-f|-flush|-w|-wait|-c|-command|-l|-lua] [cmd_script_file_name] [command][lua_script_name]\n", command_line);
-	printf("\tLinux example:'%s /dev/ttyACM0'\n", command_line);
-	printf("\tWindows example:'%s com3'\n\n", command_line);
+	printf("\texample: %s "SERIAL_PORT_H"\n\n", command_line);
 	
 	if (showFullHelp){
 		printf("help: <-h|-help> Dump all interactive command's help at once.\n");

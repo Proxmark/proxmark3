@@ -44,13 +44,13 @@ static void usage(char *argv0)
 {
 	fprintf(stderr, "Usage:   %s <port> [-b] image.elf [image.elf...]\n\n", argv0);
 	fprintf(stderr, "\t-b\tEnable flashing of bootloader area (DANGEROUS)\n\n");
-	//Is the example below really true? /Martin
-	fprintf(stderr, "Example:\n\n\t %s path/to/osimage.elf path/to/fpgaimage.elf\n", argv0);
-	fprintf(stderr, "\nExample (Linux):\n\n\t %s  /dev/ttyACM0 armsrc/obj/fullimage.elf\n", argv0);
+	fprintf(stderr, "\nExample:\n\n\t %s "SERIAL_PORT_H" armsrc/obj/fullimage.elf\n", argv0);
+#ifdef __linux__
 	fprintf(stderr, "\nNote (Linux): if the flasher gets stuck at 'Waiting for Proxmark to reappear',\n");
 	fprintf(stderr, "       you may need to blacklist proxmark for modem-manager. v1.4.14 and later\n");
 	fprintf(stderr, "       include this configuration patch already. The change can be found at:\n");
 	fprintf(stderr, "       https://cgit.freedesktop.org/ModemManager/ModemManager/commit/?id=6e7ff47\n\n");
+#endif
 }
 
 #define MAX_FILES 4
