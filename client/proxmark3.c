@@ -287,9 +287,6 @@ int main(int argc, char* argv[]) {
 	bool addLuaExec = false;
 	char *script_cmds_file = NULL;
 	char *script_cmd = NULL;
-
-	// Must be before the first PrintAndLog call, for rl_redisplay
-	rl_initialize();
   
 	if (argc < 2) {
 		show_help(true, argv[0]);
