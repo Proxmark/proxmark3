@@ -132,7 +132,7 @@ main_loop(char *script_cmds_file, char *script_cmd, bool usb_present) {
 			printf("executing commands from file: %s\n", script_cmds_file);
 		}
 	}
-	
+
 	read_history(".history");
 
 	while(1)  {
