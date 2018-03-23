@@ -141,7 +141,7 @@ bool uart_receive(const serial_port sp, byte_t* pbtRx, size_t pszMaxRxLen, size_
   
   // Reset the output count
   *pszRxLen = 0;
-  
+
   do {
     // Reset file descriptor
     FD_ZERO(&rfds);
@@ -153,12 +153,12 @@ bool uart_receive(const serial_port sp, byte_t* pbtRx, size_t pszMaxRxLen, size_
     if (res < 0) {
       return false;
     }
- 
+
     // Read time-out
     if (res == 0) {
       if (*pszRxLen == 0) {
         // Error, we received no data
-        return false;
+        return true;
       } else {
         // We received some data, but nothing more is available
         return true;
@@ -168,7 +168,7 @@ bool uart_receive(const serial_port sp, byte_t* pbtRx, size_t pszMaxRxLen, size_
     // Retrieve the count of the incoming bytes
     res = ioctl(((serial_port_unix*)sp)->fd, FIONREAD, &byteCount);
     if (res < 0) return false;
-    
+
     // Cap the number of bytes, so we don't overrun the buffer
     if (pszMaxRxLen - (*pszRxLen) < byteCount) {
     	byteCount = pszMaxRxLen - (*pszRxLen);
@@ -178,8 +178,8 @@ bool uart_receive(const serial_port sp, byte_t* pbtRx, size_t pszMaxRxLen, size_
     res = read(((serial_port_unix*)sp)->fd, pbtRx+(*pszRxLen), byteCount);
 
     // Stop if the OS has some troubles reading the data
-    if (res <= 0) return false;
- 
+    if (res < 0) return false;
+
     *pszRxLen += res;
 
     if (*pszRxLen == pszMaxRxLen) {

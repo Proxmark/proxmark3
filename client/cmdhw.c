@@ -405,10 +405,16 @@ int CmdTune(const char *Cmd)
 
 int CmdVersion(const char *Cmd)
 {
-
-	clearCommandBuffer();
 	UsbCommand c = {CMD_VERSION};
 	static UsbCommand resp = {0, {0, 0, 0}};
+
+	if(*Cmd == 'n') {
+		PrintAndLog("Version Cache Cleared");
+		PrintAndLog("");
+		memset( &resp, 0, sizeof(resp) );
+	}
+
+	clearCommandBuffer();
 
 	if (resp.arg[0] == 0 && resp.arg[1] == 0) { // no cached information available
 		SendCommand(&c);
@@ -468,7 +474,7 @@ static command_t CommandTable[] =
 	{"setlfdivisor",  CmdSetDivisor,  0, "<19 - 255> -- Drive LF antenna at 12Mhz/(divisor+1)"},
 	{"setmux",        CmdSetMux,      0, "<loraw|hiraw|lopkd|hipkd> -- Set the ADC mux to a specific value"},
 	{"tune",          CmdTune,        0, "['l'|'h'] -- Measure antenna tuning (option 'l' or 'h' to limit to LF or HF)"},
-	{"version",       CmdVersion,     0, "Show version information about the connected Proxmark"},
+	{"version",       CmdVersion,     0, "['n'] -- Show version information about the connected Proxmark (option 'nocache' to force getting version from hardware)"},
 	{"status",        CmdStatus,      0, "Show runtime status information about the connected Proxmark"},
 	{"ping",          CmdPing,        0, "Test if the pm3 is responsive"},
 	{NULL, NULL, 0, NULL}

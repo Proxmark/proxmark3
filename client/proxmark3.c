@@ -38,6 +38,7 @@
 pthread_mutex_t print_lock;
 
 static serial_port sp;
+static char* sp_name;
 static UsbCommand txcmd;
 volatile static bool txcmd_pending = false;
 
@@ -77,16 +78,52 @@ __attribute__((force_align_arg_pointer))
 *uart_receiver(void *targ) {
 	struct receiver_arg *arg = (struct receiver_arg*)targ;
 	size_t rxlen;
+	bool need_reconnect = false;
 
 	while (arg->run) {
-		rxlen = 0;
-		if (uart_receive(sp, prx, sizeof(UsbCommand) - (prx-rx), &rxlen) && rxlen) {
-			prx += rxlen;
-			if (prx-rx < sizeof(UsbCommand)) {
+		if( need_reconnect ) {
+			sp = uart_open(sp_name);
+
+			if( sp == INVALID_SERIAL_PORT || sp == CLAIMED_SERIAL_PORT )
+			{
+				//PrintAndLog("Reconnect failed, retrying...");
+
+				if( txcmd_pending ) {
+					PrintAndLog("Cannot send bytes to offline proxmark");
+					txcmd_pending = false;
+				}
+
+				sleep(1);
 				continue;
 			}
-			UsbCommandReceived((UsbCommand*)rx);
+
+			PrintAndLog("Proxmark reconnected!");
+			need_reconnect = false;
+			offline = 0;
+			clearCommandBuffer();
 		}
+
+		rxlen = 0;
+		if (uart_receive(sp, prx, sizeof(UsbCommand) - (prx-rx), &rxlen) ) {
+			if( rxlen ) {
+				prx += rxlen;
+				if (prx-rx < sizeof(UsbCommand)) {
+					continue;
+				}
+
+				UsbCommandReceived((UsbCommand*)rx);
+			}
+		}
+		else {
+			PrintAndLog("Receiving data from proxmark failed, attempting a reconnect");
+			uart_close(sp);
+			sp = INVALID_SERIAL_PORT;
+			offline = 1;
+			txcmd_pending = false;
+			need_reconnect = true;
+			continue;
+		}
+
 		prx = rx;
 
 		if(txcmd_pending) {
@@ -119,7 +156,7 @@ main_loop(char *script_cmds_file, char *script_cmd, bool usb_present) {
 		rarg.run = 1;
 		pthread_create(&reader_thread, NULL, &uart_receiver, &rarg);
 		// cache Version information now:
-		CmdVersion(NULL);
+		CmdVersion("nocache");
 	}
 
 	// file with script
@@ -364,6 +401,7 @@ int main(int argc, char* argv[]) {
 	set_my_executable_path();
 	
 	// open uart
+	sp_name = argv[1];
 	if (!waitCOMPort) {
 		sp = uart_open(argv[1]);
 	} else {
@@ -418,7 +456,7 @@ int main(int argc, char* argv[]) {
 #endif	
 
 	// Clean up the port
-	if (usb_present) {
+	if (sp != INVALID_SERIAL_PORT && sp != CLAIMED_SERIAL_PORT) {
 		uart_close(sp);
 	}
 
