@@ -465,31 +465,34 @@ int CmdHFList(const char *Cmd)
 	uint32_t traceLen = 0;
 	
 	if (loadFromFile) {
+		#define TRACE_CHUNK_SIZE (1<<16)		// 64K to start with. Will be enough for BigBuf and some room for future extensions
 		FILE *tracefile = NULL;
 		size_t bytes_read;
-		uint8_t buf[4];
-		if ((tracefile = fopen(filename,"rb")) == NULL) { 
-			PrintAndLog("Could not open file %s", filename);
-			return 0;
-		}
-		bytes_read = fread(buf, 1, 4, tracefile);
-		if (bytes_read != 4) {
-			PrintAndLog("File reading error.");
-			fclose(tracefile);
-			return 1;
-		}
-		traceLen = bytes_to_num(buf, 4); // little endian in file
-		trace = malloc(traceLen+2);
+		trace = malloc(TRACE_CHUNK_SIZE);
 		if (trace == NULL) {
 			PrintAndLog("Cannot allocate memory for trace");
 			return 2;
 		}
-		bytes_read = fread(trace, 1, traceLen, tracefile);
-		if (bytes_read != traceLen) {
-			PrintAndLog("File reading error.");
-			fclose(tracefile);
-			return 1;
+		if ((tracefile = fopen(filename,"rb")) == NULL) { 
+			PrintAndLog("Could not open file %s", filename);
+			free(trace);
+			return 0;
 		}
+		while (!feof(tracefile)) {
+			bytes_read = fread(trace+traceLen, 1, TRACE_CHUNK_SIZE, tracefile);
+			traceLen += bytes_read;
+			if (!feof(tracefile)) {
+				uint8_t *p = realloc(trace, traceLen + TRACE_CHUNK_SIZE);
+				if (p == NULL) {
+					PrintAndLog("Cannot allocate memory for trace");
+					free(trace);
+					fclose(tracefile);
+					return 2;
+				}
+				trace = p;
+			}
+		}
+		fclose(tracefile);
 	} else {
 		trace = malloc(USB_CMD_DATA_SIZE);
 		// Query for the size of the trace
@@ -511,16 +514,14 @@ int CmdHFList(const char *Cmd)
 	}
 
 	if (saveToFile) {
-		FILE *traceFile = NULL;
-		uint8_t buf[4];
-		if ((traceFile = fopen(filename,"wb")) == NULL) { 
+		FILE *tracefile = NULL;
+		if ((tracefile = fopen(filename,"wb")) == NULL) { 
 			PrintAndLog("Could not create file %s", filename);
 			return 1;
 		}
-		num_to_bytes(traceLen, 4, buf);
-		fwrite(buf, 1, 4, traceFile);
-		fwrite(trace, 1, traceLen, traceFile);
+		fwrite(trace, 1, traceLen, tracefile);
 		PrintAndLog("Recorded Activity (TraceLen = %d bytes) written to file %s", traceLen, filename);
+		fclose(tracefile);
 	} else {
 		PrintAndLog("Recorded Activity (TraceLen = %d bytes)", traceLen);
 		PrintAndLog("");
