@@ -133,7 +133,7 @@ void uart_close(const serial_port sp) {
   free(sp);
 }
 
-bool uart_receive(const serial_port sp, byte_t* pbtRx, size_t pszMaxRxLen, size_t* pszRxLen) {
+bool uart_receive(const serial_port sp, uint8_t* pbtRx, size_t pszMaxRxLen, size_t* pszRxLen) {
   int res;
   int byteCount;
   fd_set rfds;
@@ -192,7 +192,7 @@ bool uart_receive(const serial_port sp, byte_t* pbtRx, size_t pszMaxRxLen, size_
   return true;
 }
 
-bool uart_send(const serial_port sp, const byte_t* pbtTx, const size_t szTxLen) {
+bool uart_send(const serial_port sp, const uint8_t* pbtTx, const size_t szTxLen) {
   int32_t res;
   size_t szPos = 0;
   fd_set rfds;

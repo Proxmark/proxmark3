@@ -8,12 +8,14 @@
 // Command parser
 //-----------------------------------------------------------------------------
 
+#include "cmdparser.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include "ui.h"
-#include "cmdparser.h"
 #include "proxmark3.h"
+#include "comms.h"
 
 
 void CmdsHelp(const command_t Commands[])
