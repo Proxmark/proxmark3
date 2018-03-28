@@ -57,7 +57,7 @@ function checkBlock(blockNo, keys, keyType)
 	while remaining > 0 do
 		local n,data = remaining, nil
 		if remaining > 85 then n = 85 end
-		local data = table.concat(keys,"",start,start + n)
+		local data = table.concat(keys, "", start, start + n - 1)
 		--print("data",data)
 		--print("data len", #data)
 		print(("Testing block %d, keytype %d, with %d keys"):format(blockNo, keyType, n))
