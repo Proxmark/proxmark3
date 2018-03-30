@@ -355,21 +355,44 @@ int CmdHFList(const char *Cmd)
 {
 	bool showWaitCycles = false;
 	bool markCRCBytes = false;
+	bool loadFromFile = false;
+	bool saveToFile = false;
+	char param1 = '\0';
+	char param2 = '\0';
+	char param3 = '\0';
 	char type[40] = {0};
-	int tlen = param_getstr(Cmd,0,type, sizeof(type));
-	char param1 = param_getchar(Cmd, 1);
-	char param2 = param_getchar(Cmd, 2);
-	bool errors = false;
+	char filename[FILE_PATH_SIZE];
 	uint8_t protocol = 0;
-	//Validate params
+	
+	// parse command line
+	int tlen = param_getstr(Cmd, 0, type, sizeof(type));
+	if (param_getlength(Cmd, 1) == 1) {
+		param1 = param_getchar(Cmd, 1);
+	} else {
+		param_getstr(Cmd, 1, filename, sizeof(filename));
+	}
+	if (param_getlength(Cmd, 2) == 1) {
+		param2 = param_getchar(Cmd, 2);
+	} else if (strlen(filename) == 0) {
+		param_getstr(Cmd, 2, filename, sizeof(filename));
+	}
+	if (param_getlength(Cmd, 3) == 1) {
+		param3 = param_getchar(Cmd, 3);
+	} else if (strlen(filename) == 0) {
+		param_getstr(Cmd, 3, filename, sizeof(filename));
+	}
+
+	// Validate param1
+	bool errors = false;
 
 	if(tlen == 0) {
 		errors = true;
 	}
 
 	if(param1 == 'h'
-			|| (param1 != 0 && param1 != 'f' && param1 != 'c')
-			|| (param2 != 0 && param2 != 'f' && param2 != 'c')) {
+			|| (param1 != 0 && param1 != 'f' && param1 != 'c' && param1 != 'l')
+			|| (param2 != 0 && param2 != 'f' && param2 != 'c' && param2 != 'l')
+			|| (param3 != 0 && param3 != 'f' && param3 != 'c' && param3 != 'l')) {
 		errors = true;
 	}
 
@@ -382,20 +405,45 @@ int CmdHFList(const char *Cmd)
 			protocol = ISO_14443A;
 		} else if(strcmp(type, "14b") == 0)	{
 			protocol = ISO_14443B;
-		} else if(strcmp(type,"topaz")== 0) {
+		} else if(strcmp(type,"topaz") == 0) {
 			protocol = TOPAZ;
-		} else if(strcmp(type,"raw")== 0) {
-			protocol = -1;//No crc, no annotations
+		} else if(strcmp(type,"raw") == 0) {
+			protocol = -1; //No crc, no annotations
+		} else if (strcmp(type, "save") == 0) {
+			saveToFile = true;
 		} else {
 			errors = true;
 		}
 	}
+	
+	if (param1 == 'f' || param2 == 'f' || param3 == 'f') {
+		showWaitCycles = true;
+	}
 
+	if (param1 == 'c' || param2 == 'c' || param3 == 'c') {
+		markCRCBytes = true;
+	}
+
+	if (param1 == 'l' || param2 == 'l' || param3 == 'l') {
+		loadFromFile = true;
+	}
+
+	if ((loadFromFile || saveToFile) && strlen(filename) == 0) {
+		errors = true;
+	}
+
+	if (loadFromFile && saveToFile) {
+		errors = true;
+	}
+	
 	if (errors) {
-		PrintAndLog("List protocol data in trace buffer.");
-		PrintAndLog("Usage:  hf list <protocol> [f][c]");
+		PrintAndLog("List or save protocol data.");
+		PrintAndLog("Usage:  hf list <protocol> [f] [c] [l <filename>]");
+		PrintAndLog("        hf list save <filename>");
 		PrintAndLog("    f      - show frame delay times as well");
 		PrintAndLog("    c      - mark CRC bytes");
+		PrintAndLog("    l      - load data from file instead of trace buffer");
+		PrintAndLog("    save   - save data to file");
 		PrintAndLog("Supported <protocol> values:");
 		PrintAndLog("    raw    - just show raw data without annotations");
 		PrintAndLog("    14a    - interpret data as iso14443a communications");
@@ -406,52 +454,89 @@ int CmdHFList(const char *Cmd)
 		PrintAndLog("");
 		PrintAndLog("example: hf list 14a f");
 		PrintAndLog("example: hf list iclass");
+		PrintAndLog("example: hf list save myCardTrace.trc");
+		PrintAndLog("example: hf list 14a l myCardTrace.trc");
 		return 0;
 	}
 
 
-	if (param1 == 'f' || param2 == 'f') {
-		showWaitCycles = true;
-	}
-
-	if (param1 == 'c' || param2 == 'c') {
-		markCRCBytes = true;
-	}
-
 	uint8_t *trace;
-	uint16_t tracepos = 0;
-	trace = malloc(USB_CMD_DATA_SIZE);
-
-	// Query for the size of the trace
-	UsbCommand response;
-	GetFromBigBuf(trace, USB_CMD_DATA_SIZE, 0);
-	WaitForResponse(CMD_ACK, &response);
-	uint16_t traceLen = response.arg[2];
-	if (traceLen > USB_CMD_DATA_SIZE) {
-		uint8_t *p = realloc(trace, traceLen);
-		if (p == NULL) {
+	uint32_t tracepos = 0;
+	uint32_t traceLen = 0;
+	
+	if (loadFromFile) {
+		#define TRACE_CHUNK_SIZE (1<<16)		// 64K to start with. Will be enough for BigBuf and some room for future extensions
+		FILE *tracefile = NULL;
+		size_t bytes_read;
+		trace = malloc(TRACE_CHUNK_SIZE);
+		if (trace == NULL) {
 			PrintAndLog("Cannot allocate memory for trace");
-			free(trace);
 			return 2;
 		}
-		trace = p;
-		GetFromBigBuf(trace, traceLen, 0);
-		WaitForResponse(CMD_ACK, NULL);
+		if ((tracefile = fopen(filename,"rb")) == NULL) { 
+			PrintAndLog("Could not open file %s", filename);
+			free(trace);
+			return 0;
+		}
+		while (!feof(tracefile)) {
+			bytes_read = fread(trace+traceLen, 1, TRACE_CHUNK_SIZE, tracefile);
+			traceLen += bytes_read;
+			if (!feof(tracefile)) {
+				uint8_t *p = realloc(trace, traceLen + TRACE_CHUNK_SIZE);
+				if (p == NULL) {
+					PrintAndLog("Cannot allocate memory for trace");
+					free(trace);
+					fclose(tracefile);
+					return 2;
+				}
+				trace = p;
+			}
+		}
+		fclose(tracefile);
+	} else {
+		trace = malloc(USB_CMD_DATA_SIZE);
+		// Query for the size of the trace
+		UsbCommand response;
+		GetFromBigBuf(trace, USB_CMD_DATA_SIZE, 0);
+		WaitForResponse(CMD_ACK, &response);
+		traceLen = response.arg[2];
+		if (traceLen > USB_CMD_DATA_SIZE) {
+			uint8_t *p = realloc(trace, traceLen);
+			if (p == NULL) {
+				PrintAndLog("Cannot allocate memory for trace");
+				free(trace);
+				return 2;
+			}
+			trace = p;
+			GetFromBigBuf(trace, traceLen, 0);
+			WaitForResponse(CMD_ACK, NULL);
+		}
 	}
-	
-	PrintAndLog("Recorded Activity (TraceLen = %d bytes)", traceLen);
-	PrintAndLog("");
-	PrintAndLog("Start = Start of Start Bit, End = End of last modulation. Src = Source of Transfer");
-	PrintAndLog("iso14443a - All times are in carrier periods (1/13.56Mhz)");
-	PrintAndLog("iClass    - Timings are not as accurate");
-	PrintAndLog("");
-	PrintAndLog("      Start |        End | Src | Data (! denotes parity error)                                   | CRC | Annotation         |");
-	PrintAndLog("------------|------------|-----|-----------------------------------------------------------------|-----|--------------------|");
 
-	ClearAuthData();
-	while(tracepos < traceLen)
-	{
-		tracepos = printTraceLine(tracepos, traceLen, trace, protocol, showWaitCycles, markCRCBytes);
+	if (saveToFile) {
+		FILE *tracefile = NULL;
+		if ((tracefile = fopen(filename,"wb")) == NULL) { 
+			PrintAndLog("Could not create file %s", filename);
+			return 1;
+		}
+		fwrite(trace, 1, traceLen, tracefile);
+		PrintAndLog("Recorded Activity (TraceLen = %d bytes) written to file %s", traceLen, filename);
+		fclose(tracefile);
+	} else {
+		PrintAndLog("Recorded Activity (TraceLen = %d bytes)", traceLen);
+		PrintAndLog("");
+		PrintAndLog("Start = Start of Start Bit, End = End of last modulation. Src = Source of Transfer");
+		PrintAndLog("iso14443a - All times are in carrier periods (1/13.56Mhz)");
+		PrintAndLog("iClass    - Timings are not as accurate");
+		PrintAndLog("");
+		PrintAndLog("      Start |        End | Src | Data (! denotes parity error)                                   | CRC | Annotation         |");
+		PrintAndLog("------------|------------|-----|-----------------------------------------------------------------|-----|--------------------|");
+
+		ClearAuthData();
+		while(tracepos < traceLen)
+		{
+			tracepos = printTraceLine(tracepos, traceLen, trace, protocol, showWaitCycles, markCRCBytes);
+		}
 	}
 
 	free(trace);
