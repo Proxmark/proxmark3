@@ -2015,6 +2015,7 @@ void ReaderIso14443a(UsbCommand *c)
 	byte_t buf[USB_CMD_DATA_SIZE] = {0};
 	uint8_t par[MAX_PARITY_SIZE];
 	bool cantSELECT = false;
+	uint32_t start_ts = 0, end_ts = 0;
   
 	set_tracing(true);
 	
@@ -2091,7 +2092,11 @@ void ReaderIso14443a(UsbCommand *c)
 				ReaderTransmit(cmd,len, NULL);											// 8 bits, odd parity
 			}
 		}
+		start_ts = GetCountSspClk(); //started just after we send all our bytes to the PICC
 		arg0 = ReaderReceive(buf, par);
+		end_ts = GetCountSspClk(); //ended just after we have received all the response bytes from the PICC.
+		uint32_t cycles_taken = end_ts - start_ts;
+		Dbprintf("Cycles taken to receive response from sending those bytes = %d", cycles_taken);
 
 		LED_B_ON();
 		cmd_send(CMD_ACK,arg0,0,0,buf,sizeof(buf));
