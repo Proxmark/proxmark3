@@ -88,6 +88,9 @@ uint8_t trigger = 0;
 // the block number for the ISO14443-4 PCB
 static uint8_t iso14_pcb_blocknum = 0;
 
+int manchester_recv_started = 0;
+int recorded = 0;
+
 //
 // ISO14443 timing:
 //
@@ -292,12 +295,12 @@ static void UartInit(uint8_t *data, uint8_t *parity)
 // use parameter non_real_time to provide a timestamp. Set to 0 if the decoder should measure real time
 static RAMFUNC bool MillerDecoding(uint8_t bit, uint32_t non_real_time)
 {
-
+	//Dbprintf("Miller decoding now!");
 	Uart.fourBits = (Uart.fourBits << 8) | bit;
 	
-	if (Uart.state == STATE_UNSYNCD) {											// not yet synced
+	if (Uart.state == STATE_UNSYNCD) {		// not yet synced
 	
-		Uart.syncBit = 9999; 													// not set
+		Uart.syncBit = 9999; 				// not set
 		// The start bit is one ore more Sequence Y followed by a Sequence Z (... 11111111 00x11111). We need to distinguish from
 		// Sequence X followed by Sequence Y followed by Sequence Z (111100x1 11111111 00x11111)
 		// we therefore look for a ...xx11111111111100x11111xxxxxx... pattern 
@@ -463,6 +466,7 @@ static void DemodInit(uint8_t *data, uint8_t *parity)
 }
 
 // use parameter non_real_time to provide a timestamp. Set to 0 if the decoder should measure real time
+// Input *bit* to the Manchester decoding is four bytes (32 bits) which are read from the RHR.
 static RAMFUNC int ManchesterDecoding(uint8_t bit, uint16_t offset, uint32_t non_real_time)
 {
 
@@ -470,7 +474,7 @@ static RAMFUNC int ManchesterDecoding(uint8_t bit, uint16_t offset, uint32_t non
 	
 	if (Demod.state == DEMOD_UNSYNCD) {
 
-		if (Demod.highCnt < 2) {											// wait for a stable unmodulated signal
+		if (Demod.highCnt < 2) {	// wait for a stable unmodulated signal
 			if (Demod.twoBits == 0x0000) {
 				Demod.highCnt++;
 			} else {
@@ -494,14 +498,18 @@ static RAMFUNC int ManchesterDecoding(uint8_t bit, uint16_t offset, uint32_t non
 			}
 		}
 
-	} else {
-
-		if (IsManchesterModulationNibble1(Demod.twoBits >> Demod.syncBit)) {		// modulation in first half
-			if (IsManchesterModulationNibble2(Demod.twoBits >> Demod.syncBit)) {	// ... and in second half = collision
+	} else { //Demod.state == DEMOD_MANCHESTER_DATA
+		//Determine the modulation details for each nibble (4 bits) separately
+		if (IsManchesterModulationNibble1(Demod.twoBits >> Demod.syncBit)) {		// if modulation in first half
+			if (IsManchesterModulationNibble2(Demod.twoBits >> Demod.syncBit)) {	// ... and in second half, that specifies collision
+				//Save the collision position and treat as Sequence D
 				if (!Demod.collisionPos) {
 					Demod.collisionPos = (Demod.len << 3) + Demod.bitCount;
 				}
-			}															// modulation in first half only - Sequence D = 1
+			}
+			if(!recorded)
+				manchester_recv_started = 1; //specify that the data transfer has begun
+			// modulation in first half only - Sequence D = 1.
 			Demod.bitCount++;
 			Demod.shiftReg = (Demod.shiftReg >> 1) | 0x100;				// in both cases, add a 1 to the shiftreg
 			if(Demod.bitCount == 9) {									// if we decoded a full byte (including parity)
@@ -516,7 +524,7 @@ static RAMFUNC int ManchesterDecoding(uint8_t bit, uint16_t offset, uint32_t non
 				}
 			}
 			Demod.endTime = Demod.startTime + 8*(9*Demod.len + Demod.bitCount + 1) - 4;
-		} else {														// no modulation in first half
+		} else {	// if no modulation in first half
 			if (IsManchesterModulationNibble2(Demod.twoBits >> Demod.syncBit)) {	// and modulation in second half = Sequence E = 0
 				Demod.bitCount++;
 				Demod.shiftReg = (Demod.shiftReg >> 1);					// add a 0 to the shiftreg
@@ -532,7 +540,7 @@ static RAMFUNC int ManchesterDecoding(uint8_t bit, uint16_t offset, uint32_t non
 					}
 				}
 				Demod.endTime = Demod.startTime + 8*(9*Demod.len + Demod.bitCount + 1);
-			} else {													// no modulation in both halves - End of communication
+			} else {	// no modulation in both halves - End of communication
 				if(Demod.bitCount > 0) {								// there are some remaining data bits
 					Demod.shiftReg >>= (9 - Demod.bitCount);			// right align the decoded bits
 					Demod.output[Demod.len++] = Demod.shiftReg & 0xff;	// and add them to the output
@@ -1289,6 +1297,8 @@ static void TransmitFor14443a(const uint8_t *cmd, uint16_t len, uint32_t *timing
 	// clear TXRDY
 	AT91C_BASE_SSC->SSC_THR = SEC_Y;
 
+	Dbprintf("Sending bytes to the PICC.");
+
 	uint16_t c = 0;
 	for(;;) {
 		if(AT91C_BASE_SSC->SSC_SR & (AT91C_SSC_TXRDY)) {
@@ -1579,6 +1589,10 @@ int EmSendPrecompiledCmd(tag_response_info_t *response_info) {
 static int GetIso14443aAnswerFromTag(uint8_t *receivedResponse, uint8_t *receivedResponsePar, uint16_t offset)
 {
 	uint32_t c;
+	uint32_t start_ts = GetCountSspClk();
+	uint32_t end_ts = 0;
+	manchester_recv_started = 0;
+	recorded = 0;
 	
 	// Set FPGA mode to "reader listen mode", no modulation (listen
 	// only, since we are receiving, not transmitting).
@@ -1586,22 +1600,39 @@ static int GetIso14443aAnswerFromTag(uint8_t *receivedResponse, uint8_t *receive
 	LED_D_ON();
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_HF_ISO14443A | FPGA_HF_ISO14443A_READER_LISTEN);
 	
-	// Now get the answer from the card
+	/* Now, get the answer from the card.
+	32-bit registers used on the AT91:
+		SSC_RHR = Receive Holding Register
+		SSC_SR = Status Register (contains RXRDY, which is one bit. 0 is RHR is empty, or 1 if RHR has 32 bits of data in it)
+	*/
+
 	DemodInit(receivedResponse, receivedResponsePar);
 
-	// clear RXRDY:
+
+	// clear RXRDY by reading the contents of RHR.
     uint8_t b = (uint8_t)AT91C_BASE_SSC->SSC_RHR;
 
 	c = 0;
 	for(;;) {
-		WDT_HIT();
+		WDT_HIT(); //Watchdog Timer
 
-		if(AT91C_BASE_SSC->SSC_SR & (AT91C_SSC_RXRDY)) {
-			b = (uint8_t)AT91C_BASE_SSC->SSC_RHR;
+		if(AT91C_BASE_SSC->SSC_SR & AT91C_SSC_RXRDY) { 
+			b = (uint8_t)AT91C_BASE_SSC->SSC_RHR; //read in 4 bytes of data from the RHR
+			if(manchester_recv_started){
+				end_ts = GetCountSspClk();
+				manchester_recv_started = 0;
+				recorded = 1;
+			}
+
+			//Perform the manchester decoding on the 4 bytes just received.
 			if(ManchesterDecoding(b, offset, 0)) {
 				NextTransferTime = MAX(NextTransferTime, Demod.endTime - (DELAY_AIR2ARM_AS_READER + DELAY_ARM2AIR_AS_READER)/16 + FRAME_DELAY_TIME_PICC_TO_PCD);
+				uint32_t cycle_count = end_ts - start_ts;
+				Dbprintf("Finished decoding (Manchester). Value of c=%d. Cycle count (for one bit) = %d", c, cycle_count);
 				return true;
 			} else if (c++ > iso14a_timeout && Demod.state == DEMOD_UNSYNCD) {
+				//we reach here only if we time out (i.e. receiving the data from the PICC takes too long)
+				Dbprintf("Timed out while waiting for PICC response (c = %d)!", c);
 				return false; 
 			}
 		}
@@ -2095,8 +2126,8 @@ void ReaderIso14443a(UsbCommand *c)
 		start_ts = GetCountSspClk(); //started just after we send all our bytes to the PICC
 		arg0 = ReaderReceive(buf, par);
 		end_ts = GetCountSspClk(); //ended just after we have received all the response bytes from the PICC.
-		uint32_t cycles_taken = end_ts - start_ts;
-		Dbprintf("Cycles taken to receive response from sending those bytes = %d", cycles_taken);
+		uint32_t cycle_count = end_ts - start_ts;
+		Dbprintf("Cycle count (all bytes) = %d", cycle_count);
 
 		LED_B_ON();
 		cmd_send(CMD_ACK,arg0,0,0,buf,sizeof(buf));

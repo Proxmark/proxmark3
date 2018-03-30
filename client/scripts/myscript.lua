@@ -255,7 +255,7 @@ function main(args)
 
 	--writePerso()
 	--commitPerso()
-	--getVersion()
+	getVersion()
 	proximityCheck()
 
 	--commandString = VERIFYPC .. "186EFDE8DDC7D30B"
