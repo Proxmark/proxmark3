@@ -238,8 +238,7 @@ end
 ---
 -- The main entry point
 function main(args)
-
-	-- Initialize the card using the read14a library
+	-- Initialize the card using the already-present read14a library
 	info,err = lib14a.read14443a(true, false)
 	--Perform PPS (Protocol and Parameter Selection) check to finish the ISO 14443-4 protocol.
 	sendRaw("e050", true, true)
