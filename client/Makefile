@@ -170,7 +170,8 @@ CMDSRCS = 	crapto1/crapto1.c\
 			cmdscript.c\
 			pm3_binlib.c\
 			pm3_bitlib.c\
-			protocols.c
+			protocols.c\
+			comms.c
 
 cpu_arch = $(shell uname -m)
 ifneq ($(findstring 86, $(cpu_arch)), )

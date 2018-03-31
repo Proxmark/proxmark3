@@ -30,7 +30,6 @@ extern int s_Buff[MAX_GRAPH_TRACE_LEN];
 extern double CursorScaleFactor;
 extern int PlotGridX, PlotGridY, PlotGridXdefault, PlotGridYdefault, CursorCPos, CursorDPos, GridOffset;
 extern int CommandFinished;
-extern int offline;
 extern bool GridLocked;
 
 //Operations defined in data_operations

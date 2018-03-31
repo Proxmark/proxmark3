@@ -20,11 +20,12 @@
 #include "elf.h"
 #include "proxendian.h"
 #include "usb_cmd.h"
+#include "uart.h"
 
 void SendCommand(UsbCommand* txcmd);
 void ReceiveCommand(UsbCommand* rxcmd);
-void CloseProxmark();
-int OpenProxmark(size_t i);
+
+serial_port sp;
 
 // FIXME: what the fuckity fuck
 unsigned int current_command = CMD_UNKNOWN;
@@ -43,6 +44,22 @@ static const uint8_t elf_ident[] = {
 	ELFDATA2LSB,
 	EV_CURRENT
 };
+
+void CloseProxmark(const char *serial_port_name) {
+	// Clean up the port
+	uart_close(sp);
+	// Fix for linux, it seems that it is extremely slow to release the serial port file descriptor /dev/*
+	unlink(serial_port_name);
+}
+
+int OpenProxmark(size_t i, const char *serial_port_name) {
+	sp = uart_open(serial_port_name);
+	if (sp == INVALID_SERIAL_PORT || sp == CLAIMED_SERIAL_PORT) {
+		//poll once a second
+		return 0;
+	}
+	return 1;
+}
 
 // Turn PHDRs into flasher segments, checking for PHDR sanity and merging adjacent
 // unaligned segments if needed
@@ -278,7 +295,7 @@ static int get_proxmark_state(uint32_t *state)
 {
 	UsbCommand c;
 	c.cmd = CMD_DEVICE_INFO;
-  SendCommand(&c);
+	SendCommand(&c);
 	UsbCommand resp;
 	ReceiveCommand(&resp);
 
@@ -338,14 +355,14 @@ static int enter_bootloader(char *serial_port_name)
 			SendCommand(&c);
 			fprintf(stderr,"Press and hold down button NOW if your bootloader requires it.\n");
 		}
-    msleep(100);
-		CloseProxmark();
+		msleep(100);
+		CloseProxmark(serial_port_name);
 
 		fprintf(stderr,"Waiting for Proxmark to reappear on %s",serial_port_name);
-    do {
+		do {
 			sleep(1);
 			fprintf(stderr, ".");
-		} while (!OpenProxmark(0));
+		} while (!OpenProxmark(0, serial_port_name));
 		fprintf(stderr," Found.\n");
 
 		return 0;
@@ -357,7 +374,7 @@ static int enter_bootloader(char *serial_port_name)
 
 static int wait_for_ack(void)
 {
-  UsbCommand ack;
+	UsbCommand ack;
 	ReceiveCommand(&ack);
 	if (ack.cmd != CMD_ACK) {
 		printf("Error: Unexpected reply 0x%04" PRIx64 " (expected ACK)\n", ack.cmd);
@@ -472,7 +489,7 @@ void flash_free(flash_file_t *ctx)
 // just reset the unit
 int flash_stop_flashing(void) {
 	UsbCommand c = {CMD_HARDWARE_RESET};
-  SendCommand(&c);
-  msleep(100);
-  return 0;
+	SendCommand(&c);
+	msleep(100);
+	return 0;
 }

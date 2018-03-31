@@ -31,8 +31,7 @@ bool showDemod = true;
 static char *logfilename = "proxmark3.log";
 
 #ifndef EXTERNAL_PRINTANDLOG
-// Declared in proxmark3.c
-extern pthread_mutex_t print_lock;
+static pthread_mutex_t print_lock = PTHREAD_MUTEX_INITIALIZER;
 
 void PrintAndLog(char *fmt, ...)
 {
