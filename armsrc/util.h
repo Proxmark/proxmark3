@@ -14,6 +14,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include "common.h"
+#include "at91sam7s512.h"
 
 #define BYTEx(x, n) (((x) >> (n * 8)) & 0xff )
 

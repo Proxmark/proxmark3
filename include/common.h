@@ -15,7 +15,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <stdbool.h>
-#include <at91sam7s512.h>
+
 typedef unsigned char byte_t;
 
 #ifndef MIN

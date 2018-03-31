@@ -39,7 +39,17 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-typedef unsigned char byte_t;
+#include "common.h"
+
+/* Used to substitute for an example serial port path on each platform.
+ */
+#ifdef _WIN32
+#define SERIAL_PORT_H	"com3"
+#elif __APPLE__
+#define SERIAL_PORT_H	"/dev/tty.usbmodem*"
+#else
+#define SERIAL_PORT_H	"/dev/ttyACM0"
+#endif
 
 /* serial_port is declared as a void*, which you should cast to whatever type
  * makes sense to your connection method. Both the posix and win32

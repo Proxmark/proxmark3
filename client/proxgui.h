@@ -14,12 +14,13 @@ extern "C" {
 
 #include <stdint.h>
 #include <string.h>
+#include "uart.h"
 
 void ShowGraphWindow(void);
 void HideGraphWindow(void);
 void RepaintGraphWindow(void);
 void MainGraphics(void);
-void InitGraphics(int argc, char **argv, char *script_cmds_file, char *script_cmd, bool usb_present);
+void InitGraphics(int argc, char **argv, char *script_cmds_file, char *script_cmd, bool usb_present, serial_port* sp);
 void ExitGraphics(void);
 
 #define MAX_GRAPH_TRACE_LEN (40000*8)
@@ -30,7 +31,6 @@ extern int s_Buff[MAX_GRAPH_TRACE_LEN];
 extern double CursorScaleFactor;
 extern int PlotGridX, PlotGridY, PlotGridXdefault, PlotGridYdefault, CursorCPos, CursorDPos, GridOffset;
 extern int CommandFinished;
-extern int offline;
 extern bool GridLocked;
 
 //Operations defined in data_operations
