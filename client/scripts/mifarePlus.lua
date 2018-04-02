@@ -186,6 +186,7 @@ function calculateMAC(MAC_input)
 end
 
 function proximityCheck()
+	--PreparePC--
 	commandString = PREPAREPC
 	response = sendRaw(commandString, true, true)
 	OPT = string.sub(response, 5, 6)
@@ -202,23 +203,25 @@ function proximityCheck()
 	end
 	print("OPT = " .. OPT .. " pubRespTime = " .. pubRespTime .. " pps = " .. pps)
 
+	--PC--
 	RndC = "0001020304050607" --Random Challenge
 	commandString = PROXIMITYCHECK .. "08" .. RndC
 	response = sendRaw(commandString, true, true)
 	RndR = string.sub(response, 3, 18)
 	print("RndC = " .. RndC .. " RndR = " .. RndR)
 
-
+	--VerifyPC--
 	MAC_input = "FD" .. OPT .. pubRespTime
 	if(pps_present == true) then
 		MAC_input = MAC_input .. pps
 	end
 	rnum_concat = ""
-	j = 1
-	for i = 1,8 do
-		rnum_concat = rnum_concat .. string.sub(RndR, j, j + 1) .. string.sub(RndC, j, j + 1)
-		j = j + 2
-	end
+	rnum_concat = RndR .. RndC --temporary (only works for when a single random challenge (8 bytes) is sent)
+	-- j = 1
+	-- for i = 1,8 do
+	-- 	rnum_concat = rnum_concat .. string.sub(RndR, j, j + 1) .. string.sub(RndC, j, j + 1)
+	-- 	j = j + 2
+	-- end
 	MAC_input = MAC_input .. rnum_concat
 	print("Concatenation of random numbers = " .. rnum_concat)
 	print("Final PCD concatenation before input into MAC function = " .. MAC_input)
@@ -226,6 +229,7 @@ function proximityCheck()
 	print("8-byte PCD MAC_tag (placeholder - currently incorrect) = " .. MAC_tag)
 	commandString = VERIFYPC .. MAC_tag
 	response = sendRaw(commandString, true, true)
+	print(response)
 	PICC_MAC = string.sub(response, 5, 20)
 	print("8-byte MAC returned by PICC = " .. PICC_MAC)
 	MAC_input = "90" .. string.sub(MAC_input, 3)
@@ -254,7 +258,7 @@ function main(args)
 
 	--writePerso()
 	--commitPerso()
-	getVersion()
+	--getVersion()
 	proximityCheck()
 
 	--commandString = VERIFYPC .. "186EFDE8DDC7D30B"
