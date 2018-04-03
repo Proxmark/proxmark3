@@ -61,8 +61,9 @@ local function cardHex(i,f)
 
 	--As the function defaults to even parity and returns a boolean,
 	--perform a 'not' function to get odd parity
-	high = not evenparity(string.sub(stream,0,12)) and 1 or 0
-	low =  evenparity(string.sub(stream,13)) and 1 or 0
+  high = evenparity(string.sub(stream,1,12)) and 1 or 0
+  low =  not evenparity(string.sub(stream,13)) and 1 or 0
+
 	bits = bit32.bor(bit32.lshift(id,1), low)
 	bits = bit32.bor(bits, bit32.lshift(high,25))
 
