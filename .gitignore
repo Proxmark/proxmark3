@@ -12,6 +12,7 @@
 *.s19
 *.map
 *.bin
+!client/loclass/iclass_dump.bin
 !client/hardnested/*.bin
 *.dll
 *.moc.cpp
