@@ -1,6 +1,7 @@
 # .gitignore
 # don't push these files to the repository
 
+*.DS_Store
 .history
 *.log
 *.eml
