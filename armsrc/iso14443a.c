@@ -1297,7 +1297,7 @@ static void TransmitFor14443a(const uint8_t *cmd, uint16_t len, uint32_t *timing
 	// clear TXRDY
 	AT91C_BASE_SSC->SSC_THR = SEC_Y;
 
-	Dbprintf("Sending bytes to the PICC.");
+	//Dbprintf("Sending bytes to the PICC.");
 
 	uint16_t c = 0;
 	for(;;) {
@@ -1589,7 +1589,7 @@ int EmSendPrecompiledCmd(tag_response_info_t *response_info) {
 static int GetIso14443aAnswerFromTag(uint8_t *receivedResponse, uint8_t *receivedResponsePar, uint16_t offset)
 {
 	uint32_t c;
-	uint32_t start_ts = GetCountSspClk();
+	//uint32_t start_ts = GetCountSspClk();
 	uint32_t end_ts = 0;
 	manchester_recv_started = 0;
 	recorded = 0;
@@ -1618,21 +1618,21 @@ static int GetIso14443aAnswerFromTag(uint8_t *receivedResponse, uint8_t *receive
 
 		if(AT91C_BASE_SSC->SSC_SR & AT91C_SSC_RXRDY) { 
 			b = (uint8_t)AT91C_BASE_SSC->SSC_RHR; //read in 4 bytes of data from the RHR
-			if(manchester_recv_started){
-				end_ts = GetCountSspClk();
-				manchester_recv_started = 0;
-				recorded = 1;
-			}
+			// if(manchester_recv_started){
+			// 	end_ts = GetCountSspClk();
+			// 	manchester_recv_started = 0;
+			// 	recorded = 1;
+			// }
 
 			//Perform the manchester decoding on the 4 bytes just received.
 			if(ManchesterDecoding(b, offset, 0)) {
 				NextTransferTime = MAX(NextTransferTime, Demod.endTime - (DELAY_AIR2ARM_AS_READER + DELAY_ARM2AIR_AS_READER)/16 + FRAME_DELAY_TIME_PICC_TO_PCD);
-				uint32_t cycle_count = end_ts - start_ts;
-				Dbprintf("Finished decoding (Manchester). Value of c=%d. Cycle count (for one bit) = %d", c, cycle_count);
+				//uint32_t cycle_count = end_ts - start_ts;
+				//Dbprintf("Finished decoding (Manchester). Value of c=%d. Cycle count (for one bit) = %d", c, cycle_count);
 				return true;
 			} else if (c++ > iso14a_timeout && Demod.state == DEMOD_UNSYNCD) {
 				//we reach here only if we time out (i.e. receiving the data from the PICC takes too long)
-				Dbprintf("Timed out while waiting for PICC response (c = %d)!", c);
+				//Dbprintf("Timed out while waiting for PICC response (c = %d)!", c);
 				return false; 
 			}
 		}
@@ -2123,11 +2123,11 @@ void ReaderIso14443a(UsbCommand *c)
 				ReaderTransmit(cmd,len, NULL);											// 8 bits, odd parity
 			}
 		}
-		start_ts = GetCountSspClk(); //started just after we send all our bytes to the PICC
+		//start_ts = GetCountSspClk(); //started just after we send all our bytes to the PICC
 		arg0 = ReaderReceive(buf, par);
-		end_ts = GetCountSspClk(); //ended just after we have received all the response bytes from the PICC.
-		uint32_t cycle_count = end_ts - start_ts;
-		Dbprintf("Cycle count (all bytes) = %d", cycle_count);
+		//end_ts = GetCountSspClk(); //ended just after we have received all the response bytes from the PICC.
+		//uint32_t cycle_count = end_ts - start_ts;
+		//Dbprintf("Cycle count (all bytes) = %d", cycle_count);
 
 		LED_B_ON();
 		cmd_send(CMD_ACK,arg0,0,0,buf,sizeof(buf));
