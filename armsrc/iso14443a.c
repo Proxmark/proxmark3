@@ -1610,7 +1610,7 @@ static int GetIso14443aAnswerFromTag(uint8_t *receivedResponse, uint8_t *receive
 		if(AT91C_BASE_SSC->SSC_SR & AT91C_SSC_RXRDY) { 
 			b = (uint8_t)AT91C_BASE_SSC->SSC_RHR; //read in 1 byte of data from the RHR
 
-			//Perform the manchester decoding on the 4 bytes just received.
+			//Perform the manchester decoding on the 1 byte just received.
 			if(ManchesterDecoding(b, offset, 0)) {
 				NextTransferTime = MAX(NextTransferTime, Demod.endTime - (DELAY_AIR2ARM_AS_READER + DELAY_ARM2AIR_AS_READER)/16 + FRAME_DELAY_TIME_PICC_TO_PCD);
 				//Dbprintf("Finished decoding (Manchester). Value of c=%d. Cycle count (for one bit) = %d", c, cycle_count);
