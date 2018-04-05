@@ -463,7 +463,7 @@ static void DemodInit(uint8_t *data, uint8_t *parity)
 }
 
 // use parameter non_real_time to provide a timestamp. Set to 0 if the decoder should measure real time
-// Input *bit* to the Manchester decoding is four bytes (32 bits) which are read from the RHR.
+// Input *bit* to the Manchester decoding is one byte (8 bits) which are read from the RHR.
 static RAMFUNC int ManchesterDecoding(uint8_t bit, uint16_t offset, uint32_t non_real_time)
 {
 
@@ -504,8 +504,6 @@ static RAMFUNC int ManchesterDecoding(uint8_t bit, uint16_t offset, uint32_t non
 					Demod.collisionPos = (Demod.len << 3) + Demod.bitCount;
 				}
 			}
-			if(!recorded)
-				manchester_recv_started = 1; //specify that the data transfer has begun
 			// modulation in first half only - Sequence D = 1.
 			Demod.bitCount++;
 			Demod.shiftReg = (Demod.shiftReg >> 1) | 0x100;				// in both cases, add a 1 to the shiftreg
