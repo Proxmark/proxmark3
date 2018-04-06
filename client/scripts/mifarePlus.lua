@@ -265,8 +265,14 @@ function main(args)
 	-- Initialize the card using the already-present read14a library
 	info,err = lib14a.read14443a(true, false)
 	--Perform PPS (Protocol and Parameter Selection) check to finish the ISO 14443-4 protocol.
-	sendRaw("e050", true, true)
-	sendRaw("D01100", true, true)
+	response = sendRaw("e050", true, true)
+	if(response == nil) then
+		err = "No response from RATS"
+	end
+	response = sendRaw("D01100", true, true)
+	if(response == nil) then
+		err = "No response from PPS check"
+	end
 	if err then
 		oops(err)
 	else
