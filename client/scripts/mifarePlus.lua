@@ -67,10 +67,19 @@ function writePerso()
 	--		0x0C - unexpected command length
 	
 
-	-- First, set all the data in the card (4kB of data) to zeros. The keys, stored in the sector trailer block, are also set to zeros.
+	-- First, set all the data in the card to zeros. The keys, stored in the sector trailer block, are also set to zeros.
 	-- The only block which cannot be explicitly set is block 0x0000, the manufacturer block.
 	print("Setting values of normal blocks")
-	for i=1,255,1 do --skip block 0
+	cardsize = 4 --need to set to 4 for 4k or 2 for 2k
+	if(cardsize == 4) then
+		numblocks = 255
+	elseif(cardsize == 2) then
+		numblocks = 127
+	else
+		oops("Invalid card size")
+	end
+
+	for i=1,numblocks,1 do --skip block 0
 		--convert the number to hex with leading zeros, then use it as the block number in writeBlock()
 		blocknum = string.format("%04x", i)
 		writeBlock(blocknum, SIXTEEN_BYTES_ZEROS)
