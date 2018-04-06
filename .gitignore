@@ -1,6 +1,7 @@
 # .gitignore
 # don't push these files to the repository
 
+*.DS_Store
 .history
 *.log
 *.eml
@@ -11,6 +12,7 @@
 *.s19
 *.map
 *.bin
+!client/loclass/iclass_dump.bin
 !client/hardnested/*.bin
 *.dll
 *.moc.cpp

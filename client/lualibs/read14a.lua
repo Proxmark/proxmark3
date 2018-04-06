@@ -91,10 +91,10 @@ local function sendToDevice(command, ignoreresponse)
 	return response,nil
 end
 
--- This function does a connect and retrieves som einfo
+-- This function does a connect and retrieves some info
 -- @param dont_disconnect - if true, does not disable the field
 -- @param no_rats - if true, skips ISO14443-4 select (RATS)
--- @return if successfull: an table containing card info
+-- @return if successfull: a table containing card info
 -- @return if unsuccessfull : nil, error
 local function read14443a(dont_disconnect, no_rats)
 	local command, result, info, err, data
