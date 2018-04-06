@@ -205,9 +205,20 @@ function proximityCheck()
 
 	--PC--
 	RndC = "0001020304050607" --Random Challenge
-	commandString = PROXIMITYCHECK .. "08" .. RndC
-	response = sendRaw(commandString, true, true)
-	RndR = string.sub(response, 3, 18)
+	num_rounds = 8 --Needs to be 1, 2, 4, or 8
+	part_len = 8 / num_rounds
+	j = 1
+	RndR = ""
+	for i = 1,num_rounds do
+		pRndC = ""
+		for q = 1,(part_len*2) do
+			pRndC = pRndC .. string.sub(RndC,j,j)
+			j = j + 1
+		end
+		commandString = PROXIMITYCHECK .. "0" .. tostring(part_len) .. pRndC
+		pRndR = string.sub(sendRaw(commandString, true, true), 3, 3+part_len)
+		RndR = RndR .. pRndR
+	end
 	print("RndC = " .. RndC .. " RndR = " .. RndR)
 
 	--VerifyPC--
