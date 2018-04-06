@@ -153,9 +153,9 @@ function getVersion()
 	sendRaw(GETVERS_CONT, true, true)
 end
 
-function commitPerso()
-	-- commandString = COMMITPERSO .. "01" --switch to SL1
-	commandString = COMMITPERSO .. "03" --switch to SL3
+function commitPerso(SL)
+	--pass SL as "01" to move to SL1 or "03" to move to SL3.
+	commandString = COMMITPERSO .. SL
 	response = sendRaw(commandString, true, true) --0x90 is returned upon success
 	if string.sub(response, 3, 4) ~= "90" then
 		oops("error occurred while trying to switch security level")
@@ -268,7 +268,7 @@ function main(args)
 	-- Now, the card is initialized and we can do more interesting things.
 
 	--writePerso()
-	--commitPerso()
+	--commitPerso("03") --move to SL3
 	--getVersion()
 	proximityCheck()
 
