@@ -67,29 +67,18 @@ function writePerso()
 	--		0x0C - unexpected command length
 	
 
-	-- First, set all the data in the card to zeros. The keys, stored in the sector trailer block, are also set to zeros.
-	-- The only block which cannot be explicitly set is block 0x0000, the manufacturer block.
-	print("Setting values of normal blocks")
+
 	cardsize = 4 --need to set to 4 for 4k or 2 for 2k
 	if(cardsize == 4) then
-		numblocks = 255
 		numsectors = 39
 	elseif(cardsize == 2) then
-		numblocks = 127
 		numsectors = 31
 	else
 		oops("Invalid card size")
 	end
 
-	for i=1,numblocks,1 do --skip block 0
-		--convert the number to hex with leading zeros, then use it as the block number in writeBlock()
-		blocknum = string.format("%04x", i)
-		writeBlock(blocknum, SIXTEEN_BYTES_ZEROS)
-	end
-	print("Finished setting values of normal blocks")
-
+	-- Write to the AES sector keys
 	print("Setting AES Sector keys")
-	-- Next, write to the AES sector keys
 	for i=0,numsectors do --for each sector number
 		local keyA_block = "40" .. string.format("%02x", i * 2)
 		local keyB_block = "40" .. string.format("%02x", (i * 2) + 1)
