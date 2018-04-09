@@ -73,8 +73,10 @@ function writePerso()
 	cardsize = 4 --need to set to 4 for 4k or 2 for 2k
 	if(cardsize == 4) then
 		numblocks = 255
+		numsectors = 39
 	elseif(cardsize == 2) then
 		numblocks = 127
+		numsectors = 31
 	else
 		oops("Invalid card size")
 	end
@@ -88,7 +90,7 @@ function writePerso()
 
 	print("Setting AES Sector keys")
 	-- Next, write to the AES sector keys
-	for i=0,39 do --for each sector number
+	for i=0,numsectors do --for each sector number
 		local keyA_block = "40" .. string.format("%02x", i * 2)
 		local keyB_block = "40" .. string.format("%02x", (i * 2) + 1)
 		--Can also calculate the keys fancily to make them unique, if desired
