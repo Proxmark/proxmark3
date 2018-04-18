@@ -27,9 +27,6 @@ void ReceiveCommand(UsbCommand* rxcmd);
 
 serial_port sp;
 
-// FIXME: what the fuckity fuck
-unsigned int current_command = CMD_UNKNOWN;
-
 #define FLASH_START            0x100000
 #define FLASH_SIZE             (256*1024)
 #define FLASH_END              (FLASH_START + FLASH_SIZE)
@@ -52,13 +49,14 @@ void CloseProxmark(const char *serial_port_name) {
 	unlink(serial_port_name);
 }
 
-int OpenProxmark(size_t i, const char *serial_port_name) {
+bool OpenProxmark(size_t i, const char *serial_port_name) {
 	sp = uart_open(serial_port_name);
 	if (sp == INVALID_SERIAL_PORT || sp == CLAIMED_SERIAL_PORT) {
 		//poll once a second
-		return 0;
+		return false;
 	}
-	return 1;
+
+	return true;
 }
 
 // Turn PHDRs into flasher segments, checking for PHDR sanity and merging adjacent
@@ -355,6 +353,7 @@ static int enter_bootloader(char *serial_port_name)
 			SendCommand(&c);
 			fprintf(stderr,"Press and hold down button NOW if your bootloader requires it.\n");
 		}
+
 		msleep(100);
 		CloseProxmark(serial_port_name);
 
@@ -363,6 +362,7 @@ static int enter_bootloader(char *serial_port_name)
 			sleep(1);
 			fprintf(stderr, ".");
 		} while (!OpenProxmark(0, serial_port_name));
+
 		fprintf(stderr," Found.\n");
 
 		return 0;
