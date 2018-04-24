@@ -29,8 +29,6 @@
 #include "cmdscript.h"
 
 
-unsigned int current_command = CMD_UNKNOWN;
-
 static int CmdHelp(const char *Cmd);
 static int CmdQuit(const char *Cmd);
 

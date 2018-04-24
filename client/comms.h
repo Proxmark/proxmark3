@@ -30,6 +30,11 @@ typedef struct {
 	pthread_mutex_t recv_lock;
 } receiver_arg;
 
+
+// Wrappers required as static variables can only be used in one file.
+void SetOffline(bool new_offline);
+bool IsOffline();
+
 void SendCommand(UsbCommand *c);
 
 void *uart_receiver(void *targ);
@@ -40,6 +45,5 @@ bool WaitForResponseTimeout(uint32_t cmd, UsbCommand* response, size_t ms_timeou
 bool WaitForResponse(uint32_t cmd, UsbCommand* response);
 
 extern serial_port sp;
-extern bool offline;
 
 #endif // COMMS_H_
