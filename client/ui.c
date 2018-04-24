@@ -22,8 +22,7 @@
 
 double CursorScaleFactor = 1;
 int PlotGridX=0, PlotGridY=0, PlotGridXdefault= 64, PlotGridYdefault= 64, CursorCPos= 0, CursorDPos= 0;
-int offline;
-int flushAfterWrite = 0;  //buzzy
+bool flushAfterWrite = false;  //buzzy
 int GridOffset = 0;
 bool GridLocked = false;
 bool showDemod = true;
@@ -93,7 +92,7 @@ void PrintAndLog(char *fmt, ...)
 	}
 	va_end(argptr2);
 
-	if (flushAfterWrite == 1)  //buzzy
+	if (flushAfterWrite)  //buzzy
 	{
 		fflush(NULL);
 	}
@@ -106,3 +105,8 @@ void SetLogFilename(char *fn)
 {
   logfilename = fn;
 }
+
+void SetFlushAfterWrite(bool flush_after_write) {
+	flushAfterWrite = flush_after_write;
+}
+

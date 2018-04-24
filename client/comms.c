@@ -24,7 +24,7 @@
 serial_port sp;
 
 // If TRUE, then there is no active connection to the PM3, and we will drop commands sent.
-bool offline;
+static bool offline;
 
 // Transmit buffer.
 // TODO: Use locks and execute this on the main thread, rather than the receiver
@@ -47,10 +47,20 @@ static int cmd_tail = 0;
 // to lock cmdBuffer operations from different threads
 static pthread_mutex_t cmdBufferMutex = PTHREAD_MUTEX_INITIALIZER;
 
+// These wrappers are required because it is not possible to access a static
+// global variable outside of the context of a single file.
+
+void SetOffline(bool new_offline) {
+	offline = new_offline;
+}
+
+bool IsOffline() {
+	return offline;
+}
 
 void SendCommand(UsbCommand *c) {
-	#if 0
-		printf("Sending %d bytes\n", sizeof(UsbCommand));
+	#ifdef COMMS_DEBUG
+	printf("Sending %04x cmd\n", c->cmd);
 	#endif
 
 	if (offline) {
@@ -153,6 +163,8 @@ void UsbCommandReceived(UsbCommand *UC)
 		} break;
 
 		case CMD_DOWNLOADED_RAW_ADC_SAMPLES_125K: {
+			// FIXME: This does unsanitised copies into memory when we don't know
+			// the size of the buffer.
 			memcpy(sample_buf+(UC->arg[0]),UC->d.asBytes,UC->arg[1]);
 			return;
 		} break;
@@ -205,14 +217,19 @@ __attribute__((force_align_arg_pointer))
  * Waits for a certain response type. This method waits for a maximum of
  * ms_timeout milliseconds for a specified response command.
  *@brief WaitForResponseTimeout
- * @param cmd command to wait for
+ * @param cmd command to wait for, or CMD_UNKNOWN to take any command.
  * @param response struct to copy received command into.
  * @param ms_timeout
+ * @param show_warning
  * @return true if command was returned, otherwise false
  */
 bool WaitForResponseTimeoutW(uint32_t cmd, UsbCommand* response, size_t ms_timeout, bool show_warning) {
 
 	UsbCommand resp;
+
+	#ifdef COMMS_DEBUG
+	printf("Waiting for %04x cmd\n", cmd);
+	#endif
 
 	if (response == NULL) {
 		response = &resp;
@@ -223,7 +240,7 @@ bool WaitForResponseTimeoutW(uint32_t cmd, UsbCommand* response, size_t ms_timeo
 	// Wait until the command is received
 	while (true) {
 		while(getCommand(response)) {
-			if(response->cmd == cmd){
+			if (cmd == CMD_UNKNOWN || response->cmd == cmd) {
 				return true;
 			}
 		}
@@ -233,6 +250,7 @@ bool WaitForResponseTimeoutW(uint32_t cmd, UsbCommand* response, size_t ms_timeo
 		}
 
 		if (msclock() - start_time > 2000 && show_warning) {
+			// 2 seconds elapsed (but this doesn't mean the timeout was exceeded)
 			PrintAndLog("Waiting for a response from the proxmark...");
 			PrintAndLog("You can cancel this operation by pressing the pm3 button");
 			show_warning = false;

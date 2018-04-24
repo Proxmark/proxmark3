@@ -32,7 +32,7 @@ int flash_write(flash_file_t *ctx);
 void flash_free(flash_file_t *ctx);
 int flash_stop_flashing(void);
 void CloseProxmark(const char *serial_port_name);
-int OpenProxmark(size_t i, const char *serial_port_name);
+bool OpenProxmark(size_t i, const char *serial_port_name);
 
 extern serial_port sp;
 #endif
