@@ -21,7 +21,7 @@
 // Declare globals.
 
 // Serial port that we are communicating with the PM3 on.
-serial_port sp;
+static serial_port sp;
 
 // If TRUE, then there is no active connection to the PM3, and we will drop commands sent.
 static bool offline;
@@ -58,6 +58,38 @@ bool IsOffline() {
 	return offline;
 }
 
+bool OpenProxmark(char *portname, bool waitCOMPort, int timeout) {
+	if (!waitCOMPort) {
+		sp = uart_open(portname);
+	} else {
+		printf("Waiting for Proxmark to appear on %s ", portname);
+		fflush(stdout);
+		int openCount = 0;
+		do {
+			sp = uart_open(portname);
+			msleep(1000);
+			printf(".");
+			fflush(stdout);
+		} while(++openCount < timeout && (sp == INVALID_SERIAL_PORT || sp == CLAIMED_SERIAL_PORT));
+		printf("\n");
+	}
+
+	// check result of uart opening
+	if (sp == INVALID_SERIAL_PORT) {
+		printf("ERROR: invalid serial port\n");
+		return false;
+	} else if (sp == CLAIMED_SERIAL_PORT) {
+		printf("ERROR: serial port is claimed by another process\n");
+		return false;
+	} else {
+		return true;
+	}
+}
+
+void CloseProxmark(void) {
+	uart_close(sp);
+}
+
 void SendCommand(UsbCommand *c) {
 	#ifdef COMMS_DEBUG
 	printf("Sending %04x cmd\n", c->cmd);
@@ -73,6 +105,7 @@ void SendCommand(UsbCommand *c) {
 	Not good.../holiman
 	**/
 	while(txcmd_pending);
+
 	txcmd = *c;
 	txcmd_pending = true;
 }
@@ -140,11 +173,7 @@ int getCommand(UsbCommand* response)
 }
 
 
-//-----------------------------------------------------------------------------
-// Entry point into our code: called whenever we received a packet over USB
-// that we weren't necessarily expecting, for example a debug print.
-//-----------------------------------------------------------------------------
-void UsbCommandReceived(UsbCommand *UC)
+static void UsbCommandReceived(UsbCommand *UC)
 {
 	switch(UC->cmd) {
 		// First check if we are handling a debug message
@@ -170,7 +199,7 @@ void UsbCommandReceived(UsbCommand *UC)
 		} break;
 
 		default:
-			storeCommand(UC);
+ 			storeCommand(UC);
 			break;
 	}
 
@@ -184,12 +213,12 @@ __attribute__((force_align_arg_pointer))
 #endif
 #endif
 *uart_receiver(void *targ) {
-	receiver_arg *arg = (receiver_arg*)targ;
+	receiver_arg *conn = (receiver_arg*)targ;
 	size_t rxlen;
 	uint8_t rx[sizeof(UsbCommand)];
 	uint8_t *prx = rx;
 
-	while (arg->run) {
+	while (conn->run) {
 		rxlen = 0;
 		if (uart_receive(sp, prx, sizeof(UsbCommand) - (prx-rx), &rxlen) && rxlen) {
 			prx += rxlen;
