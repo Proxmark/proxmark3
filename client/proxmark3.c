@@ -21,7 +21,6 @@
 #include "util_posix.h"
 #include "proxgui.h"
 #include "cmdmain.h"
-#include "uart.h"
 #include "ui.h"
 #include "util.h"
 #include "cmdparser.h"
@@ -137,7 +136,7 @@ main_loop(char *script_cmds_file, char *script_cmd, bool usb_present) {
 	}
 
 	write_history(".history");
-  
+
 	if (usb_present) {
 		conn.run = false;
 		pthread_join(reader_thread, NULL);
@@ -293,33 +292,9 @@ int main(int argc, char* argv[]) {
 	
 	// set global variables
 	set_my_executable_path();
-	
-	// open uart
-	if (!waitCOMPort) {
-		sp = uart_open(argv[1]);
-	} else {
-		printf("Waiting for Proxmark to appear on %s ", argv[1]);
-		fflush(stdout);
-		int openCount = 0;
-		do {
-			sp = uart_open(argv[1]);
-			msleep(1000);
-			printf(".");
-			fflush(stdout);
-		} while(++openCount < 20 && (sp == INVALID_SERIAL_PORT || sp == CLAIMED_SERIAL_PORT));
-		printf("\n");
-	}
 
-	// check result of uart opening
-	if (sp == INVALID_SERIAL_PORT) {
-		printf("ERROR: invalid serial port\n");
-		usb_present = false;
-	} else if (sp == CLAIMED_SERIAL_PORT) {
-		printf("ERROR: serial port is claimed by another process\n");
-		usb_present = false;
-	} else {
-		usb_present = true;
-	}
+	// try to open USB connection to Proxmark
+	usb_present = OpenProxmark(argv[1], waitCOMPort, 20);
 
 #ifdef HAVE_GUI
 #ifdef _WIN32
@@ -344,7 +319,7 @@ int main(int argc, char* argv[]) {
 
 	// Clean up the port
 	if (usb_present) {
-		uart_close(sp);
+		CloseProxmark();
 	}
 
 	exit(0);
