@@ -21,7 +21,6 @@
 #include "cmdlf.h"
 #include "cmdlft55xx.h"
 #include "util.h"
-#include "data.h"
 #include "lfdemod.h"
 #include "cmdhf14a.h" //for getTagInfo
 #include "protocols.h"
@@ -1355,8 +1354,7 @@ int CmdResetRead(const char *Cmd) {
 	}
 
 	uint8_t got[BIGBUF_SIZE-1];
-	GetFromBigBuf(got,sizeof(got),0);
-	WaitForResponse(CMD_ACK,NULL);
+	GetFromBigBuf(got, sizeof(got), 0, NULL, -1 , 0);
 	setGraphBuf(got, sizeof(got));
 	return 1;
 }

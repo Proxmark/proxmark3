@@ -14,7 +14,6 @@
 #include <string.h>
 #include "proxmark3.h"
 #include "util.h"
-#include "data.h"
 #include "ui.h"
 #include "iso14443crc.h"
 #include "parity.h"
@@ -497,8 +496,7 @@ int CmdHFList(const char *Cmd)
 		trace = malloc(USB_CMD_DATA_SIZE);
 		// Query for the size of the trace
 		UsbCommand response;
-		GetFromBigBuf(trace, USB_CMD_DATA_SIZE, 0);
-		WaitForResponse(CMD_ACK, &response);
+		GetFromBigBuf(trace, USB_CMD_DATA_SIZE, 0, &response, -1, false);
 		traceLen = response.arg[2];
 		if (traceLen > USB_CMD_DATA_SIZE) {
 			uint8_t *p = realloc(trace, traceLen);
@@ -508,8 +506,7 @@ int CmdHFList(const char *Cmd)
 				return 2;
 			}
 			trace = p;
-			GetFromBigBuf(trace, traceLen, 0);
-			WaitForResponse(CMD_ACK, NULL);
+			GetFromBigBuf(trace, traceLen, 0, NULL, -1, false);
 		}
 	}
 

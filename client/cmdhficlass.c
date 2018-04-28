@@ -16,7 +16,6 @@
 #include <sys/stat.h>
 #include <ctype.h>
 #include "iso14443crc.h" // Can also be used for iClass, using 0xE012 as CRC-type
-#include "data.h"
 #include "proxmark3.h"
 #include "ui.h"
 #include "cmdparser.h"
@@ -750,8 +749,7 @@ int CmdHFiClassReader_Dump(const char *Cmd) {
 		blocksRead = (sizeof(tag_data)/8) - blockno;
 	}
 	// response ok - now get bigbuf content of the dump
-	GetFromBigBuf(tag_data+(blockno*8), blocksRead*8, startindex);
-	WaitForResponse(CMD_ACK,NULL);
+	GetFromBigBuf(tag_data+(blockno*8), blocksRead*8, startindex, NULL, -1, false);
 	size_t gotBytes = blocksRead*8 + blockno*8;
 
 	// try AA2
@@ -793,8 +791,7 @@ int CmdHFiClassReader_Dump(const char *Cmd) {
 				blocksRead = (sizeof(tag_data) - gotBytes)/8;
 			}
 			// get dumped data from bigbuf
-			GetFromBigBuf(tag_data+gotBytes, blocksRead*8, startindex);
-			WaitForResponse(CMD_ACK,NULL);
+			GetFromBigBuf(tag_data+gotBytes, blocksRead*8, startindex, NULL, -1, false);
 
 			gotBytes += blocksRead*8;			
 		} else { //field is still on - turn it off...

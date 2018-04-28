@@ -22,7 +22,6 @@
 #include "mifare.h"
 #include "util.h"
 #include "protocols.h"
-#include "data.h"
 
 #define MAX_UL_BLOCKS      0x0f
 #define MAX_ULC_BLOCKS     0x2b
@@ -1325,8 +1324,7 @@ int CmdHF14AMfUDump(const char *Cmd){
 		PrintAndLog("Data exceeded Buffer size!");
 		bufferSize = sizeof(data);
 	}
-	GetFromBigBuf(data, bufferSize, startindex);
-	WaitForResponse(CMD_ACK,NULL);
+	GetFromBigBuf(data, bufferSize, startindex, NULL, -1, false);
 
 	Pages = bufferSize/4;
 	// Load lock bytes.

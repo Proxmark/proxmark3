@@ -22,7 +22,6 @@
 #include "graph.h"       // for graph data
 #include "cmdparser.h"   // for getting cli commands included in cmdmain.h
 #include "cmdmain.h"     // for sending cmds to device
-#include "data.h"        // for GetFromBigBuf
 #include "cmddata.h"     // for `lf search`
 #include "cmdlfawid.h"   // for awid menu
 #include "cmdlfem4x.h"   // for em4x menu
