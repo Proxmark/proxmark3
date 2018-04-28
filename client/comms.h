@@ -31,19 +31,18 @@ typedef struct {
 } receiver_arg;
 
 
-// Wrappers required as static variables can only be used in one file.
 void SetOffline(bool new_offline);
 bool IsOffline();
+
+bool OpenProxmark(char *portname, bool waitCOMPort, int timeout);
+void CloseProxmark(void);
 
 void SendCommand(UsbCommand *c);
 
 void *uart_receiver(void *targ);
-void UsbCommandReceived(UsbCommand *UC);
 void clearCommandBuffer();
 bool WaitForResponseTimeoutW(uint32_t cmd, UsbCommand* response, size_t ms_timeout, bool show_warning);
 bool WaitForResponseTimeout(uint32_t cmd, UsbCommand* response, size_t ms_timeout);
 bool WaitForResponse(uint32_t cmd, UsbCommand* response);
-
-extern serial_port sp;
 
 #endif // COMMS_H_
