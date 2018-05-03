@@ -31,7 +31,7 @@
 #endif
 
 // Craig Young - 14a stand-alone code
-#ifdef WITH_ISO14443a_StandAlone
+#ifdef WITH_ISO14443a
  #include "iso14443a.h"
 #endif
 
