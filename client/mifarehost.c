@@ -16,7 +16,7 @@
 #include <pthread.h>
 
 #include "crapto1/crapto1.h"
-#include "proxmark3.h"
+#include "comms.h"
 #include "usb_cmd.h"
 #include "cmdmain.h"
 #include "ui.h"

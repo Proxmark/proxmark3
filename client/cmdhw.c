@@ -8,14 +8,15 @@
 // Hardware commands
 //-----------------------------------------------------------------------------
 
+#include "cmdhw.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <limits.h>
 #include "ui.h"
-#include "proxmark3.h"
+#include "comms.h"
 #include "cmdparser.h"
-#include "cmdhw.h"
 #include "cmdmain.h"
 #include "cmddata.h"
 

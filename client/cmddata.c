@@ -8,14 +8,15 @@
 // Data and Graph commands
 //-----------------------------------------------------------------------------
 
+#include "cmddata.h"
+
 #include <stdio.h>    // also included in util.h
 #include <string.h>   // also included in util.h
 #include <inttypes.h>
 #include <limits.h>   // for CmdNorm INT_MIN && INT_MAX
-#include "cmddata.h"
 #include "util.h"
 #include "cmdmain.h"
-#include "proxmark3.h"
+#include "comms.h"
 #include "ui.h"       // for show graph controls
 #include "graph.h"    // for graph data
 #include "cmdparser.h"// already included in cmdmain.h

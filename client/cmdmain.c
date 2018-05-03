@@ -50,13 +50,13 @@ command_t* getTopLevelCommandTable()
   return CommandTable;
 }
 
-int CmdHelp(const char *Cmd)
+static int CmdHelp(const char *Cmd)
 {
   CmdsHelp(CommandTable);
   return 0;
 }
 
-int CmdQuit(const char *Cmd)
+static int CmdQuit(const char *Cmd)
 {
   return 99;
 }

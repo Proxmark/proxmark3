@@ -7,19 +7,20 @@
 // Low frequency T55xx commands
 //-----------------------------------------------------------------------------
 
+#include "cmdlft55xx.h"
+
 #include <stdio.h>
 #include <string.h>
 #include <inttypes.h>
 #include <ctype.h>
 #include <time.h>
-#include "proxmark3.h"
+#include "comms.h"
 #include "ui.h"
 #include "graph.h"
 #include "cmdmain.h"
 #include "cmdparser.h"
 #include "cmddata.h"
 #include "cmdlf.h"
-#include "cmdlft55xx.h"
 #include "util.h"
 #include "lfdemod.h"
 #include "cmdhf14a.h" //for getTagInfo

@@ -8,11 +8,12 @@
 // Low frequency EM4x commands
 //-----------------------------------------------------------------------------
 
+#include "cmdlfem4x.h"
+
 #include <stdio.h>
 #include <string.h>
 #include <inttypes.h>
-#include "cmdlfem4x.h"
-#include "proxmark3.h"
+#include "comms.h"
 #include "ui.h"
 #include "util.h"
 #include "graph.h"

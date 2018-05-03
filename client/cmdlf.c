@@ -8,14 +8,15 @@
 // Low frequency commands
 //-----------------------------------------------------------------------------
 
+#include "cmdlf.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <limits.h>
 #include <stdbool.h>
 #include <stdint.h>
-#include "proxmark3.h"
-#include "cmdlf.h"
+#include "comms.h"
 #include "lfdemod.h"     // for psk2TOpsk1
 #include "util.h"        // for parsing cli command utils
 #include "ui.h"          // for show graph controls

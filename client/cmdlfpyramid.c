@@ -7,11 +7,13 @@
 // Low frequency Farpoint / Pyramid tag commands
 // FSK2a, rf/50, 128 bits (complete)
 //-----------------------------------------------------------------------------
+
+#include "cmdlfpyramid.h"
+
 #include <string.h>
 #include <inttypes.h>
 #include <stdio.h>
-#include "cmdlfpyramid.h"
-#include "proxmark3.h"
+#include "comms.h"
 #include "ui.h"
 #include "util.h"
 #include "graph.h"

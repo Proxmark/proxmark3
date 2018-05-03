@@ -7,11 +7,13 @@
 // Low frequency Presco tag commands
 // ASK/Manchester, rf/32, 128 bits (complete)
 //-----------------------------------------------------------------------------
+
+#include "cmdlfpresco.h"
+
 #include <string.h>
 #include <inttypes.h>
 #include <stdio.h>
-#include "cmdlfpresco.h"
-#include "proxmark3.h"
+#include "comms.h"
 #include "ui.h"
 #include "util.h"
 #include "graph.h"

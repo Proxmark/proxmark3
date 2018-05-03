@@ -11,12 +11,7 @@
 #ifndef CMDMAIN_H__
 #define CMDMAIN_H__
 
-#include <stdint.h>
-#include <stddef.h>
-#include "usb_cmd.h"
 #include "cmdparser.h"
-#include "comms.h"
-
 
 extern int CommandReceived(char *Cmd);
 extern command_t* getTopLevelCommandTable();

@@ -9,33 +9,45 @@
 // Code for communicating with the proxmark3 hardware.
 //-----------------------------------------------------------------------------
 
-#include <pthread.h>
-
 #include "comms.h"
+
+#include <pthread.h>
 #include "uart.h"
 #include "ui.h"
 #include "common.h"
 #include "util_posix.h"
 
-// Declare globals.
+#ifdef _WIN32
+# define unlink(x)
+#else
+# include <unistd.h>
+#endif
+
 
 // Serial port that we are communicating with the PM3 on.
 static serial_port sp;
+static char *serial_port_name;
 
 // If TRUE, then there is no active connection to the PM3, and we will drop commands sent.
 static bool offline;
 
+typedef struct {
+	bool run; // If TRUE, continue running the uart_communication thread
+	bool block_after_ACK; // if true, block after receiving an ACK package
+} communication_arg_t;
+
+static communication_arg_t conn;
+static pthread_t USB_communication_thread;
+
 // Transmit buffer.
-// TODO: Use locks and execute this on the main thread, rather than the receiver
-// thread.  Running on the main thread means we need to be careful in the
-// flasher, as it means SendCommand is no longer async, and can't be used as a
-// buffer for a pending command when the connection is re-established.
-static UsbCommand txcmd;
-volatile static bool txcmd_pending = false;
+static UsbCommand txBuffer;
+static bool txBuffer_pending = false;
+static pthread_mutex_t txBufferMutex = PTHREAD_MUTEX_INITIALIZER;
+static pthread_cond_t txBufferSig = PTHREAD_COND_INITIALIZER;
 
 // Used by UsbReceiveCommand as a ring buffer for messages that are yet to be
 // processed by a command handler (WaitForResponse{,Timeout})
-static UsbCommand cmdBuffer[CMD_BUFFER_SIZE];
+static UsbCommand rxBuffer[CMD_BUFFER_SIZE];
 
 // Points to the next empty position to write to
 static int cmd_head = 0;
@@ -43,8 +55,8 @@ static int cmd_head = 0;
 // Points to the position of the last unread command
 static int cmd_tail = 0;
 
-// to lock cmdBuffer operations from different threads
-static pthread_mutex_t cmdBufferMutex = PTHREAD_MUTEX_INITIALIZER;
+// to lock rxBuffer operations from different threads
+static pthread_mutex_t rxBufferMutex = PTHREAD_MUTEX_INITIALIZER;
 
 // These wrappers are required because it is not possible to access a static
 // global variable outside of the context of a single file.
@@ -57,38 +69,6 @@ bool IsOffline() {
 	return offline;
 }
 
-bool OpenProxmark(char *portname, bool waitCOMPort, int timeout) {
-	if (!waitCOMPort) {
-		sp = uart_open(portname);
-	} else {
-		printf("Waiting for Proxmark to appear on %s ", portname);
-		fflush(stdout);
-		int openCount = 0;
-		do {
-			sp = uart_open(portname);
-			msleep(1000);
-			printf(".");
-			fflush(stdout);
-		} while(++openCount < timeout && (sp == INVALID_SERIAL_PORT || sp == CLAIMED_SERIAL_PORT));
-		printf("\n");
-	}
-
-	// check result of uart opening
-	if (sp == INVALID_SERIAL_PORT) {
-		printf("ERROR: invalid serial port\n");
-		return false;
-	} else if (sp == CLAIMED_SERIAL_PORT) {
-		printf("ERROR: serial port is claimed by another process\n");
-		return false;
-	} else {
-		return true;
-	}
-}
-
-void CloseProxmark(void) {
-	uart_close(sp);
-}
-
 void SendCommand(UsbCommand *c) {
 	#ifdef COMMS_DEBUG
 	printf("Sending %04x cmd\n", c->cmd);
@@ -98,15 +78,22 @@ void SendCommand(UsbCommand *c) {
 		PrintAndLog("Sending bytes to proxmark failed - offline");
 		return;
     }
-	/**
-	The while-loop below causes hangups at times, when the pm3 unit is unresponsive
-	or disconnected. The main console thread is alive, but comm thread just spins here.
-	Not good.../holiman
-	**/
-	while(txcmd_pending);
 
-	txcmd = *c;
-	txcmd_pending = true;
+	pthread_mutex_lock(&txBufferMutex);
+	/**
+	This causes hangups at times, when the pm3 unit is unresponsive or disconnected. The main console thread is alive, 
+	but comm thread just spins here. Not good.../holiman
+	**/
+	while (txBuffer_pending) {
+		pthread_cond_wait(&txBufferSig, &txBufferMutex); // wait for communication thread to complete sending a previous commmand
+	}
+
+	txBuffer = *c;
+	txBuffer_pending = true;
+	pthread_cond_signal(&txBufferSig); // tell communication thread that a new command can be send
+
+	pthread_mutex_unlock(&txBufferMutex);
+
 }
 
 
@@ -119,9 +106,9 @@ void SendCommand(UsbCommand *c) {
 void clearCommandBuffer()
 {
 	//This is a very simple operation
-	pthread_mutex_lock(&cmdBufferMutex);
+	pthread_mutex_lock(&rxBufferMutex);
 	cmd_tail = cmd_head;
-	pthread_mutex_unlock(&cmdBufferMutex);
+	pthread_mutex_unlock(&rxBufferMutex);
 }
 
 /**
@@ -130,7 +117,7 @@ void clearCommandBuffer()
  */
 void storeCommand(UsbCommand *command)
 {
-	pthread_mutex_lock(&cmdBufferMutex);
+	pthread_mutex_lock(&rxBufferMutex);
 	if( (cmd_head+1) % CMD_BUFFER_SIZE == cmd_tail)
 	{
 		// If these two are equal, we're about to overwrite in the
@@ -139,11 +126,11 @@ void storeCommand(UsbCommand *command)
 	}
 
 	// Store the command at the 'head' location
-	UsbCommand* destination = &cmdBuffer[cmd_head];
+	UsbCommand* destination = &rxBuffer[cmd_head];
 	memcpy(destination, command, sizeof(UsbCommand));
 
 	cmd_head = (cmd_head +1) % CMD_BUFFER_SIZE; //increment head and wrap
-	pthread_mutex_unlock(&cmdBufferMutex);
+	pthread_mutex_unlock(&rxBufferMutex);
 }
 
 
@@ -154,20 +141,20 @@ void storeCommand(UsbCommand *command)
  */
 int getCommand(UsbCommand* response)
 {
-	pthread_mutex_lock(&cmdBufferMutex);
+	pthread_mutex_lock(&rxBufferMutex);
 	//If head == tail, there's nothing to read, or if we just got initialized
 	if (cmd_head == cmd_tail){
-		pthread_mutex_unlock(&cmdBufferMutex);
+		pthread_mutex_unlock(&rxBufferMutex);
 		return 0;
 	}
 
 	//Pick out the next unread command
-	UsbCommand* last_unread = &cmdBuffer[cmd_tail];
+	UsbCommand* last_unread = &rxBuffer[cmd_tail];
 	memcpy(response, last_unread, sizeof(UsbCommand));
 	//Increment tail - this is a circular buffer, so modulo buffer size
 	cmd_tail = (cmd_tail + 1) % CMD_BUFFER_SIZE;
 
-	pthread_mutex_unlock(&cmdBufferMutex);
+	pthread_mutex_unlock(&rxBufferMutex);
 	return 1;
 }
 
@@ -202,41 +189,59 @@ static void UsbCommandReceived(UsbCommand *UC)
 }
 
 
-void
+static void
 #ifdef __has_attribute
 #if __has_attribute(force_align_arg_pointer)
 __attribute__((force_align_arg_pointer)) 
 #endif
 #endif
-*uart_receiver(void *targ) {
-	receiver_arg *conn = (receiver_arg*)targ;
+*uart_communication(void *targ) {
+	communication_arg_t *conn = (communication_arg_t*)targ;
 	size_t rxlen;
-	uint8_t rx[sizeof(UsbCommand)];
-	uint8_t *prx = rx;
+	UsbCommand rx;
+	UsbCommand *prx = &rx;
 
 	while (conn->run) {
 		rxlen = 0;
-		if (uart_receive(sp, prx, sizeof(UsbCommand) - (prx-rx), &rxlen) && rxlen) {
+		bool ACK_received = false;
+		if (uart_receive(sp, (uint8_t *)prx, sizeof(UsbCommand) - (prx-&rx), &rxlen) && rxlen) {
 			prx += rxlen;
-			if (prx-rx < sizeof(UsbCommand)) {
+			if (prx-&rx < sizeof(UsbCommand)) {
 				continue;
 			}
-			UsbCommandReceived((UsbCommand*)rx);
+			UsbCommandReceived(&rx);
+			if (rx.cmd == CMD_ACK) {
+				ACK_received = true;
+			}
 		}
-		prx = rx;
+		prx = &rx;
 
-		if(txcmd_pending) {
-			if (!uart_send(sp, (uint8_t*) &txcmd, sizeof(UsbCommand))) {
+		
+		pthread_mutex_lock(&txBufferMutex);
+
+		if (conn->block_after_ACK) {
+			// if we just received an ACK, wait here until a new command is to be transmitted
+			if (ACK_received) {
+				while (!txBuffer_pending) {
+					pthread_cond_wait(&txBufferSig, &txBufferMutex);
+				}
+			}
+		}
+				
+		if(txBuffer_pending) {
+			if (!uart_send(sp, (uint8_t*) &txBuffer, sizeof(UsbCommand))) {
 				PrintAndLog("Sending bytes to proxmark failed");
 			}
-			txcmd_pending = false;
+			txBuffer_pending = false;
+			pthread_cond_signal(&txBufferSig); // tell main thread that txBuffer is empty
 		}
+
+		pthread_mutex_unlock(&txBufferMutex);
 	}
 
 	pthread_exit(NULL);
 	return NULL;
 }
-
 
 
 /**
@@ -287,6 +292,51 @@ bool GetFromBigBuf(uint8_t *dest, int bytes, int start_index, UsbCommand *respon
 	}
 
 	return false;
+}
+
+	
+bool OpenProxmark(char *portname, bool waitCOMPort, int timeout, bool flash_mode) {
+	if (!waitCOMPort) {
+		sp = uart_open(portname);
+	} else {
+		printf("Waiting for Proxmark to appear on %s ", portname);
+		fflush(stdout);
+		int openCount = 0;
+		do {
+			sp = uart_open(portname);
+			msleep(1000);
+			printf(".");
+			fflush(stdout);
+		} while(++openCount < timeout && (sp == INVALID_SERIAL_PORT || sp == CLAIMED_SERIAL_PORT));
+		printf("\n");
+	}
+
+	// check result of uart opening
+	if (sp == INVALID_SERIAL_PORT) {
+		printf("ERROR: invalid serial port\n");
+		serial_port_name = NULL;
+		return false;
+	} else if (sp == CLAIMED_SERIAL_PORT) {
+		printf("ERROR: serial port is claimed by another process\n");
+		serial_port_name = NULL;
+		return false;
+	} else {
+		// start the USB communication thread
+		conn.run = true;
+		conn.block_after_ACK = flash_mode;
+		pthread_create(&USB_communication_thread, NULL, &uart_communication, &conn);
+		serial_port_name = portname;
+		return true;
+	}
+}
+
+
+void CloseProxmark(void) {
+	conn.run = false;
+	pthread_join(USB_communication_thread, NULL);
+	uart_close(sp);
+	// Fix for linux, it seems that it is extremely slow to release the serial port file descriptor /dev/*
+	unlink(serial_port_name);
 }
 
 

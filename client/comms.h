@@ -22,24 +22,14 @@
 #define CMD_BUFFER_SIZE 50
 #endif
 
-typedef struct {
-	// If TRUE, continue running the uart_receiver thread
-	bool run;
-
-	// Lock around serial port receives
-	pthread_mutex_t recv_lock;
-} receiver_arg;
-
-
 void SetOffline(bool new_offline);
 bool IsOffline();
 
-bool OpenProxmark(char *portname, bool waitCOMPort, int timeout);
+bool OpenProxmark(char *portname, bool waitCOMPort, int timeout, bool flash_mode);
 void CloseProxmark(void);
 
 void SendCommand(UsbCommand *c);
 
-void *uart_receiver(void *targ);
 void clearCommandBuffer();
 bool WaitForResponseTimeoutW(uint32_t cmd, UsbCommand* response, size_t ms_timeout, bool show_warning);
 bool WaitForResponseTimeout(uint32_t cmd, UsbCommand* response, size_t ms_timeout);
