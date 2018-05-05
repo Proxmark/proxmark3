@@ -947,6 +947,7 @@ int CmdLFfind(const char *Cmd)
 				return 1;
 			}
 		}
+		PrintAndLog("\nNo Data Found! - maybe not an LF tag?\n");
 		return 0;
 	}
 
