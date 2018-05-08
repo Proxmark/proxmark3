@@ -15,7 +15,6 @@
 #include <stdint.h>
 #include "iso14443crc.h"
 #include "proxmark3.h"
-#include "data.h"
 #include "graph.h"
 #include "util.h"
 #include "ui.h"

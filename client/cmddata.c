@@ -12,7 +12,6 @@
 #include <string.h>   // also included in util.h
 #include <inttypes.h>
 #include <limits.h>   // for CmdNorm INT_MIN && INT_MAX
-#include "data.h"     // also included in util.h
 #include "cmddata.h"
 #include "util.h"
 #include "cmdmain.h"
@@ -591,8 +590,7 @@ int CmdBitsamples(const char *Cmd)
 	int cnt = 0;
 	uint8_t got[12288];
 
-	GetFromBigBuf(got,sizeof(got),0);
-	WaitForResponse(CMD_ACK,NULL);
+	GetFromBigBuf(got, sizeof(got), 0 , NULL, -1, false);
 
 		for (int j = 0; j < sizeof(got); j++) {
 			for (int k = 0; k < 8; k++) {
@@ -1131,8 +1129,7 @@ int CmdHexsamples(const char *Cmd)
 		return 0;
 	}
 
-	GetFromBigBuf(got,requested,offset);
-	WaitForResponse(CMD_ACK,NULL);
+	GetFromBigBuf(got, requested, offset, NULL, -1, false);
 
 	i = 0;
 	for (j = 0; j < requested; j++) {
@@ -1200,10 +1197,9 @@ int getSamples(int n, bool silent)
 		n = sizeof(got);
 
 	if (!silent) PrintAndLog("Reading %d bytes from device memory\n", n);
-	GetFromBigBuf(got,n,0);
-	if (!silent) PrintAndLog("Data fetched");
 	UsbCommand response;
-	WaitForResponse(CMD_ACK, &response);
+	GetFromBigBuf(got, n, 0, &response, -1, false);
+	if (!silent) PrintAndLog("Data fetched");
 	uint8_t bits_per_sample = 8;
 
 	//Old devices without this feature would send 0 at arg[0]

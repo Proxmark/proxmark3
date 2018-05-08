@@ -20,7 +20,6 @@
 #include "util.h"
 #include "util_posix.h"
 #include "iso14443crc.h"
-#include "data.h"
 #include "proxmark3.h"
 #include "ui.h"
 #include "cmdparser.h"

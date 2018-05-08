@@ -16,7 +16,6 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include "util.h"
-#include "data.h"
 #include "ui.h"
 #include "iso14443crc.h"
 #include "parity.h"

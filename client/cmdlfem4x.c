@@ -15,7 +15,6 @@
 #include "proxmark3.h"
 #include "ui.h"
 #include "util.h"
-#include "data.h"
 #include "graph.h"
 #include "cmdparser.h"
 #include "cmddata.h"
@@ -804,8 +803,7 @@ int usage_lf_em_read(void) {
 bool downloadSamplesEM() {
 	// 8 bit preamble + 32 bit word response (max clock (128) * 40bits = 5120 samples)
 	uint8_t got[6000];
-	GetFromBigBuf(got, sizeof(got), 0);
-	if ( !WaitForResponseTimeout(CMD_ACK, NULL, 4000) ) {
+	if (!GetFromBigBuf(got, sizeof(got), 0, NULL, 4000, true)) {
 		PrintAndLog("command execution time out");
 		return false;
 	}
