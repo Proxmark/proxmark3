@@ -269,6 +269,7 @@ int Plot::xCoordOf(int i, QRect r )
 int Plot::yCoordOf(int v, QRect r, int maxVal)
 {
 	int z = (r.bottom() - r.top())/2;
+	if ( maxVal == 0 ) maxVal++;
 	return -(z * v) / maxVal + z;
 }
 
@@ -579,6 +580,8 @@ Plot::Plot(QWidget *parent) : QWidget(parent), GraphStart(0), GraphPixelsPerPoin
 	CursorBPos = 0;
 
 	setWindowTitle(tr("Sliders"));
+
+	master = parent;
 }
 
 void Plot::closeEvent(QCloseEvent *event)
@@ -688,7 +691,7 @@ void Plot::keyPressEvent(QKeyEvent *event)
 			break;
 
 		case Qt::Key_Q:
-			this->hide();
+			master->hide();
 			break;
 
 		default:
