@@ -15,16 +15,15 @@
 #include "uart.h"
 #include "ui.h"
 #include "common.h"
-#include "data.h"
 #include "util_posix.h"
 
 // Declare globals.
 
 // Serial port that we are communicating with the PM3 on.
-serial_port sp;
+static serial_port sp;
 
 // If TRUE, then there is no active connection to the PM3, and we will drop commands sent.
-bool offline;
+static bool offline;
 
 // Transmit buffer.
 // TODO: Use locks and execute this on the main thread, rather than the receiver
@@ -47,10 +46,52 @@ static int cmd_tail = 0;
 // to lock cmdBuffer operations from different threads
 static pthread_mutex_t cmdBufferMutex = PTHREAD_MUTEX_INITIALIZER;
 
+// These wrappers are required because it is not possible to access a static
+// global variable outside of the context of a single file.
+
+void SetOffline(bool new_offline) {
+	offline = new_offline;
+}
+
+bool IsOffline() {
+	return offline;
+}
+
+bool OpenProxmark(char *portname, bool waitCOMPort, int timeout) {
+	if (!waitCOMPort) {
+		sp = uart_open(portname);
+	} else {
+		printf("Waiting for Proxmark to appear on %s ", portname);
+		fflush(stdout);
+		int openCount = 0;
+		do {
+			sp = uart_open(portname);
+			msleep(1000);
+			printf(".");
+			fflush(stdout);
+		} while(++openCount < timeout && (sp == INVALID_SERIAL_PORT || sp == CLAIMED_SERIAL_PORT));
+		printf("\n");
+	}
+
+	// check result of uart opening
+	if (sp == INVALID_SERIAL_PORT) {
+		printf("ERROR: invalid serial port\n");
+		return false;
+	} else if (sp == CLAIMED_SERIAL_PORT) {
+		printf("ERROR: serial port is claimed by another process\n");
+		return false;
+	} else {
+		return true;
+	}
+}
+
+void CloseProxmark(void) {
+	uart_close(sp);
+}
 
 void SendCommand(UsbCommand *c) {
-	#if 0
-		printf("Sending %d bytes\n", sizeof(UsbCommand));
+	#ifdef COMMS_DEBUG
+	printf("Sending %04x cmd\n", c->cmd);
 	#endif
 
 	if (offline) {
@@ -63,6 +104,7 @@ void SendCommand(UsbCommand *c) {
 	Not good.../holiman
 	**/
 	while(txcmd_pending);
+
 	txcmd = *c;
 	txcmd_pending = true;
 }
@@ -130,11 +172,11 @@ int getCommand(UsbCommand* response)
 }
 
 
-//-----------------------------------------------------------------------------
-// Entry point into our code: called whenever we received a packet over USB
-// that we weren't necessarily expecting, for example a debug print.
-//-----------------------------------------------------------------------------
-void UsbCommandReceived(UsbCommand *UC)
+//----------------------------------------------------------------------------------
+// Entry point into our code: called whenever we received a packet over USB.
+// Handle debug commands directly, store all other commands in circular buffer.
+//----------------------------------------------------------------------------------
+static void UsbCommandReceived(UsbCommand *UC)
 {
 	switch(UC->cmd) {
 		// First check if we are handling a debug message
@@ -152,13 +194,8 @@ void UsbCommandReceived(UsbCommand *UC)
 			return;
 		} break;
 
-		case CMD_DOWNLOADED_RAW_ADC_SAMPLES_125K: {
-			memcpy(sample_buf+(UC->arg[0]),UC->d.asBytes,UC->arg[1]);
-			return;
-		} break;
-
 		default:
-			storeCommand(UC);
+ 			storeCommand(UC);
 			break;
 	}
 
@@ -172,12 +209,12 @@ __attribute__((force_align_arg_pointer))
 #endif
 #endif
 *uart_receiver(void *targ) {
-	receiver_arg *arg = (receiver_arg*)targ;
+	receiver_arg *conn = (receiver_arg*)targ;
 	size_t rxlen;
 	uint8_t rx[sizeof(UsbCommand)];
 	uint8_t *prx = rx;
 
-	while (arg->run) {
+	while (conn->run) {
 		rxlen = 0;
 		if (uart_receive(sp, prx, sizeof(UsbCommand) - (prx-rx), &rxlen) && rxlen) {
 			prx += rxlen;
@@ -201,18 +238,75 @@ __attribute__((force_align_arg_pointer))
 }
 
 
+
+/**
+ * Data transfer from Proxmark to client. This method times out after
+ * ms_timeout milliseconds.
+ * @brief GetFromBigBuf
+ * @param dest Destination address for transfer
+ * @param bytes number of bytes to be transferred
+ * @param start_index offset into Proxmark3 BigBuf[]
+ * @param response struct to copy last command (CMD_ACK) into
+ * @param ms_timeout timeout in milliseconds
+ * @param show_warning display message after 2 seconds
+ * @return true if command was returned, otherwise false
+ */
+bool GetFromBigBuf(uint8_t *dest, int bytes, int start_index, UsbCommand *response, size_t ms_timeout, bool show_warning)
+{
+	UsbCommand c = {CMD_DOWNLOAD_RAW_ADC_SAMPLES_125K, {start_index, bytes, 0}};
+	SendCommand(&c);
+
+	uint64_t start_time = msclock();
+
+	UsbCommand resp;
+  	if (response == NULL) {
+		response = &resp;
+	}
+
+	int bytes_completed = 0;
+	while(true) {
+		if (getCommand(response)) {
+			if (response->cmd == CMD_DOWNLOADED_RAW_ADC_SAMPLES_125K) {
+				int copy_bytes = MIN(bytes - bytes_completed, response->arg[1]);
+				memcpy(dest + response->arg[0], response->d.asBytes, copy_bytes);
+				bytes_completed += copy_bytes;
+			} else if (response->cmd == CMD_ACK) {
+				return true;
+			}
+		}
+
+		if (msclock() - start_time > ms_timeout) {
+			break;
+		}
+
+		if (msclock() - start_time > 2000 && show_warning) {
+			PrintAndLog("Waiting for a response from the proxmark...");
+			PrintAndLog("You can cancel this operation by pressing the pm3 button");
+			show_warning = false;
+		}
+	}
+
+	return false;
+}
+
+
 /**
  * Waits for a certain response type. This method waits for a maximum of
  * ms_timeout milliseconds for a specified response command.
  *@brief WaitForResponseTimeout
- * @param cmd command to wait for
+ * @param cmd command to wait for, or CMD_UNKNOWN to take any command.
  * @param response struct to copy received command into.
  * @param ms_timeout
+ * @param show_warning display message after 2 seconds
  * @return true if command was returned, otherwise false
  */
 bool WaitForResponseTimeoutW(uint32_t cmd, UsbCommand* response, size_t ms_timeout, bool show_warning) {
 
 	UsbCommand resp;
+
+	#ifdef COMMS_DEBUG
+	printf("Waiting for %04x cmd\n", cmd);
+	#endif
 
 	if (response == NULL) {
 		response = &resp;
@@ -223,7 +317,7 @@ bool WaitForResponseTimeoutW(uint32_t cmd, UsbCommand* response, size_t ms_timeo
 	// Wait until the command is received
 	while (true) {
 		while(getCommand(response)) {
-			if(response->cmd == cmd){
+			if (cmd == CMD_UNKNOWN || response->cmd == cmd) {
 				return true;
 			}
 		}
@@ -233,6 +327,7 @@ bool WaitForResponseTimeoutW(uint32_t cmd, UsbCommand* response, size_t ms_timeo
 		}
 
 		if (msclock() - start_time > 2000 && show_warning) {
+			// 2 seconds elapsed (but this doesn't mean the timeout was exceeded)
 			PrintAndLog("Waiting for a response from the proxmark...");
 			PrintAndLog("You can cancel this operation by pressing the pm3 button");
 			show_warning = false;

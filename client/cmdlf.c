@@ -22,7 +22,6 @@
 #include "graph.h"       // for graph data
 #include "cmdparser.h"   // for getting cli commands included in cmdmain.h
 #include "cmdmain.h"     // for sending cmds to device
-#include "data.h"        // for GetFromBigBuf
 #include "cmddata.h"     // for `lf search`
 #include "cmdlfawid.h"   // for awid menu
 #include "cmdlfem4x.h"   // for em4x menu
@@ -327,7 +326,7 @@ int CmdLFSetConfig(const char *Cmd)
 }
 
 bool lf_read(bool silent, uint32_t samples) {
-	if (offline) return false;
+	if (IsOffline()) return false;
 	UsbCommand c = {CMD_ACQUIRE_RAW_ADC_SAMPLES_125K, {silent,samples,0}};
 	clearCommandBuffer();
 	//And ship it to device
@@ -870,7 +869,7 @@ int CmdVchDemod(const char *Cmd)
 int CheckChipType(char cmdp) {
 	uint32_t wordData = 0;
 
-	if (offline || cmdp == '1') return 0;
+	if (IsOffline() || cmdp == '1') return 0;
 
 	save_restoreGB(GRAPH_SAVE);
 	save_restoreDB(GRAPH_SAVE);
@@ -915,7 +914,7 @@ int CmdLFfind(const char *Cmd)
 		return 0;
 	}
 
-	if (!offline && (cmdp != '1')) {
+	if (!IsOffline() && (cmdp != '1')) {
 		lf_read(true, 30000);
 	} else if (GraphTraceLen < minLength) {
 		PrintAndLog("Data in Graphbuffer was too small.");
@@ -931,7 +930,7 @@ int CmdLFfind(const char *Cmd)
 	// only run if graphbuffer is just noise as it should be for hitag/cotag
 	if (graphJustNoise(GraphBuffer, testLen)) {
 		// only run these tests if we are in online mode 
-		if (!offline && (cmdp != '1')) {
+		if (!IsOffline() && (cmdp != '1')) {
 			// test for em4x05 in reader talk first mode.
 			if (EM4x05Block0Test(&wordData)) {
 				PrintAndLog("\nValid EM4x05/EM4x69 Chip Found\nUse lf em 4x05readword/dump commands to read\n");
@@ -947,6 +946,7 @@ int CmdLFfind(const char *Cmd)
 				return 1;
 			}
 		}
+		PrintAndLog("\nNo Data Found! - maybe not an LF tag?\n");
 		return 0;
 	}
 

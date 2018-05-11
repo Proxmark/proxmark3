@@ -17,7 +17,6 @@
 #include <string.h>
 #include "cmdparser.h"
 #include "proxmark3.h"
-#include "data.h"
 #include "usb_cmd.h"
 #include "ui.h"
 #include "cmdhf.h"
@@ -28,8 +27,6 @@
 #include "util_posix.h"
 #include "cmdscript.h"
 
-
-unsigned int current_command = CMD_UNKNOWN;
 
 static int CmdHelp(const char *Cmd);
 static int CmdQuit(const char *Cmd);

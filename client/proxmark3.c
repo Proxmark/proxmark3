@@ -21,7 +21,6 @@
 #include "util_posix.h"
 #include "proxgui.h"
 #include "cmdmain.h"
-#include "uart.h"
 #include "ui.h"
 #include "util.h"
 #include "cmdparser.h"
@@ -41,14 +40,17 @@ main_loop(char *script_cmds_file, char *script_cmd, bool usb_present) {
 	pthread_t reader_thread;
 	bool execCommand = (script_cmd != NULL);
 	bool stdinOnPipe = !isatty(STDIN_FILENO);
-	
+
 	memset(&conn, 0, sizeof(receiver_arg));
 
 	if (usb_present) {
 		conn.run = true;
+		SetOffline(false);
 		pthread_create(&reader_thread, NULL, &uart_receiver, &conn);
 		// cache Version information now:
 		CmdVersion(NULL);
+	} else {
+		SetOffline(true);
 	}
 
 	// file with script
@@ -64,7 +66,7 @@ main_loop(char *script_cmds_file, char *script_cmd, bool usb_present) {
 
 	read_history(".history");
 
-	while (1)  {
+	while (1) {
 		// If there is a script file
 		if (script_file)
 		{
@@ -134,7 +136,7 @@ main_loop(char *script_cmds_file, char *script_cmd, bool usb_present) {
 	}
 
 	write_history(".history");
-  
+
 	if (usb_present) {
 		conn.run = false;
 		pthread_join(reader_thread, NULL);
@@ -235,7 +237,7 @@ int main(int argc, char* argv[]) {
 		
 		if(strcmp(argv[i],"-f") == 0 || strcmp(argv[i],"-flush") == 0){
 			printf("Output will be flushed after every print.\n");
-			flushAfterWrite = 1;
+			SetFlushAfterWrite(true);
 		}
 		
 		if(strcmp(argv[i],"-w") == 0 || strcmp(argv[i],"-wait") == 0){
@@ -290,36 +292,9 @@ int main(int argc, char* argv[]) {
 	
 	// set global variables
 	set_my_executable_path();
-	
-	// open uart
-	if (!waitCOMPort) {
-		sp = uart_open(argv[1]);
-	} else {
-		printf("Waiting for Proxmark to appear on %s ", argv[1]);
-		fflush(stdout);
-		int openCount = 0;
-		do {
-			sp = uart_open(argv[1]);
-			msleep(1000);
-			printf(".");
-			fflush(stdout);
-		} while(++openCount < 20 && (sp == INVALID_SERIAL_PORT || sp == CLAIMED_SERIAL_PORT));
-		printf("\n");
-	}
 
-	// check result of uart opening
-	if (sp == INVALID_SERIAL_PORT) {
-		printf("ERROR: invalid serial port\n");
-		usb_present = false;
-		offline = 1;
-	} else if (sp == CLAIMED_SERIAL_PORT) {
-		printf("ERROR: serial port is claimed by another process\n");
-		usb_present = false;
-		offline = 1;
-	} else {
-		usb_present = true;
-		offline = 0;
-	}
+	// try to open USB connection to Proxmark
+	usb_present = OpenProxmark(argv[1], waitCOMPort, 20);
 
 #ifdef HAVE_GUI
 #ifdef _WIN32
@@ -344,7 +319,7 @@ int main(int argc, char* argv[]) {
 
 	// Clean up the port
 	if (usb_present) {
-		uart_close(sp);
+		CloseProxmark();
 	}
 
 	exit(0);

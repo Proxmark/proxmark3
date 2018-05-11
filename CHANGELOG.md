@@ -20,6 +20,7 @@ This project uses the changelog in accordance with [keepchangelog](http://keepac
 
 ### Fixed
 - Changed start sequence in Qt mode (fix: short commands hangs main Qt thread) (Merlok)
+- Changed driver file proxmark3.inf to support both old and new Product/Vendor IDs (piwi)
 
 ### Added
 - Added a bitbang mode to `lf cmdread` if delay is 0 the cmd bits turn off and on the antenna with 0 and 1 respectively (marshmellow)
@@ -64,7 +65,7 @@ This project uses the changelog in accordance with [keepchangelog](http://keepac
 - Added lf hitag write 24, the command writes a block to hitag2 tags in crypto mode (henjo)
 
 ### Added
-- Added hf mf hardnested, an attack working for hardened Mifare cards (EV1, Mifare Plus SL1) where hf mf nested fails
+- Added hf mf hardnested, an attack working for hardened Mifare cards (EV1, Mifare Plus SL1) where hf mf nested fails (piwi)
 - Added experimental testmode write option for t55xx (danger) (marshmellow)
 - Added t55xx p1detect to `lf search` chip detections (marshmellow)
 - Added lf t55xx p1detect, detect page 1 of a t55xx tag based on E015 mfg code (marshmellow)

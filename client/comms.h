@@ -30,16 +30,20 @@ typedef struct {
 	pthread_mutex_t recv_lock;
 } receiver_arg;
 
+
+void SetOffline(bool new_offline);
+bool IsOffline();
+
+bool OpenProxmark(char *portname, bool waitCOMPort, int timeout);
+void CloseProxmark(void);
+
 void SendCommand(UsbCommand *c);
 
 void *uart_receiver(void *targ);
-void UsbCommandReceived(UsbCommand *UC);
 void clearCommandBuffer();
 bool WaitForResponseTimeoutW(uint32_t cmd, UsbCommand* response, size_t ms_timeout, bool show_warning);
 bool WaitForResponseTimeout(uint32_t cmd, UsbCommand* response, size_t ms_timeout);
 bool WaitForResponse(uint32_t cmd, UsbCommand* response);
-
-extern serial_port sp;
-extern bool offline;
+bool GetFromBigBuf(uint8_t *dest, int bytes, int start_index, UsbCommand *response, size_t ms_timeout, bool show_warning);
 
 #endif // COMMS_H_
