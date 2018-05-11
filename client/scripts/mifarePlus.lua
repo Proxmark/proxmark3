@@ -45,7 +45,9 @@ function sendRaw(rawdata, crc, power)
 		--unpack the first 4 parts of the result as longs, and the last as an extremely long string to later be cut down based on arg1, the number of bytes returned
 		local count,cmd,arg1,arg2,arg3,data = bin.unpack('LLLLH512',result)
 		returned_bytes = string.sub(data, 1, arg1 * 2)
-		print(("<recvd>: %s"):format(returned_bytes)) -- need to multiply by 2 because the hex digits are actually two bytes when they are strings
+		if returned_bytes ~= "" then
+			print(("<recvd>: %s"):format(returned_bytes)) -- need to multiply by 2 because the hex digits are actually two bytes when they are strings
+		end
 		return returned_bytes
 	else
 		err = "Error sending the card raw data."
@@ -189,6 +191,10 @@ function proximityCheck()
 	--PreparePC--
 	commandString = PREPAREPC
 	response = sendRaw(commandString, true, true)
+	if(response == "") then
+		print("ERROR: This card does not support the Proximity Check command.")
+		return
+	end
 	OPT = string.sub(response, 5, 6)
 	if(tonumber(OPT) == 1) then
 		pps_present = true
@@ -255,17 +261,19 @@ end
 function main(args)
 	-- Initialize the card using the already-present read14a library
 	info,err = lib14a.read14443a(true, false)
-	--Perform PPS (Protocol and Parameter Selection) check to finish the ISO 14443-4 protocol.
+	--Perform RATS and PPS (Protocol and Parameter Selection) check to finish the ISO 14443-4 protocol.
 	response = sendRaw("e050", true, true)
-	if(response == nil) then
-		err = "No response from RATS"
+	if(response == "") then
+		print("No response from RATS.")
 	end
 	response = sendRaw("D01100", true, true)
-	if(response == nil) then
-		err = "No response from PPS check"
+	if(response == "") then
+		print("No response from PPS check.")
 	end
 	if err then
 		oops(err)
+		sendRaw(POWEROFF, false, false)
+		return
 	else
 		print(("Connected to card with a UID of %s."):format(info.uid))
 	end
