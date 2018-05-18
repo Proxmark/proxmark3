@@ -985,39 +985,39 @@ void SimulateHitagSTag(bool tag_mem_supplied, byte_t* data) {
 		tag.max_page=0;
 	//con1
 	tag.auth=0;
-	if((tag.pages[1][2]&0x80)==1)
+	if (tag.pages[1][2]&0x80)
 		tag.auth=1;
 	tag.LCON=0;
-	if((tag.pages[1][2]&0x2)==1)
+	if (tag.pages[1][2]&0x2)
 		tag.LCON=1;
 	tag.LKP=0;
-	if((tag.pages[1][2]&0x1)==1)
+	if (tag.pages[1][2]&0x1)
 		tag.LKP=1;
 	//con2
 	//0=read write 1=read only
 	tag.LCK7=0;
-	if((tag.pages[1][1]&0x80)==1)
+	if (tag.pages[1][1]&0x80)
 		tag.LCK7=1;
 	tag.LCK6=0;
-	if((tag.pages[1][1]&0x40)==1)
+	if (tag.pages[1][1]&0x40)
 		tag.LCK6=1;
 	tag.LCK5=0;
-	if((tag.pages[1][1]&0x20)==1)
+	if (tag.pages[1][1]&0x20)
 		tag.LCK5=1;
 	tag.LCK4=0;
-	if((tag.pages[1][1]&0x10)==1)
+	if (tag.pages[1][1]&0x10)
 		tag.LCK4=1;
 	tag.LCK3=0;
-	if((tag.pages[1][1]&0x8)==1)
+	if (tag.pages[1][1]&0x8)
 		tag.LCK3=1;
 	tag.LCK2=0;
-	if((tag.pages[1][1]&0x4)==1)
+	if (tag.pages[1][1]&0x4)
 		tag.LCK2=1;
 	tag.LCK1=0;
-	if((tag.pages[1][1]&0x2)==1)
+	if (tag.pages[1][1]&0x2)
 		tag.LCK1=1;
 	tag.LCK0=0;
-	if((tag.pages[1][1]&0x1)==1)
+	if (tag.pages[1][1]&0x1)
 		tag.LCK0=1;
 
 // Set up simulator mode, frequency divisor which will drive the FPGA

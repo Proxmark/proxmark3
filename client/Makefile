@@ -105,7 +105,6 @@ CMDSRCS = 	crapto1/crapto1.c\
 			crc64.c \
 			iso14443crc.c \
 			iso15693tools.c \
-			data.c \
 			graph.c \
 			ui.c \
 			cmddata.c \

@@ -44,5 +44,6 @@ void clearCommandBuffer();
 bool WaitForResponseTimeoutW(uint32_t cmd, UsbCommand* response, size_t ms_timeout, bool show_warning);
 bool WaitForResponseTimeout(uint32_t cmd, UsbCommand* response, size_t ms_timeout);
 bool WaitForResponse(uint32_t cmd, UsbCommand* response);
+bool GetFromBigBuf(uint8_t *dest, int bytes, int start_index, UsbCommand *response, size_t ms_timeout, bool show_warning);
 
 #endif // COMMS_H_

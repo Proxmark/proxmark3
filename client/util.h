@@ -24,9 +24,16 @@
 #ifndef MAX
 # define MAX(a, b) (((a) > (b)) ? (a) : (b))
 #endif
+#ifndef arraylen
+#define arraylen(x) (sizeof(x)/sizeof((x)[0]))
+#endif
 
 #define EVEN                        0
 #define ODD                         1
+
+#ifndef FILE_PATH_SIZE
+#define FILE_PATH_SIZE           2000
+#endif
 
 extern int ukbhit(void);
 

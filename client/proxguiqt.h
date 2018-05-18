@@ -28,6 +28,7 @@
 class Plot: public QWidget
 {
 private:
+	QWidget *master;
 	int GraphStart;
 	double GraphPixelsPerPoint;
 	int CursorAPos;

@@ -11,7 +11,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "data.h"
 #include "proxmark3.h"
 #include "ui.h"
 #include "cmdparser.h"
@@ -34,8 +33,7 @@ int CmdLFHitagList(const char *Cmd)
 
 	// Query for the actual size of the trace
 	UsbCommand response;
-	GetFromBigBuf(got, USB_CMD_DATA_SIZE, 0);
-	WaitForResponse(CMD_ACK, &response);
+	GetFromBigBuf(got, USB_CMD_DATA_SIZE, 0, &response, -1, false);
 	uint16_t traceLen = response.arg[2];
 	if (traceLen > USB_CMD_DATA_SIZE) {
 		uint8_t *p = realloc(got, traceLen);
@@ -45,8 +43,7 @@ int CmdLFHitagList(const char *Cmd)
 			return 2;
 		}
 		got = p;
-		GetFromBigBuf(got, traceLen, 0);
-		WaitForResponse(CMD_ACK,NULL);
+		GetFromBigBuf(got, traceLen, 0, NULL, -1, false);
 	}
 	
 	PrintAndLog("recorded activity (TraceLen = %d bytes):");
