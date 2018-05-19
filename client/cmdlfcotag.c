@@ -7,7 +7,16 @@
 //-----------------------------------------------------------------------------
 // Low frequency COTAG commands
 //-----------------------------------------------------------------------------
-#include "cmdlfcotag.h"  // COTAG function declarations
+#include <stdio.h>
+#include <string.h>
+#include <stdint.h>
+#include "proxmark3.h"
+#include "ui.h"
+#include "cmddata.h"
+#include "cmdlfcotag.h"
+#include "lfdemod.h"
+#include "usb_cmd.h"
+#include "cmdmain.h"
 
 static int CmdHelp(const char *Cmd);
 
@@ -33,7 +42,8 @@ int CmdCOTAGDemod(const char *Cmd) {
 	size_t bitlen = COTAG_BITS;
 	memcpy(bits, DemodBuffer, COTAG_BITS);
 	
-	int err = manrawdecode(bits, &bitlen, 1);
+	uint8_t alignPos = 0;
+	int err = manrawdecode(bits, &bitlen, 1, &alignPos);
 	if (err){
 		if (g_debugMode) PrintAndLog("DEBUG: Error - COTAG too many errors: %d", err);
 		return -1;
@@ -85,13 +95,12 @@ int CmdCOTAGRead(const char *Cmd) {
 		case 2: {
 			CmdPlot("");
 			CmdGrid("384");
-			getSamples("", true); break;
+			getSamples(0, true); break;
 		}
 		case 1: {
-			GetFromBigBuf(DemodBuffer, COTAG_BITS, 0);
-			DemodBufferLen = COTAG_BITS;
 			UsbCommand response;
-			if ( !WaitForResponseTimeout(CMD_ACK, &response, 1000) ) {
+			DemodBufferLen = COTAG_BITS;
+			if (!GetFromBigBuf(DemodBuffer, COTAG_BITS, 0, &response, 1000, true)) {
 				PrintAndLog("timeout while waiting for reply.");
 				return -1;
 			}

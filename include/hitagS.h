@@ -10,12 +10,10 @@
 //-----------------------------------------------------------------------------
 
 
-#include <stdlib.h>
-#include <string.h>
-#include <hitag2.h>
-
 #ifndef _HITAGS_H_
 #define _HITAGS_H_
+
+#include "hitag2.h"
 
 typedef enum PROTO_STATE {READY=0,INIT,AUTHENTICATE,SELECTED,QUIET,TTF,FAIL} PSTATE;				//protocol-state
 typedef enum TAG_STATE   {NO_OP=0,READING_PAGE,WRITING_PAGE_ACK,WRITING_PAGE_DATA,WRITING_BLOCK_DATA} TSATE;	//tag-state

@@ -11,17 +11,25 @@
 *.s19
 *.map
 *.bin
+!client/hardnested/*.bin
 *.dll
 *.moc.cpp
 *.z
+!client/hardnested/tables/*.z
+usb_cmd.lua
+version.c
+client/ui/ui_overlays.h
+*.Td
+
 *.exe
-proxmark
+hardnested_stats.txt
 proxmark3
 flasher
-version.c
 lua
 luac
 fpga_compress
+mfkey32
+mfkey64
 
 fpga/*
 !fpga/tests
@@ -34,5 +42,3 @@ fpga/*
 !fpga/xst_hf.scr
 !fpga/go.bat
 !fpga/sim.tcl
-
-

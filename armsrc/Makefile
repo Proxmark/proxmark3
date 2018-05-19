@@ -17,10 +17,10 @@ APP_CFLAGS	= -DWITH_ISO14443a_StandAlone -DWITH_LF -DWITH_ISO15693 -DWITH_ISO144
 #SRC_LCD = fonts.c LCD.c
 SRC_LF = lfops.c hitag2.c hitagS.c lfsampling.c pcf7931.c lfdemod.c protocols.c
 SRC_ISO15693 = iso15693.c iso15693tools.c
-SRC_ISO14443a = epa.c iso14443a.c mifareutil.c mifarecmd.c mifaresniff.c
+SRC_ISO14443a = epa.c iso14443a.c mifareutil.c mifarecmd.c mifaresniff.c mifaresim.c
 SRC_ISO14443b = iso14443b.c
-SRC_CRAPTO1 = crapto1.c crypto1.c des.c aes.c
-SRC_CRC = iso14443crc.c crc.c crc16.c crc32.c
+SRC_CRAPTO1 = crypto1.c des.c
+SRC_CRC = iso14443crc.c crc.c crc16.c crc32.c parity.c
 
 #the FPGA bitstream files. Note: order matters!
 FPGA_BITSTREAMS = fpga_lf.bit fpga_hf.bit
@@ -32,9 +32,6 @@ ZLIB_CFLAGS = -DZ_SOLO -DZ_PREFIX -DNO_GZIP -DZLIB_PM3_TUNED
 APP_CFLAGS += $(ZLIB_CFLAGS)
 # zlib includes:
 APP_CFLAGS += -I../zlib
-
-# stdint.h provided locally until GCC 4.5 becomes C99 compliant
-APP_CFLAGS += -I.
 
 # Compile these in thumb mode (small size)
 THUMBSRC = start.c \
@@ -100,7 +97,7 @@ $(OBJDIR)/fullimage.data.o: $(OBJDIR)/fullimage.data.bin.z
 	$(OBJCOPY) -O elf32-littlearm -I binary -B arm --rename-section .data=compressed_data $^ $@
 
 $(OBJDIR)/fullimage.elf: $(OBJDIR)/fullimage.nodata.o $(OBJDIR)/fullimage.data.o
-	$(CC) $(LDFLAGS) -Wl,-T,ldscript,-Map,$(patsubst %.elf,%.map,$@) -o $@ $^
+	$(CC) $(LDFLAGS) -Wl,-T,ldscript,-e,_osimage_entry,-Map,$(patsubst %.elf,%.map,$@) -o $@ $^
 
 tarbin: $(OBJS)
 	$(TAR) $(TARFLAGS) ../proxmark3-$(platform)-bin.tar $(OBJS:%=armsrc/%) $(OBJS:%.s19=armsrc/%.elf)

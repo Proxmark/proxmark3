@@ -337,7 +337,7 @@ static void topaz_print_control_TLVs(uint8_t *memory)
 		if (TLV_type == 0x02) {			// a Reserved Memory Control TLV
 			uint8_t pages_addr = TLV_value[0] >> 4;
 			uint8_t byte_offset = TLV_value[0] & 0x0f;
-			uint8_t size_in_bytes = TLV_value[1] ? TLV_value[1] : 256;
+			uint16_t size_in_bytes = TLV_value[1] ? TLV_value[1] : 256;
 			uint8_t bytes_per_page = 1 << (TLV_value[2] & 0x0f);
 			uint16_t area_start = pages_addr * bytes_per_page + byte_offset;
 			PrintAndLog("Reserved Memory of %d bytes at byte offset 0x%02x.", 

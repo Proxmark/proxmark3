@@ -8,15 +8,20 @@
 // Commands related to the German electronic Identification Card
 //-----------------------------------------------------------------------------
 
-#include "util.h"
+#include "cmdhfepa.h"
 
+#include <inttypes.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <stdio.h>
+#include "util.h"
+#include "util_posix.h"
 #include "proxmark3.h"
 #include "ui.h"
 #include "cmdparser.h"
 #include "common.h"
 #include "cmdmain.h"
-#include "sleep.h"
-#include "cmdhfepa.h"
 
 static int CmdHelp(const char *Cmd);
 
@@ -36,8 +41,8 @@ int CmdHFEPACollectPACENonces(const char *Cmd)
 	m = m > 0 ? m : 1;
 	n = n > 0 ? n : 1;
 
-	PrintAndLog("Collecting %u %"hhu"-byte nonces", n, m);
-	PrintAndLog("Start: %u", time(NULL));
+	PrintAndLog("Collecting %u %u-byte nonces", n, m);
+	PrintAndLog("Start: %" PRIu64 , msclock()/1000);
 	// repeat n times
 	for (unsigned int i = 0; i < n; i++) {
 		// execute PACE
@@ -64,7 +69,7 @@ int CmdHFEPACollectPACENonces(const char *Cmd)
 			sleep(d);
 		}
 	}
-	PrintAndLog("End: %u", time(NULL));
+	PrintAndLog("End: %" PRIu64, msclock()/1000);
 
 	return 1;
 }
@@ -82,7 +87,7 @@ int CmdHFEPAPACEReplay(const char *Cmd)
 	uint8_t *apdus[] = {msesa_apdu, gn_apdu, map_apdu, pka_apdu, ma_apdu};
 
 	// usage message
-	static const char const *usage_msg =
+	static const char *usage_msg =
 		"Please specify 5 APDUs separated by spaces. "
 		"Example:\n preplay 0022C1A4 1068000000 1086000002 1234ABCDEF 1A2B3C4D";
 

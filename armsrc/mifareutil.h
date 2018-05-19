@@ -8,10 +8,15 @@
 //-----------------------------------------------------------------------------
 // code for work with mifare cards.
 //-----------------------------------------------------------------------------
-#include "crapto1.h"
 
 #ifndef __MIFAREUTIL_H
 #define __MIFAREUTIL_H
+
+#include <stdint.h>
+#include <stdbool.h>
+
+#include "crapto1/crapto1.h"
+#include "usb_cdc.h"
 
 // mifare authentication
 #define CRYPT_NONE    0
@@ -36,23 +41,6 @@
 #define MF_DBG_EXTENDED      4
 
 extern int MF_DBGLEVEL;
-
-//mifare emulator states
-#define MFEMUL_NOFIELD      0
-#define MFEMUL_IDLE         1
-#define MFEMUL_SELECT1      2
-#define MFEMUL_SELECT2      3
-#define MFEMUL_SELECT3      4
-#define MFEMUL_AUTH1        5
-#define MFEMUL_AUTH2        6
-#define MFEMUL_WORK	        7
-#define MFEMUL_WRITEBL2     8
-#define MFEMUL_INTREG_INC   9
-#define MFEMUL_INTREG_DEC  10
-#define MFEMUL_INTREG_REST 11
-#define MFEMUL_HALTED      12
-
-#define cardSTATE_TO_IDLE() cardSTATE = MFEMUL_IDLE; LED_B_OFF(); LED_C_OFF();
 
 //functions
 int mifare_sendcmd(uint8_t cmd, uint8_t *data, uint8_t data_size, uint8_t* answer, uint8_t *answer_parity, uint32_t *timing);
@@ -81,12 +69,15 @@ int mifare_desfire_des_auth2(uint32_t uid, uint8_t *key, uint8_t *blockData);
 
 // crypto functions
 void mf_crypto1_decrypt(struct Crypto1State *pcs, uint8_t *receivedCmd, int len);
+void mf_crypto1_decryptEx(struct Crypto1State *pcs, uint8_t *data_in, int len, uint8_t *data_out);
 void mf_crypto1_encrypt(struct Crypto1State *pcs, uint8_t *data, uint16_t len, uint8_t *par);
 uint8_t mf_crypto1_encrypt4bit(struct Crypto1State *pcs, uint8_t data);
 
 // Mifare memory structure
 uint8_t NumBlocksPerSector(uint8_t sectorNo);
 uint8_t FirstBlockOfSector(uint8_t sectorNo);
+bool IsSectorTrailer(uint8_t blockNo);
+uint8_t SectorTrailer(uint8_t blockNo);
 
 // emulator functions
 void emlClearMem(void);
@@ -97,5 +88,11 @@ uint64_t emlGetKey(int sectorNum, int keyType);
 int emlGetValBl(uint32_t *blReg, uint8_t *blBlock, int blockNum);
 int emlSetValBl(uint32_t blReg, uint8_t blBlock, int blockNum);
 int emlCheckValBl(int blockNum);
+
+// mifare check keys
+typedef uint8_t TKeyIndex[2][40];
+int MifareChkBlockKey(uint8_t *uid, uint32_t *cuid, uint8_t *cascade_levels, uint64_t ui64Key, uint8_t blockNo, uint8_t keyType, uint8_t debugLevel);
+int MifareChkBlockKeys(uint8_t *keys, uint8_t keyCount, uint8_t blockNo, uint8_t keyType, uint8_t debugLevel);
+int MifareMultisectorChk(uint8_t *keys, uint8_t keyCount, uint8_t SectorCount, uint8_t keyType, uint8_t debugLevel, TKeyIndex *keyIndex);
 
 #endif

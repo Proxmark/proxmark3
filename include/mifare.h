@@ -34,7 +34,22 @@ typedef enum ISO14A_COMMAND {
 	ISO14A_APPEND_CRC =			(1 << 5),
 	ISO14A_SET_TIMEOUT =		(1 << 6),
 	ISO14A_NO_SELECT =			(1 << 7),
-	ISO14A_TOPAZMODE =			(1 << 8)
+	ISO14A_TOPAZMODE =			(1 << 8),
+	ISO14A_NO_RATS =			(1 << 9),
+	ISO14A_CLEAR_TRACE =		(1 << 10)
 } iso14a_command_t;
+
+typedef struct {
+	uint32_t cuid;
+	uint8_t  sector;
+	uint8_t  keytype;
+	uint32_t nonce;
+	uint32_t ar;
+	uint32_t nr;
+	uint32_t at;
+	uint32_t nonce2;
+	uint32_t ar2;
+	uint32_t nr2;
+} nonces_t;
 
 #endif // _MIFARE_H_

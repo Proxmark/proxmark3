@@ -4,12 +4,14 @@
 // at your option, any later version. See the LICENSE.txt file for the text of
 // the license.
 //-----------------------------------------------------------------------------
-// Low frequency Viking tag commands
+// Low frequency Viking tag commands (AKA FDI Matalec Transit)
+// ASK/Manchester, RF/32, 64 bits (complete)
 //-----------------------------------------------------------------------------
 #include <stdio.h>
 #include <string.h>
 #include <inttypes.h>
 #include "proxmark3.h"
+#include "cmdlfviking.h"
 #include "ui.h"
 #include "util.h"
 #include "graph.h"
@@ -17,7 +19,6 @@
 #include "cmddata.h"
 #include "cmdmain.h"
 #include "cmdlf.h"
-#include "cmdlfviking.h"
 #include "lfdemod.h"
 static int CmdHelp(const char *Cmd);
 
@@ -50,13 +51,38 @@ uint64_t getVikingBits(uint32_t id) {
 	uint8_t checksum = ((id>>24) & 0xFF) ^ ((id>>16) & 0xFF) ^ ((id>>8) & 0xFF) ^ (id & 0xFF) ^ 0xF2 ^ 0xA8;
 	return ((uint64_t)0xF2 << 56) | ((uint64_t)id << 8) | checksum;
 }
+
+//by marshmellow
+//see ASKDemod for what args are accepted
+int CmdVikingDemod(const char *Cmd) {
+	if (!ASKDemod(Cmd, false, false, 1)) {
+		if (g_debugMode) PrintAndLog("ASKDemod failed");
+		return 0;
+	}
+	size_t size = DemodBufferLen;
+	//call lfdemod.c demod for Viking
+	int ans = VikingDemod_AM(DemodBuffer, &size);
+	if (ans < 0) {
+		if (g_debugMode) PrintAndLog("Error Viking_Demod %d", ans);
+		return 0;
+	}
+	//got a good demod
+	uint32_t raw1 = bytebits_to_byte(DemodBuffer+ans, 32);
+	uint32_t raw2 = bytebits_to_byte(DemodBuffer+ans+32, 32);
+	uint32_t cardid = bytebits_to_byte(DemodBuffer+ans+24, 32);
+	uint8_t  checksum = bytebits_to_byte(DemodBuffer+ans+32+24, 8);
+	PrintAndLog("Viking Tag Found: Card ID %08X, Checksum: %02X", cardid, (unsigned int) checksum);
+	PrintAndLog("Raw: %08X%08X", raw1,raw2);
+	setDemodBuf(DemodBuffer, 64, ans);
+	setClockGrid(g_DemodClock, g_DemodStartIdx + (ans*g_DemodClock));
+	return 1;
+}
+
 //by marshmellow
 //see ASKDemod for what args are accepted
 int CmdVikingRead(const char *Cmd) {
 	// read lf silently
-	CmdLFRead("s");
-	// get samples silently
-	getSamples("30000",false);
+	lf_read(true, 10000);
 	// demod and output viking ID	
 	return CmdVikingDemod(Cmd);
 }
@@ -110,7 +136,8 @@ int CmdVikingSim(const char *Cmd) {
 
 static command_t CommandTable[] = {
 	{"help",  CmdHelp,        1, "This help"},
-	{"read",  CmdVikingRead,  0, "Attempt to read and Extract tag data"},
+	{"demod", CmdVikingDemod, 1, "Demodulate a Viking tag from the GraphBuffer"},
+	{"read",  CmdVikingRead,  0, "Attempt to read and Extract tag data from the antenna"},
 	{"clone", CmdVikingClone, 0, "<8 digit ID number> clone viking tag"},
 	{"sim",   CmdVikingSim,   0, "<8 digit ID number> simulate viking tag"},
 	{NULL, NULL, 0, NULL}

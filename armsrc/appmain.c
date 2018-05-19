@@ -10,20 +10,18 @@
 // executes.
 //-----------------------------------------------------------------------------
 
+#include <stdarg.h>
+
 #include "usb_cdc.h"
 #include "cmd.h"
-
 #include "proxmark3.h"
 #include "apps.h"
 #include "util.h"
 #include "printf.h"
 #include "string.h"
-
-#include <stdarg.h>
-
 #include "legicrf.h"
-#include <hitag2.h>
-#include <hitagS.h>
+#include "hitag2.h"
+#include "hitagS.h"
 #include "lfsampling.h"
 #include "BigBuf.h"
 #include "mifareutil.h"
@@ -33,7 +31,7 @@
 #endif
 
 // Craig Young - 14a stand-alone code
-#ifdef WITH_ISO14443a_StandAlone
+#ifdef WITH_ISO14443a
  #include "iso14443a.h"
 #endif
 
@@ -137,35 +135,28 @@ void Dbhexdump(int len, uint8_t *d, bool bAsci) {
 // return that.
 //-----------------------------------------------------------------------------
 static int ReadAdc(int ch)
-{
-	uint32_t d;
-
-	AT91C_BASE_ADC->ADC_CR = AT91C_ADC_SWRST;
-	AT91C_BASE_ADC->ADC_MR =
-		ADC_MODE_PRESCALE(63  /* was 32 */) |							// ADC_CLK = MCK / ((63+1) * 2) = 48MHz / 128 = 375kHz
-		ADC_MODE_STARTUP_TIME(1  /* was 16 */) |						// Startup Time = (1+1) * 8 / ADC_CLK = 16 / 375kHz = 42,7us     Note: must be > 20us
-		ADC_MODE_SAMPLE_HOLD_TIME(15  /* was 8 */); 					// Sample & Hold Time SHTIM = 15 / ADC_CLK = 15 / 375kHz = 40us
-
+{	
 	// Note: ADC_MODE_PRESCALE and ADC_MODE_SAMPLE_HOLD_TIME are set to the maximum allowed value. 
-	// Both AMPL_LO and AMPL_HI are very high impedance (10MOhm) outputs, the input capacitance of the ADC is 12pF (typical). This results in a time constant
-	// of RC = 10MOhm * 12pF = 120us. Even after the maximum configurable sample&hold time of 40us the input capacitor will not be fully charged. 
+	// AMPL_HI is are high impedance (10MOhm || 1MOhm) output, the input capacitance of the ADC is 12pF (typical). This results in a time constant
+	// of RC = (0.91MOhm) * 12pF = 10.9us. Even after the maximum configurable sample&hold time of 40us the input capacitor will not be fully charged. 
 	// 
 	// The maths are:
 	// If there is a voltage v_in at the input, the voltage v_cap at the capacitor (this is what we are measuring) will be
 	//
-	//       v_cap = v_in * (1 - exp(-RC/SHTIM))  =   v_in * (1 - exp(-3))  =  v_in * 0,95                   (i.e. an error of 5%)
-	// 
-	// Note: with the "historic" values in the comments above, the error was 34%  !!!
-	
-	AT91C_BASE_ADC->ADC_CHER = ADC_CHANNEL(ch);
+	//       v_cap = v_in * (1 - exp(-SHTIM/RC))  =   v_in * (1 - exp(-40us/10.9us))  =  v_in * 0,97                   (i.e. an error of 3%)
 
+	AT91C_BASE_ADC->ADC_CR = AT91C_ADC_SWRST;
+	AT91C_BASE_ADC->ADC_MR =
+		ADC_MODE_PRESCALE(63) |							// ADC_CLK = MCK / ((63+1) * 2) = 48MHz / 128 = 375kHz
+		ADC_MODE_STARTUP_TIME(1) |						// Startup Time = (1+1) * 8 / ADC_CLK = 16 / 375kHz = 42,7us     Note: must be > 20us
+		ADC_MODE_SAMPLE_HOLD_TIME(15); 					// Sample & Hold Time SHTIM = 15 / ADC_CLK = 15 / 375kHz = 40us
+
+	AT91C_BASE_ADC->ADC_CHER = ADC_CHANNEL(ch);
 	AT91C_BASE_ADC->ADC_CR = AT91C_ADC_START;
 
-	while(!(AT91C_BASE_ADC->ADC_SR & ADC_END_OF_CONVERSION(ch)))
-		;
-	d = AT91C_BASE_ADC->ADC_CDR[ch];
-
-	return d;
+	while(!(AT91C_BASE_ADC->ADC_SR & ADC_END_OF_CONVERSION(ch))) {};
+	
+	return AT91C_BASE_ADC->ADC_CDR[ch];
 }
 
 int AvgAdc(int ch) // was static - merlok
@@ -195,6 +186,8 @@ void MeasureAntennaTuningLfOnly(int *vLf125, int *vLf134, int *peakf, int *peakv
 
 	FpgaDownloadAndGo(FPGA_BITSTREAM_LF);
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_LF_ADC | FPGA_LF_ADC_READER_FIELD);
+	SpinDelay(50);
+	
 	for (i=255; i>=19; i--) {
 		WDT_HIT();
 		FpgaSendCommand(FPGA_CMD_SET_DIVISOR, i);
@@ -203,7 +196,7 @@ void MeasureAntennaTuningLfOnly(int *vLf125, int *vLf134, int *peakf, int *peakv
 		if (i==95) *vLf125 = adcval; // voltage at 125Khz
 		if (i==89) *vLf134 = adcval; // voltage at 134Khz
 
-		LF_Results[i] = adcval>>8; // scale int to fit in byte for graphing purposes
+		LF_Results[i] = adcval >> 9; // scale int to fit in byte for graphing purposes
 		if(LF_Results[i] > peak) {
 			*peakv = adcval;
 			peak = LF_Results[i];
@@ -251,7 +244,7 @@ void MeasureAntennaTuning(int mode)
 		}
 	}
 
-	cmd_send(CMD_MEASURED_ANTENNA_TUNING, vLf125 | (vLf134<<16), vHf, peakf | (peakv<<16), LF_Results, 256);
+	cmd_send(CMD_MEASURED_ANTENNA_TUNING, vLf125>>1 | (vLf134>>1<<16), vHf, peakf | (peakv>>1<<16), LF_Results, 256);
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
 	LED_B_OFF();
 	return;
@@ -452,7 +445,7 @@ void StandAloneMode14a()
 						SpinDelay(300);
 					}
 				}
-				if (!iso14443a_select_card(uid, &hi14a_card[selected], &cuid))
+				if (!iso14443a_select_card(uid, &hi14a_card[selected], &cuid, true, 0, true))
 					continue;
 				else
 				{
@@ -940,7 +933,7 @@ void UsbPacketReceived(uint8_t *packet, int len)
 			setSamplingConfig((sample_config *) c->d.asBytes);
 			break;
 		case CMD_ACQUIRE_RAW_ADC_SAMPLES_125K:
-			cmd_send(CMD_ACK,SampleLF(c->arg[0]),0,0,0,0);
+			cmd_send(CMD_ACK,SampleLF(c->arg[0], c->arg[1]),0,0,0,0);
 			break;
 		case CMD_MOD_THEN_ACQUIRE_RAW_ADC_SAMPLES_125K:
 			ModThenAcquireRawAdcSamples125k(c->arg[0],c->arg[1],c->arg[2],c->d.asBytes);
@@ -1017,10 +1010,10 @@ void UsbPacketReceived(uint8_t *packet, int len)
 			WritePCF7931(c->d.asBytes[0],c->d.asBytes[1],c->d.asBytes[2],c->d.asBytes[3],c->d.asBytes[4],c->d.asBytes[5],c->d.asBytes[6], c->d.asBytes[9], c->d.asBytes[7]-128,c->d.asBytes[8]-128, c->arg[0], c->arg[1], c->arg[2]);
 			break;
 		case CMD_EM4X_READ_WORD:
-			EM4xReadWord(c->arg[1], c->arg[2],c->d.asBytes[0]);
+			EM4xReadWord(c->arg[0], c->arg[1],c->arg[2]);
 			break;
 		case CMD_EM4X_WRITE_WORD:
-			EM4xWriteWord(c->arg[0], c->arg[1], c->arg[2], c->d.asBytes[0]);
+			EM4xWriteWord(c->arg[0], c->arg[1], c->arg[2]);
 			break;
 		case CMD_AWID_DEMOD_FSK: // Set realtime AWID demodulation
 			CmdAWIDdemodFSK(c->arg[0], 0, 0, 1);
@@ -1053,7 +1046,12 @@ void UsbPacketReceived(uint8_t *packet, int len)
 			ReadHitagS((hitag_function)c->arg[0],(hitag_data*)c->d.asBytes);
 			break;
 		case CMD_WR_HITAG_S://writer for Hitag tags args=data to write,page and key or challenge
-			WritePageHitagS((hitag_function)c->arg[0],(hitag_data*)c->d.asBytes,c->arg[2]);
+			if ((hitag_function)c->arg[0] < 10) {
+				WritePageHitagS((hitag_function)c->arg[0],(hitag_data*)c->d.asBytes,c->arg[2]);
+			}
+			else if ((hitag_function)c->arg[0] >= 10) {
+			  WriterHitag((hitag_function)c->arg[0],(hitag_data*)c->d.asBytes, c->arg[2]);
+			}
 			break;
 #endif
 
@@ -1165,6 +1163,9 @@ void UsbPacketReceived(uint8_t *packet, int len)
 		case CMD_MIFAREU_WRITEBL:
 			MifareUWriteBlock(c->arg[0], c->arg[1], c->d.asBytes);
 			break;
+		case CMD_MIFARE_ACQUIRE_ENCRYPTED_NONCES:
+			MifareAcquireEncryptedNonces(c->arg[0], c->arg[1], c->arg[2], c->d.asBytes);
+			break;
 		case CMD_MIFARE_NESTED:
 			MifareNested(c->arg[0], c->arg[1], c->arg[2], c->d.asBytes);
 			break;
@@ -1193,6 +1194,9 @@ void UsbPacketReceived(uint8_t *packet, int len)
 			break;
 			
 		// Work with "magic Chinese" card
+		case CMD_MIFARE_CWIPE:
+			MifareCWipe(c->arg[0], c->arg[1], c->arg[2], c->d.asBytes);
+			break;
 		case CMD_MIFARE_CSETBLOCK:
 			MifareCSetBlock(c->arg[0], c->arg[1], c->arg[2], c->d.asBytes);
 			break;
@@ -1288,6 +1292,15 @@ void UsbPacketReceived(uint8_t *packet, int len)
 			break;
 
 		case CMD_DOWNLOADED_SIM_SAMPLES_125K: {
+			// iceman; since changing fpga_bitstreams clears bigbuff, Its better to call it before.
+			// to be able to use this one for uploading data to device 
+			// arg1 = 0 upload for LF usage 
+			//        1 upload for HF usage
+			if (c->arg[1] == 0)
+				FpgaDownloadAndGo(FPGA_BITSTREAM_LF);
+			else
+				FpgaDownloadAndGo(FPGA_BITSTREAM_HF);
+
 			uint8_t *b = BigBuf_get_addr();
 			memcpy(b+c->arg[0], c->d.asBytes, USB_CMD_DATA_SIZE);
 			cmd_send(CMD_ACK,0,0,0,0,0);
@@ -1298,7 +1311,7 @@ void UsbPacketReceived(uint8_t *packet, int len)
 			break;
 
 		case CMD_SET_LF_DIVISOR:
-		  	FpgaDownloadAndGo(FPGA_BITSTREAM_LF);
+			FpgaDownloadAndGo(FPGA_BITSTREAM_LF);
 			FpgaSendCommand(FPGA_CMD_SET_DIVISOR, c->arg[0]);
 			break;
 

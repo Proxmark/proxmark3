@@ -11,47 +11,37 @@
 #ifndef CMDHFMF_H__
 #define CMDHFMF_H__
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <ctype.h>
-#include "proxmark3.h"
-#include "iso14443crc.h"
-#include "data.h"
-#include "ui.h"
-#include "cmdparser.h"
-#include "common.h"
-#include "util.h"
-#include "mifarehost.h"
+#include "mifaredefault.h"
 
-int CmdHFMF(const char *Cmd);
+extern int CmdHFMF(const char *Cmd);
 
-int CmdHF14AMfDbg(const char* cmd);
-int CmdHF14AMfRdBl(const char* cmd);
-int CmdHF14AMfURdBl(const char* cmd);
-int CmdHF14AMfRdSc(const char* cmd);
-int CmdHF14SMfURdCard(const char* cmd);
-int CmdHF14AMfDump(const char* cmd);
-int CmdHF14AMfRestore(const char* cmd);
-int CmdHF14AMfWrBl(const char* cmd);
-int CmdHF14AMfUWrBl(const char* cmd);
-int CmdHF14AMfChk(const char* cmd);
-int CmdHF14AMifare(const char* cmd);
-int CmdHF14AMfNested(const char* cmd);
-int CmdHF14AMfSniff(const char* cmd);
-int CmdHF14AMf1kSim(const char* cmd);
-int CmdHF14AMfEClear(const char* cmd);
-int CmdHF14AMfEGet(const char* cmd);
-int CmdHF14AMfESet(const char* cmd);
-int CmdHF14AMfELoad(const char* cmd);
-int CmdHF14AMfESave(const char* cmd);
-int CmdHF14AMfECFill(const char* cmd);
-int CmdHF14AMfEKeyPrn(const char* cmd);
-int CmdHF14AMfCSetUID(const char* cmd);
-int CmdHF14AMfCSetBlk(const char* cmd);
-int CmdHF14AMfCGetBlk(const char* cmd);
-int CmdHF14AMfCGetSc(const char* cmd);
-int CmdHF14AMfCLoad(const char* cmd);
-int CmdHF14AMfCSave(const char* cmd);
+extern int CmdHF14AMfDbg(const char* cmd);
+extern int CmdHF14AMfRdBl(const char* cmd);
+extern int CmdHF14AMfURdBl(const char* cmd);
+extern int CmdHF14AMfRdSc(const char* cmd);
+extern int CmdHF14SMfURdCard(const char* cmd);
+extern int CmdHF14AMfDump(const char* cmd);
+extern int CmdHF14AMfRestore(const char* cmd);
+extern int CmdHF14AMfWrBl(const char* cmd);
+extern int CmdHF14AMfUWrBl(const char* cmd);
+extern int CmdHF14AMfChk(const char* cmd);
+extern int CmdHF14AMifare(const char* cmd);
+extern int CmdHF14AMfNested(const char* cmd);
+extern int CmdHF14AMfSniff(const char* cmd);
+extern int CmdHF14AMf1kSim(const char* cmd);
+extern int CmdHF14AMfEClear(const char* cmd);
+extern int CmdHF14AMfEGet(const char* cmd);
+extern int CmdHF14AMfESet(const char* cmd);
+extern int CmdHF14AMfELoad(const char* cmd);
+extern int CmdHF14AMfESave(const char* cmd);
+extern int CmdHF14AMfECFill(const char* cmd);
+extern int CmdHF14AMfEKeyPrn(const char* cmd);
+extern int CmdHF14AMfCWipe(const char* cmd);
+extern int CmdHF14AMfCSetUID(const char* cmd);
+extern int CmdHF14AMfCSetBlk(const char* cmd);
+extern int CmdHF14AMfCGetBlk(const char* cmd);
+extern int CmdHF14AMfCGetSc(const char* cmd);
+extern int CmdHF14AMfCLoad(const char* cmd);
+extern int CmdHF14AMfCSave(const char* cmd);
 
 #endif

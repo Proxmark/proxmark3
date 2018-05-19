@@ -1,17 +1,20 @@
+VPATH = ../../common ../../common/crapto1 ../../client
 CC = gcc
 LD = gcc
-CFLAGS = -Wall -Winline -O4
-LDFLAGS =
+CFLAGS += -std=c99 -D_ISOC99_SOURCE -I../../include -I../../common -I../../client -Wall -O3
+LDFLAGS +=
 
-OBJS = crapto1.o crypto1.o
-HEADERS = 
-EXES = mfkey64 mfkey32
-LIBS =
-	
-all: $(OBJS) $(EXES) $(LIBS)
+OBJS = crypto1.o crapto1.o parity.o util_posix.o mfkey.o
+EXES = mfkey32 mfkey64
+WINEXES = $(patsubst %, %.exe, $(EXES))
+
+all: $(OBJS) $(EXES)
+
+%.o : %.c
+	$(CC) $(CFLAGS) -c -o $@ $<
 
 % : %.c $(OBJS)
-	$(LD) $(CFLAGS) -o $@ $< $(OBJS) $(LDFLAGS)
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(OBJS) $<
 
 clean: 
-	rm -f $(OBJS) $(EXES) $(LIBS) 
+	rm -f $(OBJS) $(EXES) $(WINEXES)

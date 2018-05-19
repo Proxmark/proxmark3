@@ -4,13 +4,13 @@
 // at your option, any later version. See the LICENSE.txt file for the text of
 // the license.
 //-----------------------------------------------------------------------------
-// Low frequency T55xx commands
+// Low frequency viking tag commands
 //-----------------------------------------------------------------------------
 #ifndef CMDLFVIKING_H__
 #define CMDLFVIKING_H__
-int CmdLFViking(const char *Cmd);
-int CmdVikingRead(const char *Cmd);
-int CmdVikingClone(const char *Cmd);
-int CmdVikingSim(const char *Cmd);
+extern int CmdLFViking(const char *Cmd);
+extern int CmdVikingDemod(const char *Cmd);
+extern int CmdVikingRead(const char *Cmd);
+extern int CmdVikingClone(const char *Cmd);
+extern int CmdVikingSim(const char *Cmd);
 #endif
-

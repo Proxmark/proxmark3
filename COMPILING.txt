@@ -3,7 +3,7 @@ The project compiles on Linux, Mac OS X and Windows (MinGW/MSYS).
 it requires:
 - gcc >= 4.4
 - libpthread
-- libreadline
+- GNU libreadline or BSD libedit (editline)
 - libusb
 - perl
 - an ARM cross-compiler to compile the firmware
@@ -81,12 +81,35 @@ Download the ProxSpace environment archive and extract it to C:\
 = Mac OS X =
 ============
 
+Installing from HomeBrew tap
+---------------------------
+This method is recommended and tested on macOS Sierra 10.12.3
+
+1. Install homebrew if you haven't yet already done so: http://brew.sh/
+
+2. Tap proxmark repo:
+    brew tap proxmark/proxmark3 
+
+3. Install Proxmark3:
+
+Stable release
+    brew install proxmark3
+
+Latest non-stable from GitHub (use this if previous command fails)
+    brew install --HEAD proxmark3
+
+For more information go to https://github.com/Proxmark/homebrew-proxmark3
+
+
+Compilling from source manually (Legacy)
+---------------------------
+
 Tested on OSX 10.10 Yosemite
 
 1 - Install Xcode and Xcode Command Line Tools
 
 2 - Install Homebrew and dependencies
-    brew install readline libusb p7zip libusb-compat wget qt5 pkgconfig
+    brew install libusb p7zip libusb-compat wget qt5 pkgconfig
 
 3 - Install DevKitARM for OSX
     Option 1:
@@ -96,12 +119,10 @@ Tested on OSX 10.10 Yosemite
         brew tap nitsky/stm32
         brew install arm-none-eabi-gcc
 
-4 - Edit proxmark3/client/Makefile adding path to readline and qt5
+4 - Edit proxmark3/client/Makefile adding path qt5
 
-    LDLIBS = -L/usr/local/opt/readline/lib -L/usr/local/opt/qt5/lib -L/opt/local/lib -L/usr/local/lib ../liblua/liblua.a -lreadline -lpthread -lm
-    CFLAGS = -std=c99 -I/usr/local/opt/qt5/include -I/usr/local/opt/readline/include -I. -I../include -I../common -I../zlib -I/opt/local/include -I../liblua -Wall $(COMMON_FLAGS) -g -O4
-
-    If your old brew intallation use /usr/local/Cellar/ path replace /usr/local/opt/readline/lib with your actuall readline and qt5 path. See homebrew manuals.
+    LDLIBS = -L/usr/local/opt/qt5/lib -L/opt/local/lib -L/usr/local/lib ../liblua/liblua.a -lreadline -lpthread -lm
+    CFLAGS = -std=c99 -I/usr/local/opt/qt5/include -I. -I../include -I../common -I../zlib -I/opt/local/include -I../liblua -Wall $(COMMON_FLAGS) -g -O4
 
 5 - Set Environment
 

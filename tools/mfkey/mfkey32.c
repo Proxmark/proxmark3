@@ -1,72 +1,77 @@
-#define __STDC_FORMAT_MACROS
 #include <inttypes.h>
-#define llx PRIx64
-#define lli PRIi64
-
-// Test-file: test2.c
-#include "crapto1.h"
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include "crapto1/crapto1.h"
+#include "mfkey.h"
+#include "util_posix.h"
 
+
+// 32 bit recover key from 2 nonces
 int main (int argc, char *argv[]) {
-  struct Crypto1State *s,*t;
-  uint64_t key;     // recovered key
-  uint32_t uid;     // serial number
-  uint32_t nt;      // tag challenge
-  uint32_t nr0_enc; // first encrypted reader challenge
-  uint32_t ar0_enc; // first encrypted reader response
-  uint32_t nr1_enc; // second encrypted reader challenge
-  uint32_t ar1_enc; // second encrypted reader response
-  uint32_t ks2;     // keystream used to encrypt reader response
 
-  printf("MIFARE Classic key recovery - based 32 bits of keystream\n");
+  nonces_t data;
+  uint32_t ks2;     // keystream used to encrypt reader response
+  uint64_t key;     // recovered key
+
+  printf("MIFARE Classic key recovery - based on 32 bits of keystream\n");
   printf("Recover key from two 32-bit reader authentication answers only!\n\n");
 
-  if (argc < 7) {
-    printf(" syntax: %s <uid> <nt> <{nr_0}> <{ar_0}> <{nr_1}> <{ar_1}>\n\n",argv[0]);
+  if (argc != 7 && argc != 8) {
+    printf(" syntax: %s <uid> <nt0> <{nr_0}> <{ar_0}> [<nt1>] <{nr_1}> <{ar_1}>\n", argv[0]);
+	printf("         (you may omit nt1 if it is equal to nt0)\n\n");
     return 1;
   }
 
-  sscanf(argv[1],"%x",&uid);
-  sscanf(argv[2],"%x",&nt);
-  sscanf(argv[3],"%x",&nr0_enc);
-  sscanf(argv[4],"%x",&ar0_enc);
-  sscanf(argv[5],"%x",&nr1_enc);
-  sscanf(argv[6],"%x",&ar1_enc);
+  bool moebius_attack = (argc == 8);
+  
+  sscanf(argv[1],"%x",&data.cuid);
+  sscanf(argv[2],"%x",&data.nonce);
+  data.nonce2 = data.nonce;
+  sscanf(argv[3],"%x",&data.nr);
+  sscanf(argv[4],"%x",&data.ar);
+  if (moebius_attack) {
+	  sscanf(argv[5],"%x",&data.nonce2);
+	  sscanf(argv[6],"%x",&data.nr2);
+	  sscanf(argv[7],"%x",&data.ar2);
+  } else {
+	  sscanf(argv[5],"%x",&data.nr2);
+	  sscanf(argv[6],"%x",&data.ar2);
+  }	  
 
   printf("Recovering key for:\n");
-  printf("    uid: %08x\n",uid);
-  printf("     nt: %08x\n",nt);
-  printf(" {nr_0}: %08x\n",nr0_enc);
-  printf(" {ar_0}: %08x\n",ar0_enc);
-  printf(" {nr_1}: %08x\n",nr1_enc);
-  printf(" {ar_1}: %08x\n",ar1_enc);
+  printf("    uid: %08x\n",data.cuid);
+  printf("    nt0: %08x\n",data.nonce);
+  printf(" {nr_0}: %08x\n",data.nr);
+  printf(" {ar_0}: %08x\n",data.ar);
+  printf("    nt1: %08x\n",data.nonce2);
+  printf(" {nr_1}: %08x\n",data.nr2);
+  printf(" {ar_1}: %08x\n",data.ar2);
 
+  uint64_t start_time = msclock();
+  
 	// Generate lfsr succesors of the tag challenge
   printf("\nLFSR succesors of the tag challenge:\n");
-  printf("  nt': %08x\n",prng_successor(nt, 64));
-  printf(" nt'': %08x\n",prng_successor(nt, 96));
+  printf("  nt': %08x\n",prng_successor(data.nonce, 64));
+  printf(" nt'': %08x\n",prng_successor(data.nonce, 96));
 
   // Extract the keystream from the messages
   printf("\nKeystream used to generate {ar} and {at}:\n");
-  ks2 = ar0_enc ^ prng_successor(nt, 64);
+  ks2 = data.ar ^ prng_successor(data.nonce, 64);
   printf("  ks2: %08x\n",ks2);
 
-	s = lfsr_recovery32(ar0_enc ^ prng_successor(nt, 64), 0);
-  
-	for(t = s; t->odd | t->even; ++t) {
-		lfsr_rollback_word(t, 0, 0);
-		lfsr_rollback_word(t, nr0_enc, 1);
-		lfsr_rollback_word(t, uid ^ nt, 0);
-		crypto1_get_lfsr(t, &key);
-		crypto1_word(t, uid ^ nt, 0);
-		crypto1_word(t, nr1_enc, 1);
-		if (ar1_enc == (crypto1_word(t, 0, 0) ^ prng_successor(nt, 64))) {
-      printf("\nFound Key: [%012"llx"]\n\n",key);
-			break;
-		}
+	bool success;
+	if (moebius_attack) {
+		success = mfkey32_moebius(data, &key);
+	} else {
+		success = mfkey32(data, &key);
 	}
-  free(s);
+	
+	if (success) {
+		printf("Recovered key: %012" PRIx64 "\n", key);
+	} else {
+		printf("Couldn't recover key.\n");
+	}
 
-  return 0;
+	printf("Time spent: %1.2f seconds\n", (float)(msclock() - start_time)/1000.0);
 }

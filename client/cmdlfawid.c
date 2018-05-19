@@ -8,31 +8,35 @@
 // the license.
 //-----------------------------------------------------------------------------
 // Low frequency AWID26 commands
+// FSK2a, RF/50, 96 bits (complete)
 //-----------------------------------------------------------------------------
 
+#include <string.h>
 #include <stdio.h>      // sscanf
 #include "proxmark3.h"  // Definitions, USB controls, etc
+#include "cmdlfawid.h"
 #include "ui.h"         // PrintAndLog
 #include "cmdparser.h"  // CmdsParse, CmdsHelp
-#include "cmdlfawid.h"  // AWID function declarations
-#include "lfdemod.h"    // parityTest
+#include "lfdemod.h"    // parityTest +
 #include "util.h"       // weigandparity
 #include "protocols.h"  // for T55xx config register definitions
+#include "cmddata.h"    // for printDemod and demodbuffer commands
+#include "graph.h"      // for getFromGraphBuff cmds
 #include "cmdmain.h"
 
 static int CmdHelp(const char *Cmd);
 
-int usage_lf_awid_fskdemod(void) {
+int usage_lf_awid_read(void) {
 	PrintAndLog("Enables AWID26 compatible reader mode printing details of scanned AWID26 tags.");
 	PrintAndLog("By default, values are printed and logged until the button is pressed or another USB command is issued.");
 	PrintAndLog("If the ['1'] option is provided, reader mode is exited after reading a single AWID26 card.");
 	PrintAndLog("");
-	PrintAndLog("Usage:  lf awid fskdemod ['1']");
+	PrintAndLog("Usage:  lf awid read ['1']");
 	PrintAndLog("Options : ");
 	PrintAndLog("  1 : (optional) stop after reading a single card");
 	PrintAndLog("");
-	PrintAndLog("Samples : lf awid fskdemod");
-	PrintAndLog("        : lf awid fskdemod 1");
+	PrintAndLog("Samples : lf awid read");
+	PrintAndLog("        : lf awid read 1");
 	return 0;
 }
 
@@ -65,15 +69,113 @@ int usage_lf_awid_clone(void) {
 	return 0;
 }
 
-int CmdAWIDDemodFSK(const char *Cmd) {
+int CmdAWIDReadFSK(const char *Cmd) {
 	int findone=0;
-	if (Cmd[0] == 'h' || Cmd[0] == 'H') return usage_lf_awid_fskdemod();
+	if (Cmd[0] == 'h' || Cmd[0] == 'H') return usage_lf_awid_read();
 	if (Cmd[0] == '1') findone = 1;
 
 	UsbCommand c = {CMD_AWID_DEMOD_FSK, {findone, 0, 0}};
 	clearCommandBuffer();
 	SendCommand(&c);
 	return 0;   
+}
+//by marshmellow
+//AWID Prox demod - FSK RF/50 with preamble of 00000001  (always a 96 bit data stream)
+//print full AWID Prox ID and some bit format details if found
+int CmdFSKdemodAWID(const char *Cmd)
+{
+	uint8_t BitStream[MAX_GRAPH_TRACE_LEN]={0};
+	size_t size = getFromGraphBuf(BitStream);
+	if (size==0) return 0;
+
+	int waveIdx = 0;
+	//get binary from fsk wave
+	int idx = AWIDdemodFSK(BitStream, &size, &waveIdx);
+	if (idx<=0){
+		if (g_debugMode){
+			if (idx == -1)
+				PrintAndLog("DEBUG: Error - not enough samples");
+			else if (idx == -2)
+				PrintAndLog("DEBUG: Error - only noise found");
+			else if (idx == -3)
+				PrintAndLog("DEBUG: Error - problem during FSK demod");
+			else if (idx == -4)
+				PrintAndLog("DEBUG: Error - AWID preamble not found");
+			else if (idx == -5)
+				PrintAndLog("DEBUG: Error - Size not correct: %d", size);
+			else
+				PrintAndLog("DEBUG: Error %d",idx);
+		}
+		return 0;
+	}
+
+	// Index map
+	// 0            10            20            30              40            50              60
+	// |            |             |             |               |             |               |
+	// 01234567 890 1 234 5 678 9 012 3 456 7 890 1 234 5 678 9 012 3 456 7 890 1 234 5 678 9 012 3 - to 96
+	// -----------------------------------------------------------------------------
+	// 00000001 000 1 110 1 101 1 011 1 101 1 010 0 000 1 000 1 010 0 001 0 110 1 100 0 000 1 000 1
+	// premable bbb o bbb o bbw o fff o fff o ffc o ccc o ccc o ccc o ccc o ccc o wxx o xxx o xxx o - to 96
+	//          |---26 bit---|    |-----117----||-------------142-------------|
+	// b = format bit len, o = odd parity of last 3 bits
+	// f = facility code, c = card number
+	// w = wiegand parity
+	// (26 bit format shown)
+ 
+	//get raw ID before removing parities
+	uint32_t rawLo = bytebits_to_byte(BitStream+idx+64,32);
+	uint32_t rawHi = bytebits_to_byte(BitStream+idx+32,32);
+	uint32_t rawHi2 = bytebits_to_byte(BitStream+idx,32);
+	setDemodBuf(BitStream,96,idx);
+	setClockGrid(50, waveIdx + (idx*50));
+
+	size = removeParity(BitStream, idx+8, 4, 1, 88);
+	if (size != 66){
+		if (g_debugMode) PrintAndLog("DEBUG: Error - at parity check-tag size does not match AWID format");
+		return 0;
+	}
+	// ok valid card found!
+
+	// Index map
+	// 0           10         20        30          40        50        60
+	// |           |          |         |           |         |         |
+	// 01234567 8 90123456 7890123456789012 3 456789012345678901234567890123456
+	// -----------------------------------------------------------------------------
+	// 00011010 1 01110101 0000000010001110 1 000000000000000000000000000000000
+	// bbbbbbbb w ffffffff cccccccccccccccc w xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+	// |26 bit|   |-117--| |-----142------|
+	// b = format bit len, o = odd parity of last 3 bits
+	// f = facility code, c = card number
+	// w = wiegand parity
+	// (26 bit format shown)
+
+	uint32_t fc = 0;
+	uint32_t cardnum = 0;
+	uint32_t code1 = 0;
+	uint32_t code2 = 0;
+	uint8_t fmtLen = bytebits_to_byte(BitStream,8);
+	if (fmtLen==26){
+		fc = bytebits_to_byte(BitStream+9, 8);
+		cardnum = bytebits_to_byte(BitStream+17, 16);
+		code1 = bytebits_to_byte(BitStream+8,fmtLen);
+		PrintAndLog("AWID Found - BitLength: %d, FC: %d, Card: %d - Wiegand: %x, Raw: %08x%08x%08x", fmtLen, fc, cardnum, code1, rawHi2, rawHi, rawLo);
+	} else {
+		cardnum = bytebits_to_byte(BitStream+8+(fmtLen-17), 16);
+		if (fmtLen>32){
+			code1 = bytebits_to_byte(BitStream+8,fmtLen-32);
+			code2 = bytebits_to_byte(BitStream+8+(fmtLen-32),32);
+			PrintAndLog("AWID Found - BitLength: %d -unknown BitLength- (%d) - Wiegand: %x%08x, Raw: %08x%08x%08x", fmtLen, cardnum, code1, code2, rawHi2, rawHi, rawLo);
+		} else{
+			code1 = bytebits_to_byte(BitStream+8,fmtLen);
+			PrintAndLog("AWID Found - BitLength: %d -unknown BitLength- (%d) - Wiegand: %x, Raw: %08x%08x%08x", fmtLen, cardnum, code1, rawHi2, rawHi, rawLo);
+		}
+	}
+	if (g_debugMode){
+		PrintAndLog("DEBUG: idx: %d, Len: %d Printing Demod Buffer:", idx, 96);
+		printDemodBuff();
+	}
+	//todo - convert hi2, hi, lo to demodbuffer for future sim/clone commands
+	return 1;
 }
 
 //refactored by marshmellow
@@ -140,7 +242,7 @@ int CmdAWIDClone(const char *Cmd) {
 	if (sscanf(Cmd, "%u %u", &fc, &cn ) != 2) return usage_lf_awid_clone();
 
 	if (param_getchar(Cmd, 3) == 'Q' || param_getchar(Cmd, 3) == 'q')
-		blocks[0] = T5555_MODULATION_FSK2 | T5555_INVERT_OUTPUT | 50<<T5555_BITRATE_SHIFT | 3<<T5555_MAXBLOCK_SHIFT;
+		blocks[0] = T5555_MODULATION_FSK2 | T5555_INVERT_OUTPUT | ((50-2)>>1)<<T5555_BITRATE_SHIFT | 3<<T5555_MAXBLOCK_SHIFT;
 
 	if ((fc & 0xFF) != fc) {
 		fc &= 0xFF;
@@ -190,7 +292,8 @@ int CmdAWIDClone(const char *Cmd) {
 
 static command_t CommandTable[] = {
 	{"help",      CmdHelp,         1, "This help"},
-	{"fskdemod",  CmdAWIDDemodFSK, 0, "['1'] Realtime AWID FSK demodulator (option '1' for one tag only)"},
+	{"demod",     CmdFSKdemodAWID, 1, "Demodulate an AWID FSK tag from the GraphBuffer"},
+	{"read",      CmdAWIDReadFSK,  0, "['1'] Realtime AWID FSK read from the antenna (option '1' for one tag only)"},
 	{"sim",       CmdAWIDSim,      0, "<Facility-Code> <Card Number> -- AWID tag simulator"},
 	{"clone",     CmdAWIDClone,    0, "<Facility-Code> <Card Number> <Q5> -- Clone AWID to T55x7 (tag must be in range of antenna)"},
 	{NULL, NULL, 0, NULL}

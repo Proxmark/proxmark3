@@ -5,16 +5,18 @@
 // the license.
 //-----------------------------------------------------------------------------
 // Low frequency Farpoint / Pyramid tag commands
+// FSK2a, rf/50, 128 bits (complete)
 //-----------------------------------------------------------------------------
 #include <string.h>
 #include <inttypes.h>
+#include <stdio.h>
 #include "cmdlfpyramid.h"
 #include "proxmark3.h"
 #include "ui.h"
 #include "util.h"
 #include "graph.h"
 #include "cmdparser.h"
-#include "cmddata.h"
+#include "cmddata.h"    // setDemodBuf +
 #include "cmdmain.h"
 #include "cmdlf.h"
 #include "protocols.h"  // for T55xx config register definitions
@@ -26,7 +28,7 @@ static int CmdHelp(const char *Cmd);
 int usage_lf_pyramid_clone(void){
 	PrintAndLog("clone a Farpointe/Pyramid tag to a T55x7 tag.");
 	PrintAndLog("The facility-code is 8-bit and the card number is 16-bit.  Larger values are truncated. ");
-	PrintAndLog("Currently work only on 26bit");
+	PrintAndLog("Currently only works on 26bit");
 	PrintAndLog("");
 	PrintAndLog("Usage: lf pyramid clone <Facility-Code> <Card-Number>");
 	PrintAndLog("Options :");
@@ -84,9 +86,149 @@ int GetPyramidBits(uint32_t fc, uint32_t cn, uint8_t *pyramidBits) {
 	return 1;
 }
 
+//by marshmellow
+//Pyramid Prox demod - FSK RF/50 with preamble of 0000000000000001  (always a 128 bit data stream)
+//print full Farpointe Data/Pyramid Prox ID and some bit format details if found
+int CmdFSKdemodPyramid(const char *Cmd)
+{
+	//raw fsk demod no manchester decoding no start bit finding just get binary from wave
+	uint8_t BitStream[MAX_GRAPH_TRACE_LEN]={0};
+	size_t size = getFromGraphBuf(BitStream);
+	if (size==0) return 0;
+
+	int waveIdx=0;
+	//get binary from fsk wave
+	int idx = PyramiddemodFSK(BitStream, &size, &waveIdx);
+	if (idx < 0){
+		if (g_debugMode){
+			if (idx == -5)
+				PrintAndLog("DEBUG: Error - not enough samples");
+			else if (idx == -1)
+				PrintAndLog("DEBUG: Error - only noise found");
+			else if (idx == -2)
+				PrintAndLog("DEBUG: Error - problem during FSK demod");
+			else if (idx == -3)
+				PrintAndLog("DEBUG: Error - Size not correct: %d", size);
+			else if (idx == -4)
+				PrintAndLog("DEBUG: Error - Pyramid preamble not found");
+			else
+				PrintAndLog("DEBUG: Error - idx: %d",idx);
+		}
+		return 0;
+	}
+	// Index map
+	// 0           10          20          30            40          50          60
+	// |           |           |           |             |           |           |
+	// 0123456 7 8901234 5 6789012 3 4567890 1 2345678 9 0123456 7 8901234 5 6789012 3
+	// -----------------------------------------------------------------------------
+	// 0000000 0 0000000 1 0000000 1 0000000 1 0000000 1 0000000 1 0000000 1 0000000 1
+	// premable  xxxxxxx o xxxxxxx o xxxxxxx o xxxxxxx o xxxxxxx o xxxxxxx o xxxxxxx o
+
+	// 64    70            80          90          100         110           120
+	// |     |             |           |           |           |             |
+	// 4567890 1 2345678 9 0123456 7 8901234 5 6789012 3 4567890 1 2345678 9 0123456 7
+	// -----------------------------------------------------------------------------
+	// 0000000 1 0000000 1 0000000 1 0110111 0 0011000 1 0000001 0 0001100 1 1001010 0
+	// xxxxxxx o xxxxxxx o xxxxxxx o xswffff o ffffccc o ccccccc o ccccccw o ppppppp o
+	//                                  |---115---||---------71---------|
+	// s = format start bit, o = odd parity of last 7 bits
+	// f = facility code, c = card number
+	// w = wiegand parity, x = extra space for other formats
+	// p = unknown checksum
+	// (26 bit format shown)
+
+	//get bytes for checksum calc
+	uint8_t checksum = bytebits_to_byte(BitStream + idx + 120, 8);
+	uint8_t csBuff[14] = {0x00};
+	for (uint8_t i = 0; i < 13; i++){
+		csBuff[i] = bytebits_to_byte(BitStream + idx + 16 + (i*8), 8);
+	}
+	//check checksum calc
+	//checksum calc thanks to ICEMAN!!
+	uint32_t checkCS =  CRC8Maxim(csBuff,13);
+
+	//get raw ID before removing parities
+	uint32_t rawLo = bytebits_to_byte(BitStream+idx+96,32);
+	uint32_t rawHi = bytebits_to_byte(BitStream+idx+64,32);
+	uint32_t rawHi2 = bytebits_to_byte(BitStream+idx+32,32);
+	uint32_t rawHi3 = bytebits_to_byte(BitStream+idx,32);
+	setDemodBuf(BitStream,128,idx);
+	setClockGrid(50, waveIdx + (idx*50));
+
+	size = removeParity(BitStream, idx+8, 8, 1, 120);
+	if (size != 105){
+		if (g_debugMode) 
+			PrintAndLog("DEBUG: Error at parity check - tag size does not match Pyramid format, SIZE: %d, IDX: %d, hi3: %x",size, idx, rawHi3);
+		return 0;
+	}
+
+	// ok valid card found!
+
+	// Index map
+	// 0         10        20        30        40        50        60        70
+	// |         |         |         |         |         |         |         |
+	// 01234567890123456789012345678901234567890123456789012345678901234567890
+	// -----------------------------------------------------------------------
+	// 00000000000000000000000000000000000000000000000000000000000000000000000
+	// xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+
+	// 71         80         90          100
+	// |          |          |           |
+	// 1 2 34567890 1234567890123456 7 8901234
+	// ---------------------------------------
+	// 1 1 01110011 0000000001000110 0 1001010
+	// s w ffffffff cccccccccccccccc w ppppppp
+	//     |--115-| |------71------|
+	// s = format start bit, o = odd parity of last 7 bits
+	// f = facility code, c = card number
+	// w = wiegand parity, x = extra space for other formats
+	// p = unknown checksum
+	// (26 bit format shown)
+
+	//find start bit to get fmtLen
+	int j;
+	for (j=0; j<size; j++){
+		if(BitStream[j]) break;
+	}
+	uint8_t fmtLen = size-j-8;
+	uint32_t fc = 0;
+	uint32_t cardnum = 0;
+	uint32_t code1 = 0;
+	if (fmtLen==26){
+		fc = bytebits_to_byte(BitStream+73, 8);
+		cardnum = bytebits_to_byte(BitStream+81, 16);
+		code1 = bytebits_to_byte(BitStream+72,fmtLen);
+		PrintAndLog("Pyramid ID Found - BitLength: %d, FC: %d, Card: %d - Wiegand: %x, Raw: %08x%08x%08x%08x", fmtLen, fc, cardnum, code1, rawHi3, rawHi2, rawHi, rawLo);
+	} else if (fmtLen==45){
+		fmtLen=42; //end = 10 bits not 7 like 26 bit fmt
+		fc = bytebits_to_byte(BitStream+53, 10);
+		cardnum = bytebits_to_byte(BitStream+63, 32);
+		PrintAndLog("Pyramid ID Found - BitLength: %d, FC: %d, Card: %d - Raw: %08x%08x%08x%08x", fmtLen, fc, cardnum, rawHi3, rawHi2, rawHi, rawLo);
+	} else {
+		cardnum = bytebits_to_byte(BitStream+81, 16);
+		if (fmtLen>32){
+			//code1 = bytebits_to_byte(BitStream+(size-fmtLen),fmtLen-32);
+			//code2 = bytebits_to_byte(BitStream+(size-32),32);
+			PrintAndLog("Pyramid ID Found - BitLength: %d -unknown BitLength- (%d), Raw: %08x%08x%08x%08x", fmtLen, cardnum, rawHi3, rawHi2, rawHi, rawLo);
+		} else{
+			//code1 = bytebits_to_byte(BitStream+(size-fmtLen),fmtLen);
+			PrintAndLog("Pyramid ID Found - BitLength: %d -unknown BitLength- (%d), Raw: %08x%08x%08x%08x", fmtLen, cardnum, rawHi3, rawHi2, rawHi, rawLo);
+		}
+	}
+	if (checksum == checkCS)
+		PrintAndLog("Checksum %02x passed", checksum);
+	else
+		PrintAndLog("Checksum %02x failed - should have been %02x", checksum, checkCS);
+
+	if (g_debugMode){
+		PrintAndLog("DEBUG: idx: %d, Len: %d, Printing Demod Buffer:", idx, 128);
+		printDemodBuff();
+	}
+	return 1;
+}
+
 int CmdPyramidRead(const char *Cmd) {
-	CmdLFRead("s");
-	getSamples("30000",false);
+	lf_read(true, 15000);
 	return CmdFSKdemodPyramid("");
 }
 
@@ -180,10 +322,11 @@ int CmdPyramidSim(const char *Cmd) {
 }
 
 static command_t CommandTable[] = {
-	{"help",  CmdHelp,         1, "This help"},
-	{"read",  CmdPyramidRead,  0, "Attempt to read and extract tag data"},
-	{"clone", CmdPyramidClone, 0, "<Facility-Code> <Card Number>  clone pyramid tag"},
-	{"sim",   CmdPyramidSim,   0, "<Facility-Code> <Card Number>  simulate pyramid tag"},
+	{"help",  CmdHelp,            1, "This help"},
+	{"demod", CmdFSKdemodPyramid, 1, "Demodulate a Pyramid FSK tag from the GraphBuffer"},
+	{"read",  CmdPyramidRead,     0, "Attempt to read and extract tag data"},
+	{"clone", CmdPyramidClone,    0, "<Facility-Code> <Card Number>  clone pyramid tag"},
+	{"sim",   CmdPyramidSim,      0, "<Facility-Code> <Card Number>  simulate pyramid tag"},
 	{NULL, NULL, 0, NULL}
 };
 

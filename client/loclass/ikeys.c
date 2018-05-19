@@ -22,7 +22,7 @@
  *
  * This is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as published
- * by the Free Software Foundation.
+ * by the Free Software Foundation, or, at your option, any later version. 
  *
  * This file is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -31,7 +31,6 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with loclass.  If not, see <http://www.gnu.org/licenses/>.
- * 
  * 
  * 
  ****************************************************************************/
@@ -69,7 +68,7 @@ From "Dismantling iclass":
 #include <inttypes.h>
 #include "fileutils.h"
 #include "cipherutils.h"
-#include "des.h"
+#include "polarssl/des.h"
 
 uint8_t pi[35] = {0x0F,0x17,0x1B,0x1D,0x1E,0x27,0x2B,0x2D,0x2E,0x33,0x35,0x39,0x36,0x3A,0x3C,0x47,0x4B,0x4D,0x4E,0x53,0x55,0x56,0x59,0x5A,0x5C,0x63,0x65,0x66,0x69,0x6A,0x6C,0x71,0x72,0x74,0x78};
 
@@ -740,17 +739,15 @@ int readKeyFile(uint8_t key[8])
 	FILE *f;
 	int retval = 1;
 	f = fopen("iclass_key.bin", "rb");
-	if (f)
-	{
-		if(fread(key, sizeof(uint8_t), 8, f) == 1) 
-	 	{
-	 		retval = 0;	
-	 	}
-		fclose(f);
+	if (!f)
+		return retval;
+	
+	if (fread(key, sizeof(uint8_t), 8, f) == 8) {
+		retval = 0;
 	}
+	fclose(f);	
 	return retval;
 }
-
 
 int doKeyTests(uint8_t debuglevel)
 {

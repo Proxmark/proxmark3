@@ -2,9 +2,89 @@
 All notable changes to this project will be documented in this file.
 This project uses the changelog in accordance with [keepchangelog](http://keepachangelog.com/). Please use this to write notable changes, which is not the same as git commit log...
 
+
 ## [unreleased][unreleased]
 
+### Changed
+- Adjusted `lf cmdread` to respond to client when complete and the client will then automatically call `data samples`
+- Improved backdoor detection missbehaving magic s50/1k tag (Fl0-0)
+- Deleted wipe functionality from `hf mf csetuid` (Merlok)
+- Changed `hf mf nested` logic (Merlok)
+- Added `hf mf nested` mode: autosearch keys for attack (from well known keys) (Merlok)
+- `hf mf nested` Check keys after they have found (Merlok)
+- `hf mf chk` Move main cycle to arm (Merlok)
+- Changed proxmark command line parameter `flush` to `-f` or `-flush` (Merlok)
+- Changed `hf 14a reader` to just reqest-anticilission-select sequence (Merlok)
+- Changed `hf 14a raw` - works with LED's and some exchange logic (Merlok)
+- Changed TLV parser messages to more convenient (Merlok)
+
+### Fixed
+- Changed start sequence in Qt mode (fix: short commands hangs main Qt thread) (Merlok)
+- Changed driver file proxmark3.inf to support both old and new Product/Vendor IDs (piwi)
+
 ### Added
+- Added a bitbang mode to `lf cmdread` if delay is 0 the cmd bits turn off and on the antenna with 0 and 1 respectively (marshmellow)
+- Added PAC/Stanley detection to lf search (marshmellow)
+- Added lf pac demod and lf pac read - extracts the raw blocks from a PAC/Stanley tag (marshmellow)
+- Added hf mf c* commands compatibity for 4k and gen1b backdoor (Fl0-0)
+- Added backdoor detection for gen1b magic s70/4k tag (Fl0-0)
+- Added data fsktonrz, a fsk cleaning/demodulating routine for weak fsk signal. Note: follow this up with a `data rawdemod nr` to finish demoding your signal. (marshmellow)
+- Added lf em 410xbrute, LF EM410x reader bruteforce attack by simulating UIDs from a file (Fl0-0)
+- Added `hf mf cwipe` command. It wipes "magic Chinese" card. For 1a generation it uses card's "wipe" command. For gen1a and gen1b it uses a write command. (Merlok)
+- Added to `hf mf nested` source key check before attack (Merlok)
+- Added to `hf mf nested` after attack it checks all found keys on non-open sectors (Merlok)
+- `hf mf chk` Added setings to set iso14443a operations timeout. default timeout set to 500us (Merlok)
+- Added to `hf mf nested` parameters `s` and `ss` for checking slow cards (Merlok)
+- Added to proxmark command line parameters `w` - wait 20s for serial port (Merlok)
+- Added to proxmark command line parameters `c` and `l` - execute command and lua script from command line (Merlok)
+- Added to proxmark ability to execute commands from stdin (pipe) (Merlok)
+- Added `hf 14a info` and moved there functionality from `hf 14a reader` (Merlok)
+- Added to `hf 14a info` detection of weak prng from Iceman1001 fork (Merlok)
+- Added to `hf 14a apdu` - exchange apdu via iso1443-4 (Merlok)
+- Added to `hf 14a apdu` - apdu and tlv results parser (Merlok)
+- Added `hf emv` group of commands (Merlok)
+- Added `hf emv search` `hf emv pse` - commands for selection of EMV application (Merlok)
+- Added `hf emv select` - command for select EMV application (Merlok)
+- Added `hf emv exec` - command for execute EMV transaction (Merlok)
+- Added to `hf emv exec` MSD path for VISA and Mastercard and some other compatible EMV cards (Merlok)
+- Added to `hf emv exec` SDA, DDA, fast DDA, CDA calculations for VISA and Mastercard and some other compatible EMV cards (Merlok)
+- Added `hf emv test` - crypto tests for DES, AES, SHA, RSA, SDA, DDA, CDA and some other crypto functions (Merlok)
+- Added `hf list mf` - deciphers crypto1 stream and works with first authentication and weak nested authentications (Merlok)
+
+## [3.0.1][2017-06-08]
+
+### Fixed
+- Compiles on OS X
+- Compiles with gcc 4.9
+- Compiles for non-Intel CPUs
+
+
+## [3.0.0][2017-06-05]
+
+### Added
+- Added lf hitag write 24, the command writes a block to hitag2 tags in crypto mode (henjo)
+
+### Added
+- Added hf mf hardnested, an attack working for hardened Mifare cards (EV1, Mifare Plus SL1) where hf mf nested fails (piwi)
+- Added experimental testmode write option for t55xx (danger) (marshmellow)
+- Added t55xx p1detect to `lf search` chip detections (marshmellow)
+- Added lf t55xx p1detect, detect page 1 of a t55xx tag based on E015 mfg code (marshmellow)
+- Added lf noralsy demod, read, clone, sim commands (iceman)
+- Added lf jablotron demod, read, clone, sim commands (iceman)
+- Added lf nexwatch read   - reads a nexwatch tag from the antenna
+- Added lf paradox read    - reads a paradox tag from the antenna
+- Added lf fdx sim (iceman)
+- Added lf fdx clone       - clones an fdx-b animal tag to t55x7 or q5 (iceman)
+- Added lf fdx read        - reads a fdx-b tag from the antenna (iceman)
+- Added lf gproxii read    - reads a gproxii tag from the antenna (marshmellow)
+- Added lf indala read     - reads an indala tag from the antenna (marshmellow)
+- Added lf visa2000 demod, read, clone, sim commands (iceman)
+- Added markers in the graph around found Sequence Terminator after askmandemod.
+- Added data mtrim <start> <stop> command to trim out samples between start and stop
+- Added data setgraphmarkers <orange> <blue> command to set two extra markers on the graph (marshmellow)
+- Added EM4x05/EM4x69 chip detection to lf search (marshmellow) 
+- Added lf em 4x05dump command to read and output all the blocks of the chip (marshmellow)
+- Added lf em 4x05info command to read and display information about the chip (marshmellow)
 - Added lf cotag read, and added it to lf search (iceman)
 - Added hitag2 read UID only and added that to lf search (marshmellow)
 - Added lf pyramid commands (iceman)
@@ -19,7 +99,7 @@ This project uses the changelog in accordance with [keepchangelog](http://keepac
 - `lf viking read` - read viking tag and output ID
 - `lf t55xx wipe`  - sets t55xx back to factory defaults
 - Added viking demod to `lf search` (marshmellow)
-- `data askvikingdemod` demod viking id tag from graphbuffer (marshmellow)
+- `lf viking demod` demod viking id tag from graphbuffer (marshmellow)
 - `lf t55xx resetread` added reset then read command - should allow determining start of stream transmissions (marshmellow)
 - `lf t55xx wakeup` added wake with password (AOR) to allow lf search or standard lf read after (iceman, marshmellow)
 - `hf iclass managekeys` to save, load and manage iclass keys.  (adjusted most commands to accept a loaded key in memory) (marshmellow)
@@ -38,6 +118,35 @@ This project uses the changelog in accordance with [keepchangelog](http://keepac
 - Added option c to 'hf list' (mark CRC bytes) (piwi)
 
 ### Changed
+- Adjusted the lf demods to auto align and set the grid for the graph plot. 
+- `lf snoop` now automatically gets samples from the device
+- `lf read` now accepts [#samples] as arg. && now automatically gets samples from the device
+- adjusted lf t5 chip timings to use WaitUS. and adjusted the readblock timings
+    appears to have more consistent results with more antennas.
+- `lf t5 wakeup` has been adjusted to not need the p in front of the pwd arg.
+- `data psknexwatchdemod` has been moved to `lf nexwatch demod` (reads from graphbuffer)
+- `data fskparadoxdemod` has been moved to `lf paradox demod` (reads from graphbuffer)
+- `data fdxdemod` has been moved to `lf fdx demod` (reads from graphbuffer)
+- `data askgproxiidemod has been moved to `lf gproxii demod` (reads from graphbuffer)
+- `lf indalaclone` has been moved to `lf indala clone`
+- `lf indalademod` has been moved to `lf indala altdemod` (reads from graphbuffer)
+- `data pskindalademod` has been moved to `lf indala demod` (reads from graphbuffer)
+- `data askvikingdemod` has been moved to `lf viking demod` (reads from graphbuffer)
+- `data fskpyramiddemod` has been moved to `lf pyramid demod` (reads from graphbuffer)
+- `data fskiodemod` has been moved to `lf io demod` (reads from graphbuffer)
+- `lf io fskdemod` has been renamed to `lf io read` (reads from antenna)
+- `data fskawiddemod` has been moved to `lf awid demod` (reads from graphbuffer)
+- `lf awid fskdemod` has been renamed to `lf awid read` (reads from antenna)
+- `data fskhiddemod` has been moved to `lf hid demod` (reads from graphbuffer)
+- `lf hid demod` has been renamed to `lf hid read` (reads from antenna)
+- all em410x demod and print functions moved to cmdlfem4x.c
+- `data askem410xdemod` has been moved to `lf em 410xdemod` (reads from graphbuffer)
+- `lf em 410xdemod` has been renamed to `lf em 410xread` (reads from antenna)
+- hf mf dump - added retry loops to try each read attempt up to 3 times.  makes getting a complete dump easier with many antennas. 
+- small changes to lf psk and fsk demods to improve results when the trace begins with noise or the chip isn't broadcasting yet (marshmellow)
+- NOTE CHANGED ALL `lf em4x em*` cmds to simpler `lf em ` - example: `lf em4x em410xdemod` is now `lf em 410xdemod`
+- Renamed and rebuilt `lf em readword` && readwordpwd to `lf em 4x05readword` - it now demods and outputs the read block (marshmellow/iceman)
+- Renamed and rebuilt `lf em writeword` && writewordpwd to `lf em 4x05writeword` - it now also reads validation output from the tag (marshmellow/iceman)
 - Fixed bug in lf sim and continuous demods not turning off antenna when finished
 - Fixed bug(s) in hf iclass write
 - Fixed bug in lf biphase sim - `lf simask b` (and any tagtype that relies on it - gproxii...) (marshmellow)

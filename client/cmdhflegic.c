@@ -10,8 +10,8 @@
 
 #include <stdio.h>
 #include <string.h>
+#include <inttypes.h>
 #include "proxmark3.h"
-#include "data.h"
 #include "ui.h"
 #include "cmdparser.h"
 #include "cmdhflegic.h"
@@ -58,13 +58,12 @@ int CmdLegicDecode(const char *Cmd)
   int crc = 0;
   int wrp = 0;
   int wrc = 0;
-  uint8_t data_buf[1052]; // receiver buffer
+  uint8_t data_buf[1053]; // receiver buffer
   char out_string[3076]; // just use big buffer - bad practice
   char token_type[4];
   
   // copy data from proxmark into buffer
-   GetFromBigBuf(data_buf,sizeof(data_buf),0);
-   WaitForResponse(CMD_ACK,NULL);
+   GetFromBigBuf(data_buf, sizeof(data_buf), 0, NULL, -1, false);
     
   // Output CDF System area (9 bytes) plus remaining header area (12 bytes)
   
@@ -250,7 +249,7 @@ int CmdLegicLoad(const char *Cmd)
           fclose(f);
           return -1;
         }
-        UsbCommand c={CMD_DOWNLOADED_SIM_SAMPLES_125K, {offset, 0, 0}};
+        UsbCommand c={CMD_DOWNLOADED_SIM_SAMPLES_125K, {offset, 1, 0}};
         int j; for(j = 0; j < 8; j++) {
             c.d.asBytes[j] = data[j];
         }
@@ -293,8 +292,7 @@ int CmdLegicSave(const char *Cmd)
     return -1;
   }
 
-  GetFromBigBuf(got,requested,offset);
-  WaitForResponse(CMD_ACK,NULL);
+  GetFromBigBuf(got, requested, offset, NULL, -1, false);
 
   for (int j = 0; j < requested; j += 8) {
     fprintf(f, "%02x %02x %02x %02x %02x %02x %02x %02x\n",
@@ -323,7 +321,7 @@ int CmdLegicRfSim(const char *Cmd)
    c.arg[0] = 6;
    c.arg[1] = 3;
    c.arg[2] = 0;
-   sscanf(Cmd, " %"lli" %"lli" %"lli, &c.arg[0], &c.arg[1], &c.arg[2]);
+   sscanf(Cmd, " %" SCNi64 " %" SCNi64 " %" SCNi64, &c.arg[0], &c.arg[1], &c.arg[2]);
    SendCommand(&c);
    return 0;
 }
@@ -331,7 +329,7 @@ int CmdLegicRfSim(const char *Cmd)
 int CmdLegicRfWrite(const char *Cmd)
 {
     UsbCommand c={CMD_WRITER_LEGIC_RF};
-    int res = sscanf(Cmd, " 0x%"llx" 0x%"llx, &c.arg[0], &c.arg[1]);
+    int res = sscanf(Cmd, " 0x%" SCNx64 " 0x%" SCNx64, &c.arg[0], &c.arg[1]);
 	if(res != 2) {
 		PrintAndLog("Please specify the offset and length as two hex strings");
         return -1;
@@ -343,14 +341,14 @@ int CmdLegicRfWrite(const char *Cmd)
 int CmdLegicRfFill(const char *Cmd)
 {
     UsbCommand cmd ={CMD_WRITER_LEGIC_RF};
-    int res = sscanf(Cmd, " 0x%"llx" 0x%"llx" 0x%"llx, &cmd.arg[0], &cmd.arg[1], &cmd.arg[2]);
+    int res = sscanf(Cmd, " 0x%" SCNx64 " 0x%" SCNx64 " 0x%" SCNx64, &cmd.arg[0], &cmd.arg[1], &cmd.arg[2]);
     if(res != 3) {
         PrintAndLog("Please specify the offset, length and value as two hex strings");
         return -1;
     }
 
     int i;
-    UsbCommand c={CMD_DOWNLOADED_SIM_SAMPLES_125K, {0, 0, 0}};
+    UsbCommand c={CMD_DOWNLOADED_SIM_SAMPLES_125K, {0, 1, 0}};
     for(i = 0; i < 48; i++) {
       c.d.asBytes[i] = cmd.arg[2];
     }

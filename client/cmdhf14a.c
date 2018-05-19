@@ -1,5 +1,5 @@
 //-----------------------------------------------------------------------------
-// 2011, Merlok
+// 2011, 2017 Merlok
 // Copyright (C) 2010 iZsh <izsh at fail0verflow.com>, Hagen Fritsch
 //
 // This code is licensed to you under the terms of the GNU GPL, version 2 or,
@@ -9,24 +9,30 @@
 // High frequency ISO14443A commands
 //-----------------------------------------------------------------------------
 
+#include "cmdhf14a.h"
+
 #include <stdio.h>
 #include <stdlib.h>
+#include <inttypes.h>
 #include <string.h>
 #include <unistd.h>
+#include <ctype.h>
 #include "util.h"
+#include "util_posix.h"
 #include "iso14443crc.h"
-#include "data.h"
 #include "proxmark3.h"
 #include "ui.h"
 #include "cmdparser.h"
-#include "cmdhf14a.h"
 #include "common.h"
 #include "cmdmain.h"
 #include "mifare.h"
 #include "cmdhfmfu.h"
+#include "mifarehost.h"
+#include "emv/apduinfo.h"
+#include "emv/emvcore.h"
 
 static int CmdHelp(const char *Cmd);
-static void waitCmd(uint8_t iLen);
+static int waitCmd(uint8_t iLen);
 
 // structure and database for uid -> tagtype lookups 
 typedef struct { 
@@ -34,7 +40,7 @@ typedef struct {
 	char* desc;
 } manufactureName; 
 
-const manufactureName manufactureMapping[] = {
+static const manufactureName manufactureMapping[] = {
 	// ID,  "Vendor Country"
 	{ 0x01, "Motorola UK" },
 	{ 0x02, "ST Microelectronics SA France" },
@@ -107,7 +113,6 @@ const manufactureName manufactureMapping[] = {
 	{ 0x00, "no tag-info available" } // must be the last entry
 };
 
-
 // get a product description based on the UID
 //		uid[8] 	tag uid
 // returns description of the best match	
@@ -130,7 +135,84 @@ int CmdHF14AList(const char *Cmd)
 	return 0;
 }
 
-int CmdHF14AReader(const char *Cmd)
+int CmdHF14AReader(const char *Cmd) {
+	uint32_t cm = ISO14A_CONNECT;
+	bool disconnectAfter = true;
+	
+	int cmdp = 0;
+	while(param_getchar(Cmd, cmdp) != 0x00) {
+		switch(param_getchar(Cmd, cmdp)) {
+		case 'h':
+		case 'H':
+			PrintAndLog("Usage: hf 14a reader [k|x] [3]");
+			PrintAndLog("       k    keep the field active after command executed");
+			PrintAndLog("       x    just drop the signal field");
+			PrintAndLog("       3    ISO14443-3 select only (skip RATS)");
+			return 0;
+		case '3':
+			cm |= ISO14A_NO_RATS; 
+			break;
+		case 'k':
+		case 'K':
+			disconnectAfter = false;
+			break;
+		case 'x':
+		case 'X':
+			cm &= ~ISO14A_CONNECT;
+			break;
+		default:
+			PrintAndLog("Unknown command.");
+			return 1;
+		}	
+		
+		cmdp++;
+	}
+
+	if (!disconnectAfter)
+		cm |= ISO14A_NO_DISCONNECT; 
+	
+	UsbCommand c = {CMD_READER_ISO_14443a, {cm, 0, 0}};
+	SendCommand(&c);
+
+	if (ISO14A_CONNECT & cm) {
+		UsbCommand resp;
+		WaitForResponse(CMD_ACK,&resp);
+		
+		iso14a_card_select_t card;
+		memcpy(&card, (iso14a_card_select_t *)resp.d.asBytes, sizeof(iso14a_card_select_t));
+
+		uint64_t select_status = resp.arg[0];		// 0: couldn't read, 1: OK, with ATS, 2: OK, no ATS, 3: proprietary Anticollision
+		
+		if(select_status == 0) {
+			PrintAndLog("iso14443a card select failed");
+			return 1;
+		}
+
+		if(select_status == 3) {
+			PrintAndLog("Card doesn't support standard iso14443-3 anticollision");
+			PrintAndLog("ATQA : %02x %02x", card.atqa[1], card.atqa[0]);
+			return 1;
+		}
+
+		PrintAndLog(" UID : %s", sprint_hex(card.uid, card.uidlen));
+		PrintAndLog("ATQA : %02x %02x", card.atqa[1], card.atqa[0]);
+		PrintAndLog(" SAK : %02x [%" PRIu64 "]", card.sak, resp.arg[0]);
+		if(card.ats_len >= 3) {			// a valid ATS consists of at least the length byte (TL) and 2 CRC bytes
+			PrintAndLog(" ATS : %s", sprint_hex(card.ats, card.ats_len));
+		}
+		if (!disconnectAfter) {
+			PrintAndLog("Card is selected. You can now start sending commands");
+		}
+	}
+
+	if (disconnectAfter) {
+		PrintAndLog("Field dropped.");
+	}
+	
+	return 0;
+}
+
+int CmdHF14AInfo(const char *Cmd)
 {
 	UsbCommand c = {CMD_READER_ISO_14443a, {ISO14A_CONNECT | ISO14A_NO_DISCONNECT, 0, 0}};
 	SendCommand(&c);
@@ -166,10 +248,12 @@ int CmdHF14AReader(const char *Cmd)
 
 	PrintAndLog(" UID : %s", sprint_hex(card.uid, card.uidlen));
 	PrintAndLog("ATQA : %02x %02x", card.atqa[1], card.atqa[0]);
-	PrintAndLog(" SAK : %02x [%d]", card.sak, resp.arg[0]);
+	PrintAndLog(" SAK : %02x [%" PRIu64 "]", card.sak, resp.arg[0]);
 
+	bool isMifareClassic = true;
 	switch (card.sak) {
 		case 0x00: 
+			isMifareClassic = false;
 
 			//***************************************test****************
 			// disconnect
@@ -402,22 +486,21 @@ int CmdHF14AReader(const char *Cmd)
 
 	
 	// try to see if card responses to "chinese magic backdoor" commands.
-	c.cmd = CMD_MIFARE_CIDENT;
-	c.arg[0] = 0;
-	c.arg[1] = 0;
-	c.arg[2] = 0;	
-	SendCommand(&c);
-	WaitForResponse(CMD_ACK,&resp);
-	uint8_t isOK  = resp.arg[0] & 0xff;
-	PrintAndLog("Answers to chinese magic backdoor commands: %s", (isOK ? "YES" : "NO") );
+	mfCIdentify();
 	
-	// disconnect
-	c.cmd = CMD_READER_ISO_14443a;
-	c.arg[0] = 0;
-	c.arg[1] = 0;
-	c.arg[2] = 0;
-	SendCommand(&c);
-
+	if (isMifareClassic) {		
+		switch(DetectClassicPrng()) {
+		case 0:
+			PrintAndLog("Prng detection: HARDEND (hardnested)");		
+			break;
+		case 1:
+			PrintAndLog("Prng detection: WEAK");
+			break;
+		default:
+			PrintAndLog("Prng detection error.");		
+		}
+	}
+	
 	return select_status;
 }
 
@@ -430,11 +513,11 @@ int CmdHF14ACUIDs(const char *Cmd)
 	n = n > 0 ? n : 1;
 
 	PrintAndLog("Collecting %d UIDs", n);
-	PrintAndLog("Start: %u", time(NULL));
+	PrintAndLog("Start: %" PRIu64, msclock()/1000);
 	// repeat n times
 	for (int i = 0; i < n; i++) {
 		// execute anticollision procedure
-		UsbCommand c = {CMD_READER_ISO_14443a, {ISO14A_CONNECT, 0, 0}};
+		UsbCommand c = {CMD_READER_ISO_14443a, {ISO14A_CONNECT | ISO14A_NO_RATS, 0, 0}};
 		SendCommand(&c);
     
 		UsbCommand resp;
@@ -453,7 +536,7 @@ int CmdHF14ACUIDs(const char *Cmd)
 			PrintAndLog("%s", uid_string);
 		}
 	}
-	PrintAndLog("End: %u", time(NULL));
+	PrintAndLog("End: %" PRIu64, msclock()/1000);
 
 	return 1;
 }
@@ -490,7 +573,7 @@ int CmdHF14ASim(const char *Cmd)
 
 	// Are we handling the (optional) second part uid?
 	if (long_uid > 0xffffffff) {
-		PrintAndLog("Emulating ISO/IEC 14443 type A tag with 7 byte UID (%014"llx")",long_uid);
+		PrintAndLog("Emulating ISO/IEC 14443 type A tag with 7 byte UID (%014" PRIx64 ")",long_uid);
 		// Store the second part
 		c.arg[2] = (long_uid & 0xffffffff);
 		long_uid >>= 32;
@@ -560,182 +643,362 @@ int CmdHF14ASnoop(const char *Cmd) {
 		if (ctmp == 'r' || ctmp == 'R') param |= 0x02;
 	}
 
-  UsbCommand c = {CMD_SNOOP_ISO_14443a, {param, 0, 0}};
-  SendCommand(&c);
-  return 0;
+	UsbCommand c = {CMD_SNOOP_ISO_14443a, {param, 0, 0}};
+	SendCommand(&c);
+	return 0;
 }
 
+void DropField() {
+	UsbCommand c = {CMD_READER_ISO_14443a, {0, 0, 0}}; 
+	SendCommand(&c);
+}
+
+int ExchangeAPDU14a(uint8_t *datain, int datainlen, bool activateField, bool leaveSignalON, uint8_t *dataout, int maxdataoutlen, int *dataoutlen) {
+	uint16_t cmdc = 0;
+	
+	if (activateField) {
+		cmdc |= ISO14A_CONNECT | ISO14A_CLEAR_TRACE;
+	}
+	if (leaveSignalON)
+		cmdc |= ISO14A_NO_DISCONNECT;
+
+	// "Command APDU" length should be 5+255+1, but javacard's APDU buffer might be smaller - 133 bytes
+	// https://stackoverflow.com/questions/32994936/safe-max-java-card-apdu-data-command-and-respond-size
+	// here length USB_CMD_DATA_SIZE=512
+	// timeout must be authomatically set by "get ATS"
+	UsbCommand c = {CMD_READER_ISO_14443a, {ISO14A_APDU | cmdc, (datainlen & 0xFFFF), 0}}; 
+	memcpy(c.d.asBytes, datain, datainlen);
+	SendCommand(&c);
+	
+    uint8_t *recv;
+    UsbCommand resp;
+
+	if (activateField) {
+		if (!WaitForResponseTimeout(CMD_ACK, &resp, 1500)) {
+			PrintAndLog("APDU ERROR: Proxmark connection timeout.");
+			return 1;
+		}
+		if (resp.arg[0] != 1) {
+			PrintAndLog("APDU ERROR: Proxmark error %d.", resp.arg[0]);
+			return 1;
+		}
+	}
+
+    if (WaitForResponseTimeout(CMD_ACK, &resp, 1500)) {
+        recv = resp.d.asBytes;
+        int iLen = resp.arg[0];
+		
+		*dataoutlen = iLen - 2;
+		if (*dataoutlen < 0)
+			*dataoutlen = 0;
+		
+		if (maxdataoutlen && *dataoutlen > maxdataoutlen) {
+			PrintAndLog("APDU ERROR: Buffer too small(%d). Needs %d bytes", *dataoutlen, maxdataoutlen);
+			return 2;
+		}
+		
+		memcpy(dataout, recv, *dataoutlen);
+		
+        if(!iLen) {
+			PrintAndLog("APDU ERROR: No APDU response.");
+            return 1;
+		}
+
+		// check block TODO
+		if (iLen == -2) {
+			PrintAndLog("APDU ERROR: Block type mismatch.");
+			return 2;
+		}
+		
+		// CRC Check
+		if (iLen == -1) {
+			PrintAndLog("APDU ERROR: ISO 14443A CRC error.");
+			return 3;
+		}
+
+		// check apdu length
+		if (iLen < 4) {
+			PrintAndLog("APDU ERROR: Small APDU response. Len=%d", iLen);
+			return 2;
+		}
+		
+    } else {
+        PrintAndLog("APDU ERROR: Reply timeout.");
+		return 4;
+    }
+	
+	return 0;
+}
+
+// ISO14443-4. 7. Half-duplex block transmission protocol
+int CmdHF14AAPDU(const char *cmd) {
+	uint8_t data[USB_CMD_DATA_SIZE];
+	int datalen = 0;
+	bool activateField = false;
+	bool leaveSignalON = false;
+	bool decodeTLV = false;
+	
+	if (strlen(cmd) < 2) {
+		PrintAndLog("Usage: hf 14a apdu [-s] [-k] [-t] <APDU (hex)>");
+		PrintAndLog("Command sends an ISO 7816-4 APDU via ISO 14443-4 block transmission protocol (T=CL)");
+		PrintAndLog("       -s    activate field and select card");
+		PrintAndLog("       -k    leave the signal field ON after receive response");
+		PrintAndLog("       -t    executes TLV decoder if it possible. TODO!!!!");
+		return 0;
+	}
+
+	int cmdp = 0;
+	while(param_getchar(cmd, cmdp) != 0x00) {
+		char c = param_getchar(cmd, cmdp);
+		if ((c == '-') && (param_getlength(cmd, cmdp) == 2))
+			switch (param_getchar_indx(cmd, 1, cmdp)) {
+				case 's':
+				case 'S':
+					activateField = true;
+					break;
+				case 'k':
+				case 'K':
+					leaveSignalON = true;
+					break;
+				case 't':
+				case 'T':
+					decodeTLV = true;
+					break;
+				default:
+					PrintAndLog("Unknown parameter '%c'", param_getchar_indx(cmd, 1, cmdp));
+					return 1;
+			}
+			
+		if (isxdigit((unsigned char)c)) {
+			// len = data + PCB(1b) + CRC(2b)
+			switch(param_gethex_to_eol(cmd, cmdp, data, sizeof(data) - 1 - 2, &datalen)) {
+			case 1:
+				PrintAndLog("Invalid HEX value.");
+				return 1;
+			case 2:
+				PrintAndLog("APDU too large.");
+				return 1;
+			case 3:
+				PrintAndLog("Hex must have even number of digits.");
+				return 1;
+			}
+			
+			// we get all the hex to end of line with spaces
+			break;
+		}
+		
+		cmdp++;
+	}
+
+	PrintAndLog(">>>>[%s%s%s] %s", activateField ? "sel ": "", leaveSignalON ? "keep ": "", decodeTLV ? "TLV": "", sprint_hex(data, datalen));
+	
+	int res = ExchangeAPDU14a(data, datalen, activateField, leaveSignalON, data, USB_CMD_DATA_SIZE, &datalen);
+
+	if (res)
+		return res;
+
+	PrintAndLog("<<<< %s", sprint_hex(data, datalen));
+	
+	PrintAndLog("APDU response: %02x %02x - %s", data[datalen - 2], data[datalen - 1], GetAPDUCodeDescription(data[datalen - 2], data[datalen - 1])); 
+
+	// TLV decoder
+	if (decodeTLV && datalen > 4) {
+		TLVPrintFromBuffer(data, datalen - 2);
+	}
+	
+	return 0;
+}
 
 int CmdHF14ACmdRaw(const char *cmd) {
-    UsbCommand c = {CMD_READER_ISO_14443a, {0, 0, 0}};
-    bool reply=1;
-    bool crc = FALSE;
-    bool power = FALSE;
-    bool active = FALSE;
-    bool active_select = FALSE;
-    uint16_t numbits = 0;
-	bool bTimeout = FALSE;
+	UsbCommand c = {CMD_READER_ISO_14443a, {0, 0, 0}};
+	bool reply=1;
+	bool crc = false;
+	bool power = false;
+	bool active = false;
+	bool active_select = false;
+	bool no_rats = false;
+	uint16_t numbits = 0;
+	bool bTimeout = false;
 	uint32_t timeout = 0;
-	bool topazmode = FALSE;
-    char buf[5]="";
-    int i = 0;
-    uint8_t data[USB_CMD_DATA_SIZE];
+	bool topazmode = false;
+	char buf[5]="";
+	int i = 0;
+	uint8_t data[USB_CMD_DATA_SIZE];
 	uint16_t datalen = 0;
 	uint32_t temp;
 
-    if (strlen(cmd)<2) {
-        PrintAndLog("Usage: hf 14a raw [-r] [-c] [-p] [-f] [-b] [-t] <number of bits> <0A 0B 0C ... hex>");
-        PrintAndLog("       -r    do not read response");
-        PrintAndLog("       -c    calculate and append CRC");
-        PrintAndLog("       -p    leave the signal field ON after receive");
-        PrintAndLog("       -a    active signal field ON without select");
-        PrintAndLog("       -s    active signal field ON with select");
-        PrintAndLog("       -b    number of bits to send. Useful for send partial byte");
+	if (strlen(cmd)<2) {
+		PrintAndLog("Usage: hf 14a raw [-r] [-c] [-p] [-f] [-b] [-t] <number of bits> <0A 0B 0C ... hex>");
+		PrintAndLog("       -r    do not read response");
+		PrintAndLog("       -c    calculate and append CRC");
+		PrintAndLog("       -p    leave the signal field ON after receive");
+		PrintAndLog("       -a    active signal field ON without select");
+		PrintAndLog("       -s    active signal field ON with select");
+		PrintAndLog("       -b    number of bits to send. Useful for send partial byte");
 		PrintAndLog("       -t    timeout in ms");
 		PrintAndLog("       -T    use Topaz protocol to send command");
-        return 0;
-    }
+		PrintAndLog("       -3    ISO14443-3 select only (skip RATS)");
+		return 0;
+	}
 
-	
-    // strip
-    while (*cmd==' ' || *cmd=='\t') cmd++;
 
-    while (cmd[i]!='\0') {
-        if (cmd[i]==' ' || cmd[i]=='\t') { i++; continue; }
-        if (cmd[i]=='-') {
-            switch (cmd[i+1]) {
-                case 'r': 
-                    reply = FALSE;
-                    break;
-                case 'c':
-                    crc = TRUE;
-                    break;
-                case 'p':
-                    power = TRUE;
-                    break;
-                case 'a':
-                    active = TRUE;
-                    break;
-                case 's':
-                    active_select = TRUE;
-                    break;
-                case 'b': 
-                    sscanf(cmd+i+2,"%d",&temp);
-                    numbits = temp & 0xFFFF;
-                    i+=3;
-                    while(cmd[i]!=' ' && cmd[i]!='\0') { i++; }
-                    i-=2;
-                    break;
+	// strip
+	while (*cmd==' ' || *cmd=='\t') cmd++;
+
+	while (cmd[i]!='\0') {
+		if (cmd[i]==' ' || cmd[i]=='\t') { i++; continue; }
+		if (cmd[i]=='-') {
+			switch (cmd[i+1]) {
+				case 'r': 
+					reply = false;
+					break;
+				case 'c':
+					crc = true;
+					break;
+				case 'p':
+					power = true;
+					break;
+				case 'a':
+					active = true;
+					break;
+				case 's':
+					active_select = true;
+					break;
+				case 'b': 
+					sscanf(cmd+i+2,"%d",&temp);
+					numbits = temp & 0xFFFF;
+					i+=3;
+					while(cmd[i]!=' ' && cmd[i]!='\0') { i++; }
+					i-=2;
+					break;
 				case 't':
-					bTimeout = TRUE;
+					bTimeout = true;
 					sscanf(cmd+i+2,"%d",&temp);
 					timeout = temp;
 					i+=3;
 					while(cmd[i]!=' ' && cmd[i]!='\0') { i++; }
 					i-=2;
 					break;
-                case 'T':
-					topazmode = TRUE;
+				case 'T':
+					topazmode = true;
 					break;
-                default:
-                    PrintAndLog("Invalid option");
-                    return 0;
-            }
-            i+=2;
-            continue;
-        }
-        if ((cmd[i]>='0' && cmd[i]<='9') ||
-            (cmd[i]>='a' && cmd[i]<='f') ||
-            (cmd[i]>='A' && cmd[i]<='F') ) {
-            buf[strlen(buf)+1]=0;
-            buf[strlen(buf)]=cmd[i];
-            i++;
+				case '3':
+					no_rats = true;
+					break;
+				default:
+					PrintAndLog("Invalid option");
+					return 0;
+			}
+			i+=2;
+			continue;
+		}
+		if ((cmd[i]>='0' && cmd[i]<='9') ||
+		    (cmd[i]>='a' && cmd[i]<='f') ||
+		    (cmd[i]>='A' && cmd[i]<='F') ) {
+			buf[strlen(buf)+1]=0;
+			buf[strlen(buf)]=cmd[i];
+			i++;
 
-            if (strlen(buf)>=2) {
-                sscanf(buf,"%x",&temp);
-                data[datalen]=(uint8_t)(temp & 0xff);
-                *buf=0;
-				if (++datalen>sizeof(data)){
+			if (strlen(buf)>=2) {
+				sscanf(buf,"%x",&temp);
+				data[datalen]=(uint8_t)(temp & 0xff);
+				*buf=0;
+				if (datalen > sizeof(data)-1) {
 					if (crc)
 						PrintAndLog("Buffer is full, we can't add CRC to your data");
 					break;
+				} else {
+					datalen++;
 				}
-            }
-            continue;
-        }
-        PrintAndLog("Invalid char on input");
-        return 0;
-    }
+			}
+			continue;
+		}
+		PrintAndLog("Invalid char on input");
+		return 0;
+	}
 
-    if(crc && datalen>0 && datalen<sizeof(data)-2)
-    {
-        uint8_t first, second;
+	if(crc && datalen>0 && datalen<sizeof(data)-2)
+	{
+		uint8_t first, second;
 		if (topazmode) {
 			ComputeCrc14443(CRC_14443_B, data, datalen, &first, &second);
 		} else {
 			ComputeCrc14443(CRC_14443_A, data, datalen, &first, &second);
 		}
-        data[datalen++] = first;
-        data[datalen++] = second;
-    }
+		data[datalen++] = first;
+		data[datalen++] = second;
+	}
 
-    if(active || active_select)
-    {
-        c.arg[0] |= ISO14A_CONNECT;
-        if(active)
-            c.arg[0] |= ISO14A_NO_SELECT;
-    }
+	if(active || active_select)
+	{
+		c.arg[0] |= ISO14A_CONNECT | ISO14A_CLEAR_TRACE;
+		if(active)
+			c.arg[0] |= ISO14A_NO_SELECT;
+	}
 
 	if(bTimeout){
-	    #define MAX_TIMEOUT 40542464 	// = (2^32-1) * (8*16) / 13560000Hz * 1000ms/s
-        c.arg[0] |= ISO14A_SET_TIMEOUT;
-        if(timeout > MAX_TIMEOUT) {
-            timeout = MAX_TIMEOUT;
-            PrintAndLog("Set timeout to 40542 seconds (11.26 hours). The max we can wait for response");
-        }
+		#define MAX_TIMEOUT 40542464 	// = (2^32-1) * (8*16) / 13560000Hz * 1000ms/s
+		c.arg[0] |= ISO14A_SET_TIMEOUT;
+		if(timeout > MAX_TIMEOUT) {
+			timeout = MAX_TIMEOUT;
+			PrintAndLog("Set timeout to 40542 seconds (11.26 hours). The max we can wait for response");
+		}
 		c.arg[2] = 13560000 / 1000 / (8*16) * timeout; // timeout in ETUs (time to transfer 1 bit, approx. 9.4 us)
 	}
 
-    if(power) {
-        c.arg[0] |= ISO14A_NO_DISCONNECT;
-    }
+	if(power) {
+		c.arg[0] |= ISO14A_NO_DISCONNECT;
+	}
 
 	if(datalen > 0) {
-        c.arg[0] |= ISO14A_RAW;
-    }
+		c.arg[0] |= ISO14A_RAW;
+	}
 
 	if(topazmode) {
 		c.arg[0] |= ISO14A_TOPAZMODE;
-    }
-		
-	// Max buffer is USB_CMD_DATA_SIZE
-    c.arg[1] = (datalen & 0xFFFF) | (numbits << 16);
-    memcpy(c.d.asBytes,data,datalen);
+	}
 
-    SendCommand(&c);
+	if(no_rats) {
+		c.arg[0] |= ISO14A_NO_RATS;
+	}
 
-    if (reply) {
-        if(active_select)
-            waitCmd(1);
-        if(datalen>0)
-            waitCmd(0);
-    } // if reply
-    return 0;
+	// Max buffer is USB_CMD_DATA_SIZE (512)
+	c.arg[1] = (datalen & 0xFFFF) | ((uint32_t)numbits << 16);
+	memcpy(c.d.asBytes,data,datalen);
+
+	SendCommand(&c);
+
+	if (reply) {
+		int res = 0;
+		if (active_select)
+			res = waitCmd(1);
+		if (!res && datalen > 0)
+			waitCmd(0);
+	} // if reply
+	return 0;
 }
 
 
-static void waitCmd(uint8_t iSelect)
-{
+static int waitCmd(uint8_t iSelect) {
     uint8_t *recv;
     UsbCommand resp;
     char *hexout;
 
     if (WaitForResponseTimeout(CMD_ACK,&resp,1500)) {
         recv = resp.d.asBytes;
-        uint8_t iLen = iSelect ? resp.arg[1] : resp.arg[0];
-        PrintAndLog("received %i octets", iLen);
+        uint8_t iLen = resp.arg[0];
+		if (iSelect){
+			iLen = resp.arg[1];
+			if (iLen){
+				PrintAndLog("Card selected. UID[%i]:", iLen);
+			} else {
+				PrintAndLog("Can't select card.");
+			}
+		} else {
+			PrintAndLog("received %i bytes:", iLen);
+		}
         if(!iLen)
-            return;
+            return 1;
         hexout = (char *)malloc(iLen * 3 + 1);
         if (hexout != NULL) {
             for (int i = 0; i < iLen; i++) { // data in hex
@@ -745,20 +1008,25 @@ static void waitCmd(uint8_t iSelect)
             free(hexout);
         } else {
             PrintAndLog("malloc failed your client has low memory?");
+			return 2;
         }
     } else {
         PrintAndLog("timeout while waiting for reply.");
+		return 3;
     }
+	return 0;
 }
 
 static command_t CommandTable[] = 
 {
   {"help",   CmdHelp,              1, "This help"},
   {"list",   CmdHF14AList,         0, "[Deprecated] List ISO 14443a history"},
-  {"reader", CmdHF14AReader,       0, "Act like an ISO14443 Type A reader"},
+  {"reader", CmdHF14AReader,       0, "Start acting like an ISO14443 Type A reader"},
+  {"info",   CmdHF14AInfo,         0, "Reads card and shows information about it"},
   {"cuids",  CmdHF14ACUIDs,        0, "<n> Collect n>0 ISO14443 Type A UIDs in one go"},
   {"sim",    CmdHF14ASim,          0, "<UID> -- Simulate ISO 14443a tag"},
   {"snoop",  CmdHF14ASnoop,        0, "Eavesdrop ISO 14443 Type A"},
+  {"apdu",   CmdHF14AAPDU,         0, "Send an ISO 7816-4 APDU via ISO 14443-4 block transmission protocol"},
   {"raw",    CmdHF14ACmdRaw,       0, "Send raw hex data to tag"},
   {NULL, NULL, 0, NULL}
 };

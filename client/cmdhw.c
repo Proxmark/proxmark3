@@ -18,7 +18,6 @@
 #include "cmdhw.h"
 #include "cmdmain.h"
 #include "cmddata.h"
-#include "data.h"
 
 /* low-level hardware control */
 
@@ -429,13 +428,10 @@ int CmdVersion(const char *Cmd)
 
 int CmdStatus(const char *Cmd)
 {
-	uint8_t speed_test_buffer[USB_CMD_DATA_SIZE];
-	sample_buf = speed_test_buffer;
-
 	clearCommandBuffer();
 	UsbCommand c = {CMD_STATUS};
 	SendCommand(&c);
-	if (!WaitForResponseTimeout(CMD_ACK,&c,1900)) {
+	if (!WaitForResponseTimeout(CMD_ACK, &c, 1900)) {
 		PrintAndLog("Status command failed. USB Speed Test timed out");
 	}
 	return 0;
@@ -449,7 +445,7 @@ int CmdPing(const char *Cmd)
 	UsbCommand c = {CMD_PING};
 	SendCommand(&c);
 	if (WaitForResponseTimeout(CMD_ACK,&resp,1000)) {
-		PrintAndLog("Ping successfull");
+		PrintAndLog("Ping successful");
 	}else{
 		PrintAndLog("Ping failed");
 	}

@@ -292,6 +292,7 @@ void FormatVersionInformation(char *dst, int len, const char *prefix, void *vers
 	strncat(dst, "\n", len - strlen(dst) - 1);
 }
 
+
 //  -------------------------------------------------------------------------
 //  timer lib
 //  -------------------------------------------------------------------------
@@ -312,12 +313,14 @@ void StartTickCount()
 	// note: worst case precision is approx 2.5%
 }
 
+
 /*
 * Get the current count.
 */
 uint32_t RAMFUNC GetTickCount(){
 	return AT91C_BASE_RTTC->RTTC_RTVR;// was * 2;
 }
+
 
 //  -------------------------------------------------------------------------
 //  microseconds timer 
@@ -344,9 +347,11 @@ void StartCountUS()
 	AT91C_BASE_TCB->TCB_BCR = 1;
 	}
 
+
 uint32_t RAMFUNC GetCountUS(){
 	return (AT91C_BASE_TC1->TC_CV * 0x8000) + ((AT91C_BASE_TC0->TC_CV * 2) / 3); //was  /15) * 10);
 }
+
 
 static uint32_t GlobalUsCounter = 0;
 
@@ -402,7 +407,7 @@ void StartCountSspClk()
 	AT91C_BASE_TC2->TC_CCR = AT91C_TC_CLKEN;				// enable TC2
 
 	//
-	// synchronize the counter with the ssp_frame signal. Note: FPGA must be in any iso14446 mode, otherwise the frame signal would not be present 
+	// synchronize the counter with the ssp_frame signal. Note: FPGA must be in any iso14443 mode, otherwise SSC_FRAME and SSC_CLK signals would not be present 
 	//
 	while(!(AT91C_BASE_PIOA->PIO_PDSR & GPIO_SSC_FRAME)); 	// wait for ssp_frame to go high (start of frame)
 	while(AT91C_BASE_PIOA->PIO_PDSR & GPIO_SSC_FRAME); 		// wait for ssp_frame to be low
@@ -416,8 +421,11 @@ void StartCountSspClk()
 	// (just started with the transfer of the 4th Bit).
 	// The high word of the counter (TC2) will not reset until the low word (TC0) overflows. Therefore need to wait quite some time before
 	// we can use the counter.
-	while (AT91C_BASE_TC0->TC_CV < 0xFFF0);
+	while (AT91C_BASE_TC0->TC_CV < 0xFFFF);
+	// Note: needs one more SSP_CLK cycle (1.18 us) until TC2 resets. Don't call GetCountSspClk() that soon.
 }
+
+
 void ResetSspClk(void) {
 	//enable clock of timer and software trigger
 	AT91C_BASE_TC0->TC_CCR = AT91C_TC_CLKEN | AT91C_TC_SWTRG;
@@ -425,6 +433,8 @@ void ResetSspClk(void) {
 	AT91C_BASE_TC2->TC_CCR = AT91C_TC_CLKEN | AT91C_TC_SWTRG;
 	while (AT91C_BASE_TC2->TC_CV > 0);
 }
+
+
 uint32_t RAMFUNC GetCountSspClk(){
 	uint32_t tmp_count;
 	tmp_count = (AT91C_BASE_TC2->TC_CV << 16) | AT91C_BASE_TC0->TC_CV;
@@ -435,6 +445,7 @@ uint32_t RAMFUNC GetCountSspClk(){
 		return tmp_count;
 	}
 }
+
 
 //  -------------------------------------------------------------------------
 //  Timer for bitbanging,  or LF stuff when you need a very precis timer
@@ -464,6 +475,7 @@ void StartTicks(void){
 	while (AT91C_BASE_TC1->TC_CV > 0);
 }
 
+
 // Wait - Spindelay in ticks.
 // if called with a high number, this will trigger the WDT...
 void WaitTicks(uint32_t ticks){
@@ -471,31 +483,42 @@ void WaitTicks(uint32_t ticks){
 	ticks += GET_TICKS;	
 	while (GET_TICKS < ticks);
 }
+
+
 // Wait / Spindelay in us (microseconds) 
 // 1us = 1.5ticks.
 void WaitUS(uint16_t us){
 	if ( us == 0 ) return;
 	WaitTicks(  (uint32_t)(us * 1.5) );
 }
+
+
 void WaitMS(uint16_t ms){
 	if (ms == 0) return;
 	WaitTicks( (uint32_t)(ms * 1500) );
 }
+
+
 // Starts Clock and waits until its reset
 void ResetTicks(void){
 	AT91C_BASE_TC0->TC_CCR = AT91C_TC_CLKEN | AT91C_TC_SWTRG;
 	AT91C_BASE_TC1->TC_CCR = AT91C_TC_CLKEN | AT91C_TC_SWTRG;
 	while (AT91C_BASE_TC1->TC_CV > 0);
 }
+
+
 void ResetTimer(AT91PS_TC timer){
 	timer->TC_CCR = AT91C_TC_CLKEN | AT91C_TC_SWTRG;
 	while(timer->TC_CV > 0) ;
 }
+
+
 // stop clock
 void StopTicks(void){
 	AT91C_BASE_TC0->TC_CCR = AT91C_TC_CLKDIS;
 	AT91C_BASE_TC1->TC_CCR = AT91C_TC_CLKDIS;	
 }
+
 
 static uint64_t next_random = 1;
 
@@ -512,4 +535,3 @@ uint32_t prand() {
 	next_random = next_random * 6364136223846793005 + 1;
 	return (uint32_t)(next_random >> 32) % 0xffffffff;
 }
-

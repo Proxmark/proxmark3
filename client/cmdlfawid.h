@@ -11,11 +11,13 @@
 #ifndef CMDLFAWID_H__
 #define CMDLFAWID_H__
 
+#include <stdint.h>  // for uint_32+
+
 int CmdLFAWID(const char *Cmd);
-//int CmdAWIDDemod(const char *Cmd);
-int CmdAWIDDemodFSK(const char *Cmd);
+int CmdAWIDReadFSK(const char *Cmd);
 int CmdAWIDSim(const char *Cmd);
 int CmdAWIDClone(const char *Cmd);
+int CmdFSKdemodAWID(const char *Cmd);
 int getAWIDBits(unsigned int fc, unsigned int cn, uint8_t *AWIDBits);
 int usage_lf_awid_fskdemod(void);
 int usage_lf_awid_clone(void);

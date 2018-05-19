@@ -11,15 +11,14 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "data.h"
 #include "proxmark3.h"
 #include "ui.h"
 #include "cmdparser.h"
 #include "common.h"
 #include "util.h"
+#include "parity.h"
 #include "hitag2.h"
 #include "hitagS.h"
-#include "sleep.h"
 #include "cmdmain.h"
 
 static int CmdHelp(const char *Cmd);
@@ -34,8 +33,7 @@ int CmdLFHitagList(const char *Cmd)
 
 	// Query for the actual size of the trace
 	UsbCommand response;
-	GetFromBigBuf(got, USB_CMD_DATA_SIZE, 0);
-	WaitForResponse(CMD_ACK, &response);
+	GetFromBigBuf(got, USB_CMD_DATA_SIZE, 0, &response, -1, false);
 	uint16_t traceLen = response.arg[2];
 	if (traceLen > USB_CMD_DATA_SIZE) {
 		uint8_t *p = realloc(got, traceLen);
@@ -45,8 +43,7 @@ int CmdLFHitagList(const char *Cmd)
 			return 2;
 		}
 		got = p;
-		GetFromBigBuf(got, traceLen, 0);
-		WaitForResponse(CMD_ACK,NULL);
+		GetFromBigBuf(got, traceLen, 0, NULL, -1, false);
 	}
 	
 	PrintAndLog("recorded activity (TraceLen = %d bytes):");
@@ -108,15 +105,9 @@ int CmdLFHitagList(const char *Cmd)
 		char line[1000] = "";
 		int j;
 		for (j = 0; j < len; j++) {
-		  int oddparity = 0x01;
-		  int k;
-
-		  for (k=0;k<8;k++) {
-			oddparity ^= (((frame[j] & 0xFF) >> k) & 0x01);
-		  }
 
 		  //if((parityBits >> (len - j - 1)) & 0x01) {
-		  if (isResponse && (oddparity != ((parityBits >> (len - j - 1)) & 0x01))) {
+		  if (isResponse && (oddparity8(frame[j]) != ((parityBits >> (len - j - 1)) & 0x01))) {
 			sprintf(line+(j*4), "%02x!  ", frame[j]);
 		  }
 		  else {
@@ -245,6 +236,7 @@ int CmdLFHitagReader(const char *Cmd) {
 	c.arg[0] = htf;
 
 	// Send the command to the proxmark
+	clearCommandBuffer();
 	SendCommand(&c);
 
 	UsbCommand resp;
@@ -355,7 +347,9 @@ int CmdLFHitagWP(const char *Cmd) {
 			c.arg[2]= param_get32ex(Cmd, 2, 0, 10);
 			num_to_bytes(param_get32ex(Cmd,3,0,16),4,htd->auth.data);
 		} break;
-		case 04: { //WHTSF_KEY
+		case 04:
+		case 24:
+		{ //WHTSF_KEY
 			num_to_bytes(param_get64ex(Cmd,1,0,16),6,htd->crypto.key);
 			c.arg[2]= param_get32ex(Cmd, 2, 0, 10);
 			num_to_bytes(param_get32ex(Cmd,3,0,16),4,htd->crypto.data);
@@ -369,6 +363,7 @@ int CmdLFHitagWP(const char *Cmd) {
 			PrintAndLog("  04 <key> (set to 0 if no authentication is needed) <page> <byte0...byte3> write page on a Hitag S tag");
 			PrintAndLog(" Hitag1 (1*)");
 			PrintAndLog(" Hitag2 (2*)");
+			PrintAndLog("  24 <key> (set to 0 if no authentication is needed) <page> <byte0...byte3> write page on a Hitag S tag");
 			return 1;
 		} break;
 	}

@@ -11,20 +11,21 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <inttypes.h>
+#include <unistd.h>
 #include "proxmark3.h"
-#include "sleep.h"
+#include "util.h"
+#include "util_posix.h"
 #include "flash.h"
 #include "elf.h"
 #include "proxendian.h"
 #include "usb_cmd.h"
+#include "uart.h"
 
 void SendCommand(UsbCommand* txcmd);
 void ReceiveCommand(UsbCommand* rxcmd);
-void CloseProxmark();
-int OpenProxmark(size_t i);
 
-// FIXME: what the fuckity fuck
-unsigned int current_command = CMD_UNKNOWN;
+serial_port sp;
 
 #define FLASH_START            0x100000
 #define FLASH_SIZE             (256*1024)
@@ -40,6 +41,23 @@ static const uint8_t elf_ident[] = {
 	ELFDATA2LSB,
 	EV_CURRENT
 };
+
+void CloseProxmark(const char *serial_port_name) {
+	// Clean up the port
+	uart_close(sp);
+	// Fix for linux, it seems that it is extremely slow to release the serial port file descriptor /dev/*
+	unlink(serial_port_name);
+}
+
+bool OpenProxmark(size_t i, const char *serial_port_name) {
+	sp = uart_open(serial_port_name);
+	if (sp == INVALID_SERIAL_PORT || sp == CLAIMED_SERIAL_PORT) {
+		//poll once a second
+		return false;
+	}
+
+	return true;
+}
 
 // Turn PHDRs into flasher segments, checking for PHDR sanity and merging adjacent
 // unaligned segments if needed
@@ -275,7 +293,7 @@ static int get_proxmark_state(uint32_t *state)
 {
 	UsbCommand c;
 	c.cmd = CMD_DEVICE_INFO;
-  SendCommand(&c);
+	SendCommand(&c);
 	UsbCommand resp;
 	ReceiveCommand(&resp);
 
@@ -295,7 +313,7 @@ static int get_proxmark_state(uint32_t *state)
 			*state = resp.arg[0];
 			break;
 		default:
-			fprintf(stderr, "Error: Couldn't get proxmark state, bad response type: 0x%04"llx"\n", resp.cmd);
+			fprintf(stderr, "Error: Couldn't get proxmark state, bad response type: 0x%04" PRIx64 "\n", resp.cmd);
 			return -1;
 			break;
 	}
@@ -335,14 +353,16 @@ static int enter_bootloader(char *serial_port_name)
 			SendCommand(&c);
 			fprintf(stderr,"Press and hold down button NOW if your bootloader requires it.\n");
 		}
-    msleep(100);
-		CloseProxmark();
+
+		msleep(100);
+		CloseProxmark(serial_port_name);
 
 		fprintf(stderr,"Waiting for Proxmark to reappear on %s",serial_port_name);
-    do {
+		do {
 			sleep(1);
 			fprintf(stderr, ".");
-		} while (!OpenProxmark(0));
+		} while (!OpenProxmark(0, serial_port_name));
+
 		fprintf(stderr," Found.\n");
 
 		return 0;
@@ -354,10 +374,10 @@ static int enter_bootloader(char *serial_port_name)
 
 static int wait_for_ack(void)
 {
-  UsbCommand ack;
+	UsbCommand ack;
 	ReceiveCommand(&ack);
 	if (ack.cmd != CMD_ACK) {
-		printf("Error: Unexpected reply 0x%04"llx" (expected ACK)\n", ack.cmd);
+		printf("Error: Unexpected reply 0x%04" PRIx64 " (expected ACK)\n", ack.cmd);
 		return -1;
 	}
 	return 0;
@@ -469,7 +489,7 @@ void flash_free(flash_file_t *ctx)
 // just reset the unit
 int flash_stop_flashing(void) {
 	UsbCommand c = {CMD_HARDWARE_RESET};
-  SendCommand(&c);
-  msleep(100);
-  return 0;
+	SendCommand(&c);
+	msleep(100);
+	return 0;
 }

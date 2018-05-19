@@ -22,7 +22,7 @@
  *
  * This is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as published
- * by the Free Software Foundation.
+ * by the Free Software Foundation, or, at your option, any later version. 
  *
  * This file is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -31,7 +31,6 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with loclass.  If not, see <http://www.gnu.org/licenses/>.
- * 
  * 
  * 
  ****************************************************************************/
@@ -114,9 +113,9 @@ uint8_t _select(bool x, bool y, uint8_t r)
 	bool r6 = r >> 1 & 0x1;
 	bool r7 = r & 0x1;
 
-	bool z0 = (r0 & r2) ^ (r1 & ~r3) ^ (r2 | r4);
+	bool z0 = (r0 & r2) ^ (r1 & !r3) ^ (r2 | r4);
 	bool z1 = (r0 | r2) ^ ( r5 | r7) ^ r1 ^ r6 ^ x ^ y;
-	bool z2 = (r3 & ~r5) ^ (r4 & r6 ) ^ r7 ^ x;
+	bool z2 = (r3 & !r5) ^ (r4 & r6 ) ^ r7 ^ x;
 
 	// The three bitz z0.. z1 are packed into a uint8_t:
 	// 00000ZZZ

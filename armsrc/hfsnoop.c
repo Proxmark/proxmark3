@@ -2,6 +2,7 @@
 #include "apps.h"
 #include "BigBuf.h"
 #include "util.h"
+#include "usb_cdc.h"	// for usb_poll_validate_length
 
 static void RAMFUNC optimizedSnoop(void);
 
@@ -19,7 +20,7 @@ static void RAMFUNC optimizedSnoop(void)
 		if(AT91C_BASE_SSC->SSC_SR & AT91C_SSC_RXRDY)
 		{
 			*dest = (uint16_t)(AT91C_BASE_SSC->SSC_RHR);
-			dest = dest + 1;
+			dest++;
 		}
 	}
 	//Resetting Frame mode (First set in fpgaloader.c)
@@ -28,8 +29,10 @@ static void RAMFUNC optimizedSnoop(void)
 
 void HfSnoop(int samplesToSkip, int triggersToSkip)
 {
-	Dbprintf("Skipping first %d sample pairs, Skipping %d triggers.", samplesToSkip, triggersToSkip);
-	bool trigger_cnt;
+	BigBuf_free(); BigBuf_Clear();
+	
+	Dbprintf("Skipping first %d sample pairs, Skipping %d triggers.\n", samplesToSkip, triggersToSkip);
+	int trigger_cnt;
 	LED_D_ON();
 	// Select correct configs
 	FpgaDownloadAndGo(FPGA_BITSTREAM_HF);
@@ -40,23 +43,18 @@ void HfSnoop(int samplesToSkip, int triggersToSkip)
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_HF_SNOOP);
 	SpinDelay(100);
 
-	BigBuf_free();
-	BigBuf_Clear();
-	
 	AT91C_BASE_SSC->SSC_RFMR = SSC_FRAME_MODE_BITS_IN_WORD(16); // Setting Frame Mode For better performance on high speed data transfer.
 
 	trigger_cnt = 0;
 	uint16_t r = 0;
-	while(!BUTTON_PRESS()) {
+	while(!BUTTON_PRESS() && !usb_poll_validate_length()) {
 		WDT_HIT();
 		if(AT91C_BASE_SSC->SSC_SR & (AT91C_SSC_RXRDY)) {
 			r = (uint16_t)AT91C_BASE_SSC->SSC_RHR;
 			r = MAX(r & 0xff, r >> 8); 
-			if (r >= 240) 
-			{
-				if (++trigger_cnt > triggersToSkip) {
+			if (r >= 240) {
+				if (++trigger_cnt > triggersToSkip)
 					break;
-				}
 			} 
 		}
 	}
@@ -64,9 +62,8 @@ void HfSnoop(int samplesToSkip, int triggersToSkip)
 	if(!BUTTON_PRESS()) {
 		int waitcount = samplesToSkip; // lets wait 40000 ticks of pck0
 		while(waitcount != 0) {
-			if(AT91C_BASE_SSC->SSC_SR & (AT91C_SSC_RXRDY)) {
+			if(AT91C_BASE_SSC->SSC_SR & (AT91C_SSC_RXRDY))
 				waitcount--;
-			}
 		}
 		optimizedSnoop();
 		Dbprintf("Trigger kicked! Value: %d, Dumping Samples Hispeed now.", r);
