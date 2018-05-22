@@ -115,7 +115,7 @@ void clearCommandBuffer()
  * @brief storeCommand stores a USB command in a circular buffer
  * @param UC
  */
-void storeCommand(UsbCommand *command)
+static void storeCommand(UsbCommand *command)
 {
 	pthread_mutex_lock(&rxBufferMutex);
 	if( (cmd_head+1) % CMD_BUFFER_SIZE == cmd_tail)
@@ -139,7 +139,7 @@ void storeCommand(UsbCommand *command)
  * @param response location to write command
  * @return 1 if response was returned, 0 if nothing has been received
  */
-int getCommand(UsbCommand* response)
+static int getCommand(UsbCommand* response)
 {
 	pthread_mutex_lock(&rxBufferMutex);
 	//If head == tail, there's nothing to read, or if we just got initialized
@@ -295,8 +295,9 @@ bool GetFromBigBuf(uint8_t *dest, int bytes, int start_index, UsbCommand *respon
 }
 
 	
-bool OpenProxmark(char *portname, bool waitCOMPort, int timeout, bool flash_mode) {
-	if (!waitCOMPort) {
+bool OpenProxmark(void *port, bool wait_for_port, int timeout, bool flash_mode) {
+	char *portname = (char *)port;
+	if (!wait_for_port) {
 		sp = uart_open(portname);
 	} else {
 		printf("Waiting for Proxmark to appear on %s ", portname);
