@@ -20,7 +20,7 @@
 // Declare globals.
 
 // Serial port that we are communicating with the PM3 on.
-static serial_port sp;
+static serial_port* sp = NULL;
 
 // If TRUE, then there is no active connection to the PM3, and we will drop commands sent.
 static bool offline;

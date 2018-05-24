@@ -57,7 +57,7 @@ void upcase(char *p) {
   }
 }
 
-serial_port uart_open(const char* pcPortName) {
+serial_port* uart_open(const char* pcPortName) {
   char acPortName[255];
   serial_port_windows* sp = malloc(sizeof(serial_port_windows));
   
@@ -68,7 +68,7 @@ serial_port uart_open(const char* pcPortName) {
   // Try to open the serial port
   sp->hPort = CreateFileA(acPortName,GENERIC_READ|GENERIC_WRITE,0,NULL,OPEN_EXISTING,0,NULL);
   if (sp->hPort == INVALID_HANDLE_VALUE) {
-    uart_close(sp);
+    uart_close((serial_port*)sp);
     return INVALID_SERIAL_PORT;
   }
   
@@ -76,13 +76,13 @@ serial_port uart_open(const char* pcPortName) {
   memset(&sp->dcb, 0, sizeof(DCB));
   sp->dcb.DCBlength = sizeof(DCB);
   if(!BuildCommDCBA("baud=9600 data=8 parity=N stop=1",&sp->dcb)) {
-    uart_close(sp);
+    uart_close((serial_port*)sp);
     return INVALID_SERIAL_PORT;
   }
   
   // Update the active serial port
   if(!SetCommState(sp->hPort,&sp->dcb)) {
-    uart_close(sp);
+    uart_close((serial_port*)sp);
     return INVALID_SERIAL_PORT;
   }
   
@@ -93,38 +93,38 @@ serial_port uart_open(const char* pcPortName) {
   sp->ct.WriteTotalTimeoutConstant   = 30;
   
   if(!SetCommTimeouts(sp->hPort,&sp->ct)) {
-    uart_close(sp);
+    uart_close((serial_port*)sp);
     return INVALID_SERIAL_PORT;
   }
   
   PurgeComm(sp->hPort, PURGE_RXABORT | PURGE_RXCLEAR);
   
-  return sp;
+  return (serial_port*)sp;
 }
 
-void uart_close(const serial_port sp) {
+void uart_close(serial_port* sp) {
   CloseHandle(((serial_port_windows*)sp)->hPort);
   free(sp);
 }
 
-bool uart_receive(const serial_port sp, uint8_t *pbtRx, size_t pszMaxRxLen, size_t *pszRxLen) {
+bool uart_receive(serial_port* sp, uint8_t *pbtRx, size_t pszMaxRxLen, size_t *pszRxLen) {
   return ReadFile(((serial_port_windows*)sp)->hPort, pbtRx, pszMaxRxLen, (LPDWORD)pszRxLen, NULL);
 }
 
-bool uart_send(const serial_port sp, const uint8_t* pbtTx, const size_t szTxLen) {
+bool uart_send(serial_port* sp, const uint8_t* pbtTx, const size_t szTxLen) {
   DWORD dwTxLen = 0;
   return WriteFile(((serial_port_windows*)sp)->hPort, pbtTx, szTxLen, &dwTxLen, NULL);
 }
 
-bool uart_set_speed(serial_port sp, const uint32_t uiPortSpeed) {
+bool uart_set_speed(serial_port* sp, const uint32_t uiPortSpeed) {
   serial_port_windows* spw;
   spw = (serial_port_windows*)sp;
   spw->dcb.BaudRate = uiPortSpeed;
   return SetCommState(spw->hPort, &spw->dcb);
 }
 
-uint32_t uart_get_speed(const serial_port sp) {
-  const serial_port_windows* spw = (serial_port_windows*)sp;
+uint32_t uart_get_speed(serial_port* sp) {
+  serial_port_windows* spw = (serial_port_windows*)sp;
   if (!GetCommState(spw->hPort, (serial_port)&spw->dcb)) {
     return spw->dcb.BaudRate;
   }
