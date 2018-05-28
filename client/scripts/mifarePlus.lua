@@ -1,5 +1,23 @@
 local cmds = require('commands')
 local lib14a = require('read14a')
+getopt = require('getopt')							-- Used to get get command line arguments
+
+example = "script run mifarePlus"
+author = "Dominic Celiano"
+desc =
+[[
+Purpose: Lua script to communicate with the Mifare Plus EV1, including personalization (setting the keys) and proximity check. Manually edit the file to add to the commands you can send the card.
+
+Please read the NXP manual before running this script to prevent making irreversible changes. Also note:
+	- The Mifare Plus must start in SL0 for personalization. Card can then be moved to SL1 or SL3.
+	- The keys are hardcoded in the script to "00...". Unless you change this, only use this script for testing purposes.
+	- Make sure you choose your card size correctly (2kB or 4kB).
+
+Small changes can be to made this script to communicate with the Mifare Plus S, X, or SE.
+
+Arguments:
+	-h             : this help
+]]
 
 SIXTEEN_BYTES_ZEROS = "00000000000000000000000000000000"
 
@@ -20,6 +38,14 @@ READPLAINNOMACUNMACED = "0336"
 -- This is only meant to be used when errors occur
 function oops(err)
 	print("ERROR: ",err)
+end
+
+---
+-- Usage help
+function help()
+	print(desc)
+	print("Example usage")
+	print(example)
 end
 
 ---
@@ -259,6 +285,11 @@ end
 ---
 -- The main entry point
 function main(args)
+	print("")								-- Print a blank line to make things look cleaner
+	for o, a in getopt.getopt(args, 'h') do			-- Populate command line arguments
+		if o == "h" then help() return end
+	end
+
 	-- Initialize the card using the already-present read14a library
 	info,err = lib14a.read14443a(true, false)
 	--Perform RATS and PPS (Protocol and Parameter Selection) check to finish the ISO 14443-4 protocol.
