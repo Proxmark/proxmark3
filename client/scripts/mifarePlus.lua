@@ -1,6 +1,6 @@
 local cmds = require('commands')
 local lib14a = require('read14a')
-getopt = require('getopt')							-- Used to get get command line arguments
+getopt = require('getopt')							-- Used to get command line arguments
 
 example = "script run mifarePlus"
 author = "Dominic Celiano"
