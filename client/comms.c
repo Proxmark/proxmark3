@@ -12,21 +12,18 @@
 #include "comms.h"
 
 #include <pthread.h>
+#ifdef __linux__
+#include <unistd.h>		// for unlink()
+#endif
 #include "uart.h"
 #include "ui.h"
 #include "common.h"
 #include "util_posix.h"
 
-#ifdef _WIN32
-# define unlink(x)
-#else
-# include <unistd.h>
-#endif
-
 
 // Serial port that we are communicating with the PM3 on.
-static serial_port sp;
-static char *serial_port_name;
+static serial_port sp = NULL;
+static char *serial_port_name = NULL;
 
 // If TRUE, then there is no active connection to the PM3, and we will drop commands sent.
 static bool offline;
@@ -315,18 +312,20 @@ bool OpenProxmark(void *port, bool wait_for_port, int timeout, bool flash_mode) 
 	// check result of uart opening
 	if (sp == INVALID_SERIAL_PORT) {
 		printf("ERROR: invalid serial port\n");
+		sp = NULL;
 		serial_port_name = NULL;
 		return false;
 	} else if (sp == CLAIMED_SERIAL_PORT) {
 		printf("ERROR: serial port is claimed by another process\n");
+		sp = NULL;
 		serial_port_name = NULL;
 		return false;
 	} else {
 		// start the USB communication thread
+		serial_port_name = portname;
 		conn.run = true;
 		conn.block_after_ACK = flash_mode;
 		pthread_create(&USB_communication_thread, NULL, &uart_communication, &conn);
-		serial_port_name = portname;
 		return true;
 	}
 }
@@ -336,8 +335,12 @@ void CloseProxmark(void) {
 	conn.run = false;
 	pthread_join(USB_communication_thread, NULL);
 	uart_close(sp);
+#ifdef __linux__
 	// Fix for linux, it seems that it is extremely slow to release the serial port file descriptor /dev/*
-	unlink(serial_port_name);
+	if (serial_port_name) {
+		unlink(serial_port_name);
+	}
+#endif
 }
 
 
