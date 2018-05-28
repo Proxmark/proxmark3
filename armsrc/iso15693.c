@@ -305,7 +305,7 @@ static int GetIso15693AnswerFromTag(uint8_t *receivedResponse, int maxLen, int *
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_HF_READER_RX_XCORR);
 	//spindelay(60);	// greg - experiment to get rid of some of the 0 byte/failed reads
 	c = 0;
-	getNext = FALSE;
+	getNext = false;
 	for(;;) {
 		if(AT91C_BASE_SSC->SSC_SR & (AT91C_SSC_TXRDY)) {
 			AT91C_BASE_SSC->SSC_THR = 0x43;
@@ -444,7 +444,7 @@ static int GetIso15693AnswerFromSniff(uint8_t *receivedResponse, int maxLen, int
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_HF_READER_RX_XCORR);
 	//spindelay(60);	// greg - experiment to get rid of some of the 0 byte/failed reads
 	c = 0;
-	getNext = FALSE;
+	getNext = false;
 	for(;;) {
 		if(AT91C_BASE_SSC->SSC_SR & (AT91C_SSC_TXRDY)) {
 			AT91C_BASE_SSC->SSC_THR = 0x43;
@@ -612,7 +612,7 @@ void AcquireRawAdcSamplesIso15693(void)
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_HF_READER_RX_XCORR);
 
 	c = 0;
-	getNext = FALSE;
+	getNext = false;
 	for(;;) {
 		if(AT91C_BASE_SSC->SSC_SR & (AT91C_SSC_TXRDY)) {
 			AT91C_BASE_SSC->SSC_THR = 0x43;
@@ -666,7 +666,7 @@ void RecordRawAdcSamplesIso15693(void)
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_HF_READER_RX_XCORR);
 
 	c = 0;
-	getNext = FALSE;
+	getNext = false;
 	for(;;) {
 		if(AT91C_BASE_SSC->SSC_SR & (AT91C_SSC_TXRDY)) {
 			AT91C_BASE_SSC->SSC_THR = 0x43;

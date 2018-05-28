@@ -220,7 +220,7 @@ static int l_iso14443b_crc(lua_State *L)
 	unsigned char buf[USB_CMD_DATA_SIZE];
 	size_t len = 0;
 	const char *data = luaL_checklstring(L, 1, &len);
-	if (USB_CMD_DATA_SIZE < len)
+	if (len > USB_CMD_DATA_SIZE-2)
 		len =  USB_CMD_DATA_SIZE-2;
 
 	for (int i = 0; i < len; i += 2) {

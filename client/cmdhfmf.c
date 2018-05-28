@@ -726,7 +726,6 @@ int CmdHF14AMfNested(const char *Cmd)
 						blockNo = i * 4;
 						keyType = j;
 						num_to_bytes(e_sector[i].Key[j], 6, key);
-						
 						keyFound = true;
 						break;
 					}
@@ -737,6 +736,7 @@ int CmdHF14AMfNested(const char *Cmd)
 			// Can't found a key....
 			if (!keyFound) {
 				PrintAndLog("Can't found any of the known keys.");
+				free(e_sector);
 				return 4;
 			}
 			PrintAndLog("--auto key. block no:%3d, key type:%c key:%s", blockNo, keyType?'B':'A', sprint_hex(key, 6));
@@ -1187,7 +1187,10 @@ int CmdHF14AMfChk(const char *Cmd)
 
 	// initialize storage for found keys
 	e_sector = calloc(SectorsCnt, sizeof(sector_t));
-	if (e_sector == NULL) return 1;
+	if (e_sector == NULL) {
+		free(keyBlock);
+		return 1;
+	}
 	for (uint8_t keyAB = 0; keyAB < 2; keyAB++) {
 		for (uint16_t sectorNo = 0; sectorNo < SectorsCnt; sectorNo++) {
 			e_sector[sectorNo].Key[keyAB] = 0xffffffffffff;
@@ -2666,11 +2669,9 @@ static command_t CommandTable[] =
 
 int CmdHFMF(const char *Cmd)
 {
-	// flush
-	WaitForResponseTimeout(CMD_ACK,NULL,100);
-
-  CmdsParse(CommandTable, Cmd);
-  return 0;
+	(void)WaitForResponseTimeout(CMD_ACK,NULL,100);
+	CmdsParse(CommandTable, Cmd);
+	return 0;
 }
 
 int CmdHelp(const char *Cmd)

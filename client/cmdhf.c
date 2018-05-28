@@ -360,7 +360,7 @@ int CmdHFList(const char *Cmd)
 	char param2 = '\0';
 	char param3 = '\0';
 	char type[40] = {0};
-	char filename[FILE_PATH_SIZE];
+	char filename[FILE_PATH_SIZE] = {0};
 	uint8_t protocol = 0;
 	
 	// parse command line
