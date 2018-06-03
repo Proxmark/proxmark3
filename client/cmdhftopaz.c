@@ -8,17 +8,18 @@
 // High frequency Topaz (NFC Type 1) commands
 //-----------------------------------------------------------------------------
 
+#include "cmdhftopaz.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 #include "cmdmain.h"
 #include "cmdparser.h"
-#include "cmdhftopaz.h"
 #include "cmdhf14a.h"
 #include "ui.h"
 #include "mifare.h"
-#include "proxmark3.h"
+#include "comms.h"
 #include "iso14443crc.h"
 #include "protocols.h"
 

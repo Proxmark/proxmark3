@@ -10,6 +10,9 @@
 #ifndef CMDLFT55XX_H__
 #define CMDLFT55XX_H__
 
+#include <stdint.h>
+#include <stdbool.h>
+
 typedef struct {
 	uint32_t bl1;
 	uint32_t bl2; 

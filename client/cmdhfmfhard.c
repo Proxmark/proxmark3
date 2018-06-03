@@ -25,6 +25,7 @@
 #include <locale.h>
 #include <math.h>
 #include "proxmark3.h"
+#include "comms.h"
 #include "cmdmain.h"
 #include "ui.h"
 #include "util.h"

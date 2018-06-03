@@ -13,7 +13,7 @@
 #include <stdio.h>
 #include <inttypes.h>
 #include <string.h>
-#include "proxmark3.h"
+#include "comms.h"
 #include "ui.h"         // for PrintAndLog
 #include "util.h"
 #include "cmdparser.h"

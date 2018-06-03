@@ -9,6 +9,8 @@
 // Main binary
 //-----------------------------------------------------------------------------
 
+#include "proxmark3.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -17,7 +19,6 @@
 #include <readline/readline.h>
 #include <readline/history.h>
 
-#include "proxmark3.h"
 #include "util_posix.h"
 #include "proxgui.h"
 #include "cmdmain.h"
@@ -26,7 +27,7 @@
 #include "cmdparser.h"
 #include "cmdhw.h"
 #include "whereami.h"
-
+#include "comms.h"
 
 void
 #ifdef __has_attribute
@@ -35,18 +36,12 @@ __attribute__((force_align_arg_pointer))
 #endif
 #endif
 main_loop(char *script_cmds_file, char *script_cmd, bool usb_present) {
-	receiver_arg conn;
 	char *cmd = NULL;
-	pthread_t reader_thread;
 	bool execCommand = (script_cmd != NULL);
 	bool stdinOnPipe = !isatty(STDIN_FILENO);
 
-	memset(&conn, 0, sizeof(receiver_arg));
-
 	if (usb_present) {
-		conn.run = true;
 		SetOffline(false);
-		pthread_create(&reader_thread, NULL, &uart_receiver, &conn);
 		// cache Version information now:
 		CmdVersion(NULL);
 	} else {
@@ -138,8 +133,7 @@ main_loop(char *script_cmds_file, char *script_cmd, bool usb_present) {
 	write_history(".history");
 
 	if (usb_present) {
-		conn.run = false;
-		pthread_join(reader_thread, NULL);
+		CloseProxmark();
 	}
 	
 	if (script_file) {
@@ -294,7 +288,7 @@ int main(int argc, char* argv[]) {
 	set_my_executable_path();
 
 	// try to open USB connection to Proxmark
-	usb_present = OpenProxmark(argv[1], waitCOMPort, 20);
+	usb_present = OpenProxmark(argv[1], waitCOMPort, 20, false);
 
 #ifdef HAVE_GUI
 #ifdef _WIN32

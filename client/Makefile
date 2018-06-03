@@ -82,7 +82,9 @@ POSTCOMPILE = $(MV) -f $(OBJDIR)/$*.Td $(OBJDIR)/$*.d
 CORESRCS = 	uart_posix.c \
 			uart_win32.c \
 			util.c \
-			util_posix.c
+			util_posix.c \
+			ui.c \
+			comms.c
 
 CMDSRCS = 	crapto1/crapto1.c\
 			crapto1/crypto1.c\
@@ -106,7 +108,6 @@ CMDSRCS = 	crapto1/crapto1.c\
 			iso14443crc.c \
 			iso15693tools.c \
 			graph.c \
-			ui.c \
 			cmddata.c \
 			lfdemod.c \
 			emv/crypto_polarssl.c\
@@ -169,8 +170,7 @@ CMDSRCS = 	crapto1/crapto1.c\
 			cmdscript.c\
 			pm3_binlib.c\
 			pm3_bitlib.c\
-			protocols.c\
-			comms.c
+			protocols.c
 
 cpu_arch = $(shell uname -m)
 ifneq ($(findstring 86, $(cpu_arch)), )
