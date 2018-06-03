@@ -291,43 +291,65 @@ bool GetFromBigBuf(uint8_t *dest, int bytes, int start_index, UsbCommand *respon
 	return false;
 }
 
-	
-bool OpenProxmark(void *port, bool wait_for_port, int timeout, bool flash_mode) {
-	char *portname = (char *)port;
+
+/**
+ * Opens a connection to the PM3, using a given port name (char*). This calls
+ * uart_open with the given port name, and can automatically handle retries.
+ *
+ * Once complete, this will call StartProxmark to set internal data structures,
+ * and start the communication thread.
+ */
+bool OpenProxmark(char *portname, bool wait_for_port, int timeout, bool flash_mode) {
+	serial_port uart;
 	if (!wait_for_port) {
-		sp = uart_open(portname);
+		uart = uart_open(portname);
 	} else {
 		printf("Waiting for Proxmark to appear on %s ", portname);
 		fflush(stdout);
 		int openCount = 0;
 		do {
-			sp = uart_open(portname);
+			uart = uart_open(portname);
 			msleep(1000);
 			printf(".");
 			fflush(stdout);
-		} while(++openCount < timeout && (sp == INVALID_SERIAL_PORT || sp == CLAIMED_SERIAL_PORT));
+		} while(++openCount < timeout && (uart == INVALID_SERIAL_PORT || uart == CLAIMED_SERIAL_PORT));
 		printf("\n");
 	}
 
 	// check result of uart opening
-	if (sp == INVALID_SERIAL_PORT) {
+	if (uart == INVALID_SERIAL_PORT) {
 		printf("ERROR: invalid serial port\n");
-		sp = NULL;
-		serial_port_name = NULL;
 		return false;
-	} else if (sp == CLAIMED_SERIAL_PORT) {
+	} else if (uart == CLAIMED_SERIAL_PORT) {
 		printf("ERROR: serial port is claimed by another process\n");
-		sp = NULL;
-		serial_port_name = NULL;
 		return false;
 	} else {
-		// start the USB communication thread
 		serial_port_name = portname;
-		conn.run = true;
-		conn.block_after_ACK = flash_mode;
-		pthread_create(&USB_communication_thread, NULL, &uart_communication, &conn);
+		StartProxmark(uart, /* block_after_ack */ flash_mode);
 		return true;
 	}
+}
+
+
+/**
+ * Given a serial_port, starts the USB communication thread and set global state
+ * to use this particular serial port. This assumes that the serial port is
+ * already open and functional.
+ *
+ * This is deliberately split from OpenProxmark for testing and library usages
+ * of PM3.
+ *
+ * Arguments:
+ * @param port A serial_port structure that can be used with uart_* methods.
+ * @param block_after_ack If true, this will cause the worker thread to suspend
+ *                        after each CMD_ACK. This should be false in normal
+ *                        operation, or true in the flasher.
+ */
+void StartProxmark(serial_port port, bool block_after_ack) {
+	sp = port;
+	conn.run = true;
+	conn.block_after_ACK = block_after_ack;
+	pthread_create(&USB_communication_thread, NULL, &uart_communication, &conn);
 }
 
 
@@ -349,6 +371,7 @@ void CloseProxmark(void) {
 	// Clean up our state
 	sp = NULL;
 	serial_port_name = NULL;
+	offline = true;
 }
 
 

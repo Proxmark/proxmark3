@@ -25,7 +25,8 @@
 void SetOffline(bool new_offline);
 bool IsOffline();
 
-bool OpenProxmark(void *port, bool wait_for_port, int timeout, bool flash_mode);
+bool OpenProxmark(char *portname, bool wait_for_port, int timeout, bool flash_mode);
+void StartProxmark(serial_port port, bool block_after_ack);
 void CloseProxmark(void);
 
 void SendCommand(UsbCommand *c);
