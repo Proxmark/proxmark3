@@ -131,10 +131,6 @@ main_loop(char *script_cmds_file, char *script_cmd, bool usb_present) {
 	}
 
 	write_history(".history");
-
-	if (usb_present) {
-		CloseProxmark();
-	}
 	
 	if (script_file) {
 		fclose(script_file);

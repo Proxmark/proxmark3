@@ -334,13 +334,21 @@ bool OpenProxmark(void *port, bool wait_for_port, int timeout, bool flash_mode) 
 void CloseProxmark(void) {
 	conn.run = false;
 	pthread_join(USB_communication_thread, NULL);
-	uart_close(sp);
+
+	if (sp) {
+		uart_close(sp);
+	}
+
 #ifdef __linux__
 	// Fix for linux, it seems that it is extremely slow to release the serial port file descriptor /dev/*
 	if (serial_port_name) {
 		unlink(serial_port_name);
 	}
 #endif
+
+	// Clean up our state
+	sp = NULL;
+	serial_port_name = NULL;
 }
 
 
