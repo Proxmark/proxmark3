@@ -8,10 +8,11 @@
 // Low frequency HID commands (known)
 //-----------------------------------------------------------------------------
 
+#include "cmdlfhid.h"
+
 #include <stdio.h>
 #include <string.h>
-#include "cmdlfhid.h"
-#include "proxmark3.h"
+#include "comms.h"
 #include "ui.h"
 #include "graph.h"
 #include "cmdparser.h"

@@ -8,10 +8,11 @@
 // PSK1, rf/32, 64 or 224 bits (known)
 //-----------------------------------------------------------------------------
 
+#include "cmdlfindala.h"
+
 #include <stdio.h>
 #include <string.h>
-#include "cmdlfindala.h"
-#include "proxmark3.h"
+#include "comms.h"
 #include "ui.h"
 #include "graph.h"
 #include "cmdparser.h"

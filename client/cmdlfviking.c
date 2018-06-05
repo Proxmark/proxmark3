@@ -7,11 +7,13 @@
 // Low frequency Viking tag commands (AKA FDI Matalec Transit)
 // ASK/Manchester, RF/32, 64 bits (complete)
 //-----------------------------------------------------------------------------
+
+#include "cmdlfviking.h"
+
 #include <stdio.h>
 #include <string.h>
 #include <inttypes.h>
-#include "proxmark3.h"
-#include "cmdlfviking.h"
+#include "comms.h"
 #include "ui.h"
 #include "util.h"
 #include "graph.h"

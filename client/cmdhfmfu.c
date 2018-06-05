@@ -12,7 +12,7 @@
 
 #include <stdint.h>
 #include <stdio.h>
-#include "proxmark3.h"
+#include "comms.h"
 #include "usb_cmd.h"
 #include "cmdmain.h"
 #include "ui.h"

@@ -7,13 +7,15 @@
 //-----------------------------------------------------------------------------
 // Low frequency COTAG commands
 //-----------------------------------------------------------------------------
+
+#include "cmdlfcotag.h"
+
 #include <stdio.h>
 #include <string.h>
 #include <stdint.h>
-#include "proxmark3.h"
+#include "comms.h"
 #include "ui.h"
 #include "cmddata.h"
-#include "cmdlfcotag.h"
 #include "lfdemod.h"
 #include "usb_cmd.h"
 #include "cmdmain.h"

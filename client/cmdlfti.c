@@ -14,7 +14,7 @@
 #include <stdlib.h>
 #include <inttypes.h>
 #include "crc16.h"
-#include "proxmark3.h"
+#include "comms.h"
 #include "ui.h"
 #include "graph.h"
 #include "cmdparser.h"

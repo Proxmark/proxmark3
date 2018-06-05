@@ -7,12 +7,14 @@
 // Low frequency Honeywell NexWatch tag commands
 // PSK1 RF/16, RF/2, 128 bits long (known)
 //-----------------------------------------------------------------------------
+
+#include "cmdlfnexwatch.h"
+
 #include <stdio.h>
 #include <string.h>
 #include <inttypes.h>
 #include <stdbool.h>
-#include "cmdlfnexwatch.h"
-#include "proxmark3.h"
+#include "comms.h"
 #include "ui.h"
 #include "util.h"
 #include "graph.h"

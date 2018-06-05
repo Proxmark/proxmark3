@@ -15,7 +15,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <ctype.h>
-#include "proxmark3.h"
+#include "comms.h"
 #include "cmdmain.h"
 #include "cmdhfmfhard.h"
 #include "parity.h"

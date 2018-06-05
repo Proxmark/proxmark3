@@ -8,15 +8,17 @@
 // High frequency Legic commands
 //-----------------------------------------------------------------------------
 
+#include "cmdhflegic.h"
+
 #include <stdio.h>
 #include <string.h>
 #include <inttypes.h>
-#include "proxmark3.h"
+#include "comms.h"
 #include "ui.h"
 #include "cmdparser.h"
-#include "cmdhflegic.h"
 #include "cmdmain.h"
 #include "util.h"
+
 static int CmdHelp(const char *Cmd);
 
 static command_t CommandTable[] = 

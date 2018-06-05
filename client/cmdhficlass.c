@@ -16,7 +16,7 @@
 #include <sys/stat.h>
 #include <ctype.h>
 #include "iso14443crc.h" // Can also be used for iClass, using 0xE012 as CRC-type
-#include "proxmark3.h"
+#include "comms.h"
 #include "ui.h"
 #include "cmdparser.h"
 #include "cmdhficlass.h"

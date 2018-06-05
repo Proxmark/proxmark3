@@ -8,10 +8,12 @@
 // Low frequency Hitag support
 //-----------------------------------------------------------------------------
 
+#include "cmdlfhitag.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "proxmark3.h"
+#include "comms.h"
 #include "ui.h"
 #include "cmdparser.h"
 #include "common.h"
