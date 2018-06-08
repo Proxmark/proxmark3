@@ -59,6 +59,9 @@ ARMSRC = fpgaloader.c \
 	optimized_cipher.c \
 	hfsnoop.c
 
+VERSIONSRC = version.c \
+	fpga_version_info.c
+
 # Do not move this inclusion before the definition of {THUMB,ASM,ARM}SRC
 include ../common/Makefile.common
 
@@ -68,6 +71,14 @@ FPGA_COMPRESSOR = ../client/fpga_compress
 all: $(OBJS)
 
 .DELETE_ON_ERROR:
+
+# version.c should be remade on every compilation
+.PHONY: version.c
+version.c: default_version.c
+	perl ../tools/mkversion.pl .. > $@ || $(COPY) $^ $@ 
+
+fpga_version_info.c: $(FPGA_BITSTREAMS) $(FPGA_COMPRESSOR)
+	$(FPGA_COMPRESSOR) -v $(filter %.bit,$^) $@
 
 $(OBJDIR)/fpga_all.o: $(OBJDIR)/fpga_all.bit.z
 	$(OBJCOPY) -O elf32-littlearm -I binary -B arm --prefix-sections=fpga_all_bit $^ $@
