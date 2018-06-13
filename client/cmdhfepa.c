@@ -202,10 +202,7 @@ int CmdHelp(const char *Cmd)
 
 int CmdHFEPA(const char *Cmd)
 {
-	// flush
-	WaitForResponseTimeout(CMD_ACK,NULL,100);
-
-	// parse
-  CmdsParse(CommandTable, Cmd);
-  return 0;
+	(void)WaitForResponseTimeout(CMD_ACK,NULL,100);
+	CmdsParse(CommandTable, Cmd);
+	return 0;
 }

@@ -568,7 +568,7 @@ static void fcAll(uint8_t fc, int *n, uint8_t clock, uint16_t *modCnt)
 	uint8_t wavesPerClock = clock/fc;
 	uint8_t mod = clock % fc;    //modifier
 	uint8_t modAdj = fc/mod;     //how often to apply modifier
-	bool modAdjOk = !(fc % mod); //if (fc % mod==0) modAdjOk=TRUE;
+	bool modAdjOk = !(fc % mod); //if (fc % mod==0) modAdjOk=true;
 	// loop through clock - step field clock
 	for (uint8_t idx=0; idx < wavesPerClock; idx++){
 		// put 1/2 FC length 1's and 1/2 0's per field clock wave (to create the wave)
@@ -820,9 +820,9 @@ void CmdPSKsimTag(uint16_t arg1, uint16_t arg2, size_t size, uint8_t *BitStream)
 
 	for (i=0; i<size; i++){
 		if (BitStream[i] == curPhase){
-			pskSimBit(carrier, &n, clk, &curPhase, FALSE);
+			pskSimBit(carrier, &n, clk, &curPhase, false);
 		} else {
-			pskSimBit(carrier, &n, clk, &curPhase, TRUE);
+			pskSimBit(carrier, &n, clk, &curPhase, true);
 		}
 	}
 	Dbprintf("Simulating with Carrier: %d, clk: %d, invert: %d, n: %d",carrier, clk, invert, n);

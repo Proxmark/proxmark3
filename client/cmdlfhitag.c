@@ -66,6 +66,7 @@ int CmdLFHitagList(const char *Cmd)
 	if (strlen(filename) > 0) {
 		if ((pf = fopen(filename,"wb")) == NULL) {
 			PrintAndLog("Error: Could not open file [%s]",filename);
+			free(got);
 			return 1;
 		}
 	}
@@ -166,11 +167,11 @@ int CmdLFHitagSim(const char *Cmd) {
 			return 1;
 		}
 		tag_mem_supplied = true;
-		if (fread(c.d.asBytes,48,1,pf) == 0) {
-      PrintAndLog("Error: File reading error");
-      fclose(pf);
+		if (fread(c.d.asBytes,1,48,pf) != 48) {
+			PrintAndLog("Error: File reading error");
+			fclose(pf);
 			return 1;
-    }
+		}
 		fclose(pf);
 	} else {
 		tag_mem_supplied = false;
@@ -289,7 +290,7 @@ int CmdLFHitagSimS(const char *Cmd) {
 			return 1;
 		}
 		tag_mem_supplied = true;
-		if (fread(c.d.asBytes, 4*64, 1, pf) == 0) {
+		if (fread(c.d.asBytes, 1, 4*64, pf) != 4*64) {
 			PrintAndLog("Error: File reading error");
 			fclose(pf);
 			return 1;
@@ -321,9 +322,9 @@ int CmdLFHitagCheckChallenges(const char *Cmd) {
 			return 1;
 		}
 		file_given = true;
-		if (fread(c.d.asBytes,8*60,1,pf) == 0) {
-      PrintAndLog("Error: File reading error");
-      fclose(pf);
+		if (fread(c.d.asBytes,1,8*60,pf) != 8*60) {
+			PrintAndLog("Error: File reading error");
+			fclose(pf);
 			return 1;
         }
 		fclose(pf);

@@ -210,7 +210,7 @@ static void hitag_send_bit(int bit) {
 				;
 			LOW(GPIO_SSC_DOUT);
 			while (AT91C_BASE_TC0->TC_CV < T0 * 32)
-				;;
+				;
 		}
 		LED_A_OFF();
 		break;
@@ -945,7 +945,6 @@ void SimulateHitagSTag(bool tag_mem_supplied, byte_t* data) {
 	int i, j;
 	byte_t rx[HITAG_FRAME_LEN];
 	size_t rxlen = 0;
-//bool bQuitTraceFull = false;
 	bQuiet = false;
 	byte_t txbuf[HITAG_FRAME_LEN];
 	byte_t* tx = txbuf;
@@ -953,7 +952,7 @@ void SimulateHitagSTag(bool tag_mem_supplied, byte_t* data) {
 	BigBuf_free();
 
 // Clean up trace and prepare it for storing frames
-	set_tracing(TRUE);
+	set_tracing(true);
 	clear_trace();
 
 	DbpString("Starting HitagS simulation");
@@ -1216,7 +1215,7 @@ void ReadHitagS(hitag_function htf, hitag_data* htd) {
 	bSuccessful = false;
 
 // Clean up trace and prepare it for storing frames
-	set_tracing(TRUE);
+	set_tracing(true);
 	clear_trace();
 
 	bQuiet = false;
@@ -1560,7 +1559,7 @@ void WritePageHitagS(hitag_function htf, hitag_data* htd,int page_) {
 	tag.tstate = NO_OP;
 
 // Clean up trace and prepare it for storing frames
-	set_tracing(TRUE);
+	set_tracing(true);
 	clear_trace();
 
 	bQuiet = false;
@@ -1847,7 +1846,7 @@ void check_challenges(bool file_given, byte_t* data) {
 	bSuccessful = false;
 
 // Clean up trace and prepare it for storing frames
-	set_tracing(TRUE);
+	set_tracing(true);
 	clear_trace();
 
 	bQuiet = false;

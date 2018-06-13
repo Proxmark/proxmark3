@@ -486,12 +486,12 @@ int CmdHF14AInfo(const char *Cmd)
 
 	
 	// try to see if card responses to "chinese magic backdoor" commands.
-	mfCIdentify();
+	(void)mfCIdentify();
 	
 	if (isMifareClassic) {		
 		switch(DetectClassicPrng()) {
 		case 0:
-			PrintAndLog("Prng detection: HARDEND (hardnested)");		
+			PrintAndLog("Prng detection: HARDENED (hardnested)");		
 			break;
 		case 1:
 			PrintAndLog("Prng detection: WEAK");
@@ -1032,12 +1032,9 @@ static command_t CommandTable[] =
 };
 
 int CmdHF14A(const char *Cmd) {
-	// flush
-	WaitForResponseTimeout(CMD_ACK,NULL,100);
-
-	// parse
-  CmdsParse(CommandTable, Cmd);
-  return 0;
+	(void)WaitForResponseTimeout(CMD_ACK,NULL,100);
+	CmdsParse(CommandTable, Cmd);
+	return 0;
 }
 
 int CmdHelp(const char *Cmd)

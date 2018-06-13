@@ -1149,7 +1149,7 @@ static bool isBlockTrailer(int blockN) {
 	if (blockN >= 128 && blockN <= 256) {
 		return ((blockN & 0x0F) == 0x0F);
 	}
-	return FALSE;
+	return false;
 }
 
 void MifareCWipe(uint32_t arg0, uint32_t arg1, uint32_t arg2, uint8_t *datain){
