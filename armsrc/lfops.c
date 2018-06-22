@@ -4,7 +4,7 @@
 // the license.
 //-----------------------------------------------------------------------------
 // Miscellaneous routines for low frequency tag operations.
-// Tags supported here so far are Texas Instruments (TI), HID
+// Tags supported here so far are Texas Instruments (TI), HID, EM4x05, EM410x
 // Also routines for raw mode reading/simulating of LF waveform
 //-----------------------------------------------------------------------------
 
@@ -28,51 +28,103 @@
  */
 void ModThenAcquireRawAdcSamples125k(uint32_t delay_off, uint32_t period_0, uint32_t period_1, uint8_t *command)
 {
+	// start timer
+	StartTicks();
 
-	int divisor_used = 95; // 125 KHz
-	// see if 'h' was specified
+	// use lf config settings
+	sample_config *sc = getSamplingConfig();
 
-	if (command[strlen((char *) command) - 1] == 'h')
-		divisor_used = 88; // 134.8 KHz
-
-	sample_config sc = { 0,0,1, divisor_used, 0};
-	setSamplingConfig(&sc);
-	//clear read buffer
-	BigBuf_Clear_keep_EM();
-
-	/* Make sure the tag is reset */
+	// Make sure the tag is reset
 	FpgaDownloadAndGo(FPGA_BITSTREAM_LF);
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
-	SpinDelay(2500);
+	WaitMS(2500);
 
-	LFSetupFPGAForADC(sc.divisor, 1);
+	// clear read buffer (after fpga bitstream loaded...)
+	BigBuf_Clear_keep_EM();
+
+	// power on
+	LFSetupFPGAForADC(sc->divisor, 1);
 
 	// And a little more time for the tag to fully power up
-	SpinDelay(2000);
-
+	WaitMS(2000);
+	// if delay_off = 0 then just bitbang 1 = antenna on 0 = off for respective periods.
+	bool bitbang = delay_off == 0;
 	// now modulate the reader field
-	while(*command != '\0' && *command != ' ') {
+
+	if (bitbang) {
+		// HACK it appears the loop and if statements take up about 7us so adjust waits accordingly...
+		uint8_t hack_cnt = 7;
+		if (period_0 < hack_cnt || period_1 < hack_cnt) {
+			DbpString("Warning periods cannot be less than 7us in bit bang mode");
+			FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
+			LED_D_OFF();
+			return;
+		}
+
+		// hack2 needed---  it appears to take about 8-16us to turn the antenna back on 
+		// leading to ~ 1 to 2 125khz samples extra in every off period 
+		// so we should test for last 0 before next 1 and reduce period_0 by this extra amount...
+		// but is this time different for every antenna or other hw builds???  more testing needed
+
+		// prime cmd_len to save time comparing strings while modulating
+		int cmd_len = 0;
+		while(command[cmd_len] != '\0' && command[cmd_len] != ' ')
+			cmd_len++;
+
+		int counter = 0;
+		bool off = false;
+		for (counter = 0; counter < cmd_len; counter++) {
+			// if cmd = 0 then turn field off
+			if (command[counter] == '0') {
+				// if field already off leave alone (affects timing otherwise)
+				if (off == false) {
+					FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
+					LED_D_OFF();
+					off = true;
+				}
+				// note we appear to take about 7us to switch over (or run the if statements/loop...)
+				WaitUS(period_0-hack_cnt);
+			// else if cmd = 1 then turn field on
+			} else {
+				// if field already on leave alone (affects timing otherwise)
+				if (off) {
+					FpgaWriteConfWord(FPGA_MAJOR_MODE_LF_ADC | FPGA_LF_ADC_READER_FIELD);
+					LED_D_ON();
+					off = false;
+				}
+				// note we appear to take about 7us to switch over (or run the if statements/loop...)
+				WaitUS(period_1-hack_cnt);
+			}
+		}
+	} else { // old mode of cmd read using delay as off period
+		while(*command != '\0' && *command != ' ') {
+			FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
+			LED_D_OFF();
+			WaitUS(delay_off);
+			FpgaSendCommand(FPGA_CMD_SET_DIVISOR, sc->divisor);
+			FpgaWriteConfWord(FPGA_MAJOR_MODE_LF_ADC | FPGA_LF_ADC_READER_FIELD);
+			LED_D_ON();
+			if(*(command++) == '0') {
+				WaitUS(period_0);
+			} else {
+				WaitUS(period_1);
+			}
+		}
 		FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
 		LED_D_OFF();
-		SpinDelayUs(delay_off);
-		FpgaSendCommand(FPGA_CMD_SET_DIVISOR, sc.divisor);
-
-		FpgaWriteConfWord(FPGA_MAJOR_MODE_LF_ADC | FPGA_LF_ADC_READER_FIELD);
-		LED_D_ON();
-		if(*(command++) == '0')
-			SpinDelayUs(period_0);
-		else
-			SpinDelayUs(period_1);
+		WaitUS(delay_off);
+		FpgaSendCommand(FPGA_CMD_SET_DIVISOR, sc->divisor);
 	}
-	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
-	LED_D_OFF();
-	SpinDelayUs(delay_off);
-	FpgaSendCommand(FPGA_CMD_SET_DIVISOR, sc.divisor);
 
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_LF_ADC | FPGA_LF_ADC_READER_FIELD);
 
 	// now do the read
 	DoAcquisition_config(false, 0);
+
+	// Turn off antenna
+	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
+	// tell client we are done
+	cmd_send(CMD_ACK,0,0,0,0,0);
 }
 
 /* blank r/w tag data stream
@@ -516,7 +568,7 @@ static void fcAll(uint8_t fc, int *n, uint8_t clock, uint16_t *modCnt)
 	uint8_t wavesPerClock = clock/fc;
 	uint8_t mod = clock % fc;    //modifier
 	uint8_t modAdj = fc/mod;     //how often to apply modifier
-	bool modAdjOk = !(fc % mod); //if (fc % mod==0) modAdjOk=TRUE;
+	bool modAdjOk = !(fc % mod); //if (fc % mod==0) modAdjOk=true;
 	// loop through clock - step field clock
 	for (uint8_t idx=0; idx < wavesPerClock; idx++){
 		// put 1/2 FC length 1's and 1/2 0's per field clock wave (to create the wave)
@@ -768,9 +820,9 @@ void CmdPSKsimTag(uint16_t arg1, uint16_t arg2, size_t size, uint8_t *BitStream)
 
 	for (i=0; i<size; i++){
 		if (BitStream[i] == curPhase){
-			pskSimBit(carrier, &n, clk, &curPhase, FALSE);
+			pskSimBit(carrier, &n, clk, &curPhase, false);
 		} else {
-			pskSimBit(carrier, &n, clk, &curPhase, TRUE);
+			pskSimBit(carrier, &n, clk, &curPhase, true);
 		}
 	}
 	Dbprintf("Simulating with Carrier: %d, clk: %d, invert: %d, n: %d",carrier, clk, invert, n);
@@ -1159,7 +1211,7 @@ void T55xxResetRead(void) {
 	TurnReadLFOn(READ_GAP);
 
 	// Acquisition
-	DoPartialAcquisition(0, true, BigBuf_max_traceLen());
+	DoPartialAcquisition(0, true, BigBuf_max_traceLen(), 0);
 
 	// Turn the field off
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF); // field off
@@ -1291,7 +1343,7 @@ void T55xxReadBlock(uint16_t arg0, uint8_t Block, uint32_t Pwd) {
 
 	// Acquisition
 	// Now do the acquisition
-	DoPartialAcquisition(0, true, 12000);
+	DoPartialAcquisition(0, true, 12000, 0);
 
 	// Turn the field off
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF); // field off
@@ -1690,7 +1742,7 @@ void EM4xReadWord(uint8_t Address, uint32_t Pwd, uint8_t PwdMode) {
 	SendForward(fwd_bit_count);
 	WaitUS(400);
 	// Now do the acquisition
-	DoPartialAcquisition(20, true, 6000);
+	DoPartialAcquisition(20, true, 6000, 1000);
 	
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF); // field off
 	LED_A_OFF();
@@ -1723,7 +1775,7 @@ void EM4xWriteWord(uint32_t flag, uint32_t Data, uint32_t Pwd) {
 
 	WaitUS(6500);
 	//Capture response if one exists
-	DoPartialAcquisition(20, true, 6000);
+	DoPartialAcquisition(20, true, 6000, 1000);
 
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF); // field off
 	LED_A_OFF();

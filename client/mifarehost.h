@@ -13,7 +13,8 @@
 
 #include <stdint.h>
 #include <stdbool.h>
-#include "data.h"
+#include "crapto1/crapto1.h"
+#include "util.h"
 
 // defaults
 // timeout in units. (ms * 106)/10 or us*0.0106
@@ -50,7 +51,7 @@ extern int mfCSetBlock(uint8_t blockNo, uint8_t *data, uint8_t *uid, bool wantWi
 extern int mfCGetBlock(uint8_t blockNo, uint8_t *data, uint8_t params);
 
 extern int mfTraceInit(uint8_t *tuid, uint8_t *atqa, uint8_t sak, bool wantSaveToEmlFile);
-extern int mfTraceDecode(uint8_t *data_src, int len, bool wantSaveToEmlFile);
+extern int mfTraceDecode(uint8_t *data_src, int len, uint8_t parity, bool wantSaveToEmlFile);
 
 extern int isTraceCardEmpty(void);
 extern int isBlockEmpty(int blockN);
@@ -60,5 +61,8 @@ extern int saveTraceCard(void);
 extern int tryDecryptWord(uint32_t nt, uint32_t ar_enc, uint32_t at_enc, uint8_t *data, int len);
 
 extern int mfCIdentify();
+extern int DetectClassicPrng(void);
+extern bool validate_prng_nonce(uint32_t nonce);
+extern void mf_crypto1_decrypt(struct Crypto1State *pcs, uint8_t *data, int len, bool isEncrypted);
 
 #endif

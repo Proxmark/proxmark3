@@ -8,14 +8,14 @@
 // Low frequency EM4x commands
 //-----------------------------------------------------------------------------
 
+#include "cmdlfem4x.h"
+
 #include <stdio.h>
 #include <string.h>
 #include <inttypes.h>
-#include "cmdlfem4x.h"
-#include "proxmark3.h"
+#include "comms.h"
 #include "ui.h"
 #include "util.h"
-#include "data.h"
 #include "graph.h"
 #include "cmdparser.h"
 #include "cmddata.h"
@@ -335,7 +335,7 @@ int CmdEM410xBrute(const char *Cmd)
 		delay = param_get32ex(Cmd, 4, 1000, 10);
 	}
 
-	param_getstr(Cmd, 0, filename);
+	param_getstr(Cmd, 0, filename, sizeof(filename));
 	
 	uidBlock = calloc(stUidBlock, 5);
 	if (uidBlock == NULL) return 1;
@@ -804,8 +804,7 @@ int usage_lf_em_read(void) {
 bool downloadSamplesEM() {
 	// 8 bit preamble + 32 bit word response (max clock (128) * 40bits = 5120 samples)
 	uint8_t got[6000];
-	GetFromBigBuf(got, sizeof(got), 0);
-	if ( !WaitForResponseTimeout(CMD_ACK, NULL, 4000) ) {
+	if (!GetFromBigBuf(got, sizeof(got), 0, NULL, 4000, true)) {
 		PrintAndLog("command execution time out");
 		return false;
 	}
@@ -950,7 +949,6 @@ int EM4x05ReadWord_ext(uint8_t addr, uint32_t pwd, bool usePwd, uint32_t *wordDa
 	}
 	int testLen = (GraphTraceLen < 1000) ? GraphTraceLen : 1000;
 	if (graphJustNoise(GraphBuffer, testLen)) {
-		PrintAndLog("no tag not found");
 		return -1;
 	}
 	//attempt demod:

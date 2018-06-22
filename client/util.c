@@ -16,7 +16,6 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <time.h>
-#include "data.h"
 
 #ifdef _WIN32
 #include <windows.h>
@@ -111,6 +110,32 @@ void FillFileNameByUID(char *fileName, uint8_t * uid, char *ext, int byteCount) 
 	sprintf(fnameptr, "%s", ext); 
 }
 
+void hex_to_buffer(const uint8_t *buf, const uint8_t *hex_data, const size_t hex_len, const size_t hex_max_len, 
+	const size_t min_str_len, const size_t spaces_between, bool uppercase) {
+		
+	char *tmp = (char *)buf;
+	size_t i;
+	memset(tmp, 0x00, hex_max_len);
+
+	int maxLen = ( hex_len > hex_max_len) ? hex_max_len : hex_len;
+
+	for (i = 0; i < maxLen; ++i, tmp += 2 + spaces_between) {
+		sprintf(tmp, (uppercase) ? "%02X" : "%02x", (unsigned int) hex_data[i]); 
+		
+		for (int j = 0; j < spaces_between; j++)
+			sprintf(tmp + 2 + j, " ");
+	}
+	
+	i *= (2 + spaces_between);
+	int minStrLen = min_str_len > i ? min_str_len : 0;
+	if (minStrLen > hex_max_len)
+		minStrLen = hex_max_len;
+	for(; i < minStrLen; i++, tmp += 1) 
+		sprintf(tmp, " ");
+
+	return;
+}
+
 // printing and converting functions
 
 void print_hex(const uint8_t * data, const size_t len)
@@ -141,17 +166,23 @@ void print_hex_break(const uint8_t *data, const size_t len, uint8_t breaks) {
 }
 
 char *sprint_hex(const uint8_t *data, const size_t len) {
+	static char buf[1025] = {0};
 	
-	int maxLen = ( len > 1024/3) ? 1024/3 : len;
-	static char buf[1024];
-	memset(buf, 0x00, 1024);
-	char *tmp = buf;
-	size_t i;
-
-	for (i=0; i < maxLen; ++i, tmp += 3)
-		sprintf(tmp, "%02x ", (unsigned int) data[i]);
+	hex_to_buffer((uint8_t *)buf, data, len, sizeof(buf) - 1, 0, 1, false);
 
 	return buf;
+}
+
+char *sprint_hex_inrow_ex(const uint8_t *data, const size_t len, const size_t min_str_len) {
+	static char buf[1025] = {0};
+
+	hex_to_buffer((uint8_t *)buf, data, len, sizeof(buf) - 1, min_str_len, 0, false);
+
+	return buf;
+}
+
+char *sprint_hex_inrow(const uint8_t *data, const size_t len) {
+	return sprint_hex_inrow_ex(data, len, 0);
 }
 
 char *sprint_bin_break(const uint8_t *data, const size_t len, const uint8_t breaks) {
@@ -210,7 +241,7 @@ char *sprint_hex_ascii(const uint8_t *data, const size_t len) {
 	return buf;
 }
 
-char *sprint_ascii(const uint8_t *data, const size_t len) {
+char *sprint_ascii_ex(const uint8_t *data, const size_t len, const size_t min_str_len) {
 	static char buf[1024];
 	char *tmp = buf;
 	memset(buf, 0x00, 1024);
@@ -221,7 +252,16 @@ char *sprint_ascii(const uint8_t *data, const size_t len) {
 		tmp[i] = ((c < 32) || (c == 127)) ? '.' : c;
 		++i;
 	}
+	
+	int minStrLen = min_str_len > i ? min_str_len : 0;
+	for(; i < minStrLen; ++i) 
+		tmp[i] = ' ';
+	
 	return buf;
+}
+
+char *sprint_ascii(const uint8_t *data, const size_t len) {
+	return sprint_ascii_ex(data, len, 0);
 }
 
 void num_to_bytes(uint64_t n, size_t len, uint8_t* dest)
@@ -316,6 +356,23 @@ char * printBits(size_t const size, void const * const ptr)
 	return buf;
 }
 
+char * printBitsPar(const uint8_t *b, size_t len) {
+	static char buf1[512] = {0};
+	static char buf2[512] = {0};
+	static char *buf;
+	if (buf != buf1)
+		buf = buf1;
+	else
+		buf = buf2;
+	memset(buf, 0x00, 512);
+
+	for (int i = 0; i < len; i++) {
+		buf[i] = ((b[i / 8] << (i % 8)) & 0x80) ? '1':'0';
+	}
+	return buf;
+}
+
+
 //  -------------------------------------------------------------------------
 //  string parameters lib
 //  -------------------------------------------------------------------------
@@ -364,13 +421,19 @@ int param_getlength(const char *line, int paramnum)
 	return en - bg + 1;
 }
 
-char param_getchar(const char *line, int paramnum)
-{
+char param_getchar(const char *line, int paramnum) {
+	return param_getchar_indx(line, 0, paramnum);
+}
+
+char param_getchar_indx(const char *line, int indx, int paramnum) {
 	int bg, en;
 	
 	if (param_getptr(line, &bg, &en, paramnum)) return 0x00;
 
-	return line[bg];
+	if (bg + indx > en)
+		return '\0';
+	
+	return line[bg + indx];
 }
 
 uint8_t param_get8(const char *line, int paramnum)
@@ -450,7 +513,7 @@ int param_gethex(const char *line, int paramnum, uint8_t * data, int hexcnt)
 		return 1;
 
 	for(i = 0; i < hexcnt; i += 2) {
-		if (!(isxdigit(line[bg + i]) && isxdigit(line[bg + i + 1])) )	return 1;
+		if (!(isxdigit((unsigned char)line[bg + i]) && isxdigit((unsigned char)line[bg + i + 1])) )	return 1;
 		
 		sscanf((char[]){line[bg + i], line[bg + i + 1], 0}, "%X", &temp);
 		data[i / 2] = temp & 0xff;
@@ -472,7 +535,7 @@ int param_gethex_ex(const char *line, int paramnum, uint8_t * data, int *hexcnt)
 		return 1;
 
 	for(i = 0; i < *hexcnt; i += 2) {
-		if (!(isxdigit(line[bg + i]) && isxdigit(line[bg + i + 1])) )	return 1;
+		if (!(isxdigit((unsigned char)line[bg + i]) && isxdigit((unsigned char)line[bg + i + 1])) )	return 1;
 		
 		sscanf((char[]){line[bg + i], line[bg + i + 1], 0}, "%X", &temp);
 		data[i / 2] = temp & 0xff;
@@ -480,11 +543,66 @@ int param_gethex_ex(const char *line, int paramnum, uint8_t * data, int *hexcnt)
 
 	return 0;
 }
-int param_getstr(const char *line, int paramnum, char * str)
+
+int param_gethex_to_eol(const char *line, int paramnum, uint8_t * data, int maxdatalen, int *datalen) {
+	int bg, en;
+	uint32_t temp;
+	char buf[5] = {0};
+
+	if (param_getptr(line, &bg, &en, paramnum)) return 1;
+
+	*datalen = 0;
+	
+	int indx = bg;
+	while (line[indx]) {
+		if (line[indx] == '\t' || line[indx] == ' ') {
+			indx++;
+			continue;
+		}
+		
+		if (isxdigit((unsigned char)line[indx])) {
+			buf[strlen(buf) + 1] = 0x00;
+			buf[strlen(buf)] = line[indx];
+		} else {
+			// if we have symbols other than spaces and hex
+			return 1;
+		}				
+
+		if (*datalen >= maxdatalen) {
+			// if we dont have space in buffer and have symbols to translate
+			return 2;
+		}
+
+		if (strlen(buf) >= 2) {
+			sscanf(buf, "%x", &temp);
+			data[*datalen] = (uint8_t)(temp & 0xff);
+			*buf = 0;
+			(*datalen)++;
+		}
+		
+		indx++;
+	}
+
+	if (strlen(buf) > 0) 
+		//error when not completed hex bytes
+		return 3;
+		
+	return 0;
+}
+
+int param_getstr(const char *line, int paramnum, char * str, size_t buffersize)
 {
 	int bg, en;
 
-	if (param_getptr(line, &bg, &en, paramnum)) return 0;
+	if (param_getptr(line, &bg, &en, paramnum)) {	
+		return 0;
+	}
+
+	// Prevent out of bounds errors
+	if (en - bg + 1 >= buffersize) {
+		printf("out of bounds error: want %d bytes have %zd bytes\n", en - bg + 1 + 1, buffersize);
+		return 0;
+	}
 	
 	memcpy(str, line + bg, en - bg + 1);
 	str[en - bg + 1] = 0;
@@ -502,6 +620,7 @@ https://github.com/ApertureLabsLtd/RFIDler/blob/master/firmware/Pic32/RFIDler.X/
 int hextobinarray(char *target, char *source)
 {
     int length, i, count= 0;
+    char* start = source;
     char x;
 
     length = strlen(source);
@@ -517,8 +636,10 @@ int hextobinarray(char *target, char *source)
             x -= '0';
         else if (x >= 'A' && x <= 'F')
             x -= 'A' - 10;
-        else
+        else {
+        	printf("Discovered unknown character %c %d at idx %tu of %s\n", x, x, source - start, start);
             return 0;
+        }
         // output
         for(i= 0 ; i < 4 ; ++i, ++count)
             *(target++)= (x >> (3 - i)) & 1;

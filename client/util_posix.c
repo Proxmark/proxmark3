@@ -37,8 +37,12 @@ void msleep(uint32_t n) {
 
 #ifdef __APPLE__
 
+#ifndef CLOCK_MONOTONIC
 	#define CLOCK_MONOTONIC (1)
+#endif
+#ifndef CLOCK_REALTIME
 	#define CLOCK_REALTIME (2)
+#endif
 
 	#include <sys/time.h>
 	#include <mach/clock.h>
@@ -113,7 +117,7 @@ uint64_t msclock() {
 	#include <sys/timeb.h>
 	struct _timeb t;
 	_ftime(&t);
-	return 1000 * t.time + t.millitm;
+	return 1000 * (uint64_t)t.time + t.millitm;
 
 // NORMAL CODE (use _ftime_s)
 	//struct _timeb t;

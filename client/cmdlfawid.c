@@ -11,10 +11,11 @@
 // FSK2a, RF/50, 96 bits (complete)
 //-----------------------------------------------------------------------------
 
+#include "cmdlfawid.h"
+
 #include <string.h>
 #include <stdio.h>      // sscanf
-#include "proxmark3.h"  // Definitions, USB controls, etc
-#include "cmdlfawid.h"
+#include "comms.h"      // Definitions, USB controls, etc
 #include "ui.h"         // PrintAndLog
 #include "cmdparser.h"  // CmdsParse, CmdsHelp
 #include "lfdemod.h"    // parityTest +

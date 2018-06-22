@@ -22,18 +22,18 @@
 // the client. Signal Processing & decoding is done on the pc. This is the slowest
 // variant, but offers the possibility to analyze the waveforms directly. 
 
+#include "cmdhf15.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
 
-#include "proxmark3.h"
-#include "data.h"
+#include "comms.h"
 #include "graph.h"
 #include "ui.h"
 #include "util.h"
 #include "cmdparser.h"
-#include "cmdhf15.h"
 #include "iso15693tools.h"
 #include "cmdmain.h"
 

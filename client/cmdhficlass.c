@@ -14,9 +14,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <ctype.h>
 #include "iso14443crc.h" // Can also be used for iClass, using 0xE012 as CRC-type
-#include "data.h"
-#include "proxmark3.h"
+#include "comms.h"
 #include "ui.h"
 #include "cmdparser.h"
 #include "cmdhficlass.h"
@@ -32,6 +32,7 @@
 #include "protocols.h"
 #include "usb_cmd.h"
 #include "cmdhfmfu.h"
+#include "util_posix.h"
 
 static int CmdHelp(const char *Cmd);
 
@@ -50,6 +51,20 @@ static uint8_t iClass_Key_Table[ICLASS_KEYS_MAX][8] = {
 typedef struct iclass_block {
     uint8_t d[8];
 } iclass_block_t;
+
+int usage_hf_iclass_chk(void) {
+	PrintAndLog("Checkkeys loads a dictionary text file with 8byte hex keys to test authenticating against a iClass tag");	
+	PrintAndLog("Usage: hf iclass chk [h|e|r] <f  (*.dic)>");
+	PrintAndLog("Options:");
+	PrintAndLog("h             Show this help");
+	PrintAndLog("f <filename>  Dictionary file with default iclass keys");
+	PrintAndLog("      e             target Elite / High security key scheme");
+	PrintAndLog("      r             interpret dictionary file as raw (diversified keys)");
+	PrintAndLog("Samples:");
+	PrintAndLog("		 hf iclass chk f default_iclass_keys.dic");	
+	PrintAndLog("		 hf iclass chk f default_iclass_keys.dic e");	
+	return 0;
+}
 
 int xorbits_8(uint8_t val) {
 	uint8_t res = val ^ (val >> 1); //1st pass
@@ -278,7 +293,7 @@ int CmdHFiClassELoad(const char *Cmd) {
 	//File handling and reading
 	FILE *f;
 	char filename[FILE_PATH_SIZE];
-	if(opt == 'f' && param_getstr(Cmd, 1, filename) > 0)
+	if(opt == 'f' && param_getstr(Cmd, 1, filename, sizeof(filename)) > 0)
 	{
 		f = fopen(filename, "rb");
 	}else{
@@ -384,7 +399,7 @@ int CmdHFiClassDecrypt(const char *Cmd) {
 	//Open the tagdump-file
 	FILE *f;
 	char filename[FILE_PATH_SIZE];
-	if(opt == 'f' && param_getstr(Cmd, 1, filename) > 0) {
+	if(opt == 'f' && param_getstr(Cmd, 1, filename, sizeof(filename)) > 0) {
 		f = fopen(filename, "rb");
 		if ( f == NULL ) {
 			PrintAndLog("Could not find file %s", filename);
@@ -531,7 +546,7 @@ static bool select_and_auth(uint8_t *KEY, uint8_t *MAC, uint8_t *div_key, bool u
 		memcpy(div_key, KEY, 8);
 	else
 		HFiClassCalcDivKey(CSN, KEY, div_key, elite);
-	PrintAndLog("Authing with %s: %02x%02x%02x%02x%02x%02x%02x%02x", rawkey ? "raw key" : "diversified key", div_key[0],div_key[1],div_key[2],div_key[3],div_key[4],div_key[5],div_key[6],div_key[7]);
+	 if (verbose) PrintAndLog("Authing with %s: %02x%02x%02x%02x%02x%02x%02x%02x", rawkey ? "raw key" : "diversified key", div_key[0],div_key[1],div_key[2],div_key[3],div_key[4],div_key[5],div_key[6],div_key[7]);
 
 	doMAC(CCNR, div_key, MAC);
 	UsbCommand resp;
@@ -541,12 +556,12 @@ static bool select_and_auth(uint8_t *KEY, uint8_t *MAC, uint8_t *div_key, bool u
 	SendCommand(&d);
 	if (!WaitForResponseTimeout(CMD_ACK,&resp,4500))
 	{
-		PrintAndLog("Auth Command execute timeout");
+		if (verbose) PrintAndLog("Auth Command execute timeout");
 		return false;
 	}
 	uint8_t isOK = resp.arg[0] & 0xff;
 	if (!isOK) {
-		PrintAndLog("Authentication error");
+		if (verbose) PrintAndLog("Authentication error");
 		return false;
 	}
 	return true;
@@ -605,7 +620,7 @@ int CmdHFiClassReader_Dump(const char *Cmd) {
 		case 'c':
 		case 'C':
 			have_credit_key = true;
-			dataLen = param_getstr(Cmd, cmdp+1, tempStr);
+			dataLen = param_getstr(Cmd, cmdp+1, tempStr, sizeof(tempStr));
 			if (dataLen == 16) {
 				errors = param_gethex(tempStr, 0, CreditKEY, dataLen);
 			} else if (dataLen == 1) {
@@ -629,7 +644,7 @@ int CmdHFiClassReader_Dump(const char *Cmd) {
 			break;
 		case 'f':
 		case 'F':
-			fileNameLen = param_getstr(Cmd, cmdp+1, filename); 
+			fileNameLen = param_getstr(Cmd, cmdp+1, filename, sizeof(filename)); 
 			if (fileNameLen < 1) {
 				PrintAndLog("No filename found after f");
 				errors = true;
@@ -639,7 +654,7 @@ int CmdHFiClassReader_Dump(const char *Cmd) {
 		case 'k':
 		case 'K':
 			have_debit_key = true;
-			dataLen = param_getstr(Cmd, cmdp+1, tempStr);
+			dataLen = param_getstr(Cmd, cmdp+1, tempStr, sizeof(tempStr));
 			if (dataLen == 16) { 
 				errors = param_gethex(tempStr, 0, KEY, dataLen);
 			} else if (dataLen == 1) {
@@ -683,7 +698,7 @@ int CmdHFiClassReader_Dump(const char *Cmd) {
 	SendCommand(&c);
 	if (!WaitForResponseTimeout(CMD_ACK, &resp, 4500)) {
 		PrintAndLog("Command execute timeout");
-		ul_switch_off_field();
+		DropField();
 		return 0;
 	}
 	uint8_t readStatus = resp.arg[0] & 0xff;
@@ -691,7 +706,7 @@ int CmdHFiClassReader_Dump(const char *Cmd) {
 
 	if(readStatus == 0){
 		PrintAndLog("No tag found...");
-		ul_switch_off_field();
+		DropField();
 		return 0;
 	}
 	if( readStatus & (FLAG_ICLASS_READER_CSN|FLAG_ICLASS_READER_CONF|FLAG_ICLASS_READER_CC)){
@@ -702,12 +717,12 @@ int CmdHFiClassReader_Dump(const char *Cmd) {
 		// large memory - not able to dump pages currently
 		if (numblks > maxBlk) numblks = maxBlk;
 	}
-	ul_switch_off_field();
+	DropField();
 	// authenticate debit key and get div_key - later store in dump block 3
 	if (!select_and_auth(KEY, MAC, div_key, use_credit_key, elite, rawkey, false)){
 		//try twice - for some reason it sometimes fails the first time...
 		if (!select_and_auth(KEY, MAC, div_key, use_credit_key, elite, rawkey, false)){
-			ul_switch_off_field();
+			DropField();
 			return 0;
 		}
 	}
@@ -718,14 +733,14 @@ int CmdHFiClassReader_Dump(const char *Cmd) {
 	SendCommand(&w);
 	if (!WaitForResponseTimeout(CMD_ACK, &resp, 4500)) {
 		PrintAndLog("Command execute time-out 1");
-		ul_switch_off_field();
+		DropField();
 		return 1;
 	}
 	uint32_t blocksRead = resp.arg[1];
 	uint8_t isOK = resp.arg[0] & 0xff;
 	if (!isOK && !blocksRead) {
 		PrintAndLog("Read Block Failed");
-		ul_switch_off_field();
+		DropField();
 		return 0;
 	}
 	uint32_t startindex = resp.arg[2];
@@ -734,20 +749,19 @@ int CmdHFiClassReader_Dump(const char *Cmd) {
 		blocksRead = (sizeof(tag_data)/8) - blockno;
 	}
 	// response ok - now get bigbuf content of the dump
-	GetFromBigBuf(tag_data+(blockno*8), blocksRead*8, startindex);
-	WaitForResponse(CMD_ACK,NULL);
+	GetFromBigBuf(tag_data+(blockno*8), blocksRead*8, startindex, NULL, -1, false);
 	size_t gotBytes = blocksRead*8 + blockno*8;
 
 	// try AA2
 	if (have_credit_key) {
 		//turn off hf field before authenticating with different key
-		ul_switch_off_field();
+		DropField();
 		memset(MAC,0,4);
 		// AA2 authenticate credit key and git c_div_key - later store in dump block 4
 		if (!select_and_auth(CreditKEY, MAC, c_div_key, true, false, false, false)){
 			//try twice - for some reason it sometimes fails the first time...
 			if (!select_and_auth(CreditKEY, MAC, c_div_key, true, false, false, false)){
-				ul_switch_off_field();
+				DropField();
 				return 0;
 			}
 		}
@@ -760,14 +774,14 @@ int CmdHFiClassReader_Dump(const char *Cmd) {
 			SendCommand(&w);
 			if (!WaitForResponseTimeout(CMD_ACK, &resp, 4500)) {
 				PrintAndLog("Command execute timeout 2");
-				ul_switch_off_field();
+				DropField();
 				return 0;
 			}
 			uint8_t isOK = resp.arg[0] & 0xff;
 			blocksRead = resp.arg[1];
 			if (!isOK && !blocksRead) {
 				PrintAndLog("Read Block Failed 2");
-				ul_switch_off_field();
+				DropField();
 				return 0;
 			}		
 
@@ -777,12 +791,11 @@ int CmdHFiClassReader_Dump(const char *Cmd) {
 				blocksRead = (sizeof(tag_data) - gotBytes)/8;
 			}
 			// get dumped data from bigbuf
-			GetFromBigBuf(tag_data+gotBytes, blocksRead*8, startindex);
-			WaitForResponse(CMD_ACK,NULL);
+			GetFromBigBuf(tag_data+gotBytes, blocksRead*8, startindex, NULL, -1, false);
 
 			gotBytes += blocksRead*8;			
 		} else { //field is still on - turn it off...
-			ul_switch_off_field();
+			DropField();
 		}
 	}
 
@@ -898,7 +911,7 @@ int CmdHFiClass_WriteBlock(const char *Cmd) {
 			break;
 		case 'k':
 		case 'K':
-			dataLen = param_getstr(Cmd, cmdp+1, tempStr);
+			dataLen = param_getstr(Cmd, cmdp+1, tempStr, sizeof(tempStr));
 			if (dataLen == 16) { 
 				errors = param_gethex(tempStr, 0, KEY, dataLen);
 			} else if (dataLen == 1) {
@@ -930,7 +943,7 @@ int CmdHFiClass_WriteBlock(const char *Cmd) {
 
 	if (cmdp < 6) return usage_hf_iclass_writeblock();
 	int ans = WriteBlock(blockno, bldata, KEY, use_credit_key, elite, rawkey, true);
-	ul_switch_off_field();
+	DropField();
 	return ans;
 }
 
@@ -992,7 +1005,7 @@ int CmdHFiClassCloneTag(const char *Cmd) {
 			break;
 		case 'f':
 		case 'F':
-			fileNameLen = param_getstr(Cmd, cmdp+1, filename); 
+			fileNameLen = param_getstr(Cmd, cmdp+1, filename, sizeof(filename)); 
 			if (fileNameLen < 1) {
 				PrintAndLog("No filename found after f");
 				errors = true;
@@ -1001,7 +1014,7 @@ int CmdHFiClassCloneTag(const char *Cmd) {
 			break;
 		case 'k':
 		case 'K':
-			dataLen = param_getstr(Cmd, cmdp+1, tempStr);
+			dataLen = param_getstr(Cmd, cmdp+1, tempStr, sizeof(tempStr));
 			if (dataLen == 16) { 
 				errors = param_gethex(tempStr, 0, KEY, dataLen);
 			} else if (dataLen == 1) {
@@ -1196,7 +1209,7 @@ int CmdHFiClass_ReadBlock(const char *Cmd) {
 		case 'k':
 		case 'K':
 			auth = true;
-			dataLen = param_getstr(Cmd, cmdp+1, tempStr);
+			dataLen = param_getstr(Cmd, cmdp+1, tempStr, sizeof(tempStr));
 			if (dataLen == 16) { 
 				errors = param_gethex(tempStr, 0, KEY, dataLen);
 			} else if (dataLen == 1) {
@@ -1253,7 +1266,7 @@ int CmdHFiClass_loclass(const char *Cmd) {
 	char fileName[255] = {0};
 	if(opt == 'f')
 	{
-		if(param_getstr(Cmd, 1, fileName) > 0)
+		if(param_getstr(Cmd, 1, fileName, sizeof(fileName)) > 0)
 		{
 			return bruteforceFileNoKeys(fileName);
 		}else
@@ -1318,14 +1331,14 @@ int CmdHFiClassReadTagFile(const char *Cmd) {
 	char tempnum[5];
 	FILE *f;
 	char filename[FILE_PATH_SIZE];
-	if (param_getstr(Cmd, 0, filename) < 1)
+	if (param_getstr(Cmd, 0, filename, sizeof(filename)) < 1)
 		return usage_hf_iclass_readtagfile();
-	if (param_getstr(Cmd,1,(char *)&tempnum) < 1)
+	if (param_getstr(Cmd, 1, tempnum, sizeof(tempnum)) < 1)
 		startblock = 0;
 	else
 		sscanf(tempnum,"%d",&startblock);
 
-	if (param_getstr(Cmd,2,(char *)&tempnum) < 1)
+	if (param_getstr(Cmd,2, tempnum, sizeof(tempnum)) < 1)
 		endblock = 0;
 	else
 		sscanf(tempnum,"%d",&endblock);
@@ -1458,7 +1471,7 @@ int CmdHFiClassCalcNewKey(const char *Cmd) {
 			return usage_hf_iclass_calc_newkey();
 		case 'e':
 		case 'E':
-			dataLen = param_getstr(Cmd, cmdp, tempStr);
+			dataLen = param_getstr(Cmd, cmdp, tempStr, sizeof(tempStr));
 			if (dataLen==2)
 				oldElite = true;
 			elite = true;
@@ -1466,7 +1479,7 @@ int CmdHFiClassCalcNewKey(const char *Cmd) {
 			break;
 		case 'n':
 		case 'N':
-			dataLen = param_getstr(Cmd, cmdp+1, tempStr);
+			dataLen = param_getstr(Cmd, cmdp+1, tempStr, sizeof(tempStr));
 			if (dataLen == 16) { 
 				errors = param_gethex(tempStr, 0, NEWKEY, dataLen);
 			} else if (dataLen == 1) {
@@ -1485,7 +1498,7 @@ int CmdHFiClassCalcNewKey(const char *Cmd) {
 			break;
 		case 'o':
 		case 'O':
-			dataLen = param_getstr(Cmd, cmdp+1, tempStr);
+			dataLen = param_getstr(Cmd, cmdp+1, tempStr, sizeof(tempStr));
 			if (dataLen == 16) { 
 				errors = param_gethex(tempStr, 0, OLDKEY, dataLen);
 			} else if (dataLen == 1) {
@@ -1626,7 +1639,7 @@ int CmdHFiClassManageKeys(const char *Cmd) {
 			return usage_hf_iclass_managekeys();
 		case 'f':
 		case 'F':
-			fileNameLen = param_getstr(Cmd, cmdp+1, filename); 
+			fileNameLen = param_getstr(Cmd, cmdp+1, filename, sizeof(filename)); 
 			if (fileNameLen < 1) {
 				PrintAndLog("No filename found after f");
 				errors = true;
@@ -1645,7 +1658,7 @@ int CmdHFiClassManageKeys(const char *Cmd) {
 		case 'k':
 		case 'K':
 			operation += 3; //set key 
-			dataLen = param_getstr(Cmd, cmdp+1, tempStr);
+			dataLen = param_getstr(Cmd, cmdp+1, tempStr, sizeof(tempStr));
 			if (dataLen == 16) { //ul-c or ev1/ntag key length
 				errors = param_gethex(tempStr, 0, KEY, dataLen);
 			} else {
@@ -1699,10 +1712,152 @@ int CmdHFiClassManageKeys(const char *Cmd) {
 	return 0;
 }
 
+int CmdHFiClassCheckKeys(const char *Cmd) {
+
+	uint8_t mac[4] = {0x00,0x00,0x00,0x00};
+	uint8_t key[8] = {0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00};
+	uint8_t div_key[8] = {0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00};
+
+	// elite key,  raw key, standard key
+	bool use_elite = false;
+	bool use_raw = false;	
+	bool found_debit = false;
+	bool found_credit = false;	
+	bool errors = false;
+	uint8_t cmdp = 0x00;
+	FILE * f;
+	char filename[FILE_PATH_SIZE] = {0};
+	uint8_t fileNameLen = 0;
+	char buf[17];
+	uint8_t *keyBlock = NULL, *p;
+	int keyitems = 0, keycnt = 0;
+
+	while (param_getchar(Cmd, cmdp) != 0x00 && !errors) {
+		switch (param_getchar(Cmd, cmdp)) {
+		case 'h':
+		case 'H':
+			return usage_hf_iclass_chk();
+		case 'f':
+		case 'F':
+			fileNameLen = param_getstr(Cmd, cmdp+1, filename, sizeof(filename)); 
+			if (fileNameLen < 1) {
+				PrintAndLog("No filename found after f");
+				errors = true;
+			}
+			cmdp += 2;
+			break;
+		case 'e':
+		case 'E':
+			use_elite = true;
+			cmdp++;
+			break;
+		case 'r':
+		case 'R':
+			use_raw = true;
+			cmdp++;
+			break;
+		default:
+			PrintAndLog("Unknown parameter '%c'\n", param_getchar(Cmd, cmdp));
+			errors = true;
+			break;
+		}
+	}
+	if (errors) return usage_hf_iclass_chk();	
+			
+	if ( !(f = fopen( filename , "r")) ) {
+		PrintAndLog("File: %s: not found or locked.", filename);
+		return 1;
+	}
+
+	while( fgets(buf, sizeof(buf), f) ){
+		if (strlen(buf) < 16 || buf[15] == '\n')
+			continue;
+	
+		while (fgetc(f) != '\n' && !feof(f)) ;  //goto next line
+		
+		if( buf[0]=='#' ) continue;	//The line start with # is comment, skip
+
+		if (!isxdigit(buf[0])){
+			PrintAndLog("File content error. '%s' must include 16 HEX symbols",buf);
+			continue;
+		}
+		
+		buf[16] = 0;
+
+		p = realloc(keyBlock, 8 * (keyitems += 64));
+		if (!p) {
+			PrintAndLog("Cannot allocate memory for default keys");
+			free(keyBlock);
+			fclose(f);
+			return 2;
+		}
+		keyBlock = p;
+
+		memset(keyBlock + 8 * keycnt, 0, 8);
+		num_to_bytes(strtoull(buf, NULL, 16), 8, keyBlock + 8 * keycnt);
+
+		//PrintAndLog("check key[%2d] %016" PRIx64, keycnt, bytes_to_num(keyBlock + 8*keycnt, 8));
+		keycnt++;
+		memset(buf, 0, sizeof(buf));
+	}
+	fclose(f);
+	PrintAndLog("Loaded %2d keys from %s", keycnt, filename);
+	
+	// time
+	uint64_t t1 = msclock();
+				
+	for (uint32_t c = 0; c < keycnt; c += 1) {
+			printf("."); fflush(stdout);			
+			if (ukbhit()) {
+				int gc = getchar(); (void)gc;
+				printf("\naborted via keyboard!\n");
+				break;
+			}
+			
+			memcpy(key, keyBlock + 8 * c , 8); 
+
+			// debit key. try twice
+			for (int foo = 0; foo < 2 && !found_debit; foo++) {
+				if (!select_and_auth(key, mac, div_key, false, use_elite, use_raw, false))
+					continue;
+
+				// key found.
+				PrintAndLog("\n--------------------------------------------------------");
+			PrintAndLog("   Found AA1 debit key\t\t[%s]", sprint_hex(key, 8));
+				found_debit = true;
+			}
+			
+			// credit key. try twice
+			for (int foo = 0; foo < 2 && !found_credit; foo++) {
+				if (!select_and_auth(key, mac, div_key, true, use_elite, use_raw, false))
+					continue;
+				
+				// key found
+				PrintAndLog("\n--------------------------------------------------------");
+				PrintAndLog("   Found AA2 credit key\t\t[%s]", sprint_hex(key, 8));
+				found_credit = true;
+			}
+			
+			// both keys found.
+			if ( found_debit && found_credit )
+				break;
+	}
+
+	t1 = msclock() - t1;
+
+	PrintAndLog("\nTime in iclass checkkeys: %.0f seconds\n", (float)t1/1000.0);
+	
+	DropField();
+	free(keyBlock);
+	PrintAndLog("");
+	return 0;
+}
+
 static command_t CommandTable[] = 
 {
 	{"help",        CmdHelp,                    	1,	"This help"},
 	{"calcnewkey",  CmdHFiClassCalcNewKey,      	1,	"[options..] Calc Diversified keys (blocks 3 & 4) to write new keys"},
+	{"chk",         CmdHFiClassCheckKeys,        	0,	"            Check keys"},	
 	{"clone",       CmdHFiClassCloneTag,        	0,	"[options..] Authenticate and Clone from iClass bin file"},
 	{"decrypt",     CmdHFiClassDecrypt,         	1,	"[f <fname>] Decrypt tagdump" },
 	{"dump",        CmdHFiClassReader_Dump,     	0,	"[options..] Authenticate and Dump iClass tag's AA1"},
@@ -1723,6 +1878,7 @@ static command_t CommandTable[] =
 
 int CmdHFiClass(const char *Cmd)
 {
+	clearCommandBuffer();	
 	CmdsParse(CommandTable, Cmd);
 	return 0;
 }

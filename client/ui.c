@@ -9,26 +9,28 @@
 // UI utilities
 //-----------------------------------------------------------------------------
 
-#include <stdarg.h>
+#include <stdbool.h>
+#ifndef EXTERNAL_PRINTANDLOG
 #include <stdlib.h>
 #include <stdio.h>
-#include <stdbool.h>
+#include <stdarg.h>
 #include <readline/readline.h>
 #include <pthread.h>
+#endif
 
 #include "ui.h"
 
 double CursorScaleFactor = 1;
 int PlotGridX=0, PlotGridY=0, PlotGridXdefault= 64, PlotGridYdefault= 64, CursorCPos= 0, CursorDPos= 0;
-int offline;
-int flushAfterWrite = 0;  //buzzy
+bool flushAfterWrite = false;  //buzzy
 int GridOffset = 0;
 bool GridLocked = false;
 bool showDemod = true;
 
-extern pthread_mutex_t print_lock;
-
 static char *logfilename = "proxmark3.log";
+
+#ifndef EXTERNAL_PRINTANDLOG
+static pthread_mutex_t print_lock = PTHREAD_MUTEX_INITIALIZER;
 
 void PrintAndLog(char *fmt, ...)
 {
@@ -49,8 +51,11 @@ void PrintAndLog(char *fmt, ...)
 		}
 	}
 
+	// If there is an incoming message from the hardware (eg: lf hid read) in
+	// the background (while the prompt is displayed and accepting user input),
+	// stash the prompt and bring it back later.
 #ifdef RL_STATE_READCMD
-	// We are using GNU readline.
+	// We are using GNU readline. libedit (OSX) doesn't support this flag.
 	int need_hack = (rl_readline_state & RL_STATE_READCMD) > 0;
 
 	if (need_hack) {
@@ -60,9 +65,6 @@ void PrintAndLog(char *fmt, ...)
 		rl_replace_line("", 0);
 		rl_redisplay();
 	}
-#else
-	// We are using libedit (OSX), which doesn't support this flag.
-	int need_hack = 0;
 #endif
 	
 	va_start(argptr, fmt);
@@ -72,6 +74,8 @@ void PrintAndLog(char *fmt, ...)
 	va_end(argptr);
 	printf("\n");
 
+#ifdef RL_STATE_READCMD
+	// We are using GNU readline. libedit (OSX) doesn't support this flag.
 	if (need_hack) {
 		rl_restore_prompt();
 		rl_replace_line(saved_line, 0);
@@ -79,6 +83,7 @@ void PrintAndLog(char *fmt, ...)
 		rl_redisplay();
 		free(saved_line);
 	}
+#endif
 	
 	if (logging && logfile) {
 		vfprintf(logfile, fmt, argptr2);
@@ -87,16 +92,21 @@ void PrintAndLog(char *fmt, ...)
 	}
 	va_end(argptr2);
 
-	if (flushAfterWrite == 1)  //buzzy
+	if (flushAfterWrite)  //buzzy
 	{
 		fflush(NULL);
 	}
 	//release lock
 	pthread_mutex_unlock(&print_lock);  
 }
-
+#endif
 
 void SetLogFilename(char *fn)
 {
   logfilename = fn;
 }
+
+void SetFlushAfterWrite(bool flush_after_write) {
+	flushAfterWrite = flush_after_write;
+}
+

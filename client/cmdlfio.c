@@ -8,14 +8,14 @@
 // FSK2a, rf/64, 64 bits (complete)
 //-----------------------------------------------------------------------------
 
+#include "cmdlfio.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <inttypes.h>
 #include <limits.h>
-#include "cmdlfio.h"
-#include "proxmark3.h"
-#include "data.h"
+#include "comms.h"
 #include "graph.h"
 #include "ui.h"
 #include "cmdparser.h"

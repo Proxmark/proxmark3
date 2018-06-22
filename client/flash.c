@@ -20,14 +20,7 @@
 #include "elf.h"
 #include "proxendian.h"
 #include "usb_cmd.h"
-
-void SendCommand(UsbCommand* txcmd);
-void ReceiveCommand(UsbCommand* rxcmd);
-void CloseProxmark();
-int OpenProxmark(size_t i);
-
-// FIXME: what the fuckity fuck
-unsigned int current_command = CMD_UNKNOWN;
+#include "comms.h"
 
 #define FLASH_START            0x100000
 #define FLASH_SIZE             (256*1024)
@@ -44,9 +37,10 @@ static const uint8_t elf_ident[] = {
 	EV_CURRENT
 };
 
+
 // Turn PHDRs into flasher segments, checking for PHDR sanity and merging adjacent
 // unaligned segments if needed
-static int build_segs_from_phdrs(flash_file_t *ctx, FILE *fd, Elf32_Phdr *phdrs, int num_phdrs)
+static int build_segs_from_phdrs(flash_file_t *ctx, FILE *fd, Elf32_Phdr *phdrs, uint16_t num_phdrs)
 {
 	Elf32_Phdr *phdr = phdrs;
 	flash_seg_t *seg;
@@ -192,12 +186,12 @@ static int check_segs(flash_file_t *ctx, int can_write_bl) {
 }
 
 // Load an ELF file and prepare it for flashing
-int flash_load(flash_file_t *ctx, const char *name, int can_write_bl)
+int flash_load(flash_file_t *ctx, const char *name, bool can_write_bl)
 {
 	FILE *fd = NULL;
 	Elf32_Ehdr ehdr;
 	Elf32_Phdr *phdrs = NULL;
-	int num_phdrs;
+	uint16_t num_phdrs;
 	int res;
 
 	fd = fopen(name, "rb");
@@ -276,11 +270,11 @@ fail:
 // Get the state of the proxmark, backwards compatible
 static int get_proxmark_state(uint32_t *state)
 {
-	UsbCommand c;
+	UsbCommand c = {0};
 	c.cmd = CMD_DEVICE_INFO;
-  SendCommand(&c);
+	SendCommand(&c);
 	UsbCommand resp;
-	ReceiveCommand(&resp);
+	WaitForResponse(CMD_UNKNOWN, &resp);  // wait for any response. No timeout.
 
 	// Three outcomes:
 	// 1. The old bootrom code will ignore CMD_DEVICE_INFO, but respond with an ACK
@@ -338,17 +332,18 @@ static int enter_bootloader(char *serial_port_name)
 			SendCommand(&c);
 			fprintf(stderr,"Press and hold down button NOW if your bootloader requires it.\n");
 		}
-    msleep(100);
+
+		msleep(100);
 		CloseProxmark();
 
-		fprintf(stderr,"Waiting for Proxmark to reappear on %s",serial_port_name);
-    do {
-			sleep(1);
-			fprintf(stderr, ".");
-		} while (!OpenProxmark(0));
-		fprintf(stderr," Found.\n");
-
-		return 0;
+		bool opened = OpenProxmark(serial_port_name, true, 120, true);   // wait for 2 minutes
+		if (opened) {
+			fprintf(stderr," Found.\n");
+			return 0;
+		} else {
+			fprintf(stderr,"Error: Proxmark not found.\n");
+			return -1;
+		}
 	}
 
 	fprintf(stderr, "Error: Unknown Proxmark mode\n");
@@ -357,8 +352,8 @@ static int enter_bootloader(char *serial_port_name)
 
 static int wait_for_ack(void)
 {
-  UsbCommand ack;
-	ReceiveCommand(&ack);
+	UsbCommand ack;
+	WaitForResponse(CMD_UNKNOWN, &ack);
 	if (ack.cmd != CMD_ACK) {
 		printf("Error: Unexpected reply 0x%04" PRIx64 " (expected ACK)\n", ack.cmd);
 		return -1;
@@ -407,12 +402,12 @@ static int write_block(uint32_t address, uint8_t *data, uint32_t length)
 
 	memset(block_buf, 0xFF, BLOCK_SIZE);
 	memcpy(block_buf, data, length);
-  UsbCommand c;
+	UsbCommand c;
 	c.cmd = CMD_FINISH_WRITE;
 	c.arg[0] = address;
 	memcpy(c.d.asBytes, block_buf, length);
-  SendCommand(&c);
-  return wait_for_ack();
+	SendCommand(&c);
+	return wait_for_ack();
 }
 
 // Write a file's segments to Flash
@@ -472,7 +467,7 @@ void flash_free(flash_file_t *ctx)
 // just reset the unit
 int flash_stop_flashing(void) {
 	UsbCommand c = {CMD_HARDWARE_RESET};
-  SendCommand(&c);
-  msleep(100);
-  return 0;
+	SendCommand(&c);
+	msleep(100);
+	return 0;
 }

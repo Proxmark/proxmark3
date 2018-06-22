@@ -8,10 +8,11 @@
 // PSK1, rf/32, 64 or 224 bits (known)
 //-----------------------------------------------------------------------------
 
+#include "cmdlfindala.h"
+
 #include <stdio.h>
 #include <string.h>
-#include "cmdlfindala.h"
-#include "proxmark3.h"
+#include "comms.h"
 #include "ui.h"
 #include "graph.h"
 #include "cmdparser.h"
@@ -286,7 +287,7 @@ int CmdIndalaDemod(const char *Cmd) {
 }
 
 int CmdIndalaClone(const char *Cmd) {
-	UsbCommand c;
+	UsbCommand c = {0};
 	unsigned int uid1, uid2, uid3, uid4, uid5, uid6, uid7;
 
 	uid1 =  uid2 = uid3 = uid4 = uid5 = uid6 = uid7 = 0;

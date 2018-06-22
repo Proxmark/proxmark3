@@ -10,21 +10,14 @@
 #include <stdlib.h>
 #include <string.h>
 #include <inttypes.h>
+#include <pthread.h>
 #include "proxmark3.h"
 #include "util.h"
 #include "util_posix.h"
 #include "flash.h"
-#include "uart.h"
+#include "comms.h"
 #include "usb_cmd.h"
 
-#ifdef _WIN32
-# define unlink(x)
-#else
-# include <unistd.h>
-#endif
-
-static serial_port sp;
-static char* serial_port_name;
 
 void cmd_debug(UsbCommand* UC) {
   //  Debug
@@ -40,62 +33,24 @@ void cmd_debug(UsbCommand* UC) {
   printf("...\n");
 }
 
-void SendCommand(UsbCommand* txcmd) {
-//  printf("send: ");
-//  cmd_debug(txcmd);
-  if (!uart_send(sp,(byte_t*)txcmd,sizeof(UsbCommand))) {
-    printf("Sending bytes to proxmark failed\n");
-    exit(1);
-  }
-}
-
-void ReceiveCommand(UsbCommand* rxcmd) {
-  byte_t* prxcmd = (byte_t*)rxcmd;
-  byte_t* prx = prxcmd;
-  size_t rxlen;
-  while (true) {
-    if (uart_receive(sp, prx, sizeof(UsbCommand) - (prx-prxcmd), &rxlen)) {
-      prx += rxlen;
-      if ((prx-prxcmd) >= sizeof(UsbCommand)) {
-        return;
-      }
-    }
-  }
-}
-
-void CloseProxmark() {
-  // Clean up the port
-  uart_close(sp);
-  // Fix for linux, it seems that it is extremely slow to release the serial port file descriptor /dev/*
-  unlink(serial_port_name);
-}
-
-int OpenProxmark(size_t i) {
-  sp = uart_open(serial_port_name);
-  if (sp == INVALID_SERIAL_PORT || sp == CLAIMED_SERIAL_PORT) {
-    //poll once a second
-    return 0;
-  }
-  return 1;
-}
-
 static void usage(char *argv0)
 {
 	fprintf(stderr, "Usage:   %s <port> [-b] image.elf [image.elf...]\n\n", argv0);
 	fprintf(stderr, "\t-b\tEnable flashing of bootloader area (DANGEROUS)\n\n");
-	//Is the example below really true? /Martin
-	fprintf(stderr, "Example:\n\n\t %s path/to/osimage.elf path/to/fpgaimage.elf\n", argv0);
-	fprintf(stderr, "\nExample (Linux):\n\n\t %s  /dev/ttyACM0 armsrc/obj/fullimage.elf\n", argv0);
-	fprintf(stderr, "\nNote (Linux): if the flasher gets stuck in 'Waiting for Proxmark to reappear on <DEVICE>',\n");
-	fprintf(stderr, "              you need to blacklist proxmark for modem-manager - see wiki for more details:\n");
-	fprintf(stderr, "              http://code.google.com/p/proxmark3/wiki/Linux\n\n");
+	fprintf(stderr, "\nExample:\n\n\t %s "SERIAL_PORT_H" armsrc/obj/fullimage.elf\n", argv0);
+#ifdef __linux__
+	fprintf(stderr, "\nNote (Linux): if the flasher gets stuck at 'Waiting for Proxmark to reappear',\n");
+	fprintf(stderr, "       you may need to blacklist proxmark for modem-manager. v1.4.14 and later\n");
+	fprintf(stderr, "       include this configuration patch already. The change can be found at:\n");
+	fprintf(stderr, "       https://cgit.freedesktop.org/ModemManager/ModemManager/commit/?id=6e7ff47\n\n");
+#endif
 }
 
 #define MAX_FILES 4
 
 int main(int argc, char **argv)
 {
-	int can_write_bl = 0;
+	int can_write_bl = false;
 	int num_files = 0;
 	int res;
 	flash_file_t files[MAX_FILES];
@@ -110,7 +65,7 @@ int main(int argc, char **argv)
 	for (int i = 2; i < argc; i++) {
 		if (argv[i][0] == '-') {
 			if (!strcmp(argv[i], "-b")) {
-				can_write_bl = 1;
+				can_write_bl = true;
 			} else {
 				usage(argv[0]);
 				return -1;
@@ -126,16 +81,16 @@ int main(int argc, char **argv)
 		}
 	}
 
-  serial_port_name = argv[1];
-  
-  fprintf(stderr,"Waiting for Proxmark to appear on %s",serial_port_name);
-  do {
-    msleep(1000);
-    fprintf(stderr, ".");
-  } while (!OpenProxmark(0));
-  fprintf(stderr," Found.\n");
+	char* serial_port_name = argv[1];
 
-	res = flash_start_flashing(can_write_bl,serial_port_name);
+	if (!OpenProxmark(serial_port_name, true, 120, true)) {   // wait for 2 minutes
+		fprintf(stderr, "Could not find Proxmark on %s.\n\n", serial_port_name);
+		return -1;
+	} else {
+		fprintf(stderr," Found.\n");
+	}
+
+	res = flash_start_flashing(can_write_bl, serial_port_name);
 	if (res < 0)
 		return -1;
 
@@ -155,6 +110,7 @@ int main(int argc, char **argv)
 	if (res < 0)
 		return -1;
 
+	// Stop the command thread.
 	CloseProxmark();
 
 	fprintf(stderr, "All done.\n\n");

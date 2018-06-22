@@ -12,6 +12,9 @@
 #ifndef __MIFAREUTIL_H
 #define __MIFAREUTIL_H
 
+#include <stdint.h>
+#include <stdbool.h>
+
 #include "crapto1/crapto1.h"
 #include "usb_cdc.h"
 
@@ -21,8 +24,6 @@
 #define CRYPT_REQUEST 2
 #define AUTH_FIRST    0	
 #define AUTH_NESTED   2
-#define AUTHENTICATION_TIMEOUT 848			// card times out 1ms after wrong authentication (according to NXP documentation)
-#define PRE_AUTHENTICATION_LEADTIME 400		// some (non standard) cards need a pause after select before they are ready for first authentication
 
 // mifare 4bit card answers
 #define CARD_ACK      0x0A  // 1010 - ACK
@@ -75,6 +76,8 @@ uint8_t mf_crypto1_encrypt4bit(struct Crypto1State *pcs, uint8_t data);
 // Mifare memory structure
 uint8_t NumBlocksPerSector(uint8_t sectorNo);
 uint8_t FirstBlockOfSector(uint8_t sectorNo);
+bool IsSectorTrailer(uint8_t blockNo);
+uint8_t SectorTrailer(uint8_t blockNo);
 
 // emulator functions
 void emlClearMem(void);

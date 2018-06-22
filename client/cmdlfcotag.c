@@ -7,14 +7,15 @@
 //-----------------------------------------------------------------------------
 // Low frequency COTAG commands
 //-----------------------------------------------------------------------------
+
+#include "cmdlfcotag.h"
+
 #include <stdio.h>
 #include <string.h>
 #include <stdint.h>
-#include "proxmark3.h"
+#include "comms.h"
 #include "ui.h"
 #include "cmddata.h"
-#include "data.h"
-#include "cmdlfcotag.h"
 #include "lfdemod.h"
 #include "usb_cmd.h"
 #include "cmdmain.h"
@@ -99,10 +100,9 @@ int CmdCOTAGRead(const char *Cmd) {
 			getSamples(0, true); break;
 		}
 		case 1: {
-			GetFromBigBuf(DemodBuffer, COTAG_BITS, 0);
-			DemodBufferLen = COTAG_BITS;
 			UsbCommand response;
-			if ( !WaitForResponseTimeout(CMD_ACK, &response, 1000) ) {
+			DemodBufferLen = COTAG_BITS;
+			if (!GetFromBigBuf(DemodBuffer, COTAG_BITS, 0, &response, 1000, true)) {
 				PrintAndLog("timeout while waiting for reply.");
 				return -1;
 			}

@@ -1,5 +1,6 @@
 //-----------------------------------------------------------------------------
 // Copyright (C) 2010 iZsh <izsh at fail0verflow.com>
+// Merlok - 2017
 //
 // This code is licensed to you under the terms of the GNU GPL, version 2 or,
 // at your option, any later version. See the LICENSE.txt file for the text of
@@ -8,18 +9,18 @@
 // High frequency commands
 //-----------------------------------------------------------------------------
 
+#include "cmdhf.h"
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
-#include "proxmark3.h"
+#include "comms.h"
 #include "util.h"
-#include "data.h"
 #include "ui.h"
 #include "iso14443crc.h"
 #include "parity.h"
 #include "cmdmain.h"
 #include "cmdparser.h"
-#include "cmdhf.h"
 #include "cmdhf14a.h"
 #include "cmdhf14b.h"
 #include "cmdhf15.h"
@@ -30,6 +31,8 @@
 #include "cmdhfmfu.h"
 #include "cmdhftopaz.h"
 #include "protocols.h"
+#include "emv/cmdemv.h"
+#include "cmdhflist.h"
 
 static int CmdHelp(const char *Cmd);
 
@@ -39,236 +42,6 @@ int CmdHFTune(const char *Cmd)
   SendCommand(&c);
   return 0;
 }
-
-
-void annotateIso14443a(char *exp, size_t size, uint8_t* cmd, uint8_t cmdsize)
-{
-	switch(cmd[0])
-	{
-	case ISO14443A_CMD_WUPA:        snprintf(exp,size,"WUPA"); break;
-	case ISO14443A_CMD_ANTICOLL_OR_SELECT:{
-		// 93 20 = Anticollision (usage: 9320 - answer: 4bytes UID+1byte UID-bytes-xor)
-		// 93 70 = Select (usage: 9370+5bytes 9320 answer - answer: 1byte SAK)
-		if(cmd[1] == 0x70)
-		{
-			snprintf(exp,size,"SELECT_UID"); break;
-		}else
-		{
-			snprintf(exp,size,"ANTICOLL"); break;
-		}
-	}
-	case ISO14443A_CMD_ANTICOLL_OR_SELECT_2:{
-		//95 20 = Anticollision of cascade level2
-		//95 70 = Select of cascade level2
-		if(cmd[2] == 0x70)
-		{
-			snprintf(exp,size,"SELECT_UID-2"); break;
-		}else
-		{
-			snprintf(exp,size,"ANTICOLL-2"); break;
-		}
-	}
-	case ISO14443A_CMD_REQA:		snprintf(exp,size,"REQA"); break;
-	case ISO14443A_CMD_READBLOCK:	snprintf(exp,size,"READBLOCK(%d)",cmd[1]); break;
-	case ISO14443A_CMD_WRITEBLOCK:	snprintf(exp,size,"WRITEBLOCK(%d)",cmd[1]); break;
-	case ISO14443A_CMD_HALT:		snprintf(exp,size,"HALT"); break;
-	case ISO14443A_CMD_RATS:		snprintf(exp,size,"RATS"); break;
-	case MIFARE_CMD_INC:			snprintf(exp,size,"INC(%d)",cmd[1]); break;
-	case MIFARE_CMD_DEC:			snprintf(exp,size,"DEC(%d)",cmd[1]); break;
-	case MIFARE_CMD_RESTORE:		snprintf(exp,size,"RESTORE(%d)",cmd[1]); break;
-	case MIFARE_CMD_TRANSFER:		snprintf(exp,size,"TRANSFER(%d)",cmd[1]); break;
-	case MIFARE_AUTH_KEYA:{
-		if ( cmdsize > 3)
-			snprintf(exp,size,"AUTH-A(%d)",cmd[1]); 
-		else
-			//	case MIFARE_ULEV1_VERSION :  both 0x60.
-			snprintf(exp,size,"EV1 VERSION");
-		break;
-	}
-	case MIFARE_AUTH_KEYB:			snprintf(exp,size,"AUTH-B(%d)",cmd[1]); break;
-	case MIFARE_MAGICWUPC1:			snprintf(exp,size,"MAGIC WUPC1"); break;
-	case MIFARE_MAGICWUPC2:			snprintf(exp,size,"MAGIC WUPC2"); break;
-	case MIFARE_MAGICWIPEC:			snprintf(exp,size,"MAGIC WIPEC"); break;
-	case MIFARE_ULC_AUTH_1:		snprintf(exp,size,"AUTH "); break;
-	case MIFARE_ULC_AUTH_2:		snprintf(exp,size,"AUTH_ANSW"); break;
-	case MIFARE_ULEV1_AUTH:
-		if ( cmdsize == 7 )
-			snprintf(exp,size,"PWD-AUTH KEY: 0x%02x%02x%02x%02x", cmd[1], cmd[2], cmd[3], cmd[4] );
-		else
-			snprintf(exp,size,"PWD-AUTH");
-		break;
-	case MIFARE_ULEV1_FASTREAD:{
-		if ( cmdsize >=3 && cmd[2] <= 0xE6)
-			snprintf(exp,size,"READ RANGE (%d-%d)",cmd[1],cmd[2]); 
-		else
-			snprintf(exp,size,"?");
-		break;
-	}
-	case MIFARE_ULC_WRITE:{
-		if ( cmd[1] < 0x21 )
-			snprintf(exp,size,"WRITEBLOCK(%d)",cmd[1]); 
-		else
-			snprintf(exp,size,"?");
-		break;
-	}
-	case MIFARE_ULEV1_READ_CNT:{
-		if ( cmd[1] < 5 )
-			snprintf(exp,size,"READ CNT(%d)",cmd[1]);
-		else
-			snprintf(exp,size,"?");
-		break;
-	}
-	case MIFARE_ULEV1_INCR_CNT:{
-		if ( cmd[1] < 5 )
-			snprintf(exp,size,"INCR(%d)",cmd[1]);
-		else
-			snprintf(exp,size,"?");
-		break;
-	}
-	case MIFARE_ULEV1_READSIG:		snprintf(exp,size,"READ_SIG"); break;
-	case MIFARE_ULEV1_CHECKTEAR:	snprintf(exp,size,"CHK_TEARING(%d)",cmd[1]); break;
-	case MIFARE_ULEV1_VCSL:		snprintf(exp,size,"VCSL"); break;
-	default:						snprintf(exp,size,"?"); break;
-	}
-	return;
-}
-
-void annotateIclass(char *exp, size_t size, uint8_t* cmd, uint8_t cmdsize)
-{
-	switch(cmd[0])
-	{
-	case ICLASS_CMD_ACTALL:      snprintf(exp,size,"ACTALL"); break;
-	case ICLASS_CMD_READ_OR_IDENTIFY:{
-		if(cmdsize > 1){
-			snprintf(exp,size,"READ(%d)",cmd[1]);
-		}else{
-			snprintf(exp,size,"IDENTIFY");
-		}
-		break;
-	}
-	case ICLASS_CMD_SELECT:      snprintf(exp,size,"SELECT"); break;
-	case ICLASS_CMD_PAGESEL:     snprintf(exp,size,"PAGESEL(%d)", cmd[1]); break;
-	case ICLASS_CMD_READCHECK_KC:snprintf(exp,size,"READCHECK[Kc](%d)", cmd[1]); break;
-	case ICLASS_CMD_READCHECK_KD:snprintf(exp,size,"READCHECK[Kd](%d)", cmd[1]); break;
-	case ICLASS_CMD_CHECK:       snprintf(exp,size,"CHECK"); break;
-	case ICLASS_CMD_DETECT:      snprintf(exp,size,"DETECT"); break;
-	case ICLASS_CMD_HALT:        snprintf(exp,size,"HALT"); break;
-	case ICLASS_CMD_UPDATE:      snprintf(exp,size,"UPDATE(%d)",cmd[1]); break;
-	case ICLASS_CMD_ACT:         snprintf(exp,size,"ACT"); break;
-	case ICLASS_CMD_READ4:       snprintf(exp,size,"READ4(%d)",cmd[1]); break;
-	default:                     snprintf(exp,size,"?"); break;
-	}
-	return;
-}
-
-void annotateIso15693(char *exp, size_t size, uint8_t* cmd, uint8_t cmdsize)
-{
-
-	if(cmd[0] == 0x26)
-	{
-		switch(cmd[1]){
-		case ISO15693_INVENTORY           :snprintf(exp, size, "INVENTORY");break;
-		case ISO15693_STAYQUIET           :snprintf(exp, size, "STAY_QUIET");break;
-		default:                     snprintf(exp,size,"?"); break;
-
-		}
-	}else if(cmd[0] == 0x02)
-	{
-		switch(cmd[1])
-		{
-		case ISO15693_READBLOCK            :snprintf(exp, size, "READBLOCK");break;
-		case ISO15693_WRITEBLOCK           :snprintf(exp, size, "WRITEBLOCK");break;
-		case ISO15693_LOCKBLOCK            :snprintf(exp, size, "LOCKBLOCK");break;
-		case ISO15693_READ_MULTI_BLOCK     :snprintf(exp, size, "READ_MULTI_BLOCK");break;
-		case ISO15693_SELECT               :snprintf(exp, size, "SELECT");break;
-		case ISO15693_RESET_TO_READY       :snprintf(exp, size, "RESET_TO_READY");break;
-		case ISO15693_WRITE_AFI            :snprintf(exp, size, "WRITE_AFI");break;
-		case ISO15693_LOCK_AFI             :snprintf(exp, size, "LOCK_AFI");break;
-		case ISO15693_WRITE_DSFID          :snprintf(exp, size, "WRITE_DSFID");break;
-		case ISO15693_LOCK_DSFID           :snprintf(exp, size, "LOCK_DSFID");break;
-		case ISO15693_GET_SYSTEM_INFO      :snprintf(exp, size, "GET_SYSTEM_INFO");break;
-		case ISO15693_READ_MULTI_SECSTATUS :snprintf(exp, size, "READ_MULTI_SECSTATUS");break;
-		default:                            snprintf(exp,size,"?"); break;
-		}
-	}
-}
-
-
-void annotateTopaz(char *exp, size_t size, uint8_t* cmd, uint8_t cmdsize)
-{
-	switch(cmd[0]) {
-		case TOPAZ_REQA						:snprintf(exp, size, "REQA");break;
-		case TOPAZ_WUPA						:snprintf(exp, size, "WUPA");break;
-		case TOPAZ_RID						:snprintf(exp, size, "RID");break;
-		case TOPAZ_RALL						:snprintf(exp, size, "RALL");break;
-		case TOPAZ_READ						:snprintf(exp, size, "READ");break;
-		case TOPAZ_WRITE_E					:snprintf(exp, size, "WRITE-E");break;
-		case TOPAZ_WRITE_NE					:snprintf(exp, size, "WRITE-NE");break;
-		case TOPAZ_RSEG						:snprintf(exp, size, "RSEG");break;
-		case TOPAZ_READ8					:snprintf(exp, size, "READ8");break;
-		case TOPAZ_WRITE_E8					:snprintf(exp, size, "WRITE-E8");break;
-		case TOPAZ_WRITE_NE8				:snprintf(exp, size, "WRITE-NE8");break;
-		default:                            snprintf(exp,size,"?"); break;
-	}
-}
-
-
-/**
-06 00 = INITIATE
-0E xx = SELECT ID (xx = Chip-ID)
-0B = Get UID
-08 yy = Read Block (yy = block number)
-09 yy dd dd dd dd = Write Block (yy = block number; dd dd dd dd = data to be written)
-0C = Reset to Inventory
-0F = Completion
-0A 11 22 33 44 55 66 = Authenticate (11 22 33 44 55 66 = data to authenticate)
-**/
-
-void annotateIso14443b(char *exp, size_t size, uint8_t* cmd, uint8_t cmdsize)
-{
-	switch(cmd[0]){
-	case ISO14443B_REQB   : snprintf(exp,size,"REQB");break;
-	case ISO14443B_ATTRIB : snprintf(exp,size,"ATTRIB");break;
-	case ISO14443B_HALT   : snprintf(exp,size,"HALT");break;
-	case ISO14443B_INITIATE     : snprintf(exp,size,"INITIATE");break;
-	case ISO14443B_SELECT       : snprintf(exp,size,"SELECT(%d)",cmd[1]);break;
-	case ISO14443B_GET_UID      : snprintf(exp,size,"GET UID");break;
-	case ISO14443B_READ_BLK     : snprintf(exp,size,"READ_BLK(%d)", cmd[1]);break;
-	case ISO14443B_WRITE_BLK    : snprintf(exp,size,"WRITE_BLK(%d)",cmd[1]);break;
-	case ISO14443B_RESET        : snprintf(exp,size,"RESET");break;
-	case ISO14443B_COMPLETION   : snprintf(exp,size,"COMPLETION");break;
-	case ISO14443B_AUTHENTICATE : snprintf(exp,size,"AUTHENTICATE");break;
-	default                     : snprintf(exp,size ,"?");break;
-	}
-
-}
-
-/**
- * @brief iso14443A_CRC_check Checks CRC in command or response
- * @param isResponse
- * @param data
- * @param len
- * @return  0 : CRC-command, CRC not ok
- *          1 : CRC-command, CRC ok
- *          2 : Not crc-command
- */
-
-uint8_t iso14443A_CRC_check(bool isResponse, uint8_t* data, uint8_t len)
-{
-	uint8_t b1,b2;
-
-	if(len <= 2) return 2;
-
-	if(isResponse & (len < 6)) return 2;
-	
-	ComputeCrc14443(CRC_14443_A, data, len-2, &b1, &b2);
-	if (b1 != data[len-2] || b2 != data[len-1]) {
-		return 0;
-	} else {
-		return 1;
-	}
-}
-
 
 /**
  * @brief iso14443B_CRC_check Checks CRC in command or response
@@ -417,6 +190,8 @@ uint16_t printTraceLine(uint16_t tracepos, uint16_t traceLen, uint8_t *trace, ui
 	uint8_t topaz_reader_command[9];
 	uint32_t timestamp, first_timestamp, EndOfTransmissionTimestamp;
 	char explanation[30] = {0};
+	uint8_t mfData[32] = {0};
+	size_t mfDataLen = 0;
 
 	if (tracepos + sizeof(uint32_t) + sizeof(uint16_t) + sizeof(uint16_t) > traceLen) return traceLen;
 	
@@ -464,6 +239,9 @@ uint16_t printTraceLine(uint16_t tracepos, uint16_t traceLen, uint8_t *trace, ui
 			case ISO_14443B:
 			case TOPAZ:
 				crcStatus = iso14443B_CRC_check(isResponse, frame, data_len); 
+				break;
+			case PROTO_MIFARE:
+				crcStatus = mifare_CRC_check(isResponse, frame, data_len);
 				break;
 			case ISO_14443A:
 				crcStatus = iso14443A_CRC_check(isResponse, frame, data_len);
@@ -513,6 +291,9 @@ uint16_t printTraceLine(uint16_t tracepos, uint16_t traceLen, uint8_t *trace, ui
 
 	EndOfTransmissionTimestamp = timestamp + duration;
 
+	if (protocol == PROTO_MIFARE)
+		annotateMifare(explanation, sizeof(explanation), frame, data_len, parityBytes, parity_len, isResponse);
+	
 	if(!isResponse)
 	{
 		switch(protocol) {
@@ -541,6 +322,19 @@ uint16_t printTraceLine(uint16_t tracepos, uint16_t traceLen, uint8_t *trace, ui
 				(j == num_lines-1) ? explanation : "");
 		}
 	}
+	
+	if (DecodeMifareData(frame, data_len, parityBytes, isResponse, mfData, &mfDataLen)) {
+		memset(explanation, 0x00, sizeof(explanation));
+		if (!isResponse) {
+			explanation[0] = '>';
+			annotateIso14443a(&explanation[1], sizeof(explanation) - 1, mfData, mfDataLen);
+		}
+		uint8_t crcc = iso14443A_CRC_check(isResponse, mfData, mfDataLen);
+		PrintAndLog("            |          * | dec |%-64s | %-4s| %s",
+			sprint_hex(mfData, mfDataLen),
+			(crcc == 0 ? "!crc" : (crcc == 1 ? " ok " : "    ")),
+			(true) ? explanation : "");
+	};
 
 	if (is_last_record(tracepos, trace, traceLen)) return traceLen;
 	
@@ -561,99 +355,186 @@ int CmdHFList(const char *Cmd)
 {
 	bool showWaitCycles = false;
 	bool markCRCBytes = false;
+	bool loadFromFile = false;
+	bool saveToFile = false;
+	char param1 = '\0';
+	char param2 = '\0';
+	char param3 = '\0';
 	char type[40] = {0};
-	int tlen = param_getstr(Cmd,0,type);
-	char param1 = param_getchar(Cmd, 1);
-	char param2 = param_getchar(Cmd, 2);
-	bool errors = false;
+	char filename[FILE_PATH_SIZE] = {0};
 	uint8_t protocol = 0;
-	//Validate params
+	
+	// parse command line
+	int tlen = param_getstr(Cmd, 0, type, sizeof(type));
+	if (param_getlength(Cmd, 1) == 1) {
+		param1 = param_getchar(Cmd, 1);
+	} else {
+		param_getstr(Cmd, 1, filename, sizeof(filename));
+	}
+	if (param_getlength(Cmd, 2) == 1) {
+		param2 = param_getchar(Cmd, 2);
+	} else if (strlen(filename) == 0) {
+		param_getstr(Cmd, 2, filename, sizeof(filename));
+	}
+	if (param_getlength(Cmd, 3) == 1) {
+		param3 = param_getchar(Cmd, 3);
+	} else if (strlen(filename) == 0) {
+		param_getstr(Cmd, 3, filename, sizeof(filename));
+	}
+
+	// Validate param1
+	bool errors = false;
 
 	if(tlen == 0) {
 		errors = true;
 	}
 
 	if(param1 == 'h'
-			|| (param1 != 0 && param1 != 'f' && param1 != 'c')
-			|| (param2 != 0 && param2 != 'f' && param2 != 'c')) {
+			|| (param1 != 0 && param1 != 'f' && param1 != 'c' && param1 != 'l')
+			|| (param2 != 0 && param2 != 'f' && param2 != 'c' && param2 != 'l')
+			|| (param3 != 0 && param3 != 'f' && param3 != 'c' && param3 != 'l')) {
 		errors = true;
 	}
 
 	if(!errors) {
 		if(strcmp(type, "iclass") == 0)	{
 			protocol = ICLASS;
+		} else if(strcmp(type, "mf") == 0) {
+			protocol = PROTO_MIFARE;
 		} else if(strcmp(type, "14a") == 0) {
 			protocol = ISO_14443A;
 		} else if(strcmp(type, "14b") == 0)	{
 			protocol = ISO_14443B;
-		} else if(strcmp(type,"topaz")== 0) {
+		} else if(strcmp(type,"topaz") == 0) {
 			protocol = TOPAZ;
-		} else if(strcmp(type,"raw")== 0) {
-			protocol = -1;//No crc, no annotations
+		} else if(strcmp(type,"raw") == 0) {
+			protocol = -1; //No crc, no annotations
+		} else if (strcmp(type, "save") == 0) {
+			saveToFile = true;
 		} else {
 			errors = true;
 		}
 	}
+	
+	if (param1 == 'f' || param2 == 'f' || param3 == 'f') {
+		showWaitCycles = true;
+	}
 
+	if (param1 == 'c' || param2 == 'c' || param3 == 'c') {
+		markCRCBytes = true;
+	}
+
+	if (param1 == 'l' || param2 == 'l' || param3 == 'l') {
+		loadFromFile = true;
+	}
+
+	if ((loadFromFile || saveToFile) && strlen(filename) == 0) {
+		errors = true;
+	}
+
+	if (loadFromFile && saveToFile) {
+		errors = true;
+	}
+	
 	if (errors) {
-		PrintAndLog("List protocol data in trace buffer.");
-		PrintAndLog("Usage:  hf list <protocol> [f][c]");
+		PrintAndLog("List or save protocol data.");
+		PrintAndLog("Usage:  hf list <protocol> [f] [c] [l <filename>]");
+		PrintAndLog("        hf list save <filename>");
 		PrintAndLog("    f      - show frame delay times as well");
 		PrintAndLog("    c      - mark CRC bytes");
+		PrintAndLog("    l      - load data from file instead of trace buffer");
+		PrintAndLog("    save   - save data to file");
 		PrintAndLog("Supported <protocol> values:");
 		PrintAndLog("    raw    - just show raw data without annotations");
 		PrintAndLog("    14a    - interpret data as iso14443a communications");
+		PrintAndLog("    mf     - interpret data as iso14443a communications and decrypt crypto1 stream");
 		PrintAndLog("    14b    - interpret data as iso14443b communications");
 		PrintAndLog("    iclass - interpret data as iclass communications");
 		PrintAndLog("    topaz  - interpret data as topaz communications");
 		PrintAndLog("");
 		PrintAndLog("example: hf list 14a f");
 		PrintAndLog("example: hf list iclass");
+		PrintAndLog("example: hf list save myCardTrace.trc");
+		PrintAndLog("example: hf list 14a l myCardTrace.trc");
 		return 0;
 	}
 
 
-	if (param1 == 'f' || param2 == 'f') {
-		showWaitCycles = true;
-	}
-
-	if (param1 == 'c' || param2 == 'c') {
-		markCRCBytes = true;
-	}
-
 	uint8_t *trace;
-	uint16_t tracepos = 0;
-	trace = malloc(USB_CMD_DATA_SIZE);
-
-	// Query for the size of the trace
-	UsbCommand response;
-	GetFromBigBuf(trace, USB_CMD_DATA_SIZE, 0);
-	WaitForResponse(CMD_ACK, &response);
-	uint16_t traceLen = response.arg[2];
-	if (traceLen > USB_CMD_DATA_SIZE) {
-		uint8_t *p = realloc(trace, traceLen);
-		if (p == NULL) {
+	uint32_t tracepos = 0;
+	uint32_t traceLen = 0;
+	
+	if (loadFromFile) {
+		#define TRACE_CHUNK_SIZE (1<<16)		// 64K to start with. Will be enough for BigBuf and some room for future extensions
+		FILE *tracefile = NULL;
+		size_t bytes_read;
+		trace = malloc(TRACE_CHUNK_SIZE);
+		if (trace == NULL) {
 			PrintAndLog("Cannot allocate memory for trace");
-			free(trace);
 			return 2;
 		}
-		trace = p;
-		GetFromBigBuf(trace, traceLen, 0);
-		WaitForResponse(CMD_ACK, NULL);
+		if ((tracefile = fopen(filename,"rb")) == NULL) { 
+			PrintAndLog("Could not open file %s", filename);
+			free(trace);
+			return 0;
+		}
+		while (!feof(tracefile)) {
+			bytes_read = fread(trace+traceLen, 1, TRACE_CHUNK_SIZE, tracefile);
+			traceLen += bytes_read;
+			if (!feof(tracefile)) {
+				uint8_t *p = realloc(trace, traceLen + TRACE_CHUNK_SIZE);
+				if (p == NULL) {
+					PrintAndLog("Cannot allocate memory for trace");
+					free(trace);
+					fclose(tracefile);
+					return 2;
+				}
+				trace = p;
+			}
+		}
+		fclose(tracefile);
+	} else {
+		trace = malloc(USB_CMD_DATA_SIZE);
+		// Query for the size of the trace
+		UsbCommand response;
+		GetFromBigBuf(trace, USB_CMD_DATA_SIZE, 0, &response, -1, false);
+		traceLen = response.arg[2];
+		if (traceLen > USB_CMD_DATA_SIZE) {
+			uint8_t *p = realloc(trace, traceLen);
+			if (p == NULL) {
+				PrintAndLog("Cannot allocate memory for trace");
+				free(trace);
+				return 2;
+			}
+			trace = p;
+			GetFromBigBuf(trace, traceLen, 0, NULL, -1, false);
+		}
 	}
-	
-	PrintAndLog("Recorded Activity (TraceLen = %d bytes)", traceLen);
-	PrintAndLog("");
-	PrintAndLog("Start = Start of Start Bit, End = End of last modulation. Src = Source of Transfer");
-	PrintAndLog("iso14443a - All times are in carrier periods (1/13.56Mhz)");
-	PrintAndLog("iClass    - Timings are not as accurate");
-	PrintAndLog("");
-	PrintAndLog("      Start |        End | Src | Data (! denotes parity error)                                   | CRC | Annotation         |");
-	PrintAndLog("------------|------------|-----|-----------------------------------------------------------------|-----|--------------------|");
 
-	while(tracepos < traceLen)
-	{
-		tracepos = printTraceLine(tracepos, traceLen, trace, protocol, showWaitCycles, markCRCBytes);
+	if (saveToFile) {
+		FILE *tracefile = NULL;
+		if ((tracefile = fopen(filename,"wb")) == NULL) { 
+			PrintAndLog("Could not create file %s", filename);
+			return 1;
+		}
+		fwrite(trace, 1, traceLen, tracefile);
+		PrintAndLog("Recorded Activity (TraceLen = %d bytes) written to file %s", traceLen, filename);
+		fclose(tracefile);
+	} else {
+		PrintAndLog("Recorded Activity (TraceLen = %d bytes)", traceLen);
+		PrintAndLog("");
+		PrintAndLog("Start = Start of Start Bit, End = End of last modulation. Src = Source of Transfer");
+		PrintAndLog("iso14443a - All times are in carrier periods (1/13.56Mhz)");
+		PrintAndLog("iClass    - Timings are not as accurate");
+		PrintAndLog("");
+		PrintAndLog("      Start |        End | Src | Data (! denotes parity error)                                   | CRC | Annotation         |");
+		PrintAndLog("------------|------------|-----|-----------------------------------------------------------------|-----|--------------------|");
+
+		ClearAuthData();
+		while(tracepos < traceLen)
+		{
+			tracepos = printTraceLine(tracepos, traceLen, trace, protocol, showWaitCycles, markCRCBytes);
+		}
 	}
 
 	free(trace);
@@ -663,7 +544,7 @@ int CmdHFList(const char *Cmd)
 int CmdHFSearch(const char *Cmd){
 	int ans = 0;
 	PrintAndLog("");
-	ans = CmdHF14AReader("s");
+	ans = CmdHF14AInfo("s");
 	if (ans > 0) {
 		PrintAndLog("\nValid ISO14443A Tag Found - Quiting Search\n");
 		return ans;
@@ -703,6 +584,7 @@ static command_t CommandTable[] =
 	{"14b",		CmdHF14B,		1, "{ ISO14443B RFIDs... }"},
 	{"15",		CmdHF15,		1, "{ ISO15693 RFIDs... }"},
 	{"epa",		CmdHFEPA,		1, "{ German Identification Card... }"},
+	{"emv",		CmdHFEMV,		1, "{ EMV cards... }"},
 	{"legic",	CmdHFLegic,		0, "{ LEGIC RFIDs... }"},
 	{"iclass",	CmdHFiClass,	1, "{ ICLASS RFIDs... }"},
 	{"mf",		CmdHFMF,		1, "{ MIFARE RFIDs... }"},

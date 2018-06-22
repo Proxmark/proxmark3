@@ -41,10 +41,10 @@ extern void ReaderMifare(bool first_try);
 
 extern int EmGetCmd(uint8_t *received, uint16_t *len, uint8_t *parity);
 extern int EmSendCmd(uint8_t *resp, uint16_t respLen);
-extern int EmSendCmdEx(uint8_t *resp, uint16_t respLen, bool correctionNeeded);
+extern int EmSendCmdEx(uint8_t *resp, uint16_t respLen);
 extern int EmSend4bit(uint8_t resp);
 extern int EmSendCmdPar(uint8_t *resp, uint16_t respLen, uint8_t *par);
-extern int EmSendPrecompiledCmd(tag_response_info_t *response_info, bool correctionNeeded);
+extern int EmSendPrecompiledCmd(tag_response_info_t *response_info);
 
 extern bool prepare_allocated_tag_modulation(tag_response_info_t *response_info, uint8_t **buffer, size_t *buffer_size);
 

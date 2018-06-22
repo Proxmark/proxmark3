@@ -10,7 +10,7 @@
 #define __FLASH_H__
 
 #include <stdint.h>
-#include "elf.h"
+#include <stdbool.h>
 
 typedef struct {
 	void *data;
@@ -25,11 +25,10 @@ typedef struct {
 	flash_seg_t *segments;
 } flash_file_t;
 
-int flash_load(flash_file_t *ctx, const char *name, int can_write_bl);
-int flash_start_flashing(int enable_bl_writes,char *serial_port_name);
+int flash_load(flash_file_t *ctx, const char *name, bool can_write_bl);
+int flash_start_flashing(int enable_bl_writes, char *serial_port_name);
 int flash_write(flash_file_t *ctx);
 void flash_free(flash_file_t *ctx);
 int flash_stop_flashing(void);
-
 #endif
 

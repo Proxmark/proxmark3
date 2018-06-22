@@ -139,8 +139,13 @@ bool verify_key(uint32_t cuid, noncelist_t *nonces, uint8_t *best_first_bytes, u
 	return true;
 }
 
-
-static void* crack_states_thread(void* x){
+static void* 
+#ifdef __has_attribute
+#if __has_attribute(force_align_arg_pointer)
+__attribute__((force_align_arg_pointer)) 
+#endif
+#endif
+crack_states_thread(void* x){
 
 	struct arg {
 		bool silent;

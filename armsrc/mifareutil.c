@@ -9,13 +9,15 @@
 // Work with mifare cards.
 //-----------------------------------------------------------------------------
 
-#include <string.h>
 #include "mifareutil.h"
+
+#include <string.h>
+#include <stdbool.h>
+
 #include "proxmark3.h"
 #include "apps.h"
 #include "util.h"
 #include "parity.h"
-
 #include "iso14443crc.h"
 #include "iso14443a.h"
 #include "crapto1/crapto1.h"
@@ -403,31 +405,48 @@ int mifare_ultra_auth(uint8_t *keybytes){
 	return 1;
 }
 
+
+#define MFU_MAX_RETRIES 5
 int mifare_ultra_readblock(uint8_t blockNo, uint8_t *blockData)
 {
 	uint16_t len;
 	uint8_t	bt[2];
 	uint8_t receivedAnswer[MAX_FRAME_SIZE];
 	uint8_t receivedAnswerPar[MAX_PARITY_SIZE];
-	
+	uint8_t retries;
+	int result = 0;
 
-	len = mifare_sendcmd_short(NULL, 1, 0x30, blockNo, receivedAnswer, receivedAnswerPar, NULL);
-	if (len == 1) {
-		if (MF_DBGLEVEL >= MF_DBG_ERROR) Dbprintf("Cmd Error: %02x", receivedAnswer[0]);
-		return 1;
+	for (retries = 0; retries < MFU_MAX_RETRIES; retries++) {
+		len = mifare_sendcmd_short(NULL, 1, 0x30, blockNo, receivedAnswer, receivedAnswerPar, NULL);
+		if (len == 1) {
+			if (MF_DBGLEVEL >= MF_DBG_ERROR) Dbprintf("Cmd Error: %02x", receivedAnswer[0]);
+			result = 1;
+			continue;
+		}
+		if (len != 18) {
+			if (MF_DBGLEVEL >= MF_DBG_ERROR) Dbprintf("Cmd Error: card timeout. len: %x", len);
+			result = 2;
+			continue;
+		}
+
+		memcpy(bt, receivedAnswer + 16, 2);
+		AppendCrc14443a(receivedAnswer, 16);
+		if (bt[0] != receivedAnswer[16] || bt[1] != receivedAnswer[17]) {
+			if (MF_DBGLEVEL >= MF_DBG_ERROR) Dbprintf("Cmd CRC response error.");
+			result = 3;
+			continue;
+		}
+
+		// No errors encountered; don't retry
+		result = 0;
+		break;
 	}
-	if (len != 18) {
-		if (MF_DBGLEVEL >= MF_DBG_ERROR) Dbprintf("Cmd Error: card timeout. len: %x", len);
-		return 2;
+
+	if (result != 0) {
+		Dbprintf("Cmd Error: too many retries; read failed");
+		return result;
 	}
-    
-	memcpy(bt, receivedAnswer + 16, 2);
-	AppendCrc14443a(receivedAnswer, 16);
-	if (bt[0] != receivedAnswer[16] || bt[1] != receivedAnswer[17]) {
-		if (MF_DBGLEVEL >= MF_DBG_ERROR) Dbprintf("Cmd CRC response error.");
-		return 3;
-	}
-	
+
 	memcpy(blockData, receivedAnswer, 14);
 	return 0;
 }
@@ -585,6 +604,19 @@ uint8_t FirstBlockOfSector(uint8_t sectorNo)
 		
 }
 
+uint8_t SectorTrailer(uint8_t blockNo)
+{
+	if (blockNo < 32*4) {
+		return (blockNo | 0x03);
+	} else {
+		return (blockNo | 0x0f);
+	}
+}
+
+bool IsSectorTrailer(uint8_t blockNo)
+{
+	return (blockNo == SectorTrailer(blockNo));
+}
 
 // work with emulator memory
 void emlSetMem(uint8_t *data, int blockNum, int blocksCount) {

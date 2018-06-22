@@ -9,10 +9,11 @@
 //-----------------------------------------------------------------------------
 
 #include "cmdlfjablotron.h"
+
 #include <string.h>
 #include <inttypes.h>
 #include <stdbool.h>
-#include "proxmark3.h"
+#include "comms.h"
 #include "ui.h"
 #include "util.h"
 #include "graph.h"

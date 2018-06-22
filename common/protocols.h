@@ -200,10 +200,11 @@ NXP/Philips CUSTOM COMMANDS
 #define TOPAZ_WRITE_NE8					0x1B	// Write-no-erase (eight bytes)
 
 
-#define ISO_14443A	0
-#define ICLASS		1
-#define ISO_14443B	2
-#define TOPAZ		3
+#define ISO_14443A		0
+#define ICLASS			1
+#define ISO_14443B		2
+#define TOPAZ			3
+#define PROTO_MIFARE	4
 
 //-- Picopass fuses
 #define FUSE_FPERS   0x80

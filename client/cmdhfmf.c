@@ -15,9 +15,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <ctype.h>
-#include "proxmark3.h"
+#include "comms.h"
 #include "cmdmain.h"
 #include "cmdhfmfhard.h"
+#include "parity.h"
 #include "util.h"
 #include "util_posix.h"
 #include "usb_cmd.h"
@@ -25,6 +26,7 @@
 #include "mifarehost.h"
 #include "mifare.h"
 #include "mfkey.h"
+#include "hardnested/hardnested_bf_core.h"
 
 #define NESTED_SECTOR_RETRY     10			// how often we try mfested() until we give up
 
@@ -527,13 +529,12 @@ int CmdHF14AMfRestore(const char *Cmd)
 //----------------------------------------------
 //   Nested
 //----------------------------------------------
-# define NESTED_KEY_COUNT 15
 
 static void parseParamTDS(const char *Cmd, const uint8_t indx, bool *paramT, bool *paramD, uint8_t *timeout) {
 	char ctmp3[3] = {0};
 	int len = param_getlength(Cmd, indx);
 	if (len > 0 && len < 4){
-		param_getstr(Cmd, indx, ctmp3);
+		param_getstr(Cmd, indx, ctmp3, sizeof(ctmp3));
 		
 		*paramT |= (ctmp3[0] == 't' || ctmp3[0] == 'T');
 		*paramD |= (ctmp3[0] == 'd' || ctmp3[0] == 'D');
@@ -563,7 +564,7 @@ int CmdHF14AMfNested(const char *Cmd)
 	uint8_t trgKeyType = 0;
 	uint8_t SectorsCnt = 0;
 	uint8_t key[6] = {0, 0, 0, 0, 0, 0};
-	uint8_t keyBlock[NESTED_KEY_COUNT * 6];
+	uint8_t keyBlock[MifareDefaultKeysSize * 6];
 	uint64_t key64 = 0;
 	// timeout in units. (ms * 106)/10 or us*0.0106
 	uint8_t btimeout14a = MF_CHKKEYS_DEFTIMEOUT; // fast by default
@@ -683,9 +684,9 @@ int CmdHF14AMfNested(const char *Cmd)
 			if (transferToEml) {
 				uint8_t sectortrailer;
 				if (trgBlockNo < 32*4) { 	// 4 block sector
-					sectortrailer = (trgBlockNo & 0x03) + 3;
+					sectortrailer = trgBlockNo | 0x03;
 				} else {					// 16 block sector
-					sectortrailer = (trgBlockNo & 0x0f) + 15;
+					sectortrailer = trgBlockNo | 0x0f;
 				}
 				mfEmlGetMem(keyBlock, sectortrailer, 1);
 
@@ -713,7 +714,7 @@ int CmdHF14AMfNested(const char *Cmd)
 		}
 
 		PrintAndLog("Testing known keys. Sector count=%d", SectorsCnt);
-		mfCheckKeysSec(SectorsCnt, 2, btimeout14a, true, NESTED_KEY_COUNT, keyBlock, e_sector);
+		mfCheckKeysSec(SectorsCnt, 2, btimeout14a, true, MifareDefaultKeysSize, keyBlock, e_sector);
 		
 		// get known key from array
 		bool keyFound = false;
@@ -725,7 +726,6 @@ int CmdHF14AMfNested(const char *Cmd)
 						blockNo = i * 4;
 						keyType = j;
 						num_to_bytes(e_sector[i].Key[j], 6, key);
-						
 						keyFound = true;
 						break;
 					}
@@ -736,6 +736,7 @@ int CmdHF14AMfNested(const char *Cmd)
 			// Can't found a key....
 			if (!keyFound) {
 				PrintAndLog("Can't found any of the known keys.");
+				free(e_sector);
 				return 4;
 			}
 			PrintAndLog("--auto key. block no:%3d, key type:%c key:%s", blockNo, keyType?'B':'A', sprint_hex(key, 6));
@@ -863,6 +864,13 @@ int CmdHF14AMfNestedHard(const char *Cmd)
 		PrintAndLog("      w: Acquire nonces and write them to binary file nonces.bin");
 		PrintAndLog("      s: Slower acquisition (required by some non standard cards)");
 		PrintAndLog("      r: Read nonces.bin and start attack");
+		PrintAndLog("      iX: set type of SIMD instructions. Without this flag programs autodetect it.");
+		PrintAndLog("        i5: AVX512");
+		PrintAndLog("        i2: AVX2");
+		PrintAndLog("        ia: AVX");
+		PrintAndLog("        is: SSE2");
+		PrintAndLog("        im: MMX");
+		PrintAndLog("        in: none (use CPU regular instruction set)");
 		PrintAndLog(" ");
 		PrintAndLog("      sample1: hf mf hardnested 0 A FFFFFFFFFFFF 4 A");
 		PrintAndLog("      sample2: hf mf hardnested 0 A FFFFFFFFFFFF 4 A w");
@@ -881,15 +889,20 @@ int CmdHF14AMfNestedHard(const char *Cmd)
 	int tests = 0;
 
 
+	uint16_t iindx = 0;
 	if (ctmp == 'R' || ctmp == 'r') {
 		nonce_file_read = true;
+		iindx = 1;
 		if (!param_gethex(Cmd, 1, trgkey, 12)) {
 			know_target_key = true;
+			iindx = 2;
 		}
 	} else if (ctmp == 'T' || ctmp == 't') {
 		tests = param_get32ex(Cmd, 1, 100, 10);
+		iindx = 2;
 		if (!param_gethex(Cmd, 2, trgkey, 12)) {
 			know_target_key = true;
+			iindx = 3;
 		}
 	} else {
 		blockNo = param_get8(Cmd, 0);
@@ -923,18 +936,53 @@ int CmdHF14AMfNestedHard(const char *Cmd)
 			know_target_key = true;
 			i++;
 		}
+		iindx = i;
 
 		while ((ctmp = param_getchar(Cmd, i))) {
 			if (ctmp == 's' || ctmp == 'S') {
 				slow = true;
 			} else if (ctmp == 'w' || ctmp == 'W') {
 				nonce_file_write = true;
+			} else if (param_getlength(Cmd, i) == 2 && ctmp == 'i') {
+				iindx = i;
 			} else {
-				PrintAndLog("Possible options are w and/or s");
+				PrintAndLog("Possible options are w , s and/or iX");
 				return 1;
 			}
 			i++;
 		}
+	}
+	
+	SetSIMDInstr(SIMD_AUTO);
+	if (iindx > 0) {
+		while ((ctmp = param_getchar(Cmd, iindx))) {
+			if (param_getlength(Cmd, iindx) == 2 && ctmp == 'i') {
+				switch(param_getchar_indx(Cmd, 1, iindx)) {
+					case '5':
+						SetSIMDInstr(SIMD_AVX512);
+						break;
+					case '2':
+						SetSIMDInstr(SIMD_AVX2);
+						break;
+					case 'a':
+						SetSIMDInstr(SIMD_AVX);
+						break;
+					case 's':
+						SetSIMDInstr(SIMD_SSE2);
+						break;
+					case 'm':
+						SetSIMDInstr(SIMD_MMX);
+						break;
+					case 'n':
+						SetSIMDInstr(SIMD_NONE);
+						break;
+					default:
+						PrintAndLog("Unknown SIMD type. %c", param_getchar_indx(Cmd, 1, iindx));
+						return 1;
+				}
+			}
+			iindx++;
+		}	
 	}
 
 	PrintAndLog("--target block no:%3d, target key type:%c, known target key: 0x%02x%02x%02x%02x%02x%02x%s, file action: %s, Slow: %s, Tests: %d ",
@@ -988,6 +1036,7 @@ int CmdHF14AMfChk(const char *Cmd)
 	int i, res;
 	int	keycnt = 0;
 	char ctmp	= 0x00;
+	int clen = 0;
 	char ctmp3[3]	= {0x00};
 	uint8_t blockNo = 0;
 	uint8_t SectorsCnt = 0;
@@ -1016,34 +1065,38 @@ int CmdHF14AMfChk(const char *Cmd)
 		blockNo = param_get8(Cmd, 0);
 
 	ctmp = param_getchar(Cmd, 1);
-	switch (ctmp) {
-	case 'a': case 'A':
-		keyType = 0;
-		break;
-	case 'b': case 'B':
-		keyType = 1;
-		break;
-	case '?':
-		keyType = 2;
-		break;
-	default:
-		PrintAndLog("Key type must be A , B or ?");
-		free(keyBlock);
-		return 1;
-	};
+	clen = param_getlength(Cmd, 1);
+	if (clen == 1) {
+		switch (ctmp) {
+		case 'a': case 'A':
+			keyType = 0;
+			break;
+		case 'b': case 'B':
+			keyType = 1;
+			break;
+		case '?':
+			keyType = 2;
+			break;
+		default:
+			PrintAndLog("Key type must be A , B or ?");
+			free(keyBlock);
+			return 1;
+		};
+	}
 
 	// transfer to emulator & create dump file
 	ctmp = param_getchar(Cmd, 2);
-	if (ctmp == 't' || ctmp == 'T') transferToEml = 1;
-	if (ctmp == 'd' || ctmp == 'D') createDumpFile = 1;
+	clen = param_getlength(Cmd, 2);
+	if (clen == 1 && (ctmp == 't' || ctmp == 'T')) transferToEml = 1;
+	if (clen == 1 && (ctmp == 'd' || ctmp == 'D')) createDumpFile = 1;
 	
 	param3InUse = transferToEml | createDumpFile;
 	
 	timeout14a = 500; // fast by default
 	// double parameters - ts, ds
-	int clen = param_getlength(Cmd, 2);
+	clen = param_getlength(Cmd, 2);
 	if (clen == 2 || clen == 3){
-		param_getstr(Cmd, 2, ctmp3);
+		param_getstr(Cmd, 2, ctmp3, sizeof(ctmp3));
 		ctmp = ctmp3[1];
 	}
 	//parse
@@ -1075,7 +1128,7 @@ int CmdHF14AMfChk(const char *Cmd)
 			keycnt++;
 		} else {
 			// May be a dic file
-			if ( param_getstr(Cmd, 2 + i,filename) >= FILE_PATH_SIZE ) {
+			if ( param_getstr(Cmd, 2 + i, filename, sizeof(filename)) >= FILE_PATH_SIZE ) {
 				PrintAndLog("File name too long");
 				free(keyBlock);
 				return 2;
@@ -1090,7 +1143,7 @@ int CmdHF14AMfChk(const char *Cmd)
 
 					if( buf[0]=='#' ) continue;	//The line start with # is comment, skip
 
-					if (!isxdigit(buf[0])){
+					if (!isxdigit((unsigned char)buf[0])){
 						PrintAndLog("File content error. '%s' must include 12 HEX symbols",buf);
 						continue;
 					}
@@ -1134,7 +1187,10 @@ int CmdHF14AMfChk(const char *Cmd)
 
 	// initialize storage for found keys
 	e_sector = calloc(SectorsCnt, sizeof(sector_t));
-	if (e_sector == NULL) return 1;
+	if (e_sector == NULL) {
+		free(keyBlock);
+		return 1;
+	}
 	for (uint8_t keyAB = 0; keyAB < 2; keyAB++) {
 		for (uint16_t sectorNo = 0; sectorNo < SectorsCnt; sectorNo++) {
 			e_sector[sectorNo].Key[keyAB] = 0xffffffffffff;
@@ -1398,7 +1454,7 @@ int CmdHF14AMf1kSim(const char *Cmd) {
 			break;
 		case 'f':
 		case 'F':
-			len = param_getstr(Cmd, cmdp+1, filename);
+			len = param_getstr(Cmd, cmdp+1, filename, sizeof(filename));
 			if (len < 1) {
 				PrintAndLog("error no filename found");
 				return 0;
@@ -1633,10 +1689,7 @@ int CmdHF14AMfESet(const char *Cmd)
 	}
 
 	//  1 - blocks count
-	UsbCommand c = {CMD_MIFARE_EML_MEMSET, {blockNo, 1, 0}};
-	memcpy(c.d.asBytes, memBlock, 16);
-	SendCommand(&c);
-	return 0;
+	return mfEmlSetMem(memBlock, blockNo, 1);
 }
 
 
@@ -1674,7 +1727,7 @@ int CmdHF14AMfELoad(const char *Cmd)
 		}
 	}
 
-	len = param_getstr(Cmd,nameParamNo,filename);
+	len = param_getstr(Cmd,nameParamNo,filename,sizeof(filename));
 
 	if (len > FILE_PATH_SIZE - 5) len = FILE_PATH_SIZE - 5;
 
@@ -1773,7 +1826,7 @@ int CmdHF14AMfESave(const char *Cmd)
 		}
 	}
 
-	len = param_getstr(Cmd,nameParamNo,filename);
+	len = param_getstr(Cmd,nameParamNo,filename,sizeof(filename));
 
 	if (len > FILE_PATH_SIZE - 5) len = FILE_PATH_SIZE - 5;
 
@@ -1855,7 +1908,7 @@ int CmdHF14AMfECFill(const char *Cmd)
 		default:   numSectors = 16;
 	}
 
-	printf("--params: numSectors: %d, keyType:%d", numSectors, keyType);
+	printf("--params: numSectors: %d, keyType:%d\n", numSectors, keyType);
 	UsbCommand c = {CMD_MIFARE_EML_CARDLOAD, {numSectors, keyType, 0}};
 	SendCommand(&c);
 	return 0;
@@ -1986,8 +2039,8 @@ int CmdHF14AMfCWipe(const char *Cmd)
 	bool fillCard = false;
 	
 	if (strlen(Cmd) < 1 || param_getchar(Cmd, 0) == 'h') {
-		PrintAndLog("Usage:  hf mf cwipe [card size] [w] [p]");
-		PrintAndLog("sample:  hf mf cwipe 1 w s");
+		PrintAndLog("Usage:  hf mf cwipe [card size] [w] [f]");
+		PrintAndLog("sample:  hf mf cwipe 1 w f");
 		PrintAndLog("[card size]: 0 = 320 bytes (Mifare Mini), 1 = 1K (default), 2 = 2K, 4 = 4K");
 		PrintAndLog("w - Wipe magic Chinese card (only works with gen:1a cards)");
 		PrintAndLog("f - Fill the card with default data and keys (works with gen:1a and gen:1b cards only)");
@@ -2137,7 +2190,7 @@ int CmdHF14AMfCLoad(const char *Cmd)
 		}
 		return 0;
 	} else {
-		param_getstr(Cmd, 0, filename);
+		param_getstr(Cmd, 0, filename, sizeof(filename));
 
 		len = strlen(filename);
 		if (len > FILE_PATH_SIZE - 5) len = FILE_PATH_SIZE - 5;
@@ -2348,7 +2401,7 @@ int CmdHF14AMfCSave(const char *Cmd) {
 		}
 		return 0;
 	} else {
-		param_getstr(Cmd, 0, filename);
+		param_getstr(Cmd, 0, filename, sizeof(filename));
 
 		len = strlen(filename);
 		if (len > FILE_PATH_SIZE - 5) len = FILE_PATH_SIZE - 5;
@@ -2421,6 +2474,7 @@ int CmdHF14AMfSniff(const char *Cmd){
 	//var
 	int res = 0;
 	int len = 0;
+	int parlen = 0;
 	int blockLen = 0;
 	int pckNum = 0;
 	int num = 0;
@@ -2432,6 +2486,7 @@ int CmdHF14AMfSniff(const char *Cmd){
 	uint8_t *buf = NULL;
 	uint16_t bufsize = 0;
 	uint8_t *bufPtr = NULL;
+	uint8_t parity[16];
 
 	char ctmp = param_getchar(Cmd, 0);
 	if ( ctmp == 'h' || ctmp == 'H' ) {
@@ -2475,14 +2530,13 @@ int CmdHF14AMfSniff(const char *Cmd){
 		}
 
 		UsbCommand resp;
-		if (WaitForResponseTimeout(CMD_ACK,&resp,2000)) {
+		if (WaitForResponseTimeoutW(CMD_ACK, &resp, 2000, false)) {
 			res = resp.arg[0] & 0xff;
 			uint16_t traceLen = resp.arg[1];
 			len = resp.arg[2];
 
 			if (res == 0) {								// we are done
-				free(buf);
-				return 0;
+				break;
 			}
 
 			if (res == 1) {								// there is (more) data to be transferred
@@ -2524,6 +2578,7 @@ int CmdHF14AMfSniff(const char *Cmd){
 					} else {
 						isTag = false;
 					}
+					parlen = (len - 1) / 8 + 1;
 					bufPtr += 2;
 					if ((len == 14) && (bufPtr[0] == 0xff) && (bufPtr[1] == 0xff) && (bufPtr[12] == 0xff) && (bufPtr[13] == 0xff)) {
 						memcpy(uid, bufPtr + 2, 7);
@@ -2542,15 +2597,22 @@ int CmdHF14AMfSniff(const char *Cmd){
 						if (wantDecrypt)
 							mfTraceInit(uid, atqa, sak, wantSaveToEmlFile);
 					} else {
-						PrintAndLog("%s(%d):%s", isTag ? "TAG":"RDR", num, sprint_hex(bufPtr, len));
+						oddparitybuf(bufPtr, len, parity);
+						PrintAndLog("%s(%d):%s [%s] c[%s]%c", 
+							isTag ? "TAG":"RDR", 
+							num, 
+							sprint_hex(bufPtr, len), 
+							printBitsPar(bufPtr + len, len), 
+							printBitsPar(parity, len),
+							memcmp(bufPtr + len, parity, len / 8 + 1) ? '!' : ' ');
 						if (wantLogToFile)
 							AddLogHex(logHexFileName, isTag ? "TAG: ":"RDR: ", bufPtr, len);
 						if (wantDecrypt)
-							mfTraceDecode(bufPtr, len, wantSaveToEmlFile);
+							mfTraceDecode(bufPtr, len, bufPtr[len], wantSaveToEmlFile);
 						num++;
 					}
 					bufPtr += len;
-					bufPtr += ((len-1)/8+1);	// ignore parity
+					bufPtr += parlen;	// ignore parity
 				}
 				pckNum = 0;
 			}
@@ -2558,6 +2620,9 @@ int CmdHF14AMfSniff(const char *Cmd){
 	} // while (true)
 
 	free(buf);
+	
+	msleep(300); // wait for exiting arm side.
+	PrintAndLog("Done.");
 	return 0;
 }
 
@@ -2604,11 +2669,9 @@ static command_t CommandTable[] =
 
 int CmdHFMF(const char *Cmd)
 {
-	// flush
-	WaitForResponseTimeout(CMD_ACK,NULL,100);
-
-  CmdsParse(CommandTable, Cmd);
-  return 0;
+	(void)WaitForResponseTimeout(CMD_ACK,NULL,100);
+	CmdsParse(CommandTable, Cmd);
+	return 0;
 }
 
 int CmdHelp(const char *Cmd)

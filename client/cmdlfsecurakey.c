@@ -7,11 +7,13 @@
 // Low frequency Securakey tag commands
 // ASK/Manchester, RF/40, 96 bits long (unknown cs)
 //-----------------------------------------------------------------------------
+
 #include "cmdlfsecurakey.h"
+
 #include <string.h>
 #include <inttypes.h>
 #include <math.h>
-#include "proxmark3.h"
+#include "comms.h"
 #include "ui.h"
 #include "util.h"
 #include "graph.h"

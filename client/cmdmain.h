@@ -11,17 +11,9 @@
 #ifndef CMDMAIN_H__
 #define CMDMAIN_H__
 
-#include <stdint.h>
-#include <stddef.h>
-#include "usb_cmd.h"
 #include "cmdparser.h"
 
-extern void UsbCommandReceived(UsbCommand *UC);
 extern int CommandReceived(char *Cmd);
-extern bool WaitForResponseTimeoutW(uint32_t cmd, UsbCommand* response, size_t ms_timeout, bool show_warning);
-extern bool WaitForResponseTimeout(uint32_t cmd, UsbCommand* response, size_t ms_timeout);
-extern bool WaitForResponse(uint32_t cmd, UsbCommand* response);
-extern void clearCommandBuffer();
 extern command_t* getTopLevelCommandTable();
 
 #endif

@@ -12,7 +12,7 @@
 
 #include <stdint.h>
 #include <stdio.h>
-#include "proxmark3.h"
+#include "comms.h"
 #include "usb_cmd.h"
 #include "cmdmain.h"
 #include "ui.h"
@@ -22,7 +22,6 @@
 #include "mifare.h"
 #include "util.h"
 #include "protocols.h"
-#include "data.h"
 
 #define MAX_UL_BLOCKS      0x0f
 #define MAX_ULC_BLOCKS     0x2b
@@ -113,12 +112,6 @@ static void ul_switch_on_field(void) {
 	SendCommand(&c);
 }
 
-void ul_switch_off_field(void) {
-	UsbCommand c = {CMD_READER_ISO_14443a, {0, 0, 0}};
-	clearCommandBuffer();
-	SendCommand(&c);
-}
-
 static int ul_send_cmd_raw( uint8_t *cmd, uint8_t cmdlen, uint8_t *response, uint16_t responseLength ) {
 	UsbCommand c = {CMD_READER_ISO_14443a, {ISO14A_RAW | ISO14A_NO_DISCONNECT | ISO14A_APPEND_CRC, cmdlen, 0}};
 	memcpy(c.d.asBytes, cmd, cmdlen);
@@ -159,7 +152,7 @@ static int ul_select( iso14a_card_select_t *card ){
 	ans = WaitForResponseTimeout(CMD_ACK, &resp, 1500);
 	if (!ans || resp.arg[0] < 1) {
 		PrintAndLog("iso14443a card select failed");
-		ul_switch_off_field();
+		DropField();
 		return 0;
 	}
 
@@ -232,7 +225,7 @@ static int ul_auth_select( iso14a_card_select_t *card, TagTypeUL_t tagtype, bool
 
 		if (hasAuthKey) {
 			if (ulev1_requestAuthentication(authenticationkey, pack, packSize) < 1) {
-				ul_switch_off_field();
+				DropField();
 				PrintAndLog("Error: Authentication Failed UL-EV1/NTAG");
 				return 0;
 			}
@@ -556,7 +549,7 @@ static int ulc_magic_test(){
 	} else {
 		returnValue = UL;
 	}	
-	ul_switch_off_field();
+	DropField();
 	return returnValue;
 }
 */
@@ -569,7 +562,7 @@ static int ul_magic_test(){
 	if ( !ul_select(&card) ) 
 		return UL_ERROR;
 	int status = ul_comp_write(0, NULL, 0);
-	ul_switch_off_field();
+	DropField();
 	if ( status == 0 ) 
 		return MAGIC;
 	return 0;
@@ -588,14 +581,14 @@ uint32_t GetHF14AMfU_Type(void){
 	// Ultralight - ATQA / SAK 
 	if ( card.atqa[1] != 0x00 || card.atqa[0] != 0x44 || card.sak != 0x00 ) {
 		PrintAndLog("Tag is not Ultralight | NTAG | MY-D  [ATQA: %02X %02X SAK: %02X]\n", card.atqa[1], card.atqa[0], card.sak);
-		ul_switch_off_field();
+		DropField();
 		return UL_ERROR;
 	}
 
 	if ( card.uid[0] != 0x05) {
 
 		len  = ulev1_getVersion(version, sizeof(version));
-		ul_switch_off_field();
+		DropField();
 
 		switch (len) {
 			case 0x0A: {
@@ -635,7 +628,7 @@ uint32_t GetHF14AMfU_Type(void){
 			// do UL_C check first...
 			uint8_t nonce[11] = {0x00};
 			status = ulc_requestAuthentication(nonce, sizeof(nonce));
-			ul_switch_off_field();
+			DropField();
 			if (status > 1) {
 				tagtype = UL_C;
 			} else { 
@@ -656,15 +649,15 @@ uint32_t GetHF14AMfU_Type(void){
 						tagtype = UNKNOWN;
 					}
 				}
-				ul_switch_off_field();
+				DropField();
 			}
 		}
 		if (tagtype & UL) {
 			tagtype = ul_fudan_check(); 
-			ul_switch_off_field();
+			DropField();
 		}
 	} else {
-		ul_switch_off_field();
+		DropField();
 		// Infinition MY-D tests   Exam high nibble 
 		uint8_t nib = (card.uid[1] & 0xf0) >> 4;
 		switch ( nib ){
@@ -709,7 +702,7 @@ int CmdHF14AMfUInfo(const char *Cmd){
 			return usage_hf_mfu_info();
 		case 'k':
 		case 'K':
-			dataLen = param_getstr(Cmd, cmdp+1, tempStr);
+			dataLen = param_getstr(Cmd, cmdp+1, tempStr, sizeof(tempStr));
 			if (dataLen == 32 || dataLen == 8) { //ul-c or ev1/ntag key length
 				errors = param_gethex(tempStr, 0, authenticationkey, dataLen);
 				dataLen /= 2; // handled as bytes from now on
@@ -751,7 +744,7 @@ int CmdHF14AMfUInfo(const char *Cmd){
 	// read pages 0,1,2,3 (should read 4pages)
 	status = ul_read(0, data, sizeof(data));
 	if ( status == -1 ) {
-		ul_switch_off_field();
+		DropField();
 		PrintAndLog("Error: tag didn't answer to READ");
 		return status;
 	} else if (status == 16) {
@@ -769,7 +762,7 @@ int CmdHF14AMfUInfo(const char *Cmd){
 		status = ul_read(0x28, ulc_conf, sizeof(ulc_conf));
 		if ( status == -1 ){
 			PrintAndLog("Error: tag didn't answer to READ UL-C");
-			ul_switch_off_field();
+			DropField();
 			return status;
 		} 
 		if (status == 16) ulc_print_configuration(ulc_conf);
@@ -780,14 +773,14 @@ int CmdHF14AMfUInfo(const char *Cmd){
 			uint8_t ulc_deskey[16] = {0x00};
 			status = ul_read(0x2C, ulc_deskey, sizeof(ulc_deskey));
 			if ( status == -1 ) {
-				ul_switch_off_field();
+				DropField();
 				PrintAndLog("Error: tag didn't answer to READ magic");
 				return status;
 			}
 			if (status == 16) ulc_print_3deskey(ulc_deskey);
 
 		} else {
-			ul_switch_off_field();
+			DropField();
 			// if we called info with key, just return 
 			if ( hasAuthKey ) return 1;
 
@@ -822,7 +815,7 @@ int CmdHF14AMfUInfo(const char *Cmd){
 		status = ulev1_readSignature( ulev1_signature, sizeof(ulev1_signature));
 		if ( status == -1 ) {
 			PrintAndLog("Error: tag didn't answer to READ SIGNATURE");
-			ul_switch_off_field();
+			DropField();
 			return status;
 		}
 		if (status == 32) ulev1_print_signature( ulev1_signature, sizeof(ulev1_signature));
@@ -837,7 +830,7 @@ int CmdHF14AMfUInfo(const char *Cmd){
 		status  = ulev1_getVersion(version, sizeof(version));
 		if ( status == -1 ) {
 			PrintAndLog("Error: tag didn't answer to GETVERSION");
-			ul_switch_off_field();
+			DropField();
 			return status;
 		} else if (status == 10) {
 			ulev1_print_version(version);
@@ -857,7 +850,7 @@ int CmdHF14AMfUInfo(const char *Cmd){
 			status = ul_read(startconfigblock, ulev1_conf, sizeof(ulev1_conf));
 			if ( status == -1 ) {
 				PrintAndLog("Error: tag didn't answer to READ EV1");
-				ul_switch_off_field();
+				DropField();
 				return status;
 			} else if (status == 16) {
 				// save AUTHENTICATION LIMITS for later:
@@ -887,7 +880,7 @@ int CmdHF14AMfUInfo(const char *Cmd){
 		}
 	}
 
-	ul_switch_off_field();
+	DropField();
 	if (locked) PrintAndLog("\nTag appears to be locked, try using the key to get more info");
 	PrintAndLog("");
 	return 1;
@@ -1244,7 +1237,7 @@ int CmdHF14AMfUDump(const char *Cmd){
 			return usage_hf_mfu_dump();
 		case 'k':
 		case 'K':
-			dataLen = param_getstr(Cmd, cmdp+1, tempStr);
+			dataLen = param_getstr(Cmd, cmdp+1, tempStr, sizeof(tempStr));
 			if (dataLen == 32 || dataLen == 8) { //ul-c or ev1/ntag key length
 				errors = param_gethex(tempStr, 0, authenticationkey, dataLen);
 				dataLen /= 2;
@@ -1262,7 +1255,7 @@ int CmdHF14AMfUDump(const char *Cmd){
 			break;
 		case 'n':
 		case 'N':
-			fileNlen = param_getstr(Cmd, cmdp+1, filename);
+			fileNlen = param_getstr(Cmd, cmdp+1, filename, sizeof(filename));
 			if (!fileNlen) errors = true; 
 			if (fileNlen > FILE_PATH_SIZE-5) fileNlen = FILE_PATH_SIZE-5;
 			cmdp += 2;
@@ -1331,8 +1324,7 @@ int CmdHF14AMfUDump(const char *Cmd){
 		PrintAndLog("Data exceeded Buffer size!");
 		bufferSize = sizeof(data);
 	}
-	GetFromBigBuf(data, bufferSize, startindex);
-	WaitForResponse(CMD_ACK,NULL);
+	GetFromBigBuf(data, bufferSize, startindex, NULL, -1, false);
 
 	Pages = bufferSize/4;
 	// Load lock bytes.
@@ -1842,7 +1834,7 @@ static command_t CommandTable[] =
 };
 
 int CmdHFMFUltra(const char *Cmd){
-	WaitForResponseTimeout(CMD_ACK,NULL,100);
+	(void)WaitForResponseTimeout(CMD_ACK,NULL,100);
 	CmdsParse(CommandTable, Cmd);
 	return 0;
 }

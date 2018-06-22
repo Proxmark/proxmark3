@@ -25,6 +25,7 @@
 #include <locale.h>
 #include <math.h>
 #include "proxmark3.h"
+#include "comms.h"
 #include "cmdmain.h"
 #include "ui.h"
 #include "util.h"
@@ -32,6 +33,7 @@
 #include "crapto1/crapto1.h"
 #include "parity.h"
 #include "hardnested/hardnested_bruteforce.h"
+#include "hardnested/hardnested_bf_core.h"
 #include "hardnested/hardnested_bitarray_core.h"
 #include "zlib.h"
 
@@ -71,27 +73,32 @@ static float brute_force_per_second;
 
 
 static void get_SIMD_instruction_set(char* instruction_set) {
-#if defined (__i386__) || defined (__x86_64__)	
-	#if !defined(__APPLE__) || (defined(__APPLE__) && (__clang_major__ > 8 || __clang_major__ == 8 && __clang_minor__ >= 1))
-		#if (__GNUC__ >= 5) && (__GNUC__ > 5 || __GNUC_MINOR__ > 2)
-	if (__builtin_cpu_supports("avx512f")) strcpy(instruction_set, "AVX512F");
-	else if (__builtin_cpu_supports("avx2")) strcpy(instruction_set, "AVX2");
-		#else 
-	if (__builtin_cpu_supports("avx2")) strcpy(instruction_set, "AVX2");
-		#endif
-	else if (__builtin_cpu_supports("avx")) strcpy(instruction_set, "AVX");
-	else if (__builtin_cpu_supports("sse2")) strcpy(instruction_set, "SSE2");
-	else if (__builtin_cpu_supports("mmx")) strcpy(instruction_set, "MMX");
-	else 
-	#endif
-#endif
-		strcpy(instruction_set, "no");
+	switch(GetSIMDInstrAuto()) {
+		case SIMD_AVX512:
+			strcpy(instruction_set, "AVX512F");
+			break;
+		case SIMD_AVX2:
+			strcpy(instruction_set, "AVX2");
+			break;
+		case SIMD_AVX:
+			strcpy(instruction_set, "AVX");
+			break;
+		case SIMD_SSE2:
+			strcpy(instruction_set, "SSE2");
+			break;
+		case SIMD_MMX:
+			strcpy(instruction_set, "MMX");
+			break;
+		default:
+			strcpy(instruction_set, "no");
+			break;
+	}	
 }
 
 
 static void print_progress_header(void) {
 	char progress_text[80];
-	char instr_set[12] = "";
+	char instr_set[12] = {0};
 	get_SIMD_instruction_set(instr_set);
 	sprintf(progress_text, "Start using %d threads and %s SIMD core", num_CPUs(), instr_set);
 	PrintAndLog("\n\n");
@@ -144,12 +151,6 @@ static inline void set_bit24(uint32_t *bitarray, uint32_t index)
 }
 
 
-static inline void clear_bit24(uint32_t *bitarray, uint32_t index)
-{
-	bitarray[index>>5] &= ~(0x80000000>>(index&0x0000001f));
-}
-
-
 static inline uint32_t test_bit24(uint32_t *bitarray, uint32_t index)
 {
 	return 	bitarray[index>>5] & (0x80000000>>(index&0x0000001f));
@@ -181,40 +182,6 @@ static inline uint32_t next_state(uint32_t *bitarray, uint32_t state)
 	line = bitarray[index];
 	while (bit <= 0x1f) {
 		if (line & 0x80000000) return state;
-		state++;
-		bit++;
-		line <<= 1;
-	}
-	return 1<<24;
-#endif
-}
-
-
-static inline uint32_t next_not_state(uint32_t *bitarray, uint32_t state)
-{
-	if (++state == 1<<24) return 1<<24;
-	uint32_t index = state >> 5;
-	uint_fast8_t bit = state & 0x1f;
-	uint32_t line = bitarray[index] << bit;
-	while (bit <= 0x1f) {
-		if ((line & 0x80000000) == 0) return state;
-		state++;
-		bit++;
-		line <<= 1;
-	}
-	index++;
-	while (bitarray[index] == 0xffffffff && state < 1<<24) {
-		index++;
-		state += 0x20;
-	}
-	if (state >= 1<<24) return 1<<24;
-#if defined __GNUC__
-	return state + __builtin_clz(~bitarray[index]);
-#else
-	bit = 0x00;
-	line = bitarray[index];
-	while (bit <= 0x1f) {
-		if ((line & 0x80000000) == 0) return state;
 		state++;
 		bit++;
 		line <<= 1;
@@ -309,7 +276,6 @@ static void init_bitflip_bitarrays(void)
 				if (bytesread != filesize) {
 					printf("File read error with %s. Aborting...\n", state_file_name);
 					fclose(statesfile);
-					inflateEnd(&compressed_stream);
 					exit(5);
 				}
 				fclose(statesfile);
@@ -1192,7 +1158,13 @@ static bool timeout(void)
 }
 
 
-static void *check_for_BitFlipProperties_thread(void *args)
+static void 
+#ifdef __has_attribute
+#if __has_attribute(force_align_arg_pointer)
+__attribute__((force_align_arg_pointer)) 
+#endif
+#endif
+*check_for_BitFlipProperties_thread(void *args)
 {
 	uint8_t first_byte = ((uint8_t *)args)[0];
 	uint8_t last_byte = ((uint8_t *)args)[1];
@@ -1940,7 +1912,13 @@ static void init_book_of_work(void)
 }
 
 
-static void *generate_candidates_worker_thread(void *args)
+static void 
+#ifdef __has_attribute
+#if __has_attribute(force_align_arg_pointer)
+__attribute__((force_align_arg_pointer)) 
+#endif
+#endif
+*generate_candidates_worker_thread(void *args)
 {
 	uint16_t *sum_args = (uint16_t *)args;
 	uint16_t sum_a0 = sums[sum_args[0]];
@@ -2528,6 +2506,10 @@ static void set_test_state(uint8_t byte)
 int mfnestedhard(uint8_t blockNo, uint8_t keyType, uint8_t *key, uint8_t trgBlockNo, uint8_t trgKeyType, uint8_t *trgkey, bool nonce_file_read, bool nonce_file_write, bool slow, int tests) 
 {
 	char progress_text[80];
+	
+	char instr_set[12] = {0};
+	get_SIMD_instruction_set(instr_set);
+	PrintAndLog("Using %s SIMD core.", instr_set);
 
 	srand((unsigned) time(NULL));
 	brute_force_per_second = brute_force_benchmark();

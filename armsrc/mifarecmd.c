@@ -20,6 +20,9 @@
 #include "parity.h"
 #include "crc.h"
 
+#define HARDNESTED_AUTHENTICATION_TIMEOUT 848			// card times out 1ms after wrong authentication (according to NXP documentation)
+#define HARDNESTED_PRE_AUTHENTICATION_LEADTIME 400		// some (non standard) cards need a pause after select before they are ready for first authentication 
+
 // the block number for the ISO14443-4 PCB
 static uint8_t pcb_blocknum = 0;
 // Deselect card by sending a s-block. the crc is precalced for speed
@@ -677,7 +680,7 @@ void MifareAcquireEncryptedNonces(uint32_t arg0, uint32_t arg1, uint32_t flags, 
 		}
 
 		if (slow) {
-			timeout = GetCountSspClk() + PRE_AUTHENTICATION_LEADTIME;
+			timeout = GetCountSspClk() + HARDNESTED_PRE_AUTHENTICATION_LEADTIME;
 			while(GetCountSspClk() < timeout);
 		}
 
@@ -694,11 +697,12 @@ void MifareAcquireEncryptedNonces(uint32_t arg0, uint32_t arg1, uint32_t flags, 
 			continue;
 		}
 
-		// send a dummy byte as reader response in order to trigger the cards authentication timeout
-		uint8_t dummy_answer = 0;
-		ReaderTransmit(&dummy_answer, 1, NULL);
-		timeout = GetCountSspClk() + AUTHENTICATION_TIMEOUT;
+		// send an incomplete dummy response in order to trigger the card's authentication failure timeout
+		uint8_t dummy_answer[1] = {0};
+		ReaderTransmit(dummy_answer, 1, NULL);
 
+		timeout = GetCountSspClk() + HARDNESTED_AUTHENTICATION_TIMEOUT;
+		
 		num_nonces++;
 		if (num_nonces % 2) {
 			memcpy(buf+i, receivedAnswer, 4);
@@ -1145,7 +1149,7 @@ static bool isBlockTrailer(int blockN) {
 	if (blockN >= 128 && blockN <= 256) {
 		return ((blockN & 0x0F) == 0x0F);
 	}
-	return FALSE;
+	return false;
 }
 
 void MifareCWipe(uint32_t arg0, uint32_t arg1, uint32_t arg2, uint8_t *datain){
@@ -1510,6 +1514,14 @@ void MifareCIdent(){
 
 	uint8_t receivedAnswer[MAX_MIFARE_FRAME_SIZE];
 	uint8_t receivedAnswerPar[MAX_MIFARE_PARITY_SIZE];
+	
+	LED_A_ON();
+	LED_B_OFF();
+	LED_C_OFF();
+	iso14443a_setup(FPGA_HF_ISO14443A_READER_LISTEN);
+
+	clear_trace();
+	set_tracing(true);	
 
 	ReaderTransmitBitsPar(wupC1,7,0, NULL);
 	if(ReaderReceive(receivedAnswer, receivedAnswerPar) && (receivedAnswer[0] == 0x0a)) {
@@ -1523,8 +1535,13 @@ void MifareCIdent(){
 
 	// From iceman1001: removed the if,  since some magic tags misbehavies and send an answer to it.
 	mifare_classic_halt(NULL, 0);
-
+	
+	LED_B_ON();
 	cmd_send(CMD_ACK,isOK,0,0,0,0);
+	LED_B_OFF();
+
+	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
+	LEDsoff();	
 }
 
 //

@@ -82,7 +82,7 @@
  *
  * Comment to disable the use of assembly code.
  */
-#define POLARSSL_HAVE_ASM
+//#define POLARSSL_HAVE_ASM
 
 /**
  * \def POLARSSL_HAVE_SSE2
@@ -762,7 +762,7 @@
  *
  * This enables support for RSAES-OAEP and RSASSA-PSS operations.
  */
-#define POLARSSL_PKCS1_V21
+//#define POLARSSL_PKCS1_V21
 
 /**
  * \def POLARSSL_RSA_NO_CRT

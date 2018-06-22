@@ -306,7 +306,7 @@ static int l_pack(lua_State *L) 		/** pack(f,...) */
         sbyte = 0;
         odd = 0;
       }
-    } else if (isspace(a[ii])) {
+    } else if (isspace((unsigned char)a[ii])) {
       /* ignore */
     } else {
       /* err ... ignore too*/

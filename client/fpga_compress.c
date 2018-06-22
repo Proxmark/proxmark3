@@ -108,7 +108,7 @@ int zlib_compress(FILE *infile[], uint8_t num_infiles, FILE *outfile, bool hardn
 
 		for(uint16_t j = 0; j < num_infiles; j++) {
 			for(uint16_t k = 0; k < FPGA_INTERLEAVE_SIZE; k++) {
-				c = fgetc(infile[j]);
+				c = (uint8_t)fgetc(infile[j]);
 				if (!feof(infile[j])) {
 					fpga_config[i++] = c;
 				} else if (num_infiles > 1) {
@@ -297,9 +297,9 @@ int main(int argc, char **argv)
 		}
 		infiles = calloc(num_input_files, sizeof(FILE*));
 		for (uint16_t i = 0; i < num_input_files; i++) { 
-			infiles[i] = fopen(argv[i+hardnested_mode?2:1], "rb");
+			infiles[i] = fopen(argv[i+(hardnested_mode?2:1)], "rb");
 			if (infiles[i] == NULL) {
-				fprintf(stderr, "Error. Cannot open input file %s", argv[i+hardnested_mode?2:1]);
+				fprintf(stderr, "Error. Cannot open input file %s", argv[i+(hardnested_mode?2:1)]);
 				return(EXIT_FAILURE);
 			}
 		}

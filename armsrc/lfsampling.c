@@ -119,7 +119,7 @@ void LFSetupFPGAForADC(int divisor, bool lf_field)
  * @param silent - is true, now outputs are made. If false, dbprints the status
  * @return the number of bits occupied by the samples.
  */
-uint32_t DoAcquisition(uint8_t decimation, uint32_t bits_per_sample, bool averaging, int trigger_threshold, bool silent, int bufsize)
+uint32_t DoAcquisition(uint8_t decimation, uint32_t bits_per_sample, bool averaging, int trigger_threshold, bool silent, int bufsize, int cancel_after)
 {
 	//.
 	uint8_t *dest = BigBuf_get_addr();
@@ -140,6 +140,7 @@ uint32_t DoAcquisition(uint8_t decimation, uint32_t bits_per_sample, bool averag
 	uint32_t sample_sum =0 ;
 	uint32_t sample_total_numbers =0 ;
 	uint32_t sample_total_saved =0 ;
+	uint32_t cancel_counter = 0;
 
 	while(!BUTTON_PRESS() && !usb_poll_validate_length() ) {
 		WDT_HIT();
@@ -151,9 +152,13 @@ uint32_t DoAcquisition(uint8_t decimation, uint32_t bits_per_sample, bool averag
 			sample = (uint8_t)AT91C_BASE_SSC->SSC_RHR;
 			LED_D_OFF();
 			// threshold either high or low values 128 = center 0.  if trigger = 178 
-			if ((trigger_threshold > 0) && (sample < (trigger_threshold+128)) && (sample > (128-trigger_threshold))) // 
+			if ((trigger_threshold > 0) && (sample < (trigger_threshold+128)) && (sample > (128-trigger_threshold))) { // 
+				if (cancel_after > 0) {
+					cancel_counter++;
+					if (cancel_after == cancel_counter) break;
+				}
 				continue;
-		
+			}
 			trigger_threshold = 0;
 			sample_total_numbers++;
 
@@ -213,7 +218,7 @@ uint32_t DoAcquisition(uint8_t decimation, uint32_t bits_per_sample, bool averag
  */
 uint32_t DoAcquisition_default(int trigger_threshold, bool silent)
 {
-	return DoAcquisition(1,8,0,trigger_threshold,silent,0);
+	return DoAcquisition(1,8,0,trigger_threshold,silent,0,0);
 }
 uint32_t DoAcquisition_config(bool silent, int sample_size)
 {
@@ -222,11 +227,12 @@ uint32_t DoAcquisition_config(bool silent, int sample_size)
 				  ,config.averaging
 				  ,config.trigger_threshold
 				  ,silent
-				  ,sample_size);
+				  ,sample_size
+				  ,0);
 }
 
-uint32_t DoPartialAcquisition(int trigger_threshold, bool silent, int sample_size) {
-	return DoAcquisition(1,8,0,trigger_threshold,silent,sample_size);
+uint32_t DoPartialAcquisition(int trigger_threshold, bool silent, int sample_size, int cancel_after) {
+	return DoAcquisition(1,8,0,trigger_threshold,silent,sample_size,cancel_after);
 }
 
 uint32_t ReadLF(bool activeField, bool silent, int sample_size)
@@ -260,7 +266,7 @@ uint32_t SnoopLF()
 }
 
 /**
-* acquisition of Cotag LF signal. Similart to other LF,  since the Cotag has such long datarate RF/384
+* acquisition of Cotag LF signal. Similar to other LF,  since the Cotag has such long datarate RF/384
 * and is Manchester?,  we directly gather the manchester data into bigbuff
 **/
 #define COTAG_T1 384
@@ -329,8 +335,8 @@ uint32_t doCotagAcquisitionManchester() {
 	uint8_t sample = 0, firsthigh = 0, firstlow = 0; 
 	uint16_t sample_counter = 0, period = 0;
 	uint8_t curr = 0, prev = 0;
-
-	while (!BUTTON_PRESS() && !usb_poll_validate_length() && (sample_counter < bufsize) ) {
+	uint16_t noise_counter = 0;
+	while (!BUTTON_PRESS() && !usb_poll_validate_length() && (sample_counter < bufsize) && (noise_counter < (COTAG_T1<<1)) ) {
 		WDT_HIT();
 		if (AT91C_BASE_SSC->SSC_SR & AT91C_SSC_TXRDY) {
 			AT91C_BASE_SSC->SSC_THR = 0x43;
@@ -343,14 +349,20 @@ uint32_t doCotagAcquisitionManchester() {
 
 			// find first peak
 			if ( !firsthigh ) {
-				if (sample < COTAG_ONE_THRESHOLD) 
+				if (sample < COTAG_ONE_THRESHOLD) {
+					noise_counter++;
 					continue;
+				}
+				noise_counter = 0;
 				firsthigh = 1;
 			}
 
 			if ( !firstlow ){
-				if (sample > COTAG_ZERO_THRESHOLD )
+				if (sample > COTAG_ZERO_THRESHOLD ) {
+					noise_counter++;
 					continue;
+				}
+				noise_counter=0;
 				firstlow = 1;
 			}
 

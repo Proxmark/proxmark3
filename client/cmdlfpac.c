@@ -7,10 +7,12 @@
 // Low frequency Stanley/PAC tag commands
 // NRZ, RF/32, 128 bits long (unknown cs)
 //-----------------------------------------------------------------------------
+
 #include "cmdlfpac.h"
+
 #include <string.h>
 #include <inttypes.h>
-#include "proxmark3.h"
+#include "comms.h"
 #include "ui.h"
 #include "util.h"
 #include "graph.h"
