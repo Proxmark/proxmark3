@@ -6,6 +6,16 @@
 // the license.
 //-----------------------------------------------------------------------------
 // Low frequency HID commands (known)
+//
+// Useful resources:
+// RF interface, programming a T55x7 clone, 26-bit HID H10301 encoding:
+// http://www.proxmark.org/files/Documents/125%20kHz%20-%20HID/HID_format_example.pdf
+//
+// "Understanding Card Data Formats"
+// https://www.hidglobal.com/sites/default/files/hid-understanding_card_data_formats-wp-en.pdf
+//
+// "What Format Do You Need?"
+// https://www.hidglobal.com/sites/default/files/resource_files/hid-prox-br-en.pdf
 //-----------------------------------------------------------------------------
 
 #include "cmdlfhid.h"
@@ -18,6 +28,7 @@
 #include "cmdparser.h"
 #include "cmddata.h"  //for g_debugMode, demodbuff cmds
 #include "lfdemod.h" // for HIDdemodFSK
+#include "parity.h" // for parity
 #include "util.h" // for param_get8,32
 
 static int CmdHelp(const char *Cmd);
@@ -28,33 +39,45 @@ static int CmdHelp(const char *Cmd);
  *
  * This only works with 26, 34, 35 and 37 bit card IDs.
  *
+ * NOTE: Parity calculation is only supported on 26-bit tags. Other card lengths
+ * may have invalid parity.
+ *
  * Returns false on invalid inputs.
  */
 bool pack_short_hid(/* out */ uint32_t *hi, /* out */ uint32_t *lo, /* in */ const short_hid_info *info) {
   uint32_t high = 0, low = 0;
 
   switch (info->fmtLen) {
-  case 26:
+  case 26: // HID H10301
     low |= (info->cardnum & 0xffff) << 1;
     low |= (info->fc & 0xff) << 17;
+
+    if (info->parityValid) {
+      // Calculate parity
+      low |= oddparity32((low >> 1) & 0xfff) & 1;
+      low |= (evenparity32((low >> 13) & 0xfff) & 1) << 25;
+    }
     break;
 
   case 34:
     low |= (info->cardnum & 0xffff) << 1;
     low |= (info->fc & 0x7fff) << 17;
     high |= (info->fc & 0x8000) >> 15;
+    // TODO: Calculate parity
     break;
 
   case 35:
     low |= (info->cardnum & 0xfffff) << 1;
     low |= (info->fc & 0x7ff) << 21;
     high |= (info->fc & 0x800) >> 11;
+    // TODO: Calculate parity
     break;
 
   case 37:
     low |= (info->cardnum & 0x7ffff) << 1;
     low |= (info->fc & 0xfff) << 20;
     high |= (info->fc & 0xf000) >> 12;
+    // TODO: Calculate parity
     break;
 
   default:
@@ -87,6 +110,8 @@ bool pack_short_hid(/* out */ uint32_t *hi, /* out */ uint32_t *lo, /* in */ con
  *
  * This only works with 26, 34, 35 and 37 bit card IDs.
  *
+ * NOTE: Parity checking is only supported on 26-bit tags.
+ *
  * Returns false on invalid inputs.
  */
 bool unpack_short_hid(short_hid_info *out, uint32_t hi, uint32_t lo) {
@@ -107,29 +132,43 @@ bool unpack_short_hid(short_hid_info *out, uint32_t hi, uint32_t lo) {
     out->fmtLen = idx3 + 19;
 
     switch (out->fmtLen) {
-    case 26:
+    case 26: // HID H10301
       out->cardnum = (lo >> 1) & 0xFFFF;
       out->fc = (lo >> 17) & 0xFF;
+
+      if (g_debugMode) {
+        PrintAndLog("oddparity : input=%x, calculated=%d, provided=%d",
+          (lo >> 1) & 0xFFF, oddparity32((lo >> 1) & 0xFFF), lo & 1);
+        PrintAndLog("evenparity: input=%x, calculated=%d, provided=%d",
+          (lo >> 13) & 0xFFF, evenparity32((lo >> 13) & 0xFFF) & 1, (lo >> 25) & 1);
+      }
+
+      out->parityValid =
+        (oddparity32((lo >> 1) & 0xFFF) == (lo & 1)) &&
+        ((evenparity32((lo >> 13) & 0xFFF) & 1) == ((lo >> 25) & 1));
       break;
 
     case 34:
       out->cardnum = (lo >> 1) & 0xFFFF;
       out->fc = ((hi & 1) << 15) | (lo >> 17);
+      // TODO: Calculate parity
       break;
 
     case 35:
       out->cardnum = (lo >> 1) & 0xFFFFF;
       out->fc = ((hi & 1) << 11) | (lo >> 21);
+      // TODO: Calculate parity
       break;
 
     default:
       return false;
     }
   } else {
-    // if bit 38 is not set then 37 bit format is used
+    // If bit 38 is not set, then 37 bit format is used
     out->fmtLen = 37;
     out->cardnum = (lo >> 1) & 0x7FFFF;
     out->fc = ((hi & 0xF) << 12) | (lo >> 20);
+    // TODO: Calculate parity
   }
   return true;
 }
@@ -198,6 +237,11 @@ int CmdFSKdemodHID(const char *Cmd)
     PrintAndLog("HID Prox TAG ID: %x%08x (%d) - Format Len: %u bits - FC: %u - Card: %u",
       (unsigned int) hi, (unsigned int) lo, (unsigned int) (lo>>1) & 0xFFFF,
       card_info.fmtLen, card_info.fc, card_info.cardnum);
+
+    if (card_info.fmtLen == 26) {
+      PrintAndLog("Parity: %s", card_info.parityValid ? "valid" : "invalid");
+    }
+
     if (!ret) {
       PrintAndLog("Invalid or unsupported tag length.");
     }
@@ -283,15 +327,21 @@ int CmdHIDPack(const char *Cmd) {
   uint32_t hi = 0, lo = 0;
   short_hid_info card_info;
 
-	if (strlen(Cmd)<3) {
-		PrintAndLog("Usage:  lf hid pack <length> <facility code (decimal)> <card number (decimal)>");
-		PrintAndLog("        sample: lf hid pack 34 111 2345");
-		return 0;
-	}
+  if (strlen(Cmd)<3) {
+    PrintAndLog("Usage:  lf hid pack <length> <facility code (decimal)> <card number (decimal)>");
+    PrintAndLog("        sample: lf hid pack 26 123 4567");
+    return 0;
+  }
 
-	card_info.fmtLen = param_get8(Cmd, 0);
+  card_info.fmtLen = param_get8(Cmd, 0);
   card_info.fc = param_get32ex(Cmd, 1, 0, 10);
   card_info.cardnum = param_get32ex(Cmd, 2, 0, 10);
+  card_info.parityValid = true;
+
+  // TODO
+  if (card_info.fmtLen != 26) {
+    PrintAndLog("Warning: Parity bits are only calculated for 26 bit IDs -- this may be invalid!");
+  }
 
   bool ret = pack_short_hid(&hi, &lo, &card_info);
 
@@ -309,11 +359,11 @@ int CmdHIDPack(const char *Cmd) {
 int CmdHIDUnpack(const char *Cmd)
 {
   uint32_t hi = 0, lo = 0;
-	if (strlen(Cmd)<1) {
-		PrintAndLog("Usage:  lf hid unpack <ID>");
-		PrintAndLog("        sample: lf hid unpack 2400de1252");
-		return 0;
-	}
+  if (strlen(Cmd)<1) {
+    PrintAndLog("Usage:  lf hid unpack <ID>");
+    PrintAndLog("        sample: lf hid unpack 2006f623ae");
+    return 0;
+  }
 
   hexstring_to_int64(&hi, &lo, Cmd);
   if (hi >= 0x40) {
@@ -327,6 +377,10 @@ int CmdHIDUnpack(const char *Cmd)
   PrintAndLog("HID Prox TAG ID: %x%08x (%d) - Format Len: %u bits - FC: %u - Card: %u",
     (unsigned int) hi, (unsigned int) lo, (unsigned int) (lo>>1) & 0xFFFF,
     card_info.fmtLen, card_info.fc, card_info.cardnum);
+
+  if (card_info.fmtLen == 26) {
+    PrintAndLog("Parity: %s", card_info.parityValid ? "valid" : "invalid");
+  }
 
   if (!ret) {
     PrintAndLog("Invalid or unsupported tag length.");

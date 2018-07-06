@@ -18,10 +18,21 @@
 typedef struct {
   // Format length, in bits.
   uint8_t fmtLen;
+
   // Facility code.
   uint32_t fc;
+
   // Card number.
   uint32_t cardnum;
+
+  // Parity validity.
+  //
+  // When used with pack_short_hid, this determines if we should calculate
+  // parity values for the ID.
+  //
+  // When used with unpack_short_hid, this indicates if we got valid parity
+  // values for the ID.
+  bool parityValid;
 } short_hid_info;
 
 bool pack_short_hid(/* out */ uint32_t *hi, /* out */ uint32_t *lo, /* in */ const short_hid_info *info);
