@@ -394,8 +394,8 @@ void StandAloneMode14a()
 	FpgaDownloadAndGo(FPGA_BITSTREAM_HF);
 
 	int selected = 0;
-	int playing = 0, iGotoRecord = 0, iGotoClone = 0;
-	int cardRead[OPTS] = {0};
+	bool playing = false, GotoRecord = false, GotoClone = false;
+	bool cardRead[OPTS] = {false};
 	uint8_t readUID[10] = {0};
 	uint32_t uid_1st[OPTS]={0};
 	uint32_t uid_2nd[OPTS]={0};
@@ -411,9 +411,9 @@ void StandAloneMode14a()
 		WDT_HIT();
 		SpinDelay(300);
 
-		if (iGotoRecord == 1 || cardRead[selected] == 0)
+		if (GotoRecord || !cardRead[selected])
 		{
-			iGotoRecord = 0;
+			GotoRecord = false;
 			LEDsoff();
 			LED(selected + 1, 0);
 			LED(LED_RED2, 0);
@@ -438,7 +438,7 @@ void StandAloneMode14a()
 					else if (cardRead[(selected+1)%OPTS]) {
 						Dbprintf("Button press detected but no card in bank[%d] so playing from bank[%d]", selected, (selected+1)%OPTS);
 						selected = (selected+1)%OPTS;
-						break; // playing = 1;
+						break;
 					}
 					else {
 						Dbprintf("Button press detected but no stored tag to play. (Ignoring button)");
@@ -488,14 +488,14 @@ void StandAloneMode14a()
 			LED(selected + 1, 0);
 
 			// Next state is replay:
-			playing = 1;
+			playing = true;
 
-			cardRead[selected] = 1;
+			cardRead[selected] = true;
 		}
 		/* MF Classic UID clone */
-		else if (iGotoClone==1)
+		else if (GotoClone)
 		{
-			iGotoClone=0;
+			GotoClone=false;
 			LEDsoff();
 			LED(selected + 1, 0);
 			LED(LED_ORANGE, 250);
@@ -546,7 +546,7 @@ void StandAloneMode14a()
 			MifareCGetBlock(0x3F, 1, 0, oldBlock0);
 			if (oldBlock0[0] == 0 && oldBlock0[0] == oldBlock0[1]  && oldBlock0[1] == oldBlock0[2] && oldBlock0[2] == oldBlock0[3]) {
 				Dbprintf("No changeable tag detected. Returning to replay mode for bank[%d]", selected);
-				playing = 1;
+				playing = true;
 			}
 			else {
 				Dbprintf("UID from target tag: %02X%02X%02X%02X", oldBlock0[0],oldBlock0[1],oldBlock0[2],oldBlock0[3]);
@@ -564,14 +564,14 @@ void StandAloneMode14a()
 				if (memcmp(testBlock0,newBlock0,16)==0)
 				{
 					DbpString("Cloned successfull!");
-					cardRead[selected] = 0; // Only if the card was cloned successfully should we clear it
-					playing = 0;
-					iGotoRecord = 1;
+					cardRead[selected] = false; // Only if the card was cloned successfully should we clear it
+					playing = false;
+					GotoRecord = true;
 					selected = (selected+1) % OPTS;
 				}
 				else {
 					Dbprintf("Clone failed. Back to replay mode on bank[%d]", selected);
-					playing = 1;
+					playing = true;
 				}
 			}
 			LEDsoff();
@@ -579,61 +579,55 @@ void StandAloneMode14a()
 
 		}
 		// Change where to record (or begin playing)
-		else if (playing==1) // button_pressed == BUTTON_SINGLE_CLICK && cardRead[selected])
+		else if (playing) // button_pressed == BUTTON_SINGLE_CLICK && cardRead[selected])
 		{
 			LEDsoff();
 			LED(selected + 1, 0);
 
 			// Begin transmitting
-			if (playing)
-			{
-				LED(LED_GREEN, 0);
-				DbpString("Playing");
-				for ( ; ; ) {
-					WDT_HIT();
-					int button_action = BUTTON_HELD(1000);
-					if (button_action == 0) { // No button action, proceed with sim
-						uint8_t data[512] = {0}; // in case there is a read command received we shouldn't break
-						Dbprintf("Simulating ISO14443a tag with uid[0]: %08x, uid[1]: %08x [Bank: %u]", uid_1st[selected],uid_2nd[selected],selected);
-						if (hi14a_card[selected].sak == 8 && hi14a_card[selected].atqa[0] == 4 && hi14a_card[selected].atqa[1] == 0) {
-							DbpString("Mifare Classic");
-							SimulateIso14443aTag(1,uid_1st[selected], uid_2nd[selected], data); // Mifare Classic
-						}
-						else if (hi14a_card[selected].sak == 0 && hi14a_card[selected].atqa[0] == 0x44 && hi14a_card[selected].atqa[1] == 0) {
-							DbpString("Mifare Ultralight");
-							SimulateIso14443aTag(2,uid_1st[selected],uid_2nd[selected],data); // Mifare Ultralight
-						}
-						else if (hi14a_card[selected].sak == 20 && hi14a_card[selected].atqa[0] == 0x44 && hi14a_card[selected].atqa[1] == 3) {
-							DbpString("Mifare DESFire");
-							SimulateIso14443aTag(3,uid_1st[selected],uid_2nd[selected],data); // Mifare DESFire
-						}
-						else {
-							Dbprintf("Unrecognized tag type -- defaulting to Mifare Classic emulation");
-							SimulateIso14443aTag(1,uid_1st[selected], uid_2nd[selected], data);
-						}
+			LED(LED_GREEN, 0);
+			DbpString("Playing");
+			for ( ; ; ) {
+				WDT_HIT();
+				int button_action = BUTTON_HELD(1000);
+				if (button_action == 0) { // No button action, proceed with sim
+					uint8_t data[512] = {0}; // in case there is a read command received we shouldn't break
+					Dbprintf("Simulating ISO14443a tag with uid[0]: %08x, uid[1]: %08x [Bank: %u]", uid_1st[selected],uid_2nd[selected],selected);
+					if (hi14a_card[selected].sak == 8 && hi14a_card[selected].atqa[0] == 4 && hi14a_card[selected].atqa[1] == 0) {
+						DbpString("Mifare Classic");
+						SimulateIso14443aTag(1,uid_1st[selected], uid_2nd[selected], data); // Mifare Classic
 					}
-					else if (button_action == BUTTON_SINGLE_CLICK) {
-						selected = (selected + 1) % OPTS;
-						Dbprintf("Done playing. Switching to record mode on bank %d",selected);
-						iGotoRecord = 1;
-						break;
+					else if (hi14a_card[selected].sak == 0 && hi14a_card[selected].atqa[0] == 0x44 && hi14a_card[selected].atqa[1] == 0) {
+						DbpString("Mifare Ultralight");
+						SimulateIso14443aTag(2,uid_1st[selected],uid_2nd[selected],data); // Mifare Ultralight
 					}
-					else if (button_action == BUTTON_HOLD) {
-						Dbprintf("Playtime over. Begin cloning...");
-						iGotoClone = 1;
-						break;
+					else if (hi14a_card[selected].sak == 20 && hi14a_card[selected].atqa[0] == 0x44 && hi14a_card[selected].atqa[1] == 3) {
+						DbpString("Mifare DESFire");
+						SimulateIso14443aTag(3,uid_1st[selected],uid_2nd[selected],data); // Mifare DESFire
 					}
-					WDT_HIT();
+					else {
+						Dbprintf("Unrecognized tag type -- defaulting to Mifare Classic emulation");
+						SimulateIso14443aTag(1,uid_1st[selected], uid_2nd[selected], data);
+					}
 				}
-
-				/* We pressed a button so ignore it here with a delay */
-				SpinDelay(300);
-				LEDsoff();
-				LED(selected + 1, 0);
+				else if (button_action == BUTTON_SINGLE_CLICK) {
+					selected = (selected + 1) % OPTS;
+					Dbprintf("Done playing. Switching to record mode on bank %d",selected);
+					GotoRecord = true;
+					break;
+				}
+				else if (button_action == BUTTON_HOLD) {
+					Dbprintf("Playtime over. Begin cloning...");
+					GotoClone = true;
+					break;
+				}
+				WDT_HIT();
 			}
-			else
-				while(BUTTON_PRESS())
-					WDT_HIT();
+
+			/* We pressed a button so ignore it here with a delay */
+			SpinDelay(300);
+			LEDsoff();
+			LED(selected + 1, 0);
 		}
 	}
 }

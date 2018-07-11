@@ -328,7 +328,7 @@ int mfnested(uint8_t blockNo, uint8_t keyType, uint8_t *key, uint8_t trgBlockNo,
 	struct Crypto1State *p1, *p2, *p3, *p4;
 
 	// flush queue
-	WaitForResponseTimeout(CMD_ACK, NULL, 100);
+	(void)WaitForResponseTimeout(CMD_ACK,NULL,100);
 
 	UsbCommand c = {CMD_MIFARE_NESTED, {blockNo + keyType * 0x100, trgBlockNo + trgKeyType * 0x100, calibrate}};
 	memcpy(c.d.asBytes, key, 6);
@@ -910,6 +910,7 @@ int mfTraceDecode(uint8_t *data_src, int len, uint8_t parity, bool wantSaveToEml
 					uint32_t nr1 = crypto1_word(pcs, nr_enc, 1) ^ nr_enc;
 					uint32_t ar1 = crypto1_word(pcs, 0, 0) ^ ar_enc;
 					uint32_t at1 = crypto1_word(pcs, 0, 0) ^ at_enc;
+					crypto1_destroy(pcs);
 					printf("key> the same key test. nr1: %08x ar1: %08x at1: %08x \n", nr1, ar1, at1);
 
 					if (NTParityCheck(nt1))

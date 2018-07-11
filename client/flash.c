@@ -40,7 +40,7 @@ static const uint8_t elf_ident[] = {
 
 // Turn PHDRs into flasher segments, checking for PHDR sanity and merging adjacent
 // unaligned segments if needed
-static int build_segs_from_phdrs(flash_file_t *ctx, FILE *fd, Elf32_Phdr *phdrs, int num_phdrs)
+static int build_segs_from_phdrs(flash_file_t *ctx, FILE *fd, Elf32_Phdr *phdrs, uint16_t num_phdrs)
 {
 	Elf32_Phdr *phdr = phdrs;
 	flash_seg_t *seg;
@@ -191,7 +191,7 @@ int flash_load(flash_file_t *ctx, const char *name, bool can_write_bl)
 	FILE *fd = NULL;
 	Elf32_Ehdr ehdr;
 	Elf32_Phdr *phdrs = NULL;
-	int num_phdrs;
+	uint16_t num_phdrs;
 	int res;
 
 	fd = fopen(name, "rb");
@@ -270,7 +270,7 @@ fail:
 // Get the state of the proxmark, backwards compatible
 static int get_proxmark_state(uint32_t *state)
 {
-	UsbCommand c;
+	UsbCommand c = {0};
 	c.cmd = CMD_DEVICE_INFO;
 	SendCommand(&c);
 	UsbCommand resp;

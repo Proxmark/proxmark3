@@ -110,7 +110,6 @@ class ProxGuiQT : public QObject
 		ProxWidget *plotwidget;
 		int argc;
 		char **argv;
-		void (*main_func)(void);
 		WorkerThread *proxmarkThread;
 	
 	public:

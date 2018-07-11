@@ -35,7 +35,7 @@ bool MfSniffInit(void){
 	sniffSAK = 0;
 	sniffUIDType = SNF_UID_4;
 
-	return FALSE;
+	return false;
 }
 
 bool MfSniffEnd(void){
@@ -43,7 +43,7 @@ bool MfSniffEnd(void){
 	cmd_send(CMD_ACK,0,0,0,0,0);
 	LED_B_OFF();
 
-	return FALSE;
+	return false;
 }
 
 bool RAMFUNC MfSniffLogic(const uint8_t *data, uint16_t len, uint8_t *parity, uint16_t bitCnt, bool reader) {
@@ -112,7 +112,7 @@ bool RAMFUNC MfSniffLogic(const uint8_t *data, uint16_t len, uint8_t *parity, ui
 			sniffBuf[11] = sniffSAK;
 			sniffBuf[12] = 0xFF;
 			sniffBuf[13] = 0xFF;
-			LogTrace(sniffBuf, 14, 0, 0, NULL, TRUE);
+			LogTrace(sniffBuf, 14, 0, 0, NULL, true);
 			sniffState = SNF_CARD_CMD;
 		}	// intentionally no break;
 		case SNF_CARD_CMD:{	
@@ -127,14 +127,14 @@ bool RAMFUNC MfSniffLogic(const uint8_t *data, uint16_t len, uint8_t *parity, ui
 	}
 
 
-	return FALSE;
+	return false;
 }
 
 bool RAMFUNC MfSniffSend(uint16_t maxTimeoutMs) {
 	if (BigBuf_get_traceLen() && (GetTickCount() > timerData + maxTimeoutMs)) {
 		return intMfSniffSend();
 	}
-	return FALSE;
+	return false;
 }
 
 // internal sending function. not a RAMFUNC.
@@ -162,5 +162,5 @@ bool intMfSniffSend() {
 
 	clear_trace();
 	
-	return TRUE;
+	return true;
 }

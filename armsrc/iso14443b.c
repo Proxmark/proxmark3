@@ -243,7 +243,7 @@ static RAMFUNC int Handle14443bUartBit(uint8_t bit)
 					LED_A_OFF(); // Finished receiving
 					Uart.state = STATE_UNSYNCD;
 					if (Uart.byteCnt != 0) {
-						return TRUE;
+						return true;
 					}
 				} else {
 					// this is an error
@@ -259,7 +259,7 @@ static RAMFUNC int Handle14443bUartBit(uint8_t bit)
 			break;
 	}
 
-	return FALSE;
+	return false;
 }
 
 
@@ -283,7 +283,7 @@ static void UartInit(uint8_t *data)
 // Receive a command (from the reader to us, where we are the simulated tag),
 // and store it in the given buffer, up to the given maximum length. Keeps
 // spinning, waiting for a well-framed command, until either we get one
-// (returns TRUE) or someone presses the pushbutton on the board (FALSE).
+// (returns true) or someone presses the pushbutton on the board (false).
 //
 // Assume that we're called with the SSC (to the FPGA) and ADC path set
 // correctly.
@@ -302,20 +302,20 @@ static int GetIso14443bCommandFromReader(uint8_t *received, uint16_t *len)
 	for(;;) {
 		WDT_HIT();
 
-		if(BUTTON_PRESS()) return FALSE;
+		if(BUTTON_PRESS()) return false;
 
 		if(AT91C_BASE_SSC->SSC_SR & (AT91C_SSC_RXRDY)) {
 			uint8_t b = (uint8_t)AT91C_BASE_SSC->SSC_RHR;
 			for(uint8_t mask = 0x80; mask != 0x00; mask >>= 1) {
 				if(Handle14443bUartBit(b & mask)) {
 					*len = Uart.byteCnt;
-					return TRUE;
+					return true;
 				}
 			}
 		}
 	}
 
-	return FALSE;
+	return false;
 }
 
 //-----------------------------------------------------------------------------
@@ -347,7 +347,7 @@ void SimulateIso14443bTag(void)
 	FpgaDownloadAndGo(FPGA_BITSTREAM_HF);
 
 	clear_trace();
-	set_tracing(TRUE);
+	set_tracing(true);
 
 	const uint8_t *resp;
 	uint8_t *respCode;
@@ -387,7 +387,7 @@ void SimulateIso14443bTag(void)
 
 		if (tracing) {
 			uint8_t parity[MAX_PARITY_SIZE];
-			LogTrace(receivedCmd, len, 0, 0, parity, TRUE);
+			LogTrace(receivedCmd, len, 0, 0, parity, true);
 		}
 
 		// Good, look at the command now.
@@ -464,7 +464,7 @@ void SimulateIso14443bTag(void)
 		// trace the response:
 		if (tracing) {
 			uint8_t parity[MAX_PARITY_SIZE];
-			LogTrace(resp, respLen, 0, 0, parity, FALSE);
+			LogTrace(resp, respLen, 0, 0, parity, false);
 		}
 
 	}
@@ -702,7 +702,7 @@ static RAMFUNC int Handle14443bSamplesDemod(int ci, int cq)
 						LED_C_OFF();
 						if(s == 0x000) {
 							// This is EOF (start, stop and all data bits == '0'
-							return TRUE;
+							return true;
 						}
 					}
 				}
@@ -716,7 +716,7 @@ static RAMFUNC int Handle14443bSamplesDemod(int ci, int cq)
 			break;
 	}
 
-	return FALSE;
+	return false;
 }
 
 
@@ -739,12 +739,12 @@ static void DemodInit(uint8_t *data)
 
 /*
  *  Demodulate the samples we received from the tag, also log to tracebuffer
- *  quiet: set to 'TRUE' to disable debug output
+ *  quiet: set to 'true' to disable debug output
  */
 static void GetSamplesFor14443bDemod(int n, bool quiet)
 {
 	int max = 0;
-	bool gotFrame = FALSE;
+	bool gotFrame = false;
 	int lastRxCounter, ci, cq, samples = 0;
 
 	// Allocate memory from BigBuf for some buffers
@@ -792,7 +792,7 @@ static void GetSamplesFor14443bDemod(int n, bool quiet)
 			samples += 2;
 
 			if(Handle14443bSamplesDemod(ci, cq)) {
-				gotFrame = TRUE;
+				gotFrame = true;
 				break;
 			}
 		}
@@ -808,7 +808,7 @@ static void GetSamplesFor14443bDemod(int n, bool quiet)
 	//Tracing
 	if (tracing && Demod.len > 0) {
 		uint8_t parity[MAX_PARITY_SIZE];
-		LogTrace(Demod.output, Demod.len, 0, 0, parity, FALSE);
+		LogTrace(Demod.output, Demod.len, 0, 0, parity, false);
 	}
 }
 
@@ -929,7 +929,7 @@ static void CodeAndTransmit14443bAsReader(const uint8_t *cmd, int len)
 	TransmitFor14443b();
 	if (tracing) {
 		uint8_t parity[MAX_PARITY_SIZE];
-		LogTrace(cmd,len, 0, 0, parity, TRUE);
+		LogTrace(cmd,len, 0, 0, parity, true);
 	}
 }
 
@@ -951,7 +951,7 @@ int iso14443b_apdu(uint8_t const *message, size_t message_length, uint8_t *respo
 	// send
 	CodeAndTransmit14443bAsReader(message_frame, message_length + 4);
 	// get response
-	GetSamplesFor14443bDemod(RECEIVE_SAMPLES_TIMEOUT*100, TRUE);
+	GetSamplesFor14443bDemod(RECEIVE_SAMPLES_TIMEOUT*100, true);
 	if(Demod.len < 3)
 	{
 		return 0;
@@ -981,7 +981,7 @@ int iso14443b_select_card()
 
 	// first, wake up the tag
 	CodeAndTransmit14443bAsReader(wupb, sizeof(wupb));
-	GetSamplesFor14443bDemod(RECEIVE_SAMPLES_TIMEOUT, TRUE);
+	GetSamplesFor14443bDemod(RECEIVE_SAMPLES_TIMEOUT, true);
 	// ATQB too short?
 	if (Demod.len < 14)
 	{
@@ -996,7 +996,7 @@ int iso14443b_select_card()
     attrib[7] = Demod.output[10] & 0x0F;
     ComputeCrc14443(CRC_14443_B, attrib, 9, attrib + 9, attrib + 10);
     CodeAndTransmit14443bAsReader(attrib, sizeof(attrib));
-    GetSamplesFor14443bDemod(RECEIVE_SAMPLES_TIMEOUT, TRUE);
+    GetSamplesFor14443bDemod(RECEIVE_SAMPLES_TIMEOUT, true);
     // Answer to ATTRIB too short?
     if(Demod.len < 3)
 	{
@@ -1056,12 +1056,12 @@ void ReadSTMemoryIso14443b(uint32_t dwLast)
 	SpinDelay(200);
 
 	clear_trace();
-	set_tracing(TRUE);
+	set_tracing(true);
 
 	// First command: wake up the tag using the INITIATE command
 	uint8_t cmd1[] = {0x06, 0x00, 0x97, 0x5b};
 	CodeAndTransmit14443bAsReader(cmd1, sizeof(cmd1));
-	GetSamplesFor14443bDemod(RECEIVE_SAMPLES_TIMEOUT, TRUE);
+	GetSamplesFor14443bDemod(RECEIVE_SAMPLES_TIMEOUT, true);
 
 	if (Demod.len == 0) {
 		DbpString("No response from tag");
@@ -1077,7 +1077,7 @@ void ReadSTMemoryIso14443b(uint32_t dwLast)
 	cmd1[1] = Demod.output[0];
 	ComputeCrc14443(CRC_14443_B, cmd1, 2, &cmd1[2], &cmd1[3]);
 	CodeAndTransmit14443bAsReader(cmd1, sizeof(cmd1));
-	GetSamplesFor14443bDemod(RECEIVE_SAMPLES_TIMEOUT, TRUE);
+	GetSamplesFor14443bDemod(RECEIVE_SAMPLES_TIMEOUT, true);
 	if (Demod.len != 3) {
 		Dbprintf("Expected 3 bytes from tag, got %d", Demod.len);
 		return;
@@ -1099,7 +1099,7 @@ void ReadSTMemoryIso14443b(uint32_t dwLast)
 	cmd1[0] = 0x0B;
 	ComputeCrc14443(CRC_14443_B, cmd1, 1 , &cmd1[1], &cmd1[2]);
 	CodeAndTransmit14443bAsReader(cmd1, 3); // Only first three bytes for this one
-	GetSamplesFor14443bDemod(RECEIVE_SAMPLES_TIMEOUT, TRUE);
+	GetSamplesFor14443bDemod(RECEIVE_SAMPLES_TIMEOUT, true);
 	if (Demod.len != 10) {
 		Dbprintf("Expected 10 bytes from tag, got %d", Demod.len);
 		return;
@@ -1128,7 +1128,7 @@ void ReadSTMemoryIso14443b(uint32_t dwLast)
 		cmd1[1] = i;
 		ComputeCrc14443(CRC_14443_B, cmd1, 2, &cmd1[2], &cmd1[3]);
 		CodeAndTransmit14443bAsReader(cmd1, sizeof(cmd1));
-		GetSamplesFor14443bDemod(RECEIVE_SAMPLES_TIMEOUT, TRUE);
+		GetSamplesFor14443bDemod(RECEIVE_SAMPLES_TIMEOUT, true);
 		if (Demod.len != 6) { // Check if we got an answer from the tag
 			DbpString("Expected 6 bytes from tag, got less...");
 			return;
@@ -1174,13 +1174,13 @@ void RAMFUNC SnoopIso14443b(void)
 	// We won't start recording the frames that we acquire until we trigger;
 	// a good trigger condition to get started is probably when we see a
 	// response from the tag.
-	int triggered = TRUE;			// TODO: set and evaluate trigger condition
+	int triggered = true;			// TODO: set and evaluate trigger condition
 
 	FpgaDownloadAndGo(FPGA_BITSTREAM_HF);
 	BigBuf_free();
 
 	clear_trace();
-	set_tracing(TRUE);
+	set_tracing(true);
 
 	// The DMA buffer, used to stream samples from the FPGA
 	int8_t *dmaBuf = (int8_t*) BigBuf_malloc(ISO14443B_DMA_BUFFER_SIZE);
@@ -1217,8 +1217,8 @@ void RAMFUNC SnoopIso14443b(void)
 	FpgaSetupSscDma((uint8_t*) dmaBuf, ISO14443B_DMA_BUFFER_SIZE);
 	uint8_t parity[MAX_PARITY_SIZE];
 
-	bool TagIsActive = FALSE;
-	bool ReaderIsActive = FALSE;
+	bool TagIsActive = false;
+	bool ReaderIsActive = false;
 
 	// And now we loop, receiving samples.
 	for(;;) {
@@ -1259,7 +1259,7 @@ void RAMFUNC SnoopIso14443b(void)
 		if (!TagIsActive) {							// no need to try decoding reader data if the tag is sending
 			if(Handle14443bUartBit(ci & 0x01)) {
 				if(triggered && tracing) {
-					LogTrace(Uart.output, Uart.byteCnt, samples, samples, parity, TRUE);
+					LogTrace(Uart.output, Uart.byteCnt, samples, samples, parity, true);
 				}
 				/* And ready to receive another command. */
 				UartReset();
@@ -1269,7 +1269,7 @@ void RAMFUNC SnoopIso14443b(void)
 			}
 			if(Handle14443bUartBit(cq & 0x01)) {
 				if(triggered && tracing) {
-					LogTrace(Uart.output, Uart.byteCnt, samples, samples, parity, TRUE);
+					LogTrace(Uart.output, Uart.byteCnt, samples, samples, parity, true);
 				}
 				/* And ready to receive another command. */
 				UartReset();
@@ -1287,9 +1287,9 @@ void RAMFUNC SnoopIso14443b(void)
 				if(tracing)
 				{
 					uint8_t parity[MAX_PARITY_SIZE];
-					LogTrace(Demod.output, Demod.len, samples, samples, parity, FALSE);
+					LogTrace(Demod.output, Demod.len, samples, samples, parity, false);
 				}
-				triggered = TRUE;
+				triggered = true;
 
 				// And ready to receive another response.
 				DemodReset();
@@ -1330,12 +1330,12 @@ void SendRawCommand14443B(uint32_t datalen, uint32_t recv, uint8_t powerfield, u
 	FpgaSetupSsc();
 
 	if (datalen){
-		set_tracing(TRUE);
+		set_tracing(true);
 		
 		CodeAndTransmit14443bAsReader(data, datalen);
 
 		if(recv) {
-			GetSamplesFor14443bDemod(RECEIVE_SAMPLES_TIMEOUT, TRUE);
+			GetSamplesFor14443bDemod(RECEIVE_SAMPLES_TIMEOUT, true);
 			uint16_t iLen = MIN(Demod.len, USB_CMD_DATA_SIZE);
 			cmd_send(CMD_ACK, iLen, 0, 0, Demod.output, iLen);
 		}

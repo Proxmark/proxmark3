@@ -276,7 +276,6 @@ static void init_bitflip_bitarrays(void)
 				if (bytesread != filesize) {
 					printf("File read error with %s. Aborting...\n", state_file_name);
 					fclose(statesfile);
-					inflateEnd(&compressed_stream);
 					exit(5);
 				}
 				fclose(statesfile);
