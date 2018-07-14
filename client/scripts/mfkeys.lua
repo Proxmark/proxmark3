@@ -68,7 +68,7 @@ function checkBlock(blockNo, keys, keyType)
 								data = data}
 		local status = checkCommand(command)
 		if status then return status, blockNo end
-		start = start+n+1
+		start = start+n
 		remaining = remaining - n
 	end
 	return nil
