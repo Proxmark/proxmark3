@@ -68,7 +68,7 @@ function checkBlock(blockNo, keys, keyType)
 								data = data}
 		local status = checkCommand(command)
 		if status then return status, blockNo end
-		start = start+n
+		start = start+n --fixed base on pwpiwi's reccomendation
 		remaining = remaining - n
 	end
 	return nil
