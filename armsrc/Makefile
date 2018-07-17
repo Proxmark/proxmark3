@@ -10,7 +10,7 @@ APP_INCLUDES = apps.h
 
 #remove one of the following defines and comment out the relevant line
 #in the next section to remove that particular feature from compilation
-APP_CFLAGS	= -DWITH_ISO14443a_StandAlone -DWITH_LF -DWITH_ISO15693 -DWITH_ISO14443a -DWITH_ISO14443b -DWITH_ICLASS -DWITH_LEGICRF -DWITH_HITAG  -DWITH_CRC -DON_DEVICE -DWITH_HFSNOOP \
+APP_CFLAGS	= -DWITH_LF -DWITH_ISO15693 -DWITH_ISO14443a -DWITH_ISO14443b -DWITH_ICLASS -DWITH_LEGICRF -DWITH_HITAG  -DWITH_CRC -DON_DEVICE -DWITH_HFSNOOP \
 				-fno-strict-aliasing -ffunction-sections -fdata-sections
 #-DWITH_LCD
 
@@ -118,4 +118,3 @@ help:
 	@echo Possible targets:
 	@echo +	all    - Build the full image $(OBJDIR)/fullimage.s19
 	@echo +	clean  - Clean $(OBJDIR)
-
