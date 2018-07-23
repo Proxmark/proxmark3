@@ -489,13 +489,13 @@ void WaitTicks(uint32_t ticks){
 // 1us = 1.5ticks.
 void WaitUS(uint16_t us){
 	if ( us == 0 ) return;
-	WaitTicks(  (uint32_t)(us * 1.5) );
+	WaitTicks( (uint32_t)us * 3 / 2 ) ;
 }
 
 
 void WaitMS(uint16_t ms){
 	if (ms == 0) return;
-	WaitTicks( (uint32_t)(ms * 1500) );
+	WaitTicks( (uint32_t)ms * 1500 );
 }
 
 
