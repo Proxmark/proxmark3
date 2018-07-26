@@ -12,7 +12,7 @@
 #include "comms.h"
 
 #include <pthread.h>
-#ifdef __linux__
+#if defined(__linux__) && !defined(NO_UNLINK)
 #include <unistd.h>		// for unlink()
 #endif
 #include "uart.h"
@@ -339,8 +339,10 @@ void CloseProxmark(void) {
 		uart_close(sp);
 	}
 
-#ifdef __linux__
+#if defined(__linux__) && !defined(NO_UNLINK)
 	// Fix for linux, it seems that it is extremely slow to release the serial port file descriptor /dev/*
+	//
+	// This may be disabled at compile-time with -DNO_UNLINK (used for a JNI-based serial port on Android).
 	if (serial_port_name) {
 		unlink(serial_port_name);
 	}
