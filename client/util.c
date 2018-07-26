@@ -226,7 +226,7 @@ char *sprint_hex_ascii(const uint8_t *data, const size_t len) {
 	memset(buf, 0x00, 1024);
 	size_t max_len = (len > 255) ? 255 : len;
 	// max 255 bytes * 3 + 2 characters = 767 in buffer
-	sprintf(tmp, "%s| ", sprint_hex(data, max_len) );
+	sprintf(tmp, "%.765s| ", sprint_hex(data, max_len) );
 	
 	size_t i = 0;
 	size_t pos = (max_len * 3)+2;
