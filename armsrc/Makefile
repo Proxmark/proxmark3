@@ -27,6 +27,11 @@ SRC_ISO14443a = epa.c iso14443a.c mifareutil.c mifarecmd.c mifaresniff.c mifares
 SRC_ISO14443b = iso14443b.c
 SRC_CRAPTO1 = crypto1.c des.c
 SRC_CRC = iso14443crc.c crc.c crc16.c crc32.c parity.c
+ifneq (,$(findstring SMARTCARD,$(APP_CFLAGS)))
+	SRC_SMARTCARD = i2c.c
+else
+	SRC_SMARTCARD = 
+endif
 #the FPGA bitstream files. Note: order matters!
 FPGA_BITSTREAMS = fpga_lf.bit fpga_hf.bit
 
@@ -44,6 +49,7 @@ THUMBSRC = start.c \
 	$(SRC_ISO15693) \
 	$(SRC_LF) \
 	$(SRC_ZLIB) \
+	$(SRC_SMARTCARD) \
 	appmain.c \
 	printf.c \
 	util.c \
