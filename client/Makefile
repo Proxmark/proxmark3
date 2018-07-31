@@ -23,6 +23,15 @@ LDFLAGS = $(ENV_LDFLAGS)
 CFLAGS = $(ENV_CFLAGS) -std=c99 -D_ISOC99_SOURCE -I. -I../include -I../common -I../common/polarssl -I../zlib -I../uart -I/opt/local/include -I../liblua -Wall -g -O3
 CXXFLAGS = -I../include -Wall -O3
 
+APP_CFLAGS =
+include ../common/Makefile_Enabled_Options.common
+CFLAGS += $(APP_CFLAGS)
+ifneq (,$(findstring WITH_SMARTCARD,$(APP_CFLAGS)))
+	SRC_SMARTCARD = cmdsmartcard.c
+else
+	SRC_SMARTCARD = 
+endif
+
 LUAPLATFORM = generic
 platform = $(shell uname)
 ifneq (,$(findstring MINGW,$(platform)))
@@ -37,32 +46,34 @@ else
 	endif
 endif
 
-# Check for correctly configured Qt5
-QTINCLUDES = $(shell pkg-config --cflags Qt5Core Qt5Widgets 2>/dev/null)
-QTLDLIBS = $(shell pkg-config --libs Qt5Core Qt5Widgets 2>/dev/null)
-MOC = $(shell pkg-config --variable=host_bins Qt5Core)/moc
-UIC = $(shell pkg-config --variable=host_bins Qt5Core)/uic
-ifeq ($(QTINCLUDES), )
-# if Qt5 not found check for correctly configured Qt4	
-	QTINCLUDES = $(shell pkg-config --cflags QtCore QtGui 2>/dev/null)
-	QTLDLIBS = $(shell pkg-config --libs QtCore QtGui 2>/dev/null)
-	MOC = $(shell pkg-config --variable=moc_location QtCore)
-	UIC = $(shell pkg-config --variable=uic_location QtCore)
-else
-	CXXFLAGS += -std=c++11 -fPIC
-endif
-ifeq ($(QTINCLUDES), )
-# if both pkg-config commands failed, search in common places
-	ifneq ($(QTDIR), )
-		QTINCLUDES = -I$(QTDIR)/include -I$(QTDIR)/include/QtCore -I$(QTDIR)/include/QtGui
-		QTLDLIBS = -L$(QTDIR)/lib -lQtCore4 -lQtGui4
-		ifneq ($(wildcard $(QTDIR)/include/QtWidgets),)
-			QTINCLUDES += -I$(QTDIR)/include/QtWidgets
-			QTLDLIBS = -L$(QTDIR)/lib -lQt5Widgets -lQt5Gui -lQt5Core
-			CXXFLAGS += -std=c++11 -fPIC
+ifneq (,$(findstring WITH_GUI,$(APP_CFLAGS)))
+	# Check for correctly configured Qt5
+	QTINCLUDES = $(shell pkg-config --cflags Qt5Core Qt5Widgets 2>/dev/null)
+	QTLDLIBS = $(shell pkg-config --libs Qt5Core Qt5Widgets 2>/dev/null)
+	MOC = $(shell pkg-config --variable=host_bins Qt5Core)/moc
+	UIC = $(shell pkg-config --variable=host_bins Qt5Core)/uic
+	ifeq ($(QTINCLUDES), )
+	# if Qt5 not found check for correctly configured Qt4	
+		QTINCLUDES = $(shell pkg-config --cflags QtCore QtGui 2>/dev/null)
+		QTLDLIBS = $(shell pkg-config --libs QtCore QtGui 2>/dev/null)
+		MOC = $(shell pkg-config --variable=moc_location QtCore)
+		UIC = $(shell pkg-config --variable=uic_location QtCore)
+	else
+		CXXFLAGS += -std=c++11 -fPIC
+	endif
+	ifeq ($(QTINCLUDES), )
+	# if both pkg-config commands failed, search in common places
+		ifneq ($(QTDIR), )
+			QTINCLUDES = -I$(QTDIR)/include -I$(QTDIR)/include/QtCore -I$(QTDIR)/include/QtGui
+			QTLDLIBS = -L$(QTDIR)/lib -lQtCore4 -lQtGui4
+			ifneq ($(wildcard $(QTDIR)/include/QtWidgets),)
+				QTINCLUDES += -I$(QTDIR)/include/QtWidgets
+				QTLDLIBS = -L$(QTDIR)/lib -lQt5Widgets -lQt5Gui -lQt5Core
+				CXXFLAGS += -std=c++11 -fPIC
+			endif
+			MOC = $(QTDIR)/bin/moc
+			UIC = $(QTDIR)/bin/uic
 		endif
-		MOC = $(QTDIR)/bin/moc
-		UIC = $(QTDIR)/bin/uic
 	endif
 endif
 
@@ -79,6 +90,7 @@ DEPFLAGS = -MT $@ -MMD -MP -MF $(OBJDIR)/$*.Td
 # make temporary to final dependeny files after successful compilation
 POSTCOMPILE = $(MV) -f $(OBJDIR)/$*.Td $(OBJDIR)/$*.d
 
+
 CORESRCS = 	uart_posix.c \
 			uart_win32.c \
 			util.c \
@@ -86,7 +98,8 @@ CORESRCS = 	uart_posix.c \
 			ui.c \
 			comms.c
 
-CMDSRCS = 	crapto1/crapto1.c\
+CMDSRCS = 	$(SRC_SMARTCARD) \
+			crapto1/crapto1.c\
 			crapto1/crypto1.c\
 			polarssl/des.c \
 			polarssl/aes.c\
@@ -302,6 +315,7 @@ $(OBJDIR)/%.o : %.cpp $(OBJDIR)/%.d
 DEPENDENCY_FILES = $(patsubst %.c, $(OBJDIR)/%.d, $(CORESRCS) $(CMDSRCS) $(ZLIBSRCS) $(MULTIARCHSRCS)) \
 	$(patsubst %.cpp, $(OBJDIR)/%.d, $(QTGUISRCS)) \
 	$(OBJDIR)/proxmark3.d $(OBJDIR)/flash.d $(OBJDIR)/flasher.d $(OBJDIR)/fpga_compress.d
+
 
 $(DEPENDENCY_FILES): ;
 .PRECIOUS: $(DEPENDENCY_FILES)
