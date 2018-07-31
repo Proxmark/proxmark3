@@ -26,11 +26,6 @@ CXXFLAGS = -I../include -Wall -O3
 APP_CFLAGS =
 include ../common/Makefile_Enabled_Options.common
 CFLAGS += $(APP_CFLAGS)
-ifneq (,$(findstring WITH_SMARTCARD,$(APP_CFLAGS)))
-	SRC_SMARTCARD = cmdsmartcard.c
-else
-	SRC_SMARTCARD = 
-endif
 
 LUAPLATFORM = generic
 platform = $(shell uname)
@@ -98,8 +93,7 @@ CORESRCS = 	uart_posix.c \
 			ui.c \
 			comms.c
 
-CMDSRCS = 	$(SRC_SMARTCARD) \
-			crapto1/crapto1.c\
+CMDSRCS = 	crapto1/crapto1.c\
 			crapto1/crypto1.c\
 			polarssl/des.c \
 			polarssl/aes.c\
