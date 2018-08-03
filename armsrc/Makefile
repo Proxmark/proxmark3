@@ -16,7 +16,7 @@ APP_CFLAGS  = -DON_DEVICE \
 include ../common/Makefile_Enabled_Options.common
 
 ifneq (,$(findstring LCD,$(APP_CFLAGS)))
-        SRC_LCD = #fonts.c LCD.c
+        SRC_LCD = fonts.c LCD.c
 else
         SRC_LCD = 
 endif
