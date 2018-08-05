@@ -10,10 +10,15 @@
 // mode once it is configured.
 //-----------------------------------------------------------------------------
 
+#ifndef __FPGALOADER_H
+#define __FPGALOADER_H
+
+#include <stdint.h>
+#include <stdbool.h>
+
 void FpgaSendCommand(uint16_t cmd, uint16_t v);
 void FpgaWriteConfWord(uint8_t v);
 void FpgaDownloadAndGo(int bitstream_version);
-void FpgaGatherVersion(int bitstream_version, char *dst, int len);
 void FpgaSetupSsc(void);
 void SetupSpi(int mode);
 bool FpgaSetupSscDma(uint8_t *buf, int len);
@@ -24,11 +29,8 @@ int FpgaGetCurrent();
 void SetAdcMuxFor(uint32_t whichGpio);
 
 // definitions for multiple FPGA config files support
-#define FPGA_BITSTREAM_MAX 2	// the total number of FPGA bitstreams (configs)
-#define FPGA_BITSTREAM_ERR 0
 #define FPGA_BITSTREAM_LF 1
 #define FPGA_BITSTREAM_HF 2
-
 
 // Definitions for the FPGA commands.
 #define FPGA_CMD_SET_CONFREG						(1<<12)
@@ -72,3 +74,5 @@ void SetAdcMuxFor(uint32_t whichGpio);
 #define FPGA_HF_ISO14443A_TAGSIM_MOD				(2<<0)
 #define FPGA_HF_ISO14443A_READER_LISTEN				(3<<0)
 #define FPGA_HF_ISO14443A_READER_MOD				(4<<0)
+
+#endif
