@@ -367,7 +367,7 @@ void SendStatus(void)
 	cmd_send(CMD_ACK,1,0,0,0,0);
 }
 
-#if defined(WITH_ISO14443a_StandAlone) || defined(WITH_LF)
+#if defined(WITH_ISO14443a_StandAlone) || defined(WITH_LF_StandAlone)
 
 #define OPTS 2
 
@@ -635,7 +635,7 @@ void StandAloneMode14a()
 		}
 	}
 }
-#elif WITH_LF
+#elif WITH_LF_StandAlone
 // samy's sniff and repeat routine
 void SamyRun()
 {
@@ -1428,7 +1428,7 @@ void  __attribute__((noreturn)) AppMain(void)
     }
 		WDT_HIT();
 
-#ifdef WITH_LF
+#ifdef WITH_LF_StandAlone
 #ifndef WITH_ISO14443a_StandAlone
 		if (BUTTON_HELD(1000) > 0)
 			SamyRun();

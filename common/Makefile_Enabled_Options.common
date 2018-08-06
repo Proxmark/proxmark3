@@ -4,6 +4,7 @@
 #  
 #BEGIN
 APP_CFLAGS += -DWITH_ISO14443a_StandAlone \
+        -DWITH_LF\
         -DWITH_ISO15693 \
         -DWITH_ISO14443a \
         -DWITH_ISO14443b \
@@ -18,7 +19,7 @@ APP_CFLAGS += -DWITH_ISO14443a_StandAlone \
         
 ### Standalone modes:
 #-DWITH_ISO14443a_StandAlone
-#-DWITH_LF
+#-DWITH_LF_StandAlone
 #
 # if both WITH_LF and WITH_ISO4443a_StandAlone are defined
 #   ISO14443a_StandAlone will be the only one that runs 
