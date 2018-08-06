@@ -13,9 +13,9 @@ APP_CFLAGS += -DWITH_ISO14443a_StandAlone \
         -DWITH_HITAG \
         -DWITH_CRC \
         -DWITH_HFSNOOP \
+        -DWITH_SMARTCARD \
         -DWITH_GUI
 #END
-
         
 ### Standalone modes:
 #-DWITH_ISO14443a_StandAlone
@@ -39,4 +39,4 @@ APP_CFLAGS += -DWITH_ISO14443a_StandAlone \
 #-DWITH_GUI       \ include QT GUI/Graph support in build
 #-DWITH_LCD       \ include LCD support in build (experimental?)
 
-#marshmellow NOTE: tested GUI, and SMARTCARD removal only...
+#marshmellow NOTE: tested GUI, and smartcard removal only...
