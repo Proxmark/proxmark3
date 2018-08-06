@@ -21,12 +21,13 @@ APP_CFLAGS += -DWITH_ISO14443a_StandAlone \
 #-DWITH_ISO14443a_StandAlone
 #-DWITH_LF_StandAlone
 #
-# if both WITH_LF and WITH_ISO4443a_StandAlone are defined
+# if both WITH_LF_StandAlone and WITH_ISO4443a_StandAlone are defined
 #   ISO14443a_StandAlone will be the only one that runs 
-#   You must remove it and define WITH_LF for LF standalone mode
+#   You must remove it and define WITH_LF_StandAlone for LF standalone mode
 
 ### Other options:
-#-DWITH_ISO15693  \ Include ISO15693 support in build
+#-DWITH_LF        \ include LF support in build
+#-DWITH_ISO15693  \ include ISO15693 support in build
 #-DWITH_ISO14443a \ include ISO14443a support in build
 #-DWITH_ISO14443b \ include ISO14443b support in build
 #-DWITH_ICLASS    \ include ICLASS support in build
