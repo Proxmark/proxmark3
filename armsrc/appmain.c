@@ -16,6 +16,7 @@
 #include "cmd.h"
 #include "proxmark3.h"
 #include "apps.h"
+#include "fpga.h"
 #include "util.h"
 #include "printf.h"
 #include "string.h"
@@ -286,6 +287,7 @@ void ReadMem(int addr)
 extern struct version_information version_information;
 /* bootrom version information is pointed to from _bootphase1_version_pointer */
 extern char *_bootphase1_version_pointer, _flash_start, _flash_end, _bootrom_start, _bootrom_end, __data_src_start__;
+
 void SendVersion(void)
 {
 	char temp[USB_CMD_DATA_SIZE]; /* Limited data payload in USB packets */
@@ -306,10 +308,12 @@ void SendVersion(void)
 	FormatVersionInformation(temp, sizeof(temp), "os: ", &version_information);
 	strncat(VersionString, temp, sizeof(VersionString) - strlen(VersionString) - 1);
 
-	FpgaGatherVersion(FPGA_BITSTREAM_LF, temp, sizeof(temp));
-	strncat(VersionString, temp, sizeof(VersionString) - strlen(VersionString) - 1);
-	FpgaGatherVersion(FPGA_BITSTREAM_HF, temp, sizeof(temp));
-	strncat(VersionString, temp, sizeof(VersionString) - strlen(VersionString) - 1);
+	for (int i = 0; i < fpga_bitstream_num; i++) {
+		strncat(VersionString, fpga_version_information[i], sizeof(VersionString) - strlen(VersionString) - 1);
+		if (i < fpga_bitstream_num - 1) {
+			strncat(VersionString, "\n", sizeof(VersionString) - strlen(VersionString) - 1);
+		}
+	}
 
 	// Send Chip ID and used flash memory
 	uint32_t text_and_rodata_section_size = (uint32_t)&__data_src_start__ - (uint32_t)&_flash_start;
@@ -363,7 +367,7 @@ void SendStatus(void)
 	cmd_send(CMD_ACK,1,0,0,0,0);
 }
 
-#if defined(WITH_ISO14443a_StandAlone) || defined(WITH_LF)
+#if defined(WITH_ISO14443a_StandAlone) || defined(WITH_LF_StandAlone)
 
 #define OPTS 2
 
@@ -631,7 +635,7 @@ void StandAloneMode14a()
 		}
 	}
 }
-#elif WITH_LF
+#elif WITH_LF_StandAlone
 // samy's sniff and repeat routine
 void SamyRun()
 {
@@ -1424,7 +1428,7 @@ void  __attribute__((noreturn)) AppMain(void)
     }
 		WDT_HIT();
 
-#ifdef WITH_LF
+#ifdef WITH_LF_StandAlone
 #ifndef WITH_ISO14443a_StandAlone
 		if (BUTTON_HELD(1000) > 0)
 			SamyRun();
