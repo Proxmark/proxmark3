@@ -30,6 +30,10 @@
 #ifdef WITH_LCD
  #include "LCD.h"
 #endif
+#ifdef WITH_SMARTCARD
+ #include "i2c.h"
+#endif
+
 
 // Craig Young - 14a stand-alone code
 #ifdef WITH_ISO14443a
@@ -1252,6 +1256,35 @@ void UsbPacketReceived(uint8_t *packet, int len)
 		case CMD_HF_SNIFFER:
 			HfSnoop(c->arg[0], c->arg[1]);
 			break;
+#endif
+#ifdef WITH_SMARTCARD
+		case CMD_SMART_ATR: {
+			SmartCardAtr();
+			break;
+		}
+		case CMD_SMART_SETBAUD:{
+			SmartCardSetBaud(c->arg[0]);
+			break;
+		}
+		case CMD_SMART_SETCLOCK:{
+			SmartCardSetClock(c->arg[0]);
+			break;
+		}
+		case CMD_SMART_RAW: {
+			SmartCardRaw(c->arg[0], c->arg[1], c->d.asBytes);
+			break;
+		}
+		case CMD_SMART_UPLOAD: {
+			// upload file from client
+			uint8_t *mem = BigBuf_get_addr();
+			memcpy( mem + c->arg[0], c->d.asBytes, USB_CMD_DATA_SIZE);
+			cmd_send(CMD_ACK,1,0,0,0,0);
+			break;
+		}
+		case CMD_SMART_UPGRADE: {
+			SmartCardUpgrade(c->arg[0]);
+			break;
+		}
 #endif
 
 		case CMD_BUFF_CLEAR:

@@ -372,7 +372,6 @@ int CmdSmartReader(const char *Cmd){
 	}
 	smart_card_atr_t card;
 	memcpy(&card, (smart_card_atr_t *)resp.d.asBytes, sizeof(smart_card_atr_t));
-
 	PrintAndLog("ISO7816-3 ATR : %s", sprint_hex(card.atr, card.atr_len));	
 	return 0;
 }
@@ -510,7 +509,6 @@ uint16_t printScTraceLine(uint16_t tracepos, uint16_t traceLen, uint8_t *trace) 
 	}
 
 	parity_len = (data_len-1)/8 + 1;
-	PrintAndLog("TODO REMOVE ME: parlen=%u",parity_len);
 	if (tracepos + data_len + parity_len > traceLen) {
 		return traceLen;
 	}
@@ -562,49 +560,26 @@ uint16_t printScTraceLine(uint16_t tracepos, uint16_t traceLen, uint8_t *trace) 
 int ScTraceList(const char *Cmd) {
 	bool loadFromFile = false;
 	bool saveToFile = false;
-	char param1 = '\0';
-	char param2 = '\0';
-	char type[40] = {0};
+	char type[5] = {0};
 	char filename[FILE_PATH_SIZE] = {0};
 	
 	// parse command line
-	int tlen = param_getstr(Cmd, 0, type, sizeof(type));
-	if (param_getlength(Cmd, 1) == 1) {
-		param1 = param_getchar(Cmd, 1);
-	} else {
-		param_getstr(Cmd, 1, filename, sizeof(filename));
-	}
-	if (param_getlength(Cmd, 2) == 1) {
-		param2 = param_getchar(Cmd, 2);
-	} else if (strlen(filename) == 0) {
-		param_getstr(Cmd, 2, filename, sizeof(filename));
-	}
+	param_getstr(Cmd, 0, type, sizeof(type));
+	param_getstr(Cmd, 1, filename, sizeof(filename));
 
-	// Validate param1
 	bool errors = false;
-
-	if(tlen == 0) {
-		errors = true;
-	}
-
-	if(param1 == 'h'
-			|| (param1 != 0 && param1 != 'l')
-			|| (param2 != 0 && param2 != 'l')) {
+	if(type[0] == 'h') {
 		errors = true;
 	}
 
 	if(!errors) {
-		if (strcmp(type, "save") == 0) {
+		if (strcmp(type, "s") == 0) {
 			saveToFile = true;
-		} else {
-			errors = true;
+		} else if (strcmp(type,"l") == 0) {
+			loadFromFile = true;
 		}
 	}
 	
-	if (param1 == 'l' || param2 == 'l') {
-		loadFromFile = true;
-	}
-
 	if ((loadFromFile || saveToFile) && strlen(filename) == 0) {
 		errors = true;
 	}
@@ -616,16 +591,15 @@ int ScTraceList(const char *Cmd) {
 	if (errors) {
 		PrintAndLog("List or save protocol data.");
 		PrintAndLog("Usage:  sc list [l <filename>]");
-		PrintAndLog("        sc list save <filename>");
+		PrintAndLog("        sc list [s <filename>]");
 		PrintAndLog("    l      - load data from file instead of trace buffer");
-		PrintAndLog("    save   - save data to file");
+		PrintAndLog("    s      - save data to file");
 		PrintAndLog("");
 		PrintAndLog("example: sc list");
 		PrintAndLog("example: sc list save myCardTrace.trc");
 		PrintAndLog("example: sc list l myCardTrace.trc");
 		return 0;
 	}
-
 
 	uint8_t *trace;
 	uint32_t tracepos = 0;
@@ -692,8 +666,8 @@ int ScTraceList(const char *Cmd) {
 		PrintAndLog("");
 		PrintAndLog("Start = Start of Start Bit, End = End of last modulation. Src = Source of Transfer");
 		PrintAndLog("");
-		PrintAndLog("      Start |        End | Src | Data (! denotes parity error)                                   | CRC | Annotation         |");
-		PrintAndLog("------------|------------|-----|-----------------------------------------------------------------|-----|--------------------|");
+		PrintAndLog("      Start |        End | Src | Data (! denotes parity error)                                           | CRC | Annotation         |");
+		PrintAndLog("------------|------------|-----|-------------------------------------------------------------------------|-----|--------------------|");
 
 		while(tracepos < traceLen)
 		{

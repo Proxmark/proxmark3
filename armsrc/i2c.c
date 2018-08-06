@@ -259,7 +259,7 @@ bool I2C_WriteCmd(uint8_t device_cmd, uint8_t device_address) {
 	do 	{
 		if (!I2C_Start())
 			return false;
-
+		//[C0]
 		I2C_SendByte(device_address & 0xFE);
 		if (!I2C_WaitAck())
 			break;
@@ -545,6 +545,8 @@ bool GetATR(smart_card_atr_t *card_ptr) {
 	// Send ATR
 	// start [C0 01] stop start C1 len aa bb cc stop]
 	I2C_WriteCmd(I2C_DEVICE_CMD_GENERATE_ATR, I2C_DEVICE_ADDRESS_MAIN);
+	uint8_t	cmd[1] = {1};
+	LogTrace(cmd, 1, 0, 0, NULL, true);
 
 	//wait for sim card to answer.
 	if (!I2C_WaitForSim()) 
@@ -556,10 +558,24 @@ bool GetATR(smart_card_atr_t *card_ptr) {
 	if ( len == 0 )
 		return false;
 
+	// for some reason we only get first byte of atr, if that is so, send dummy command to retrieve the rest of the atr 
+	if (len == 1) {
+
+		uint8_t data[1] = {0};
+		I2C_BufferWrite(data, len, I2C_DEVICE_CMD_SEND, I2C_DEVICE_ADDRESS_MAIN);
+
+		if ( !I2C_WaitForSim() )
+			return false;
+
+		uint8_t len2 = I2C_BufferRead(card_ptr->atr + len, sizeof(card_ptr->atr) - len, I2C_DEVICE_CMD_READ, I2C_DEVICE_ADDRESS_MAIN);
+		len = len + len2;
+	}
+
 	if ( card_ptr ) {
 		card_ptr->atr_len = len;
 		LogTrace(card_ptr->atr, card_ptr->atr_len, 0, 0, NULL, false);
 	}
+
 	return true;
 }
 
