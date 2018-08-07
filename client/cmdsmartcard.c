@@ -43,7 +43,7 @@ int usage_sm_info(void) {
 	PrintAndLog("       s          :  silent (no messages)");
 	PrintAndLog("");
 	PrintAndLog("Examples:");
-	PrintAndLog("        sc info");		
+	PrintAndLog("        sc info");
 	return 0;
 }
 int usage_sm_upgrade(void) {
@@ -64,7 +64,7 @@ int usage_sm_setclock(void) {
 	PrintAndLog("       c <>       :  clockspeed (0 = 16mhz, 1=8mhz, 2=4mhz) ");
 	PrintAndLog("");
 	PrintAndLog("Examples:");
-	PrintAndLog("        sc setclock c 2");	
+	PrintAndLog("        sc setclock c 2");
 	return 0;
 }
 
@@ -72,11 +72,11 @@ int CmdSmartRaw(const char *Cmd) {
 
 	int hexlen = 0;
 	bool active = false;
-	bool active_select = false;	
+	bool active_select = false;
 	uint8_t cmdp = 0;
 	bool errors = false, reply = true, decodeTLV = false, breakloop = false;
 	uint8_t data[USB_CMD_DATA_SIZE] = {0x00};
-		
+
 	while (param_getchar(Cmd, cmdp) != 0x00 && !errors) {
 		switch (tolower(param_getchar(Cmd, cmdp))) {
 		case 'h': return usage_sm_raw();
@@ -123,11 +123,11 @@ int CmdSmartRaw(const char *Cmd) {
 	}
 
 	//Validations
-	if (errors || cmdp == 0 ) return usage_sm_raw();			
+	if (errors || cmdp == 0 ) return usage_sm_raw();
 
 	// arg0 = RFU flags
 	// arg1 = length
-	UsbCommand c = {CMD_SMART_RAW, {0, hexlen, 0}};	
+	UsbCommand c = {CMD_SMART_RAW, {0, hexlen, 0}};
 
 	if (active || active_select) {
 		c.arg[0] |= SC_CONNECT;
@@ -249,20 +249,20 @@ int CmdSmartUpgrade(const char *Cmd) {
 	uint32_t bytes_remaining = bytes_read;
 
 	while (bytes_remaining > 0){
-		uint32_t bytes_in_packet = MIN(USB_CMD_DATA_SIZE, bytes_remaining);		
+		uint32_t bytes_in_packet = MIN(USB_CMD_DATA_SIZE, bytes_remaining);
 		UsbCommand c = {CMD_SMART_UPLOAD, {index + bytes_sent, bytes_in_packet, 0}};
 
 		// Fill usb bytes with 0xFF
 		memset(c.d.asBytes, 0xFF, USB_CMD_DATA_SIZE);
 		memcpy(c.d.asBytes, dump + bytes_sent, bytes_in_packet);
 		clearCommandBuffer();
-		SendCommand(&c);	
+		SendCommand(&c);
 		if ( !WaitForResponseTimeout(CMD_ACK, NULL, 2000) ) {
 			PrintAndLog("timeout while waiting for reply.");
 			free(dump);
 			return 1;
 		}
-		
+
 		bytes_remaining -= bytes_in_packet;
 		bytes_sent += bytes_in_packet;
 		printf("."); fflush(stdout);
@@ -562,7 +562,7 @@ int ScTraceList(const char *Cmd) {
 	bool saveToFile = false;
 	char type[5] = {0};
 	char filename[FILE_PATH_SIZE] = {0};
-	
+
 	// parse command line
 	param_getstr(Cmd, 0, type, sizeof(type));
 	param_getstr(Cmd, 1, filename, sizeof(filename));
@@ -579,7 +579,7 @@ int ScTraceList(const char *Cmd) {
 			loadFromFile = true;
 		}
 	}
-	
+
 	if ((loadFromFile || saveToFile) && strlen(filename) == 0) {
 		errors = true;
 	}
@@ -587,7 +587,7 @@ int ScTraceList(const char *Cmd) {
 	if (loadFromFile && saveToFile) {
 		errors = true;
 	}
-	
+
 	if (errors) {
 		PrintAndLog("List or save protocol data.");
 		PrintAndLog("Usage:  sc list [l <filename>]");
@@ -604,9 +604,9 @@ int ScTraceList(const char *Cmd) {
 	uint8_t *trace;
 	uint32_t tracepos = 0;
 	uint32_t traceLen = 0;
-	
+
 	if (loadFromFile) {
-		#define TRACE_CHUNK_SIZE (1<<16)		// 64K to start with. Will be enough for BigBuf and some room for future extensions
+		#define TRACE_CHUNK_SIZE (1<<16)    // 64K to start with. Will be enough for BigBuf and some room for future extensions
 		FILE *tracefile = NULL;
 		size_t bytes_read;
 		trace = malloc(TRACE_CHUNK_SIZE);

@@ -68,6 +68,7 @@ typedef struct{
 #define CMD_SMART_UPGRADE                                                 0x0141
 #define CMD_SMART_UPLOAD                                                  0x0142
 #define CMD_SMART_ATR                                                     0x0143
+// CMD_SMART_SETBAUD is unused for now
 #define CMD_SMART_SETBAUD                                                 0x0144
 #define CMD_SMART_SETCLOCK                                                0x0145
 

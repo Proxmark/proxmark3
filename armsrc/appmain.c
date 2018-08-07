@@ -361,12 +361,15 @@ void SendStatus(void)
 {
 	BigBuf_print_status();
 	Fpga_print_status();
+#ifdef WITH_SMARTCARD
+	I2C_print_status();
+#endif
 	printConfig(); //LF Sampling config
 	printUSBSpeed();
 	Dbprintf("Various");
-	Dbprintf("  MF_DBGLEVEL......%d", MF_DBGLEVEL);
-	Dbprintf("  ToSendMax........%d",ToSendMax);
-	Dbprintf("  ToSendBit........%d",ToSendBit);
+	Dbprintf("  MF_DBGLEVEL........%d", MF_DBGLEVEL);
+	Dbprintf("  ToSendMax..........%d", ToSendMax);
+	Dbprintf("  ToSendBit..........%d", ToSendBit);
 
 	cmd_send(CMD_ACK,1,0,0,0,0);
 }
@@ -1260,10 +1263,6 @@ void UsbPacketReceived(uint8_t *packet, int len)
 #ifdef WITH_SMARTCARD
 		case CMD_SMART_ATR: {
 			SmartCardAtr();
-			break;
-		}
-		case CMD_SMART_SETBAUD:{
-			SmartCardSetBaud(c->arg[0]);
 			break;
 		}
 		case CMD_SMART_SETCLOCK:{
