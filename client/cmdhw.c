@@ -408,21 +408,13 @@ int CmdVersion(const char *Cmd)
 
 	clearCommandBuffer();
 	UsbCommand c = {CMD_VERSION};
-	static UsbCommand resp = {0, {0, 0, 0}};
+	UsbCommand resp = {0, {0, 0, 0}};
 
-	if (resp.arg[0] == 0 && resp.arg[1] == 0) { // no cached information available
-		SendCommand(&c);
-		if (WaitForResponseTimeout(CMD_ACK,&resp,1000)) {
-			PrintAndLog("Prox/RFID mark3 RFID instrument");
-			PrintAndLog((char*)resp.d.asBytes);
-			lookupChipID(resp.arg[0], resp.arg[1]);
-		}
-	} else {
-		PrintAndLog("[[[ Cached information ]]]\n");
+	SendCommand(&c);
+	if (WaitForResponseTimeout(CMD_ACK,&resp,1000)) {
 		PrintAndLog("Prox/RFID mark3 RFID instrument");
 		PrintAndLog((char*)resp.d.asBytes);
 		lookupChipID(resp.arg[0], resp.arg[1]);
-		PrintAndLog("");
 	}
 	return 0;
 }
