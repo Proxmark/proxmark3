@@ -33,7 +33,6 @@
 
 static int CmdHelp(const char *Cmd);
 
-
 /**
  * Packs a "short" (<38-bit) HID ID from component parts.
  *
@@ -104,6 +103,45 @@ bool pack_short_hid(/* out */ uint32_t *hi, /* out */ uint32_t *lo, /* in */ con
   return true;
 }
 
+/**
+ * Packs a "long" (>37-bit) HID ID from component parts.
+ *
+ * This only works with 48 bit card IDs.
+ *
+ * NOTE: Parity calculation is not yet supported
+ *
+ * Returns false on invalid inputs.
+ */
+bool pack_long_hid(/* out */ uint32_t *hi2, /* out */ uint32_t *hi, /* out */ uint32_t *lo, /* in */ const long_hid_info *info) {
+  uint32_t higher = 0, high = 0, low = 0;
+
+  switch (info->fmtLen) {
+
+  case 48:
+    low |= (info->cardnum & 0x7FFFFF) << 1;
+    low |= (info->fc & 0xff) << 24;
+    high |= (info->fc & 0x3FFF00) >> 8;
+    // TODO: Calculate parity
+    break;
+
+  default:
+    // Invalid / unsupported length
+    return false;
+  }
+  
+  // Set the bit corresponding to the length.
+  if (info->fmtLen < 64) {
+    high |= 1 << (info->fmtLen - 32);
+  } else {
+    higher |= 1 << (info->fmtLen - 64);
+  }
+  
+  // Return result only if successful.
+  *hi2 = higher;
+  *hi = high;
+  *lo = low;
+  return true;
+}
 
 /**
  * Unpacks a "short" (<38-bit) HID ID into its component parts.
@@ -173,19 +211,58 @@ bool unpack_short_hid(short_hid_info *out, uint32_t hi, uint32_t lo) {
   return true;
 }
 
+/**
+ * Unpacks a "long" (>37-bit) HID ID into its component parts.
+ *
+ * This currently only works with 48 bit card IDs.
+ *
+ * NOTE: Parity checking is not yet supported.
+ *
+ * Returns false on invalid inputs.
+ */
+bool unpack_long_hid(long_hid_info *out, uint32_t hi2, uint32_t hi, uint32_t lo) {
+  memset(out, 0, sizeof(long_hid_info));
+  uint8_t fmtLen = 0;
+	
+  uint32_t hFmt;
+  if ((hi2 & 0xFFFFF) > 0) { // > 64 bits
+    hFmt = hi2 & 0x000FFFFF; // Eliminate header
+    fmtLen = 64;
+  } else { // < 64 bits
+    hFmt = hi;
+    fmtLen = 32;
+  }
+  while (hFmt > 1) {
+    hFmt >>= 1;
+    fmtLen++;
+  }
+  out->fmtLen = fmtLen;
+  switch (out->fmtLen) {
+  case 48:
+    out->cardnum = (lo >> 1) & 0x7FFFFF;  //Start 24, 23 length
+    out->fc = ((hi & 0x3FFF) << 8 ) | (lo >> 24);  //Start 2, 22 length
+    // TODO: Calculate parity
+    break;
+
+  default:
+    return false;
+  }
+  return true;
+}
 
 /**
- * Converts a hex string to component "hi" and "lo" 32-bit integers, one nibble
+ * Converts a hex string to component "hi2", "hi" and "lo" 32-bit integers, one nibble
  * at a time.
  *
  * Returns the number of nibbles (4 bits) entered.
  */
-int hexstring_to_int64(/* out */ uint32_t* hi, /* out */ uint32_t* lo, const char* str) {
+int hexstring_to_int96(/* out */ uint32_t* hi2,/* out */ uint32_t* hi, /* out */ uint32_t* lo, const char* str) {
   // TODO: Replace this with param_gethex when it supports arbitrary length
   // inputs.
   int n = 0, i = 0;
 
   while (sscanf(&str[i++], "%1x", &n ) == 1) {
+    *hi2 = (*hi2 << 4) | (*hi >> 28);
     *hi = (*hi << 4) | (*lo >> 28);
     *lo = (*lo << 4) | (n & 0xf);
   }
@@ -228,8 +305,20 @@ int CmdFSKdemodHID(const char *Cmd)
     return 0;
   }
   if (hi2 != 0){ //extra large HID tags
-    PrintAndLog("HID Prox TAG ID: %x%08x%08x (%d)",
-       (unsigned int) hi2, (unsigned int) hi, (unsigned int) lo, (unsigned int) (lo>>1) & 0xFFFF);
+    long_hid_info card_info;
+    bool ret = unpack_long_hid(&card_info, (uint32_t)hi2, (uint32_t)hi, (uint32_t)lo);
+    
+    PrintAndLog("HID Prox TAG ID: %x%08x%08x (%d) - Format Len: %u bits - FC: %u - Card: %u",
+      (unsigned int) hi2, (unsigned int) hi, (unsigned int) lo, (unsigned int) (lo>>1) & 0xFFFF,
+      card_info.fmtLen, card_info.fc, card_info.cardnum);
+    
+    // if (card_info.fmtLen == 26) {
+    //   PrintAndLog("Parity: %s", card_info.parityValid ? "valid" : "invalid");
+    // }
+
+    if (!ret) {
+      PrintAndLog("Invalid or unsupported tag length.");
+    }
   }
   else {  //standard HID tags <38 bits
     short_hid_info card_info;
@@ -267,9 +356,9 @@ int CmdHIDReadFSK(const char *Cmd)
 
 int CmdHIDSim(const char *Cmd)
 {
-  uint32_t hi = 0, lo = 0;
-  hexstring_to_int64(&hi, &lo, Cmd);
-  if (hi >= 0x40) {
+  uint32_t hi2 = 0, hi = 0, lo = 0;
+  hexstring_to_int96(&hi2, &hi, &lo, Cmd);
+  if (hi >= 0x40 || hi2 != 0) {
     PrintAndLog("This looks like a long tag ID. Use 'lf simfsk' for long tags. Aborting!");
     return 0;
   }
@@ -286,30 +375,13 @@ int CmdHIDClone(const char *Cmd)
 {
   unsigned int hi2 = 0, hi = 0, lo = 0;
   UsbCommand c;
-
-  if (strchr(Cmd,'l') != 0) {
-    int n = 0, i = 0;
-
-    while (sscanf(&Cmd[i++], "%1x", &n ) == 1) {
-      hi2 = (hi2 << 4) | (hi >> 28);
-      hi = (hi << 4) | (lo >> 28);
-      lo = (lo << 4) | (n & 0xf);
-    }
-
+  hexstring_to_int96(&hi2, &hi, &lo, Cmd);
+    
+  if (hi >= 0x40 || hi2 != 0) {
     PrintAndLog("Cloning tag with long ID %x%08x%08x", hi2, hi, lo);
-
     c.d.asBytes[0] = 1;
-  }
-  else {
-    hexstring_to_int64(&hi, &lo, Cmd);
-    if (hi >= 0x40) {
-      PrintAndLog("This looks like a long tag ID. Aborting!");
-      return 0;
-    }
-
+  } else {
     PrintAndLog("Cloning tag with ID %x%08x", hi, lo);
-
-    hi2 = 0;
     c.d.asBytes[0] = 0;
   }
 
@@ -324,33 +396,53 @@ int CmdHIDClone(const char *Cmd)
 
 
 int CmdHIDPack(const char *Cmd) {
-  uint32_t hi = 0, lo = 0;
-  short_hid_info card_info;
-
+  uint32_t hi2 = 0, hi = 0, lo = 0;
+  
   if (strlen(Cmd)<3) {
     PrintAndLog("Usage:  lf hid pack <length> <facility code (decimal)> <card number (decimal)>");
     PrintAndLog("        sample: lf hid pack 26 123 4567");
     return 0;
   }
-
-  card_info.fmtLen = param_get8(Cmd, 0);
-  card_info.fc = param_get32ex(Cmd, 1, 0, 10);
-  card_info.cardnum = param_get32ex(Cmd, 2, 0, 10);
-  card_info.parityValid = true;
+  uint8_t fmtLen = param_get8(Cmd, 0);
 
   // TODO
-  if (card_info.fmtLen != 26) {
+  if (fmtLen != 26) {
     PrintAndLog("Warning: Parity bits are only calculated for 26 bit IDs -- this may be invalid!");
   }
+  bool ret;
 
-  bool ret = pack_short_hid(&hi, &lo, &card_info);
+  if (fmtLen > 37) {
+    long_hid_info card_info;
+    card_info.fmtLen = fmtLen;
+    card_info.fc = param_get64ex(Cmd, 1, 0, 10);
+    card_info.cardnum = param_get64ex(Cmd, 2, 0, 10);
+    card_info.parityValid = true;
 
-  if (ret) {
-    PrintAndLog("HID Prox TAG ID: %x%08x (%d) - Format Len: %u bits - FC: %u - Card: %u",
-      (unsigned int) hi, (unsigned int) lo, (unsigned int) (lo>>1) & 0xFFFF,
-      card_info.fmtLen, card_info.fc, card_info.cardnum);
+    ret = pack_long_hid(&hi2, &hi, &lo, &card_info);
+
+    if (ret) {
+      PrintAndLog("HID Prox TAG ID: %x%08x%08x (%d) - Format Len: %u bits - FC: %u - Card: %u",
+        (unsigned int) hi2, (unsigned int) hi, (unsigned int) lo, (unsigned int) (lo>>1) & 0xFFFF,
+        card_info.fmtLen, card_info.fc, card_info.cardnum);
+    } else {
+      PrintAndLog("Invalid or unsupported tag length.");
+    }
   } else {
-    PrintAndLog("Invalid or unsupported tag length.");
+    short_hid_info card_info;
+    card_info.fmtLen = fmtLen;
+    card_info.fc = param_get32ex(Cmd, 1, 0, 10);
+    card_info.cardnum = param_get32ex(Cmd, 2, 0, 10);
+    card_info.parityValid = true;
+
+    ret = pack_short_hid(&hi, &lo, &card_info);
+
+    if (ret) {
+      PrintAndLog("HID Prox TAG ID: %x%08x (%d) - Format Len: %u bits - FC: %u - Card: %u",
+        (unsigned int) hi, (unsigned int) lo, (unsigned int) (lo>>1) & 0xFFFF,
+        card_info.fmtLen, card_info.fc, card_info.cardnum);
+    } else {
+      PrintAndLog("Invalid or unsupported tag length.");
+    }
   }
   return 0;
 }
@@ -358,30 +450,39 @@ int CmdHIDPack(const char *Cmd) {
 
 int CmdHIDUnpack(const char *Cmd)
 {
-  uint32_t hi = 0, lo = 0;
+  uint32_t hi2 = 0, hi = 0, lo = 0;
   if (strlen(Cmd)<1) {
     PrintAndLog("Usage:  lf hid unpack <ID>");
     PrintAndLog("        sample: lf hid unpack 2006f623ae");
     return 0;
   }
 
-  hexstring_to_int64(&hi, &lo, Cmd);
-  if (hi >= 0x40) {
-    PrintAndLog("This looks like a long tag ID. Aborting!");
-    return 0;
+  bool ret;
+
+  hexstring_to_int96(&hi2, &hi, &lo, Cmd);
+  if (hi >= 0x40 || hi2 != 0) {
+    long_hid_info card_info;
+    ret = unpack_long_hid(&card_info, hi2, hi, lo);
+
+    PrintAndLog("HID Prox TAG ID: %x%08x%08x (%d) - Format Len: %u bits - FC: %u - Card: %u",
+      (unsigned int) hi2, (unsigned int) hi, (unsigned int) lo, (unsigned int) (lo>>1) & 0xFFFF,
+      card_info.fmtLen, card_info.fc, card_info.cardnum);
+
+    // if (card_info.fmtLen == 26) {
+    //   PrintAndLog("Parity: %s", card_info.parityValid ? "valid" : "invalid");
+    // }
+  } else {
+    short_hid_info card_info;
+    ret = unpack_short_hid(&card_info, hi, lo);
+
+    PrintAndLog("HID Prox TAG ID: %x%08x (%d) - Format Len: %u bits - FC: %u - Card: %u",
+      (unsigned int) hi, (unsigned int) lo, (unsigned int) (lo>>1) & 0xFFFF,
+      card_info.fmtLen, card_info.fc, card_info.cardnum);
+
+    if (card_info.fmtLen == 26) {
+      PrintAndLog("Parity: %s", card_info.parityValid ? "valid" : "invalid");
+    }
   }
-
-  short_hid_info card_info;
-  bool ret = unpack_short_hid(&card_info, hi, lo);
-
-  PrintAndLog("HID Prox TAG ID: %x%08x (%d) - Format Len: %u bits - FC: %u - Card: %u",
-    (unsigned int) hi, (unsigned int) lo, (unsigned int) (lo>>1) & 0xFFFF,
-    card_info.fmtLen, card_info.fc, card_info.cardnum);
-
-  if (card_info.fmtLen == 26) {
-    PrintAndLog("Parity: %s", card_info.parityValid ? "valid" : "invalid");
-  }
-
   if (!ret) {
     PrintAndLog("Invalid or unsupported tag length.");
   }
@@ -395,9 +496,9 @@ static command_t CommandTable[] =
   {"demod",     CmdFSKdemodHID, 1, "Demodulate HID Prox from GraphBuffer"},
   {"read",      CmdHIDReadFSK,  0, "['1'] Realtime HID FSK Read from antenna (option '1' for one tag only)"},
   {"sim",       CmdHIDSim,      0, "<ID> -- HID tag simulator"},
-  {"clone",     CmdHIDClone,    0, "<ID> ['l'] -- Clone HID to T55x7 (tag must be in antenna)(option 'l' for 84bit ID)"},
-  {"pack",      CmdHIDPack,     1, "<len> <fc> <num> -- packs a <38 bit (short) HID ID from its length, facility code and card number"},
-  {"unpack",    CmdHIDUnpack,   1, "<ID> -- unpacks a <38 bit (short) HID ID to its length, facility code and card number"},
+  {"clone",     CmdHIDClone,    0, "<ID> -- Clone HID to T55x7 (tag must be in antenna)"},
+  {"pack",      CmdHIDPack,     1, "<len> <fc> <num> -- packs an HID ID from its length, facility code and card number"},
+  {"unpack",    CmdHIDUnpack,   1, "<ID> -- unpacks an HID ID to its length, facility code and card number"},
   {NULL, NULL, 0, NULL}
 };
 
