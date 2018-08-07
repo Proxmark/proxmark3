@@ -10,10 +10,16 @@ APP_INCLUDES = apps.h
 
 #remove one of the following defines and comment out the relevant line
 #in the next section to remove that particular feature from compilation
-APP_CFLAGS	= -DWITH_ISO14443a_StandAlone -DWITH_LF -DWITH_ISO15693 -DWITH_ISO14443a -DWITH_ISO14443b -DWITH_ICLASS -DWITH_LEGICRF -DWITH_HITAG  -DWITH_CRC -DON_DEVICE -DWITH_HFSNOOP \
-				-fno-strict-aliasing -ffunction-sections -fdata-sections
-#-DWITH_LCD
+APP_CFLAGS  = -DON_DEVICE \
+        -fno-strict-aliasing -ffunction-sections -fdata-sections
 
+include ../common/Makefile_Enabled_Options.common
+
+ifneq (,$(findstring LCD,$(APP_CFLAGS)))
+        SRC_LCD = fonts.c LCD.c
+else
+        SRC_LCD = 
+endif
 #SRC_LCD = fonts.c LCD.c
 SRC_LF = lfops.c hitag2.c hitagS.c lfsampling.c pcf7931.c lfdemod.c protocols.c
 SRC_ISO15693 = iso15693.c iso15693tools.c
@@ -21,7 +27,6 @@ SRC_ISO14443a = epa.c iso14443a.c mifareutil.c mifarecmd.c mifaresniff.c mifares
 SRC_ISO14443b = iso14443b.c
 SRC_CRAPTO1 = crypto1.c des.c
 SRC_CRC = iso14443crc.c crc.c crc16.c crc32.c parity.c
-
 #the FPGA bitstream files. Note: order matters!
 FPGA_BITSTREAMS = fpga_lf.bit fpga_hf.bit
 
@@ -59,6 +64,9 @@ ARMSRC = fpgaloader.c \
 	optimized_cipher.c \
 	hfsnoop.c
 
+VERSIONSRC = version.c \
+	fpga_version_info.c
+
 # Do not move this inclusion before the definition of {THUMB,ASM,ARM}SRC
 include ../common/Makefile.common
 
@@ -68,6 +76,14 @@ FPGA_COMPRESSOR = ../client/fpga_compress
 all: $(OBJS)
 
 .DELETE_ON_ERROR:
+
+# version.c should be remade on every compilation
+.PHONY: version.c
+version.c: default_version.c
+	perl ../tools/mkversion.pl .. > $@ || $(COPY) $^ $@ 
+
+fpga_version_info.c: $(FPGA_BITSTREAMS) $(FPGA_COMPRESSOR)
+	$(FPGA_COMPRESSOR) -v $(filter %.bit,$^) $@
 
 $(OBJDIR)/fpga_all.o: $(OBJDIR)/fpga_all.bit.z
 	$(OBJCOPY) -O elf32-littlearm -I binary -B arm --prefix-sections=fpga_all_bit $^ $@

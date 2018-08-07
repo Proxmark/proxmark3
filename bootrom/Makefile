@@ -10,6 +10,7 @@
 ARMSRC = 
 THUMBSRC = cmd.c usb_cdc.c bootrom.c
 ASMSRC = ram-reset.s flash-reset.s
+VERSIONSRC = version.c
 
 ## There is a strange bug with the linker: Sometimes it will not emit the glue to call
 ## BootROM from ARM mode. The symbol is emitted, but the section will be filled with
@@ -20,6 +21,11 @@ ASMSRC = ram-reset.s flash-reset.s
 
 # stdint.h provided locally until GCC 4.5 becomes C99 compliant
 APP_CFLAGS = -I.
+
+# version.c should be remade on every compilation
+.PHONY: version.c
+version.c: default_version.c
+	perl ../tools/mkversion.pl .. > $@ || $(COPY) $^ $@
 
 # Do not move this inclusion before the definition of {THUMB,ASM,ARM}SRC
 include ../common/Makefile.common
