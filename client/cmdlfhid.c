@@ -29,33 +29,32 @@
 #include "cmddata.h"  //for g_debugMode, demodbuff cmds
 #include "lfdemod.h" // for HIDdemodFSK
 #include "parity.h" // for parity
-#include "util.h" // for param_get8,32
+#include "util.h" // for param_get8,32,64
 
 static int CmdHelp(const char *Cmd);
 
 /**
- * Packs a "short" (<38-bit) HID ID from component parts.
+ * Packs an HID ID from component parts.
  *
- * This only works with 26, 34, 35 and 37 bit card IDs.
+ * This only works with 26, 34, 35, 37, and 48 bit card IDs.
  *
- * NOTE: Parity calculation is only supported on 26-bit and 35-bit tags. Other card lengths
- * may have invalid parity.
+ * NOTE: Parity calculation is supported only on 26, 35, and 48 bit IDs.
  *
  * Returns false on invalid inputs.
  */
-bool pack_short_hid(/* out */ uint32_t *hi, /* out */ uint32_t *lo, /* in */ const short_hid_info *info) {
-  uint32_t high = 0, low = 0;
+bool pack_hid(/* out */ uint32_t *hi2, /* out */ uint32_t *hi, /* out */ uint32_t *lo, /* in */ const hid_info *info) {
+  uint32_t higher = 0, high = 0, low = 0;
 
   switch (info->fmtLen) {
-  case 26: // HID H10301
-    low |= (info->cardnum & 0xffff) << 1;
-    low |= (info->fc & 0xff) << 17;
+    case 26: // HID H10301
+      low |= (info->cardnum & 0xffff) << 1;
+      low |= (info->fc & 0xff) << 17;
 
-    if (info->parityValid) {
-      // Calculate parity
-      low |= oddparity32((low >> 1) & 0xfff) & 1;
-      low |= (evenparity32((low >> 13) & 0xfff) & 1) << 25;
-    }
+      if (info->parityValid) {
+        // Calculate parity
+        low |= oddparity32((low >> 1) & 0xfff) & 1;
+        low |= (evenparity32((low >> 13) & 0xfff) & 1) << 25;
+      }
     break;
 
   case 34:
@@ -69,9 +68,11 @@ bool pack_short_hid(/* out */ uint32_t *hi, /* out */ uint32_t *lo, /* in */ con
     low |= (info->cardnum & 0xfffff) << 1;
     low |= (info->fc & 0x7ff) << 21;
     high |= (info->fc & 0x800) >> 11;
-    high |= (evenparity32((high & 0x05) ^ (low & 0xB6DB6DB6)) & 1) << 1;
-    low |= (oddparity32((high & 0x03) ^ (low & 0x6DB6DB6D)) & 1);
-    high |= (oddparity32((high & 0x07) ^ (low & 0xFFFFFFFF)) & 1) << 2;
+    if (info->parityValid) {
+      high |= (evenparity32((high & 0x00000001) ^ (low & 0xB6DB6DB6)) & 1) << 1;
+      low |=  (oddparity32( (high & 0x00000003) ^ (low & 0x6DB6DB6C)) & 1);
+      high |= (oddparity32( (high & 0x00000003) ^ (low & 0xFFFFFFFF)) & 1) << 2;
+    }
     break;
 
   case 37:
@@ -81,49 +82,15 @@ bool pack_short_hid(/* out */ uint32_t *hi, /* out */ uint32_t *lo, /* in */ con
     // TODO: Calculate parity
     break;
 
-  default:
-    // Invalid / unsupported length
-    return false;
-  }
-
-  // Set the highest bit
-  if (info->fmtLen != 37) {
-    // Bit 37 is always set
-    high |= 0x20;
-
-    // Set the bit corresponding to the length.
-    if (info->fmtLen < 32) {
-      low |= 1 << info->fmtLen;
-    } else {
-      high |= 1 << (info->fmtLen - 32);
-    }
-  }
-
-  // Return result only if successful.
-  *hi = high;
-  *lo = low;
-  return true;
-}
-
-/**
- * Packs a "long" (>37-bit) HID ID from component parts.
- *
- * This only works with 48 bit card IDs.
- *
- * NOTE: Parity calculation is not yet supported
- *
- * Returns false on invalid inputs.
- */
-bool pack_long_hid(/* out */ uint32_t *hi2, /* out */ uint32_t *hi, /* out */ uint32_t *lo, /* in */ const long_hid_info *info) {
-  uint32_t higher = 0, high = 0, low = 0;
-
-  switch (info->fmtLen) {
-
   case 48:
     low |= (info->cardnum & 0x7FFFFF) << 1;
     low |= (info->fc & 0xff) << 24;
     high |= (info->fc & 0x3FFF00) >> 8;
-    // TODO: Calculate parity
+    if (info->parityValid) {
+      high |= (evenparity32((high & 0x00001B6D) ^ (low & 0xB6DB6DB6)) & 1) << 14;
+      low |=  (oddparity32( (high & 0x000036DB) ^ (low & 0x6DB6DB6C)) & 1);
+      high |= (oddparity32( (high & 0x00007FFF) ^ (low & 0xFFFFFFFF)) & 1) << 15;
+    }
     break;
 
   default:
@@ -131,13 +98,23 @@ bool pack_long_hid(/* out */ uint32_t *hi2, /* out */ uint32_t *hi, /* out */ ui
     return false;
   }
   
-  // Set the bit corresponding to the length.
-  if (info->fmtLen < 64) {
-    high |= 1 << (info->fmtLen - 32);
-  } else {
-    higher |= 1 << (info->fmtLen - 64);
+  // Set the format length bits
+  if (info->fmtLen < 37) {
+    // Bit 37 is always set
+    high |= 0x20;
+
+    // Set the bit corresponding to the length.
+    if (info->fmtLen < 32)
+      low |= 1 << info->fmtLen;
+    else 
+      high |= 1 << (info->fmtLen - 32);
+    
+  } else if (info->fmtLen > 37){
+    if (info->fmtLen < 64) 
+      high |= 1 << (info->fmtLen - 32);
+    else 
+      higher |= 1 << (info->fmtLen - 64);
   }
-  
   // Return result only if successful.
   *hi2 = higher;
   *hi = high;
@@ -146,32 +123,42 @@ bool pack_long_hid(/* out */ uint32_t *hi2, /* out */ uint32_t *hi, /* out */ ui
 }
 
 /**
- * Unpacks a "short" (<38-bit) HID ID into its component parts.
+ * Unpacks an HID ID into its component parts.
  *
- * This only works with 26, 34, 35 and 37 bit card IDs.
+ * This only works with 26, 34, 35, 37, and 48 bit card IDs.
  *
- * NOTE: Parity checking is only supported on 26-bit and 35-bit tags.
+ * NOTE: Parity checking is only supported on 26, 35, and 48 bit tags.
  *
  * Returns false on invalid inputs.
  */
-bool unpack_short_hid(short_hid_info *out, uint32_t hi, uint32_t lo) {
-  memset(out, 0, sizeof(short_hid_info));
+bool unpack_hid(hid_info *out, uint32_t hi2, uint32_t hi, uint32_t lo) {
+  memset(out, 0, sizeof(hid_info));
+  uint8_t fmtLen = 0;
+	
+  uint32_t hFmt; // for calculating card length
+  if ((hi2 & 0x000FFFFF) > 0) { // > 64 bits
+    hFmt = hi2 & 0x000FFFFF;
+    fmtLen = 64;
+  } else if ((hi & 0xFFFFFFC0) > 0) { // < 63-38 bits
+    hFmt = hi & 0xFFFFFFC0;
+    fmtLen = 32;
+  } else if ((hi & 0x00000020) == 0) { // 37 bits
+    hFmt = 0;
+    fmtLen = 37;
+  } else if ((hi & 0x0000001F) > 0){ // 36-32 bits
+    hFmt = hi & 0x0000001F;
+    fmtLen = 32;
+  } else { // <32 bits
+    hFmt = lo;
+    fmtLen = 0;
+  }
 
-  if (((hi >> 5) & 1) == 1) {
-    // if bit 38 is set then < 37 bit format is used
-    uint32_t lo2 = 0;
-    // get bits 21-37 to check for format len bit
-    lo2 = (((hi & 31) << 12) | (lo >> 20));
-    uint8_t idx3 = 1;
-    // find last bit set to 1 (format len bit)
-    while (lo2 > 1) {
-      lo2 = lo2 >> 1;
-      idx3++;
-    }
-
-    out->fmtLen = idx3 + 19;
-
-    switch (out->fmtLen) {
+  while (hFmt > 1) {
+    hFmt >>= 1;
+    fmtLen++;
+  }
+  out->fmtLen = fmtLen;
+  switch (out->fmtLen) {
     case 26: // HID H10301
       out->cardnum = (lo >> 1) & 0xFFFF;
       out->fc = (lo >> 17) & 0xFF;
@@ -198,70 +185,47 @@ bool unpack_short_hid(short_hid_info *out, uint32_t hi, uint32_t lo) {
       out->cardnum = (lo >> 1) & 0xFFFFF;
       out->fc = ((hi & 1) << 11) | (lo >> 21);
       out->parityValid = 
-        (evenparity32((hi & 0x01) ^ (lo & 0xB6DB6DB6)) == ((hi >> 1) & 1)) &&
-        (oddparity32((hi & 0x03) ^ (lo & 0x6DB6DB6C)) == ((lo >> 0) & 1)) &&
-        (oddparity32((hi & 0x03) ^ (lo & 0xFFFFFFFF)) == ((hi >> 2) & 1));
+        (evenparity32((hi & 0x00000001) ^ (lo & 0xB6DB6DB6)) == ((hi >> 1) & 1)) &&
+        (oddparity32( (hi & 0x00000003) ^ (lo & 0x6DB6DB6C)) == ((lo >> 0) & 1)) &&
+        (oddparity32( (hi & 0x00000003) ^ (lo & 0xFFFFFFFF)) == ((hi >> 2) & 1));
       if (g_debugMode) {
         PrintAndLog("Parity check: %d, %d, %d vs bits %d, %d, %d",
-          evenparity32((hi & 0x01) ^ (lo & 0xB6DB6DB6)),
-          oddparity32((hi & 0x03) ^ (lo & 0x6DB6DB6C)),
-          oddparity32((hi & 0x03) ^ (lo & 0xFFFFFFFF)),
+          evenparity32((hi & 0x00000001) ^ (lo & 0xB6DB6DB6)),
+          oddparity32( (hi & 0x00000003) ^ (lo & 0x6DB6DB6C)),
+          oddparity32( (hi & 0x00000003) ^ (lo & 0xFFFFFFFF)),
           ((hi >> 1) & 1),
           ((lo >> 0) & 1),
           ((hi >> 2) & 1)
         );
       }
-      
+      break;
+    case 37:
+      out->fmtLen = 37;
+      out->cardnum = (lo >> 1) & 0x7FFFF;
+      out->fc = ((hi & 0xF) << 12) | (lo >> 20);
+      // TODO: Calculate parity
+      break;
+    case 48:
+      out->cardnum = (lo >> 1) & 0x7FFFFF;  //Start 24, 23 length
+      out->fc = ((hi & 0x3FFF) << 8 ) | (lo >> 24);  //Start 2, 22 length
+      out->parityValid = 
+        (evenparity32((hi & 0x00001B6D) ^ (lo & 0xB6DB6DB6)) == ((hi >> 14) & 1)) &&
+        (oddparity32( (hi & 0x000036DB) ^ (lo & 0x6DB6DB6C)) == ((lo >> 0) & 1)) &&
+        (oddparity32( (hi & 0x00007FFF) ^ (lo & 0xFFFFFFFF)) == ((hi >> 15) & 1));
+      if (g_debugMode) {
+        PrintAndLog("Parity check: %d, %d, %d vs bits %d, %d, %d",
+          evenparity32((hi & 0x00001B6D) ^ (lo & 0xB6DB6DB6)),
+          oddparity32( (hi & 0x000036DB) ^ (lo & 0x6DB6DB6C)),
+          oddparity32( (hi & 0x00007FFF) ^ (lo & 0xFFFFFFFF)),
+          ((hi >> 14) & 1),
+          ((lo >> 0) & 1),
+          ((hi >> 15) & 1)
+        );
+      }
       break;
 
     default:
       return false;
-    }
-  } else {
-    // If bit 38 is not set, then 37 bit format is used
-    out->fmtLen = 37;
-    out->cardnum = (lo >> 1) & 0x7FFFF;
-    out->fc = ((hi & 0xF) << 12) | (lo >> 20);
-    // TODO: Calculate parity
-  }
-  return true;
-}
-
-/**
- * Unpacks a "long" (>37-bit) HID ID into its component parts.
- *
- * This currently only works with 48 bit card IDs.
- *
- * NOTE: Parity checking is not yet supported.
- *
- * Returns false on invalid inputs.
- */
-bool unpack_long_hid(long_hid_info *out, uint32_t hi2, uint32_t hi, uint32_t lo) {
-  memset(out, 0, sizeof(long_hid_info));
-  uint8_t fmtLen = 0;
-	
-  uint32_t hFmt;
-  if ((hi2 & 0xFFFFF) > 0) { // > 64 bits
-    hFmt = hi2 & 0x000FFFFF; // Eliminate header
-    fmtLen = 64;
-  } else { // < 64 bits
-    hFmt = hi;
-    fmtLen = 32;
-  }
-  while (hFmt > 1) {
-    hFmt >>= 1;
-    fmtLen++;
-  }
-  out->fmtLen = fmtLen;
-  switch (out->fmtLen) {
-  case 48:
-    out->cardnum = (lo >> 1) & 0x7FFFFF;  //Start 24, 23 length
-    out->fc = ((hi & 0x3FFF) << 8 ) | (lo >> 24);  //Start 2, 22 length
-    // TODO: Calculate parity
-    break;
-
-  default:
-    return false;
   }
   return true;
 }
@@ -320,36 +284,24 @@ int CmdFSKdemodHID(const char *Cmd)
     if (g_debugMode) PrintAndLog("DEBUG: Error - no values found");
     return 0;
   }
-  if (hi2 != 0){ //extra large HID tags
-    long_hid_info card_info;
-    bool ret = unpack_long_hid(&card_info, (uint32_t)hi2, (uint32_t)hi, (uint32_t)lo);
-    
+  
+  hid_info card_info;
+  bool ret = unpack_hid(&card_info, (uint32_t)hi2, (uint32_t)hi, (uint32_t)lo);
+  
+  if (hi2 != 0)
     PrintAndLog("HID Prox TAG ID: %x%08x%08x (%d) - Format Len: %u bits - FC: %u - Card: %u",
       (unsigned int) hi2, (unsigned int) hi, (unsigned int) lo, (unsigned int) (lo>>1) & 0xFFFF,
       card_info.fmtLen, card_info.fc, card_info.cardnum);
-    
-    // if (card_info.fmtLen == 26) {
-    //   PrintAndLog("Parity: %s", card_info.parityValid ? "valid" : "invalid");
-    // }
-
-    if (!ret) {
-      PrintAndLog("Invalid or unsupported tag length.");
-    }
-  }
-  else {  //standard HID tags <38 bits
-    short_hid_info card_info;
-    bool ret = unpack_short_hid(&card_info, (uint32_t)hi, (uint32_t)lo);
+  else
     PrintAndLog("HID Prox TAG ID: %x%08x (%d) - Format Len: %u bits - FC: %u - Card: %u",
       (unsigned int) hi, (unsigned int) lo, (unsigned int) (lo>>1) & 0xFFFF,
       card_info.fmtLen, card_info.fc, card_info.cardnum);
 
-    if (card_info.fmtLen == 26 || card_info.fmtLen == 35) {
-      PrintAndLog("Parity: %s", card_info.parityValid ? "valid" : "invalid");
-    }
-
-    if (!ret) {
-      PrintAndLog("Invalid or unsupported tag length.");
-    }
+  if (card_info.fmtLen == 26 || card_info.fmtLen == 35 || card_info.fmtLen == 48) {
+    PrintAndLog("Parity: %s", card_info.parityValid ? "valid" : "invalid");
+  }
+  if (!ret) {
+    PrintAndLog("Invalid or unsupported tag length.");
   }
   setDemodBuf(BitStream,BitLen,idx);
   setClockGrid(50, waveIdx + (idx*50));
@@ -422,43 +374,29 @@ int CmdHIDPack(const char *Cmd) {
   uint8_t fmtLen = param_get8(Cmd, 0);
 
   // TODO
-  if (fmtLen != 26 && fmtLen != 35) {
-    PrintAndLog("Warning: Parity bits are only calculated for 26 and 35 bit IDs -- this may be invalid!");
+  if (fmtLen != 26 && fmtLen != 35 && fmtLen != 48) {
+    PrintAndLog("Warning: Parity bits are only calculated for 26, 35, and 48 bit IDs -- this may be invalid!");
   }
-  bool ret;
 
-  if (fmtLen > 37) {
-    long_hid_info card_info;
-    card_info.fmtLen = fmtLen;
-    card_info.fc = param_get64ex(Cmd, 1, 0, 10);
-    card_info.cardnum = param_get64ex(Cmd, 2, 0, 10);
-    card_info.parityValid = true;
+  hid_info card_info;
+  card_info.fmtLen = fmtLen;
+  card_info.fc = param_get32ex(Cmd, 1, 0, 10);
+  card_info.cardnum = param_get64ex(Cmd, 2, 0, 10);
+  card_info.parityValid = true;
 
-    ret = pack_long_hid(&hi2, &hi, &lo, &card_info);
-
-    if (ret) {
+  bool ret = pack_hid(&hi2, &hi, &lo, &card_info);
+  if (ret) {
+    if (hi2 != 0) {
       PrintAndLog("HID Prox TAG ID: %x%08x%08x (%d) - Format Len: %u bits - FC: %u - Card: %u",
         (unsigned int) hi2, (unsigned int) hi, (unsigned int) lo, (unsigned int) (lo>>1) & 0xFFFF,
         card_info.fmtLen, card_info.fc, card_info.cardnum);
     } else {
-      PrintAndLog("Invalid or unsupported tag length.");
-    }
-  } else {
-    short_hid_info card_info;
-    card_info.fmtLen = fmtLen;
-    card_info.fc = param_get32ex(Cmd, 1, 0, 10);
-    card_info.cardnum = param_get32ex(Cmd, 2, 0, 10);
-    card_info.parityValid = true;
-
-    ret = pack_short_hid(&hi, &lo, &card_info);
-
-    if (ret) {
       PrintAndLog("HID Prox TAG ID: %x%08x (%d) - Format Len: %u bits - FC: %u - Card: %u",
         (unsigned int) hi, (unsigned int) lo, (unsigned int) (lo>>1) & 0xFFFF,
-        card_info.fmtLen, card_info.fc, card_info.cardnum);
-    } else {
-      PrintAndLog("Invalid or unsupported tag length.");
+        card_info.fmtLen, card_info.fc, card_info.cardnum); 
     }
+  } else {
+    PrintAndLog("Invalid or unsupported tag length.");
   }
   return 0;
 }
@@ -473,31 +411,21 @@ int CmdHIDUnpack(const char *Cmd)
     return 0;
   }
 
-  bool ret;
+  hid_info card_info;
+  bool ret = unpack_hid(&card_info, hi2, hi, lo);
 
   hexstring_to_int96(&hi2, &hi, &lo, Cmd);
-  if (hi >= 0x40 || hi2 != 0) {
-    long_hid_info card_info;
-    ret = unpack_long_hid(&card_info, hi2, hi, lo);
-
+  if (hi2 != 0) {
     PrintAndLog("HID Prox TAG ID: %x%08x%08x (%d) - Format Len: %u bits - FC: %u - Card: %u",
       (unsigned int) hi2, (unsigned int) hi, (unsigned int) lo, (unsigned int) (lo>>1) & 0xFFFF,
       card_info.fmtLen, card_info.fc, card_info.cardnum);
-
-    // if (card_info.fmtLen == 26) {
-    //   PrintAndLog("Parity: %s", card_info.parityValid ? "valid" : "invalid");
-    // }
   } else {
-    short_hid_info card_info;
-    ret = unpack_short_hid(&card_info, hi, lo);
-
     PrintAndLog("HID Prox TAG ID: %x%08x (%d) - Format Len: %u bits - FC: %u - Card: %u",
       (unsigned int) hi, (unsigned int) lo, (unsigned int) (lo>>1) & 0xFFFF,
       card_info.fmtLen, card_info.fc, card_info.cardnum);
-
-    if (card_info.fmtLen == 26 || card_info.fmtLen == 35) {
-      PrintAndLog("Parity: %s", card_info.parityValid ? "valid" : "invalid");
-    }
+  }
+  if (card_info.fmtLen == 26 || card_info.fmtLen == 35 || card_info.fmtLen == 48) {
+    PrintAndLog("Parity: %s", card_info.parityValid ? "valid" : "invalid");
   }
   if (!ret) {
     PrintAndLog("Invalid or unsupported tag length.");
