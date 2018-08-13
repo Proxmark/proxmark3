@@ -71,12 +71,15 @@ begin
 	corr_i_cnt <= corr_i_cnt + 1;
 end		
 
-// And a couple of registers in which to accumulate the correlations.
-// We would add at most 32 times the difference between unmodulated and modulated signal. It should
+// And a couple of registers in which to accumulate the correlations. From the 64 samples
+// we would add at most 32 times the difference between unmodulated and modulated signal. It should
 // be safe to assume that a tag will not be able to modulate the carrier signal by more than 25%.
 // 32 * 255 * 0,25 = 2040, which can be held in 11 bits. Add 1 bit for sign.
-reg signed [11:0] corr_i_accum;
-reg signed [11:0] corr_q_accum;
+// Temporary we might need more bits. For the 212kHz subcarrier we could possible add 32 times the
+// maximum signal value before a first subtraction would occur. 32 * 255 = 8160 can be held in 13 bits. 
+// Add one bit for sign -> need 14 bit registers but final result will fit into 12 bits.
+reg signed [13:0] corr_i_accum;
+reg signed [13:0] corr_q_accum;
 // we will report maximum 8 significant bits
 reg signed [7:0] corr_i_out;
 reg signed [7:0] corr_q_out;
@@ -104,7 +107,7 @@ begin
 	else
 		begin											// 424 kHz
 			subcarrier_I = ~corr_i_cnt[4];
-			subcarrier_Q = ~(corr_i_cnt[4]^corr_i_cnt[3]);
+			subcarrier_Q = ~(corr_i_cnt[4] ^ corr_i_cnt[3]);
 		end
 end
 	
@@ -119,32 +122,56 @@ begin
         if(snoop)
         begin
 			// Send 7 most significant bits of tag signal (signed), plus 1 bit reader signal
-            corr_i_out <= {corr_i_accum[11:5], after_hysteresis_prev_prev};
-            corr_q_out <= {corr_q_accum[11:5], after_hysteresis_prev};
+			if (corr_i_accum[13:11] == 3'b000 || corr_i_accum[13:11] == 3'b111) 
+				corr_i_out <= {corr_i_accum[11:5], after_hysteresis_prev_prev};
+			else // truncate to maximum value
+				if (corr_i_accum[13] == 1'b0)
+					corr_i_out <= {7'b0111111, after_hysteresis_prev_prev};
+				else
+					corr_i_out <= {7'b1000000, after_hysteresis_prev_prev};
+			if (corr_q_accum[13:11] == 3'b000 || corr_q_accum[13:11] == 3'b111) 
+				corr_q_out <= {corr_q_accum[11:5], after_hysteresis_prev};
+			else // truncate to maximum value
+				if (corr_q_accum[13] == 1'b0)
+					corr_q_out <= {7'b0111111, after_hysteresis_prev};
+				else
+					corr_q_out <= {7'b1000000, after_hysteresis_prev};
 			after_hysteresis_prev_prev <= after_hysteresis;
         end
         else
         begin
-            // Send 8 most significant bits of tag signal
-            corr_i_out <= corr_i_accum[11:4];
-            corr_q_out <= corr_q_accum[11:4];
+            // Send 8 bits of tag signal
+			if (corr_i_accum[13:11] == 3'b000 || corr_i_accum[13:11] == 3'b111) 
+				corr_i_out <= corr_i_accum[11:4];
+			else // truncate to maximum value
+				if (corr_i_accum[13] == 1'b0)
+					corr_i_out <= 8'b01111111;
+				else
+					corr_i_out <= 8'b10000000;
+			if (corr_q_accum[13:11] == 3'b000 || corr_q_accum[13:11] == 3'b111) 
+				corr_q_out <= corr_q_accum[11:4];
+			else // truncate to maximum value
+				if (corr_q_accum[13] == 1'b0)
+					corr_q_out <= 8'b01111111;
+				else
+					corr_q_out <= 8'b10000000;
         end
 		// Initialize next correlation. 
 		// Both I and Q reference signals are high when corr_i_nct == 0. Therefore need to accumulate.
-        corr_i_accum <= adc_d;
-        corr_q_accum <= adc_d;
+        corr_i_accum <= $signed({1'b0,adc_d});
+        corr_q_accum <= $signed({1'b0,adc_d});
     end
     else
     begin
         if (subcarrier_I)
-            corr_i_accum <= corr_i_accum + adc_d;
+            corr_i_accum <= corr_i_accum + $signed({1'b0,adc_d});
         else
-            corr_i_accum <= corr_i_accum - adc_d;
+            corr_i_accum <= corr_i_accum - $signed({1'b0,adc_d});
 
         if (subcarrier_Q)
-            corr_q_accum <= corr_q_accum + adc_d;
+            corr_q_accum <= corr_q_accum + $signed({1'b0,adc_d});
         else
-            corr_q_accum <= corr_q_accum - adc_d;
+            corr_q_accum <= corr_q_accum - $signed({1'b0,adc_d});
 
     end
 
