@@ -268,7 +268,7 @@ static char* TagErrorStr(uint8_t error) {
 		case 0x02: return "The command is not recognised";
 		case 0x03: return "The option is not supported.";
 		case 0x0f: return "Unknown error.";
-		case 0x10: return "The specified block is not available (doesn’t exist).";
+		case 0x10: return "The specified block is not available (doesn't exist).";
 		case 0x11: return "The specified block is already -locked and thus cannot be locked again";
 		case 0x12: return "The specified block is locked and its content cannot be changed.";
 		case 0x13: return "The specified block was not successfully programmed.";
@@ -286,12 +286,12 @@ int CmdHF15Demod(const char *Cmd)
 	int i, j;
 	int max = 0, maxPos = 0;
 
-	int skip = 4;
+	int skip = 2;
 
-	if (GraphTraceLen < 1000) return 0;
+	if (GraphTraceLen < 2000) return 0;
 
 	// First, correlate for SOF
-	for (i = 0; i < 100; i++) {
+	for (i = 0; i < 200; i++) {
 		int corr = 0;
 		for (j = 0; j < arraylen(FrameSOF); j += skip) {
 			corr += FrameSOF[j] * GraphBuffer[i + (j / skip)];
@@ -310,23 +310,30 @@ int CmdHF15Demod(const char *Cmd)
 	memset(outBuf, 0, sizeof(outBuf));
 	uint8_t mask = 0x01;
 	for (;;) {
-		int corr0 = 0, corr1 = 0, corrEOF = 0;
-		for (j = 0; j < arraylen(Logic0); j += skip) {
-			corr0 += Logic0[j] * GraphBuffer[i + (j / skip)];
-		}
-		for (j = 0; j < arraylen(Logic1); j += skip) {
-			corr1 += Logic1[j] * GraphBuffer[i + (j / skip)];
-		}
-		for (j = 0; j < arraylen(FrameEOF); j += skip) {
-			corrEOF += FrameEOF[j] * GraphBuffer[i + (j / skip)];
-		}
-		// Even things out by the length of the target waveform.
-		corr0 *= 4;
-		corr1 *= 4;
-		
-		if (corrEOF > corr1 && corrEOF > corr0) {
-			PrintAndLog("EOF at %d", i);
-			break;
+			int corr0 = 0, corr00 = 0, corr01 = 0, corr1 = 0, corrEOF = 0;
+			for(j = 0; j < arraylen(Logic0); j += skip) {
+				corr0 += Logic0[j]*GraphBuffer[i+(j/skip)];
+			}
+			corr01 = corr00 = corr0;
+			for(j = 0; j < arraylen(Logic0); j += skip) {
+				corr00 += Logic0[j]*GraphBuffer[i+arraylen(Logic0)/skip+(j/skip)];
+				corr01 += Logic1[j]*GraphBuffer[i+arraylen(Logic0)/skip+(j/skip)];
+			}
+			for(j = 0; j < arraylen(Logic1); j += skip) {
+				corr1 += Logic1[j]*GraphBuffer[i+(j/skip)];
+			}
+			for(j = 0; j < arraylen(FrameEOF); j += skip) {
+				corrEOF += FrameEOF[j]*GraphBuffer[i+(j/skip)];
+			}
+			// Even things out by the length of the target waveform.
+			corr00 *= 2;
+			corr01 *= 2;
+			corr0 *= 4;
+			corr1 *= 4;
+	
+			if(corrEOF > corr1 && corrEOF > corr00 && corrEOF > corr01) {
+				PrintAndLog("EOF at %d", i);
+				break;
 		} else if (corr1 > corr0) {
 			i += arraylen(Logic1) / skip;
 			outBuf[k] |= mask;
