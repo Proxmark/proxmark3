@@ -11,6 +11,8 @@
 #ifndef CMDHF14B_H__
 #define CMDHF14B_H__
 
+#include <stdbool.h>
+
 int CmdHF14B(const char *Cmd);
 int CmdHF14BList(const char *Cmd);
 int CmdHF14BInfo(const char *Cmd);

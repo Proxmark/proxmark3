@@ -28,6 +28,7 @@ The Proxmark3 is available for purchase (assembled and tested) from the
 following locations:
 
 * [RyscCorp](https://proxmark3.com/) (US)
+* [Hackerwarehouse](https://hackerwarehouse.com/) (US)
 * [Elechouse](http://www.elechouse.com/) (HK)
 * [Lab401](https://lab401.com/) (FR)
 * [RFxSecure](http://www.rfxsecure.com/) (SG)

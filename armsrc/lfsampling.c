@@ -266,7 +266,7 @@ uint32_t SnoopLF()
 }
 
 /**
-* acquisition of Cotag LF signal. Similart to other LF,  since the Cotag has such long datarate RF/384
+* acquisition of Cotag LF signal. Similar to other LF,  since the Cotag has such long datarate RF/384
 * and is Manchester?,  we directly gather the manchester data into bigbuff
 **/
 #define COTAG_T1 384

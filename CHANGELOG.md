@@ -6,6 +6,7 @@ This project uses the changelog in accordance with [keepchangelog](http://keepac
 ## [unreleased][unreleased]
 
 ### Changed
+- Adjusted `lf cmdread` to respond to client when complete and the client will then automatically call `data samples`
 - Improved backdoor detection missbehaving magic s50/1k tag (Fl0-0)
 - Deleted wipe functionality from `hf mf csetuid` (Merlok)
 - Changed `hf mf nested` logic (Merlok)
@@ -20,8 +21,10 @@ This project uses the changelog in accordance with [keepchangelog](http://keepac
 
 ### Fixed
 - Changed start sequence in Qt mode (fix: short commands hangs main Qt thread) (Merlok)
+- Changed driver file proxmark3.inf to support both old and new Product/Vendor IDs (piwi)
 
 ### Added
+- Added a bitbang mode to `lf cmdread` if delay is 0 the cmd bits turn off and on the antenna with 0 and 1 respectively (marshmellow)
 - Added PAC/Stanley detection to lf search (marshmellow)
 - Added lf pac demod and lf pac read - extracts the raw blocks from a PAC/Stanley tag (marshmellow)
 - Added hf mf c* commands compatibity for 4k and gen1b backdoor (Fl0-0)
@@ -47,6 +50,7 @@ This project uses the changelog in accordance with [keepchangelog](http://keepac
 - Added to `hf emv exec` MSD path for VISA and Mastercard and some other compatible EMV cards (Merlok)
 - Added to `hf emv exec` SDA, DDA, fast DDA, CDA calculations for VISA and Mastercard and some other compatible EMV cards (Merlok)
 - Added `hf emv test` - crypto tests for DES, AES, SHA, RSA, SDA, DDA, CDA and some other crypto functions (Merlok)
+- Added `hf list mf` - deciphers crypto1 stream and works with first authentication and weak nested authentications (Merlok)
 
 ## [3.0.1][2017-06-08]
 
@@ -62,7 +66,7 @@ This project uses the changelog in accordance with [keepchangelog](http://keepac
 - Added lf hitag write 24, the command writes a block to hitag2 tags in crypto mode (henjo)
 
 ### Added
-- Added hf mf hardnested, an attack working for hardened Mifare cards (EV1, Mifare Plus SL1) where hf mf nested fails
+- Added hf mf hardnested, an attack working for hardened Mifare cards (EV1, Mifare Plus SL1) where hf mf nested fails (piwi)
 - Added experimental testmode write option for t55xx (danger) (marshmellow)
 - Added t55xx p1detect to `lf search` chip detections (marshmellow)
 - Added lf t55xx p1detect, detect page 1 of a t55xx tag based on E015 mfg code (marshmellow)

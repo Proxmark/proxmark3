@@ -10,7 +10,7 @@
 // 32 bit recover key from 2 nonces
 int main (int argc, char *argv[]) {
 
-  nonces_t data;
+  nonces_t data = {0};
   uint32_t ks2;     // keystream used to encrypt reader response
   uint64_t key;     // recovered key
 

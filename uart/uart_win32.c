@@ -107,11 +107,11 @@ void uart_close(const serial_port sp) {
   free(sp);
 }
 
-bool uart_receive(const serial_port sp, byte_t *pbtRx, size_t pszMaxRxLen, size_t *pszRxLen) {
+bool uart_receive(const serial_port sp, uint8_t *pbtRx, size_t pszMaxRxLen, size_t *pszRxLen) {
   return ReadFile(((serial_port_windows*)sp)->hPort, pbtRx, pszMaxRxLen, (LPDWORD)pszRxLen, NULL);
 }
 
-bool uart_send(const serial_port sp, const byte_t* pbtTx, const size_t szTxLen) {
+bool uart_send(const serial_port sp, const uint8_t* pbtTx, const size_t szTxLen) {
   DWORD dwTxLen = 0;
   return WriteFile(((serial_port_windows*)sp)->hPort, pbtTx, szTxLen, &dwTxLen, NULL);
 }

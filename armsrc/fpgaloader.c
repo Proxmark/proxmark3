@@ -10,20 +10,21 @@
 // mode once it is configured.
 //-----------------------------------------------------------------------------
 
+#include "fpgaloader.h"
+
 #include <stdint.h>
 #include <stddef.h>
 #include <stdbool.h>
-#include "fpgaloader.h"
+#include "apps.h"
+#include "fpga.h"
 #include "proxmark3.h"
 #include "util.h"
 #include "string.h"
 #include "BigBuf.h"
 #include "zlib.h"
 
-extern void Dbprintf(const char *fmt, ...);
-
 // remember which version of the bitstream we have already downloaded to the FPGA
-static int downloaded_bitstream = FPGA_BITSTREAM_ERR;
+static int downloaded_bitstream = 0;
 
 // this is where the bitstreams are located in memory:
 extern uint8_t _binary_obj_fpga_all_bit_z_start, _binary_obj_fpga_all_bit_z_end;
@@ -31,10 +32,7 @@ extern uint8_t _binary_obj_fpga_all_bit_z_start, _binary_obj_fpga_all_bit_z_end;
 static uint8_t *fpga_image_ptr = NULL;
 static uint32_t uncompressed_bytes_cnt;
 
-static const uint8_t _bitparse_fixed_header[] = {0x00, 0x09, 0x0f, 0xf0, 0x0f, 0xf0, 0x0f, 0xf0, 0x0f, 0xf0, 0x00, 0x00, 0x01};
-#define FPGA_BITSTREAM_FIXED_HEADER_SIZE	sizeof(_bitparse_fixed_header)
 #define OUTPUT_BUFFER_LEN 		80
-#define FPGA_INTERLEAVE_SIZE 	288
 
 //-----------------------------------------------------------------------------
 // Set up the Serial Peripheral Interface as master
@@ -201,7 +199,7 @@ static int get_from_fpga_combined_stream(z_streamp compressed_fpga_stream, uint8
 //----------------------------------------------------------------------------
 static int get_from_fpga_stream(int bitstream_version, z_streamp compressed_fpga_stream, uint8_t *output_buffer)
 {
-	while((uncompressed_bytes_cnt / FPGA_INTERLEAVE_SIZE) % FPGA_BITSTREAM_MAX != (bitstream_version - 1)) {
+	while((uncompressed_bytes_cnt / FPGA_INTERLEAVE_SIZE) % fpga_bitstream_num != (bitstream_version - 1)) {
 		// skip undesired data belonging to other bitstream_versions
 		get_from_fpga_combined_stream(compressed_fpga_stream, output_buffer);
 	}
@@ -234,7 +232,7 @@ static bool reset_fpga_stream(int bitstream_version, z_streamp compressed_fpga_s
 	
 	// initialize z_stream structure for inflate:
 	compressed_fpga_stream->next_in = &_binary_obj_fpga_all_bit_z_start;
-	compressed_fpga_stream->avail_in = &_binary_obj_fpga_all_bit_z_start - &_binary_obj_fpga_all_bit_z_end;
+	compressed_fpga_stream->avail_in = &_binary_obj_fpga_all_bit_z_end - &_binary_obj_fpga_all_bit_z_start;
 	compressed_fpga_stream->next_out = output_buffer;
 	compressed_fpga_stream->avail_out = OUTPUT_BUFFER_LEN;
 	compressed_fpga_stream->zalloc = &fpga_inflate_malloc;
@@ -248,8 +246,8 @@ static bool reset_fpga_stream(int bitstream_version, z_streamp compressed_fpga_s
 		header[i] = get_from_fpga_stream(bitstream_version, compressed_fpga_stream, output_buffer);
 	}
 	
-	// Check for a valid .bit file (starts with _bitparse_fixed_header)
-	if(memcmp(_bitparse_fixed_header, header, FPGA_BITSTREAM_FIXED_HEADER_SIZE) == 0) {
+	// Check for a valid .bit file (starts with bitparse_fixed_header)
+	if(memcmp(bitparse_fixed_header, header, FPGA_BITSTREAM_FIXED_HEADER_SIZE) == 0) {
 		return true;
 	} else {
 		return false;
@@ -427,7 +425,7 @@ void FpgaDownloadAndGo(int bitstream_version)
 	}
 
 	unsigned int bitstream_length;
-	if(bitparse_find_section(bitstream_version, 'e', &bitstream_length, &compressed_fpga_stream, output_buffer)) {
+	if (bitparse_find_section(bitstream_version, 'e', &bitstream_length, &compressed_fpga_stream, output_buffer)) {
 		DownloadFPGA(bitstream_version, bitstream_length, &compressed_fpga_stream, output_buffer);
 		downloaded_bitstream = bitstream_version;
 	}
@@ -440,77 +438,6 @@ void FpgaDownloadAndGo(int bitstream_version)
 	// free eventually allocated BigBuf memory
 	BigBuf_free(); BigBuf_Clear_ext(false);	
 }	
-
-
-//-----------------------------------------------------------------------------
-// Gather version information from FPGA image. Needs to decompress the begin 
-// of the respective (HF or LF) image.
-// Note: decompression makes use of (i.e. overwrites) BigBuf[]. It is therefore
-// advisable to call this only once and store the results for later use.
-//-----------------------------------------------------------------------------
-void FpgaGatherVersion(int bitstream_version, char *dst, int len)
-{
-	unsigned int fpga_info_len;
-	char tempstr[40] = {0x00};
-	z_stream compressed_fpga_stream;
-	uint8_t output_buffer[OUTPUT_BUFFER_LEN] = {0x00};
-	
-	dst[0] = '\0';
-
-	// ensure that we can allocate enough memory for decompression:
-	BigBuf_free(); BigBuf_Clear_ext(false);
-
-	if (!reset_fpga_stream(bitstream_version, &compressed_fpga_stream, output_buffer))
-		return;
-
-	if(bitparse_find_section(bitstream_version, 'a', &fpga_info_len, &compressed_fpga_stream, output_buffer)) {
-		for (uint16_t i = 0; i < fpga_info_len; i++) {
-			char c = (char)get_from_fpga_stream(bitstream_version, &compressed_fpga_stream, output_buffer);
-			if (i < sizeof(tempstr)) {
-				tempstr[i] = c;
-			}
-		}
-		if (!memcmp("fpga_lf", tempstr, 7))
-			strncat(dst, "LF ", len-1);
-		else if (!memcmp("fpga_hf", tempstr, 7))
-			strncat(dst, "HF ", len-1);
-	}
-	strncat(dst, "FPGA image built", len-1);
-	if(bitparse_find_section(bitstream_version, 'b', &fpga_info_len, &compressed_fpga_stream, output_buffer)) {
-		strncat(dst, " for ", len-1);
-		for (uint16_t i = 0; i < fpga_info_len; i++) {
-			char c = (char)get_from_fpga_stream(bitstream_version, &compressed_fpga_stream, output_buffer);
-			if (i < sizeof(tempstr)) {
-				tempstr[i] = c;
-			}
-		}
-		strncat(dst, tempstr, len-1);
-	}
-	if(bitparse_find_section(bitstream_version, 'c', &fpga_info_len, &compressed_fpga_stream, output_buffer)) {
-		strncat(dst, " on ", len-1);
-		for (uint16_t i = 0; i < fpga_info_len; i++) {
-			char c = (char)get_from_fpga_stream(bitstream_version, &compressed_fpga_stream, output_buffer);
-			if (i < sizeof(tempstr)) {
-				tempstr[i] = c;
-			}
-		}
-		strncat(dst, tempstr, len-1);
-	}
-	if(bitparse_find_section(bitstream_version, 'd', &fpga_info_len, &compressed_fpga_stream, output_buffer)) {
-		strncat(dst, " at ", len-1);
-		for (uint16_t i = 0; i < fpga_info_len; i++) {
-			char c = (char)get_from_fpga_stream(bitstream_version, &compressed_fpga_stream, output_buffer);
-			if (i < sizeof(tempstr)) {
-				tempstr[i] = c;
-			}
-		}
-		strncat(dst, tempstr, len-1);
-	}
-	
-	strncat(dst, "\n", len-1);
-
-	inflateEnd(&compressed_fpga_stream);
-}
 
 
 //-----------------------------------------------------------------------------
@@ -562,12 +489,8 @@ void SetAdcMuxFor(uint32_t whichGpio)
 }
 
 void Fpga_print_status(void) {
-	Dbprintf("Fgpa");
-	switch(downloaded_bitstream) {
-		case FPGA_BITSTREAM_HF: Dbprintf("  mode....................HF"); break;
-		case FPGA_BITSTREAM_LF: Dbprintf("  mode....................LF"); break;
-		default:		Dbprintf("  mode....................%d", downloaded_bitstream); break;
-	}
+	Dbprintf("Currently loaded FPGA image:");
+	Dbprintf("  %s", fpga_version_information[downloaded_bitstream-1]);
 }
 
 int FpgaGetCurrent() {

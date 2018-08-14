@@ -9,7 +9,7 @@ bit32 = require('bit32')
 
 usage = [[ script run lf_bulk_program.lua -f facility -b base_id_num -c count
 
- e.g: 
+ e.g:
    script run lf_bulk_program.lua -f 1 -b 1000 -c 10
 ]]
 author = "Brian Redbeard"
@@ -32,12 +32,12 @@ function toBits(num,bits)
 end
 
 --[[Likely, I'm an idiot, but I couldn't find any parity functions in Lua
-  This can also be done with a combination of bitwise operations (in fact, 
+  This can also be done with a combination of bitwise operations (in fact,
   is the canonically "correct" way to do it, but my brain doesn't just
   default to this and so counting some ones is good enough for me]]--
 local function evenparity(s)
 	local _, count = string.gsub(s, "1", "")
-	
+
 	local p = count % 2
 	if (p == 0) then
 		return(false)
@@ -45,7 +45,7 @@ local function evenparity(s)
 		return(true)
 	end
 end
-	
+
 
 local function isempty(s)
 	return s == nil or s == ''
@@ -57,12 +57,13 @@ end
 local function cardHex(i,f)
 	fac = bit32.lshift(f,16)
 	id = bit32.bor(i, fac)
-	stream=toBits(id,26)
+	stream=toBits(id,24)
 
 	--As the function defaults to even parity and returns a boolean,
 	--perform a 'not' function to get odd parity
-	high = evenparity(string.sub(stream,0,12)) and 1 or 0
-	low = not evenparity(string.sub(stream,13)) and 1 or 0
+  	high = evenparity(string.sub(stream,1,12)) and 1 or 0
+  	low =  not evenparity(string.sub(stream,13)) and 1 or 0
+
 	bits = bit32.bor(bit32.lshift(id,1), low)
 	bits = bit32.bor(bits, bit32.lshift(high,25))
 
@@ -71,13 +72,13 @@ local function cardHex(i,f)
 	--to create a higher order and lower order component which we will
 	--then assemble in the return.  The math above defines the proper
 	--encoding as per HID/Weigand/etc.  These bit flips are due to the
-	--format length check on bit 38 (cmdlfhid.c:64) and 
+	--format length check on bit 38 (cmdlfhid.c:64) and
 	--bit 31 (cmdlfhid.c:66).
 	preamble = bit32.bor(0, bit32.lshift(1,5))
 	bits = bit32.bor(bits, bit32.lshift(1,26))
 
 	return ("%04x%08x"):format(preamble,bits)
-	
+
 end
 
 local function main(args)
@@ -86,22 +87,22 @@ local function main(args)
 	--long arguments, but it seems this library was chosen for BSD style
 	--compatibility
 	for o, a in getopt.getopt(args, 'f:b:c:h') do
-		if o == 'f' then 
-			if isempty(a) then 
+		if o == 'f' then
+			if isempty(a) then
 				print("You did not supply a facility code, using 0")
 				facility = 0
-			else 
+			else
 				facility = a
 			end
-		elseif o == 'b' then 
-			if isempty(a) then 
+		elseif o == 'b' then
+			if isempty(a) then
 				print("You must supply the flag -b (base id)")
 				return
 			else
 				baseid = a
 			end
-		elseif o == 'c' then 
-			if isempty(a) then 
+		elseif o == 'c' then
+			if isempty(a) then
 				print("You must supply the flag -c (count)")
 				return
 			else
@@ -118,22 +119,22 @@ local function main(args)
 	--works, specifying ":" does not enforce supplying a value, thus we
 	--need to do these checks all over again.
 
-	if isempty(baseid) then 
+	if isempty(baseid) then
 		print("You must supply the flag -b (base id)")
 		print(usage)
 		return
 	end
 
-	if isempty(count) then 
+	if isempty(count) then
 		print("You must supply the flag -c (count)")
 		print(usage)
 		return
 	end
 
 	--If the facility ID is non specified, ensure we code it as zero
-	if isempty(facility) then 
+	if isempty(facility) then
 		print("Using 0 for the facility code as -f was not supplied")
-		facility = 0 
+		facility = 0
 	end
 
 	--The next baseid + count function presents a logic/UX conflict
@@ -144,7 +145,7 @@ local function main(args)
 
 	endid = baseid + count
 
-	for cardnum = baseid,endid do 
+	for cardnum = baseid,endid do
 		local card = cardHex(cardnum, facility)
 		print("Press enter to program card "..cardnum..":"..facility.." (hex: "..card..")")
 		--This would be better with "press any key", but we'll take

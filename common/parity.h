@@ -13,6 +13,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include "string.h"
 
 extern const uint8_t OddByteParity[256];
 
@@ -21,6 +22,11 @@ static inline bool oddparity8(const uint8_t x) {
 	return OddByteParity[x];
 }
 
+static inline void oddparitybuf(const uint8_t *x, size_t len, uint8_t *parity) {
+	memset(parity, 0x00, (len - 1) / 8 + 1);
+	for (int i = 0; i < len; i++) 
+		parity[i / 8] |= oddparity8(x[i]) << (7 - (i % 8));
+}
 
 static inline bool evenparity8(const uint8_t x) {
 	return !OddByteParity[x];

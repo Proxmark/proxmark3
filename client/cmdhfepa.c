@@ -17,7 +17,7 @@
 #include <stdio.h>
 #include "util.h"
 #include "util_posix.h"
-#include "proxmark3.h"
+#include "comms.h"
 #include "ui.h"
 #include "cmdparser.h"
 #include "common.h"
@@ -202,10 +202,7 @@ int CmdHelp(const char *Cmd)
 
 int CmdHFEPA(const char *Cmd)
 {
-	// flush
-	WaitForResponseTimeout(CMD_ACK,NULL,100);
-
-	// parse
-  CmdsParse(CommandTable, Cmd);
-  return 0;
+	(void)WaitForResponseTimeout(CMD_ACK,NULL,100);
+	CmdsParse(CommandTable, Cmd);
+	return 0;
 }

@@ -11,6 +11,12 @@
 #include <stdint.h>
 #include <stdlib.h>
 //#include "iso15693tools.h"
+#ifdef ON_DEVICE
+#include "printf.h"
+#else
+#include <stdio.h>
+#endif
+
 
 #define POLY 0x8408
 
@@ -50,8 +56,6 @@ int Iso15693AddCrc(uint8_t *req, int n) {
 	return n+2;
 }
 
-
-int sprintf(char *str, const char *format, ...);
 
 // returns a string representation of the UID
 // UID is transmitted and stored LSB first, displayed MSB first

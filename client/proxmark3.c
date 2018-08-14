@@ -9,6 +9,8 @@
 // Main binary
 //-----------------------------------------------------------------------------
 
+#include "proxmark3.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -17,96 +19,33 @@
 #include <readline/readline.h>
 #include <readline/history.h>
 
-#include "proxmark3.h"
 #include "util_posix.h"
 #include "proxgui.h"
 #include "cmdmain.h"
-#include "uart.h"
 #include "ui.h"
 #include "util.h"
 #include "cmdparser.h"
 #include "cmdhw.h"
 #include "whereami.h"
+#include "comms.h"
 
-#ifdef _WIN32
-#define SERIAL_PORT_H	"com3"
-#else
-#define SERIAL_PORT_H	"/dev/ttyACM0"
+void
+#ifdef __has_attribute
+#if __has_attribute(force_align_arg_pointer)
+__attribute__((force_align_arg_pointer)) 
 #endif
-
-// a global mutex to prevent interlaced printing from different threads
-pthread_mutex_t print_lock;
-
-static serial_port sp;
-static UsbCommand txcmd;
-volatile static bool txcmd_pending = false;
-
-void SendCommand(UsbCommand *c) {
-	#if 0
-		printf("Sending %d bytes\n", sizeof(UsbCommand));
-	#endif
-
-	if (offline) {
-      PrintAndLog("Sending bytes to proxmark failed - offline");
-      return;
-    }
-  /**
-	The while-loop below causes hangups at times, when the pm3 unit is unresponsive
-	or disconnected. The main console thread is alive, but comm thread just spins here.
-	Not good.../holiman
-	**/
-	while(txcmd_pending);
-	txcmd = *c;
-	txcmd_pending = true;
-}
-
-struct receiver_arg {
-	int run;
-};
-
-byte_t rx[sizeof(UsbCommand)];
-byte_t* prx = rx;
-
-static void *uart_receiver(void *targ) {
-	struct receiver_arg *arg = (struct receiver_arg*)targ;
-	size_t rxlen;
-
-	while (arg->run) {
-		rxlen = 0;
-		if (uart_receive(sp, prx, sizeof(UsbCommand) - (prx-rx), &rxlen) && rxlen) {
-			prx += rxlen;
-			if (prx-rx < sizeof(UsbCommand)) {
-				continue;
-			}
-			UsbCommandReceived((UsbCommand*)rx);
-		}
-		prx = rx;
-
-		if(txcmd_pending) {
-			if (!uart_send(sp, (byte_t*) &txcmd, sizeof(UsbCommand))) {
-				PrintAndLog("Sending bytes to proxmark failed");
-			}
-			txcmd_pending = false;
-		}
-	}
-
-	pthread_exit(NULL);
-	return NULL;
-}
-
-
-void main_loop(char *script_cmds_file, char *script_cmd, bool usb_present) {
-	struct receiver_arg rarg;
+#endif
+main_loop(char *script_cmds_file, char *script_cmd, bool usb_present) {
 	char *cmd = NULL;
-	pthread_t reader_thread;
 	bool execCommand = (script_cmd != NULL);
 	bool stdinOnPipe = !isatty(STDIN_FILENO);
-	
+
 	if (usb_present) {
-		rarg.run = 1;
-		pthread_create(&reader_thread, NULL, &uart_receiver, &rarg);
+		SetOffline(false);
 		// cache Version information now:
 		CmdVersion(NULL);
+	} else {
+		SetOffline(true);
 	}
 
 	// file with script
@@ -119,10 +58,10 @@ void main_loop(char *script_cmds_file, char *script_cmd, bool usb_present) {
 			printf("executing commands from file: %s\n", script_cmds_file);
 		}
 	}
-	
+
 	read_history(".history");
 
-	while(1)  {
+	while (1) {
 		// If there is a script file
 		if (script_file)
 		{
@@ -192,11 +131,6 @@ void main_loop(char *script_cmds_file, char *script_cmd, bool usb_present) {
 	}
 
 	write_history(".history");
-  
-	if (usb_present) {
-		rarg.run = 0;
-		pthread_join(reader_thread, NULL);
-	}
 	
 	if (script_file) {
 		fclose(script_file);
@@ -244,9 +178,8 @@ static void set_my_executable_path(void)
 
 static void show_help(bool showFullHelp, char *command_line){
 	printf("syntax: %s <port> [-h|-help|-m|-f|-flush|-w|-wait|-c|-command|-l|-lua] [cmd_script_file_name] [command][lua_script_name]\n", command_line);
-	printf("\tLinux example:'%s /dev/ttyACM0'\n", command_line);
-	printf("\tWindows example:'%s com3'\n\n", command_line);
-	
+	printf("\texample: %s "SERIAL_PORT_H"\n\n", command_line);
+
 	if (showFullHelp){
 		printf("help: <-h|-help> Dump all interactive command's help at once.\n");
 		printf("\t%s  -h\n\n", command_line);
@@ -274,7 +207,7 @@ int main(int argc, char* argv[]) {
 	bool addLuaExec = false;
 	char *script_cmds_file = NULL;
 	char *script_cmd = NULL;
-  
+
 	if (argc < 2) {
 		show_help(true, argv[0]);
 		return 1;
@@ -294,7 +227,7 @@ int main(int argc, char* argv[]) {
 		
 		if(strcmp(argv[i],"-f") == 0 || strcmp(argv[i],"-flush") == 0){
 			printf("Output will be flushed after every print.\n");
-			flushAfterWrite = 1;
+			SetFlushAfterWrite(true);
 		}
 		
 		if(strcmp(argv[i],"-w") == 0 || strcmp(argv[i],"-wait") == 0){
@@ -349,39 +282,9 @@ int main(int argc, char* argv[]) {
 	
 	// set global variables
 	set_my_executable_path();
-	
-	// open uart
-	if (!waitCOMPort) {
-		sp = uart_open(argv[1]);
-	} else {
-		printf("Waiting for Proxmark to appear on %s ", argv[1]);
-		fflush(stdout);
-		int openCount = 0;
-		do {
-			sp = uart_open(argv[1]);
-			msleep(1000);
-			printf(".");
-			fflush(stdout);
-		} while(++openCount < 20 && (sp == INVALID_SERIAL_PORT || sp == CLAIMED_SERIAL_PORT));
-		printf("\n");
-	}
 
-	// check result of uart opening
-	if (sp == INVALID_SERIAL_PORT) {
-		printf("ERROR: invalid serial port\n");
-		usb_present = false;
-		offline = 1;
-	} else if (sp == CLAIMED_SERIAL_PORT) {
-		printf("ERROR: serial port is claimed by another process\n");
-		usb_present = false;
-		offline = 1;
-	} else {
-		usb_present = true;
-		offline = 0;
-	}
-	
-	// create a mutex to avoid interlacing print commands from our different threads
-	pthread_mutex_init(&print_lock, NULL);
+	// try to open USB connection to Proxmark
+	usb_present = OpenProxmark(argv[1], waitCOMPort, 20, false);
 
 #ifdef HAVE_GUI
 #ifdef _WIN32
@@ -406,11 +309,8 @@ int main(int argc, char* argv[]) {
 
 	// Clean up the port
 	if (usb_present) {
-		uart_close(sp);
+		CloseProxmark();
 	}
-
-	// clean up mutex
-	pthread_mutex_destroy(&print_lock);
 
 	exit(0);
 }

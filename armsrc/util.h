@@ -44,7 +44,7 @@ void FormatVersionInformation(char *dst, int len, const char *prefix, void *vers
 
 //iceman's ticks.h
 #ifndef GET_TICKS
-# define GET_TICKS   (uint32_t)((AT91C_BASE_TC1->TC_CV << 16) | AT91C_BASE_TC0->TC_CV)
+# define GET_TICKS GetTicks()
 #endif
 
 void SpinDelay(int ms);
@@ -62,6 +62,7 @@ void ResetSspClk(void);
 uint32_t RAMFUNC GetCountSspClk();
 
 extern void StartTicks(void);
+extern uint32_t GetTicks(void);
 extern void WaitTicks(uint32_t ticks);
 extern void WaitUS(uint16_t us);
 extern void WaitMS(uint16_t ms);

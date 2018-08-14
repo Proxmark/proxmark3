@@ -12,7 +12,7 @@
 
 #include <stdint.h>
 #include <stdio.h>
-#include "proxmark3.h"
+#include "comms.h"
 #include "usb_cmd.h"
 #include "cmdmain.h"
 #include "ui.h"
@@ -22,7 +22,6 @@
 #include "mifare.h"
 #include "util.h"
 #include "protocols.h"
-#include "data.h"
 
 #define MAX_UL_BLOCKS      0x0f
 #define MAX_ULC_BLOCKS     0x2b
@@ -1325,8 +1324,7 @@ int CmdHF14AMfUDump(const char *Cmd){
 		PrintAndLog("Data exceeded Buffer size!");
 		bufferSize = sizeof(data);
 	}
-	GetFromBigBuf(data, bufferSize, startindex);
-	WaitForResponse(CMD_ACK,NULL);
+	GetFromBigBuf(data, bufferSize, startindex, NULL, -1, false);
 
 	Pages = bufferSize/4;
 	// Load lock bytes.
@@ -1836,7 +1834,7 @@ static command_t CommandTable[] =
 };
 
 int CmdHFMFUltra(const char *Cmd){
-	WaitForResponseTimeout(CMD_ACK,NULL,100);
+	(void)WaitForResponseTimeout(CMD_ACK,NULL,100);
 	CmdsParse(CommandTable, Cmd);
 	return 0;
 }

@@ -23,6 +23,10 @@ LDFLAGS = $(ENV_LDFLAGS)
 CFLAGS = $(ENV_CFLAGS) -std=c99 -D_ISOC99_SOURCE -I. -I../include -I../common -I../common/polarssl -I../zlib -I../uart -I/opt/local/include -I../liblua -Wall -g -O3
 CXXFLAGS = -I../include -Wall -O3
 
+APP_CFLAGS =
+include ../common/Makefile_Enabled_Options.common
+CFLAGS += $(APP_CFLAGS)
+
 LUAPLATFORM = generic
 platform = $(shell uname)
 ifneq (,$(findstring MINGW,$(platform)))
@@ -37,32 +41,34 @@ else
 	endif
 endif
 
-# Check for correctly configured Qt5
-QTINCLUDES = $(shell pkg-config --cflags Qt5Core Qt5Widgets 2>/dev/null)
-QTLDLIBS = $(shell pkg-config --libs Qt5Core Qt5Widgets 2>/dev/null)
-MOC = $(shell pkg-config --variable=host_bins Qt5Core)/moc
-UIC = $(shell pkg-config --variable=host_bins Qt5Core)/uic
-ifeq ($(QTINCLUDES), )
-# if Qt5 not found check for correctly configured Qt4	
-	QTINCLUDES = $(shell pkg-config --cflags QtCore QtGui 2>/dev/null)
-	QTLDLIBS = $(shell pkg-config --libs QtCore QtGui 2>/dev/null)
-	MOC = $(shell pkg-config --variable=moc_location QtCore)
-	UIC = $(shell pkg-config --variable=uic_location QtCore)
-else
-	CXXFLAGS += -std=c++11 -fPIC
-endif
-ifeq ($(QTINCLUDES), )
-# if both pkg-config commands failed, search in common places
-	ifneq ($(QTDIR), )
-		QTINCLUDES = -I$(QTDIR)/include -I$(QTDIR)/include/QtCore -I$(QTDIR)/include/QtGui
-		QTLDLIBS = -L$(QTDIR)/lib -lQtCore4 -lQtGui4
-		ifneq ($(wildcard $(QTDIR)/include/QtWidgets),)
-			QTINCLUDES += -I$(QTDIR)/include/QtWidgets
-			QTLDLIBS = -L$(QTDIR)/lib -lQt5Widgets -lQt5Gui -lQt5Core
-			CXXFLAGS += -std=c++11 -fPIC
+ifneq (,$(findstring WITH_GUI,$(APP_CFLAGS)))
+	# Check for correctly configured Qt5
+	QTINCLUDES = $(shell pkg-config --cflags Qt5Core Qt5Widgets 2>/dev/null)
+	QTLDLIBS = $(shell pkg-config --libs Qt5Core Qt5Widgets 2>/dev/null)
+	MOC = $(shell pkg-config --variable=host_bins Qt5Core)/moc
+	UIC = $(shell pkg-config --variable=host_bins Qt5Core)/uic
+	ifeq ($(QTINCLUDES), )
+	# if Qt5 not found check for correctly configured Qt4	
+		QTINCLUDES = $(shell pkg-config --cflags QtCore QtGui 2>/dev/null)
+		QTLDLIBS = $(shell pkg-config --libs QtCore QtGui 2>/dev/null)
+		MOC = $(shell pkg-config --variable=moc_location QtCore)
+		UIC = $(shell pkg-config --variable=uic_location QtCore)
+	else
+		CXXFLAGS += -std=c++11 -fPIC
+	endif
+	ifeq ($(QTINCLUDES), )
+	# if both pkg-config commands failed, search in common places
+		ifneq ($(QTDIR), )
+			QTINCLUDES = -I$(QTDIR)/include -I$(QTDIR)/include/QtCore -I$(QTDIR)/include/QtGui
+			QTLDLIBS = -L$(QTDIR)/lib -lQtCore4 -lQtGui4
+			ifneq ($(wildcard $(QTDIR)/include/QtWidgets),)
+				QTINCLUDES += -I$(QTDIR)/include/QtWidgets
+				QTLDLIBS = -L$(QTDIR)/lib -lQt5Widgets -lQt5Gui -lQt5Core
+				CXXFLAGS += -std=c++11 -fPIC
+			endif
+			MOC = $(QTDIR)/bin/moc
+			UIC = $(QTDIR)/bin/uic
 		endif
-		MOC = $(QTDIR)/bin/moc
-		UIC = $(QTDIR)/bin/uic
 	endif
 endif
 
@@ -79,10 +85,13 @@ DEPFLAGS = -MT $@ -MMD -MP -MF $(OBJDIR)/$*.Td
 # make temporary to final dependeny files after successful compilation
 POSTCOMPILE = $(MV) -f $(OBJDIR)/$*.Td $(OBJDIR)/$*.d
 
+
 CORESRCS = 	uart_posix.c \
 			uart_win32.c \
 			util.c \
-			util_posix.c
+			util_posix.c \
+			ui.c \
+			comms.c
 
 CMDSRCS = 	crapto1/crapto1.c\
 			crapto1/crypto1.c\
@@ -107,9 +116,7 @@ CMDSRCS = 	crapto1/crapto1.c\
 			crc64.c \
 			iso14443crc.c \
 			iso15693tools.c \
-			data.c \
 			graph.c \
-			ui.c \
 			cmddata.c \
 			lfdemod.c \
 			emv/crypto_polarssl.c\
@@ -130,6 +137,7 @@ CMDSRCS = 	crapto1/crapto1.c\
 			emv/test/cda_test.c\
 			emv/cmdemv.c\
 			cmdhf.c \
+			cmdhflist.c \
 			cmdhf14a.c \
 			cmdhf14b.c \
 			cmdhf15.c \
@@ -171,14 +179,7 @@ CMDSRCS = 	crapto1/crapto1.c\
 			cmdscript.c\
 			pm3_binlib.c\
 			pm3_bitlib.c\
-			protocols.c\
-			cmdcrc.c\
-			reveng/reveng.c\
-			reveng/cli.c\
-			reveng/bmpbit.c\
-			reveng/model.c\
-			reveng/poly.c\
-			#reveng/getopt.c\
+			protocols.c
 
 cpu_arch = $(shell uname -m)
 ifneq ($(findstring 86, $(cpu_arch)), )
@@ -310,6 +311,7 @@ $(OBJDIR)/%.o : %.cpp $(OBJDIR)/%.d
 DEPENDENCY_FILES = $(patsubst %.c, $(OBJDIR)/%.d, $(CORESRCS) $(CMDSRCS) $(ZLIBSRCS) $(MULTIARCHSRCS)) \
 	$(patsubst %.cpp, $(OBJDIR)/%.d, $(QTGUISRCS)) \
 	$(OBJDIR)/proxmark3.d $(OBJDIR)/flash.d $(OBJDIR)/flasher.d $(OBJDIR)/fpga_compress.d
+
 
 $(DEPENDENCY_FILES): ;
 .PRECIOUS: $(DEPENDENCY_FILES)

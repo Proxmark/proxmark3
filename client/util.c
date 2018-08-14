@@ -16,7 +16,6 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <time.h>
-#include "data.h"
 
 #ifdef _WIN32
 #include <windows.h>
@@ -116,6 +115,7 @@ void hex_to_buffer(const uint8_t *buf, const uint8_t *hex_data, const size_t hex
 		
 	char *tmp = (char *)buf;
 	size_t i;
+	memset(tmp, 0x00, hex_max_len);
 
 	int maxLen = ( hex_len > hex_max_len) ? hex_max_len : hex_len;
 
@@ -226,7 +226,7 @@ char *sprint_hex_ascii(const uint8_t *data, const size_t len) {
 	memset(buf, 0x00, 1024);
 	size_t max_len = (len > 255) ? 255 : len;
 	// max 255 bytes * 3 + 2 characters = 767 in buffer
-	sprintf(tmp, "%s| ", sprint_hex(data, max_len) );
+	sprintf(tmp, "%.765s| ", sprint_hex(data, max_len) );
 	
 	size_t i = 0;
 	size_t pos = (max_len * 3)+2;
@@ -355,6 +355,23 @@ char * printBits(size_t const size, void const * const ptr)
     }
 	return buf;
 }
+
+char * printBitsPar(const uint8_t *b, size_t len) {
+	static char buf1[512] = {0};
+	static char buf2[512] = {0};
+	static char *buf;
+	if (buf != buf1)
+		buf = buf1;
+	else
+		buf = buf2;
+	memset(buf, 0x00, 512);
+
+	for (int i = 0; i < len; i++) {
+		buf[i] = ((b[i / 8] << (i % 8)) & 0x80) ? '1':'0';
+	}
+	return buf;
+}
+
 
 //  -------------------------------------------------------------------------
 //  string parameters lib

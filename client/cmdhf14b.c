@@ -8,19 +8,19 @@
 // High frequency ISO14443B commands
 //-----------------------------------------------------------------------------
 
+#include "cmdhf14b.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
 #include <string.h>
 #include <stdint.h>
 #include "iso14443crc.h"
-#include "proxmark3.h"
-#include "data.h"
+#include "comms.h"
 #include "graph.h"
 #include "util.h"
 #include "ui.h"
 #include "cmdparser.h"
-#include "cmdhf14b.h"
 #include "cmdmain.h"
 #include "cmdhf14a.h"
 

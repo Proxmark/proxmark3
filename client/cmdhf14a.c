@@ -20,8 +20,7 @@
 #include "util.h"
 #include "util_posix.h"
 #include "iso14443crc.h"
-#include "data.h"
-#include "proxmark3.h"
+#include "comms.h"
 #include "ui.h"
 #include "cmdparser.h"
 #include "common.h"
@@ -36,8 +35,13 @@
 static int CmdHelp(const char *Cmd);
 static int waitCmd(uint8_t iLen);
 
+// structure and database for uid -> tagtype lookups 
+typedef struct { 
+	uint8_t uid;
+	char* desc;
+} manufactureName; 
 
-const manufactureName manufactureMapping[] = {
+static const manufactureName manufactureMapping[] = {
 	// ID,  "Vendor Country"
 	{ 0x01, "Motorola UK" },
 	{ 0x02, "ST Microelectronics SA France" },
@@ -187,7 +191,7 @@ int CmdHF14AReader(const char *Cmd) {
 
 		PrintAndLog(" UID : %s", sprint_hex(card.uid, card.uidlen));
 		PrintAndLog("ATQA : %02x %02x", card.atqa[1], card.atqa[0]);
-		PrintAndLog(" SAK : %02x [%d]", card.sak, resp.arg[0]);
+		PrintAndLog(" SAK : %02x [%" PRIu64 "]", card.sak, resp.arg[0]);
 		if(card.ats_len >= 3) {			// a valid ATS consists of at least the length byte (TL) and 2 CRC bytes
 			PrintAndLog(" ATS : %s", sprint_hex(card.ats, card.ats_len));
 		}
@@ -239,7 +243,7 @@ int CmdHF14AInfo(const char *Cmd)
 
 	PrintAndLog(" UID : %s", sprint_hex(card.uid, card.uidlen));
 	PrintAndLog("ATQA : %02x %02x", card.atqa[1], card.atqa[0]);
-	PrintAndLog(" SAK : %02x [%d]", card.sak, resp.arg[0]);
+	PrintAndLog(" SAK : %02x [%" PRIu64 "]", card.sak, resp.arg[0]);
 
 	bool isMifareClassic = true;
 	switch (card.sak) {
@@ -477,12 +481,12 @@ int CmdHF14AInfo(const char *Cmd)
 
 	
 	// try to see if card responses to "chinese magic backdoor" commands.
-	mfCIdentify();
+	(void)mfCIdentify();
 	
 	if (isMifareClassic) {		
 		switch(DetectClassicPrng()) {
 		case 0:
-			PrintAndLog("Prng detection: HARDEND (hardnested)");		
+			PrintAndLog("Prng detection: HARDENED (hardnested)");		
 			break;
 		case 1:
 			PrintAndLog("Prng detection: WEAK");
@@ -949,12 +953,9 @@ static command_t CommandTable[] =
 };
 
 int CmdHF14A(const char *Cmd) {
-	// flush
-	WaitForResponseTimeout(CMD_ACK,NULL,100);
-
-	// parse
-  CmdsParse(CommandTable, Cmd);
-  return 0;
+	(void)WaitForResponseTimeout(CMD_ACK,NULL,100);
+	CmdsParse(CommandTable, Cmd);
+	return 0;
 }
 
 int CmdHelp(const char *Cmd)

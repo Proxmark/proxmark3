@@ -15,9 +15,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <ctype.h>
-#include "proxmark3.h"
+#include "comms.h"
 #include "cmdmain.h"
 #include "cmdhfmfhard.h"
+#include "parity.h"
 #include "util.h"
 #include "util_posix.h"
 #include "usb_cmd.h"
@@ -25,6 +26,7 @@
 #include "mifarehost.h"
 #include "mifare.h"
 #include "mfkey.h"
+#include "hardnested/hardnested_bf_core.h"
 
 #define NESTED_SECTOR_RETRY     10			// how often we try mfested() until we give up
 
@@ -682,9 +684,9 @@ int CmdHF14AMfNested(const char *Cmd)
 			if (transferToEml) {
 				uint8_t sectortrailer;
 				if (trgBlockNo < 32*4) { 	// 4 block sector
-					sectortrailer = (trgBlockNo & 0x03) + 3;
+					sectortrailer = trgBlockNo | 0x03;
 				} else {					// 16 block sector
-					sectortrailer = (trgBlockNo & 0x0f) + 15;
+					sectortrailer = trgBlockNo | 0x0f;
 				}
 				mfEmlGetMem(keyBlock, sectortrailer, 1);
 
@@ -724,7 +726,6 @@ int CmdHF14AMfNested(const char *Cmd)
 						blockNo = i * 4;
 						keyType = j;
 						num_to_bytes(e_sector[i].Key[j], 6, key);
-						
 						keyFound = true;
 						break;
 					}
@@ -735,6 +736,7 @@ int CmdHF14AMfNested(const char *Cmd)
 			// Can't found a key....
 			if (!keyFound) {
 				PrintAndLog("Can't found any of the known keys.");
+				free(e_sector);
 				return 4;
 			}
 			PrintAndLog("--auto key. block no:%3d, key type:%c key:%s", blockNo, keyType?'B':'A', sprint_hex(key, 6));
@@ -862,6 +864,13 @@ int CmdHF14AMfNestedHard(const char *Cmd)
 		PrintAndLog("      w: Acquire nonces and write them to binary file nonces.bin");
 		PrintAndLog("      s: Slower acquisition (required by some non standard cards)");
 		PrintAndLog("      r: Read nonces.bin and start attack");
+		PrintAndLog("      iX: set type of SIMD instructions. Without this flag programs autodetect it.");
+		PrintAndLog("        i5: AVX512");
+		PrintAndLog("        i2: AVX2");
+		PrintAndLog("        ia: AVX");
+		PrintAndLog("        is: SSE2");
+		PrintAndLog("        im: MMX");
+		PrintAndLog("        in: none (use CPU regular instruction set)");
 		PrintAndLog(" ");
 		PrintAndLog("      sample1: hf mf hardnested 0 A FFFFFFFFFFFF 4 A");
 		PrintAndLog("      sample2: hf mf hardnested 0 A FFFFFFFFFFFF 4 A w");
@@ -880,15 +889,20 @@ int CmdHF14AMfNestedHard(const char *Cmd)
 	int tests = 0;
 
 
+	uint16_t iindx = 0;
 	if (ctmp == 'R' || ctmp == 'r') {
 		nonce_file_read = true;
+		iindx = 1;
 		if (!param_gethex(Cmd, 1, trgkey, 12)) {
 			know_target_key = true;
+			iindx = 2;
 		}
 	} else if (ctmp == 'T' || ctmp == 't') {
 		tests = param_get32ex(Cmd, 1, 100, 10);
+		iindx = 2;
 		if (!param_gethex(Cmd, 2, trgkey, 12)) {
 			know_target_key = true;
+			iindx = 3;
 		}
 	} else {
 		blockNo = param_get8(Cmd, 0);
@@ -922,18 +936,53 @@ int CmdHF14AMfNestedHard(const char *Cmd)
 			know_target_key = true;
 			i++;
 		}
+		iindx = i;
 
 		while ((ctmp = param_getchar(Cmd, i))) {
 			if (ctmp == 's' || ctmp == 'S') {
 				slow = true;
 			} else if (ctmp == 'w' || ctmp == 'W') {
 				nonce_file_write = true;
+			} else if (param_getlength(Cmd, i) == 2 && ctmp == 'i') {
+				iindx = i;
 			} else {
-				PrintAndLog("Possible options are w and/or s");
+				PrintAndLog("Possible options are w , s and/or iX");
 				return 1;
 			}
 			i++;
 		}
+	}
+	
+	SetSIMDInstr(SIMD_AUTO);
+	if (iindx > 0) {
+		while ((ctmp = param_getchar(Cmd, iindx))) {
+			if (param_getlength(Cmd, iindx) == 2 && ctmp == 'i') {
+				switch(param_getchar_indx(Cmd, 1, iindx)) {
+					case '5':
+						SetSIMDInstr(SIMD_AVX512);
+						break;
+					case '2':
+						SetSIMDInstr(SIMD_AVX2);
+						break;
+					case 'a':
+						SetSIMDInstr(SIMD_AVX);
+						break;
+					case 's':
+						SetSIMDInstr(SIMD_SSE2);
+						break;
+					case 'm':
+						SetSIMDInstr(SIMD_MMX);
+						break;
+					case 'n':
+						SetSIMDInstr(SIMD_NONE);
+						break;
+					default:
+						PrintAndLog("Unknown SIMD type. %c", param_getchar_indx(Cmd, 1, iindx));
+						return 1;
+				}
+			}
+			iindx++;
+		}	
 	}
 
 	PrintAndLog("--target block no:%3d, target key type:%c, known target key: 0x%02x%02x%02x%02x%02x%02x%s, file action: %s, Slow: %s, Tests: %d ",
@@ -1138,7 +1187,10 @@ int CmdHF14AMfChk(const char *Cmd)
 
 	// initialize storage for found keys
 	e_sector = calloc(SectorsCnt, sizeof(sector_t));
-	if (e_sector == NULL) return 1;
+	if (e_sector == NULL) {
+		free(keyBlock);
+		return 1;
+	}
 	for (uint8_t keyAB = 0; keyAB < 2; keyAB++) {
 		for (uint16_t sectorNo = 0; sectorNo < SectorsCnt; sectorNo++) {
 			e_sector[sectorNo].Key[keyAB] = 0xffffffffffff;
@@ -1637,10 +1689,7 @@ int CmdHF14AMfESet(const char *Cmd)
 	}
 
 	//  1 - blocks count
-	UsbCommand c = {CMD_MIFARE_EML_MEMSET, {blockNo, 1, 0}};
-	memcpy(c.d.asBytes, memBlock, 16);
-	SendCommand(&c);
-	return 0;
+	return mfEmlSetMem(memBlock, blockNo, 1);
 }
 
 
@@ -1859,7 +1908,7 @@ int CmdHF14AMfECFill(const char *Cmd)
 		default:   numSectors = 16;
 	}
 
-	printf("--params: numSectors: %d, keyType:%d", numSectors, keyType);
+	printf("--params: numSectors: %d, keyType:%d\n", numSectors, keyType);
 	UsbCommand c = {CMD_MIFARE_EML_CARDLOAD, {numSectors, keyType, 0}};
 	SendCommand(&c);
 	return 0;
@@ -2425,6 +2474,7 @@ int CmdHF14AMfSniff(const char *Cmd){
 	//var
 	int res = 0;
 	int len = 0;
+	int parlen = 0;
 	int blockLen = 0;
 	int pckNum = 0;
 	int num = 0;
@@ -2436,6 +2486,7 @@ int CmdHF14AMfSniff(const char *Cmd){
 	uint8_t *buf = NULL;
 	uint16_t bufsize = 0;
 	uint8_t *bufPtr = NULL;
+	uint8_t parity[16];
 
 	char ctmp = param_getchar(Cmd, 0);
 	if ( ctmp == 'h' || ctmp == 'H' ) {
@@ -2479,14 +2530,13 @@ int CmdHF14AMfSniff(const char *Cmd){
 		}
 
 		UsbCommand resp;
-		if (WaitForResponseTimeout(CMD_ACK,&resp,2000)) {
+		if (WaitForResponseTimeoutW(CMD_ACK, &resp, 2000, false)) {
 			res = resp.arg[0] & 0xff;
 			uint16_t traceLen = resp.arg[1];
 			len = resp.arg[2];
 
 			if (res == 0) {								// we are done
-				free(buf);
-				return 0;
+				break;
 			}
 
 			if (res == 1) {								// there is (more) data to be transferred
@@ -2528,6 +2578,7 @@ int CmdHF14AMfSniff(const char *Cmd){
 					} else {
 						isTag = false;
 					}
+					parlen = (len - 1) / 8 + 1;
 					bufPtr += 2;
 					if ((len == 14) && (bufPtr[0] == 0xff) && (bufPtr[1] == 0xff) && (bufPtr[12] == 0xff) && (bufPtr[13] == 0xff)) {
 						memcpy(uid, bufPtr + 2, 7);
@@ -2546,15 +2597,22 @@ int CmdHF14AMfSniff(const char *Cmd){
 						if (wantDecrypt)
 							mfTraceInit(uid, atqa, sak, wantSaveToEmlFile);
 					} else {
-						PrintAndLog("%s(%d):%s", isTag ? "TAG":"RDR", num, sprint_hex(bufPtr, len));
+						oddparitybuf(bufPtr, len, parity);
+						PrintAndLog("%s(%d):%s [%s] c[%s]%c", 
+							isTag ? "TAG":"RDR", 
+							num, 
+							sprint_hex(bufPtr, len), 
+							printBitsPar(bufPtr + len, len), 
+							printBitsPar(parity, len),
+							memcmp(bufPtr + len, parity, len / 8 + 1) ? '!' : ' ');
 						if (wantLogToFile)
 							AddLogHex(logHexFileName, isTag ? "TAG: ":"RDR: ", bufPtr, len);
 						if (wantDecrypt)
-							mfTraceDecode(bufPtr, len, wantSaveToEmlFile);
+							mfTraceDecode(bufPtr, len, bufPtr[len], wantSaveToEmlFile);
 						num++;
 					}
 					bufPtr += len;
-					bufPtr += ((len-1)/8+1);	// ignore parity
+					bufPtr += parlen;	// ignore parity
 				}
 				pckNum = 0;
 			}
@@ -2562,6 +2620,9 @@ int CmdHF14AMfSniff(const char *Cmd){
 	} // while (true)
 
 	free(buf);
+	
+	msleep(300); // wait for exiting arm side.
+	PrintAndLog("Done.");
 	return 0;
 }
 
@@ -2608,11 +2669,9 @@ static command_t CommandTable[] =
 
 int CmdHFMF(const char *Cmd)
 {
-	// flush
-	WaitForResponseTimeout(CMD_ACK,NULL,100);
-
-  CmdsParse(CommandTable, Cmd);
-  return 0;
+	(void)WaitForResponseTimeout(CMD_ACK,NULL,100);
+	CmdsParse(CommandTable, Cmd);
+	return 0;
 }
 
 int CmdHelp(const char *Cmd)

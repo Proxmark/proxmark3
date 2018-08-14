@@ -15,12 +15,6 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-// structure and database for uid -> tagtype lookups 
-typedef struct { 
-	uint8_t uid;
-	char* desc;
-} manufactureName; 
-
 int CmdHF14A(const char *Cmd);
 int CmdHF14AList(const char *Cmd);
 int CmdHF14AMifare(const char *Cmd);

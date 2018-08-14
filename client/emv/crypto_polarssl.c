@@ -105,7 +105,7 @@ static struct crypto_pk *crypto_pk_polarssl_open_rsa(va_list vl)
 	int res = rsa_check_pubkey(&cp->ctx);
 	if(res != 0) {
 		fprintf(stderr, "PolarSSL public key error res=%x exp=%d mod=%d.\n", res * -1, explen, modlen);
-
+		free(cp);
 		return NULL;
 	}
 
@@ -150,6 +150,7 @@ static struct crypto_pk *crypto_pk_polarssl_open_priv_rsa(va_list vl)
 	int res = rsa_check_privkey(&cp->ctx);
 	if(res != 0) {
 		fprintf(stderr, "PolarSSL private key error res=%x exp=%d mod=%d.\n", res * -1, explen, modlen);
+		free(cp);
 		return NULL;
 	}
 
@@ -184,6 +185,7 @@ static struct crypto_pk *crypto_pk_polarssl_genkey_rsa(va_list vl)
 	int res = rsa_gen_key(&cp->ctx, &myrand, NULL, nbits, exp);
 	if (res) {
 		fprintf(stderr, "PolarSSL private key generation error res=%x exp=%d nbits=%d.\n", res * -1, exp, nbits);
+		free(cp);
 		return NULL;
 	}
 	
@@ -215,7 +217,8 @@ static unsigned char *crypto_pk_polarssl_encrypt(const struct crypto_pk *_cp, co
 
 	res = rsa_public(&cp->ctx, buf, result);
 	if(res) {
-		printf("RSA encrypt failed. Error: %x data len: %d key len: %d\n", res * -1, len, keylen);
+		printf("RSA encrypt failed. Error: %x data len: %zd key len: %zd\n", res * -1, len, keylen);
+		free(result);
 		return NULL;
 	}
 	
@@ -241,7 +244,8 @@ static unsigned char *crypto_pk_polarssl_decrypt(const struct crypto_pk *_cp, co
 
 	res = rsa_private(&cp->ctx, buf, result); // CHECK???
 	if(res) {
-		printf("RSA decrypt failed. Error: %x data len: %d key len: %d\n", res * -1, len, keylen);
+		printf("RSA decrypt failed. Error: %x data len: %zd key len: %zd\n", res * -1, len, keylen);
+		free(result);
 		return NULL;
 	}
 	
