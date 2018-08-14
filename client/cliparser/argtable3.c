@@ -283,9 +283,8 @@ extern   char *suboptarg;               /* getsubopt(3) external variable */
  * Materiel Command, USAF, under agreement number F39502-99-1-0512.
  */
 
-#ifndef lint
-static const char rcsid[]="$Id: getopt_long.c,v 1.1 2009/10/16 19:50:28 rodney Exp rodney $";
-#endif /* lint */
+// $Id: getopt_long.c,v 1.1 2009/10/16 19:50:28 rodney Exp rodney $"
+
 /*-
  * Copyright (c) 2000 The NetBSD Foundation, Inc.
  * All rights reserved.
