@@ -81,7 +81,10 @@
 #define AddCrc(data,datalen)  Iso15693AddCrc(data,datalen)
 #define sprintUID(target,uid)	Iso15693sprintUID(target,uid)
 
-int DEBUG=0;
+// approximate amplitude=sqrt(ci^2+cq^2) 
+#define AMPLITUDE(ci, cq) (MAX(ABS(ci), ABS(cq)) + (MIN(ABS(ci), ABS(cq))>>1))
+
+static int DEBUG = 0;
 
 
 // ---------------------------
@@ -303,13 +306,9 @@ static int GetIso15693AnswerFromTag(uint8_t *receivedResponse, int maxLen, int *
 
 // NOW READ RESPONSE
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_HF_READER_RX_XCORR);
-	//spindelay(60);	// greg - experiment to get rid of some of the 0 byte/failed reads
 	c = 0;
 	getNext = false;
 	for(;;) {
-		if(AT91C_BASE_SSC->SSC_SR & (AT91C_SSC_TXRDY)) {
-			AT91C_BASE_SSC->SSC_THR = 0x43;
-		}
 		if(AT91C_BASE_SSC->SSC_SR & (AT91C_SSC_RXRDY)) {
 			int8_t b;
 			b = (int8_t)AT91C_BASE_SSC->SSC_RHR;
@@ -319,11 +318,11 @@ static int GetIso15693AnswerFromTag(uint8_t *receivedResponse, int maxLen, int *
 			// every other is Q. We just want power, so abs(I) + abs(Q) is
 			// close to what we want.
 			if(getNext) {
-				uint8_t r = ABS(b) + ABS(prev);
+				uint8_t r = AMPLITUDE(b, prev);
 
-				dest[c++] = (uint8_t)r;
+				dest[c++] = r;
 
-				if(c >= 2000) {
+				if(c >= 4000) {
 					break;
 				}
 			} else {
@@ -341,12 +340,10 @@ static int GetIso15693AnswerFromTag(uint8_t *receivedResponse, int maxLen, int *
 	int i, j;
 	int max = 0, maxPos=0;
 
-	int skip = 4;
-
-	//	if(GraphTraceLen < 1000) return;	// THIS CHECKS FOR A BUFFER TO SMALL
+	int skip = 2;
 
 	// First, correlate for SOF
-	for(i = 0; i < 100; i++) {
+	for(i = 0; i < 200; i++) {  // usually, SOF is found around i = 60
 		int corr = 0;
 		for(j = 0; j < arraylen(FrameSOF); j += skip) {
 			corr += FrameSOF[j]*dest[i+(j/skip)];
@@ -356,7 +353,7 @@ static int GetIso15693AnswerFromTag(uint8_t *receivedResponse, int maxLen, int *
 			maxPos = i;
 		}
 	}
-		// Dbprintf("SOF at %d, correlation %d", maxPos,max/(arraylen(FrameSOF)/skip));
+	if (DEBUG) Dbprintf("SOF at %d, correlation %d", maxPos, max/(arraylen(FrameSOF)/skip));
 
 	int k = 0; // this will be our return value
 
@@ -370,9 +367,14 @@ static int GetIso15693AnswerFromTag(uint8_t *receivedResponse, int maxLen, int *
 		memset(outBuf, 0, sizeof(outBuf));
 		uint8_t mask = 0x01;
 		for(;;) {
-			int corr0 = 0, corr1 = 0, corrEOF = 0;
+			int corr0 = 0, corr00 = 0, corr01 = 0, corr1 = 0, corrEOF = 0;
 			for(j = 0; j < arraylen(Logic0); j += skip) {
 				corr0 += Logic0[j]*dest[i+(j/skip)];
+			}
+			corr01 = corr00 = corr0;
+			for(j = 0; j < arraylen(Logic0); j += skip) {
+				corr00 += Logic0[j]*dest[i+arraylen(Logic0)/skip+(j/skip)];
+				corr01 += Logic1[j]*dest[i+arraylen(Logic0)/skip+(j/skip)];
 			}
 			for(j = 0; j < arraylen(Logic1); j += skip) {
 				corr1 += Logic1[j]*dest[i+(j/skip)];
@@ -381,11 +383,14 @@ static int GetIso15693AnswerFromTag(uint8_t *receivedResponse, int maxLen, int *
 				corrEOF += FrameEOF[j]*dest[i+(j/skip)];
 			}
 			// Even things out by the length of the target waveform.
+			corr00 *= 2;
+			corr01 *= 2;
 			corr0 *= 4;
 			corr1 *= 4;
 	
-			if(corrEOF > corr1 && corrEOF > corr0) {
-				// Dbprintf("EOF at %d", i);
+			if(corrEOF > corr1 && corrEOF > corr00 && corrEOF > corr01) {
+				if (DEBUG) Dbprintf("EOF at %d, correlation %d (corr01: %d, corr00: %d, corr1: %d, corr0: %d)", 
+					i, corrEOF, corr01, corr00, corr1, corr0);
 				break;
 			} else if(corr1 > corr0) {
 				i += arraylen(Logic1)/skip;
@@ -398,7 +403,7 @@ static int GetIso15693AnswerFromTag(uint8_t *receivedResponse, int maxLen, int *
 				k++;
 				mask = 0x01;
 			}
-			if((i+(int)arraylen(FrameEOF)) >= 2000) {
+			if((i+(int)arraylen(FrameEOF)/skip) >= 4000) {
 				DbpString("ran off end!");
 				break;
 			}
@@ -446,9 +451,6 @@ static int GetIso15693AnswerFromSniff(uint8_t *receivedResponse, int maxLen, int
 	c = 0;
 	getNext = false;
 	for(;;) {
-		if(AT91C_BASE_SSC->SSC_SR & (AT91C_SSC_TXRDY)) {
-			AT91C_BASE_SSC->SSC_THR = 0x43;
-		}
 		if(AT91C_BASE_SSC->SSC_SR & (AT91C_SSC_RXRDY)) {
 			int8_t b = (int8_t)AT91C_BASE_SSC->SSC_RHR;
 
@@ -457,11 +459,11 @@ static int GetIso15693AnswerFromSniff(uint8_t *receivedResponse, int maxLen, int
 			// every other is Q. We just want power, so abs(I) + abs(Q) is
 			// close to what we want.
 			if(getNext) {
-				uint8_t r = ABS(b) + ABS(prev);
+				uint8_t r = AMPLITUDE(b, prev);
 
-				dest[c++] = (uint8_t)r;
+				dest[c++] = r;
 
-				if(c >= 20000) {
+				if(c >= BIGBUF_SIZE) {
 					break;
 				}
 			} else {
@@ -479,12 +481,10 @@ static int GetIso15693AnswerFromSniff(uint8_t *receivedResponse, int maxLen, int
 	int i, j;
 	int max = 0, maxPos=0;
 
-	int skip = 4;
-
-//	if(GraphTraceLen < 1000) return;	// THIS CHECKS FOR A BUFFER TO SMALL
+	int skip = 2;
 
 	// First, correlate for SOF
-	for(i = 0; i < 19000; i++) {
+	for(i = 0; i < 38000; i++) {
 		int corr = 0;
 		for(j = 0; j < arraylen(FrameSOF); j += skip) {
 			corr += FrameSOF[j]*dest[i+(j/skip)];
@@ -494,7 +494,7 @@ static int GetIso15693AnswerFromSniff(uint8_t *receivedResponse, int maxLen, int
 			maxPos = i;
 		}
 	}
-//	DbpString("SOF at %d, correlation %d", maxPos,max/(arraylen(FrameSOF)/skip));
+	if (DEBUG) Dbprintf("SOF at %d, correlation %d", maxPos,max/(arraylen(FrameSOF)/skip));
 
 	int k = 0; // this will be our return value
 
@@ -508,9 +508,14 @@ static int GetIso15693AnswerFromSniff(uint8_t *receivedResponse, int maxLen, int
 		memset(outBuf, 0, sizeof(outBuf));
 		uint8_t mask = 0x01;
 		for(;;) {
-			int corr0 = 0, corr1 = 0, corrEOF = 0;
+			int corr0 = 0, corr00 = 0, corr01 = 0, corr1 = 0, corrEOF = 0;
 			for(j = 0; j < arraylen(Logic0); j += skip) {
 				corr0 += Logic0[j]*dest[i+(j/skip)];
+			}
+			corr01 = corr00 = corr0;
+			for(j = 0; j < arraylen(Logic0); j += skip) {
+				corr00 += Logic0[j]*dest[i+arraylen(Logic0)/skip+(j/skip)];
+				corr01 += Logic1[j]*dest[i+arraylen(Logic0)/skip+(j/skip)];
 			}
 			for(j = 0; j < arraylen(Logic1); j += skip) {
 				corr1 += Logic1[j]*dest[i+(j/skip)];
@@ -519,11 +524,14 @@ static int GetIso15693AnswerFromSniff(uint8_t *receivedResponse, int maxLen, int
 				corrEOF += FrameEOF[j]*dest[i+(j/skip)];
 			}
 			// Even things out by the length of the target waveform.
+			corr00 *= 2;
+			corr01 *= 2;
 			corr0 *= 4;
 			corr1 *= 4;
 	
-			if(corrEOF > corr1 && corrEOF > corr0) {
-	//			DbpString("EOF at %d", i);
+			if(corrEOF > corr1 && corrEOF > corr00 && corrEOF > corr01) {
+				if (DEBUG) Dbprintf("EOF at %d, correlation %d (corr01: %d, corr00: %d, corr1: %d, corr0: %d)", 
+					i, corrEOF, corr01, corr00, corr1, corr0);
 				break;
 			} else if(corr1 > corr0) {
 				i += arraylen(Logic1)/skip;
@@ -536,7 +544,7 @@ static int GetIso15693AnswerFromSniff(uint8_t *receivedResponse, int maxLen, int
 				k++;
 				mask = 0x01;
 			}
-			if((i+(int)arraylen(FrameEOF)) >= 2000) {
+			if((i+(int)arraylen(FrameEOF)/skip) >= BIGBUF_SIZE) {
 				DbpString("ran off end!");
 				break;
 			}
@@ -602,10 +610,6 @@ void AcquireRawAdcSamplesIso15693(void)
 				break;
 			}
 		}
-		if(AT91C_BASE_SSC->SSC_SR & (AT91C_SSC_RXRDY)) {
-			volatile uint32_t r = AT91C_BASE_SSC->SSC_RHR;
-			(void)r;
-		}
 		WDT_HIT();
 	}
 
@@ -614,9 +618,6 @@ void AcquireRawAdcSamplesIso15693(void)
 	c = 0;
 	getNext = false;
 	for(;;) {
-		if(AT91C_BASE_SSC->SSC_SR & (AT91C_SSC_TXRDY)) {
-			AT91C_BASE_SSC->SSC_THR = 0x43;
-		}
 		if(AT91C_BASE_SSC->SSC_SR & (AT91C_SSC_RXRDY)) {
 			int8_t b;
 			b = (int8_t)AT91C_BASE_SSC->SSC_RHR;
@@ -626,11 +627,11 @@ void AcquireRawAdcSamplesIso15693(void)
 			// every other is Q. We just want power, so abs(I) + abs(Q) is
 			// close to what we want.
 			if(getNext) {
-				uint8_t r = ABS(b) + ABS(prev);
+				uint8_t r = AMPLITUDE(b, prev);
 
-				dest[c++] = (uint8_t)r;
+				dest[c++] = r;
 
-				if(c >= 2000) {
+				if(c >= 4000) {
 					break;
 				}
 			} else {
@@ -668,9 +669,6 @@ void RecordRawAdcSamplesIso15693(void)
 	c = 0;
 	getNext = false;
 	for(;;) {
-		if(AT91C_BASE_SSC->SSC_SR & (AT91C_SSC_TXRDY)) {
-			AT91C_BASE_SSC->SSC_THR = 0x43;
-		}
 		if(AT91C_BASE_SSC->SSC_SR & (AT91C_SSC_RXRDY)) {
 			int8_t b;
 			b = (int8_t)AT91C_BASE_SSC->SSC_RHR;
@@ -680,11 +678,11 @@ void RecordRawAdcSamplesIso15693(void)
 			// every other is Q. We just want power, so abs(I) + abs(Q) is
 			// close to what we want.
 			if(getNext) {
-				uint8_t r = ABS(b) + ABS(prev);
+				uint8_t r = AMPLITUDE(b, prev);
 
-				dest[c++] = (uint8_t)r;
+				dest[c++] = r;
 
-				if(c >= 7000) {
+				if(c >= 14000) {
 					break;
 				}
 			} else {
@@ -836,7 +834,7 @@ int SendDataTag(uint8_t *send, int sendlen, int init, int speed, uint8_t **recv)
 	if (init) Iso15693InitReader();
 
 	int answerLen=0;
-	uint8_t *answer = BigBuf_get_addr() + 3660;
+	uint8_t *answer = BigBuf_get_addr() + 4000;
 	if (recv != NULL) memset(answer, 0, 100);
 
 	if (!speed) {
@@ -957,7 +955,7 @@ void ReaderIso15693(uint32_t parameter)
 
 	int answerLen1 = 0;
 	int answerLen2 = 0;
-	int answerLen3 = 0;
+	// int answerLen3 = 0;
 	int i = 0;
 	int samples = 0;
 	int tsamples = 0;
@@ -967,11 +965,11 @@ void ReaderIso15693(uint32_t parameter)
 
 	FpgaDownloadAndGo(FPGA_BITSTREAM_HF);
 
-	uint8_t *answer1 = BigBuf_get_addr() + 3660;
-	uint8_t *answer2 = BigBuf_get_addr() + 3760;
-	uint8_t *answer3 = BigBuf_get_addr() + 3860;
+	uint8_t *answer1 = BigBuf_get_addr() + 4000;
+	uint8_t *answer2 = BigBuf_get_addr() + 4100;
+	// uint8_t *answer3 = BigBuf_get_addr() + 4200;
 	// Blank arrays
-	memset(answer1, 0x00, 300);
+	memset(answer1, 0x00, 200);
 
 	SetAdcMuxFor(GPIO_MUXSEL_HIPKD);
 	// Setup SSC
@@ -1025,21 +1023,21 @@ void ReaderIso15693(uint32_t parameter)
 			TagUID[3],TagUID[2],TagUID[1],TagUID[0]);
 
 
-	Dbprintf("%d octets read from SELECT request:", answerLen2);
-	DbdecodeIso15693Answer(answerLen2,answer2);
-	Dbhexdump(answerLen2,answer2,true);
+	// Dbprintf("%d octets read from SELECT request:", answerLen2);
+	// DbdecodeIso15693Answer(answerLen2,answer2);
+	// Dbhexdump(answerLen2,answer2,true);
 
-	Dbprintf("%d octets read from XXX request:", answerLen3);
-	DbdecodeIso15693Answer(answerLen3,answer3);
-	Dbhexdump(answerLen3,answer3,true);
+	// Dbprintf("%d octets read from XXX request:", answerLen3);
+	// DbdecodeIso15693Answer(answerLen3,answer3);
+	// Dbhexdump(answerLen3,answer3,true);
 
 	// read all pages
 	if (answerLen1>=12 && DEBUG) {
 		i=0;			
 		while (i<32) {  // sanity check, assume max 32 pages
 			BuildReadBlockRequest(TagUID,i);
-	      TransmitTo15693Tag(ToSend,ToSendMax,&tsamples, &wait);  
-         answerLen2 = GetIso15693AnswerFromTag(answer2, 100, &samples, &elapsed);
+			TransmitTo15693Tag(ToSend,ToSendMax,&tsamples, &wait);  
+			answerLen2 = GetIso15693AnswerFromTag(answer2, 100, &samples, &elapsed);
 			if (answerLen2>0) {
 				Dbprintf("READ SINGLE BLOCK %d returned %d octets:",i,answerLen2);
 				DbdecodeIso15693Answer(answerLen2,answer2);
@@ -1073,7 +1071,7 @@ void SimTagIso15693(uint32_t parameter, uint8_t *uid)
 
 	FpgaDownloadAndGo(FPGA_BITSTREAM_HF);
 
-	uint8_t *buf = BigBuf_get_addr() + 3660;
+	uint8_t *buf = BigBuf_get_addr() + 4000;
 	memset(buf, 0x00, 100);
 	
 	SetAdcMuxFor(GPIO_MUXSEL_HIPKD);
@@ -1177,7 +1175,7 @@ void DirectTag15693Command(uint32_t datalen,uint32_t speed, uint32_t recv, uint8
 
 	if (recv) { 
 		LED_B_ON();
-    cmd_send(CMD_ACK,recvlen>48?48:recvlen,0,0,recvbuf,48);
+		cmd_send(CMD_ACK,recvlen>48?48:recvlen,0,0,recvbuf,48);
 		LED_B_OFF();	
 		
 		if (DEBUG) {
