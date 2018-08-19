@@ -141,7 +141,7 @@ static inline int32_t sample_power() {
 static inline bool rx_bit_as_reader() {
   int32_t power;
 
-  for(size_t i = 0; i<5; ++i) {
+  for(size_t i = 0; i<3; ++i) {
     power = sample_power();
   }
 
@@ -216,6 +216,7 @@ static uint32_t rx_frame_as_reader(uint8_t len) {
 
     // rx_bit_as_reader runs only 95us, resync to TAG_BIT_PERIOD
     last_frame_end += TAG_BIT_PERIOD;
+    while(GET_TICKS < last_frame_end) { };
   }
 
   return frame;
@@ -239,6 +240,7 @@ static bool rx_ack_as_reader() {
 
     // rx_bit_as_reader runs only 95us, resync to TAG_BIT_PERIOD
     last_frame_end += TAG_BIT_PERIOD;
+    while(GET_TICKS < last_frame_end) { };
 
     // check if it was an ACK
     if(ack) {
