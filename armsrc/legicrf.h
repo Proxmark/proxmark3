@@ -12,7 +12,7 @@
 #define __LEGICRF_H
 
 extern void LegicRfSimulate(int phase, int frame, int reqresp);
-extern int  LegicRfReader(int bytes, int offset);
+extern void LegicRfReader(int bytes, int offset);
 extern void LegicRfWriter(int bytes, int offset);
 
 #endif /* __LEGICRF_H */

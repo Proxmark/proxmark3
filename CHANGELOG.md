@@ -17,6 +17,7 @@ This project uses the changelog in accordance with [keepchangelog](http://keepac
 - Changed `hf 14a reader` to just reqest-anticilission-select sequence (Merlok)
 - Changed `hf 14a raw` - works with LED's and some exchange logic (Merlok)
 - Changed TLV parser messages to more convenient (Merlok)
+- Rewritten Legic Prime reader (`hf legic reader`, `write` and `fill`) - it is using xcorrelation now (AntiCat)
 
 ### Fixed
 - Changed start sequence in Qt mode (fix: short commands hangs main Qt thread) (Merlok)
