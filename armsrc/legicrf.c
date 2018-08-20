@@ -107,45 +107,46 @@ static inline uint8_t rx_byte_from_fpga() {
 // Demodulation (Reader)
 //-----------------------------------------------------------------------------
 
-// Returns am aproximated power measurement
+// Returns a demedulated bit
 //
 // The FPGA running xcorrelation samples the subcarrier at ~13.56 MHz. The mode
 // was initialy designed to receive BSPK/2-PSK. Hance, it reports an I/Q pair
-// every 4.7us (8 bits i and 8 bits q). We use the average of 4 samples.
+// every 4.7us (8 bits i and 8 bits q).
 //
 // The subcarrier amplitude can be calculated using Pythagoras sqrt(i^2 + q^2).
 // To reduce CPU time the amplitude is approximated by using linear functions:
 //   am = MAX(ABS(i),ABS(q)) + 1/2*MIN(ABS(i),ABSq))
 //
 // Note: The SSC receiver is never synchronized the calculation my be performed
-// on a i/q pair from two subsequent correlations, but does not matter.
-static inline int32_t sample_power() {
+// on a I/Q pair from two subsequent correlations, but does not matter.
+//
+// The bit time is 99.1us (21 I/Q pairs). The receiver skips the first 5 samples
+// and averages the next (most stable) 8 samples. The final 8 samples are dropped
+// also.
+//
+// The demedulated should be alligned to the bit periode by the caller. This is
+// done in rx_bit_as_reader and rx_ack_as_reader.
+static inline bool rx_bit_as_reader() {
   int32_t cq = 0;
   int32_t ci = 0;
 
-  for(size_t i = 0; i<4; i++) {
+  // skip first 5 I/Q pairs
+  for(size_t i = 0; i<5; ++i) {
+    (int8_t)rx_byte_from_fpga();
+    (int8_t)rx_byte_from_fpga();
+  }
+
+  // sample next 8 I/Q pairs
+  for(size_t i = 0; i<8; ++i) {
     cq += (int8_t)rx_byte_from_fpga();
     ci += (int8_t)rx_byte_from_fpga();
   }
 
-  return (MAX(ABS(ci), ABS(cq)) + (MIN(ABS(ci), ABS(cq)) >> 1)) >> 2;
-}
+  // calculate power
+  int32_t power = (MAX(ABS(ci), ABS(cq)) + (MIN(ABS(ci), ABS(cq)) >> 1));
 
-// Returns a demedulated bit
-//
-// An aproximated power measurement is available every 18.9us. The bit time
-// is 100us. The code samples 5 times and uses the last (most stable) sample.
-//
-// Note: The demodulator would be drifting (18.9us * 5 != 100us), rx_frame_as_reader
-// has a delay loop that aligns rx_bit_as_reader calls to the TAG tx timeslots.
-static inline bool rx_bit_as_reader() {
-  int32_t power;
-
-  for(size_t i = 0; i<3; ++i) {
-    power = sample_power();
-  }
-
-  return (power > INPUT_THRESHOLD);
+  // compare average (power / 8) to threshold
+  return ((power >> 3) > INPUT_THRESHOLD);
 }
 
 //-----------------------------------------------------------------------------
