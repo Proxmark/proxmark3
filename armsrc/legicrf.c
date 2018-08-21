@@ -476,7 +476,7 @@ void LegicRfWriter(int bytes, int offset) {
 
   // write in reverse order, only then is DCF (decremental field) writable
   while(bytes-- > 0 && !BUTTON_PRESS()) {
-    if(!write_byte(bytes + offset, BigBuf[bytes], card.addrsize)) {
+    if(!write_byte(bytes + offset, BigBuf[bytes + offset], card.addrsize)) {
       Dbprintf("operation failed @ 0x%03.3x", bytes);
       goto OUT;
     }
