@@ -26,7 +26,9 @@
 #include "util.h"
 #include "util_posix.h"
 #include "cmdscript.h"
-
+#ifdef WITH_SMARTCARD 
+  #include "cmdsmartcard.h"
+#endif
 
 static int CmdHelp(const char *Cmd);
 static int CmdQuit(const char *Cmd);
@@ -39,6 +41,9 @@ static command_t CommandTable[] =
   {"hf",    CmdHF,    1, "{ High Frequency commands... }"},
   {"hw",    CmdHW,    1, "{ Hardware commands... }"},
   {"lf",    CmdLF,    1, "{ Low Frequency commands... }"},
+#ifdef WITH_SMARTCARD
+  {"sc",    CmdSmartcard,1,"{ Smartcard commands... }"},
+#endif
   {"script",CmdScript,1, "{ Scripting commands }"},
   {"quit",  CmdQuit,  1, "Exit program"},
   {"exit",  CmdQuit,  1, "Exit program"},
