@@ -27,22 +27,12 @@ assign pwr_hi = ck_1356megb & (~snoop);
 assign pwr_oe1 = 1'b0;
 assign pwr_oe3 = 1'b0;
 assign pwr_oe4 = 1'b0;
+// Unused.
+assign pwr_lo = 1'b0;
+assign pwr_oe2 = 1'b0;
 
-reg [2:0] fc_div;
-always @(negedge ck_1356megb)
-    fc_div <= fc_div + 1;
+assign adc_clk = ck_1356megb;  // sample frequency is 13,56 MHz
 
-(* clock_signal = "yes" *) reg adc_clk;				// sample frequency, always 16 * fc
-always @(ck_1356megb, xcorr_is_848, xcorr_quarter_freq, fc_div)
-	if (xcorr_is_848 & ~xcorr_quarter_freq)			// fc = 847.5 kHz, standard ISO14443B
-		adc_clk <= ck_1356megb;
-	else if (~xcorr_is_848 & ~xcorr_quarter_freq)	// fc = 423.75 kHz 
-		adc_clk <= fc_div[0];
-	else if (xcorr_is_848 & xcorr_quarter_freq)		// fc = 211.875 kHz
-		adc_clk <= fc_div[1];
-	else 											// fc = 105.9375 kHz
-		adc_clk <= fc_div[2];
-		
 // When we're a reader, we just need to do the BPSK demod; but when we're an
 // eavesdropper, we also need to pick out the commands sent by the reader,
 // using AM. Do this the same way that we do it for the simulated tag.
@@ -69,15 +59,27 @@ begin
     end
 end
 
-// Let us report a correlation every 4 subcarrier cycles, or 4*16=64 samples,
-// so we need a 6-bit counter.
+
+// Let us report a correlation every 64 samples. I.e.
+// one Q/I pair after 4 subcarrier cycles for the 848kHz subcarrier,
+// one Q/I pair after 2 subcarrier cycles for the 424kHz subcarriers,
+// one Q/I pair for each subcarrier cyle for the 212kHz subcarrier.
+// We need a 6-bit counter for the timing.
 reg [5:0] corr_i_cnt;
-// And a couple of registers in which to accumulate the correlations.
-// We would add at most 32 times the difference between unmodulated and modulated signal. It should
+always @(negedge adc_clk)
+begin
+	corr_i_cnt <= corr_i_cnt + 1;
+end		
+
+// And a couple of registers in which to accumulate the correlations. From the 64 samples
+// we would add at most 32 times the difference between unmodulated and modulated signal. It should
 // be safe to assume that a tag will not be able to modulate the carrier signal by more than 25%.
 // 32 * 255 * 0,25 = 2040, which can be held in 11 bits. Add 1 bit for sign.
-reg signed [11:0] corr_i_accum;
-reg signed [11:0] corr_q_accum;
+// Temporary we might need more bits. For the 212kHz subcarrier we could possible add 32 times the
+// maximum signal value before a first subtraction would occur. 32 * 255 = 8160 can be held in 13 bits. 
+// Add one bit for sign -> need 14 bit registers but final result will fit into 12 bits.
+reg signed [13:0] corr_i_accum;
+reg signed [13:0] corr_q_accum;
 // we will report maximum 8 significant bits
 reg signed [7:0] corr_i_out;
 reg signed [7:0] corr_q_out;
@@ -86,12 +88,29 @@ reg ssp_clk;
 reg ssp_frame;
 
 
-always @(negedge adc_clk)
-begin
-	corr_i_cnt <= corr_i_cnt + 1;
-end		
-		
+// The subcarrier reference signals
+reg subcarrier_I;
+reg subcarrier_Q;
 
+always @(corr_i_cnt or xcorr_is_848 or xcorr_quarter_freq)
+begin
+	if (xcorr_is_848 & ~xcorr_quarter_freq)				// 848 kHz
+		begin
+			subcarrier_I = ~corr_i_cnt[3];
+			subcarrier_Q = ~(corr_i_cnt[3] ^ corr_i_cnt[2]);
+		end
+	else if (xcorr_is_848 & xcorr_quarter_freq)			// 212 kHz	
+		begin
+			subcarrier_I = ~corr_i_cnt[5];
+			subcarrier_Q = ~(corr_i_cnt[5] ^ corr_i_cnt[4]);
+		end
+	else
+		begin											// 424 kHz
+			subcarrier_I = ~corr_i_cnt[4];
+			subcarrier_Q = ~(corr_i_cnt[4] ^ corr_i_cnt[3]);
+		end
+end
+	
 // ADC data appears on the rising edge, so sample it on the falling edge
 always @(negedge adc_clk)
 begin
@@ -103,36 +122,60 @@ begin
         if(snoop)
         begin
 			// Send 7 most significant bits of tag signal (signed), plus 1 bit reader signal
-            corr_i_out <= {corr_i_accum[11:5], after_hysteresis_prev_prev};
-            corr_q_out <= {corr_q_accum[11:5], after_hysteresis_prev};
+			if (corr_i_accum[13:11] == 3'b000 || corr_i_accum[13:11] == 3'b111) 
+				corr_i_out <= {corr_i_accum[11:5], after_hysteresis_prev_prev};
+			else // truncate to maximum value
+				if (corr_i_accum[13] == 1'b0)
+					corr_i_out <= {7'b0111111, after_hysteresis_prev_prev};
+				else
+					corr_i_out <= {7'b1000000, after_hysteresis_prev_prev};
+			if (corr_q_accum[13:11] == 3'b000 || corr_q_accum[13:11] == 3'b111) 
+				corr_q_out <= {corr_q_accum[11:5], after_hysteresis_prev};
+			else // truncate to maximum value
+				if (corr_q_accum[13] == 1'b0)
+					corr_q_out <= {7'b0111111, after_hysteresis_prev};
+				else
+					corr_q_out <= {7'b1000000, after_hysteresis_prev};
 			after_hysteresis_prev_prev <= after_hysteresis;
         end
         else
         begin
-            // 8 bits of tag signal
-            corr_i_out <= corr_i_accum[11:4];
-            corr_q_out <= corr_q_accum[11:4];
+            // Send 8 bits of tag signal
+			if (corr_i_accum[13:11] == 3'b000 || corr_i_accum[13:11] == 3'b111) 
+				corr_i_out <= corr_i_accum[11:4];
+			else // truncate to maximum value
+				if (corr_i_accum[13] == 1'b0)
+					corr_i_out <= 8'b01111111;
+				else
+					corr_i_out <= 8'b10000000;
+			if (corr_q_accum[13:11] == 3'b000 || corr_q_accum[13:11] == 3'b111) 
+				corr_q_out <= corr_q_accum[11:4];
+			else // truncate to maximum value
+				if (corr_q_accum[13] == 1'b0)
+					corr_q_out <= 8'b01111111;
+				else
+					corr_q_out <= 8'b10000000;
         end
-
-        corr_i_accum <= adc_d;
-        corr_q_accum <= adc_d;
+		// Initialize next correlation. 
+		// Both I and Q reference signals are high when corr_i_nct == 0. Therefore need to accumulate.
+        corr_i_accum <= $signed({1'b0,adc_d});
+        corr_q_accum <= $signed({1'b0,adc_d});
     end
     else
     begin
-        if(corr_i_cnt[3])
-            corr_i_accum <= corr_i_accum - adc_d;
+        if (subcarrier_I)
+            corr_i_accum <= corr_i_accum + $signed({1'b0,adc_d});
         else
-            corr_i_accum <= corr_i_accum + adc_d;
+            corr_i_accum <= corr_i_accum - $signed({1'b0,adc_d});
 
-        if(corr_i_cnt[3] == corr_i_cnt[2])			// phase shifted by pi/2
-            corr_q_accum <= corr_q_accum + adc_d;
+        if (subcarrier_Q)
+            corr_q_accum <= corr_q_accum + $signed({1'b0,adc_d});
         else
-            corr_q_accum <= corr_q_accum - adc_d;
+            corr_q_accum <= corr_q_accum - $signed({1'b0,adc_d});
 
     end
 
-    // The logic in hi_simulate.v reports 4 samples per bit. We report two
-    // (I, Q) pairs per bit, so we should do 2 samples per pair.
+	// for each Q/I pair report two reader signal samples when sniffing
     if(corr_i_cnt == 6'd32)
         after_hysteresis_prev <= after_hysteresis;
 
@@ -166,9 +209,5 @@ end
 assign ssp_din = corr_i_out[7];
 
 assign dbg = corr_i_cnt[3];
-
-// Unused.
-assign pwr_lo = 1'b0;
-assign pwr_oe2 = 1'b0;
 
 endmodule

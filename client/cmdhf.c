@@ -353,6 +353,12 @@ uint16_t printTraceLine(uint16_t tracepos, uint16_t traceLen, uint8_t *trace, ui
 
 int CmdHFList(const char *Cmd)
 {
+	#ifdef WITH_SMARTCARD
+		PrintAndLog("TEST_WITH_SMARTCARD");
+	#endif
+	#ifdef WITH_TEST
+		PrintAndLog("TEST_WITH_TEST");
+	#endif
 	bool showWaitCycles = false;
 	bool markCRCBytes = false;
 	bool loadFromFile = false;
