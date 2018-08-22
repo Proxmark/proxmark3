@@ -232,7 +232,7 @@ WINBINS = $(patsubst %, %.exe, $(BINS))
 CLEAN = $(BINS) $(WINBINS) $(COREOBJS) $(CMDOBJS) $(ZLIBOBJS) $(QTGUIOBJS) $(MULTIARCHOBJS) $(OBJDIR)/*.o *.moc.cpp ui/ui_overlays.h
 
 # need to assign dependancies to build these first...
-all: lua_build $(BINS)
+all: lua_build jansson_build $(BINS)
 
 all-static: LDLIBS:=-static $(LDLIBS)
 all-static: proxmark3 flasher fpga_compress
@@ -261,6 +261,7 @@ lualibs/usb_cmd.lua: ../include/usb_cmd.h
 clean:
 	$(RM) $(CLEAN)
 	cd ../liblua && make clean
+	cd ../include/jansson && make clean
 
 tarbin: $(BINS)
 	$(TAR) $(TARFLAGS) ../proxmark3-$(platform)-bin.tar $(BINS:%=client/%) $(WINBINS:%=client/%)
@@ -268,6 +269,10 @@ tarbin: $(BINS)
 lua_build:
 	@echo Compiling liblua, using platform $(LUAPLATFORM)
 	cd ../liblua && make $(LUAPLATFORM)
+	
+jansson_build:
+	@echo Compiling jansson
+	cd ../include/jansson && make all
 
 .PHONY: all clean
 
