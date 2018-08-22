@@ -17,12 +17,14 @@ This project uses the changelog in accordance with [keepchangelog](http://keepac
 - Changed `hf 14a reader` to just reqest-anticilission-select sequence (Merlok)
 - Changed `hf 14a raw` - works with LED's and some exchange logic (Merlok)
 - Changed TLV parser messages to more convenient (Merlok)
+- Rewritten Legic Prime reader (`hf legic reader`, `write` and `fill`) - it is using xcorrelation now (AntiCat)
 
 ### Fixed
 - Changed start sequence in Qt mode (fix: short commands hangs main Qt thread) (Merlok)
 - Changed driver file proxmark3.inf to support both old and new Product/Vendor IDs (piwi)
 
 ### Added
+- Added `sc` smartcard (contact card) commands - reader, info, raw, upgrade, setclock, list (hardware version RDV4.0 only) must turn option on in makefile options (Willok, Iceman, marshmellow)
 - Added a bitbang mode to `lf cmdread` if delay is 0 the cmd bits turn off and on the antenna with 0 and 1 respectively (marshmellow)
 - Added PAC/Stanley detection to lf search (marshmellow)
 - Added lf pac demod and lf pac read - extracts the raw blocks from a PAC/Stanley tag (marshmellow)

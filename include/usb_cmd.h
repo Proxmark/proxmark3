@@ -60,8 +60,17 @@ typedef struct{
 #define CMD_BUFF_CLEAR                                                    0x0105
 #define CMD_READ_MEM                                                      0x0106
 #define CMD_VERSION                                                       0x0107
-#define CMD_STATUS														  0x0108
-#define CMD_PING														  0x0109
+#define CMD_STATUS                                                        0x0108
+#define CMD_PING                                                          0x0109
+
+// RDV40,  Smart card operations
+#define CMD_SMART_RAW                                                     0x0140
+#define CMD_SMART_UPGRADE                                                 0x0141
+#define CMD_SMART_UPLOAD                                                  0x0142
+#define CMD_SMART_ATR                                                     0x0143
+// CMD_SMART_SETBAUD is unused for now
+#define CMD_SMART_SETBAUD                                                 0x0144
+#define CMD_SMART_SETCLOCK                                                0x0145
 
 // For low-frequency tags
 #define CMD_READ_TI_TYPE                                                  0x0202
@@ -126,10 +135,10 @@ typedef struct{
 #define CMD_READER_HITAG                                                  0x0372
 
 #define CMD_SIMULATE_HITAG_S                                              0x0368
-#define CMD_TEST_HITAGS_TRACES						  0x0367
-#define CMD_READ_HITAG_S						  0x0373
-#define CMD_WR_HITAG_S							  0x0375
-#define CMD_EMU_HITAG_S						          0x0376
+#define CMD_TEST_HITAGS_TRACES                                            0x0367
+#define CMD_READ_HITAG_S                                                  0x0373
+#define CMD_WR_HITAG_S                                                    0x0375
+#define CMD_EMU_HITAG_S                                                   0x0376
 
 
 #define CMD_SIMULATE_TAG_ISO_14443B                                       0x0381
