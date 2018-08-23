@@ -336,6 +336,7 @@ bool ParamLoadFromJson() {
 			json_decref(root);
 			return false;
 		}
+		const char *tlvType = json_string_value(jtype);
 
 		jvalue = json_object_get(data, "value");
 		if(!json_is_string(jvalue))
@@ -344,6 +345,7 @@ bool ParamLoadFromJson() {
 			json_decref(root);
 			return false;
 		}
+		const char *tlvValue = json_string_value(jvalue);
 
 		jlength = json_object_get(data, "length");
 		if(!json_is_number(jlength))
@@ -353,7 +355,14 @@ bool ParamLoadFromJson() {
 			return false;
 		}
 		
+		int tlvLength = json_integer_value(jlength);
+		if (tlvLength > 250) {
+			PrintAndLog("Load params: data [%d] length more than 250", i + 1);
+			json_decref(root);
+			return false;
+		}
 		
+		PrintAndLog("TLV param: %s[%d]=%s", tlvType, tlvLength, tlvValue);
 		
 		
 		
