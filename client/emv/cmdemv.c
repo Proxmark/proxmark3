@@ -300,24 +300,69 @@ int UsageCmdHFEMVExec(void) {
 #define TLV_ADD(tag, value)( tlvdb_add(tlvRoot, tlvdb_fixed(tag, sizeof(value) - 1, (const unsigned char *)value)) )
 #define dreturn(n) {free(pdol_data_tlv);tlvdb_free(tlvSelect);tlvdb_free(tlvRoot);DropField();return n;}
 
-void ParamLoadFromJson() {
-    json_t *root;
-    json_error_t error;
+bool ParamLoadFromJson() {
+	json_t *root;
+	json_error_t error;
+
+	// TODO: add search current path
+	root = json_load_file("./emv/defparams.json", 0, &error);
+	if (!root) {
+		PrintAndLog("Load params: json error on line %d: %s", error.line, error.text);
+		return false; 
+	}
 	
-	char *text = "{\"json\":22}";
+	if (!json_is_array(root)) {
+		PrintAndLog("Load params: Invalid json format. root must be array.");
+		return false; 
+	}
+	
+	PrintAndLog("Load params: json OK");
+	
+	for(int i = 0; i < json_array_size(root); i++) {
+		json_t *data, *jtype, *jlength, *jvalue;
 
-    root = json_loads(text, 0, &error);
+		data = json_array_get(root, i);
+		if(!json_is_object(data))
+		{
+			PrintAndLog("Load params: data [%d] is not an object", i + 1);
+			json_decref(root);
+			return false;
+		}
+		
+		jtype = json_object_get(data, "type");
+		if(!json_is_string(jtype))
+		{
+			PrintAndLog("Load params: data [%d] type is not a string", i + 1);
+			json_decref(root);
+			return false;
+		}
 
-    if (root) {
-        PrintAndLog("json OK");
-        return; //root;
-    } else {
-        PrintAndLog("json error on line %d: %s", error.line, error.text);
-        return; //(json_t *)0;
-    }
+		jvalue = json_object_get(data, "value");
+		if(!json_is_string(jvalue))
+		{
+			PrintAndLog("Load params: data [%d] value is not a string", i + 1);
+			json_decref(root);
+			return false;
+		}
 
+		jlength = json_object_get(data, "length");
+		if(!json_is_number(jlength))
+		{
+			PrintAndLog("Load params: data [%d] length is not a number", i + 1);
+			json_decref(root);
+			return false;
+		}
+		
+		
+		
+		
+		
+	}
+
+	json_decref(root);
+
+	return true;
 }
-
 
 int CmdHFEMVExec(const char *cmd) {
 	bool activateField = false;
@@ -455,7 +500,7 @@ int CmdHFEMVExec(const char *cmd) {
 
 	ParamLoadFromJson();
 	
-    //9F66:(Terminal Transaction Qualifiers (TTQ)) len:4
+	//9F66:(Terminal Transaction Qualifiers (TTQ)) len:4
 	char *qVSDC = "\x26\x00\x00\x00";
 	if (GenACGPO) {
 		qVSDC = "\x26\x80\x00\x00";
@@ -479,16 +524,16 @@ int CmdHFEMVExec(const char *cmd) {
 			break;
 	}
 	
-    //9F02:(Amount, authorized (Numeric)) len:6
+	//9F02:(Amount, authorized (Numeric)) len:6
 	TLV_ADD(0x9F02, "\x00\x00\x00\x00\x01\x00");
-    //9F1A:(Terminal Country Code) len:2
+	//9F1A:(Terminal Country Code) len:2
 	TLV_ADD(0x9F1A, "ru");
-    //5F2A:(Transaction Currency Code) len:2
-    // USD 840, EUR 978, RUR 810, RUB 643, RUR 810(old), UAH 980, AZN 031, n/a 999
+	//5F2A:(Transaction Currency Code) len:2
+	// USD 840, EUR 978, RUR 810, RUB 643, RUR 810(old), UAH 980, AZN 031, n/a 999
 	TLV_ADD(0x5F2A, "\x09\x80");
-    //9A:(Transaction Date) len:3
+	//9A:(Transaction Date) len:3
 	TLV_ADD(0x9A,   "\x00\x00\x00");
-    //9C:(Transaction Type) len:1   |  00 => Goods and service #01 => Cash
+	//9C:(Transaction Type) len:1   |  00 => Goods and service #01 => Cash
 	TLV_ADD(0x9C,   "\x00");
 	// 9F37 Unpredictable Number len:4
 	TLV_ADD(0x9F37, "\x01\x02\x03\x04");
