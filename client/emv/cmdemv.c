@@ -300,9 +300,14 @@ int UsageCmdHFEMVExec(void) {
 #define TLV_ADD(tag, value)( tlvdb_add(tlvRoot, tlvdb_fixed(tag, sizeof(value) - 1, (const unsigned char *)value)) )
 #define dreturn(n) {free(pdol_data_tlv);tlvdb_free(tlvSelect);tlvdb_free(tlvRoot);DropField();return n;}
 
-bool ParamLoadFromJson() {
+bool ParamLoadFromJson(struct tlvdb *tlv) {
 	json_t *root;
 	json_error_t error;
+
+	if (!tlv) {
+		PrintAndLog("ERROR load params: tlv tree is NULL.");
+		return false; 
+	}
 
 	// TODO: add search current path
 	root = json_load_file("./emv/defparams.json", 0, &error);
@@ -507,7 +512,7 @@ int CmdHFEMVExec(const char *cmd) {
 	
 	PrintAndLog("\n* Init transaction parameters.");
 
-	ParamLoadFromJson();
+	ParamLoadFromJson(tlvRoot);
 	
 	//9F66:(Terminal Transaction Qualifiers (TTQ)) len:4
 	char *qVSDC = "\x26\x00\x00\x00";
