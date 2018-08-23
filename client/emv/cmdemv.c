@@ -11,6 +11,7 @@
 #include <ctype.h>
 #include "cmdemv.h"
 #include "test/cryptotest.h"
+#include <jansson.h>
 
 int UsageCmdHFEMVSelect(void) {
 	PrintAndLog("HELP :  Executes select applet command:\n");
@@ -299,6 +300,25 @@ int UsageCmdHFEMVExec(void) {
 #define TLV_ADD(tag, value)( tlvdb_add(tlvRoot, tlvdb_fixed(tag, sizeof(value) - 1, (const unsigned char *)value)) )
 #define dreturn(n) {free(pdol_data_tlv);tlvdb_free(tlvSelect);tlvdb_free(tlvRoot);DropField();return n;}
 
+void ParamLoadFromJson() {
+    json_t *root;
+    json_error_t error;
+	
+	char *text = "{\"json\":22}";
+
+    root = json_loads(text, 0, &error);
+
+    if (root) {
+        PrintAndLog("json OK");
+        return; //root;
+    } else {
+        PrintAndLog("json error on line %d: %s", error.line, error.text);
+        return; //(json_t *)0;
+    }
+
+}
+
+
 int CmdHFEMVExec(const char *cmd) {
 	bool activateField = false;
 	bool showAPDU = false;
@@ -433,6 +453,8 @@ int CmdHFEMVExec(const char *cmd) {
 	
 	PrintAndLog("\n* Init transaction parameters.");
 
+	ParamLoadFromJson();
+	
     //9F66:(Terminal Transaction Qualifiers (TTQ)) len:4
 	char *qVSDC = "\x26\x00\x00\x00";
 	if (GenACGPO) {
