@@ -30,9 +30,9 @@
   {
     "name": "Terminal Country Code",
     "type": "9F 1A",
-    "value": "ru",
+    "value": "72 75",
     "length": 2,
-    "hint": "ISO3166: de, en, gb, ru, us, ua"
+    "hint": "ISO3166: de, en, gb, ru (72 75), us, ua"
   },
   {
     "name": "Terminal Transaction Qualifiers (TTQ)",

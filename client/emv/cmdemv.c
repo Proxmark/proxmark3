@@ -300,6 +300,31 @@ int UsageCmdHFEMVExec(void) {
 #define TLV_ADD(tag, value)( tlvdb_add(tlvRoot, tlvdb_fixed(tag, sizeof(value) - 1, (const unsigned char *)value)) )
 #define dreturn(n) {free(pdol_data_tlv);tlvdb_free(tlvSelect);tlvdb_free(tlvRoot);DropField();return n;}
 
+bool HexToBuffer(const char *errormsg, const char *hexvalue, uint8_t * buffer, size_t maxbufferlen, size_t *bufferlen) {
+	int buflen = 0;	
+	
+	switch(param_gethex_to_eol(hexvalue, 0, buffer, maxbufferlen, &buflen)) {
+	case 1:
+		PrintAndLog("%s Invalid HEX value.", errormsg);
+		return false;
+	case 2:
+		PrintAndLog("%s Hex value too large.", errormsg);
+		return false;
+	case 3:
+		PrintAndLog("%s Hex value must have even number of digits.", errormsg);
+		return false;
+	}
+	
+	if (buflen > maxbufferlen) {
+		PrintAndLog("%s HEX length (%d) more than %d", errormsg, *bufferlen, maxbufferlen);
+		return false;
+	}
+	
+	*bufferlen = buflen;
+	
+	return true;
+}
+
 bool ParamLoadFromJson(struct tlvdb *tlv) {
 	json_t *root;
 	json_error_t error;
@@ -368,9 +393,32 @@ bool ParamLoadFromJson(struct tlvdb *tlv) {
 		}
 		
 		PrintAndLog("TLV param: %s[%d]=%s", tlvType, tlvLength, tlvValue);
+		uint8_t buf[251] = {0};
+		size_t buflen = 0;
 		
+		// here max length must be 4, but now tlv_tag_t is 2-byte var. so let it be 2 by now...  needs refactoring tlv_tag_t...
+		if (!HexToBuffer("TLV Error type:", tlvType, buf, 2, &buflen)) { 
+			json_decref(root);
+			return false;
+		}
+		tlv_tag_t tag = 0;
+		for (int i = 0; i < buflen; i++) {
+			tag = (tag << 8) + buf[i];
+		}	
 		
+		if (!HexToBuffer("TLV Error value:", tlvValue, buf, sizeof(buf) - 1, &buflen)) {
+			json_decref(root);
+			return false;
+		}
 		
+		if (buflen != tlvLength) {
+			PrintAndLog("Load params: data [%d] length of HEX must(%d) be identical to length in TLV param(%d)", i + 1, buflen, tlvLength);
+			json_decref(root);
+			return false;
+		}
+		
+		// TODO: here needs to be change_or_add!!!!
+		tlvdb_add(tlv, tlvdb_fixed(tag, tlvLength, (const unsigned char *)buf));		
 	}
 
 	json_decref(root);
