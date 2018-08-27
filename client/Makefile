@@ -160,6 +160,8 @@ CMDSRCS = 	$(SRC_SMARTCARD) \
 			cmdlfem4x.c \
 			cmdlffdx.c \
 			cmdlfgproxii.c \
+			hidcardformatutils.c\
+			hidcardformats.c\
 			cmdlfhid.c \
 			cmdlfhitag.c \
 			cmdlfio.c \

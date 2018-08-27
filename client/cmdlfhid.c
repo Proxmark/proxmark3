@@ -28,223 +28,10 @@
 #include "cmdparser.h"
 #include "cmddata.h"  //for g_debugMode, demodbuff cmds
 #include "lfdemod.h" // for HIDdemodFSK
-#include "parity.h" // for parity
+#include "hidcardformats.h"
+#include "hidcardformatutils.h"
 #include "util.h" // for param_get8,32,64
 
-static int CmdHelp(const char *Cmd);
-
-/**
- * Packs an HID ID from component parts.
- *
- * This only works with 26, 34, 35, 37, and 48 bit card IDs.
- *
- * Returns false on invalid inputs.
- */
-bool pack_hid(/* out */ uint32_t *hi2, /* out */ uint32_t *hi, /* out */ uint32_t *lo, /* in */ const hid_info *info) {
-  uint32_t higher = 0, high = 0, low = 0;
-
-  switch (info->fmtLen) {
-    case 26: // HID H10301
-      low |= (info->cardnum & 0xffff) << 1;
-      low |= (info->fc & 0xff) << 17;
-
-      if (info->parityValid) {
-        // Calculate parity
-        low |= oddparity32((low >> 1) & 0xfff) & 1;
-        low |= (evenparity32((low >> 13) & 0xfff) & 1) << 25;
-      }
-    break;
-
-  case 34: // H10306
-    low |= (info->cardnum & 0xffff) << 1;
-    low |= (info->fc & 0x7fff) << 17;
-    high |= (info->fc & 0x8000) >> 15;
-      
-    if (info->parityValid) {
-      // Calculate parity
-      high |= (evenparity32((high & 0x00000001) ^ (low & 0xFFFE0000)) & 1) << 1;
-      low |= (oddparity32(low & 0x0001FFFE) & 1);
-    }
-    break;
-
-  case 35: // (Corporate 1000 35-bit)
-    low |= (info->cardnum & 0xfffff) << 1;
-    low |= (info->fc & 0x7ff) << 21;
-    high |= (info->fc & 0x800) >> 11;
-
-    if (info->parityValid) {
-      // Calculate parity
-      high |= (evenparity32((high & 0x00000001) ^ (low & 0xB6DB6DB6)) & 1) << 1;
-      low |=  (oddparity32( (high & 0x00000003) ^ (low & 0x6DB6DB6C)) & 1);
-      high |= (oddparity32( (high & 0x00000003) ^ (low & 0xFFFFFFFF)) & 1) << 2;
-    }
-    break;
-
-  case 37: //H10304
-    low |= (info->cardnum & 0x7ffff) << 1;
-    low |= (info->fc & 0xfff) << 20;
-    high |= (info->fc & 0xf000) >> 12;
-
-    if (info->parityValid) {
-      // Calculate parity
-      high |= (evenparity32((high & 0x0000000F) ^ (low & 0xFFFC0000)) & 1) << 4;
-      low |= (oddparity32(low & 0x0007FFFE) & 1);
-    }
-    break;
-
-  case 48: // Corporate 1000 48-bit
-    low |= (info->cardnum & 0x7FFFFF) << 1;
-    low |= (info->fc & 0xff) << 24;
-    high |= (info->fc & 0x3FFF00) >> 8;
-
-    if (info->parityValid) {
-      // Calculate parity
-      high |= (evenparity32((high & 0x00001B6D) ^ (low & 0xB6DB6DB6)) & 1) << 14;
-      low |=  (oddparity32( (high & 0x000036DB) ^ (low & 0x6DB6DB6C)) & 1);
-      high |= (oddparity32( (high & 0x00007FFF) ^ (low & 0xFFFFFFFF)) & 1) << 15;
-    }
-    break;
-
-  default:
-    // Invalid / unsupported length
-    return false;
-  }
-  
-  // Set the format length bits
-  if (info->fmtLen < 37) {
-    // Bit 37 is always set
-    high |= 0x20;
-
-    // Set the bit corresponding to the length.
-    if (info->fmtLen < 32)
-      low |= 1 << info->fmtLen;
-    else 
-      high |= 1 << (info->fmtLen - 32);
-    
-  } else if (info->fmtLen > 37){
-    if (info->fmtLen < 64) 
-      high |= 1 << (info->fmtLen - 32);
-    else 
-      higher |= 1 << (info->fmtLen - 64);
-  }
-  // Return result only if successful.
-  *hi2 = higher;
-  *hi = high;
-  *lo = low;
-  return true;
-}
-
-/**
- * Unpacks an HID ID into its component parts.
- *
- * This only works with 26, 34, 35, 37, and 48 bit card IDs.
- *
- * Returns false on invalid inputs.
- */
-bool unpack_hid(hid_info *out, uint32_t hi2, uint32_t hi, uint32_t lo) {
-  memset(out, 0, sizeof(hid_info));
-  uint8_t fmtLen = 0;
-	
-  uint32_t hFmt; // for calculating card length
-  if ((hi2 & 0x000FFFFF) > 0) { // > 64 bits
-    hFmt = hi2 & 0x000FFFFF;
-    fmtLen = 64;
-  } else if ((hi & 0xFFFFFFC0) > 0) { // < 63-38 bits
-    hFmt = hi & 0xFFFFFFC0;
-    fmtLen = 32;
-  } else if ((hi & 0x00000020) == 0) { // 37 bits
-    hFmt = 0;
-    fmtLen = 37;
-  } else if ((hi & 0x0000001F) > 0){ // 36-32 bits
-    hFmt = hi & 0x0000001F;
-    fmtLen = 32;
-  } else { // <32 bits
-    hFmt = lo;
-    fmtLen = 0;
-  }
-
-  while (hFmt > 1) {
-    hFmt >>= 1;
-    fmtLen++;
-  }
-  out->fmtLen = fmtLen;
-  switch (out->fmtLen) {
-    case 26: // HID H10301
-      out->cardnum = (lo >> 1) & 0xFFFF;
-      out->fc = (lo >> 17) & 0xFF;
-
-      if (g_debugMode) {
-        PrintAndLog("oddparity : input=%x, calculated=%d, provided=%d",
-          (lo >> 1) & 0xFFF, oddparity32((lo >> 1) & 0xFFF), lo & 1);
-        PrintAndLog("evenparity: input=%x, calculated=%d, provided=%d",
-          (lo >> 13) & 0xFFF, evenparity32((lo >> 13) & 0xFFF) & 1, (lo >> 25) & 1);
-      }
-
-      out->parityValid =
-        (oddparity32((lo >> 1) & 0xFFF) == (lo & 1)) &&
-        ((evenparity32((lo >> 13) & 0xFFF) & 1) == ((lo >> 25) & 1));
-      break;
-
-    case 34: // HID H10306
-      out->cardnum = (lo >> 1) & 0xFFFF;
-      out->fc = ((hi & 1) << 15) | (lo >> 17);
-      out->parityValid =
-        ((evenparity32((hi & 0x00000001) ^ (lo & 0xFFFE0000)) & 1) == ((hi >> 1) & 1)) &&
-        ((oddparity32(lo & 0x0001FFFE) & 1) == ((lo & 1)));
-      break;
-
-    case 35: // HID Corporate 1000-35
-      out->cardnum = (lo >> 1) & 0xFFFFF;
-      out->fc = ((hi & 1) << 11) | (lo >> 21);
-      out->parityValid = 
-        (evenparity32((hi & 0x00000001) ^ (lo & 0xB6DB6DB6)) == ((hi >> 1) & 1)) &&
-        (oddparity32( (hi & 0x00000003) ^ (lo & 0x6DB6DB6C)) == ((lo >> 0) & 1)) &&
-        (oddparity32( (hi & 0x00000003) ^ (lo & 0xFFFFFFFF)) == ((hi >> 2) & 1));
-      if (g_debugMode) {
-        PrintAndLog("Parity check: calculated {%d, %d, %d}, provided {%d, %d, %d}",
-          evenparity32((hi & 0x00000001) ^ (lo & 0xB6DB6DB6)),
-          oddparity32( (hi & 0x00000003) ^ (lo & 0x6DB6DB6C)),
-          oddparity32( (hi & 0x00000003) ^ (lo & 0xFFFFFFFF)),
-          ((hi >> 1) & 1),
-          ((lo >> 0) & 1),
-          ((hi >> 2) & 1)
-        );
-      }
-      break;
-
-    case 37: // HID H10304
-      out->fmtLen = 37;
-      out->cardnum = (lo >> 1) & 0x7FFFF;
-      out->fc = ((hi & 0xF) << 12) | (lo >> 20);
-      out->parityValid =
-        (evenparity32((hi & 0x0000000F) ^ (lo & 0xFFFC0000)) == ((hi >> 4) & 1)) &&
-        (oddparity32( lo & 0x0007FFFE) == (lo & 1));
-      break;
-
-    case 48: // HID Corporate 1000-48
-      out->cardnum = (lo >> 1) & 0x7FFFFF;  //Start 24, 23 length
-      out->fc = ((hi & 0x3FFF) << 8 ) | (lo >> 24);  //Start 2, 22 length
-      out->parityValid = 
-        (evenparity32((hi & 0x00001B6D) ^ (lo & 0xB6DB6DB6)) == ((hi >> 14) & 1)) &&
-        (oddparity32( (hi & 0x000036DB) ^ (lo & 0x6DB6DB6C)) == ((lo >> 0) & 1)) &&
-        (oddparity32( (hi & 0x00007FFF) ^ (lo & 0xFFFFFFFF)) == ((hi >> 15) & 1));
-      if (g_debugMode) {
-        PrintAndLog("Parity check: calculated {%d, %d, %d}, provided {%d, %d, %d}",
-          evenparity32((hi & 0x00001B6D) ^ (lo & 0xB6DB6DB6)),
-          oddparity32( (hi & 0x000036DB) ^ (lo & 0x6DB6DB6C)),
-          oddparity32( (hi & 0x00007FFF) ^ (lo & 0xFFFFFFFF)),
-          ((hi >> 14) & 1),
-          ((lo >> 0) & 1),
-          ((hi >> 15) & 1)
-        );
-      }
-      break;
-
-    default:
-      return false;
-  }
-  return true;
-}
 
 /**
  * Converts a hex string to component "hi2", "hi" and "lo" 32-bit integers, one nibble
@@ -301,21 +88,18 @@ int CmdFSKdemodHID(const char *Cmd)
     return 0;
   }
   
-  hid_info card_info;
-  bool ret = unpack_hid(&card_info, (uint32_t)hi2, (uint32_t)hi, (uint32_t)lo);
-  
   if (hi2 != 0)
-    PrintAndLog("HID Prox TAG ID: %x%08x%08x (%d) - Format Len: %u bits - FC: %u - Card: %u",
-      (unsigned int) hi2, (unsigned int) hi, (unsigned int) lo, (unsigned int) (lo>>1) & 0xFFFF,
-      card_info.fmtLen, card_info.fc, card_info.cardnum);
+    PrintAndLog("HID Prox TAG ID: %x%08x%08x",
+      (unsigned int) hi2, (unsigned int) hi, (unsigned int) lo
+    );
   else
-    PrintAndLog("HID Prox TAG ID: %x%08x (%d) - Format Len: %u bits - FC: %u - Card: %u",
-      (unsigned int) hi, (unsigned int) lo, (unsigned int) (lo>>1) & 0xFFFF,
-      card_info.fmtLen, card_info.fc, card_info.cardnum);
+    PrintAndLog("HID Prox TAG ID: %x%08x",
+      (unsigned int) hi, (unsigned int) lo
+    );
 
-  if (card_info.fmtLen == 26 || card_info.fmtLen == 35 || card_info.fmtLen == 48) {
-    PrintAndLog("Parity: %s", card_info.parityValid ? "valid" : "invalid");
-  }
+  hidproxmessage_t packed = initialize_proxmessage_object(hi2, hi, lo);
+  bool ret = HIDTryUnpack(&packed);
+
   if (!ret) {
     PrintAndLog("Invalid or unsupported tag length.");
   }
@@ -370,7 +154,7 @@ int CmdHIDClone(const char *Cmd)
   }
 
   c.cmd = CMD_HID_CLONE_TAG;
-  c.arg[0] = hi2;
+  c.arg[0] = (hi2 & 0x000FFFFF);
   c.arg[1] = hi;
   c.arg[2] = lo;
 
@@ -378,73 +162,118 @@ int CmdHIDClone(const char *Cmd)
   return 0;
 }
 
-
-int CmdHIDPack(const char *Cmd) {
-  uint32_t hi2 = 0, hi = 0, lo = 0;
-  
+int CmdHIDDecode(const char *Cmd){
   if (strlen(Cmd)<3) {
-    PrintAndLog("Usage:  lf hid pack <length> <facility code (decimal)> <card number (decimal)>");
-    PrintAndLog("        sample: lf hid pack 26 123 4567");
+    PrintAndLog("Usage:  lf hid decode <id>");
+    PrintAndLog("        sample: lf hid decode 2006f623ae");
     return 0;
   }
-  uint8_t fmtLen = param_get8(Cmd, 0);
 
-  hid_info card_info;
-  card_info.fmtLen = fmtLen;
-  card_info.fc = param_get32ex(Cmd, 1, 0, 10);
-  card_info.cardnum = param_get64ex(Cmd, 2, 0, 10);
-  card_info.parityValid = true;
+  uint32_t top = 0, mid = 0, bot = 0;
+  hexstring_to_int96(&top, &mid, &bot, Cmd);
+  hidproxmessage_t packed = initialize_proxmessage_object(top, mid, bot);
+  HIDTryUnpack(&packed);
+  return 0;
+}
+int CmdHIDEncode(const char *Cmd) {
+  if (strlen(Cmd) == 0) {
+    PrintAndLog("Usage:  lf hid encode <format> <facility code (decimal)> <card number (decimal)>");
+    PrintAndLog("        sample: lf hid encode H10301 123 4567");
+    return 0;
+  }
 
-  bool ret = pack_hid(&hi2, &hi, &lo, &card_info);
-  if (ret) {
-    if (hi2 != 0) {
-      PrintAndLog("HID Prox TAG ID: %x%08x%08x (%d) - Format Len: %u bits - FC: %u - Card: %u",
-        (unsigned int) hi2, (unsigned int) hi, (unsigned int) lo, (unsigned int) (lo>>1) & 0xFFFF,
-        card_info.fmtLen, card_info.fc, card_info.cardnum);
+  int formatIndex = -1;
+  if (!strcmp(Cmd, "help") || !strcmp(Cmd, "h") || !strcmp(Cmd, "list") || !strcmp(Cmd, "?")){
+    HIDListFormats();
+    return 0;
+  } else {
+    char format[16];
+    memset(format, 0, sizeof(format));
+    param_getstr(Cmd, 0, format, sizeof(format));
+    formatIndex = HIDFindCardFormat(format);
+    if (formatIndex == -1) {
+      HIDListFormats();
+      return 0;
+    }
+  }
+
+  hidproxcard_t card;
+  memset(&card, 0, sizeof(hidproxcard_t));
+  card.FacilityCode = param_get32ex(Cmd, 1, 0, 10);
+  card.CardNumber = param_get64ex(Cmd, 2, 0, 10);
+  card.ParitySupported = true; // Try to encode parity if supported.
+
+  hidproxmessage_t packed;
+  memset(&packed, 0, sizeof(hidproxmessage_t));
+  if (HIDPack(formatIndex, &card, &packed)){
+    if (packed.top != 0) {
+      PrintAndLog("HID Prox TAG ID: %x%08x%08x",
+        (unsigned int)packed.top, (unsigned int)packed.mid, (unsigned int)packed.bot);
     } else {
-      PrintAndLog("HID Prox TAG ID: %x%08x (%d) - Format Len: %u bits - FC: %u - Card: %u",
-        (unsigned int) hi, (unsigned int) lo, (unsigned int) (lo>>1) & 0xFFFF,
-        card_info.fmtLen, card_info.fc, card_info.cardnum); 
+      PrintAndLog("HID Prox TAG ID: %x%08x",
+        (unsigned int)packed.mid, (unsigned int)packed.bot); 
     }
   } else {
-    PrintAndLog("Invalid or unsupported tag length.");
+    PrintAndLog("The provided data could not be encoded with the selected format.");
   }
   return 0;
 }
 
-
-int CmdHIDUnpack(const char *Cmd)
-{
-  uint32_t hi2 = 0, hi = 0, lo = 0;
-  if (strlen(Cmd)<1) {
-    PrintAndLog("Usage:  lf hid unpack <ID>");
-    PrintAndLog("        sample: lf hid unpack 2006f623ae");
+int CmdHIDWrite(const char *Cmd) {
+  if (strlen(Cmd) == 0) {
+    PrintAndLog("Usage:  lf hid write <format> <facility code (decimal)> <card number (decimal)>");
+    PrintAndLog("        sample: lf hid write H10301 123 4567");
     return 0;
   }
 
-  hexstring_to_int96(&hi2, &hi, &lo, Cmd);
-	
-  hid_info card_info;
-  bool ret = unpack_hid(&card_info, hi2, hi, lo);
-
-  if (hi2 != 0) {
-    PrintAndLog("HID Prox TAG ID: %x%08x%08x (%d) - Format Len: %u bits - FC: %u - Card: %u",
-      (unsigned int) hi2, (unsigned int) hi, (unsigned int) lo, (unsigned int) (lo>>1) & 0xFFFF,
-      card_info.fmtLen, card_info.fc, card_info.cardnum);
+  int formatIndex = -1;
+  if (!strcmp(Cmd, "help") || !strcmp(Cmd, "h") || !strcmp(Cmd, "list") || !strcmp(Cmd, "?")){
+    HIDListFormats();
+    return 0;
   } else {
-    PrintAndLog("HID Prox TAG ID: %x%08x (%d) - Format Len: %u bits - FC: %u - Card: %u",
-      (unsigned int) hi, (unsigned int) lo, (unsigned int) (lo>>1) & 0xFFFF,
-      card_info.fmtLen, card_info.fc, card_info.cardnum);
+    char format[16];
+    memset(format, 0, sizeof(format));
+    param_getstr(Cmd, 0, format, sizeof(format));
+    formatIndex = HIDFindCardFormat(format);
+    if (formatIndex == -1) {
+      HIDListFormats();
+      return 0;
+    }
   }
-  PrintAndLog("Parity: %s", card_info.parityValid ? "valid" : "invalid");
-  
-  if (!ret) {
-    PrintAndLog("Invalid or unsupported tag length.");
+
+  hidproxcard_t card;
+  memset(&card, 0, sizeof(hidproxcard_t));
+  card.FacilityCode = param_get32ex(Cmd, 1, 0, 10);
+  card.CardNumber = param_get64ex(Cmd, 2, 0, 10);
+  card.ParitySupported = true; // Try to encode parity if supported.
+
+  hidproxmessage_t packed;
+  memset(&packed, 0, sizeof(hidproxmessage_t));
+  if (HIDPack(formatIndex, &card, &packed)){
+    UsbCommand c;
+    if (packed.top != 0) {
+      PrintAndLog("HID Prox TAG ID: %x%08x%08x",
+        (unsigned int)packed.top, (unsigned int)packed.mid, (unsigned int)packed.bot);
+      c.d.asBytes[0] = 1;
+    } else {
+      PrintAndLog("HID Prox TAG ID: %x%08x",
+        (unsigned int)packed.mid, (unsigned int)packed.bot); 
+      c.d.asBytes[0] = 0;
+    }
+
+    c.cmd = CMD_HID_CLONE_TAG;
+    c.arg[0] = (packed.top & 0x000FFFFF);
+    c.arg[1] = packed.mid;
+    c.arg[2] = packed.bot;
+    SendCommand(&c);
+
+  } else {
+    PrintAndLog("The provided data could not be encoded with the selected format.");
   }
   return 0;
 }
 
-
+static int CmdHelp(const char *Cmd); // define this now so the below won't error out.
 static command_t CommandTable[] = 
 {
   {"help",      CmdHelp,        1, "This help"},
@@ -452,8 +281,9 @@ static command_t CommandTable[] =
   {"read",      CmdHIDReadFSK,  0, "['1'] Realtime HID FSK Read from antenna (option '1' for one tag only)"},
   {"sim",       CmdHIDSim,      0, "<ID> -- HID tag simulator"},
   {"clone",     CmdHIDClone,    0, "<ID> -- Clone HID to T55x7 (tag must be in antenna)"},
-  {"pack",      CmdHIDPack,     1, "<len> <fc> <num> -- packs an HID ID from its length, facility code and card number"},
-  {"unpack",    CmdHIDUnpack,   1, "<ID> -- unpacks an HID ID to its length, facility code and card number"},
+  {"decode",    CmdHIDDecode,   1, "<ID> -- Try to decode an HID tag and show its contents"},
+  {"encode",    CmdHIDEncode,   1, "<format> <fc> <num> -- Encode an HID ID with the specified format, facility code and card number"},
+  {"write",     CmdHIDWrite,    0, "<format> <fc> <num> -- Encode and write to a T55x7 tag (tag must be in antenna)"},
   {NULL, NULL, 0, NULL}
 };
 
