@@ -297,7 +297,7 @@ int UsageCmdHFEMVExec(void) {
 	return 0;
 }
 
-#define TLV_ADD(tag, value)( tlvdb_add(tlvRoot, tlvdb_fixed(tag, sizeof(value) - 1, (const unsigned char *)value)) )
+#define TLV_ADD(tag, value)( tlvdb_change_or_add_node(tlvRoot, tag, sizeof(value) - 1, (const unsigned char *)value) )
 #define dreturn(n) {free(pdol_data_tlv);tlvdb_free(tlvSelect);tlvdb_free(tlvRoot);DropField();return n;}
 
 bool HexToBuffer(const char *errormsg, const char *hexvalue, uint8_t * buffer, size_t maxbufferlen, size_t *bufferlen) {
@@ -417,8 +417,7 @@ bool ParamLoadFromJson(struct tlvdb *tlv) {
 			return false;
 		}
 		
-		// TODO: here needs to be change_or_add!!!!
-		tlvdb_add(tlv, tlvdb_fixed(tag, tlvLength, (const unsigned char *)buf));		
+		tlvdb_change_or_add_node(tlv, tag, tlvLength, (const unsigned char *)buf);		
 	}
 
 	json_decref(root);

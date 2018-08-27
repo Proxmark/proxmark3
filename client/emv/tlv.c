@@ -342,6 +342,35 @@ void tlvdb_add(struct tlvdb *tlvdb, struct tlvdb *other)
 	tlvdb->next = other;
 }
 
+void tlvdb_change_or_add_node(struct tlvdb *tlvdb, tlv_tag_t tag, size_t len, const unsigned char *value)
+{
+	struct tlvdb *telm = tlvdb_find(tlvdb, tag);
+	if (telm == NULL) {
+		// new tlv element
+		tlvdb_add(tlvdb, tlvdb_fixed(tag, len, value));
+	} else {
+		// the same tlv structure
+		if (telm->tag.tag == tag && telm->tag.len == len && !memcmp(telm->tag.value, value, len))
+			return;
+
+PrintAndLog("-replace %x", tag);
+		// replace tlv element
+		struct tlvdb *tnewelm = tlvdb_fixed(tag, len, value);
+		tnewelm->next = telm->next;
+		tnewelm->parent = telm->parent;
+		
+		if (telm->parent && telm->parent->children == telm) {
+			telm->parent->children = tnewelm;
+		}
+		
+		
+//		telm->next = NULL;
+//		tlvdb_free(telm);
+	}
+	
+	return;
+}
+
 void tlvdb_visit(const struct tlvdb *tlvdb, tlv_cb cb, void *data, int level)
 {
 	struct tlvdb *next = NULL;
