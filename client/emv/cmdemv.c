@@ -1010,7 +1010,7 @@ static command_t CommandTable[] =  {
 	{"pse",		CmdHFEMVPPSE,	0,	"Execute PPSE. It selects 2PAY.SYS.DDF01 or 1PAY.SYS.DDF01 directory."},
 	{"search",	CmdHFEMVSearch,	0,	"Try to select all applets from applets list and print installed applets."},
 	{"select",	CmdHFEMVSelect,	0,	"Select applet."},
-	{"scan",	CmdHFEMVScan,	0,	"Scan EMV card and save it contents to json file for emulator"},
+//	{"scan",	CmdHFEMVScan,	0,	"Scan EMV card and save it contents to json file for emulator"},
 	{"test",	CmdHFEMVTest,	0,	"Crypto logic test."},
 	{NULL, NULL, 0, NULL}
 };
