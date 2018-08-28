@@ -98,7 +98,7 @@ int CmdFSKdemodHID(const char *Cmd)
     );
 
   hidproxmessage_t packed = initialize_proxmessage_object(hi2, hi, lo);
-  bool ret = HIDTryUnpack(&packed);
+  bool ret = HIDTryUnpack(&packed, false);
 
   if (!ret) {
     PrintAndLog("Invalid or unsupported tag length.");
@@ -164,20 +164,26 @@ int CmdHIDClone(const char *Cmd)
 
 int CmdHIDDecode(const char *Cmd){
   if (strlen(Cmd)<3) {
-    PrintAndLog("Usage:  lf hid decode <id>");
+    PrintAndLog("Usage:  lf hid decode <id> {p}");
+    PrintAndLog("        (optional) p: Ignore invalid parity");
     PrintAndLog("        sample: lf hid decode 2006f623ae");
     return 0;
   }
 
   uint32_t top = 0, mid = 0, bot = 0;
+  bool ignoreParity = false;
   hexstring_to_int96(&top, &mid, &bot, Cmd);
   hidproxmessage_t packed = initialize_proxmessage_object(top, mid, bot);
-  HIDTryUnpack(&packed);
+
+  char opt = param_getchar(Cmd, 1);
+  if (opt == 'p') ignoreParity = true;
+
+  HIDTryUnpack(&packed, ignoreParity);
   return 0;
 }
 int CmdHIDEncode(const char *Cmd) {
   if (strlen(Cmd) == 0) {
-    PrintAndLog("Usage:  lf hid encode <format> <facility code (decimal)> <card number (decimal)>");
+    PrintAndLog("Usage:  lf hid encode <format> <facility code (decimal)> <card number (decimal)> [issue level (decimal)]");
     PrintAndLog("        sample: lf hid encode H10301 123 4567");
     return 0;
   }
@@ -201,6 +207,7 @@ int CmdHIDEncode(const char *Cmd) {
   memset(&card, 0, sizeof(hidproxcard_t));
   card.FacilityCode = param_get32ex(Cmd, 1, 0, 10);
   card.CardNumber = param_get64ex(Cmd, 2, 0, 10);
+  card.IssueLevel = param_get32ex(Cmd, 3, 0, 10);
   card.ParitySupported = true; // Try to encode parity if supported.
 
   hidproxmessage_t packed;
@@ -221,7 +228,7 @@ int CmdHIDEncode(const char *Cmd) {
 
 int CmdHIDWrite(const char *Cmd) {
   if (strlen(Cmd) == 0) {
-    PrintAndLog("Usage:  lf hid write <format> <facility code (decimal)> <card number (decimal)>");
+    PrintAndLog("Usage:  lf hid write <format> <facility code (decimal)> <card number (decimal)> [issue level (decimal)]");
     PrintAndLog("        sample: lf hid write H10301 123 4567");
     return 0;
   }
@@ -245,6 +252,7 @@ int CmdHIDWrite(const char *Cmd) {
   memset(&card, 0, sizeof(hidproxcard_t));
   card.FacilityCode = param_get32ex(Cmd, 1, 0, 10);
   card.CardNumber = param_get64ex(Cmd, 2, 0, 10);
+  card.IssueLevel = param_get32ex(Cmd, 3, 0, 10);
   card.ParitySupported = true; // Try to encode parity if supported.
 
   hidproxmessage_t packed;

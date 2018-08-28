@@ -27,6 +27,6 @@ void HIDListFormats();
 int HIDFindCardFormat(const char *format);
 hidcardformat_t HIDGetCardFormat(int idx);
 bool HIDPack(/* in */int FormatIndex, /* in */hidproxcard_t* card, /* out */hidproxmessage_t* packed);
-bool HIDTryUnpack(/* in */hidproxmessage_t* packed);
+bool HIDTryUnpack(/* in */hidproxmessage_t* packed, /* in */bool ignoreParity);
 
 #endif

@@ -61,7 +61,7 @@ bool set_bit_by_position(/* inout */hidproxmessage_t* data, /* in */bool value, 
  * mean it won't eventually contain one, however. To prevent memory leaks and erroneous
  * aliasing, perform the copy function manually instead. Hence, this function.
  * 
- * If the definition of the hid_proxmessage struct changes, this function must also
+ * If the definition of the hidproxmessage struct changes, this function must also
  * be updated to match.
  */
 void proxmessage_datacopy(/*in*/hidproxmessage_t* src, /*out*/hidproxmessage_t* dest){
