@@ -376,12 +376,12 @@ void tlvdb_change_or_add_node(struct tlvdb *tlvdb, tlv_tag_t tag, size_t len, co
 		tnewelm->next = telm->next;
 		tnewelm->parent = telm->parent;
 		
-		// if elm stays 1st in children link
+		// if telm stayed first in children chain
 		if (telm->parent && telm->parent->children == telm) {
 			telm->parent->children = tnewelm;
 		}
 		
-		// if elm have prev element
+		// if telm have previous element
 		if (telm != tlvdb) {
 			// elm in root
 			struct tlvdb *celm = tlvdb;
@@ -398,7 +398,7 @@ void tlvdb_change_or_add_node(struct tlvdb *tlvdb, tlv_tag_t tag, size_t len, co
 			}
 		}
 		
-		// free old element
+		// free old element with childrens
 		telm->next = NULL;
 		tlvdb_free(telm);
 	}

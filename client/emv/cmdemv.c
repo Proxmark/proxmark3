@@ -334,8 +334,13 @@ bool ParamLoadFromJson(struct tlvdb *tlv) {
 		return false; 
 	}
 
-	// TODO: add search current path
-	root = json_load_file("./emv/defparams.json", 0, &error);
+	// current path + file name
+	const char *relfname = "emv/defparams.json"; 
+	char fname[strlen(get_my_executable_directory()) + strlen(relfname) + 1];
+	strcpy(fname, get_my_executable_directory());
+	strcat(fname, relfname);
+
+	root = json_load_file(fname, 0, &error);
 	if (!root) {
 		PrintAndLog("Load params: json error on line %d: %s", error.line, error.text);
 		return false; 
@@ -396,7 +401,7 @@ bool ParamLoadFromJson(struct tlvdb *tlv) {
 		uint8_t buf[251] = {0};
 		size_t buflen = 0;
 		
-		// here max length must be 4, but now tlv_tag_t is 2-byte var. so let it be 2 by now...  needs refactoring tlv_tag_t...
+		// here max length must be 4, but now tlv_tag_t is 2-byte var. so let it be 2 by now...  TODO: needs refactoring tlv_tag_t...
 		if (!HexToBuffer("TLV Error type:", tlvType, buf, 2, &buflen)) { 
 			json_decref(root);
 			return false;
@@ -425,6 +430,26 @@ bool ParamLoadFromJson(struct tlvdb *tlv) {
 	return true;
 }
 
+void ParamLoadDefaults(struct tlvdb *tlvRoot) {
+	//9F02:(Amount, authorized (Numeric)) len:6
+	TLV_ADD(0x9F02, "\x00\x00\x00\x00\x01\x00");
+	//9F1A:(Terminal Country Code) len:2
+	TLV_ADD(0x9F1A, "ru");
+	//5F2A:(Transaction Currency Code) len:2
+	// USD 840, EUR 978, RUR 810, RUB 643, RUR 810(old), UAH 980, AZN 031, n/a 999
+	TLV_ADD(0x5F2A, "\x09\x80");
+	//9A:(Transaction Date) len:3
+	TLV_ADD(0x9A,   "\x00\x00\x00");
+	//9C:(Transaction Type) len:1   |  00 => Goods and service #01 => Cash
+	TLV_ADD(0x9C,   "\x00");
+	// 9F37 Unpredictable Number len:4
+	TLV_ADD(0x9F37, "\x01\x02\x03\x04");
+	// 9F6A Unpredictable Number (MSD for UDOL) len:4
+	TLV_ADD(0x9F6A, "\x01\x02\x03\x04");
+	//9F66:(Terminal Transaction Qualifiers (TTQ)) len:4
+	TLV_ADD(0x9F66, "\x26\x00\x00\x00"); // qVSDC
+}
+
 int CmdHFEMVExec(const char *cmd) {
 	bool activateField = false;
 	bool showAPDU = false;
@@ -432,6 +457,7 @@ int CmdHFEMVExec(const char *cmd) {
 	bool forceSearch = false;
 	enum TransactionType TrType = TT_MSD;
 	bool GenACGPO = false;
+	bool paramLoadJSON = false;
 
 	uint8_t buf[APDU_RES_LEN] = {0};
 	size_t len = 0;
@@ -492,6 +518,10 @@ int CmdHFEMVExec(const char *cmd) {
 				case 'g':
 				case 'G':
 					GenACGPO = true;
+					break;
+				case 'j':
+				case 'J':
+					paramLoadJSON = true;
 					break;
 				default:
 					PrintAndLog("Unknown parameter '%c'", param_getchar_indx(cmd, 1, cmdp));
@@ -559,7 +589,12 @@ int CmdHFEMVExec(const char *cmd) {
 	
 	PrintAndLog("\n* Init transaction parameters.");
 
-	ParamLoadFromJson(tlvRoot);
+	ParamLoadDefaults(tlvRoot);
+
+	if (paramLoadJSON) {
+		PrintAndLog("* * Transaction parameters loading from JSON...");
+		ParamLoadFromJson(tlvRoot);
+	}
 	
 	//9F66:(Terminal Transaction Qualifiers (TTQ)) len:4
 	char *qVSDC = "\x26\x00\x00\x00";
@@ -581,26 +616,9 @@ int CmdHFEMVExec(const char *cmd) {
 			TLV_ADD(0x9F66, qVSDC); // qVSDC (VISA CDA not enabled)
 			break;
 		default:
-			TLV_ADD(0x9F66, "\x26\x00\x00\x00"); // qVSDC
 			break;
 	}
 	
-	//9F02:(Amount, authorized (Numeric)) len:6
-	TLV_ADD(0x9F02, "\x00\x00\x00\x00\x01\x00");
-	//9F1A:(Terminal Country Code) len:2
-	TLV_ADD(0x9F1A, "ru");
-	//5F2A:(Transaction Currency Code) len:2
-	// USD 840, EUR 978, RUR 810, RUB 643, RUR 810(old), UAH 980, AZN 031, n/a 999
-	TLV_ADD(0x5F2A, "\x09\x80");
-	//9A:(Transaction Date) len:3
-	TLV_ADD(0x9A,   "\x00\x00\x00");
-	//9C:(Transaction Type) len:1   |  00 => Goods and service #01 => Cash
-	TLV_ADD(0x9C,   "\x00");
-	// 9F37 Unpredictable Number len:4
-	TLV_ADD(0x9F37, "\x01\x02\x03\x04");
-	// 9F6A Unpredictable Number (MSD for UDOL) len:4
-	TLV_ADD(0x9F6A, "\x01\x02\x03\x04");
-
 	TLVPrintFromTLV(tlvRoot); // TODO delete!!!
 	
 	PrintAndLog("\n* Calc PDOL.");

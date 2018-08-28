@@ -51,7 +51,7 @@
   {
     "name": "Unpredictable Number (MSD for UDOL)",
     "type": "9F 6A",
-    "value": "01 02 03 04",
+    "value": "01 02 03 05",
     "length": 4,
     "hint": "4 byte random number"
   }
