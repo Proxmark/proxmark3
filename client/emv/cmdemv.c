@@ -280,11 +280,12 @@ int CmdHFEMVPPSE(const char *cmd) {
 
 int UsageCmdHFEMVExec(void) {
 	PrintAndLog("HELP :  Executes EMV contactless transaction:\n");
-	PrintAndLog("Usage:  hf emv exec [-s][-a][-t][-f][-v][-c][-x][-g]\n");
+	PrintAndLog("Usage:  hf emv exec [-s][-a][-t][-j][-f][-v][-c][-x][-g]\n");
 	PrintAndLog("  Options:");
 	PrintAndLog("  -s       : select card");
 	PrintAndLog("  -a       : show APDU reqests and responses\n");
 	PrintAndLog("  -t       : TLV decode results\n");
+	PrintAndLog("  -j       : load transaction parameters from `emv/defparams.json` file\n");
 	PrintAndLog("  -f       : force search AID. Search AID instead of execute PPSE.\n");
 	PrintAndLog("  -v       : transaction type - qVSDC or M/Chip.\n");
 	PrintAndLog("  -c       : transaction type - qVSDC or M/Chip plus CDA (SDAD generation).\n");
@@ -974,6 +975,30 @@ int CmdHFEMVExec(const char *cmd) {
 	return 0;
 }
 
+int UsageCmdHFEMVScan(void) {
+	PrintAndLog("HELP :  Scan EMV card and save it contents to a file. \n");
+	PrintAndLog("        It executes EMV contactless transaction and saves result to a file which can be used for emulation.\n");
+	PrintAndLog("Usage:  hf emv scan [-a][-t][-v][-c][-x][-g] <file_name>\n");
+	PrintAndLog("  Options:");
+	PrintAndLog("  -a       : show APDU reqests and responses\n");
+	PrintAndLog("  -t       : TLV decode results\n");
+	PrintAndLog("  -v       : transaction type - qVSDC or M/Chip.\n");
+	PrintAndLog("  -c       : transaction type - qVSDC or M/Chip plus CDA (SDAD generation).\n");
+	PrintAndLog("  -x       : transaction type - VSDC. For test only. Not a standart behavior.\n");
+	PrintAndLog("  -g       : VISA. generate AC from GPO\n");
+	PrintAndLog("By default : transaction type - MSD.\n");
+	PrintAndLog("Samples:");
+	PrintAndLog(" hf emv scan -a -t -> scan MSD transaction mode");
+	PrintAndLog(" hf emv scan -a -t -c -> scan CDA transaction mode");
+	return 0;
+}
+
+int CmdHFEMVScan(const char *cmd) {
+	UsageCmdHFEMVScan();
+	
+	return 0;
+}
+
 int CmdHFEMVTest(const char *cmd) {
 	return ExecuteCryptoTests(true);
 }
@@ -985,6 +1010,7 @@ static command_t CommandTable[] =  {
 	{"pse",		CmdHFEMVPPSE,	0,	"Execute PPSE. It selects 2PAY.SYS.DDF01 or 1PAY.SYS.DDF01 directory."},
 	{"search",	CmdHFEMVSearch,	0,	"Try to select all applets from applets list and print installed applets."},
 	{"select",	CmdHFEMVSelect,	0,	"Select applet."},
+	{"scan",	CmdHFEMVScan,	0,	"Scan EMV card and save it contents to json file for emulator"},
 	{"test",	CmdHFEMVTest,	0,	"Crypto logic test."},
 	{NULL, NULL, 0, NULL}
 };
