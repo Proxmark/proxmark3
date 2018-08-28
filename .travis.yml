@@ -1,0 +1,55 @@
+# Travis-CI config
+# variable REPOSITORY_EP must be filled with repository name. as sample: "merlokk/proxmark3"
+language: c
+
+compiler: gcc
+
+# Test on Linux and MacOS
+matrix:
+  include:
+    - os: osx
+      osx_image: xcode7.3	# OS X 10.11
+    - os: osx
+      osx_image: xcode8.3   # OS X 10.12
+    - os: osx
+      osx_image: xcode9     # OS X 10.12
+    - os: osx
+      osx_image: xcode9.2   # OS X 10.12
+    - os: linux
+      dist: trusty
+      sudo: required
+
+before_install:
+## Install ARM toolchain on Linux.
+## add our homebrew tap for MacOS
+## Note: all dependencies on MacOS should be resolved by the brew install command
+  echo $REPOSITORY_EP;
+  if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then 
+    sudo apt-get update -qq;
+    sudo apt-get install -y gcc-arm-none-eabi;
+  elif [[ "$TRAVIS_OS_NAME" == "osx" ]]; then
+    brew update;
+    if [[ "$REPOSITORY_EP" == "" ]]; then
+      brew tap proxmark/proxmark3;
+    else
+      brew tap "$REPOSITORY_EP" --env=std;
+    fi
+  fi
+
+install:
+  if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then 
+    brew info proxmark3;
+    brew install -v --HEAD proxmark3;
+  elif [[ "$TRAVIS_OS_NAME" == "linux" ]]; then 
+    make all;
+  fi
+
+before_script:
+
+script: 
+## for the time being we are satisfied if it can be build and then successfully started
+  if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then 
+    proxmark3 /dev/notexists travis_test_commands.scr ;
+  elif [[ "$TRAVIS_OS_NAME" == "linux" ]]; then 
+    ./client/proxmark3  /dev/notexists travis_test_commands.scr ;
+  fi
