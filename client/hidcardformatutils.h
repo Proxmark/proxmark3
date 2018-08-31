@@ -28,8 +28,8 @@ typedef struct hidproxmessage_s{
 typedef struct hidproxcard_s{
   uint32_t FacilityCode;
   uint64_t CardNumber;
-  uint8_t IssueLevel;
-  bool ParitySupported;
+  uint32_t IssueLevel;
+  uint32_t OEM;
   bool ParityValid; // Only valid for responses
 } hidproxcard_t;
 

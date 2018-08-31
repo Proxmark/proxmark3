@@ -947,10 +947,10 @@ void UsbPacketReceived(uint8_t *packet, int len)
 			cmd_send(CMD_ACK,SnoopLF(),0,0,0,0);
 			break;
 		case CMD_HID_DEMOD_FSK:
-			CmdHIDdemodFSK(c->arg[0], 0, 0, 1);
+			CmdHIDdemodFSK(c->arg[0], 0, 0, 0, 1);
 			break;
 		case CMD_HID_SIM_TAG:
-			CmdHIDsimTAG(c->arg[0], c->arg[1], 1);
+			CmdHIDsimTAG(c->arg[0], c->arg[1], c->arg[2], 1);
 			break;
 		case CMD_FSK_SIM_TAG:
 			CmdFSKsimTAG(c->arg[0], c->arg[1], c->arg[2], c->d.asBytes);

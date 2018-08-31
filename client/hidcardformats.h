@@ -15,12 +15,22 @@
 #include <stdbool.h>
 #include "hidcardformatutils.h"
 
+
+typedef struct hidcardformatdescriptor_s{
+  bool hasCardNumber;
+  bool hasFacilityCode;
+  bool hasIssueLevel;
+  bool hasOEMCode;
+  bool hasParity;
+} hidcardformatdescriptor_t;
+
 // Structure for defined HID card formats available for packing/unpacking
 typedef struct hidcardformat_s{
   const char* Name;
   bool (*Pack)(/*in*/hidproxcard_t* card, /*out*/hidproxmessage_t* packed);
   bool (*Unpack)(/*in*/hidproxmessage_t* packed, /*out*/hidproxcard_t* card);
   const char* Descrp;
+  hidcardformatdescriptor_t Fields;
 } hidcardformat_t;
 
 void HIDListFormats();

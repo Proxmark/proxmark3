@@ -593,7 +593,7 @@ static void fcAll(uint8_t fc, int *n, uint8_t clock, uint16_t *modCnt)
 
 // prepare a waveform pattern in the buffer based on the ID given then
 // simulate a HID tag until the button is pressed
-void CmdHIDsimTAG(int hi, int lo, int ledcontrol)
+void CmdHIDsimTAG(int hi2, int hi, int lo, int ledcontrol)
 {
 	int n=0, i=0;
 	/*
@@ -606,8 +606,8 @@ void CmdHIDsimTAG(int hi, int lo, int ledcontrol)
 	 nor 1 bits, they are special patterns (a = set of 12 fc8 and b = set of 10 fc10)
 	*/
 
-	if (hi>0xFFF) {
-		DbpString("Tags can only have 44 bits. - USE lf simfsk for larger tags");
+	if (hi2>0x0FFFFFFF) {
+		DbpString("Tags can only have 44 or 84 bits. - USE lf simfsk for larger tags");
 		return;
 	}
 	// set LF so we don't kill the bigbuf we are setting with simulation data.
@@ -621,13 +621,35 @@ void CmdHIDsimTAG(int hi, int lo, int ledcontrol)
 	fc(8,  &n);	fc(10, &n); // logical 0
 
 	WDT_HIT();
-	// manchester encode bits 43 to 32
-	for (i=11; i>=0; i--) {
-		if ((i%4)==3) fc(0,&n);
-		if ((hi>>i)&1) {
-			fc(10, &n); fc(8,  &n);		// low-high transition
-		} else {
-			fc(8,  &n); fc(10, &n);		// high-low transition
+	if (hi2 > 0 || hi > 0xFFF){
+		// manchester encode bits 91 to 64 (91-84 are part of the header)
+		for (i=27; i>=0; i--) {
+			if ((i%4)==3) fc(0,&n);
+			if ((hi2>>i)&1) {
+				fc(10, &n); fc(8,  &n);		// low-high transition
+			} else {
+				fc(8,  &n); fc(10, &n);		// high-low transition
+			}
+		}
+		WDT_HIT();
+		// manchester encode bits 63 to 32
+		for (i=31; i>=0; i--) {
+			if ((i%4)==3) fc(0,&n);
+			if ((hi>>i)&1) {
+				fc(10, &n); fc(8,  &n);		// low-high transition
+			} else {
+				fc(8,  &n); fc(10, &n);		// high-low transition
+			}
+		}
+	} else {
+		// manchester encode bits 43 to 32
+		for (i=11; i>=0; i--) {
+			if ((i%4)==3) fc(0,&n);
+			if ((hi>>i)&1) {
+				fc(10, &n); fc(8,  &n);		// low-high transition
+			} else {
+				fc(8,  &n); fc(10, &n);		// high-low transition
+			}
 		}
 	}
 
@@ -839,7 +861,7 @@ void CmdPSKsimTag(uint16_t arg1, uint16_t arg2, size_t size, uint8_t *BitStream)
 }
 
 // loop to get raw HID waveform then FSK demodulate the TAG ID from it
-void CmdHIDdemodFSK(int findone, int *high, int *low, int ledcontrol)
+void CmdHIDdemodFSK(int findone, int *high2, int *high, int *low, int ledcontrol)
 {
 	uint8_t *dest = BigBuf_get_addr();
 	//const size_t sizeOfBigBuff = BigBuf_max_traceLen();
@@ -869,56 +891,12 @@ void CmdHIDdemodFSK(int findone, int *high, int *low, int ledcontrol)
 			if (hi2 != 0){ //extra large HID tags  88/192 bits
 				Dbprintf("TAG ID: %x%08x%08x (%d)",
 				  (unsigned int) hi2, (unsigned int) hi, (unsigned int) lo, (unsigned int) (lo>>1) & 0xFFFF);
-			}else {  //standard HID tags 44/96 bits
-				//Dbprintf("TAG ID: %x%08x (%d)",(unsigned int) hi, (unsigned int) lo, (unsigned int) (lo>>1) & 0xFFFF); //old print cmd
-				uint8_t bitlen = 0;
-				uint32_t fc = 0;
-				uint32_t cardnum = 0;
-				if (((hi>>5)&1) == 1){//if bit 38 is set then < 37 bit format is used
-					uint32_t lo2=0;
-					lo2=(((hi & 31) << 12) | (lo>>20)); //get bits 21-37 to check for format len bit
-					uint8_t idx3 = 1;
-					while(lo2 > 1){ //find last bit set to 1 (format len bit)
-						lo2=lo2 >> 1;
-						idx3++;
-					}
-					bitlen = idx3+19;
-					fc =0;
-					cardnum=0;
-					if(bitlen == 26){
-						cardnum = (lo>>1)&0xFFFF;
-						fc = (lo>>17)&0xFF;
-					}
-					if(bitlen == 37){
-						cardnum = (lo>>1)&0x7FFFF;
-						fc = ((hi&0xF)<<12)|(lo>>20);
-					}
-					if(bitlen == 34){
-						cardnum = (lo>>1)&0xFFFF;
-						fc= ((hi&1)<<15)|(lo>>17);
-					}
-					if(bitlen == 35){
-						cardnum = (lo>>1)&0xFFFFF;
-						fc = ((hi&1)<<11)|(lo>>21);
-					}
-				}
-				else { //if bit 38 is not set then 37 bit format is used
-					bitlen= 37;
-					fc =0;
-					cardnum=0;
-					if(bitlen==37){
-						cardnum = (lo>>1)&0x7FFFF;
-						fc = ((hi&0xF)<<12)|(lo>>20);
-					}
-				}
-				//Dbprintf("TAG ID: %x%08x (%d)",
-				// (unsigned int) hi, (unsigned int) lo, (unsigned int) (lo>>1) & 0xFFFF);
-				Dbprintf("TAG ID: %x%08x (%d) - Format Len: %dbit - FC: %d - Card: %d",
-						 (unsigned int) hi, (unsigned int) lo, (unsigned int) (lo>>1) & 0xFFFF,
-						 (unsigned int) bitlen, (unsigned int) fc, (unsigned int) cardnum);
+			} else {  //standard HID tags 44/96 bits
+				Dbprintf("TAG ID: %x%08x (%d)",(unsigned int) hi, (unsigned int) lo, (unsigned int) (lo>>1) & 0xFFFF); //old print cmd
 			}
 			if (findone){
 				if (ledcontrol)	LED_A_OFF();
+				*high2 = hi2;
 				*high = hi;
 				*low = lo;
 				break;
