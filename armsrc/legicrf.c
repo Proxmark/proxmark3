@@ -284,7 +284,7 @@ static void init_reader(bool clear_mem) {
 // The setup consists of a three way handshake:
 //  - Transmit initialisation vector 7 bits
 //  - Receive card type 6 bits
-//  - Acknowledge frame 6 bits
+//  - Transmit Acknowledge 6 bits
 static uint32_t setup_phase(uint8_t iv) {
   // init coordination timestamp
   last_frame_end = GET_TICKS;
