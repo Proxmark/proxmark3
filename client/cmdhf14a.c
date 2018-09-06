@@ -28,6 +28,7 @@
 #include "mifare.h"
 #include "cmdhfmfu.h"
 #include "mifarehost.h"
+#include "cliparser/cliparser.h"
 #include "emv/apduinfo.h"
 #include "emv/emvcore.h"
 
@@ -137,38 +138,32 @@ int CmdHF14AList(const char *Cmd)
 
 int CmdHF14AReader(const char *Cmd) {
 	uint32_t cm = ISO14A_CONNECT;
-	bool disconnectAfter = true;
+	bool leaveSignalON = false;
 	
-	int cmdp = 0;
-	while(param_getchar(Cmd, cmdp) != 0x00) {
-		switch(param_getchar(Cmd, cmdp)) {
-		case 'h':
-		case 'H':
-			PrintAndLog("Usage: hf 14a reader [k|x] [3]");
-			PrintAndLog("       k    keep the field active after command executed");
-			PrintAndLog("       x    just drop the signal field");
-			PrintAndLog("       3    ISO14443-3 select only (skip RATS)");
-			return 0;
-		case '3':
-			cm |= ISO14A_NO_RATS; 
-			break;
-		case 'k':
-		case 'K':
-			disconnectAfter = false;
-			break;
-		case 'x':
-		case 'X':
-			cm &= ~ISO14A_CONNECT;
-			break;
-		default:
-			PrintAndLog("Unknown command.");
-			return 1;
-		}	
-		
-		cmdp++;
+	CLIParserInit("hf 14a reader", "Executes ISO1443A anticollision-select group of commands.", NULL);
+	void* argtable[] = {
+		arg_param_begin,
+		arg_lit0("kK",  "keep",    "keep the field active after command executed"),
+		arg_lit0("xX",  "drop",    "just drop the signal field"),
+		arg_lit0("3",   NULL,      "ISO14443-3 select only (skip RATS)"),
+		arg_param_end
+	};
+	if (CLIParserParseString(Cmd, argtable, arg_getsize(argtable), true)){
+		CLIParserFree();
+		return 0;
 	}
-
-	if (!disconnectAfter)
+	
+	leaveSignalON = arg_get_lit(1);
+	if (arg_get_lit(2)) {
+		cm = cm - ISO14A_CONNECT;
+	}
+	if (arg_get_lit(3)) {
+		cm |= ISO14A_NO_RATS;
+	}
+	
+	CLIParserFree();
+	
+	if (leaveSignalON)
 		cm |= ISO14A_NO_DISCONNECT; 
 	
 	UsbCommand c = {CMD_READER_ISO_14443a, {cm, 0, 0}};
@@ -200,12 +195,12 @@ int CmdHF14AReader(const char *Cmd) {
 		if(card.ats_len >= 3) {			// a valid ATS consists of at least the length byte (TL) and 2 CRC bytes
 			PrintAndLog(" ATS : %s", sprint_hex(card.ats, card.ats_len));
 		}
-		if (!disconnectAfter) {
+		if (leaveSignalON) {
 			PrintAndLog("Card is selected. You can now start sending commands");
 		}
 	}
 
-	if (disconnectAfter) {
+	if (!leaveSignalON) {
 		PrintAndLog("Field dropped.");
 	}
 	
@@ -737,59 +732,30 @@ int CmdHF14AAPDU(const char *cmd) {
 	bool activateField = false;
 	bool leaveSignalON = false;
 	bool decodeTLV = false;
+
+	CLIParserInit("hf 14a apdu", 
+		"Sends an ISO 7816-4 APDU via ISO 14443-4 block transmission protocol (T=CL)", 
+		"Sample:\n\thf 14a apdu -st 00A404000E325041592E5359532E444446303100\n");
+
+	void* argtable[] = {
+		arg_param_begin,
+		arg_lit0("sS",  "select",  "activate field and select card"),
+		arg_lit0("kK",  "keep",    "leave the signal field ON after receive response"),
+		arg_lit0("tT",  "tlv",     "executes TLV decoder if it possible"),
+		arg_str1(NULL,  NULL,      "<APDU (hex)>", NULL),
+		arg_param_end
+	};
+	CLIExecWithReturn(cmd, argtable, false);
 	
-	if (strlen(cmd) < 2) {
-		PrintAndLog("Usage: hf 14a apdu [-s] [-k] [-t] <APDU (hex)>");
-		PrintAndLog("Command sends an ISO 7816-4 APDU via ISO 14443-4 block transmission protocol (T=CL)");
-		PrintAndLog("       -s    activate field and select card");
-		PrintAndLog("       -k    leave the signal field ON after receive response");
-		PrintAndLog("       -t    executes TLV decoder if it possible. TODO!!!!");
-		return 0;
-	}
+	activateField = arg_get_lit(1);
+	leaveSignalON = arg_get_lit(2);
+	decodeTLV = arg_get_lit(3);
+	// len = data + PCB(1b) + CRC(2b)
+	CLIGetStrBLessWithReturn(4, data, &datalen, 1 + 2);
 
-	int cmdp = 0;
-	while(param_getchar(cmd, cmdp) != 0x00) {
-		char c = param_getchar(cmd, cmdp);
-		if ((c == '-') && (param_getlength(cmd, cmdp) == 2))
-			switch (param_getchar_indx(cmd, 1, cmdp)) {
-				case 's':
-				case 'S':
-					activateField = true;
-					break;
-				case 'k':
-				case 'K':
-					leaveSignalON = true;
-					break;
-				case 't':
-				case 'T':
-					decodeTLV = true;
-					break;
-				default:
-					PrintAndLog("Unknown parameter '%c'", param_getchar_indx(cmd, 1, cmdp));
-					return 1;
-			}
-			
-		if (isxdigit((unsigned char)c)) {
-			// len = data + PCB(1b) + CRC(2b)
-			switch(param_gethex_to_eol(cmd, cmdp, data, sizeof(data) - 1 - 2, &datalen)) {
-			case 1:
-				PrintAndLog("Invalid HEX value.");
-				return 1;
-			case 2:
-				PrintAndLog("APDU too large.");
-				return 1;
-			case 3:
-				PrintAndLog("Hex must have even number of digits.");
-				return 1;
-			}
-			
-			// we get all the hex to end of line with spaces
-			break;
-		}
-		
-		cmdp++;
-	}
 
+	CLIParserFree();
+//	PrintAndLog("---str [%d] %s", arg_get_str(4)->count, arg_get_str(4)->sval[0]);
 	PrintAndLog(">>>>[%s%s%s] %s", activateField ? "sel ": "", leaveSignalON ? "keep ": "", decodeTLV ? "TLV": "", sprint_hex(data, datalen));
 	
 	int res = ExchangeAPDU14a(data, datalen, activateField, leaveSignalON, data, USB_CMD_DATA_SIZE, &datalen);
@@ -821,102 +787,57 @@ int CmdHF14ACmdRaw(const char *cmd) {
 	bool bTimeout = false;
 	uint32_t timeout = 0;
 	bool topazmode = false;
-	char buf[5]="";
-	int i = 0;
 	uint8_t data[USB_CMD_DATA_SIZE];
-	uint16_t datalen = 0;
-	uint32_t temp;
+	int datalen = 0;
 
-	if (strlen(cmd)<2) {
-		PrintAndLog("Usage: hf 14a raw [-r] [-c] [-p] [-f] [-b] [-t] <number of bits> <0A 0B 0C ... hex>");
-		PrintAndLog("       -r    do not read response");
-		PrintAndLog("       -c    calculate and append CRC");
-		PrintAndLog("       -p    leave the signal field ON after receive");
-		PrintAndLog("       -a    active signal field ON without select");
-		PrintAndLog("       -s    active signal field ON with select");
-		PrintAndLog("       -b    number of bits to send. Useful for send partial byte");
-		PrintAndLog("       -t    timeout in ms");
-		PrintAndLog("       -T    use Topaz protocol to send command");
-		PrintAndLog("       -3    ISO14443-3 select only (skip RATS)");
+	// extract parameters
+	CLIParserInit("hf 14a raw", "Send raw hex data to tag", 
+		"Sample:\n"\
+		"\thf 14a raw -pa -b7 -t1000 52  -- execute WUPA\n"\
+		"\thf 14a raw -p 9320            -- anticollision\n"\
+		"\thf 14a raw -psc 60 00         -- select and mifare AUTH\n");
+	void* argtable[] = {
+		arg_param_begin,
+		arg_lit0("rR",  "nreply",  "do not read response"),
+		arg_lit0("cC",  "crc",     "calculate and append CRC"),
+		arg_lit0("pP",  "power",   "leave the signal field ON after receive"),
+		arg_lit0("aA",  "active",  "active signal field ON without select"),
+		arg_lit0("sS",  "actives", "active signal field ON with select"),
+		arg_int0("bB",  "bits",    NULL, "number of bits to send. Useful for send partial byte"),
+		arg_int0("t",   "timeout", NULL, "timeout in ms"),
+		arg_lit0("T",   "topaz",   "use Topaz protocol to send command"),
+		arg_lit0("3",   NULL,      "ISO14443-3 select only (skip RATS)"),
+		arg_str1(NULL,  NULL,      "<data (hex)>", NULL),
+		arg_param_end
+	};
+	// defaults
+	arg_get_int(6) = 0;
+	arg_get_int(7) = 0;
+	
+	if (CLIParserParseString(cmd, argtable, arg_getsize(argtable), false)){
+		CLIParserFree();
 		return 0;
 	}
-
-
-	// strip
-	while (*cmd==' ' || *cmd=='\t') cmd++;
-
-	while (cmd[i]!='\0') {
-		if (cmd[i]==' ' || cmd[i]=='\t') { i++; continue; }
-		if (cmd[i]=='-') {
-			switch (cmd[i+1]) {
-				case 'r': 
-					reply = false;
-					break;
-				case 'c':
-					crc = true;
-					break;
-				case 'p':
-					power = true;
-					break;
-				case 'a':
-					active = true;
-					break;
-				case 's':
-					active_select = true;
-					break;
-				case 'b': 
-					sscanf(cmd+i+2,"%d",&temp);
-					numbits = temp & 0xFFFF;
-					i+=3;
-					while(cmd[i]!=' ' && cmd[i]!='\0') { i++; }
-					i-=2;
-					break;
-				case 't':
-					bTimeout = true;
-					sscanf(cmd+i+2,"%d",&temp);
-					timeout = temp;
-					i+=3;
-					while(cmd[i]!=' ' && cmd[i]!='\0') { i++; }
-					i-=2;
-					break;
-				case 'T':
-					topazmode = true;
-					break;
-				case '3':
-					no_rats = true;
-					break;
-				default:
-					PrintAndLog("Invalid option");
-					return 0;
-			}
-			i+=2;
-			continue;
-		}
-		if ((cmd[i]>='0' && cmd[i]<='9') ||
-		    (cmd[i]>='a' && cmd[i]<='f') ||
-		    (cmd[i]>='A' && cmd[i]<='F') ) {
-			buf[strlen(buf)+1]=0;
-			buf[strlen(buf)]=cmd[i];
-			i++;
-
-			if (strlen(buf)>=2) {
-				sscanf(buf,"%x",&temp);
-				data[datalen]=(uint8_t)(temp & 0xff);
-				*buf=0;
-				if (datalen > sizeof(data)-1) {
-					if (crc)
-						PrintAndLog("Buffer is full, we can't add CRC to your data");
-					break;
-				} else {
-					datalen++;
-				}
-			}
-			continue;
-		}
-		PrintAndLog("Invalid char on input");
-		return 0;
+	
+	reply = !arg_get_lit(1);
+	crc = arg_get_lit(2);
+	power = arg_get_lit(3);
+	active = arg_get_lit(4);
+	active_select = arg_get_lit(5);
+	numbits = arg_get_int(6) & 0xFFFF;
+	timeout = arg_get_int(7);
+	bTimeout = (timeout > 0);	
+	topazmode = arg_get_lit(8);
+	no_rats = arg_get_lit(9);
+	// len = data + CRC(2b)
+	if (CLIParamHexToBuf(arg_get_str(10), data, sizeof(data) -2, &datalen)) {
+		CLIParserFree();
+		return 1;
 	}
-
+	
+	CLIParserFree();	
+	
+	// logic 
 	if(crc && datalen>0 && datalen<sizeof(data)-2)
 	{
 		uint8_t first, second;
