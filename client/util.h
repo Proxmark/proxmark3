@@ -90,7 +90,6 @@ extern void wiegand_add_parity(uint8_t *target, uint8_t *source, uint8_t length)
 
 extern void xor(unsigned char *dst, unsigned char *src, size_t len);
 extern int32_t le24toh(uint8_t data[3]);
-extern uint32_t le32toh (uint8_t *data);
 extern void rol(uint8_t *data, const size_t len);
 
 extern void clean_ascii(unsigned char *buf, size_t len);
