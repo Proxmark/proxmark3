@@ -59,11 +59,12 @@ THUMBSRC = start.c \
 # These are to be compiled in ARM mode
 ARMSRC = fpgaloader.c \
 	legicrf.c \
+	legicrfsim.c \
+	legic_prng.c \
 	$(SRC_ISO14443a) \
 	$(SRC_ISO14443b) \
 	$(SRC_CRAPTO1) \
 	$(SRC_CRC) \
-	legic_prng.c \
 	iclass.c \
 	BigBuf.c \
 	optimized_cipher.c \
