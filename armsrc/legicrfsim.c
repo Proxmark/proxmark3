@@ -19,6 +19,7 @@
 #include "legic_prng.h"
 #include "legic.h"
 #include "crc.h"
+#include "usb_cdc.h"  // for usb_poll_validate_length
 
 static uint8_t* legic_mem;      /* card memory, used for sim */
 static legic_card_select_t card;/* metadata of currently selected card */
@@ -439,7 +440,7 @@ void LegicRfSimulate(uint8_t cardtype) {
 
   LED_A_ON();
   DbpString("Starting Legic emulator, press button to end");
-  while(!BUTTON_PRESS()) {
+  while(!BUTTON_PRESS() && !usb_poll_validate_length()) {
     WDT_HIT();
 
     // wait for carrier, restart after timeout
