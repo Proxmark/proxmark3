@@ -193,27 +193,6 @@ char *sprint_bin(const uint8_t *data, const size_t len) {
 	return sprint_bin_break(data, len, 0);
 }
 
-char *sprint_hex_ascii(const uint8_t *data, const size_t len) {
-	static char buf[1024];
-	char *tmp = buf;
-	memset(buf, 0x00, 1024);
-	size_t max_len = (len > 255) ? 255 : len;
-	// max 255 bytes * 3 + 2 characters = 767 in buffer
-	sprintf(tmp, "%.765s| ", sprint_hex(data, max_len) );
-	
-	size_t i = 0;
-	size_t pos = (max_len * 3)+2;
-	// add another 255 characters ascii = 1020 characters of buffer used
-	while(i < max_len) {
-		char c = data[i];
-		if ( (c < 32) || (c == 127))
-			c = '.';
-		sprintf(tmp+pos+i, "%c",  c);
-		++i;
-	}
-	return buf;
-}
-
 char *sprint_ascii_ex(const uint8_t *data, const size_t len, const size_t min_str_len) {
 	static char buf[1024];
 	char *tmp = buf;
@@ -231,10 +210,6 @@ char *sprint_ascii_ex(const uint8_t *data, const size_t len, const size_t min_st
 		tmp[i] = ' ';
 	
 	return buf;
-}
-
-char *sprint_ascii(const uint8_t *data, const size_t len) {
-	return sprint_ascii_ex(data, len, 0);
 }
 
 void num_to_bytes(uint64_t n, size_t len, uint8_t* dest)
