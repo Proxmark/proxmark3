@@ -51,8 +51,7 @@ int CmdHFEMVSelect(const char *cmd) {
 	bool leaveSignalON = arg_get_lit(2);
 	bool APDULogging = arg_get_lit(3);
 	bool decodeTLV = arg_get_lit(4);
-	if (arg_get_str_len(5))
-		CLIGetStrBLessWithReturn(5, data, &datalen, 0);
+	CLIGetStrBLessWithReturn(5, data, &datalen, 0);
 	CLIParserFree();
 	
 	SetAPDULogging(APDULogging);
