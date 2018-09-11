@@ -272,16 +272,6 @@ uint8_t *SwapEndian64(const uint8_t *src, const size_t len, const uint8_t blockS
 	return tmp;
 }
 
-// takes a uint8_t src array, for len items and reverses the byte order in blocksizes (8,16,32,64), 
-// returns: the dest array contains the reordered src array.
-void SwapEndian64ex(const uint8_t *src, const size_t len, const uint8_t blockSize, uint8_t *dest){
-	for (uint8_t block=0; block < (uint8_t)(len/blockSize); block++){
-		for (size_t i = 0; i < blockSize; i++){
-			dest[i+(blockSize*block)] = src[(blockSize-1-i)+(blockSize*block)];
-		}
-	}
-}
-
 //assumes little endian
 char * printBits(size_t const size, void const * const ptr)
 {
