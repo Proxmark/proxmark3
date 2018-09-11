@@ -37,7 +37,7 @@ void HfSnoop(int samplesToSkip, int triggersToSkip)
 	// Select correct configs
 	FpgaDownloadAndGo(FPGA_BITSTREAM_HF);
 	// Set up the synchronous serial port
-	FpgaSetupSsc();
+	FpgaSetupSsc(FPGA_MAJOR_MODE_HF_SNOOP);
 	// connect Demodulated Signal to ADC:
 	SetAdcMuxFor(GPIO_MUXSEL_HIPKD);
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_HF_SNOOP);

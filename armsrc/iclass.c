@@ -676,7 +676,7 @@ void RAMFUNC SnoopIClass(void)
     Demod.state = DEMOD_UNSYNCD;
 
     // Setup for the DMA.
-    FpgaSetupSsc();
+    FpgaSetupSsc(FPGA_MAJOR_MODE_HF_ISO14443A);
     upTo = dmaBuf;
     lastRxCounter = DMA_BUFFER_SIZE;
     FpgaSetupSscDma((uint8_t *)dmaBuf, DMA_BUFFER_SIZE);
@@ -1163,7 +1163,7 @@ int doIClassSimulation( int simulationMode, uint8_t *reader_mac_buf)
 	StartCountSspClk();
 	// We need to listen to the high-frequency, peak-detected path.
 	SetAdcMuxFor(GPIO_MUXSEL_HIPKD);
-	FpgaSetupSsc();
+	FpgaSetupSsc(FPGA_MAJOR_MODE_HF_ISO14443A);
 
 	// To control where we are in the protocol
 	int cmdsRecvd = 0;
@@ -1360,7 +1360,7 @@ static int SendIClassAnswer(uint8_t *resp, int respLen, int delay)
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_HF_SIMULATOR|FPGA_HF_SIMULATOR_MODULATE_424K_8BIT);
 
 	AT91C_BASE_SSC->SSC_THR = 0x00;
-	FpgaSetupSsc();
+	FpgaSetupSsc(FPGA_MAJOR_MODE_HF_SIMULATOR);
 	while(!BUTTON_PRESS()) {
 		if((AT91C_BASE_SSC->SSC_SR & AT91C_SSC_RXRDY)){
 			b = AT91C_BASE_SSC->SSC_RHR; (void) b;
@@ -1398,7 +1398,7 @@ static void TransmitIClassCommand(const uint8_t *cmd, int len, int *samples, int
   int c;
   FpgaWriteConfWord(FPGA_MAJOR_MODE_HF_ISO14443A | FPGA_HF_ISO14443A_READER_MOD);
   AT91C_BASE_SSC->SSC_THR = 0x00;
-  FpgaSetupSsc();
+  FpgaSetupSsc(FPGA_MAJOR_MODE_HF_ISO14443A);
 
    if (wait)
    {
@@ -1586,7 +1586,7 @@ void setupIclassReader()
 	  clear_trace();
 
     // Setup SSC
-    FpgaSetupSsc();
+    FpgaSetupSsc(FPGA_MAJOR_MODE_HF_ISO14443A);
     // Start from off (no field generated)
     // Signal field is off with the appropriate LED
     LED_D_OFF();
