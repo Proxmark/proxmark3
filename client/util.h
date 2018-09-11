@@ -82,9 +82,7 @@ extern int param_gethex_to_eol(const char *line, int paramnum, uint8_t * data, i
 extern int param_getstr(const char *line, int paramnum, char * str, size_t buffersize);
 
 extern int hextobinarray( char *target,  char *source);
-extern int hextobinstring( char *target,  char *source);
 extern int binarraytohex( char *target,  char *source,  int length);
-extern void binarraytobinstring(char *target,  char *source,  int length);
 extern uint8_t GetParity( uint8_t *string, uint8_t type,  int length);
 extern void wiegand_add_parity(uint8_t *target, uint8_t *source, uint8_t length);
 

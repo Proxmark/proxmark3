@@ -648,17 +648,6 @@ int hextobinarray(char *target, char *source)
     return count;
 }
 
-// convert hex to human readable binary string
-int hextobinstring(char *target, char *source)
-{
-    int length;
-
-    if(!(length= hextobinarray(target, source)))
-        return 0;
-    binarraytobinstring(target, target, length);
-    return length;
-}
-
 // convert binary array of 0x00/0x01 values to hex (safe to do in place as target will always be shorter than source)
 // return number of bits converted
 int binarraytohex(char *target,char *source, int length)
@@ -679,16 +668,6 @@ int binarraytohex(char *target,char *source, int length)
         j -= 4;
     }
     return length;
-}
-
-// convert binary array to human readable binary
-void binarraytobinstring(char *target, char *source,  int length)
-{
-    int i;
-
-    for(i= 0 ; i < length ; ++i)
-        *(target++)= *(source++) + '0';
-    *target= '\0';
 }
 
 // return parity bit required to match type
