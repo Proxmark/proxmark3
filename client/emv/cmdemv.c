@@ -20,7 +20,7 @@ int CmdHFEMVSelect(const char *cmd) {
 
 	CLIParserInit("hf 14a select", 
 		"Executes select applet command", 
-		"Usage:\n\thf emv select -s a00000000101 -> select card, select applet\n\thf emv select -s -t a00000000101 -> select card, select applet, show result in TLV\n");
+		"Usage:\n\thf emv select -s a00000000101 -> select card, select applet\n\thf emv select -st a00000000101 -> select card, select applet, show result in TLV\n");
 
 	void* argtable[] = {
 		arg_param_begin,
@@ -64,7 +64,7 @@ int CmdHFEMVSearch(const char *cmd) {
 
 	CLIParserInit("hf 14a select", 
 		"Tries to select all applets from applet list:\n", 
-		"Usage:\n\thf emv search -s -> select card and search\n\thf emv search -s -t -> select card, search and show result in TLV\n");
+		"Usage:\n\thf emv search -s -> select card and search\n\thf emv search -st -> select card, search and show result in TLV\n");
 
 	void* argtable[] = {
 		arg_param_begin,
@@ -105,74 +105,37 @@ int CmdHFEMVSearch(const char *cmd) {
 	return 0;
 }
 
-int UsageCmdHFEMVPPSE(void) {
-	PrintAndLog("HELP :  Executes PSE/PPSE select command. It returns list of applet on the card:\n");
-	PrintAndLog("Usage:  hf emv pse [-s][-k][-1][-2][-a][-t]\n");
-	PrintAndLog("  Options:");
-	PrintAndLog("  -s       : select card");
-	PrintAndLog("  -k       : keep field for next command");
-	PrintAndLog("  -1       : ppse (1PAY.SYS.DDF01)");
-	PrintAndLog("  -2       : pse (2PAY.SYS.DDF01)");
-	PrintAndLog("  -a       : show APDU reqests and responses\n");
-	PrintAndLog("  -t       : TLV decode results\n");
-	PrintAndLog("Samples:");
-	PrintAndLog(" hf emv pse -s -1 -> select, get pse");
-	PrintAndLog(" hf emv pse -s -k -2 -> select, get ppse, keep field");
-	PrintAndLog(" hf emv pse -s -t -2 -> select, get ppse, show result in TLV");
-	return 0;
-}
-
 int CmdHFEMVPPSE(const char *cmd) {
 	
-	uint8_t PSENum = 2;
-	bool activateField = false;
-	bool leaveSignalON = false;
-	bool decodeTLV = false;
-
-	if (strlen(cmd) < 1) {
-		UsageCmdHFEMVPPSE();
-		return 0;
-	}
-
-	SetAPDULogging(false);
 	
-	int cmdp = 0;
-	while(param_getchar(cmd, cmdp) != 0x00) {
-		char c = param_getchar(cmd, cmdp);
-		if ((c == '-') && (param_getlength(cmd, cmdp) == 2))
-			switch (param_getchar_indx(cmd, 1, cmdp)) {
-				case 'h':
-				case 'H':
-					UsageCmdHFEMVPPSE();
-					return 0;
-				case 's':
-				case 'S':
-					activateField = true;
-					break;
-				case 'k':
-				case 'K':
-					leaveSignalON = true;
-					break;
-				case 'a':
-				case 'A':
-					SetAPDULogging(true);
-					break;
-				case 't':
-				case 'T':
-					decodeTLV = true;
-					break;
-				case '1':
-					PSENum = 1;
-					break;
-				case '2':
-					PSENum = 2;
-					break;
-				default:
-					PrintAndLog("Unknown parameter '%c'", param_getchar_indx(cmd, 1, cmdp));
-					return 1;
-		}
-		cmdp++;
-	}
+	CLIParserInit("hf 14a pse", 
+		"Executes PSE/PPSE select command. It returns list of applet on the card:\n", 
+		"Usage:\n\thf emv pse -s1 -> select, get pse\n\thf emv pse -st2 -> select, get ppse, show result in TLV\n");
+
+	void* argtable[] = {
+		arg_param_begin,
+		arg_lit0("sS",  "select",  "activate field and select card"),
+		arg_lit0("kK",  "keep",    "keep field ON for next command"),
+		arg_lit0("1",   "pse",     "pse (1PAY.SYS.DDF01) mode"),
+		arg_lit0("2",   "ppse",    "ppse (2PAY.SYS.DDF01) mode (default mode)"),
+		arg_lit0("aA",  "apdu",    "show APDU reqests and responses"),
+		arg_lit0("tT",  "tlv",     "TLV decode results of selected applets"),
+		arg_param_end
+	};
+	CLIExecWithReturn(cmd, argtable, true);
+	
+	bool activateField = arg_get_lit(1);
+	bool leaveSignalON = arg_get_lit(2);
+	uint8_t PSENum = 2;
+	if (arg_get_lit(3))
+		PSENum = 1;
+	if (arg_get_lit(4))
+		PSENum = 2;
+	bool APDULogging = arg_get_lit(5);
+	bool decodeTLV = arg_get_lit(6);
+	CLIParserFree();	
+	
+	SetAPDULogging(APDULogging);
 	
 	// exec
 	uint8_t buf[APDU_RES_LEN] = {0};
@@ -191,6 +154,26 @@ int CmdHFEMVPPSE(const char *cmd) {
 		TLVPrintFromBuffer(buf, len);
 
 	return 0;
+}
+
+int CmdHFEMVGPO(const char *cmd) {
+
+}
+
+int CmdHFEMVReadRecord(const char *cmd) {
+
+}
+
+int CmdHFEMVAC(const char *cmd) {
+
+}
+
+int CmdHFEMVGenerateChallenge(const char *cmd) {
+
+}
+
+int CmdHFEMVInternalAuthenticate(const char *cmd) {
+
 }
 
 int UsageCmdHFEMVExec(void) {
