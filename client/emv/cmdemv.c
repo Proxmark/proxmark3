@@ -30,67 +30,32 @@ int UsageCmdHFEMVSelect(void) {
 int CmdHFEMVSelect(const char *cmd) {
 	uint8_t data[APDU_AID_LEN] = {0};
 	int datalen = 0;
-	bool activateField = false;
-	bool leaveSignalON = false;
-	bool decodeTLV = false;
 
-	if (strlen(cmd) < 1) {
-		UsageCmdHFEMVSelect();
-		return 0;
-	}
+
+	CLIParserInit("hf 14a select", 
+		"Executes select applet command", 
+		"Usage:\n\thf emv select -s a00000000101 -> select card, select applet\n\thf emv select -s -t a00000000101 -> select card, select applet, show result in TLV\n");
+
+	void* argtable[] = {
+		arg_param_begin,
+		arg_lit0("sS",  "select",  "activate field and select card"),
+		arg_lit0("kK",  "keep",    "keep field for next command"),
+		arg_lit0("aA",  "apdu",    "show APDU reqests and responses"),
+		arg_lit0("tT",  "tlv",     "TLV decode results"),
+		arg_str0(NULL,  NULL,      "<HEX applet AID>", NULL),
+		arg_param_end
+	};
+	CLIExecWithReturn(cmd, argtable, true);
 	
-	SetAPDULogging(false);
+	bool activateField = arg_get_lit(1);
+	bool leaveSignalON = arg_get_lit(2);
+	bool APDULogging = arg_get_lit(3);
+	bool decodeTLV = arg_get_lit(4);
+	if (arg_get_str_len(5))
+		CLIGetStrBLessWithReturn(5, data, &datalen, 0);
+	CLIParserFree();
 	
-	int cmdp = 0;
-	while(param_getchar(cmd, cmdp) != 0x00) {
-		char c = param_getchar(cmd, cmdp);
-		if ((c == '-') && (param_getlength(cmd, cmdp) == 2))
-			switch (param_getchar_indx(cmd, 1, cmdp)) {
-				case 'h':
-				case 'H':
-					UsageCmdHFEMVSelect();
-					return 0;
-				case 's':
-				case 'S':
-					activateField = true;
-					break;
-				case 'k':
-				case 'K':
-					leaveSignalON = true;
-					break;
-				case 'a':
-				case 'A':
-					SetAPDULogging(true);
-					break;
-				case 't':
-				case 'T':
-					decodeTLV = true;
-					break;
-				default:
-					PrintAndLog("Unknown parameter '%c'", param_getchar_indx(cmd, 1, cmdp));
-					return 1;
-		}
-
-		if (isxdigit((unsigned char)c)) {
-			switch(param_gethex_to_eol(cmd, cmdp, data, sizeof(data), &datalen)) {
-			case 1:
-				PrintAndLog("Invalid HEX value.");
-				return 1;
-			case 2:
-				PrintAndLog("AID too large.");
-				return 1;
-			case 3:
-				PrintAndLog("Hex must have even number of digits.");
-				return 1;
-			}
-			
-			// we get all the hex to end of line with spaces
-			break;
-		}
-
-
-		cmdp++;
-	}
+	SetAPDULogging(APDULogging);
 	
 	// exec
 	uint8_t buf[APDU_RES_LEN] = {0};
@@ -107,20 +72,6 @@ int CmdHFEMVSelect(const char *cmd) {
 	if (decodeTLV)
 		TLVPrintFromBuffer(buf, len);
 
-	return 0;
-}
-
-int UsageCmdHFEMVSearch(void) {
-	PrintAndLog("HELP :  Tries to select all applets from applet list:\n");
-	PrintAndLog("Usage:  hf emv search [-s][-k][-a][-t]\n");
-	PrintAndLog("  Options:");
-	PrintAndLog("  -s       : select card");
-	PrintAndLog("  -k       : keep field for next command");
-	PrintAndLog("  -a       : show APDU reqests and responses\n");
-	PrintAndLog("  -t       : TLV decode results of selected applets\n");
-	PrintAndLog("Samples:");
-	PrintAndLog(" hf emv search -s -> select card and search");
-	PrintAndLog(" hf emv search -s -t -> select card, search and show result in TLV");
 	return 0;
 }
 
@@ -144,6 +95,7 @@ int CmdHFEMVSearch(const char *cmd) {
 	bool leaveSignalON = arg_get_lit(2);
 	bool APDULogging = arg_get_lit(3);
 	bool decodeTLV = arg_get_lit(4);
+	CLIParserFree();
 	
 	SetAPDULogging(APDULogging);
 	

@@ -19,6 +19,7 @@
 #define arg_get_lit(n)(((struct arg_lit*)argtable[n])->count)
 #define arg_get_int(n)(((struct arg_int*)argtable[n])->ival[0])
 #define arg_get_str(n)((struct arg_str*)argtable[n])
+#define arg_get_str_len(n)(strlen(((struct arg_int*)argtable[n])->ival[0]))
 
 #define CLIExecWithReturn(cmd, atbl, ifempty) if (CLIParserParseString(cmd, atbl, arg_getsize(atbl), ifempty)){CLIParserFree();return 0;}
 #define CLIGetStrBLessWithReturn(paramnum, data, datalen, delta) if (CLIParamHexToBuf(arg_get_str(paramnum), data, sizeof(data) - (delta), datalen)) {CLIParserFree();return 1;}
