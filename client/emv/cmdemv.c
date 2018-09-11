@@ -11,6 +11,7 @@
 #include <ctype.h>
 #include "cmdemv.h"
 #include "test/cryptotest.h"
+#include "cliparser/cliparser.h"
 
 int UsageCmdHFEMVSelect(void) {
 	PrintAndLog("HELP :  Executes select applet command:\n");
@@ -125,49 +126,27 @@ int UsageCmdHFEMVSearch(void) {
 
 int CmdHFEMVSearch(const char *cmd) {
 
-	bool activateField = false;
-	bool leaveSignalON = false;
-	bool decodeTLV = false;
+	CLIParserInit("hf 14a select", 
+		"Tries to select all applets from applet list:\n", 
+		"Usage:\n\thf emv search -s -> select card and search\n\thf emv search -s -t -> select card, search and show result in TLV\n");
 
-	if (strlen(cmd) < 1) {
-		UsageCmdHFEMVSearch();
-		return 0;
-	}
+	void* argtable[] = {
+		arg_param_begin,
+		arg_lit0("sS",  "select",  "activate field and select card"),
+		arg_lit0("kK",  "keep",    "keep field ON for next command"),
+		arg_lit0("aA",  "apdu",    "show APDU reqests and responses"),
+		arg_lit0("tT",  "tlv",     "TLV decode results of selected applets"),
+		arg_param_end
+	};
+	CLIExecWithReturn(cmd, argtable, true);
 	
-	SetAPDULogging(false);
+	bool activateField = arg_get_lit(1);
+	bool leaveSignalON = arg_get_lit(2);
+	bool APDULogging = arg_get_lit(3);
+	bool decodeTLV = arg_get_lit(4);
 	
-	int cmdp = 0;
-	while(param_getchar(cmd, cmdp) != 0x00) {
-		char c = param_getchar(cmd, cmdp);
-		if ((c == '-') && (param_getlength(cmd, cmdp) == 2))
-			switch (param_getchar_indx(cmd, 1, cmdp)) {
-				case 'h':
-				case 'H':
-					UsageCmdHFEMVSearch();
-					return 0;
-				case 's':
-				case 'S':
-					activateField = true;
-					break;
-				case 'k':
-				case 'K':
-					leaveSignalON = true;
-					break;
-				case 'a':
-				case 'A':
-					SetAPDULogging(true);
-					break;
-				case 't':
-				case 'T':
-					decodeTLV = true;
-					break;
-				default:
-					PrintAndLog("Unknown parameter '%c'", param_getchar_indx(cmd, 1, cmdp));
-					return 1;
-		}
-		cmdp++;
-	}
-
+	SetAPDULogging(APDULogging);
+	
 	struct tlvdb *t = NULL;
 	const char *al = "Applets list";
 	t = tlvdb_fixed(1, strlen(al), (const unsigned char *)al);
