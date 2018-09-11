@@ -158,22 +158,27 @@ int CmdHFEMVPPSE(const char *cmd) {
 
 int CmdHFEMVGPO(const char *cmd) {
 
+	return 0;
 }
 
 int CmdHFEMVReadRecord(const char *cmd) {
 
+	return 0;
 }
 
 int CmdHFEMVAC(const char *cmd) {
 
+	return 0;
 }
 
 int CmdHFEMVGenerateChallenge(const char *cmd) {
 
+	return 0;
 }
 
 int CmdHFEMVInternalAuthenticate(const char *cmd) {
 
+	return 0;
 }
 
 int UsageCmdHFEMVExec(void) {
@@ -733,12 +738,17 @@ int CmdHFEMVTest(const char *cmd) {
 
 int CmdHelp(const char *Cmd);
 static command_t CommandTable[] =  {
-	{"help",	CmdHelp,		1,	"This help"},
-	{"exec",	CmdHFEMVExec,	0,	"Executes EMV contactless transaction."},
-	{"pse",		CmdHFEMVPPSE,	0,	"Execute PPSE. It selects 2PAY.SYS.DDF01 or 1PAY.SYS.DDF01 directory."},
-	{"search",	CmdHFEMVSearch,	0,	"Try to select all applets from applets list and print installed applets."},
-	{"select",	CmdHFEMVSelect,	0,	"Select applet."},
-	{"test",	CmdHFEMVTest,	0,	"Crypto logic test."},
+	{"help",		CmdHelp,						1,	"This help"},
+	{"exec",		CmdHFEMVExec,					0,	"Executes EMV contactless transaction."},
+	{"pse",			CmdHFEMVPPSE,					0,	"Execute PPSE. It selects 2PAY.SYS.DDF01 or 1PAY.SYS.DDF01 directory."},
+	{"search",		CmdHFEMVSearch,					0,	"Try to select all applets from applets list and print installed applets."},
+	{"select",		CmdHFEMVSelect,					0,	"Select applet."},
+	{"gpo",			CmdHFEMVGPO,					0,	"Execute GetProcessingOptions."},
+	{"readrec",		CmdHFEMVReadRecord,				0,	"Read files from card."},
+	{"genac",		CmdHFEMVAC,						0,	"Generate ApplicationCryptogram."},
+	{"challenge",	CmdHFEMVGenerateChallenge,		0,	"Generate challenge."},
+	{"intauth",		CmdHFEMVInternalAuthenticate,	0,	"Internal authentication."},
+	{"test",		CmdHFEMVTest,	0,	"Crypto logic test."},
 	{NULL, NULL, 0, NULL}
 };
 
