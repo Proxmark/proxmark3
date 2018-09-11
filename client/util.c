@@ -718,10 +718,6 @@ void xor(unsigned char *dst, unsigned char *src, size_t len) {
        *dst ^= *src;
 }
 
-int32_t le24toh (uint8_t data[3]) {
-    return (data[2] << 16) | (data[1] << 8) | data[0];
-}
-
 // RotateLeft - Ultralight, Desfire, works on byte level
 // 00-01-02  >> 01-02-00
 void rol(uint8_t *data, const size_t len){
