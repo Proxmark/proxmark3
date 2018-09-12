@@ -155,13 +155,16 @@ int CmdHFEMVPPSE(const char *cmd) {
 	return 0;
 }
 
+#define TLV_ADD(tag, value)( tlvdb_add(tlvRoot, tlvdb_fixed(tag, sizeof(value) - 1, (const unsigned char *)value)) )
+
 int CmdHFEMVGPO(const char *cmd) {
 	uint8_t data[APDU_RES_LEN] = {0};
 	int datalen = 0;
 
 	CLIParserInit("hf 14a gpo", 
-		"Executes Get Processing Options command. It returns data in TLV format (0x77 - format2) or plain (0x80 - format1) formats.\nNeeds a bank applet to be selected.\n", 
-		"Usage:\n\thf emv gpo -k -> select, execute GPO\n\thf emv gpo -st 01020304 -> select, execute GPO with 4-byte PDOL data, show result in TLV\n");
+		"Executes Get Processing Options command. It returns data in TLV format (0x77 - format2) or plain format (0x80 - format1).\nNeeds a EMV applet to be selected.", 
+		"Usage:\n\thf emv gpo -k -> execute GPO\n\thf emv gpo -st 01020304 -> execute GPO with 4-byte PDOL data, show result in TLV\n"); 
+		// here need to add load params from file and gen pdol
 
 	void* argtable[] = {
 		arg_param_begin,
@@ -199,6 +202,25 @@ int CmdHFEMVGPO(const char *cmd) {
 	if (dataMakeFromPDOL) {
 		// TODO
 		PrintAndLog("Make PDOL data not implemented!");
+
+		//9F02:(Amount, authorized (Numeric)) len:6
+		TLV_ADD(0x9F02, "\x00\x00\x00\x00\x01\x00");
+		//9F1A:(Terminal Country Code) len:2
+		TLV_ADD(0x9F1A, "ru");
+		//5F2A:(Transaction Currency Code) len:2
+		// USD 840, EUR 978, RUR 810, RUB 643, RUR 810(old), UAH 980, AZN 031, n/a 999
+		TLV_ADD(0x5F2A, "\x09\x80");
+		//9A:(Transaction Date) len:3
+		TLV_ADD(0x9A,   "\x00\x00\x00");
+		//9C:(Transaction Type) len:1   |  00 => Goods and service #01 => Cash
+		TLV_ADD(0x9C,   "\x00");
+		// 9F37 Unpredictable Number len:4
+		TLV_ADD(0x9F37, "\x01\x02\x03\x04");
+		// 9F6A Unpredictable Number (MSD for UDOL) len:4
+		TLV_ADD(0x9F6A, "\x01\x02\x03\x04");
+		//9F66:(Terminal Transaction Qualifiers (TTQ)) len:4
+		TLV_ADD(0x9F66, "\x26\x00\x00\x00"); // qVSDC
+
 		if (paramsLoadFromFile) {
 		};
 /*		pdol_data_tlv = dol_process(tlvdb_get(tlvRoot, 0x9f38, NULL), tlvRoot, 0x83);
@@ -247,15 +269,15 @@ int CmdHFEMVReadRecord(const char *cmd) {
 	int datalen = 0;
 
 	CLIParserInit("hf 14a readrec", 
-		"Executes Read Record command. It returns data in TLV format.\nNeeds a bank applet to be selected and sometimes needs GPO to be executed.\n", 
-		"Usage:\n\thf emv readrec -k -> select, get pse\n\thf emv readrec -st2 -> select, get ppse, show result in TLV\n");
+		"Executes Read Record command. It returns data in TLV format.\nNeeds a bank applet to be selected and sometimes needs GPO to be executed.", 
+		"Usage:\n\thf emv readrec -k 0101 -> read file SFI=01, SFIrec=01\n\thf emv readrec -kt 0201-> read file 0201 and show result in TLV\n");
 
 	void* argtable[] = {
 		arg_param_begin,
 		arg_lit0("kK",  "keep",    "keep field ON for next command"),
 		arg_lit0("aA",  "apdu",    "show APDU reqests and responses"),
 		arg_lit0("tT",  "tlv",     "TLV decode results of selected applets"),
-		arg_str0(NULL,  NULL,      "<SFI 1byte HEX><SFIrec 1byte HEX>", NULL),
+		arg_str1(NULL,  NULL,      "<SFI 1byte HEX><SFIrec 1byte HEX>", NULL),
 		arg_param_end
 	};
 	CLIExecWithReturn(cmd, argtable, true);
@@ -326,7 +348,6 @@ int UsageCmdHFEMVExec(void) {
 	return 0;
 }
 
-#define TLV_ADD(tag, value)( tlvdb_add(tlvRoot, tlvdb_fixed(tag, sizeof(value) - 1, (const unsigned char *)value)) )
 #define dreturn(n) {free(pdol_data_tlv);tlvdb_free(tlvSelect);tlvdb_free(tlvRoot);DropField();return n;}
 
 int CmdHFEMVExec(const char *cmd) {
