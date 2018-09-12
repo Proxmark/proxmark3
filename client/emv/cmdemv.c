@@ -37,7 +37,7 @@ int CmdHFEMVSelect(const char *cmd) {
 	bool leaveSignalON = arg_get_lit(2);
 	bool APDULogging = arg_get_lit(3);
 	bool decodeTLV = arg_get_lit(4);
-	CLIGetStrBLessWithReturn(5, data, &datalen, 0);
+	CLIGetStrWithReturn(5, data, &datalen);
 	CLIParserFree();
 	
 	SetAPDULogging(APDULogging);
@@ -107,7 +107,6 @@ int CmdHFEMVSearch(const char *cmd) {
 
 int CmdHFEMVPPSE(const char *cmd) {
 	
-	
 	CLIParserInit("hf 14a pse", 
 		"Executes PSE/PPSE select command. It returns list of applet on the card:\n", 
 		"Usage:\n\thf emv pse -s1 -> select, get pse\n\thf emv pse -st2 -> select, get ppse, show result in TLV\n");
@@ -157,11 +156,138 @@ int CmdHFEMVPPSE(const char *cmd) {
 }
 
 int CmdHFEMVGPO(const char *cmd) {
+	uint8_t data[APDU_RES_LEN] = {0};
+	int datalen = 0;
+
+	CLIParserInit("hf 14a gpo", 
+		"Executes Get Processing Options command. It returns data in TLV format (0x77 - format2) or plain (0x80 - format1) formats.\nNeeds a bank applet to be selected.\n", 
+		"Usage:\n\thf emv gpo -k -> select, execute GPO\n\thf emv gpo -st 01020304 -> select, execute GPO with 4-byte PDOL data, show result in TLV\n");
+
+	void* argtable[] = {
+		arg_param_begin,
+		arg_lit0("kK",  "keep",    "keep field ON for next command"),
+		arg_lit0("pP",  "params",  "load parameters for PDOL making from `emv/defparams.json` file (by default uses default parameters) (NOT WORK!!!)"),
+		arg_lit0("mM",  "make",    "make PDOLdata from PDOL (tag 9F38) and parameters (NOT WORK!!!)"),
+		arg_lit0("aA",  "apdu",    "show APDU reqests and responses"),
+		arg_lit0("tT",  "tlv",     "TLV decode results of selected applets"),
+		arg_str0(NULL,  NULL,      "<HEX PDOLdata/PDOL>", NULL),
+		arg_param_end
+	};
+	CLIExecWithReturn(cmd, argtable, true);
+	
+	bool leaveSignalON = arg_get_lit(1);
+	bool paramsLoadFromFile = arg_get_lit(2);
+	bool dataMakeFromPDOL = arg_get_lit(3);
+	bool APDULogging = arg_get_lit(4);
+	bool decodeTLV = arg_get_lit(5);
+	CLIGetStrWithReturn(6, data, &datalen);
+	CLIParserFree();	
+	
+	SetAPDULogging(APDULogging);
+	
+	// Init TLV tree
+	const char *alr = "Root terminal TLV tree";
+	struct tlvdb *tlvRoot = tlvdb_fixed(1, strlen(alr), (const unsigned char *)alr);
+	
+	// calc PDOL
+	struct tlv *pdol_data_tlv = NULL;
+	struct tlv data_tlv = {
+		.tag = 0x83,  //was 01
+		.len = datalen,
+		.value = (uint8_t *)data,
+	};
+	if (dataMakeFromPDOL) {
+		// TODO
+		PrintAndLog("Make PDOL data not implemented!");
+		if (paramsLoadFromFile) {
+		};
+/*		pdol_data_tlv = dol_process(tlvdb_get(tlvRoot, 0x9f38, NULL), tlvRoot, 0x83);
+		if (!pdol_data_tlv){
+			PrintAndLog("ERROR: can't create PDOL TLV.");
+			tlvdb_free(tlvRoot);
+			return 4;
+		}*/
+		return 0;
+	} else {
+		pdol_data_tlv = &data_tlv;
+	}
+
+	size_t pdol_data_tlv_data_len = 0;
+	unsigned char *pdol_data_tlv_data = tlv_encode(pdol_data_tlv, &pdol_data_tlv_data_len);
+	if (!pdol_data_tlv_data) {
+		PrintAndLog("ERROR: can't create PDOL data.");
+		tlvdb_free(tlvRoot);
+		return 4;
+	}
+	PrintAndLog("PDOL data[%d]: %s", pdol_data_tlv_data_len, sprint_hex(pdol_data_tlv_data, pdol_data_tlv_data_len));
+	
+	// exec
+	uint8_t buf[APDU_RES_LEN] = {0};
+	size_t len = 0;
+	uint16_t sw = 0;
+	int res = EMVGPO(leaveSignalON, pdol_data_tlv_data, pdol_data_tlv_data_len, buf, sizeof(buf), &len, &sw, tlvRoot);
+	
+	free(pdol_data_tlv_data);
+	tlvdb_free(tlvRoot);
+	
+	if (sw)
+		PrintAndLog("APDU response status: %04x - %s", sw, GetAPDUCodeDescription(sw >> 8, sw & 0xff)); 
+
+	if (res)
+		return res;
+	
+	if (decodeTLV)
+		TLVPrintFromBuffer(buf, len);
 
 	return 0;
 }
 
 int CmdHFEMVReadRecord(const char *cmd) {
+	uint8_t data[APDU_RES_LEN] = {0};
+	int datalen = 0;
+
+	CLIParserInit("hf 14a readrec", 
+		"Executes Read Record command. It returns data in TLV format.\nNeeds a bank applet to be selected and sometimes needs GPO to be executed.\n", 
+		"Usage:\n\thf emv readrec -k -> select, get pse\n\thf emv readrec -st2 -> select, get ppse, show result in TLV\n");
+
+	void* argtable[] = {
+		arg_param_begin,
+		arg_lit0("kK",  "keep",    "keep field ON for next command"),
+		arg_lit0("aA",  "apdu",    "show APDU reqests and responses"),
+		arg_lit0("tT",  "tlv",     "TLV decode results of selected applets"),
+		arg_str0(NULL,  NULL,      "<SFI 1byte HEX><SFIrec 1byte HEX>", NULL),
+		arg_param_end
+	};
+	CLIExecWithReturn(cmd, argtable, true);
+	
+	bool leaveSignalON = arg_get_lit(1);
+	bool APDULogging = arg_get_lit(2);
+	bool decodeTLV = arg_get_lit(3);
+	CLIGetStrWithReturn(4, data, &datalen);
+	CLIParserFree();
+	
+	if (datalen != 2) {
+		PrintAndLog("ERROR: Command needs to have 2 bytes of data");
+		return 1;
+	}
+	
+	SetAPDULogging(APDULogging);
+		
+	// exec
+	uint8_t buf[APDU_RES_LEN] = {0};
+	size_t len = 0;
+	uint16_t sw = 0;
+	int res = EMVReadRecord(leaveSignalON, data[0], data[1], buf, sizeof(buf), &len, &sw, NULL);
+	
+	if (sw)
+		PrintAndLog("APDU response status: %04x - %s", sw, GetAPDUCodeDescription(sw >> 8, sw & 0xff)); 
+
+	if (res)
+		return res;
+	
+	
+	if (decodeTLV)
+		TLVPrintFromBuffer(buf, len);
 
 	return 0;
 }
