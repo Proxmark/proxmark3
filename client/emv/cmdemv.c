@@ -322,7 +322,7 @@ int CmdHFEMVAC(const char *cmd) {
 int CmdHFEMVGenerateChallenge(const char *cmd) {
 
 	CLIParserInit("hf 14a challenge", 
-		"Executes Generate Challenge command. It returns 4-byte random number from card:\n", 
+		"Executes Generate Challenge command. It returns 4 or 8-byte random number from card:\n", 
 		"Usage:\n\thf emv challenge -> get challenge\n\thf emv challenge -k -> get challenge, keep fileld ON\n");
 
 	void* argtable[] = {
