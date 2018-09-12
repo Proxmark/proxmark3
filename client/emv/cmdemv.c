@@ -321,6 +321,41 @@ int CmdHFEMVAC(const char *cmd) {
 
 int CmdHFEMVGenerateChallenge(const char *cmd) {
 
+	CLIParserInit("hf 14a challenge", 
+		"Executes Generate Challenge command. It returns 4-byte random number from card:\n", 
+		"Usage:\n\thf emv challenge -> get challenge\n\thf emv challenge -k -> get challenge, keep fileld ON\n");
+
+	void* argtable[] = {
+		arg_param_begin,
+		arg_lit0("kK",  "keep",    "keep field ON for next command"),
+		arg_lit0("aA",  "apdu",    "show APDU reqests and responses"),
+		arg_param_end
+	};
+	CLIExecWithReturn(cmd, argtable, true);
+	
+	bool leaveSignalON = arg_get_lit(1);
+	bool APDULogging = arg_get_lit(2);
+	CLIParserFree();	
+	
+	SetAPDULogging(APDULogging);
+	
+	// exec
+	uint8_t buf[APDU_RES_LEN] = {0};
+	size_t len = 0;
+	uint16_t sw = 0;
+	int res = EMVGenerateChallenge(leaveSignalON, buf, sizeof(buf), &len, &sw, NULL);
+	
+	if (sw)
+		PrintAndLog("APDU response status: %04x - %s", sw, GetAPDUCodeDescription(sw >> 8, sw & 0xff)); 
+
+	if (res)
+		return res;
+
+	PrintAndLog("Challenge: %s", sprint_hex(buf, len));
+	
+	if (len != 4 && len != 8)
+		PrintAndLog("WARNING: length of challenge must be 4 or 8, but it %d", len);
+	
 	return 0;
 }
 
