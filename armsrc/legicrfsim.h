@@ -1,4 +1,4 @@
-//-----------------------------------------------------------------------------
+﻿//-----------------------------------------------------------------------------
 // (c) 2009 Henryk Plötz <henryk@ploetzli.ch>
 //     2018 AntiCat
 //
@@ -9,10 +9,11 @@
 // LEGIC RF emulation public interface
 //-----------------------------------------------------------------------------
 
-#ifndef __LEGICRF_H
-#define __LEGICRF_H
+#ifndef __LEGICRFSIM_H
+#define __LEGICRFSIM_H
 
-extern void LegicRfReader(int bytes, int offset);
-extern void LegicRfWriter(int bytes, int offset);
+#include "proxmark3.h"
 
-#endif /* __LEGICRF_H */
+extern void LegicRfSimulate(uint8_t tagtype);
+
+#endif /* __LEGICRFSIM_H */

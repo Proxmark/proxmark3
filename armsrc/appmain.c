@@ -21,6 +21,7 @@
 #include "printf.h"
 #include "string.h"
 #include "legicrf.h"
+#include "legicrfsim.h"
 #include "hitag2.h"
 #include "hitagS.h"
 #include "lfsampling.h"
@@ -1090,7 +1091,7 @@ void UsbPacketReceived(uint8_t *packet, int len)
 
 #ifdef WITH_LEGICRF
 		case CMD_SIMULATE_TAG_LEGIC_RF:
-			LegicRfSimulate(c->arg[0], c->arg[1], c->arg[2]);
+			LegicRfSimulate(c->arg[0]);
 			break;
 
 		case CMD_WRITER_LEGIC_RF:
