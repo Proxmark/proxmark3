@@ -197,8 +197,8 @@ begin
         end
     end
 
-	// set ssp_frame signal for corr_i_cnt = 0..3 and corr_i_cnt = 32..35
-	// (send one frame with 16 Bits)
+    // set ssp_frame signal for corr_i_cnt = 0..3
+    // (send one frame with 16 Bits)
     if(corr_i_cnt[5:2] == 4'b0000)
         ssp_frame = 1'b1;
     else
