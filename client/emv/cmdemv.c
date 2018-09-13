@@ -163,8 +163,9 @@ int CmdHFEMVGPO(const char *cmd) {
 
 	CLIParserInit("hf emv gpo", 
 		"Executes Get Processing Options command. It returns data in TLV format (0x77 - format2) or plain format (0x80 - format1).\nNeeds a EMV applet to be selected.", 
-		"Usage:\n\thf emv gpo -k -> execute GPO\n\thf emv gpo -st 01020304 -> execute GPO with 4-byte PDOL data, show result in TLV\n"); 
-		// here need to add load params from file and gen pdol
+		"Usage:\n\thf emv gpo -k -> execute GPO\n"
+			"\thf emv gpo -st 01020304 -> execute GPO with 4-byte PDOL data, show result in TLV\n"); 
+			// here need to add load params from file and gen pdol
 
 	void* argtable[] = {
 		arg_param_begin,
@@ -402,7 +403,7 @@ int CmdHFEMVAC(const char *cmd) {
 int CmdHFEMVGenerateChallenge(const char *cmd) {
 
 	CLIParserInit("hf emv challenge", 
-		"Executes Generate Challenge command. It returns 4 or 8-byte random number from card:\n", 
+		"Executes Generate Challenge command. It returns 4 or 8-byte random number from card.\nNeeds a EMV applet to be selected and GPO to be executed.", 
 		"Usage:\n\thf emv challenge -> get challenge\n\thf emv challenge -k -> get challenge, keep fileld ON\n");
 
 	void* argtable[] = {
