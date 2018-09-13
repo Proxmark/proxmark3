@@ -18,7 +18,7 @@ int CmdHFEMVSelect(const char *cmd) {
 	int datalen = 0;
 
 
-	CLIParserInit("hf 14a select", 
+	CLIParserInit("hf emv select", 
 		"Executes select applet command", 
 		"Usage:\n\thf emv select -s a00000000101 -> select card, select applet\n\thf emv select -st a00000000101 -> select card, select applet, show result in TLV\n");
 
@@ -62,7 +62,7 @@ int CmdHFEMVSelect(const char *cmd) {
 
 int CmdHFEMVSearch(const char *cmd) {
 
-	CLIParserInit("hf 14a select", 
+	CLIParserInit("hf emv search", 
 		"Tries to select all applets from applet list:\n", 
 		"Usage:\n\thf emv search -s -> select card and search\n\thf emv search -st -> select card, search and show result in TLV\n");
 
@@ -107,7 +107,7 @@ int CmdHFEMVSearch(const char *cmd) {
 
 int CmdHFEMVPPSE(const char *cmd) {
 	
-	CLIParserInit("hf 14a pse", 
+	CLIParserInit("hf emv pse", 
 		"Executes PSE/PPSE select command. It returns list of applet on the card:\n", 
 		"Usage:\n\thf emv pse -s1 -> select, get pse\n\thf emv pse -st2 -> select, get ppse, show result in TLV\n");
 
@@ -161,7 +161,7 @@ int CmdHFEMVGPO(const char *cmd) {
 	uint8_t data[APDU_RES_LEN] = {0};
 	int datalen = 0;
 
-	CLIParserInit("hf 14a gpo", 
+	CLIParserInit("hf emv gpo", 
 		"Executes Get Processing Options command. It returns data in TLV format (0x77 - format2) or plain format (0x80 - format1).\nNeeds a EMV applet to be selected.", 
 		"Usage:\n\thf emv gpo -k -> execute GPO\n\thf emv gpo -st 01020304 -> execute GPO with 4-byte PDOL data, show result in TLV\n"); 
 		// here need to add load params from file and gen pdol
@@ -268,7 +268,7 @@ int CmdHFEMVReadRecord(const char *cmd) {
 	uint8_t data[APDU_RES_LEN] = {0};
 	int datalen = 0;
 
-	CLIParserInit("hf 14a readrec", 
+	CLIParserInit("hf emv readrec", 
 		"Executes Read Record command. It returns data in TLV format.\nNeeds a bank applet to be selected and sometimes needs GPO to be executed.", 
 		"Usage:\n\thf emv readrec -k 0101 -> read file SFI=01, SFIrec=01\n\thf emv readrec -kt 0201-> read file 0201 and show result in TLV\n");
 
@@ -318,27 +318,47 @@ int CmdHFEMVAC(const char *cmd) {
 	uint8_t data[APDU_RES_LEN] = {0};
 	int datalen = 0;
 
-	CLIParserInit("hf 14a genac", 
+	CLIParserInit("hf emv genac", 
 		"Generate Application Cryptogram command. It returns data in TLV format .\nNeeds a EMV applet to be selected and GPO to be executed.", 
-		"Usage:\n\thf emv genac -k 0102 -> execute GPO with 2-byte CDOLdata and keep field ON after command\n"
-			"\thf emv genac -t 01020304 -> execute GPO with 4-byte CDOL data, show result in TLV\n"); 
+		"Usage:\n\thf emv genac -k 0102 -> generate AC with 2-byte CDOLdata and keep field ON after command\n"
+			"\thf emv genac -t 01020304 -> generate AC with 4-byte CDOL data, show result in TLV\n"
+			"\thf emv genac -Daac 01020304 -> generate AC with 4-byte CDOL data and terminal decision 'declined'\n"); 
 
 	void* argtable[] = {
 		arg_param_begin,
-		arg_lit0("kK",  "keep",    "keep field ON for next command"),
-		arg_lit0("cC",  "cda",     "executes CDA transaction. Needs to get SDAD in results."),
-		arg_lit0("aA",  "apdu",    "show APDU reqests and responses"),
-		arg_lit0("tT",  "tlv",     "TLV decode results of selected applets"),
-		arg_str1(NULL,  NULL,      "<HEX CDOLdata>", NULL),
+		arg_lit0("kK",  "keep",     "keep field ON for next command"),
+		arg_lit0("cC",  "cda",      "executes CDA transaction. Needs to get SDAD in results."),
+		arg_str0("dD",  "decision", "<aac|tc|arqc>", "Terminal decision. aac - declined, tc - approved, arqc - online authorisation requested"),
+		arg_lit0("aA",  "apdu",     "show APDU reqests and responses"),
+		arg_lit0("tT",  "tlv",      "TLV decode results of selected applets"),
+		arg_str1(NULL,  NULL,       "<HEX CDOLdata>", NULL),
 		arg_param_end
 	};
 	CLIExecWithReturn(cmd, argtable, false);
 	
 	bool leaveSignalON = arg_get_lit(1);
 	bool trTypeCDA = arg_get_lit(2);
-	bool APDULogging = arg_get_lit(3);
-	bool decodeTLV = arg_get_lit(4);
-	CLIGetStrWithReturn(5, data, &datalen);
+	uint8_t termDecision = 0xff;
+	if (arg_get_str_len(3)) {
+		if (!strncmp(arg_get_str(3)->sval[0], "aac", 4))
+			termDecision = EMVAC_AAC;
+		if (!strncmp(arg_get_str(3)->sval[0], "tc", 4))
+			termDecision = EMVAC_TC;
+		if (!strncmp(arg_get_str(3)->sval[0], "arqc", 4))
+			termDecision = EMVAC_ARQC;
+
+		if (termDecision == 0xff) {
+			PrintAndLog("ERROR: can't find terminal decision '%s'", arg_get_str(3)->sval[0]);
+			return 1;
+		}
+	} else {
+		termDecision = EMVAC_TC;
+	}
+	if (trTypeCDA)
+		termDecision = termDecision | EMVAC_CDAREQ;
+	bool APDULogging = arg_get_lit(4);
+	bool decodeTLV = arg_get_lit(5);
+	CLIGetStrWithReturn(6, data, &datalen);
 	CLIParserFree();	
 	
 	SetAPDULogging(APDULogging);
@@ -362,7 +382,7 @@ int CmdHFEMVAC(const char *cmd) {
 	uint8_t buf[APDU_RES_LEN] = {0};
 	size_t len = 0;
 	uint16_t sw = 0;
-	int res = EMVAC(leaveSignalON, (trTypeCDA) ? EMVAC_TC + EMVAC_CDAREQ : EMVAC_TC, (uint8_t *)cdol_data_tlv->value, cdol_data_tlv->len, buf, sizeof(buf), &len, &sw, tlvRoot);
+	int res = EMVAC(leaveSignalON, termDecision, (uint8_t *)cdol_data_tlv->value, cdol_data_tlv->len, buf, sizeof(buf), &len, &sw, tlvRoot);
 	
 //	free(cdol_data_tlv);
 	tlvdb_free(tlvRoot);
@@ -381,7 +401,7 @@ int CmdHFEMVAC(const char *cmd) {
 
 int CmdHFEMVGenerateChallenge(const char *cmd) {
 
-	CLIParserInit("hf 14a challenge", 
+	CLIParserInit("hf emv challenge", 
 		"Executes Generate Challenge command. It returns 4 or 8-byte random number from card:\n", 
 		"Usage:\n\thf emv challenge -> get challenge\n\thf emv challenge -k -> get challenge, keep fileld ON\n");
 
@@ -423,7 +443,7 @@ int CmdHFEMVInternalAuthenticate(const char *cmd) {
 	uint8_t data[APDU_RES_LEN] = {0};
 	int datalen = 0;
 
-	CLIParserInit("hf 14a intauth", 
+	CLIParserInit("hf emv intauth", 
 		"Generate Internal Authenticate command. Usually needs 4-byte random number. It returns data in TLV format .\nNeeds a EMV applet to be selected and GPO to be executed.", 
 		"Usage:\n\thf emv intauth -k 01020304 -> execute Internal Authenticate with 4-byte DDOLdata and keep field ON after command\n"
 			"\thf emv intauth -t 01020304 -> execute Internal Authenticate with 4-byte DDOL data, show result in TLV\n"); 
