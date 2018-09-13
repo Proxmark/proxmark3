@@ -1,5 +1,5 @@
 //-----------------------------------------------------------------------------
-// Copyright (C) 2017 Merlok
+// Copyright (C) 2017, 2018 Merlok
 //
 // This code is licensed to you under the terms of the GNU GPL, version 2 or,
 // at your option, any later version. See the LICENSE.txt file for the text of
@@ -195,7 +195,7 @@ int CmdHFEMVGPO(const char *cmd) {
 	// calc PDOL
 	struct tlv *pdol_data_tlv = NULL;
 	struct tlv data_tlv = {
-		.tag = 0x83,  //was 01
+		.tag = 0x01,
 		.len = datalen,
 		.value = (uint8_t *)data,
 	};
@@ -315,8 +315,67 @@ int CmdHFEMVReadRecord(const char *cmd) {
 }
 
 int CmdHFEMVAC(const char *cmd) {
+	uint8_t data[APDU_RES_LEN] = {0};
+	int datalen = 0;
 
-	return 0;
+	CLIParserInit("hf 14a genac", 
+		"Generate Application Cryptogram command. It returns data in TLV format .\nNeeds a EMV applet to be selected and GPO to be executed.", 
+		"Usage:\n\thf emv genac -k 0102-> execute GPO with 2-byte CDOLdata and keep field ON after command\n\thf emv genac -t 01020304 -> execute GPO with 4-byte CDOL data, show result in TLV\n"); 
+
+	void* argtable[] = {
+		arg_param_begin,
+		arg_lit0("kK",  "keep",    "keep field ON for next command"),
+		arg_lit0("aA",  "apdu",    "show APDU reqests and responses"),
+		arg_lit0("tT",  "tlv",     "TLV decode results of selected applets"),
+		arg_str1(NULL,  NULL,      "<HEX CDOLdata>", NULL),
+		arg_param_end
+	};
+	CLIExecWithReturn(cmd, argtable, false);
+	
+	bool leaveSignalON = arg_get_lit(1);
+	bool APDULogging = arg_get_lit(2);
+	bool decodeTLV = arg_get_lit(3);
+	CLIGetStrWithReturn(4, data, &datalen);
+	CLIParserFree();	
+	
+	SetAPDULogging(APDULogging);
+	
+	// Init TLV tree
+	const char *alr = "Root terminal TLV tree";
+	struct tlvdb *tlvRoot = tlvdb_fixed(1, strlen(alr), (const unsigned char *)alr);
+	
+	// calc CDOL
+	struct tlv *cdol_data_tlv = NULL;
+//	struct tlv *cdol_data_tlv = dol_process(tlvdb_get(tlvRoot, 0x8c, NULL), tlvRoot, 0x01); // 0x01 - dummy tag
+	struct tlv data_tlv = {
+		.tag = 0x01,
+		.len = datalen,
+		.value = (uint8_t *)data,
+	};	
+	cdol_data_tlv = &data_tlv;
+	PrintAndLog("CDOL data[%d]: %s", cdol_data_tlv->len, sprint_hex(cdol_data_tlv->value, cdol_data_tlv->len));
+	
+	// exec
+	uint8_t buf[APDU_RES_LEN] = {0};
+	size_t len = 0;
+	uint16_t sw = 0;
+// EMVAC_TC + EMVAC_CDAREQ --- to get SDAD
+//	res = EMVAC(true, (TrType == TT_CDA) ? EMVAC_TC + EMVAC_CDAREQ : EMVAC_TC, (uint8_t *)cdol_data_tlv->value, cdol_data_tlv->len, buf, sizeof(buf), &len, &sw, tlvRoot);
+	int res = EMVAC(leaveSignalON, EMVAC_TC, (uint8_t *)cdol_data_tlv->value, cdol_data_tlv->len, buf, sizeof(buf), &len, &sw, tlvRoot);
+	
+//	free(cdol_data_tlv);
+	tlvdb_free(tlvRoot);
+	
+	if (sw)
+		PrintAndLog("APDU response status: %04x - %s", sw, GetAPDUCodeDescription(sw >> 8, sw & 0xff)); 
+
+	if (res)
+		return res;
+	
+	if (decodeTLV)
+		TLVPrintFromBuffer(buf, len);
+
+	return 0;	
 }
 
 int CmdHFEMVGenerateChallenge(const char *cmd) {
@@ -360,8 +419,51 @@ int CmdHFEMVGenerateChallenge(const char *cmd) {
 }
 
 int CmdHFEMVInternalAuthenticate(const char *cmd) {
+	uint8_t data[APDU_RES_LEN] = {0};
+	int datalen = 0;
 
-	return 0;
+	CLIParserInit("hf 14a intauth", 
+		"Generate Internal Authenticate command. Usually needs 4-byte random number. It returns data in TLV format .\nNeeds a EMV applet to be selected and GPO to be executed.", 
+		"Usage:\n\thf emv intauth -k 01020304 -> execute Internal Authenticate with 4-byte DDOLdata and keep field ON after command\n"
+			"\thf emv intauth -t 01020304 -> execute Internal Authenticate with 4-byte DDOL data, show result in TLV\n"); 
+
+	void* argtable[] = {
+		arg_param_begin,
+		arg_lit0("kK",  "keep",    "keep field ON for next command"),
+		arg_lit0("aA",  "apdu",    "show APDU reqests and responses"),
+		arg_lit0("tT",  "tlv",     "TLV decode results of selected applets"),
+		arg_str1(NULL,  NULL,      "<HEX DDOLdata>", NULL),
+		arg_param_end
+	};
+	CLIExecWithReturn(cmd, argtable, false);
+	
+	bool leaveSignalON = arg_get_lit(1);
+	bool APDULogging = arg_get_lit(2);
+	bool decodeTLV = arg_get_lit(3);
+	CLIGetStrWithReturn(4, data, &datalen);
+	CLIParserFree();	
+	
+	SetAPDULogging(APDULogging);
+	
+	// DDOL
+	PrintAndLog("DDOL data[%d]: %s", datalen, sprint_hex(data, datalen));
+	
+	// exec
+	uint8_t buf[APDU_RES_LEN] = {0};
+	size_t len = 0;
+	uint16_t sw = 0;
+	int res = EMVInternalAuthenticate(leaveSignalON, data, datalen, buf, sizeof(buf), &len, &sw, NULL);
+	
+	if (sw)
+		PrintAndLog("APDU response status: %04x - %s", sw, GetAPDUCodeDescription(sw >> 8, sw & 0xff)); 
+
+	if (res)
+		return res;
+	
+	if (decodeTLV)
+		TLVPrintFromBuffer(buf, len);
+
+	return 0;	
 }
 
 int UsageCmdHFEMVExec(void) {
@@ -930,7 +1032,7 @@ static command_t CommandTable[] =  {
 	{"genac",		CmdHFEMVAC,						0,	"Generate ApplicationCryptogram."},
 	{"challenge",	CmdHFEMVGenerateChallenge,		0,	"Generate challenge."},
 	{"intauth",		CmdHFEMVInternalAuthenticate,	0,	"Internal authentication."},
-	{"test",		CmdHFEMVTest,	0,	"Crypto logic test."},
+	{"test",		CmdHFEMVTest,					0,	"Crypto logic test."},
 	{NULL, NULL, 0, NULL}
 };
 
