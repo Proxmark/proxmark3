@@ -92,8 +92,8 @@ static inline uint16_t rx_frame_from_fpga() {
 // and averages the next (most stable) 8 samples. The final 8 samples are dropped
 // also.
 //
-// The demedulated should be alligned to the bit period by the caller. This is
-// done in rx_bit_as_reader and rx_ack_as_reader.
+// The demodulated should be alligned to the bit period by the caller. This is
+// done in rx_bit and rx_ack.
 static inline bool rx_bit() {
   int32_t sum_cq = 0;
   int32_t sum_ci = 0;
@@ -105,11 +105,11 @@ static inline bool rx_bit() {
 
   // sample next 8 I/Q pairs
   for(size_t i = 0; i<8; ++i) {
-	uint16_t iq = rx_frame_from_fpga();
-    int8_t ci = iq >> 8;
-    int8_t cq = iq;
-	sum_ci += ci;
-	sum_cq += cq;
+    uint16_t iq = rx_frame_from_fpga();
+    int8_t ci = (int8_t)(iq >> 8);
+    int8_t cq = (int8_t)(iq & 0xff);
+    sum_ci += ci;
+    sum_cq += cq;
   }
 
   // calculate power
@@ -129,12 +129,12 @@ static inline bool rx_bit() {
 //-----------------------------------------------------------------------------
 
 static inline void tx_bit(bool bit) {
-  // insert pause (modulate carrier, ssp_dout=1)
+  // insert pause
   HIGH(GPIO_SSC_DOUT);
   last_frame_end += RWD_TIME_PAUSE;
   while(GET_TICKS < last_frame_end) { };
 
-  // return to high (unmodulated carrier, ssp_dout = 0), wait for bit periode to end
+  // return to carrier on, wait for bit periode to end
   LOW(GPIO_SSC_DOUT);
   last_frame_end += (bit ? RWD_TIME_1 : RWD_TIME_0) - RWD_TIME_PAUSE;
   while(GET_TICKS < last_frame_end) { };
@@ -164,7 +164,7 @@ static void tx_frame(uint32_t frame, uint8_t len) {
     legic_prng_forward(1);
   };
 
-  // add pause (modulate carrier, ssp_dout = 1) to mark end of the frame
+  // add pause to mark end of the frame
   HIGH(GPIO_SSC_DOUT);
   last_frame_end += RWD_TIME_PAUSE;
   while(GET_TICKS < last_frame_end) { };
