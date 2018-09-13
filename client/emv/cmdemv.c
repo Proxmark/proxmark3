@@ -320,11 +320,13 @@ int CmdHFEMVAC(const char *cmd) {
 
 	CLIParserInit("hf 14a genac", 
 		"Generate Application Cryptogram command. It returns data in TLV format .\nNeeds a EMV applet to be selected and GPO to be executed.", 
-		"Usage:\n\thf emv genac -k 0102-> execute GPO with 2-byte CDOLdata and keep field ON after command\n\thf emv genac -t 01020304 -> execute GPO with 4-byte CDOL data, show result in TLV\n"); 
+		"Usage:\n\thf emv genac -k 0102 -> execute GPO with 2-byte CDOLdata and keep field ON after command\n"
+			"\thf emv genac -t 01020304 -> execute GPO with 4-byte CDOL data, show result in TLV\n"); 
 
 	void* argtable[] = {
 		arg_param_begin,
 		arg_lit0("kK",  "keep",    "keep field ON for next command"),
+		arg_lit0("cC",  "cda",     "executes CDA transaction. Needs to get SDAD in results."),
 		arg_lit0("aA",  "apdu",    "show APDU reqests and responses"),
 		arg_lit0("tT",  "tlv",     "TLV decode results of selected applets"),
 		arg_str1(NULL,  NULL,      "<HEX CDOLdata>", NULL),
@@ -333,9 +335,10 @@ int CmdHFEMVAC(const char *cmd) {
 	CLIExecWithReturn(cmd, argtable, false);
 	
 	bool leaveSignalON = arg_get_lit(1);
-	bool APDULogging = arg_get_lit(2);
-	bool decodeTLV = arg_get_lit(3);
-	CLIGetStrWithReturn(4, data, &datalen);
+	bool trTypeCDA = arg_get_lit(2);
+	bool APDULogging = arg_get_lit(3);
+	bool decodeTLV = arg_get_lit(4);
+	CLIGetStrWithReturn(5, data, &datalen);
 	CLIParserFree();	
 	
 	SetAPDULogging(APDULogging);
@@ -359,9 +362,7 @@ int CmdHFEMVAC(const char *cmd) {
 	uint8_t buf[APDU_RES_LEN] = {0};
 	size_t len = 0;
 	uint16_t sw = 0;
-// EMVAC_TC + EMVAC_CDAREQ --- to get SDAD
-//	res = EMVAC(true, (TrType == TT_CDA) ? EMVAC_TC + EMVAC_CDAREQ : EMVAC_TC, (uint8_t *)cdol_data_tlv->value, cdol_data_tlv->len, buf, sizeof(buf), &len, &sw, tlvRoot);
-	int res = EMVAC(leaveSignalON, EMVAC_TC, (uint8_t *)cdol_data_tlv->value, cdol_data_tlv->len, buf, sizeof(buf), &len, &sw, tlvRoot);
+	int res = EMVAC(leaveSignalON, (trTypeCDA) ? EMVAC_TC + EMVAC_CDAREQ : EMVAC_TC, (uint8_t *)cdol_data_tlv->value, cdol_data_tlv->len, buf, sizeof(buf), &len, &sw, tlvRoot);
 	
 //	free(cdol_data_tlv);
 	tlvdb_free(tlvRoot);
