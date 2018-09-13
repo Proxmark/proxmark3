@@ -649,7 +649,7 @@ void SamyRun()
 	StandAloneMode();
 	FpgaDownloadAndGo(FPGA_BITSTREAM_LF);
 
-	int high[OPTS], low[OPTS];
+	int tops[OPTS], high[OPTS], low[OPTS];
 	int selected = 0;
 	int playing = 0;
 	int cardRead = 0;
@@ -683,8 +683,11 @@ void SamyRun()
 			/* need this delay to prevent catching some weird data */
 			SpinDelay(500);
 
-			CmdHIDdemodFSK(1, &high[selected], &low[selected], 0);
-			Dbprintf("Recorded %x %x%08x", selected, high[selected], low[selected]);
+			CmdHIDdemodFSK(1, &tops[selected], &high[selected], &low[selected], 0);
+			if (tops[selected] > 0)
+				Dbprintf("Recorded %x %x%08x%08x", selected, tops[selected], high[selected], low[selected]);
+			else
+				Dbprintf("Recorded %x %x%08x", selected, high[selected], low[selected]);
 
 			LEDsoff();
 			LED(selected + 1, 0);
@@ -705,7 +708,10 @@ void SamyRun()
 					LED(LED_ORANGE, 0);
 
 					// record
-					Dbprintf("Cloning %x %x%08x", selected, high[selected], low[selected]);
+					if (tops[selected] > 0)
+						Dbprintf("Cloning %x %x%08x%08x", selected, tops[selected], high[selected], low[selected]);
+					else
+						Dbprintf("Cloning %x %x%08x", selected, high[selected], low[selected]);
 
 					// wait for button to be released
 					while(BUTTON_PRESS())
@@ -714,8 +720,11 @@ void SamyRun()
 					/* need this delay to prevent catching some weird data */
 					SpinDelay(500);
 
-					CopyHIDtoT55x7(0, high[selected], low[selected], 0);
-					Dbprintf("Cloned %x %x%08x", selected, high[selected], low[selected]);
+					CopyHIDtoT55x7(tops[selected] & 0x000FFFFF, high[selected], low[selected], (tops[selected] != 0 && ((high[selected]& 0xFFFFFFC0) != 0)));
+					if (tops[selected] > 0)
+						Dbprintf("Cloned %x %x%08x%08x", selected, tops[selected], high[selected], low[selected]);
+					else
+						Dbprintf("Cloned %x %x%08x", selected, high[selected], low[selected]);
 
 					LEDsoff();
 					LED(selected + 1, 0);
@@ -748,8 +757,12 @@ void SamyRun()
 				// wait for button to be released
 				while(BUTTON_PRESS())
 					WDT_HIT();
-				Dbprintf("%x %x%08x", selected, high[selected], low[selected]);
-				CmdHIDsimTAG(high[selected], low[selected], 0);
+				if (tops[selected] > 0)
+					Dbprintf("%x %x%08x%08x", selected, tops[selected], high[selected], low[selected]);
+				else
+					Dbprintf("%x %x%08x", selected, high[selected], low[selected]);
+				
+				CmdHIDsimTAG(tops[selected], high[selected], low[selected], 0);
 				DbpString("Done playing");
 				if (BUTTON_HELD(1000) > 0)
 					{
