@@ -28,7 +28,7 @@ static command_t CommandTable[] =
   {"reader",      CmdLegicRFRead, 0, "[offset [length]] -- read bytes from a LEGIC card"},
   {"save",        CmdLegicSave,   0, "<filename> [<length>] -- Store samples"},
   {"load",        CmdLegicLoad,   0, "<filename> -- Restore samples"},
-  {"sim",         CmdLegicRfSim,  0, "[phase drift [frame drift [req/resp drift]]] Start tag simulator (use after load or read)"},
+  {"sim",         CmdLegicRfSim,  0, "[tagtype, 0:MIM22, 1:MIM256, 2:MIM1024] Start tag simulator (use after load or read)"},
   {"write",       CmdLegicRfWrite,0, "<offset> <length> -- Write sample buffer (user after load or read)"},
   {"fill",        CmdLegicRfFill, 0, "<offset> <length> <value> -- Fill/Write tag with constant value"},
   {NULL, NULL, 0, NULL}
@@ -320,10 +320,8 @@ int CmdLegicSave(const char *Cmd)
 int CmdLegicRfSim(const char *Cmd)
 {
    UsbCommand c={CMD_SIMULATE_TAG_LEGIC_RF};
-   c.arg[0] = 6;
-   c.arg[1] = 3;
-   c.arg[2] = 0;
-   sscanf(Cmd, " %" SCNi64 " %" SCNi64 " %" SCNi64, &c.arg[0], &c.arg[1], &c.arg[2]);
+   c.arg[0] = 1;
+   sscanf(Cmd, " %" SCNi64, &c.arg[0]);
    SendCommand(&c);
    return 0;
 }
