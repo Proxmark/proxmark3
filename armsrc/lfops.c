@@ -876,7 +876,6 @@ void CmdHIDdemodFSK(int findone, int *high2, int *high, int *low, int ledcontrol
 	BigBuf_Clear_keep_EM();
 
 	while(!BUTTON_PRESS() && !usb_poll_validate_length()) {
-
 		WDT_HIT();
 		if (ledcontrol) LED_A_ON();
 
@@ -887,13 +886,67 @@ void CmdHIDdemodFSK(int findone, int *high2, int *high, int *low, int ledcontrol
 		idx = HIDdemodFSK(dest, &size, &hi2, &hi, &lo, &dummyIdx);
 		
 		if (idx>0 && lo>0 && (size==96 || size==192)){
+			uint8_t bitlen = 0;
+			uint32_t fc = 0;
+			uint32_t cardnum = 0;
+			bool decoded = false;
+
 			// go over previously decoded manchester data and decode into usable tag ID
-			if (hi2 != 0){ //extra large HID tags  88/192 bits
-				Dbprintf("TAG ID: %x%08x%08x (%d)",
-				  (unsigned int) hi2, (unsigned int) hi, (unsigned int) lo, (unsigned int) (lo>>1) & 0xFFFF);
-			} else {  //standard HID tags 44/96 bits
-				Dbprintf("TAG ID: %x%08x (%d)",(unsigned int) hi, (unsigned int) lo, (unsigned int) (lo>>1) & 0xFFFF); //old print cmd
+			if ((hi2 & 0x000FFFF) != 0){ //extra large HID tags  88/192 bits
+				uint32_t bp = hi2 & 0x000FFFFF;
+				bitlen = 63;
+				while (bp > 0) {
+					bp = bp >> 1;
+					bitlen++;
+				}
+			} else if ((hi >> 6) > 0) {
+				uint32_t bp = hi;
+				bitlen = 31;
+				while (bp > 0) {
+					bp = bp >> 1;
+					bitlen++;
+				}
+			} else if (((hi >> 5) & 1) == 0) {
+				bitlen = 37;
+			} else if ((hi & 0x0000001F) > 0 ) {
+				uint32_t bp = (hi & 0x0000001F);
+				bitlen = 31;
+				while (bp > 0) {
+					bp = bp >> 1;
+					bitlen++;
+				}
+			} else {
+				uint32_t bp = lo;
+				bitlen = 0;
+				while (bp > 0) {
+					bp = bp >> 1;
+					bitlen++;
+				}
 			}
+			switch (bitlen){
+				case 26:
+					cardnum = (lo>>1)&0xFFFF;
+					fc = (lo>>17)&0xFF;
+					decoded = true;
+					break;
+				case 35:
+					cardnum = (lo>>1)&0xFFFFF;
+					fc = ((hi&1)<<11)|(lo>>21);
+					decoded = true;
+					break;
+			}
+				
+			if (hi2 != 0) //extra large HID tags  88/192 bits
+				Dbprintf("TAG ID: %x%08x%08x (%d)",
+					(unsigned int) hi2, (unsigned int) hi, (unsigned int) lo, (unsigned int) (lo>>1) & 0xFFFF);
+			else 
+				Dbprintf("TAG ID: %x%08x (%d)",
+					(unsigned int) hi, (unsigned int) lo, (unsigned int) (lo>>1) & 0xFFFF);
+			
+			if (decoded)
+				Dbprintf("Format Len: %dbits - FC: %d - Card: %d",
+					(unsigned int) bitlen, (unsigned int) fc, (unsigned int) cardnum);
+
 			if (findone){
 				if (ledcontrol)	LED_A_OFF();
 				*high2 = hi2;
