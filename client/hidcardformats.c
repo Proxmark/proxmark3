@@ -140,6 +140,34 @@ bool Unpack_ADT31(/*in*/hidproxmessage_t* packed, /*out*/hidproxcard_t* card){
   return true;
 }
 
+bool Pack_Kastle(/*in*/hidproxcard_t* card, /*out*/hidproxmessage_t* packed){
+  memset(packed, 0, sizeof(hidproxmessage_t));
+  if (card->FacilityCode > 0x00FF) return false; // Can't encode FC.
+  if (card->CardNumber > 0x0000FFFF) return false; // Can't encode CN.
+  if (card->IssueLevel > 0x001F) return false; // IL is only 5 bits.
+  if (card->OEM > 0) return false; // Not used in this format
+  packed->Length = 32; // Set number of bits
+  set_bit_by_position(packed, 1, 1); // Always 1
+  set_linear_field(packed, card->IssueLevel, 2, 5);
+  set_linear_field(packed, card->FacilityCode, 7, 8);
+  set_linear_field(packed, card->CardNumber, 15, 16);
+  set_bit_by_position(packed, evenparity32(get_linear_field(packed, 1, 16)), 0);
+  set_bit_by_position(packed, oddparity32(get_linear_field(packed, 14, 17)), 31);
+  return add_HID_header(packed);
+}
+bool Unpack_Kastle(/*in*/hidproxmessage_t* packed, /*out*/hidproxcard_t* card){
+  memset(card, 0, sizeof(hidproxcard_t));
+  if (packed->Length != 32) return false; // Wrong length? Stop here.
+  if (get_bit_by_position(packed, 1) != 1) return false; // Always 1 in this format
+  card->IssueLevel = get_linear_field(packed, 2, 5);
+  card->FacilityCode = get_linear_field(packed, 7, 8);
+  card->CardNumber = get_linear_field(packed, 15, 16);
+  card->ParityValid =
+    (get_bit_by_position(packed, 0) == evenparity32(get_linear_field(packed, 1, 16))) &&
+    (get_bit_by_position(packed, 31) == oddparity32(get_linear_field(packed, 14, 17)));
+  return true;
+}
+
 bool Pack_D10202(/*in*/hidproxcard_t* card, /*out*/hidproxmessage_t* packed){
   memset(packed, 0, sizeof(hidproxmessage_t));
   if (card->FacilityCode > 0x007F) return false; // Can't encode FC.
@@ -485,6 +513,7 @@ static const hidcardformat_t FormatTable[] = {
     {"2804W", Pack_2804W, Unpack_2804W, "2804 Wiegand", {1, 1, 0, 0, 1}}, // from cardinfo.barkweb.com.au
     {"ATSW30", Pack_ATSW30, Unpack_ATSW30, "ATS Wiegand 30-bit", {1, 1, 0, 0, 1}}, // from cardinfo.barkweb.com.au
     {"ADT31", Pack_ADT31, Unpack_ADT31, "HID ADT 31-bit", {1, 1, 0, 0, 1}}, // from cardinfo.barkweb.com.au
+    {"Kastle", Pack_Kastle, Unpack_Kastle, "Kastle 32-bit", {1, 1, 1, 0, 1}}, // from @xilni; PR #23 on RfidResearchGroup/proxmark3
     {"D10202", Pack_D10202, Unpack_D10202, "HID D10202 33-bit", {1, 1, 0, 0, 1}}, // from cardinfo.barkweb.com.au
     {"H10306", Pack_H10306, Unpack_H10306, "HID H10306 34-bit", {1, 1, 0, 0, 1}}, // imported from old pack/unpack
     {"N10002", Pack_N10002, Unpack_N10002, "HID N10002 34-bit", {1, 1, 0, 0, 1}}, // from cardinfo.barkweb.com.au
