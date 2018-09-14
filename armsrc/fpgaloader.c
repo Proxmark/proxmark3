@@ -112,10 +112,10 @@ void SetupSpi(int mode)
 }
 
 //-----------------------------------------------------------------------------
-// Set up the synchronous serial port, with the one set of options that we
-// always use when we are talking to the FPGA. Both RX and TX are enabled.
+// Set up the synchronous serial port with the set of options that fits
+// the FPGA mode. Both RX and TX are always enabled.
 //-----------------------------------------------------------------------------
-void FpgaSetupSsc(uint8_t mode)
+void FpgaSetupSsc(uint8_t FPGA_mode)
 {
 	// First configure the GPIOs, and get ourselves a clock.
 	AT91C_BASE_PIOA->PIO_ASR =
@@ -136,7 +136,7 @@ void FpgaSetupSsc(uint8_t mode)
 
 	// 8, 16 or 32 bits per transfer, no loopback, MSB first, 1 transfer per sync
 	// pulse, no output sync
-	if ((mode & 0xe0) == FPGA_MAJOR_MODE_HF_READER_RX_XCORR) {
+	if ((FPGA_mode & 0xe0) == FPGA_MAJOR_MODE_HF_READER_RX_XCORR) {
 		AT91C_BASE_SSC->SSC_RFMR = SSC_FRAME_MODE_BITS_IN_WORD(16) | AT91C_SSC_MSBF | SSC_FRAME_MODE_WORDS_PER_TRANSFER(0);
 	} else {
 		AT91C_BASE_SSC->SSC_RFMR = SSC_FRAME_MODE_BITS_IN_WORD(8) | AT91C_SSC_MSBF | SSC_FRAME_MODE_WORDS_PER_TRANSFER(0);
@@ -158,16 +158,15 @@ void FpgaSetupSsc(uint8_t mode)
 // ourselves, not to another buffer). The stuff to manipulate those buffers
 // is in apps.h, because it should be inlined, for speed.
 //-----------------------------------------------------------------------------
-bool FpgaSetupSscDma(uint8_t *buf, int len)
+bool FpgaSetupSscDma(uint8_t *buf, uint16_t sample_count)
 {
 	if (buf == NULL) return false;
 
-	AT91C_BASE_PDC_SSC->PDC_PTCR = AT91C_PDC_RXTDIS;	// Disable DMA Transfer
-	AT91C_BASE_PDC_SSC->PDC_RPR = (uint32_t) buf;		// transfer to this memory address
-	AT91C_BASE_PDC_SSC->PDC_RCR = len;					// transfer this many frames
-	AT91C_BASE_PDC_SSC->PDC_RNPR = (uint32_t) buf;		// next transfer to same memory address
-	AT91C_BASE_PDC_SSC->PDC_RNCR = len;					// ... with same number of frames
-	AT91C_BASE_PDC_SSC->PDC_PTCR = AT91C_PDC_RXTEN;		// go!
+	AT91C_BASE_PDC_SSC->PDC_PTCR = AT91C_PDC_RXTDIS;        // Disable DMA Transfer
+	AT91C_BASE_PDC_SSC->PDC_RPR = (uint32_t) buf;           // transfer to this memory address
+	AT91C_BASE_PDC_SSC->PDC_RCR = sample_count;             // transfer this many samples
+	AT91C_BASE_PDC_SSC->PDC_RNPR = (uint32_t) buf;          // next transfer to same memory address
+	AT91C_BASE_PDC_SSC->PDC_RNCR = sample_count;            // ... with same number of samples	AT91C_BASE_PDC_SSC->PDC_PTCR = AT91C_PDC_RXTEN;	        // go!
 
 	return true;
 }
