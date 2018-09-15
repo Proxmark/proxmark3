@@ -333,7 +333,20 @@ bool OpenProxmark(void *port, bool wait_for_port, int timeout, bool flash_mode) 
 
 void CloseProxmark(void) {
 	conn.run = false;
+
+#ifdef __BIONIC__
+	// In Android O and later, if an invalid pthread_t is passed to pthread_join, it calls fatal().
+	// https://github.com/aosp-mirror/platform_bionic/blob/ed16b344e75f422fb36fbfd91fb30de339475880/libc/bionic/pthread_internal.cpp#L116-L128
+	//
+	// In Bionic libc, pthread_t is an integer.
+
+	if (USB_communication_thread != 0) {
+		pthread_join(USB_communication_thread, NULL);
+	}
+#else
+	// pthread_t is a struct on other libc, treat as an opaque memory reference
 	pthread_join(USB_communication_thread, NULL);
+#endif
 
 	if (sp) {
 		uart_close(sp);
@@ -351,6 +364,7 @@ void CloseProxmark(void) {
 	// Clean up our state
 	sp = NULL;
 	serial_port_name = NULL;
+	memset(&USB_communication_thread, 0, sizeof(pthread_t));
 }
 
 
