@@ -19,7 +19,7 @@
 void FpgaSendCommand(uint16_t cmd, uint16_t v);
 void FpgaWriteConfWord(uint8_t v);
 void FpgaDownloadAndGo(int bitstream_version);
-void FpgaSetupSsc(void);
+void FpgaSetupSsc(uint8_t mode);
 void SetupSpi(int mode);
 bool FpgaSetupSscDma(uint8_t *buf, int len);
 void Fpga_print_status();

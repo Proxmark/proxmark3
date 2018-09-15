@@ -227,26 +227,14 @@ static void TransmitTo15693Tag(const uint8_t *cmd, int len, int *samples, int *w
 {
     int c;
 
-//    FpgaWriteConfWord(FPGA_MAJOR_MODE_HF_ISO14443A | FPGA_HF_ISO14443A_READER_MOD);
+	FpgaSetupSsc(FPGA_MAJOR_MODE_HF_READER_TX);
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_HF_READER_TX);
 	if(*wait < 10) { *wait = 10; }
-
-//    for(c = 0; c < *wait;) {
-//        if(AT91C_BASE_SSC->SSC_SR & (AT91C_SSC_TXRDY)) {
-//            AT91C_BASE_SSC->SSC_THR = 0x00;		// For exact timing!
-//            c++;
-//        }
-//        if(AT91C_BASE_SSC->SSC_SR & (AT91C_SSC_RXRDY)) {
-//            volatile uint32_t r = AT91C_BASE_SSC->SSC_RHR;
-//            (void)r;
-//        }
-//        WDT_HIT();
-//    }
 
     c = 0;
     for(;;) {
         if(AT91C_BASE_SSC->SSC_SR & (AT91C_SSC_TXRDY)) {
-            AT91C_BASE_SSC->SSC_THR = cmd[c];
+            AT91C_BASE_SSC->SSC_THR = ~cmd[c];
             c++;
             if(c >= len) {
                 break;
@@ -300,36 +288,25 @@ static int GetIso15693AnswerFromTag(uint8_t *receivedResponse, int maxLen, int *
 {
 	int c = 0;
 	uint8_t *dest = BigBuf_get_addr();
-	int getNext = 0;
-
-	int8_t prev = 0;
 
 // NOW READ RESPONSE
+	FpgaSetupSsc(FPGA_MAJOR_MODE_HF_READER_RX_XCORR);
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_HF_READER_RX_XCORR);
 	c = 0;
-	getNext = false;
 	for(;;) {
 		if(AT91C_BASE_SSC->SSC_SR & (AT91C_SSC_RXRDY)) {
-			int8_t b;
-			b = (int8_t)AT91C_BASE_SSC->SSC_RHR;
-
+			uint16_t iq = AT91C_BASE_SSC->SSC_RHR;
 			// The samples are correlations against I and Q versions of the
-			// tone that the tag AM-modulates, so every other sample is I,
-			// every other is Q. We just want power, so abs(I) + abs(Q) is
-			// close to what we want.
-			if(getNext) {
-				uint8_t r = AMPLITUDE(b, prev);
+			// tone that the tag AM-modulates. We just want power. 
+			int8_t i = iq >> 8;
+			int8_t q = iq;
+			uint8_t r = AMPLITUDE(i, q);
 
-				dest[c++] = r;
-
-				if(c >= 4000) {
-					break;
-				}
-			} else {
-				prev = b;
+			dest[c++] = r;
+			
+			if(c >= 4000) {
+				break;
 			}
-
-			getNext = !getNext;
 		}
 	}
 
@@ -441,36 +418,26 @@ static int GetIso15693AnswerFromSniff(uint8_t *receivedResponse, int maxLen, int
 {
 	int c = 0;
 	uint8_t *dest = BigBuf_get_addr();
-	int getNext = 0;
-
-	int8_t prev = 0;
 
 // NOW READ RESPONSE
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_HF_READER_RX_XCORR);
 	//spindelay(60);	// greg - experiment to get rid of some of the 0 byte/failed reads
 	c = 0;
-	getNext = false;
 	for(;;) {
 		if(AT91C_BASE_SSC->SSC_SR & (AT91C_SSC_RXRDY)) {
-			int8_t b = (int8_t)AT91C_BASE_SSC->SSC_RHR;
-
+			uint16_t iq = AT91C_BASE_SSC->SSC_RHR;
 			// The samples are correlations against I and Q versions of the
-			// tone that the tag AM-modulates, so every other sample is I,
-			// every other is Q. We just want power, so abs(I) + abs(Q) is
-			// close to what we want.
-			if(getNext) {
-				uint8_t r = AMPLITUDE(b, prev);
+			// tone that the tag AM-modulates. We just want power, 
+			// so abs(I) + abs(Q) is close to what we want.
+			int8_t i = iq >> 8;
+			int8_t q = iq;
+			uint8_t r = AMPLITUDE(i, q);
 
-				dest[c++] = r;
+			dest[c++] = r;
 
-				if(c >= BIGBUF_SIZE) {
-					break;
-				}
-			} else {
-				prev = b;
+			if(c >= BIGBUF_SIZE) {
+				break;
 			}
-
-			getNext = !getNext;
 		}
 	}
 
@@ -585,8 +552,6 @@ void AcquireRawAdcSamplesIso15693(void)
 	uint8_t *dest = BigBuf_get_addr();
 
 	int c = 0;
-	int getNext = 0;
-	int8_t prev = 0;
 
 	FpgaDownloadAndGo(FPGA_BITSTREAM_HF);
 	BuildIdentifyRequest();
@@ -598,13 +563,13 @@ void AcquireRawAdcSamplesIso15693(void)
 	SpinDelay(100);
 
 	// Now send the command
-	FpgaSetupSsc();
+	FpgaSetupSsc(FPGA_MAJOR_MODE_HF_READER_TX);
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_HF_READER_TX);
 
 	c = 0;
 	for(;;) {
 		if(AT91C_BASE_SSC->SSC_SR & (AT91C_SSC_TXRDY)) {
-			AT91C_BASE_SSC->SSC_THR = ToSend[c];
+			AT91C_BASE_SSC->SSC_THR = ~ToSend[c];
 			c++;
 			if(c == ToSendMax+3) {
 				break;
@@ -613,32 +578,25 @@ void AcquireRawAdcSamplesIso15693(void)
 		WDT_HIT();
 	}
 
+	FpgaSetupSsc(FPGA_MAJOR_MODE_HF_READER_RX_XCORR);
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_HF_READER_RX_XCORR);
 
 	c = 0;
-	getNext = false;
 	for(;;) {
 		if(AT91C_BASE_SSC->SSC_SR & (AT91C_SSC_RXRDY)) {
-			int8_t b;
-			b = (int8_t)AT91C_BASE_SSC->SSC_RHR;
-
+			uint16_t iq = AT91C_BASE_SSC->SSC_RHR;
 			// The samples are correlations against I and Q versions of the
-			// tone that the tag AM-modulates, so every other sample is I,
-			// every other is Q. We just want power, so abs(I) + abs(Q) is
-			// close to what we want.
-			if(getNext) {
-				uint8_t r = AMPLITUDE(b, prev);
+			// tone that the tag AM-modulates. We just want power, 
+			// so abs(I) + abs(Q) is close to what we want.
+			int8_t i = iq >> 8;
+			int8_t q = iq;
+			uint8_t r = AMPLITUDE(i, q);
 
-				dest[c++] = r;
+			dest[c++] = r;
 
-				if(c >= 4000) {
-					break;
-				}
-			} else {
-				prev = b;
+			if(c >= 4000) {
+				break;
 			}
-
-			getNext = !getNext;
 		}
 	}
 }
@@ -649,16 +607,14 @@ void RecordRawAdcSamplesIso15693(void)
 	uint8_t *dest = BigBuf_get_addr();
 
 	int c = 0;
-	int getNext = 0;
-	int8_t prev = 0;
 
 	FpgaDownloadAndGo(FPGA_BITSTREAM_HF);
 	// Setup SSC
-	FpgaSetupSsc();
+	FpgaSetupSsc(FPGA_MAJOR_MODE_HF_READER_RX_XCORR);
 
 	// Start from off (no field generated)
-    	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
-    	SpinDelay(200);
+   	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
+   	SpinDelay(200);
 
 	SetAdcMuxFor(GPIO_MUXSEL_HIPKD);
 
@@ -667,33 +623,24 @@ void RecordRawAdcSamplesIso15693(void)
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_HF_READER_RX_XCORR);
 
 	c = 0;
-	getNext = false;
 	for(;;) {
 		if(AT91C_BASE_SSC->SSC_SR & (AT91C_SSC_RXRDY)) {
-			int8_t b;
-			b = (int8_t)AT91C_BASE_SSC->SSC_RHR;
-
+			uint16_t iq = AT91C_BASE_SSC->SSC_RHR;
 			// The samples are correlations against I and Q versions of the
-			// tone that the tag AM-modulates, so every other sample is I,
-			// every other is Q. We just want power, so abs(I) + abs(Q) is
-			// close to what we want.
-			if(getNext) {
-				uint8_t r = AMPLITUDE(b, prev);
+			// tone that the tag AM-modulates. We just want power, 
+			// so abs(I) + abs(Q) is close to what we want.
+			int8_t i = iq >> 8;
+			int8_t q = iq;
+			uint8_t r = AMPLITUDE(i, q);
 
-				dest[c++] = r;
+			dest[c++] = r;
 
-				if(c >= 14000) {
-					break;
-				}
-			} else {
-				prev = b;
+			if(c >= 14000) {
+				break;
 			}
-
-			getNext = !getNext;
-			WDT_HIT();
 		}
 	}
-	Dbprintf("fin record");
+	Dbprintf("finished recording");
 }
 
 
@@ -714,7 +661,7 @@ void Iso15693InitReader() {
 	SpinDelay(10);
 
 	SetAdcMuxFor(GPIO_MUXSEL_HIPKD);
-	FpgaSetupSsc();
+	FpgaSetupSsc(FPGA_MAJOR_MODE_HF_READER_RX_XCORR);
 
 	// Give the tags time to energize
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_HF_READER_RX_XCORR);
@@ -973,7 +920,7 @@ void ReaderIso15693(uint32_t parameter)
 
 	SetAdcMuxFor(GPIO_MUXSEL_HIPKD);
 	// Setup SSC
-	FpgaSetupSsc();
+	FpgaSetupSsc(FPGA_MAJOR_MODE_HF_READER_RX_XCORR);
 
 	// Start from off (no field generated)
    	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
@@ -1075,7 +1022,7 @@ void SimTagIso15693(uint32_t parameter, uint8_t *uid)
 	memset(buf, 0x00, 100);
 	
 	SetAdcMuxFor(GPIO_MUXSEL_HIPKD);
-	FpgaSetupSsc();
+	FpgaSetupSsc(FPGA_MAJOR_MODE_HF_READER_RX_XCORR);
 
 	// Start from off (no field generated)
    	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);

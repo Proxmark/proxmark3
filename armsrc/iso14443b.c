@@ -1,5 +1,6 @@
 //-----------------------------------------------------------------------------
 // Jonathan Westhues, split Nov 2006
+// piwi 2018
 //
 // This code is licensed to you under the terms of the GNU GPL, version 2 or,
 // at your option, any later version. See the LICENSE.txt file for the text of
@@ -16,8 +17,8 @@
 
 #include "iso14443crc.h"
 
-#define RECEIVE_SAMPLES_TIMEOUT 2000
-#define ISO14443B_DMA_BUFFER_SIZE 256
+#define RECEIVE_SAMPLES_TIMEOUT 1000 // TR0 max is 256/fs = 256/(848kHz) = 302us or 64 samples from FPGA. 1000 seems to be much too high?
+#define ISO14443B_DMA_BUFFER_SIZE 128
 
 // PCB Block number for APDUs
 static uint8_t pcb_blocknum = 0;
@@ -374,7 +375,7 @@ void SimulateIso14443bTag(void)
 
 	// We need to listen to the high-frequency, peak-detected path.
 	SetAdcMuxFor(GPIO_MUXSEL_HIPKD);
-	FpgaSetupSsc();
+	FpgaSetupSsc(FPGA_MAJOR_MODE_HF_SIMULATOR);
 
 	cmdsRecvd = 0;
 
@@ -440,7 +441,7 @@ void SimulateIso14443bTag(void)
 		LED_D_OFF();
 		FpgaWriteConfWord(FPGA_MAJOR_MODE_HF_SIMULATOR | FPGA_HF_SIMULATOR_MODULATE_BPSK);
 		AT91C_BASE_SSC->SSC_THR = 0xff;
-		FpgaSetupSsc();
+		FpgaSetupSsc(FPGA_MAJOR_MODE_HF_SIMULATOR);
 
 		// Transmit the response.
 		uint16_t i = 0;
@@ -535,60 +536,11 @@ static RAMFUNC int Handle14443bSamplesDemod(int ci, int cq)
 
 #define SUBCARRIER_DETECT_THRESHOLD	8
 
-// Subcarrier amplitude v = sqrt(ci^2 + cq^2), approximated here by abs(ci) + abs(cq)
-/* #define CHECK_FOR_SUBCARRIER() { \
-		v = ci; \
-		if(v < 0) v = -v; \
-		if(cq > 0) { \
-			v += cq; \
-		} else { \
-			v -= cq; \
-		} \
-	}
- */
 // Subcarrier amplitude v = sqrt(ci^2 + cq^2), approximated here by max(abs(ci),abs(cq)) + 1/2*min(abs(ci),abs(cq)))
-
-	//note: couldn't we just use MAX(ABS(ci),ABS(cq)) + (MIN(ABS(ci),ABS(cq))/2) from common.h - marshmellow
-#define CHECK_FOR_SUBCARRIER() { \
-		v = MAX(ABS(ci),ABS(cq)) + (MIN(ABS(ci),ABS(cq))/2); \
- 	}
-		/*
-		if(ci < 0) { \
-			if(cq < 0) { \ // ci < 0, cq < 0
-				if (cq < ci) { \
-					v = -cq - (ci >> 1); \
-				} else { \
-					v = -ci - (cq >> 1); \
-				} \
-			} else {	\ // ci < 0, cq >= 0
-				if (cq < -ci) { \
-					v = -ci + (cq >> 1); \
-				} else { \
-					v = cq - (ci >> 1); \
-				} \
-			} \
-		} else { \
-			if(cq < 0) { \ // ci >= 0, cq < 0
-				if (-cq < ci) { \
-					v = ci - (cq >> 1); \
-				} else { \
-					v = -cq + (ci >> 1); \
-				} \
-			} else {	\ // ci >= 0, cq >= 0
-				if (cq < ci) { \
-					v = ci + (cq >> 1); \
-				} else { \
-					v = cq + (ci >> 1); \
-				} \
-			} \
-		} \
-	}
-		*/
-
+#define AMPLITUDE(ci,cq) (MAX(ABS(ci),ABS(cq)) + (MIN(ABS(ci),ABS(cq))/2))
 	switch(Demod.state) {
 		case DEMOD_UNSYNCD:
-			CHECK_FOR_SUBCARRIER();
-			if(v > SUBCARRIER_DETECT_THRESHOLD) {	// subcarrier detected
+			if(AMPLITUDE(ci,cq) > SUBCARRIER_DETECT_THRESHOLD) {	// subcarrier detected
 				Demod.state = DEMOD_PHASE_REF_TRAINING;
 				Demod.sumI = ci;
 				Demod.sumQ = cq;
@@ -598,8 +550,7 @@ static RAMFUNC int Handle14443bSamplesDemod(int ci, int cq)
 
 		case DEMOD_PHASE_REF_TRAINING:
 			if(Demod.posCount < 8) {
-				CHECK_FOR_SUBCARRIER();
-				if (v > SUBCARRIER_DETECT_THRESHOLD) {
+				if (AMPLITUDE(ci,cq) > SUBCARRIER_DETECT_THRESHOLD) {
 					// set the reference phase (will code a logic '1') by averaging over 32 1/fs.
 					// note: synchronization time > 80 1/fs
 					Demod.sumI += ci;
@@ -743,10 +694,11 @@ static void DemodInit(uint8_t *data)
  */
 static void GetSamplesFor14443bDemod(int n, bool quiet)
 {
-	int max = 0;
+	int maxBehindBy = 0;
 	bool gotFrame = false;
-	int lastRxCounter, ci, cq, samples = 0;
-
+	int lastRxCounter, samples = 0;
+	int8_t ci, cq;
+	
 	// Allocate memory from BigBuf for some buffers
 	// free all previous allocations first
 	BigBuf_free();
@@ -755,15 +707,19 @@ static void GetSamplesFor14443bDemod(int n, bool quiet)
 	uint8_t *receivedResponse = BigBuf_malloc(MAX_FRAME_SIZE);
 
 	// The DMA buffer, used to stream samples from the FPGA
-	int8_t *dmaBuf = (int8_t*) BigBuf_malloc(ISO14443B_DMA_BUFFER_SIZE);
+	uint16_t *dmaBuf = (uint16_t*) BigBuf_malloc(ISO14443B_DMA_BUFFER_SIZE * sizeof(uint16_t));
 
 	// Set up the demodulator for tag -> reader responses.
 	DemodInit(receivedResponse);
 
+	// wait for last transfer to complete
+	while (!(AT91C_BASE_SSC->SSC_SR & AT91C_SSC_TXEMPTY))
+
 	// Setup and start DMA.
+	FpgaSetupSsc(FPGA_MAJOR_MODE_HF_READER_RX_XCORR);
 	FpgaSetupSscDma((uint8_t*) dmaBuf, ISO14443B_DMA_BUFFER_SIZE);
 
-	int8_t *upTo = dmaBuf;
+	uint16_t *upTo = dmaBuf;
 	lastRxCounter = ISO14443B_DMA_BUFFER_SIZE;
 
 	// Signal field is ON with the appropriate LED:
@@ -772,39 +728,40 @@ static void GetSamplesFor14443bDemod(int n, bool quiet)
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_HF_READER_RX_XCORR | FPGA_HF_READER_RX_XCORR_848_KHZ);
 
 	for(;;) {
-		int behindBy = lastRxCounter - AT91C_BASE_PDC_SSC->PDC_RCR;
-		if(behindBy > max) max = behindBy;
-
-		while(((lastRxCounter-AT91C_BASE_PDC_SSC->PDC_RCR) & (ISO14443B_DMA_BUFFER_SIZE-1)) > 2) {
-			ci = upTo[0];
-			cq = upTo[1];
-			upTo += 2;
-			if(upTo >= dmaBuf + ISO14443B_DMA_BUFFER_SIZE) {
-				upTo = dmaBuf;
-				AT91C_BASE_PDC_SSC->PDC_RNPR = (uint32_t) upTo;
-				AT91C_BASE_PDC_SSC->PDC_RNCR = ISO14443B_DMA_BUFFER_SIZE;
-			}
-			lastRxCounter -= 2;
-			if(lastRxCounter <= 0) {
-				lastRxCounter += ISO14443B_DMA_BUFFER_SIZE;
-			}
-
-			samples += 2;
-
-			if(Handle14443bSamplesDemod(ci, cq)) {
-				gotFrame = true;
-				break;
-			}
+		int behindBy = (lastRxCounter - AT91C_BASE_PDC_SSC->PDC_RCR) & (ISO14443B_DMA_BUFFER_SIZE-1);
+		if(behindBy > maxBehindBy) {
+			maxBehindBy = behindBy;
 		}
 
-		if(samples > n || gotFrame) {
+		if(behindBy < 1) continue;
+
+		ci = *upTo >> 8;
+		cq = *upTo;
+		upTo++;
+		lastRxCounter--;
+		if(upTo >= dmaBuf + ISO14443B_DMA_BUFFER_SIZE) {               // we have read all of the DMA buffer content.
+			upTo = dmaBuf;                                             // start reading the circular buffer from the beginning
+			lastRxCounter += ISO14443B_DMA_BUFFER_SIZE;
+		}
+		if (AT91C_BASE_SSC->SSC_SR & (AT91C_SSC_ENDRX)) {              // DMA Counter Register had reached 0, already rotated.
+			AT91C_BASE_PDC_SSC->PDC_RNPR = (uint32_t) dmaBuf;          // refresh the DMA Next Buffer and
+			AT91C_BASE_PDC_SSC->PDC_RNCR = ISO14443B_DMA_BUFFER_SIZE;  // DMA Next Counter registers
+		}
+		samples++;
+
+		if(Handle14443bSamplesDemod(ci, cq)) {
+			gotFrame = true;
+			break;
+		}
+
+		if(samples > n) {
 			break;
 		}
 	}
 
-	AT91C_BASE_PDC_SSC->PDC_PTCR = AT91C_PDC_RXTDIS;
+	FpgaDisableSscDma();
 
-	if (!quiet) Dbprintf("max behindby = %d, samples = %d, gotFrame = %d, Demod.len = %d, Demod.sumI = %d, Demod.sumQ = %d", max, samples, gotFrame, Demod.len, Demod.sumI, Demod.sumQ);
+	if (!quiet) Dbprintf("max behindby = %d, samples = %d, gotFrame = %d, Demod.len = %d, Demod.sumI = %d, Demod.sumQ = %d", maxBehindBy, samples, gotFrame, Demod.len, Demod.sumI, Demod.sumQ);
 	//Tracing
 	if (tracing && Demod.len > 0) {
 		uint8_t parity[MAX_PARITY_SIZE];
@@ -820,11 +777,7 @@ static void TransmitFor14443b(void)
 {
 	int c;
 
-	FpgaSetupSsc();
-
-	while(AT91C_BASE_SSC->SSC_SR & (AT91C_SSC_TXRDY)) {
-		AT91C_BASE_SSC->SSC_THR = 0xff;
-	}
+	FpgaSetupSsc(FPGA_MAJOR_MODE_HF_READER_TX);
 
 	// Signal field is ON with the appropriate Red LED
 	LED_D_ON();
@@ -832,30 +785,14 @@ static void TransmitFor14443b(void)
 	LED_B_ON();
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_HF_READER_TX | FPGA_HF_READER_TX_SHALLOW_MOD);
 
-	for(c = 0; c < 10;) {
-		if(AT91C_BASE_SSC->SSC_SR & (AT91C_SSC_TXRDY)) {
-			AT91C_BASE_SSC->SSC_THR = 0xff;
-			c++;
-		}
-		if(AT91C_BASE_SSC->SSC_SR & (AT91C_SSC_RXRDY)) {
-			volatile uint32_t r = AT91C_BASE_SSC->SSC_RHR;
-			(void)r;
-		}
-		WDT_HIT();
-	}
-
 	c = 0;
 	for(;;) {
 		if(AT91C_BASE_SSC->SSC_SR & (AT91C_SSC_TXRDY)) {
-			AT91C_BASE_SSC->SSC_THR = ToSend[c];
+			AT91C_BASE_SSC->SSC_THR = ~ToSend[c];
 			c++;
 			if(c >= ToSendMax) {
 				break;
 			}
-		}
-		if(AT91C_BASE_SSC->SSC_SR & (AT91C_SSC_RXRDY)) {
-			volatile uint32_t r = AT91C_BASE_SSC->SSC_RHR;
-			(void)r;
 		}
 		WDT_HIT();
 	}
@@ -874,19 +811,14 @@ static void CodeIso14443bAsReader(const uint8_t *cmd, int len)
 
 	ToSendReset();
 
-	// Establish initial reference level
-	for(i = 0; i < 40; i++) {
-		ToSendStuffBit(1);
-	}
 	// Send SOF
 	for(i = 0; i < 10; i++) {
 		ToSendStuffBit(0);
 	}
+	ToSendStuffBit(1);
+	ToSendStuffBit(1);
 
 	for(i = 0; i < len; i++) {
-		// Stop bits/EGT
-		ToSendStuffBit(1);
-		ToSendStuffBit(1);
 		// Start bit
 		ToSendStuffBit(0);
 		// Data bits
@@ -899,19 +831,18 @@ static void CodeIso14443bAsReader(const uint8_t *cmd, int len)
 			}
 			b >>= 1;
 		}
-	}
-	// Send EOF
-	ToSendStuffBit(1);
-	for(i = 0; i < 10; i++) {
-		ToSendStuffBit(0);
-	}
-	for(i = 0; i < 8; i++) {
+		// Stop bit
 		ToSendStuffBit(1);
 	}
 
-	// And then a little more, to make sure that the last character makes
-	// it out before we switch to rx mode.
-	for(i = 0; i < 24; i++) {
+	// Send EOF
+	for(i = 0; i < 10; i++) {
+		ToSendStuffBit(0);
+	}
+	ToSendStuffBit(1);
+
+	// ensure that last byte is filled up
+	for(i = 0; i < 8; i++) {
 		ToSendStuffBit(1);
 	}
 
@@ -951,7 +882,7 @@ int iso14443b_apdu(uint8_t const *message, size_t message_length, uint8_t *respo
 	// send
 	CodeAndTransmit14443bAsReader(message_frame, message_length + 4);
 	// get response
-	GetSamplesFor14443bDemod(RECEIVE_SAMPLES_TIMEOUT*100, true);
+	GetSamplesFor14443bDemod(RECEIVE_SAMPLES_TIMEOUT, true);
 	if(Demod.len < 3)
 	{
 		return 0;
@@ -1011,16 +942,13 @@ int iso14443b_select_card()
 void iso14443b_setup() {
 	FpgaDownloadAndGo(FPGA_BITSTREAM_HF);
 	// Set up the synchronous serial port
-	FpgaSetupSsc();
+	FpgaSetupSsc(FPGA_MAJOR_MODE_HF_READER_TX);
 	// connect Demodulated Signal to ADC:
 	SetAdcMuxFor(GPIO_MUXSEL_HIPKD);
 
 	// Signal field is on with the appropriate LED
     LED_D_ON();
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_HF_READER_TX | FPGA_HF_READER_TX_SHALLOW_MOD);
-
-	// Start the timer
-	StartCountSspClk();
 
 	DemodReset();
 	UartReset();
@@ -1047,7 +975,7 @@ void ReadSTMemoryIso14443b(uint32_t dwLast)
 	SpinDelay(200);
 
 	SetAdcMuxFor(GPIO_MUXSEL_HIPKD);
-	FpgaSetupSsc();
+	FpgaSetupSsc(FPGA_MAJOR_MODE_HF_READER_RX_XCORR);
 
 	// Now give it time to spin up.
 	// Signal field is on with the appropriate LED
@@ -1065,6 +993,8 @@ void ReadSTMemoryIso14443b(uint32_t dwLast)
 
 	if (Demod.len == 0) {
 		DbpString("No response from tag");
+		LED_D_OFF();
+		FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
 		return;
 	} else {
 		Dbprintf("Randomly generated Chip ID (+ 2 byte CRC): %02x %02x %02x",
@@ -1080,17 +1010,23 @@ void ReadSTMemoryIso14443b(uint32_t dwLast)
 	GetSamplesFor14443bDemod(RECEIVE_SAMPLES_TIMEOUT, true);
 	if (Demod.len != 3) {
 		Dbprintf("Expected 3 bytes from tag, got %d", Demod.len);
+		LED_D_OFF();
+		FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
 		return;
 	}
 	// Check the CRC of the answer:
 	ComputeCrc14443(CRC_14443_B, Demod.output, 1 , &cmd1[2], &cmd1[3]);
 	if(cmd1[2] != Demod.output[1] || cmd1[3] != Demod.output[2]) {
 		DbpString("CRC Error reading select response.");
+		LED_D_OFF();
+		FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
 		return;
 	}
 	// Check response from the tag: should be the same UID as the command we just sent:
 	if (cmd1[1] != Demod.output[0]) {
 		Dbprintf("Bad response to SELECT from Tag, aborting: %02x %02x", cmd1[1], Demod.output[0]);
+		LED_D_OFF();
+		FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
 		return;
 	}
 
@@ -1102,6 +1038,8 @@ void ReadSTMemoryIso14443b(uint32_t dwLast)
 	GetSamplesFor14443bDemod(RECEIVE_SAMPLES_TIMEOUT, true);
 	if (Demod.len != 10) {
 		Dbprintf("Expected 10 bytes from tag, got %d", Demod.len);
+		LED_D_OFF();
+		FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
 		return;
 	}
 	// The check the CRC of the answer (use cmd1 as temporary variable):
@@ -1131,6 +1069,8 @@ void ReadSTMemoryIso14443b(uint32_t dwLast)
 		GetSamplesFor14443bDemod(RECEIVE_SAMPLES_TIMEOUT, true);
 		if (Demod.len != 6) { // Check if we got an answer from the tag
 			DbpString("Expected 6 bytes from tag, got less...");
+			LED_D_OFF();
+			FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
 			return;
 		}
 		// The check the CRC of the answer (use cmd1 as temporary variable):
@@ -1149,6 +1089,9 @@ void ReadSTMemoryIso14443b(uint32_t dwLast)
 		}
 		i++;
 	}
+	
+	LED_D_OFF();
+	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
 }
 
 
@@ -1171,11 +1114,6 @@ void ReadSTMemoryIso14443b(uint32_t dwLast)
  */
 void RAMFUNC SnoopIso14443b(void)
 {
-	// We won't start recording the frames that we acquire until we trigger;
-	// a good trigger condition to get started is probably when we see a
-	// response from the tag.
-	int triggered = true;			// TODO: set and evaluate trigger condition
-
 	FpgaDownloadAndGo(FPGA_BITSTREAM_HF);
 	BigBuf_free();
 
@@ -1183,10 +1121,10 @@ void RAMFUNC SnoopIso14443b(void)
 	set_tracing(true);
 
 	// The DMA buffer, used to stream samples from the FPGA
-	int8_t *dmaBuf = (int8_t*) BigBuf_malloc(ISO14443B_DMA_BUFFER_SIZE);
+	uint16_t *dmaBuf = (uint16_t*) BigBuf_malloc(ISO14443B_DMA_BUFFER_SIZE * sizeof(uint16_t));
 	int lastRxCounter;
-	int8_t *upTo;
-	int ci, cq;
+	uint16_t *upTo;
+	int8_t ci, cq;
 	int maxBehindBy = 0;
 
 	// Count of samples received so far, so that we can include timing
@@ -1211,7 +1149,7 @@ void RAMFUNC SnoopIso14443b(void)
 	SetAdcMuxFor(GPIO_MUXSEL_HIPKD);
 
 	// Setup for the DMA.
-	FpgaSetupSsc();
+	FpgaSetupSsc(FPGA_MAJOR_MODE_HF_READER_RX_XCORR);
 	upTo = dmaBuf;
 	lastRxCounter = ISO14443B_DMA_BUFFER_SIZE;
 	FpgaSetupSscDma((uint8_t*) dmaBuf, ISO14443B_DMA_BUFFER_SIZE);
@@ -1219,46 +1157,48 @@ void RAMFUNC SnoopIso14443b(void)
 
 	bool TagIsActive = false;
 	bool ReaderIsActive = false;
+	// We won't start recording the frames that we acquire until we trigger.
+	// A good trigger condition to get started is probably when we see a
+	// reader command
+	bool triggered = false;
 
 	// And now we loop, receiving samples.
 	for(;;) {
-		int behindBy = (lastRxCounter - AT91C_BASE_PDC_SSC->PDC_RCR) &
-								(ISO14443B_DMA_BUFFER_SIZE-1);
+		int behindBy = (lastRxCounter - AT91C_BASE_PDC_SSC->PDC_RCR) & (ISO14443B_DMA_BUFFER_SIZE-1);
 		if(behindBy > maxBehindBy) {
 			maxBehindBy = behindBy;
 		}
 
-		if(behindBy < 2) continue;
+		if(behindBy < 1) continue;
 
-		ci = upTo[0];
-		cq = upTo[1];
-		upTo += 2;
-		lastRxCounter -= 2;
-		if(upTo >= dmaBuf + ISO14443B_DMA_BUFFER_SIZE) {
-			upTo = dmaBuf;
+		ci = *upTo>>8;
+		cq = *upTo;
+		upTo++;
+		lastRxCounter--;
+		if(upTo >= dmaBuf + ISO14443B_DMA_BUFFER_SIZE) {               // we have read all of the DMA buffer content.
+			upTo = dmaBuf;                                             // start reading the circular buffer from the beginning again
 			lastRxCounter += ISO14443B_DMA_BUFFER_SIZE;
-			AT91C_BASE_PDC_SSC->PDC_RNPR = (uint32_t) dmaBuf;
-			AT91C_BASE_PDC_SSC->PDC_RNCR = ISO14443B_DMA_BUFFER_SIZE;
+			if(behindBy > (9*ISO14443B_DMA_BUFFER_SIZE/10)) { 
+				Dbprintf("About to blow circular buffer - aborted! behindBy=%d", behindBy);
+				break;
+			}
+		}
+		if (AT91C_BASE_SSC->SSC_SR & (AT91C_SSC_ENDRX)) {              // DMA Counter Register had reached 0, already rotated.
+			AT91C_BASE_PDC_SSC->PDC_RNPR = (uint32_t) dmaBuf;          // refresh the DMA Next Buffer and
+			AT91C_BASE_PDC_SSC->PDC_RNCR = ISO14443B_DMA_BUFFER_SIZE;  // DMA Next Counter registers
 			WDT_HIT();
-			if(behindBy > (9*ISO14443B_DMA_BUFFER_SIZE/10)) { // TODO: understand whether we can increase/decrease as we want or not?
-				Dbprintf("blew circular buffer! behindBy=%d", behindBy);
-				break;
-			}
-			if(!tracing) {
-				DbpString("Reached trace limit");
-				break;
-			}
 			if(BUTTON_PRESS()) {
 				DbpString("cancelled");
 				break;
 			}
 		}
 
-		samples += 2;
+		samples++;
 
 		if (!TagIsActive) {							// no need to try decoding reader data if the tag is sending
 			if(Handle14443bUartBit(ci & 0x01)) {
-				if(triggered && tracing) {
+				triggered = true;
+				if(tracing) {
 					LogTrace(Uart.output, Uart.byteCnt, samples, samples, parity, true);
 				}
 				/* And ready to receive another command. */
@@ -1268,7 +1208,8 @@ void RAMFUNC SnoopIso14443b(void)
 				DemodReset();
 			}
 			if(Handle14443bUartBit(cq & 0x01)) {
-				if(triggered && tracing) {
+				triggered = true;
+				if(tracing) {
 					LogTrace(Uart.output, Uart.byteCnt, samples, samples, parity, true);
 				}
 				/* And ready to receive another command. */
@@ -1280,8 +1221,8 @@ void RAMFUNC SnoopIso14443b(void)
 			ReaderIsActive = (Uart.state > STATE_GOT_FALLING_EDGE_OF_SOF);
 		}
 
-		if(!ReaderIsActive) {						// no need to try decoding tag data if the reader is sending - and we cannot afford the time
-			if(Handle14443bSamplesDemod(ci | 0x01, cq | 0x01)) {
+		if(!ReaderIsActive && triggered) {						// no need to try decoding tag data if the reader is sending or not yet triggered
+			if(Handle14443bSamplesDemod(ci/2, cq/2)) {
 
 				//Use samples as a time measurement
 				if(tracing)
@@ -1289,8 +1230,6 @@ void RAMFUNC SnoopIso14443b(void)
 					uint8_t parity[MAX_PARITY_SIZE];
 					LogTrace(Demod.output, Demod.len, samples, samples, parity, false);
 				}
-				triggered = true;
-
 				// And ready to receive another response.
 				DemodReset();
 			}
@@ -1301,7 +1240,6 @@ void RAMFUNC SnoopIso14443b(void)
 
 	FpgaDisableSscDma();
 	LEDsoff();
-	AT91C_BASE_PDC_SSC->PDC_PTCR = AT91C_PDC_RXTDIS;
 	DbpString("Snoop statistics:");
 	Dbprintf("  Max behind by: %i", maxBehindBy);
 	Dbprintf("  Uart State: %x", Uart.state);
@@ -1327,7 +1265,11 @@ void SendRawCommand14443B(uint32_t datalen, uint32_t recv, uint8_t powerfield, u
 {
 	FpgaDownloadAndGo(FPGA_BITSTREAM_HF);
 	SetAdcMuxFor(GPIO_MUXSEL_HIPKD);
-	FpgaSetupSsc();
+
+	// switch field on and give tag some time to power up
+	LED_D_ON();
+	FpgaSetupSsc(FPGA_MAJOR_MODE_HF_READER_TX);
+	SpinDelay(10);
 
 	if (datalen){
 		set_tracing(true);

@@ -42,11 +42,11 @@ begin
         pwr_hi <= ck_1356megb;
         pwr_oe1 <= 1'b0;
         pwr_oe3 <= 1'b0;
-        pwr_oe4 <= ~ssp_dout;
+        pwr_oe4 <= ssp_dout;
     end
     else
     begin
-        pwr_hi <= ck_1356megb & ssp_dout;
+        pwr_hi <= ck_1356megb & ~ssp_dout;
         pwr_oe1 <= 1'b0;
         pwr_oe3 <= 1'b0;
         pwr_oe4 <= 1'b0;

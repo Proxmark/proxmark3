@@ -63,11 +63,11 @@ static uint32_t last_frame_end; /* ts of last bit of previews rx or tx frame */
 // I/O interface abstraction (FPGA -> ARM)
 //-----------------------------------------------------------------------------
 
-static inline uint8_t rx_byte_from_fpga() {
+static inline uint16_t rx_frame_from_fpga() {
   for(;;) {
     WDT_HIT();
 
-    // wait for byte be become available in rx holding register
+    // wait for frame be become available in rx holding register
     if(AT91C_BASE_SSC->SSC_SR & (AT91C_SSC_RXRDY)) {
       return AT91C_BASE_SSC->SSC_RHR;
     }
@@ -88,33 +88,32 @@ static inline uint8_t rx_byte_from_fpga() {
 // To reduce CPU time the amplitude is approximated by using linear functions:
 //   am = MAX(ABS(i),ABS(q)) + 1/2*MIN(ABS(i),ABSq))
 //
-// Note: The SSC receiver is never synchronized the calculation my be performed
-// on a I/Q pair from two subsequent correlations, but does not matter.
-//
 // The bit time is 99.1us (21 I/Q pairs). The receiver skips the first 5 samples
 // and averages the next (most stable) 8 samples. The final 8 samples are dropped
 // also.
 //
-// The demedulated should be alligned to the bit periode by the caller. This is
+// The demodulated should be alligned to the bit period by the caller. This is
 // done in rx_bit and rx_ack.
 static inline bool rx_bit() {
-  int32_t cq = 0;
-  int32_t ci = 0;
+  int32_t sum_cq = 0;
+  int32_t sum_ci = 0;
 
   // skip first 5 I/Q pairs
   for(size_t i = 0; i<5; ++i) {
-    (int8_t)rx_byte_from_fpga();
-    (int8_t)rx_byte_from_fpga();
+    (void)rx_frame_from_fpga();
   }
 
   // sample next 8 I/Q pairs
   for(size_t i = 0; i<8; ++i) {
-    cq += (int8_t)rx_byte_from_fpga();
-    ci += (int8_t)rx_byte_from_fpga();
+    uint16_t iq = rx_frame_from_fpga();
+    int8_t ci = (int8_t)(iq >> 8);
+    int8_t cq = (int8_t)(iq & 0xff);
+    sum_ci += ci;
+    sum_cq += cq;
   }
 
   // calculate power
-  int32_t power = (MAX(ABS(ci), ABS(cq)) + (MIN(ABS(ci), ABS(cq)) >> 1));
+  int32_t power = (MAX(ABS(sum_ci), ABS(sum_cq)) + MIN(ABS(sum_ci), ABS(sum_cq))/2);
 
   // compare average (power / 8) to threshold
   return ((power >> 3) > INPUT_THRESHOLD);
@@ -131,12 +130,12 @@ static inline bool rx_bit() {
 
 static inline void tx_bit(bool bit) {
   // insert pause
-  LOW(GPIO_SSC_DOUT);
+  HIGH(GPIO_SSC_DOUT);
   last_frame_end += RWD_TIME_PAUSE;
   while(GET_TICKS < last_frame_end) { };
-  HIGH(GPIO_SSC_DOUT);
 
-  // return to high, wait for bit periode to end
+  // return to carrier on, wait for bit periode to end
+  LOW(GPIO_SSC_DOUT);
   last_frame_end += (bit ? RWD_TIME_1 : RWD_TIME_0) - RWD_TIME_PAUSE;
   while(GET_TICKS < last_frame_end) { };
 }
@@ -166,10 +165,10 @@ static void tx_frame(uint32_t frame, uint8_t len) {
   };
 
   // add pause to mark end of the frame
-  LOW(GPIO_SSC_DOUT);
+  HIGH(GPIO_SSC_DOUT);
   last_frame_end += RWD_TIME_PAUSE;
   while(GET_TICKS < last_frame_end) { };
-  HIGH(GPIO_SSC_DOUT);
+  LOW(GPIO_SSC_DOUT);
 }
 
 static uint32_t rx_frame(uint8_t len) {
@@ -265,12 +264,12 @@ static void init_reader(bool clear_mem) {
   LED_D_ON();
 
   // configure SSC with defaults
-  FpgaSetupSsc();
+  FpgaSetupSsc(FPGA_MAJOR_MODE_HF_READER_RX_XCORR);
 
   // re-claim GPIO_SSC_DOUT as GPIO and enable output
   AT91C_BASE_PIOA->PIO_OER = GPIO_SSC_DOUT;
   AT91C_BASE_PIOA->PIO_PER = GPIO_SSC_DOUT;
-  HIGH(GPIO_SSC_DOUT);
+  LOW(GPIO_SSC_DOUT);
 
   // init crc calculator
   crc_init(&legic_crc, 4, 0x19 >> 1, 0x05, 0);
