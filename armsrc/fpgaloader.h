@@ -21,7 +21,7 @@ void FpgaWriteConfWord(uint8_t v);
 void FpgaDownloadAndGo(int bitstream_version);
 void FpgaSetupSsc(uint8_t mode);
 void SetupSpi(int mode);
-bool FpgaSetupSscDma(uint8_t *buf, int len);
+bool FpgaSetupSscDma(uint8_t *buf, uint16_t sample_count);
 void Fpga_print_status();
 int FpgaGetCurrent();
 #define FpgaDisableSscDma(void)	AT91C_BASE_PDC_SSC->PDC_PTCR = AT91C_PDC_RXTDIS;
