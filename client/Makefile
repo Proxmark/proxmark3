@@ -19,7 +19,7 @@ OBJDIR = obj
 
 LDLIBS = -L/opt/local/lib -L/usr/local/lib -lreadline -lpthread -lm
 LUALIB = ../liblua/liblua.a
-JANSSONLIBPATH = ../include/jansson
+JANSSONLIBPATH = ./jansson
 JANSSONLIB = $(JANSSONLIBPATH)/libjansson.a
 LDFLAGS = $(ENV_LDFLAGS)
 CFLAGS = $(ENV_CFLAGS) -std=c99 -D_ISOC99_SOURCE -I. -I../include -I../common -I../common/polarssl -I../zlib -I../uart -I/opt/local/include -I../liblua -I$(JANSSONLIBPATH) -Wall -g -O3
@@ -263,7 +263,7 @@ lualibs/usb_cmd.lua: ../include/usb_cmd.h
 clean:
 	$(RM) $(CLEAN)
 	cd ../liblua && make clean
-	cd ../include/jansson && make clean
+	cd ./jansson && make clean
 
 tarbin: $(BINS)
 	$(TAR) $(TARFLAGS) ../proxmark3-$(platform)-bin.tar $(BINS:%=client/%) $(WINBINS:%=client/%)
@@ -274,7 +274,7 @@ lua_build:
 	
 jansson_build:
 	@echo Compiling jansson
-	cd ../include/jansson && make all
+	cd ./jansson && make all
 
 .PHONY: all clean
 

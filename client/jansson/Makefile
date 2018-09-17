@@ -54,6 +54,7 @@ all: $(CMDOBJS)
 	
 clean:
 	$(RM) $(CLEAN)
+	$(RM) $(LIB_A)
 	
 %.o: %.c
 	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(CFLAGS) -c -o $@ $< $(LIBS)
