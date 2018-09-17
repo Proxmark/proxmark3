@@ -138,33 +138,6 @@ void hex_to_buffer(const uint8_t *buf, const uint8_t *hex_data, const size_t hex
 
 // printing and converting functions
 
-void print_hex(const uint8_t * data, const size_t len)
-{
-	size_t i;
-
-	for (i=0; i < len; i++)
-		printf("%02x ", data[i]);
-
-	printf("\n");
-}
-
-void print_hex_break(const uint8_t *data, const size_t len, uint8_t breaks) {
-
-	int rownum = 0;
-	printf("[%02d] | ", rownum);
-	for (int i = 0; i < len; ++i) {
-
-		printf("%02X ", data[i]);
-		
-		// check if a line break is needed
-		if ( breaks > 0 && !((i+1) % breaks) && (i+1 < len) ) {
-			++rownum;
-			printf("\n[%02d] | ", rownum);
-		}
-	}
-	printf("\n");
-}
-
 char *sprint_hex(const uint8_t *data, const size_t len) {
 	static char buf[1025] = {0};
 	
@@ -220,27 +193,6 @@ char *sprint_bin(const uint8_t *data, const size_t len) {
 	return sprint_bin_break(data, len, 0);
 }
 
-char *sprint_hex_ascii(const uint8_t *data, const size_t len) {
-	static char buf[1024];
-	char *tmp = buf;
-	memset(buf, 0x00, 1024);
-	size_t max_len = (len > 255) ? 255 : len;
-	// max 255 bytes * 3 + 2 characters = 767 in buffer
-	sprintf(tmp, "%.765s| ", sprint_hex(data, max_len) );
-	
-	size_t i = 0;
-	size_t pos = (max_len * 3)+2;
-	// add another 255 characters ascii = 1020 characters of buffer used
-	while(i < max_len) {
-		char c = data[i];
-		if ( (c < 32) || (c == 127))
-			c = '.';
-		sprintf(tmp+pos+i, "%c",  c);
-		++i;
-	}
-	return buf;
-}
-
 char *sprint_ascii_ex(const uint8_t *data, const size_t len, const size_t min_str_len) {
 	static char buf[1024];
 	char *tmp = buf;
@@ -258,10 +210,6 @@ char *sprint_ascii_ex(const uint8_t *data, const size_t len, const size_t min_st
 		tmp[i] = ' ';
 	
 	return buf;
-}
-
-char *sprint_ascii(const uint8_t *data, const size_t len) {
-	return sprint_ascii_ex(data, len, 0);
 }
 
 void num_to_bytes(uint64_t n, size_t len, uint8_t* dest)
@@ -322,16 +270,6 @@ uint8_t *SwapEndian64(const uint8_t *src, const size_t len, const uint8_t blockS
 		}
 	}
 	return tmp;
-}
-
-// takes a uint8_t src array, for len items and reverses the byte order in blocksizes (8,16,32,64), 
-// returns: the dest array contains the reordered src array.
-void SwapEndian64ex(const uint8_t *src, const size_t len, const uint8_t blockSize, uint8_t *dest){
-	for (uint8_t block=0; block < (uint8_t)(len/blockSize); block++){
-		for (size_t i = 0; i < blockSize; i++){
-			dest[i+(blockSize*block)] = src[(blockSize-1-i)+(blockSize*block)];
-		}
-	}
 }
 
 //assumes little endian
@@ -648,17 +586,6 @@ int hextobinarray(char *target, char *source)
     return count;
 }
 
-// convert hex to human readable binary string
-int hextobinstring(char *target, char *source)
-{
-    int length;
-
-    if(!(length= hextobinarray(target, source)))
-        return 0;
-    binarraytobinstring(target, target, length);
-    return length;
-}
-
 // convert binary array of 0x00/0x01 values to hex (safe to do in place as target will always be shorter than source)
 // return number of bits converted
 int binarraytohex(char *target,char *source, int length)
@@ -679,16 +606,6 @@ int binarraytohex(char *target,char *source, int length)
         j -= 4;
     }
     return length;
-}
-
-// convert binary array to human readable binary
-void binarraytobinstring(char *target, char *source,  int length)
-{
-    int i;
-
-    for(i= 0 ; i < length ; ++i)
-        *(target++)= *(source++) + '0';
-    *target= '\0';
 }
 
 // return parity bit required to match type
@@ -716,13 +633,6 @@ void wiegand_add_parity(uint8_t *target, uint8_t *source, uint8_t length)
 void xor(unsigned char *dst, unsigned char *src, size_t len) {
    for( ; len > 0; len--,dst++,src++)
        *dst ^= *src;
-}
-
-int32_t le24toh (uint8_t data[3]) {
-    return (data[2] << 16) | (data[1] << 8) | data[0];
-}
-uint32_t le32toh (uint8_t *data) {
-	return (uint32_t)( (data[3]<<24) | (data[2]<<16) | (data[1]<<8) | data[0]);
 }
 
 // RotateLeft - Ultralight, Desfire, works on byte level
