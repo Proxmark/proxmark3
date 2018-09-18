@@ -318,6 +318,24 @@ struct tlvdb *tlvdb_find(struct tlvdb *tlvdb, tlv_tag_t tag) {
 	return NULL;
 }
 
+struct tlvdb *tlvdb_find_full(struct tlvdb *tlvdb, tlv_tag_t tag) {
+	if (!tlvdb)
+		return NULL;
+	
+	for (; tlvdb; tlvdb = tlvdb->next) {
+		if (tlvdb->tag.tag == tag)
+			return tlvdb;
+		
+		if (tlvdb->children) {
+			struct tlvdb * ch = tlvdb_find_full(tlvdb->children, tag);
+			if (ch)
+				return ch;
+		}			
+	}
+
+	return NULL;
+}
+
 struct tlvdb *tlvdb_find_path(struct tlvdb *tlvdb, tlv_tag_t tag[]) {
 	int i = 0;
 	struct tlvdb *tnext = tlvdb;
@@ -340,6 +358,52 @@ void tlvdb_add(struct tlvdb *tlvdb, struct tlvdb *other)
 	}
 
 	tlvdb->next = other;
+}
+
+void tlvdb_change_or_add_node(struct tlvdb *tlvdb, tlv_tag_t tag, size_t len, const unsigned char *value)
+{
+	struct tlvdb *telm = tlvdb_find_full(tlvdb, tag);
+	if (telm == NULL) {
+		// new tlv element
+		tlvdb_add(tlvdb, tlvdb_fixed(tag, len, value));
+	} else {
+		// the same tlv structure
+		if (telm->tag.tag == tag && telm->tag.len == len && !memcmp(telm->tag.value, value, len))
+			return;
+
+		// replace tlv element
+		struct tlvdb *tnewelm = tlvdb_fixed(tag, len, value);
+		tnewelm->next = telm->next;
+		tnewelm->parent = telm->parent;
+		
+		// if telm stayed first in children chain
+		if (telm->parent && telm->parent->children == telm) {
+			telm->parent->children = tnewelm;
+		}
+		
+		// if telm have previous element
+		if (telm != tlvdb) {
+			// elm in root
+			struct tlvdb *celm = tlvdb;
+			// elm in child list of node
+			if (telm->parent && telm->parent->children)
+				celm = telm->parent->children;		
+			
+			// find previous element
+			for (; celm; celm = celm->next) {
+				if (celm->next == telm) {
+					celm->next = tnewelm;
+					break;
+				}
+			}
+		}
+		
+		// free old element with childrens
+		telm->next = NULL;
+		tlvdb_free(telm);
+	}
+	
+	return;
 }
 
 void tlvdb_visit(const struct tlvdb *tlvdb, tlv_cb cb, void *data, int level)

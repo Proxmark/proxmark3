@@ -19,6 +19,7 @@ This project uses the changelog in accordance with [keepchangelog](http://keepac
 - Changed TLV parser messages to more convenient (Merlok)
 - Rewritten Legic Prime reader (`hf legic reader`, `write` and `fill`) - it is using xcorrelation now (AntiCat)
 - `hf 14a` commands works via argtable3 commandline parsing library (Merlok)
+- Changed Legic Prime tag simulator (`hf legic sim`) to run from 212 kHz SSP clock for better reliability (AntiCat)
 
 ### Fixed
 - Changed start sequence in Qt mode (fix: short commands hangs main Qt thread) (Merlok)

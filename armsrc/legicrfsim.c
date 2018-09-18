@@ -284,7 +284,7 @@ static void init_tag() {
   SetAdcMuxFor(GPIO_MUXSEL_HIPKD);
 
   // configure SSC with defaults
-  FpgaSetupSsc();
+  FpgaSetupSsc(FPGA_MAJOR_MODE_HF_SIMULATOR);
 
   // first pull output to low to prevent glitches then re-claim GPIO_SSC_DOUT
   LOW(GPIO_SSC_DOUT);

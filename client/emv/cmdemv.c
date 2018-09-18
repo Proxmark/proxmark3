@@ -12,6 +12,21 @@
 #include "cmdemv.h"
 #include "test/cryptotest.h"
 #include "cliparser/cliparser.h"
+#include <jansson.h>
+
+int UsageCmdHFEMVSelect(void) {
+	PrintAndLog("HELP :  Executes select applet command:\n");
+	PrintAndLog("Usage:  hf emv select [-s][-k][-a][-t] <HEX applet AID>\n");
+	PrintAndLog("  Options:");
+	PrintAndLog("  -s       : select card");
+	PrintAndLog("  -k       : keep field for next command");
+	PrintAndLog("  -a       : show APDU reqests and responses\n");
+	PrintAndLog("  -t       : TLV decode results\n");
+	PrintAndLog("Samples:");
+	PrintAndLog(" hf emv select -s a00000000101 -> select card, select applet");
+	PrintAndLog(" hf emv select -s -t a00000000101 -> select card, select applet, show result in TLV");
+	return 0;
+}
 
 int CmdHFEMVSelect(const char *cmd) {
 	uint8_t data[APDU_AID_LEN] = {0};
@@ -155,7 +170,7 @@ int CmdHFEMVPPSE(const char *cmd) {
 	return 0;
 }
 
-#define TLV_ADD(tag, value)( tlvdb_add(tlvRoot, tlvdb_fixed(tag, sizeof(value) - 1, (const unsigned char *)value)) )
+#define TLV_ADD(tag, value)( tlvdb_change_or_add_node(tlvRoot, tag, sizeof(value) - 1, (const unsigned char *)value) )
 
 int CmdHFEMVGPO(const char *cmd) {
 	uint8_t data[APDU_RES_LEN] = {0};
@@ -490,11 +505,12 @@ int CmdHFEMVInternalAuthenticate(const char *cmd) {
 
 int UsageCmdHFEMVExec(void) {
 	PrintAndLog("HELP :  Executes EMV contactless transaction:\n");
-	PrintAndLog("Usage:  hf emv exec [-s][-a][-t][-f][-v][-c][-x][-g]\n");
+	PrintAndLog("Usage:  hf emv exec [-s][-a][-t][-j][-f][-v][-c][-x][-g]\n");
 	PrintAndLog("  Options:");
 	PrintAndLog("  -s       : select card");
 	PrintAndLog("  -a       : show APDU reqests and responses\n");
 	PrintAndLog("  -t       : TLV decode results\n");
+	PrintAndLog("  -j       : load transaction parameters from `emv/defparams.json` file\n");
 	PrintAndLog("  -f       : force search AID. Search AID instead of execute PPSE.\n");
 	PrintAndLog("  -v       : transaction type - qVSDC or M/Chip.\n");
 	PrintAndLog("  -c       : transaction type - qVSDC or M/Chip plus CDA (SDAD generation).\n");
@@ -509,6 +525,156 @@ int UsageCmdHFEMVExec(void) {
 
 #define dreturn(n) {free(pdol_data_tlv);tlvdb_free(tlvSelect);tlvdb_free(tlvRoot);DropField();return n;}
 
+bool HexToBuffer(const char *errormsg, const char *hexvalue, uint8_t * buffer, size_t maxbufferlen, size_t *bufferlen) {
+	int buflen = 0;	
+	
+	switch(param_gethex_to_eol(hexvalue, 0, buffer, maxbufferlen, &buflen)) {
+	case 1:
+		PrintAndLog("%s Invalid HEX value.", errormsg);
+		return false;
+	case 2:
+		PrintAndLog("%s Hex value too large.", errormsg);
+		return false;
+	case 3:
+		PrintAndLog("%s Hex value must have even number of digits.", errormsg);
+		return false;
+	}
+	
+	if (buflen > maxbufferlen) {
+		PrintAndLog("%s HEX length (%d) more than %d", errormsg, *bufferlen, maxbufferlen);
+		return false;
+	}
+	
+	*bufferlen = buflen;
+	
+	return true;
+}
+
+bool ParamLoadFromJson(struct tlvdb *tlv) {
+	json_t *root;
+	json_error_t error;
+
+	if (!tlv) {
+		PrintAndLog("ERROR load params: tlv tree is NULL.");
+		return false; 
+	}
+
+	// current path + file name
+	const char *relfname = "emv/defparams.json"; 
+	char fname[strlen(get_my_executable_directory()) + strlen(relfname) + 1];
+	strcpy(fname, get_my_executable_directory());
+	strcat(fname, relfname);
+
+	root = json_load_file(fname, 0, &error);
+	if (!root) {
+		PrintAndLog("Load params: json error on line %d: %s", error.line, error.text);
+		return false; 
+	}
+	
+	if (!json_is_array(root)) {
+		PrintAndLog("Load params: Invalid json format. root must be array.");
+		return false; 
+	}
+	
+	PrintAndLog("Load params: json OK");
+	
+	for(int i = 0; i < json_array_size(root); i++) {
+		json_t *data, *jtype, *jlength, *jvalue;
+
+		data = json_array_get(root, i);
+		if(!json_is_object(data))
+		{
+			PrintAndLog("Load params: data [%d] is not an object", i + 1);
+			json_decref(root);
+			return false;
+		}
+		
+		jtype = json_object_get(data, "type");
+		if(!json_is_string(jtype))
+		{
+			PrintAndLog("Load params: data [%d] type is not a string", i + 1);
+			json_decref(root);
+			return false;
+		}
+		const char *tlvType = json_string_value(jtype);
+
+		jvalue = json_object_get(data, "value");
+		if(!json_is_string(jvalue))
+		{
+			PrintAndLog("Load params: data [%d] value is not a string", i + 1);
+			json_decref(root);
+			return false;
+		}
+		const char *tlvValue = json_string_value(jvalue);
+
+		jlength = json_object_get(data, "length");
+		if(!json_is_number(jlength))
+		{
+			PrintAndLog("Load params: data [%d] length is not a number", i + 1);
+			json_decref(root);
+			return false;
+		}
+		
+		int tlvLength = json_integer_value(jlength);
+		if (tlvLength > 250) {
+			PrintAndLog("Load params: data [%d] length more than 250", i + 1);
+			json_decref(root);
+			return false;
+		}
+		
+		PrintAndLog("TLV param: %s[%d]=%s", tlvType, tlvLength, tlvValue);
+		uint8_t buf[251] = {0};
+		size_t buflen = 0;
+		
+		// here max length must be 4, but now tlv_tag_t is 2-byte var. so let it be 2 by now...  TODO: needs refactoring tlv_tag_t...
+		if (!HexToBuffer("TLV Error type:", tlvType, buf, 2, &buflen)) { 
+			json_decref(root);
+			return false;
+		}
+		tlv_tag_t tag = 0;
+		for (int i = 0; i < buflen; i++) {
+			tag = (tag << 8) + buf[i];
+		}	
+		
+		if (!HexToBuffer("TLV Error value:", tlvValue, buf, sizeof(buf) - 1, &buflen)) {
+			json_decref(root);
+			return false;
+		}
+		
+		if (buflen != tlvLength) {
+			PrintAndLog("Load params: data [%d] length of HEX must(%d) be identical to length in TLV param(%d)", i + 1, buflen, tlvLength);
+			json_decref(root);
+			return false;
+		}
+		
+		tlvdb_change_or_add_node(tlv, tag, tlvLength, (const unsigned char *)buf);		
+	}
+
+	json_decref(root);
+
+	return true;
+}
+
+void ParamLoadDefaults(struct tlvdb *tlvRoot) {
+	//9F02:(Amount, authorized (Numeric)) len:6
+	TLV_ADD(0x9F02, "\x00\x00\x00\x00\x01\x00");
+	//9F1A:(Terminal Country Code) len:2
+	TLV_ADD(0x9F1A, "ru");
+	//5F2A:(Transaction Currency Code) len:2
+	// USD 840, EUR 978, RUR 810, RUB 643, RUR 810(old), UAH 980, AZN 031, n/a 999
+	TLV_ADD(0x5F2A, "\x09\x80");
+	//9A:(Transaction Date) len:3
+	TLV_ADD(0x9A,   "\x00\x00\x00");
+	//9C:(Transaction Type) len:1   |  00 => Goods and service #01 => Cash
+	TLV_ADD(0x9C,   "\x00");
+	// 9F37 Unpredictable Number len:4
+	TLV_ADD(0x9F37, "\x01\x02\x03\x04");
+	// 9F6A Unpredictable Number (MSD for UDOL) len:4
+	TLV_ADD(0x9F6A, "\x01\x02\x03\x04");
+	//9F66:(Terminal Transaction Qualifiers (TTQ)) len:4
+	TLV_ADD(0x9F66, "\x26\x00\x00\x00"); // qVSDC
+}
+
 int CmdHFEMVExec(const char *cmd) {
 	bool activateField = false;
 	bool showAPDU = false;
@@ -516,6 +682,7 @@ int CmdHFEMVExec(const char *cmd) {
 	bool forceSearch = false;
 	enum TransactionType TrType = TT_MSD;
 	bool GenACGPO = false;
+	bool paramLoadJSON = false;
 
 	uint8_t buf[APDU_RES_LEN] = {0};
 	size_t len = 0;
@@ -576,6 +743,10 @@ int CmdHFEMVExec(const char *cmd) {
 				case 'g':
 				case 'G':
 					GenACGPO = true;
+					break;
+				case 'j':
+				case 'J':
+					paramLoadJSON = true;
 					break;
 				default:
 					PrintAndLog("Unknown parameter '%c'", param_getchar_indx(cmd, 1, cmdp));
@@ -643,7 +814,14 @@ int CmdHFEMVExec(const char *cmd) {
 	
 	PrintAndLog("\n* Init transaction parameters.");
 
-    //9F66:(Terminal Transaction Qualifiers (TTQ)) len:4
+	ParamLoadDefaults(tlvRoot);
+
+	if (paramLoadJSON) {
+		PrintAndLog("* * Transaction parameters loading from JSON...");
+		ParamLoadFromJson(tlvRoot);
+	}
+	
+	//9F66:(Terminal Transaction Qualifiers (TTQ)) len:4
 	char *qVSDC = "\x26\x00\x00\x00";
 	if (GenACGPO) {
 		qVSDC = "\x26\x80\x00\x00";
@@ -663,26 +841,9 @@ int CmdHFEMVExec(const char *cmd) {
 			TLV_ADD(0x9F66, qVSDC); // qVSDC (VISA CDA not enabled)
 			break;
 		default:
-			TLV_ADD(0x9F66, "\x26\x00\x00\x00"); // qVSDC
 			break;
 	}
 	
-    //9F02:(Amount, authorized (Numeric)) len:6
-	TLV_ADD(0x9F02, "\x00\x00\x00\x00\x01\x00");
-    //9F1A:(Terminal Country Code) len:2
-	TLV_ADD(0x9F1A, "ru");
-    //5F2A:(Transaction Currency Code) len:2
-    // USD 840, EUR 978, RUR 810, RUB 643, RUR 810(old), UAH 980, AZN 031, n/a 999
-	TLV_ADD(0x5F2A, "\x09\x80");
-    //9A:(Transaction Date) len:3
-	TLV_ADD(0x9A,   "\x00\x00\x00");
-    //9C:(Transaction Type) len:1   |  00 => Goods and service #01 => Cash
-	TLV_ADD(0x9C,   "\x00");
-	// 9F37 Unpredictable Number len:4
-	TLV_ADD(0x9F37, "\x01\x02\x03\x04");
-	// 9F6A Unpredictable Number (MSD for UDOL) len:4
-	TLV_ADD(0x9F6A, "\x01\x02\x03\x04");
-
 	TLVPrintFromTLV(tlvRoot); // TODO delete!!!
 	
 	PrintAndLog("\n* Calc PDOL.");
@@ -1038,6 +1199,30 @@ int CmdHFEMVExec(const char *cmd) {
 	return 0;
 }
 
+int UsageCmdHFEMVScan(void) {
+	PrintAndLog("HELP :  Scan EMV card and save it contents to a file. \n");
+	PrintAndLog("        It executes EMV contactless transaction and saves result to a file which can be used for emulation.\n");
+	PrintAndLog("Usage:  hf emv scan [-a][-t][-v][-c][-x][-g] <file_name>\n");
+	PrintAndLog("  Options:");
+	PrintAndLog("  -a       : show APDU reqests and responses\n");
+	PrintAndLog("  -t       : TLV decode results\n");
+	PrintAndLog("  -v       : transaction type - qVSDC or M/Chip.\n");
+	PrintAndLog("  -c       : transaction type - qVSDC or M/Chip plus CDA (SDAD generation).\n");
+	PrintAndLog("  -x       : transaction type - VSDC. For test only. Not a standart behavior.\n");
+	PrintAndLog("  -g       : VISA. generate AC from GPO\n");
+	PrintAndLog("By default : transaction type - MSD.\n");
+	PrintAndLog("Samples:");
+	PrintAndLog(" hf emv scan -a -t -> scan MSD transaction mode");
+	PrintAndLog(" hf emv scan -a -t -c -> scan CDA transaction mode");
+	return 0;
+}
+
+int CmdHFEMVScan(const char *cmd) {
+	UsageCmdHFEMVScan();
+	
+	return 0;
+}
+
 int CmdHFEMVTest(const char *cmd) {
 	return ExecuteCryptoTests(true);
 }
@@ -1054,6 +1239,7 @@ static command_t CommandTable[] =  {
 	{"genac",		CmdHFEMVAC,						0,	"Generate ApplicationCryptogram."},
 	{"challenge",	CmdHFEMVGenerateChallenge,		0,	"Generate challenge."},
 	{"intauth",		CmdHFEMVInternalAuthenticate,	0,	"Internal authentication."},
+//	{"scan",	CmdHFEMVScan,	0,	"Scan EMV card and save it contents to json file for emulator."},
 	{"test",		CmdHFEMVTest,					0,	"Crypto logic test."},
 	{NULL, NULL, 0, NULL}
 };
