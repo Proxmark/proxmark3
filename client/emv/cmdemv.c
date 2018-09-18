@@ -14,20 +14,6 @@
 #include "cliparser/cliparser.h"
 #include <jansson.h>
 
-int UsageCmdHFEMVSelect(void) {
-	PrintAndLog("HELP :  Executes select applet command:\n");
-	PrintAndLog("Usage:  hf emv select [-s][-k][-a][-t] <HEX applet AID>\n");
-	PrintAndLog("  Options:");
-	PrintAndLog("  -s       : select card");
-	PrintAndLog("  -k       : keep field for next command");
-	PrintAndLog("  -a       : show APDU reqests and responses\n");
-	PrintAndLog("  -t       : TLV decode results\n");
-	PrintAndLog("Samples:");
-	PrintAndLog(" hf emv select -s a00000000101 -> select card, select applet");
-	PrintAndLog(" hf emv select -s -t a00000000101 -> select card, select applet, show result in TLV");
-	return 0;
-}
-
 int CmdHFEMVSelect(const char *cmd) {
 	uint8_t data[APDU_AID_LEN] = {0};
 	int datalen = 0;
