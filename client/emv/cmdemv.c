@@ -14,10 +14,30 @@
 #include "cliparser/cliparser.h"
 #include <jansson.h>
 
+#define TLV_ADD(tag, value)( tlvdb_change_or_add_node(tlvRoot, tag, sizeof(value) - 1, (const unsigned char *)value) )
+void ParamLoadDefaults(struct tlvdb *tlvRoot) {
+	//9F02:(Amount, authorized (Numeric)) len:6
+	TLV_ADD(0x9F02, "\x00\x00\x00\x00\x01\x00");
+	//9F1A:(Terminal Country Code) len:2
+	TLV_ADD(0x9F1A, "ru");
+	//5F2A:(Transaction Currency Code) len:2
+	// USD 840, EUR 978, RUR 810, RUB 643, RUR 810(old), UAH 980, AZN 031, n/a 999
+	TLV_ADD(0x5F2A, "\x09\x80");
+	//9A:(Transaction Date) len:3
+	TLV_ADD(0x9A,   "\x00\x00\x00");
+	//9C:(Transaction Type) len:1   |  00 => Goods and service #01 => Cash
+	TLV_ADD(0x9C,   "\x00");
+	// 9F37 Unpredictable Number len:4
+	TLV_ADD(0x9F37, "\x01\x02\x03\x04");
+	// 9F6A Unpredictable Number (MSD for UDOL) len:4
+	TLV_ADD(0x9F6A, "\x01\x02\x03\x04");
+	//9F66:(Terminal Transaction Qualifiers (TTQ)) len:4
+	TLV_ADD(0x9F66, "\x26\x00\x00\x00"); // qVSDC
+}
+
 int CmdHFEMVSelect(const char *cmd) {
 	uint8_t data[APDU_AID_LEN] = {0};
 	int datalen = 0;
-
 
 	CLIParserInit("hf emv select", 
 		"Executes select applet command", 
@@ -156,8 +176,6 @@ int CmdHFEMVPPSE(const char *cmd) {
 	return 0;
 }
 
-#define TLV_ADD(tag, value)( tlvdb_change_or_add_node(tlvRoot, tag, sizeof(value) - 1, (const unsigned char *)value) )
-
 int CmdHFEMVGPO(const char *cmd) {
 	uint8_t data[APDU_RES_LEN] = {0};
 	int datalen = 0;
@@ -205,23 +223,7 @@ int CmdHFEMVGPO(const char *cmd) {
 		// TODO
 		PrintAndLog("Make PDOL data not implemented!");
 
-		//9F02:(Amount, authorized (Numeric)) len:6
-		TLV_ADD(0x9F02, "\x00\x00\x00\x00\x01\x00");
-		//9F1A:(Terminal Country Code) len:2
-		TLV_ADD(0x9F1A, "ru");
-		//5F2A:(Transaction Currency Code) len:2
-		// USD 840, EUR 978, RUR 810, RUB 643, RUR 810(old), UAH 980, AZN 031, n/a 999
-		TLV_ADD(0x5F2A, "\x09\x80");
-		//9A:(Transaction Date) len:3
-		TLV_ADD(0x9A,   "\x00\x00\x00");
-		//9C:(Transaction Type) len:1   |  00 => Goods and service #01 => Cash
-		TLV_ADD(0x9C,   "\x00");
-		// 9F37 Unpredictable Number len:4
-		TLV_ADD(0x9F37, "\x01\x02\x03\x04");
-		// 9F6A Unpredictable Number (MSD for UDOL) len:4
-		TLV_ADD(0x9F6A, "\x01\x02\x03\x04");
-		//9F66:(Terminal Transaction Qualifiers (TTQ)) len:4
-		TLV_ADD(0x9F66, "\x26\x00\x00\x00"); // qVSDC
+		ParamLoadDefaults(tlvRoot);
 
 		if (paramsLoadFromFile) {
 		};
@@ -489,26 +491,6 @@ int CmdHFEMVInternalAuthenticate(const char *cmd) {
 	return 0;	
 }
 
-int UsageCmdHFEMVExec(void) {
-	PrintAndLog("HELP :  Executes EMV contactless transaction:\n");
-	PrintAndLog("Usage:  hf emv exec [-s][-a][-t][-j][-f][-v][-c][-x][-g]\n");
-	PrintAndLog("  Options:");
-	PrintAndLog("  -s       : select card");
-	PrintAndLog("  -a       : show APDU reqests and responses\n");
-	PrintAndLog("  -t       : TLV decode results\n");
-	PrintAndLog("  -j       : load transaction parameters from `emv/defparams.json` file\n");
-	PrintAndLog("  -f       : force search AID. Search AID instead of execute PPSE.\n");
-	PrintAndLog("  -v       : transaction type - qVSDC or M/Chip.\n");
-	PrintAndLog("  -c       : transaction type - qVSDC or M/Chip plus CDA (SDAD generation).\n");
-	PrintAndLog("  -x       : transaction type - VSDC. For test only. Not a standart behavior.\n");
-	PrintAndLog("  -g       : VISA. generate AC from GPO\n");
-	PrintAndLog("By default : transaction type - MSD.\n");
-	PrintAndLog("Samples:");
-	PrintAndLog(" hf emv exec -s -a -t -> execute MSD transaction");
-	PrintAndLog(" hf emv exec -s -a -t -c -> execute CDA transaction");
-	return 0;
-}
-
 #define dreturn(n) {free(pdol_data_tlv);tlvdb_free(tlvSelect);tlvdb_free(tlvRoot);DropField();return n;}
 
 bool HexToBuffer(const char *errormsg, const char *hexvalue, uint8_t * buffer, size_t maxbufferlen, size_t *bufferlen) {
@@ -641,35 +623,7 @@ bool ParamLoadFromJson(struct tlvdb *tlv) {
 	return true;
 }
 
-void ParamLoadDefaults(struct tlvdb *tlvRoot) {
-	//9F02:(Amount, authorized (Numeric)) len:6
-	TLV_ADD(0x9F02, "\x00\x00\x00\x00\x01\x00");
-	//9F1A:(Terminal Country Code) len:2
-	TLV_ADD(0x9F1A, "ru");
-	//5F2A:(Transaction Currency Code) len:2
-	// USD 840, EUR 978, RUR 810, RUB 643, RUR 810(old), UAH 980, AZN 031, n/a 999
-	TLV_ADD(0x5F2A, "\x09\x80");
-	//9A:(Transaction Date) len:3
-	TLV_ADD(0x9A,   "\x00\x00\x00");
-	//9C:(Transaction Type) len:1   |  00 => Goods and service #01 => Cash
-	TLV_ADD(0x9C,   "\x00");
-	// 9F37 Unpredictable Number len:4
-	TLV_ADD(0x9F37, "\x01\x02\x03\x04");
-	// 9F6A Unpredictable Number (MSD for UDOL) len:4
-	TLV_ADD(0x9F6A, "\x01\x02\x03\x04");
-	//9F66:(Terminal Transaction Qualifiers (TTQ)) len:4
-	TLV_ADD(0x9F66, "\x26\x00\x00\x00"); // qVSDC
-}
-
 int CmdHFEMVExec(const char *cmd) {
-	bool activateField = false;
-	bool showAPDU = false;
-	bool decodeTLV = false;
-	bool forceSearch = false;
-	enum TransactionType TrType = TT_MSD;
-	bool GenACGPO = false;
-	bool paramLoadJSON = false;
-
 	uint8_t buf[APDU_RES_LEN] = {0};
 	size_t len = 0;
 	uint16_t sw = 0;
@@ -684,63 +638,45 @@ int CmdHFEMVExec(const char *cmd) {
 	struct tlvdb *tlvRoot = NULL;
 	struct tlv *pdol_data_tlv = NULL;
 
-	if (strlen(cmd) < 1) {
-		UsageCmdHFEMVExec();
-		return 0;
-	}
-	
-	int cmdp = 0;
-	while(param_getchar(cmd, cmdp) != 0x00) {
-		char c = param_getchar(cmd, cmdp);
-		if ((c == '-') && (param_getlength(cmd, cmdp) == 2))
-			switch (param_getchar_indx(cmd, 1, cmdp)) {
-				case 'h':
-				case 'H':
-					UsageCmdHFEMVExec();
-					return 0;
-				case 's':
-				case 'S':
-					activateField = true;
-					break;
-				case 'a':
-				case 'A':
-					showAPDU = true;
-					break;
-				case 't':
-				case 'T':
-					decodeTLV = true;
-					break;
-				case 'f':
-				case 'F':
-					forceSearch = true;
-					break;
-				case 'x':
-				case 'X':
-					TrType = TT_VSDC;
-					break;
-				case 'v':
-				case 'V':
-					TrType = TT_QVSDCMCHIP;
-					break;
-				case 'c':
-				case 'C':
-					TrType = TT_CDA;
-					break;
-				case 'g':
-				case 'G':
-					GenACGPO = true;
-					break;
-				case 'j':
-				case 'J':
-					paramLoadJSON = true;
-					break;
-				default:
-					PrintAndLog("Unknown parameter '%c'", param_getchar_indx(cmd, 1, cmdp));
-					return 1;
-		}
-		cmdp++;
-	}
+	CLIParserInit("hf emv exec", 
+		"Executes EMV contactless transaction", 
+		"Usage:\n\thf emv exec -sat -> select card, execute MSD transaction, show APDU and TLV\n"
+			"\thf emv exec -satc -> select card, execute CDA transaction, show APDU and TLV\n");
 
+	void* argtable[] = {
+		arg_param_begin,
+		arg_lit0("sS",  "select",   "activate field and select card."),
+		arg_lit0("aA",  "apdu",     "show APDU reqests and responses."),
+		arg_lit0("tT",  "tlv",      "TLV decode results."),
+		arg_lit0("jJ",  "jload",    "Load transaction parameters from `emv/defparams.json` file."),
+		arg_lit0("fF",  "forceaid", "Force search AID. Search AID instead of execute PPSE."),
+		arg_rem("By default:",      "Transaction type - MSD"),
+		arg_lit0("vV",  "qvsdc",    "Transaction type - qVSDC or M/Chip."),
+		arg_lit0("cC",  "qvsdccda", "Transaction type - qVSDC or M/Chip plus CDA (SDAD generation)."),
+		arg_lit0("xX",  "vsdc",     "Transaction type - VSDC. For test only. Not a standart behavior."),
+		arg_lit0("gG",  "acgpo",    "VISA. generate AC from GPO."),
+		arg_param_end
+	};
+	CLIExecWithReturn(cmd, argtable, true);
+	
+	bool activateField = arg_get_lit(1);
+	bool showAPDU = arg_get_lit(2);
+	bool decodeTLV = arg_get_lit(3);
+	bool paramLoadJSON = arg_get_lit(4);
+	bool forceSearch = arg_get_lit(5);
+
+	enum TransactionType TrType = TT_MSD;
+	if (arg_get_lit(6))
+		TrType = TT_QVSDCMCHIP;
+	if (arg_get_lit(7))
+		TrType = TT_CDA;
+	if (arg_get_lit(8))
+		TrType = TT_VSDC;
+
+	bool GenACGPO = arg_get_lit(9);
+	CLIParserFree();
+	
+	SetAPDULogging(showAPDU);
 	
 	// init applets list tree
 	const char *al = "Applets list";
