@@ -19,8 +19,10 @@ OBJDIR = obj
 
 LDLIBS = -L/opt/local/lib -L/usr/local/lib -lreadline -lpthread -lm
 LUALIB = ../liblua/liblua.a
+JANSSONLIBPATH = ./jansson
+JANSSONLIB = $(JANSSONLIBPATH)/libjansson.a
 LDFLAGS = $(ENV_LDFLAGS)
-CFLAGS = $(ENV_CFLAGS) -std=c99 -D_ISOC99_SOURCE -I. -I../include -I../common -I../common/polarssl -I../zlib -I../uart -I/opt/local/include -I../liblua -Wall -g -O3
+CFLAGS = $(ENV_CFLAGS) -std=c99 -D_ISOC99_SOURCE -I. -I../include -I../common -I../common/polarssl -I../zlib -I../uart -I/opt/local/include -I../liblua -I$(JANSSONLIBPATH) -Wall -g -O3
 CXXFLAGS = -I../include -Wall -O3
 
 APP_CFLAGS =
@@ -236,12 +238,12 @@ WINBINS = $(patsubst %, %.exe, $(BINS))
 CLEAN = $(BINS) $(WINBINS) $(COREOBJS) $(CMDOBJS) $(ZLIBOBJS) $(QTGUIOBJS) $(MULTIARCHOBJS) $(OBJDIR)/*.o *.moc.cpp ui/ui_overlays.h
 
 # need to assign dependancies to build these first...
-all: lua_build $(BINS)
+all: lua_build jansson_build $(BINS)
 
 all-static: LDLIBS:=-static $(LDLIBS)
 all-static: proxmark3 flasher fpga_compress
 
-proxmark3: LDLIBS+=$(LUALIB) $(QTLDLIBS)
+proxmark3: LDLIBS+=$(LUALIB) $(JANSSONLIB) $(QTLDLIBS)
 proxmark3: $(OBJDIR)/proxmark3.o $(COREOBJS) $(CMDOBJS) $(QTGUIOBJS) $(MULTIARCHOBJS) $(ZLIBOBJS) lualibs/usb_cmd.lua
 	$(LD) $(LDFLAGS) $(OBJDIR)/proxmark3.o $(COREOBJS) $(CMDOBJS) $(QTGUIOBJS) $(MULTIARCHOBJS) $(ZLIBOBJS) $(LDLIBS) -o $@
 
@@ -265,6 +267,7 @@ lualibs/usb_cmd.lua: ../include/usb_cmd.h
 clean:
 	$(RM) $(CLEAN)
 	cd ../liblua && make clean
+	cd ./jansson && make clean
 
 tarbin: $(BINS)
 	$(TAR) $(TARFLAGS) ../proxmark3-$(platform)-bin.tar $(BINS:%=client/%) $(WINBINS:%=client/%)
@@ -272,6 +275,10 @@ tarbin: $(BINS)
 lua_build:
 	@echo Compiling liblua, using platform $(LUAPLATFORM)
 	cd ../liblua && make $(LUAPLATFORM)
+	
+jansson_build:
+	@echo Compiling jansson
+	cd ./jansson && make all
 
 .PHONY: all clean
 

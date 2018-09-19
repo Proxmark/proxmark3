@@ -101,7 +101,7 @@ void LFSetupFPGAForADC(int divisor, bool lf_field)
 	// Give it a bit of time for the resonant antenna to settle.
 	SpinDelay(50);
 	// Now set up the SSC to get the ADC samples that are now streaming at us.
-	FpgaSetupSsc();
+	FpgaSetupSsc(FPGA_MAJOR_MODE_LF_ADC);
 }
 
 /**

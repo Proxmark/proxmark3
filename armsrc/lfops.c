@@ -1849,7 +1849,7 @@ void Cotag(uint32_t arg0) {
 	SetAdcMuxFor(GPIO_MUXSEL_LOPKD);
 
 	// Now set up the SSC to get the ADC samples that are now streaming at us.
-	FpgaSetupSsc();
+	FpgaSetupSsc(FPGA_MAJOR_MODE_LF_ADC);
 
 	// start clock - 1.5ticks is 1us
 	StartTicks();
