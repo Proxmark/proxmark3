@@ -68,11 +68,11 @@ void AcquireTiType(void);
 void AcquireRawBitsTI(void);
 void SimulateTagLowFrequency(int period, int gap, int ledcontrol);
 void SimulateTagLowFrequencyBidir(int divisor, int max_bitlen);
-void CmdHIDsimTAG(int hi, int lo, int ledcontrol);
+void CmdHIDsimTAG(int hi2, int hi, int lo, int ledcontrol);
 void CmdFSKsimTAG(uint16_t arg1, uint16_t arg2, size_t size, uint8_t *BitStream);
 void CmdASKsimTag(uint16_t arg1, uint16_t arg2, size_t size, uint8_t *BitStream);
 void CmdPSKsimTag(uint16_t arg1, uint16_t arg2, size_t size, uint8_t *BitStream);
-void CmdHIDdemodFSK(int findone, int *high, int *low, int ledcontrol);
+void CmdHIDdemodFSK(int findone, int *high2, int *high, int *low, int ledcontrol);
 void CmdAWIDdemodFSK(int findone, int *high, int *low, int ledcontrol); // Realtime demodulation mode for AWID26
 void CmdEM410xdemod(int findone, int *high, int *low, int ledcontrol);
 void CmdIOdemodFSK(int findone, int *high, int *low, int ledcontrol);
