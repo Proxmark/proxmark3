@@ -28,11 +28,9 @@
 #include "BigBuf.h"
 #include "mifareutil.h"
 #include "pcf7931.h"
+#include "i2c.h"
 #ifdef WITH_LCD
  #include "LCD.h"
-#endif
-#ifdef WITH_SMARTCARD
- #include "i2c.h"
 #endif
 
 
@@ -143,7 +141,7 @@ void Dbhexdump(int len, uint8_t *d, bool bAsci) {
 static int ReadAdc(int ch)
 {	
 	// Note: ADC_MODE_PRESCALE and ADC_MODE_SAMPLE_HOLD_TIME are set to the maximum allowed value. 
-	// AMPL_HI is are high impedance (10MOhm || 1MOhm) output, the input capacitance of the ADC is 12pF (typical). This results in a time constant
+	// AMPL_HI is a high impedance (10MOhm || 1MOhm) output, the input capacitance of the ADC is 12pF (typical). This results in a time constant
 	// of RC = (0.91MOhm) * 12pF = 10.9us. Even after the maximum configurable sample&hold time of 40us the input capacitor will not be fully charged. 
 	// 
 	// The maths are:
@@ -162,7 +160,7 @@ static int ReadAdc(int ch)
 
 	while(!(AT91C_BASE_ADC->ADC_SR & ADC_END_OF_CONVERSION(ch))) {};
 	
-	return AT91C_BASE_ADC->ADC_CDR[ch];
+	return AT91C_BASE_ADC->ADC_CDR[ch] & 0x3ff;
 }
 
 int AvgAdc(int ch) // was static - merlok
@@ -175,6 +173,26 @@ int AvgAdc(int ch) // was static - merlok
 	}
 
 	return (a + 15) >> 5;
+}
+
+static int AvgAdc_Voltage_HF(void)
+{
+	int AvgAdc_Voltage_Low, AvgAdc_Voltage_High;
+	
+	AvgAdc_Voltage_Low= (MAX_ADC_HF_VOLTAGE_LOW * AvgAdc(ADC_CHAN_HF_LOW)) >> 10;
+	// if voltage range is about to be exceeded, use high voltage ADC channel if available (RDV40 only)
+	if (AvgAdc_Voltage_Low > MAX_ADC_HF_VOLTAGE_LOW - 300) {
+		AvgAdc_Voltage_High = (MAX_ADC_HF_VOLTAGE_HIGH * AvgAdc(ADC_CHAN_HF_HIGH)) >> 10;
+		if (AvgAdc_Voltage_High >= AvgAdc_Voltage_Low) {
+			return AvgAdc_Voltage_High;
+		}
+	}
+	return AvgAdc_Voltage_Low;
+}
+
+static int AvgAdc_Voltage_LF(void)
+{
+	return (MAX_ADC_LF_VOLTAGE * AvgAdc(ADC_CHAN_LF)) >> 10;
 }
 
 void MeasureAntennaTuningLfOnly(int *vLf125, int *vLf134, int *peakf, int *peakv, uint8_t LF_Results[])
@@ -198,7 +216,7 @@ void MeasureAntennaTuningLfOnly(int *vLf125, int *vLf134, int *peakf, int *peakv
 		WDT_HIT();
 		FpgaSendCommand(FPGA_CMD_SET_DIVISOR, i);
 		SpinDelay(20);
-		adcval = ((MAX_ADC_LF_VOLTAGE * AvgAdc(ADC_CHAN_LF)) >> 10);
+		adcval = AvgAdc_Voltage_LF();
 		if (i==95) *vLf125 = adcval; // voltage at 125Khz
 		if (i==89) *vLf134 = adcval; // voltage at 134Khz
 
@@ -223,9 +241,8 @@ void MeasureAntennaTuningHfOnly(int *vHf)
 	FpgaDownloadAndGo(FPGA_BITSTREAM_HF);
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_HF_READER_RX_XCORR);
 	SpinDelay(20);
-	*vHf = (MAX_ADC_HF_VOLTAGE * AvgAdc(ADC_CHAN_HF)) >> 10;
+	*vHf = AvgAdc_Voltage_HF();
 	LED_A_OFF();
-
 	return;
 }
 
@@ -267,8 +284,8 @@ void MeasureAntennaTuningHf(void)
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_HF_READER_RX_XCORR);
 
 	for (;;) {
-		SpinDelay(20);
-		vHf = (MAX_ADC_HF_VOLTAGE * AvgAdc(ADC_CHAN_HF)) >> 10;
+		SpinDelay(500);
+		vHf = AvgAdc_Voltage_HF();
 
 		Dbprintf("%d mV",vHf);
 		if (BUTTON_PRESS()) break;
@@ -293,6 +310,7 @@ extern struct version_information version_information;
 /* bootrom version information is pointed to from _bootphase1_version_pointer */
 extern char *_bootphase1_version_pointer, _flash_start, _flash_end, _bootrom_start, _bootrom_end, __data_src_start__;
 
+
 void SendVersion(void)
 {
 	char temp[USB_CMD_DATA_SIZE]; /* Limited data payload in USB packets */
@@ -315,11 +333,16 @@ void SendVersion(void)
 
 	for (int i = 0; i < fpga_bitstream_num; i++) {
 		strncat(VersionString, fpga_version_information[i], sizeof(VersionString) - strlen(VersionString) - 1);
-		if (i < fpga_bitstream_num - 1) {
-			strncat(VersionString, "\n", sizeof(VersionString) - strlen(VersionString) - 1);
-		}
+		strncat(VersionString, "\n", sizeof(VersionString) - strlen(VersionString) - 1);
 	}
-
+	
+	// test availability of SmartCard slot
+	if (I2C_is_available()) {
+		strncat(VersionString, "SmartCard Slot: available\n", sizeof(VersionString) - strlen(VersionString) - 1);
+	} else {
+		strncat(VersionString, "SmartCard Slot: not available\n", sizeof(VersionString) - strlen(VersionString) - 1);
+	}
+	
 	// Send Chip ID and used flash memory
 	uint32_t text_and_rodata_section_size = (uint32_t)&__data_src_start__ - (uint32_t)&_flash_start;
 	uint32_t compressed_data_section_size = common_area.arg1;
@@ -828,13 +851,15 @@ static const int LIGHT_LEN = sizeof(LIGHT_SCHEME)/sizeof(LIGHT_SCHEME[0]);
 
 void ListenReaderField(int limit)
 {
-	int lf_av, lf_av_new, lf_baseline= 0, lf_max;
-	int hf_av, hf_av_new,  hf_baseline= 0, hf_max;
+	int lf_av, lf_av_new=0, lf_baseline= 0, lf_max;
+	int hf_av, hf_av_new=0,  hf_baseline= 0, hf_max;
 	int mode=1, display_val, display_max, i;
 
-#define LF_ONLY						1
-#define HF_ONLY						2
-#define REPORT_CHANGE			 	10    // report new values only if they have changed at least by REPORT_CHANGE
+#define LF_ONLY                    1
+#define HF_ONLY                    2
+#define REPORT_CHANGE_PERCENT      5    // report new values only if they have changed at least by REPORT_CHANGE_PERCENT
+#define MIN_HF_FIELD             300    // in mode 1 signal HF field greater than MIN_HF_FIELD above baseline
+#define MIN_LF_FIELD            1200    // in mode 1 signal LF field greater than MIN_LF_FIELD above baseline
 
 
 	// switch off FPGA - we don't want to measure our own signal
@@ -843,23 +868,23 @@ void ListenReaderField(int limit)
 
 	LEDsoff();
 
-	lf_av = lf_max = AvgAdc(ADC_CHAN_LF);
+	lf_av = lf_max = AvgAdc_Voltage_LF();
 
 	if(limit != HF_ONLY) {
-		Dbprintf("LF 125/134kHz Baseline: %dmV", (MAX_ADC_LF_VOLTAGE * lf_av) >> 10);
+		Dbprintf("LF 125/134kHz Baseline: %dmV", lf_av);
 		lf_baseline = lf_av;
 	}
 
-	hf_av = hf_max = AvgAdc(ADC_CHAN_HF);
-
+	hf_av = hf_max = AvgAdc_Voltage_HF();
+	
 	if (limit != LF_ONLY) {
-		Dbprintf("HF 13.56MHz Baseline: %dmV", (MAX_ADC_HF_VOLTAGE * hf_av) >> 10);
+		Dbprintf("HF 13.56MHz Baseline: %dmV", hf_av);
 		hf_baseline = hf_av;
 	}
 
 	for(;;) {
+		SpinDelay(500);
 		if (BUTTON_PRESS()) {
-			SpinDelay(500);
 			switch (mode) {
 				case 1:
 					mode=2;
@@ -872,21 +897,22 @@ void ListenReaderField(int limit)
 					return;
 					break;
 			}
+			while (BUTTON_PRESS());
 		}
 		WDT_HIT();
 
 		if (limit != HF_ONLY) {
 			if(mode == 1) {
-				if (ABS(lf_av - lf_baseline) > REPORT_CHANGE) 
+				if (lf_av - lf_baseline > MIN_LF_FIELD)
 					LED_D_ON();
 				else
 					LED_D_OFF();
 			}
 
-			lf_av_new = AvgAdc(ADC_CHAN_LF);
+			lf_av_new = AvgAdc_Voltage_LF();
 			// see if there's a significant change
-			if(ABS(lf_av - lf_av_new) > REPORT_CHANGE) {
-				Dbprintf("LF 125/134kHz Field Change: %5dmV", (MAX_ADC_LF_VOLTAGE * lf_av_new) >> 10);
+			if (ABS((lf_av - lf_av_new)*100/(lf_av?lf_av:1)) > REPORT_CHANGE_PERCENT) {
+				Dbprintf("LF 125/134kHz Field Change: %5dmV", lf_av_new);
 				lf_av = lf_av_new;
 				if (lf_av > lf_max)
 					lf_max = lf_av;
@@ -895,16 +921,17 @@ void ListenReaderField(int limit)
 
 		if (limit != LF_ONLY) {
 			if (mode == 1){
-				if (ABS(hf_av - hf_baseline) > REPORT_CHANGE) 	
+				if (hf_av - hf_baseline > MIN_HF_FIELD)
 					LED_B_ON();
 				else
 					LED_B_OFF();
 			}
 
-			hf_av_new = AvgAdc(ADC_CHAN_HF);
+			hf_av_new = AvgAdc_Voltage_HF();
+			
 			// see if there's a significant change
-			if(ABS(hf_av - hf_av_new) > REPORT_CHANGE) {
-				Dbprintf("HF 13.56MHz Field Change: %5dmV", (MAX_ADC_HF_VOLTAGE * hf_av_new) >> 10);
+			if (ABS((hf_av - hf_av_new)*100/(hf_av?hf_av:1)) > REPORT_CHANGE_PERCENT) {
+				Dbprintf("HF 13.56MHz Field Change: %5dmV", hf_av_new);
 				hf_av = hf_av_new;
 				if (hf_av > hf_max)
 					hf_max = hf_av;
@@ -1436,7 +1463,7 @@ void  __attribute__((noreturn)) AppMain(void)
 	LED_A_OFF();
 
 	// Init USB device
-  usb_enable();
+	usb_enable();
 
 	// The FPGA gets its clock from us from PCK0 output, so set that up.
 	AT91C_BASE_PIOA->PIO_BSR = GPIO_PCK0;
