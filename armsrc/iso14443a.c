@@ -1405,7 +1405,7 @@ int EmGetCmd(uint8_t *received, uint16_t *len, uint8_t *parity)
 				ADC_MODE_PRESCALE(63) |
 				ADC_MODE_STARTUP_TIME(1) |
 				ADC_MODE_SAMPLE_HOLD_TIME(15);
-	AT91C_BASE_ADC->ADC_CHER = ADC_CHANNEL(ADC_CHAN_HF);
+	AT91C_BASE_ADC->ADC_CHER = ADC_CHANNEL(ADC_CHAN_HF_LOW);
 	// start ADC
 	AT91C_BASE_ADC->ADC_CR = AT91C_ADC_START;
 	
@@ -1432,12 +1432,12 @@ int EmGetCmd(uint8_t *received, uint16_t *len, uint8_t *parity)
 		if (BUTTON_PRESS()) return 1;
 
 		// test if the field exists
-		if (AT91C_BASE_ADC->ADC_SR & ADC_END_OF_CONVERSION(ADC_CHAN_HF)) {
+		if (AT91C_BASE_ADC->ADC_SR & ADC_END_OF_CONVERSION(ADC_CHAN_HF_LOW)) {
 			analogCnt++;
-			analogAVG += AT91C_BASE_ADC->ADC_CDR[ADC_CHAN_HF];
+			analogAVG += AT91C_BASE_ADC->ADC_CDR[ADC_CHAN_HF_LOW];
 			AT91C_BASE_ADC->ADC_CR = AT91C_ADC_START;
 			if (analogCnt >= 32) {
-				if ((MAX_ADC_HF_VOLTAGE * (analogAVG / analogCnt) >> 10) < MF_MINFIELDV) {
+				if ((MAX_ADC_HF_VOLTAGE_LOW * (analogAVG / analogCnt) >> 10) < MF_MINFIELDV) {
 					vtime = GetTickCount();
 					if (!timer) timer = vtime;
 					// 50ms no field --> card to idle state
