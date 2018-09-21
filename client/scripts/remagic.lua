@@ -45,10 +45,10 @@ function main(args)
 	local _cmds = {
     --[[
     --]]
-	[0] = "hf 14a raw -p -a -b 7 40",
-	[1] = "hf 14a raw -p -a 43",
-	[2] = "hf 14a raw -c -p -a A000",
-	[3] = "hf 14a raw -c -p -a 01 02 03 04 04 98 02 00 00 00 00 00 00 00 10 01",
+	[0] = "hf 14a raw -pab7 40",
+	[1] = "hf 14a raw -pa 43",
+	[2] = "hf 14a raw -cpa A000",
+	[3] = "hf 14a raw -cpa 01 02 03 04 04 98 02 00 00 00 00 00 00 00 10 01",
 	}
 	core.clearCommandBuffer()
 	
