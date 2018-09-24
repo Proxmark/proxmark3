@@ -167,7 +167,7 @@ bool FpgaSetupSscDma(uint8_t *buf, uint16_t sample_count)
 	AT91C_BASE_PDC_SSC->PDC_RCR = sample_count;             // transfer this many samples
 	AT91C_BASE_PDC_SSC->PDC_RNPR = (uint32_t) buf;          // next transfer to same memory address
 	AT91C_BASE_PDC_SSC->PDC_RNCR = sample_count;            // ... with same number of samples	AT91C_BASE_PDC_SSC->PDC_PTCR = AT91C_PDC_RXTEN;	        // go!
-
+	AT91C_BASE_PDC_SSC->PDC_PTCR = AT91C_PDC_RXTEN;         // go!
 	return true;
 }
 
