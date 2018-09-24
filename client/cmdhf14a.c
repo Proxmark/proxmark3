@@ -807,7 +807,7 @@ int CmdHF14ACmdRaw(const char *cmd) {
 		arg_int0("t",   "timeout", NULL, "timeout in ms"),
 		arg_lit0("T",   "topaz",   "use Topaz protocol to send command"),
 		arg_lit0("3",   NULL,      "ISO14443-3 select only (skip RATS)"),
-		arg_str1(NULL,  NULL,      "<data (hex)>", NULL),
+		arg_strn(NULL,  NULL,      "<data (hex)>", 1, 250, NULL),
 		arg_param_end
 	};
 	// defaults
