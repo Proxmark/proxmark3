@@ -42,9 +42,10 @@ void Dbprintf(const char *fmt, ...);
 void Dbhexdump(int len, uint8_t *d, bool bAsci);
 
 // ADC Vref = 3300mV, and an (10M+1M):1M voltage divider on the HF input can measure voltages up to 36300 mV
-#define MAX_ADC_HF_VOLTAGE 36300
+#define MAX_ADC_HF_VOLTAGE_LOW   36300
 // ADC Vref = 3300mV, and an (10000k+240k):240k voltage divider on the LF input can measure voltages up to 140800 mV
-#define MAX_ADC_LF_VOLTAGE 140800
+#define MAX_ADC_HF_VOLTAGE_HIGH 140800
+#define MAX_ADC_LF_VOLTAGE      140800
 int AvgAdc(int ch);
 
 void ToSendStuffBit(int b);
@@ -68,11 +69,11 @@ void AcquireTiType(void);
 void AcquireRawBitsTI(void);
 void SimulateTagLowFrequency(int period, int gap, int ledcontrol);
 void SimulateTagLowFrequencyBidir(int divisor, int max_bitlen);
-void CmdHIDsimTAG(int hi, int lo, int ledcontrol);
+void CmdHIDsimTAG(int hi2, int hi, int lo, int ledcontrol);
 void CmdFSKsimTAG(uint16_t arg1, uint16_t arg2, size_t size, uint8_t *BitStream);
 void CmdASKsimTag(uint16_t arg1, uint16_t arg2, size_t size, uint8_t *BitStream);
 void CmdPSKsimTag(uint16_t arg1, uint16_t arg2, size_t size, uint8_t *BitStream);
-void CmdHIDdemodFSK(int findone, int *high, int *low, int ledcontrol);
+void CmdHIDdemodFSK(int findone, int *high2, int *high, int *low, int ledcontrol);
 void CmdAWIDdemodFSK(int findone, int *high, int *low, int ledcontrol); // Realtime demodulation mode for AWID26
 void CmdEM410xdemod(int findone, int *high, int *low, int ledcontrol);
 void CmdIOdemodFSK(int findone, int *high, int *low, int ledcontrol);

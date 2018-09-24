@@ -347,7 +347,7 @@ void Mifare1ksim(uint8_t flags, uint8_t exitAfterNReads, uint8_t arg2, uint8_t *
 
 		// find reader field
 		if (cardSTATE == MFEMUL_NOFIELD) {
-			int vHf = (MAX_ADC_HF_VOLTAGE * AvgAdc(ADC_CHAN_HF)) >> 10;
+			int vHf = (MAX_ADC_HF_VOLTAGE_LOW * AvgAdc(ADC_CHAN_HF_LOW)) >> 10;
 			if (vHf > MF_MINFIELDV) {
 				LED_A_ON();
 				cardSTATE_TO_IDLE();
