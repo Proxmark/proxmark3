@@ -80,6 +80,10 @@ enum ParserState {
 #define isSpace(c)(c == ' ' || c == '\t')
 
 int CLIParserParseString(const char* str, void* vargtable[], size_t vargtableLen, bool allowEmptyExec) {
+	return CLIParserParseStringEx(str, vargtable, vargtableLen, allowEmptyExec, false);
+}
+
+int CLIParserParseStringEx(const char* str, void* vargtable[], size_t vargtableLen, bool allowEmptyExec, bool clueData) {
 	int argc = 0;
 	char *argv[200] = {NULL};
 	
@@ -99,7 +103,7 @@ int CLIParserParseString(const char* str, void* vargtable[], size_t vargtableLen
 	for (int i = 0; i < len; i++) {
 		switch(state){
 			case PS_FIRST: // first char
-				if (true/*str[i] == '-'*/){ // first char before space is '-' - next element - option
+				if (!clueData || str[i] == '-'){ // first char before space is '-' - next element - option OR not "clueData" for not-option fields
 					state = PS_OPTION;
 
 					if (spaceptr) {

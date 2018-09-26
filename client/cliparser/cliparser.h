@@ -29,6 +29,7 @@
 
 extern int CLIParserInit(char *vprogramName, char *vprogramHint, char *vprogramHelp);
 extern int CLIParserParseString(const char* str, void* argtable[], size_t vargtableLen, bool allowEmptyExec);
+extern int CLIParserParseStringEx(const char* str, void* vargtable[], size_t vargtableLen, bool allowEmptyExec, bool clueData);
 extern int CLIParserParseArg(int argc, char **argv, void* argtable[], size_t vargtableLen, bool allowEmptyExec);
 extern void CLIParserFree();
 
