@@ -25,6 +25,7 @@ This project uses the changelog in accordance with [keepchangelog](http://keepac
 ### Fixed
 - Changed start sequence in Qt mode (fix: short commands hangs main Qt thread) (Merlok)
 - Changed driver file proxmark3.inf to support both old and new Product/Vendor IDs (piwi)
+- Changed all command line parsers in `hf emv` commands to argtable (Merlok)
 
 ### Added
 - Added `sc` smartcard (contact card) commands - reader, info, raw, upgrade, setclock, list (hardware version RDV4.0 only) must turn option on in makefile options (Willok, Iceman, marshmellow)
@@ -55,6 +56,7 @@ This project uses the changelog in accordance with [keepchangelog](http://keepac
 - Added to `hf emv exec` SDA, DDA, fast DDA, CDA calculations for VISA and Mastercard and some other compatible EMV cards (Merlok)
 - Added `hf emv test` - crypto tests for DES, AES, SHA, RSA, SDA, DDA, CDA and some other crypto functions (Merlok)
 - Added `hf list mf` - deciphers crypto1 stream and works with first authentication and weak nested authentications (Merlok)
+- Added to `hf emv` commands: `gpo`, `readrec`, `genac`, `challenge`, `intauth` - commands working with EMV cards (Merlok)
 - Added `lf hid encode` and `lf hid decode` commands to translate printed HID card data to and from the packed data transmitted by a prox tag (grauerfuchs)
 - Added `lf hid write` command, which operates as a macro for encode followed by clone operations (grauerfuchs)
 
