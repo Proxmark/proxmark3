@@ -148,6 +148,10 @@ void CLIParserFree() {
 
 // convertors
 int CLIParamHexToBuf(struct arg_str *argstr, uint8_t *data, int maxdatalen, int *datalen) {
+	*datalen = 0;
+	if (!strlen(argstr->sval[0]))
+		return 0;
+	
 	switch(param_gethex_to_eol(argstr->sval[0], 0, data, maxdatalen, datalen)) {
 	case 1:
 		printf("Parameter error: Invalid HEX value.\n");
