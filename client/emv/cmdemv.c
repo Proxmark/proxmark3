@@ -49,7 +49,7 @@ int CmdHFEMVSelect(const char *cmd) {
 		arg_lit0("kK",  "keep",    "keep field for next command"),
 		arg_lit0("aA",  "apdu",    "show APDU reqests and responses"),
 		arg_lit0("tT",  "tlv",     "TLV decode results"),
-		arg_str0(NULL,  NULL,      "<HEX applet AID>", NULL),
+		arg_strx0(NULL,  NULL,     "<HEX applet AID>", NULL),
 		arg_param_end
 	};
 	CLIExecWithReturn(cmd, argtable, true);
@@ -193,7 +193,7 @@ int CmdHFEMVGPO(const char *cmd) {
 		arg_lit0("mM",  "make",    "make PDOLdata from PDOL (tag 9F38) and parameters (NOT WORK!!!)"),
 		arg_lit0("aA",  "apdu",    "show APDU reqests and responses"),
 		arg_lit0("tT",  "tlv",     "TLV decode results of selected applets"),
-		arg_str0(NULL,  NULL,      "<HEX PDOLdata/PDOL>", NULL),
+		arg_strx0(NULL,  NULL,     "<HEX PDOLdata/PDOL>", NULL),
 		arg_param_end
 	};
 	CLIExecWithReturn(cmd, argtable, true);
@@ -281,7 +281,7 @@ int CmdHFEMVReadRecord(const char *cmd) {
 		arg_lit0("kK",  "keep",    "keep field ON for next command"),
 		arg_lit0("aA",  "apdu",    "show APDU reqests and responses"),
 		arg_lit0("tT",  "tlv",     "TLV decode results of selected applets"),
-		arg_str1(NULL,  NULL,      "<SFI 1byte HEX><SFIrec 1byte HEX>", NULL),
+		arg_strx1(NULL,  NULL,     "<SFI 1byte HEX><SFIrec 1byte HEX>", NULL),
 		arg_param_end
 	};
 	CLIExecWithReturn(cmd, argtable, true);
@@ -335,7 +335,7 @@ int CmdHFEMVAC(const char *cmd) {
 		arg_str0("dD",  "decision", "<aac|tc|arqc>", "Terminal decision. aac - declined, tc - approved, arqc - online authorisation requested"),
 		arg_lit0("aA",  "apdu",     "show APDU reqests and responses"),
 		arg_lit0("tT",  "tlv",      "TLV decode results of selected applets"),
-		arg_str1(NULL,  NULL,       "<HEX CDOLdata>", NULL),
+		arg_strx1(NULL,  NULL,      "<HEX CDOLdata>", NULL),
 		arg_param_end
 	};
 	CLIExecWithReturn(cmd, argtable, false);
@@ -457,7 +457,7 @@ int CmdHFEMVInternalAuthenticate(const char *cmd) {
 		arg_lit0("kK",  "keep",    "keep field ON for next command"),
 		arg_lit0("aA",  "apdu",    "show APDU reqests and responses"),
 		arg_lit0("tT",  "tlv",     "TLV decode results of selected applets"),
-		arg_str1(NULL,  NULL,      "<HEX DDOLdata>", NULL),
+		arg_strx1(NULL,  NULL,     "<HEX DDOLdata>", NULL),
 		arg_param_end
 	};
 	CLIExecWithReturn(cmd, argtable, false);

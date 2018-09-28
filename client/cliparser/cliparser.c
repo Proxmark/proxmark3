@@ -166,7 +166,7 @@ int CLIParamHexToBuf(struct arg_str *argstr, uint8_t *data, int maxdatalen, int 
 	}
 	buf[ibuf] = 0;
   
-	if (!len)
+	if (!ibuf)
 		return 0;
 	
 	switch(param_gethex_to_eol(buf, 0, data, maxdatalen, datalen)) {
