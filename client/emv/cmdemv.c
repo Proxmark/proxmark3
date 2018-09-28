@@ -183,7 +183,7 @@ int CmdHFEMVGPO(const char *cmd) {
 	CLIParserInit("hf emv gpo", 
 		"Executes Get Processing Options command. It returns data in TLV format (0x77 - format2) or plain format (0x80 - format1).\nNeeds a EMV applet to be selected.", 
 		"Usage:\n\thf emv gpo -k -> execute GPO\n"
-			"\thf emv gpo -st 01020304 -> execute GPO with 4-byte PDOL data, show result in TLV\n"); 
+			"\thf emv gpo -t 01020304 -> execute GPO with 4-byte PDOL data, show result in TLV\n"); 
 			// here need to add load params from file and gen pdol
 
 	void* argtable[] = {
