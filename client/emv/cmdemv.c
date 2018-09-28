@@ -215,7 +215,7 @@ int CmdHFEMVGPO(const char *cmd) {
 	// calc PDOL
 	struct tlv *pdol_data_tlv = NULL;
 	struct tlv data_tlv = {
-		.tag = 0x01,
+		.tag = 0x83,
 		.len = datalen,
 		.value = (uint8_t *)data,
 	};
