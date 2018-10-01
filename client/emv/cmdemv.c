@@ -465,9 +465,11 @@ int CmdHFEMVAC(const char *cmd) {
 		arg_lit0("kK",  "keep",     "keep field ON for next command"),
 		arg_lit0("cC",  "cda",      "executes CDA transaction. Needs to get SDAD in results."),
 		arg_str0("dD",  "decision", "<aac|tc|arqc>", "Terminal decision. aac - declined, tc - approved, arqc - online authorisation requested"),
+		arg_lit0("pP",  "params",   "load parameters for CDOL making from `emv/defparams.json` file (by default uses default parameters)"),
+		arg_lit0("mM",  "make",     "make PDOLdata from CDOL (tag 8C and 8D) and parameters"),
 		arg_lit0("aA",  "apdu",     "show APDU reqests and responses"),
 		arg_lit0("tT",  "tlv",      "TLV decode results of selected applets"),
-		arg_strx1(NULL,  NULL,      "<HEX CDOLdata>", NULL),
+		arg_strx1(NULL,  NULL,      "<HEX CDOLdata/CDOL>", NULL),
 		arg_param_end
 	};
 	CLIExecWithReturn(cmd, argtable, false);
