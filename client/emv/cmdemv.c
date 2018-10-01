@@ -364,10 +364,10 @@ int CmdHFEMVGPO(const char *cmd) {
 			return 4;
 		}
 	} else {
-		pdol_data_tlv = &data_tlv;
 		if (paramsLoadFromFile) {
 			PrintAndLog("WARNING: don't need to load parameters. Sending plain PDOL data...");
 		}
+		pdol_data_tlv = &data_tlv;
 	}
 
 	size_t pdol_data_tlv_data_len = 0;
