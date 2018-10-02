@@ -1121,26 +1121,50 @@ int CmdHFEMVExec(const char *cmd) {
 	return 0;
 }
 
-int UsageCmdHFEMVScan(void) {
-	PrintAndLog("HELP :  Scan EMV card and save it contents to a file. \n");
-	PrintAndLog("        It executes EMV contactless transaction and saves result to a file which can be used for emulation.\n");
-	PrintAndLog("Usage:  hf emv scan [-a][-t][-v][-c][-x][-g] <file_name>\n");
-	PrintAndLog("  Options:");
-	PrintAndLog("  -a       : show APDU reqests and responses\n");
-	PrintAndLog("  -t       : TLV decode results\n");
-	PrintAndLog("  -v       : transaction type - qVSDC or M/Chip.\n");
-	PrintAndLog("  -c       : transaction type - qVSDC or M/Chip plus CDA (SDAD generation).\n");
-	PrintAndLog("  -x       : transaction type - VSDC. For test only. Not a standart behavior.\n");
-	PrintAndLog("  -g       : VISA. generate AC from GPO\n");
-	PrintAndLog("By default : transaction type - MSD.\n");
-	PrintAndLog("Samples:");
-	PrintAndLog(" hf emv scan -a -t -> scan MSD transaction mode");
-	PrintAndLog(" hf emv scan -a -t -c -> scan CDA transaction mode");
-	return 0;
-}
-
 int CmdHFEMVScan(const char *cmd) {
-	UsageCmdHFEMVScan();
+
+	CLIParserInit("hf emv save", 
+		"Scan EMV card and save it contents to a file.", 
+		"It executes EMV contactless transaction and saves result to a file which can be used for emulation\n"
+			"Usage:\n\thf emv scan -at -> scan MSD transaction mode and show APDU and TLV\n"
+			"\thf emv scan -c -> scan CDA transaction mode\n");
+
+	void* argtable[] = {
+		arg_param_begin,
+		arg_lit0("aA",  "apdu",     "show APDU reqests and responses."),
+		arg_lit0("tT",  "tlv",      "TLV decode results."),
+		arg_lit0("jJ",  "jload",    "Load transaction parameters from `emv/defparams.json` file."),
+		arg_rem("By default:",      "Transaction type - MSD"),
+		arg_lit0("vV",  "qvsdc",    "Transaction type - qVSDC or M/Chip."),
+		arg_lit0("cC",  "qvsdccda", "Transaction type - qVSDC or M/Chip plus CDA (SDAD generation)."),
+		arg_lit0("xX",  "vsdc",     "Transaction type - VSDC. For test only. Not a standart behavior."),
+		arg_lit0("gG",  "acgpo",    "VISA. generate AC from GPO."),
+		arg_lit0("mM",  "merge",    "Merge output file with card's data. (warning: the file may be corrupted!)"),
+		arg_str1("fF",  "file",		"JSON output file name", NULL),
+		arg_param_end
+	};
+	CLIExecWithReturn(cmd, argtable, true);
+	
+	bool showAPDU = arg_get_lit(1);
+	bool decodeTLV = arg_get_lit(2);
+	bool paramLoadJSON = arg_get_lit(3);
+
+	enum TransactionType TrType = TT_MSD;
+	if (arg_get_lit(4))
+		TrType = TT_QVSDCMCHIP;
+	if (arg_get_lit(5))
+		TrType = TT_CDA;
+	if (arg_get_lit(6))
+		TrType = TT_VSDC;
+
+	bool GenACGPO = arg_get_lit(7);
+	CLIParserFree();
+	
+	SetAPDULogging(showAPDU);
+
+
+
+
 	
 	return 0;
 }
@@ -1161,7 +1185,7 @@ static command_t CommandTable[] =  {
 	{"genac",		CmdHFEMVAC,						0,	"Generate ApplicationCryptogram."},
 	{"challenge",	CmdHFEMVGenerateChallenge,		0,	"Generate challenge."},
 	{"intauth",		CmdHFEMVInternalAuthenticate,	0,	"Internal authentication."},
-//	{"scan",	CmdHFEMVScan,	0,	"Scan EMV card and save it contents to json file for emulator."},
+	{"scan",		CmdHFEMVScan,					0,	"Scan EMV card and save it contents to json file for emulator."},
 	{"test",		CmdHFEMVTest,					0,	"Crypto logic test."},
 	{NULL, NULL, 0, NULL}
 };
