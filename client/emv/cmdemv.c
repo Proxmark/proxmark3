@@ -9,6 +9,7 @@
 //-----------------------------------------------------------------------------
 
 #include <ctype.h>
+#include "mifare.h"
 #include "cmdemv.h"
 #include "test/cryptotest.h"
 #include "cliparser/cliparser.h"
@@ -1122,6 +1123,12 @@ int CmdHFEMVExec(const char *cmd) {
 }
 
 int CmdHFEMVScan(const char *cmd) {
+	uint8_t AID[APDU_AID_LEN] = {0};
+	size_t AIDlen = 0;
+	uint8_t buf[APDU_RES_LEN] = {0};
+	size_t len = 0;
+	uint16_t sw = 0;
+	int res;
 
 	CLIParserInit("hf emv save", 
 		"Scan EMV card and save it contents to a file.", 
@@ -1140,7 +1147,7 @@ int CmdHFEMVScan(const char *cmd) {
 		arg_lit0("xX",  "vsdc",     "Transaction type - VSDC. For test only. Not a standart behavior."),
 		arg_lit0("gG",  "acgpo",    "VISA. generate AC from GPO."),
 		arg_lit0("mM",  "merge",    "Merge output file with card's data. (warning: the file may be corrupted!)"),
-		arg_str1("fF",  "file",		"JSON output file name", NULL),
+		arg_str1(NULL,  NULL,		"output.json", "JSON output file name"),
 		arg_param_end
 	};
 	CLIExecWithReturn(cmd, argtable, true);
@@ -1162,9 +1169,103 @@ int CmdHFEMVScan(const char *cmd) {
 	
 	SetAPDULogging(showAPDU);
 
+	PrintAndLog("--> GET UID, ATS.");
+	
+	UsbCommand c = {CMD_READER_ISO_14443a, {ISO14A_CONNECT, 0, 0}};
+	SendCommand(&c);
 
+	UsbCommand resp;
+	WaitForResponse(CMD_ACK,&resp);
+	
+	iso14a_card_select_t card;
+	memcpy(&card, (iso14a_card_select_t *)resp.d.asBytes, sizeof(iso14a_card_select_t));
 
+	uint64_t select_status = resp.arg[0];		// 0: couldn't read, 1: OK, with ATS, 2: OK, no ATS, 3: proprietary Anticollision
+	
+	if(select_status == 0) {
+		PrintAndLog("E->iso14443a card select failed");
+		return 1;
+	}
 
+	if(select_status == 2) {
+		PrintAndLog("E->Card doesn't support iso14443-4 mode");
+		return 1;
+	}
+
+	if(select_status == 3) {
+		PrintAndLog("E->Card doesn't support standard iso14443-3 anticollision");
+		PrintAndLog("\tATQA : %02x %02x", card.atqa[1], card.atqa[0]);
+		return 1;
+	}
+
+	PrintAndLog(" UID: %s", sprint_hex(card.uid, card.uidlen));
+	PrintAndLog("ATQA: %02x %02x", card.atqa[1], card.atqa[0]);
+	PrintAndLog(" SAK: %02x [%" PRIu64 "]", card.sak, resp.arg[0]);
+	if(card.ats_len < 3) {			// a valid ATS consists of at least the length byte (TL) and 2 CRC bytes
+		PrintAndLog("E-> Error ATS length(%d) : %s", card.ats_len, sprint_hex(card.ats, card.ats_len));
+	}
+	PrintAndLog(" ATS: %s", sprint_hex(card.ats, card.ats_len));
+	
+	// init applets list tree
+	const char *al = "Applets list";
+	struct tlvdb *tlvSelect = tlvdb_fixed(1, strlen(al), (const unsigned char *)al);
+	
+	// EMV PPSE
+	PrintAndLog("--> PPSE.");
+	res = EMVSearchPSE(true, true, decodeTLV, tlvSelect);
+
+	// check PPSE and select application id
+	if (!res) {	
+		TLVPrintAIDlistFromSelectTLV(tlvSelect);
+		
+		// here save PSE result to JSON
+		
+	} else {
+		// EMV SEARCH with AID list
+		SetAPDULogging(false);
+		PrintAndLog("--> AID search.");
+		if (EMVSearch(true, true, decodeTLV, tlvSelect)) {
+			PrintAndLog("E->Can't found any of EMV AID. Exit...");
+			tlvdb_free(tlvSelect);
+			return 2;
+		}
+
+		// check search and select application id
+		TLVPrintAIDlistFromSelectTLV(tlvSelect);
+	}
+	tlvdb_free(tlvSelect);
+
+	
+	// EMV SELECT application
+	SetAPDULogging(showAPDU);
+	EMVSelectApplication(tlvSelect, AID, &AIDlen);
+
+	if (!AIDlen) {
+		PrintAndLog("Can't select AID. EMV AID not found. Exit...");
+		return 3;
+	}
+	
+	// EMV SELECT applet
+	PrintAndLog("\n-->Selecting AID:%s.", sprint_hex_inrow(AID, AIDlen));
+	SetAPDULogging(showAPDU);
+	res = EMVSelect(false, true, AID, AIDlen, buf, sizeof(buf), &len, &sw, NULL);
+	
+	if (res) {	
+		PrintAndLog("E->Can't select AID (%d). Exit...", res);
+		return 4;
+	}
+	
+	if (decodeTLV)
+		TLVPrintFromBuffer(buf, len);
+
+	// here save Select result to JSON
+
+	
+	
+	
+	
+	// DropField
+	DropField();
 	
 	return 0;
 }
