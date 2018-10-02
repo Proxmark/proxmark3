@@ -385,7 +385,8 @@ int CmdHFEMVGPO(const char *cmd) {
 	uint16_t sw = 0;
 	int res = EMVGPO(leaveSignalON, pdol_data_tlv_data, pdol_data_tlv_data_len, buf, sizeof(buf), &len, &sw, tlvRoot);
 	
-	free(pdol_data_tlv_data);
+	if (pdol_data_tlv != &data_tlv)
+		free(pdol_data_tlv);
 	tlvdb_free(tlvRoot);
 	
 	if (sw)
@@ -458,7 +459,8 @@ int CmdHFEMVAC(const char *cmd) {
 		"Generate Application Cryptogram command. It returns data in TLV format .\nNeeds a EMV applet to be selected and GPO to be executed.", 
 		"Usage:\n\thf emv genac -k 0102 -> generate AC with 2-byte CDOLdata and keep field ON after command\n"
 			"\thf emv genac -t 01020304 -> generate AC with 4-byte CDOL data, show result in TLV\n"
-			"\thf emv genac -Daac 01020304 -> generate AC with 4-byte CDOL data and terminal decision 'declined'\n"); 
+			"\thf emv genac -Daac 01020304 -> generate AC with 4-byte CDOL data and terminal decision 'declined'\n"
+			"\thf emv genac -pmt 9F 37 04 -> load params from file, make CDOL data from CDOL, generate AC with CDOL, show result in TLV"); 
 
 	void* argtable[] = {
 		arg_param_begin,
@@ -466,7 +468,7 @@ int CmdHFEMVAC(const char *cmd) {
 		arg_lit0("cC",  "cda",      "executes CDA transaction. Needs to get SDAD in results."),
 		arg_str0("dD",  "decision", "<aac|tc|arqc>", "Terminal decision. aac - declined, tc - approved, arqc - online authorisation requested"),
 		arg_lit0("pP",  "params",   "load parameters for CDOL making from `emv/defparams.json` file (by default uses default parameters)"),
-		arg_lit0("mM",  "make",     "make PDOLdata from CDOL (tag 8C and 8D) and parameters"),
+		arg_lit0("mM",  "make",     "make CDOLdata from CDOL (tag 8C and 8D) and parameters"),
 		arg_lit0("aA",  "apdu",     "show APDU reqests and responses"),
 		arg_lit0("tT",  "tlv",      "TLV decode results of selected applets"),
 		arg_strx1(NULL,  NULL,      "<HEX CDOLdata/CDOL>", NULL),
@@ -494,9 +496,11 @@ int CmdHFEMVAC(const char *cmd) {
 	}
 	if (trTypeCDA)
 		termDecision = termDecision | EMVAC_CDAREQ;
-	bool APDULogging = arg_get_lit(4);
-	bool decodeTLV = arg_get_lit(5);
-	CLIGetStrWithReturn(6, data, &datalen);
+	bool paramsLoadFromFile = arg_get_lit(4);
+	bool dataMakeFromCDOL = arg_get_lit(5);
+	bool APDULogging = arg_get_lit(6);
+	bool decodeTLV = arg_get_lit(7);
+	CLIGetStrWithReturn(8, data, &datalen);
 	CLIParserFree();	
 	
 	SetAPDULogging(APDULogging);
@@ -507,22 +511,43 @@ int CmdHFEMVAC(const char *cmd) {
 	
 	// calc CDOL
 	struct tlv *cdol_data_tlv = NULL;
-//	struct tlv *cdol_data_tlv = dol_process(tlvdb_get(tlvRoot, 0x8c, NULL), tlvRoot, 0x01); // 0x01 - dummy tag
 	struct tlv data_tlv = {
 		.tag = 0x01,
 		.len = datalen,
 		.value = (uint8_t *)data,
-	};	
-	cdol_data_tlv = &data_tlv;
-	PrintAndLog("CDOL data[%d]: %s", cdol_data_tlv->len, sprint_hex(cdol_data_tlv->value, cdol_data_tlv->len));
+	};
 	
+	if (dataMakeFromCDOL) {
+		ParamLoadDefaults(tlvRoot);
+
+		if (paramsLoadFromFile) {
+			PrintAndLog("Params loading from file...");
+			ParamLoadFromJson(tlvRoot);
+		};
+		
+		cdol_data_tlv = dol_process((const struct tlv *)tlvdb_external(0x8c, datalen, data), tlvRoot, 0x01); // 0x01 - dummy tag
+		if (!cdol_data_tlv){
+			PrintAndLog("ERROR: can't create CDOL TLV.");
+			tlvdb_free(tlvRoot);
+			return 4;
+		}
+	} else {
+		if (paramsLoadFromFile) {
+			PrintAndLog("WARNING: don't need to load parameters. Sending plain CDOL data...");
+		}
+		cdol_data_tlv = &data_tlv;
+	}
+	
+	PrintAndLog("CDOL data[%d]: %s", cdol_data_tlv->len, sprint_hex(cdol_data_tlv->value, cdol_data_tlv->len));
+
 	// exec
 	uint8_t buf[APDU_RES_LEN] = {0};
 	size_t len = 0;
 	uint16_t sw = 0;
 	int res = EMVAC(leaveSignalON, termDecision, (uint8_t *)cdol_data_tlv->value, cdol_data_tlv->len, buf, sizeof(buf), &len, &sw, tlvRoot);
 	
-//	free(cdol_data_tlv);
+	if (cdol_data_tlv != &data_tlv)
+		free(cdol_data_tlv);
 	tlvdb_free(tlvRoot);
 	
 	if (sw)
@@ -584,34 +609,75 @@ int CmdHFEMVInternalAuthenticate(const char *cmd) {
 	CLIParserInit("hf emv intauth", 
 		"Generate Internal Authenticate command. Usually needs 4-byte random number. It returns data in TLV format .\nNeeds a EMV applet to be selected and GPO to be executed.", 
 		"Usage:\n\thf emv intauth -k 01020304 -> execute Internal Authenticate with 4-byte DDOLdata and keep field ON after command\n"
-			"\thf emv intauth -t 01020304 -> execute Internal Authenticate with 4-byte DDOL data, show result in TLV\n"); 
+			"\thf emv intauth -t 01020304 -> execute Internal Authenticate with 4-byte DDOL data, show result in TLV\n"
+			"\thf emv intauth -pmt 9F 37 04 -> load params from file, make DDOL data from DDOL, Internal Authenticate with DDOL, show result in TLV"); 
 
 	void* argtable[] = {
 		arg_param_begin,
 		arg_lit0("kK",  "keep",    "keep field ON for next command"),
+		arg_lit0("pP",  "params",  "load parameters for DDOL making from `emv/defparams.json` file (by default uses default parameters)"),
+		arg_lit0("mM",  "make",    "make DDOLdata from DDOL (tag 9F49) and parameters"),
 		arg_lit0("aA",  "apdu",    "show APDU reqests and responses"),
 		arg_lit0("tT",  "tlv",     "TLV decode results of selected applets"),
-		arg_strx1(NULL,  NULL,     "<HEX DDOLdata>", NULL),
+		arg_strx1(NULL,  NULL,     "<HEX DDOLdata/DDOL>", NULL),
 		arg_param_end
 	};
 	CLIExecWithReturn(cmd, argtable, false);
 	
 	bool leaveSignalON = arg_get_lit(1);
-	bool APDULogging = arg_get_lit(2);
-	bool decodeTLV = arg_get_lit(3);
-	CLIGetStrWithReturn(4, data, &datalen);
+	bool paramsLoadFromFile = arg_get_lit(2);
+	bool dataMakeFromDDOL = arg_get_lit(3);
+	bool APDULogging = arg_get_lit(4);
+	bool decodeTLV = arg_get_lit(5);
+	CLIGetStrWithReturn(6, data, &datalen);
 	CLIParserFree();	
 	
 	SetAPDULogging(APDULogging);
+
+	// Init TLV tree
+	const char *alr = "Root terminal TLV tree";
+	struct tlvdb *tlvRoot = tlvdb_fixed(1, strlen(alr), (const unsigned char *)alr);
 	
-	// DDOL
-	PrintAndLog("DDOL data[%d]: %s", datalen, sprint_hex(data, datalen));
+	// calc DDOL
+	struct tlv *ddol_data_tlv = NULL;
+	struct tlv data_tlv = {
+		.tag = 0x01,
+		.len = datalen,
+		.value = (uint8_t *)data,
+	};
+	
+	if (dataMakeFromDDOL) {
+		ParamLoadDefaults(tlvRoot);
+
+		if (paramsLoadFromFile) {
+			PrintAndLog("Params loading from file...");
+			ParamLoadFromJson(tlvRoot);
+		};
+		
+		ddol_data_tlv = dol_process((const struct tlv *)tlvdb_external(0x9f49, datalen, data), tlvRoot, 0x01); // 0x01 - dummy tag
+		if (!ddol_data_tlv){
+			PrintAndLog("ERROR: can't create DDOL TLV.");
+			tlvdb_free(tlvRoot);
+			return 4;
+		}
+	} else {
+		if (paramsLoadFromFile) {
+			PrintAndLog("WARNING: don't need to load parameters. Sending plain DDOL data...");
+		}
+		ddol_data_tlv = &data_tlv;
+	}
+	
+	PrintAndLog("DDOL data[%d]: %s", ddol_data_tlv->len, sprint_hex(ddol_data_tlv->value, ddol_data_tlv->len));
 	
 	// exec
 	uint8_t buf[APDU_RES_LEN] = {0};
 	size_t len = 0;
 	uint16_t sw = 0;
 	int res = EMVInternalAuthenticate(leaveSignalON, data, datalen, buf, sizeof(buf), &len, &sw, NULL);
+	
+	if (ddol_data_tlv != &data_tlv)
+		free(ddol_data_tlv);
+	tlvdb_free(tlvRoot);	
 	
 	if (sw)
 		PrintAndLog("APDU response status: %04x - %s", sw, GetAPDUCodeDescription(sw >> 8, sw & 0xff)); 
