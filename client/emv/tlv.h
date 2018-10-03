@@ -50,6 +50,7 @@ void tlvdb_change_or_add_node(struct tlvdb *tlvdb, tlv_tag_t tag, size_t len, co
 void tlvdb_visit(const struct tlvdb *tlvdb, tlv_cb cb, void *data, int level);
 const struct tlv *tlvdb_get(const struct tlvdb *tlvdb, tlv_tag_t tag, const struct tlv *prev);
 const struct tlv *tlvdb_get_inchild(const struct tlvdb *tlvdb, tlv_tag_t tag, const struct tlv *prev);
+const struct tlv *tlvdb_get_tlv(const struct tlvdb *tlvdb);
 
 bool tlv_parse_tl(const unsigned char **buf, size_t *len, struct tlv *tlv);
 unsigned char *tlv_encode(const struct tlv *tlv, size_t *len);

@@ -1170,6 +1170,37 @@ int JsonSaveHex(json_t *elm, char *path, uint64_t data, int datalen) {
 	return JsonSaveBufAsHex(elm, path, bdata, len);
 }
 
+int JsonSaveTLVElm(json_t *elm, char *path, struct tlv *tlvelm, bool saveValue) {
+	json_error_t error;
+
+	if (strlen(path) < 1)
+		return 1;
+	
+	if (path[0] == '$') {
+		json_t *obj = json_object();
+		
+		if (json_path_set(elm, path, obj, 0, &error)) {
+			PrintAndLog("ERROR: can't set json path: ", error.text);
+			return 2;
+		} else {
+			char * name = emv_get_tag_name(tlvelm);
+			if (name && strlen(name) > 0 && strncmp(name, "Unknown", 7))
+				JsonSaveStr(obj, "name", emv_get_tag_name(tlvelm));
+			JsonSaveHex(obj, "tag", tlvelm->tag, 0);
+			JsonSaveHex(obj, "length", tlvelm->len, 0);
+			if (saveValue)
+				JsonSaveBufAsHex(obj, "value", (uint8_t *)tlvelm->value, tlvelm->len);
+		}
+	}
+
+	return 0;
+}
+
+int JsonSaveTLVTreeElm(json_t *elm, char *path, struct tlvdb *tlvdbelm, bool saveValue) {
+	JsonSaveTLVElm(elm, path, (struct tlv *)tlvdb_get_tlv(tlvdbelm), saveValue);
+	return 0;
+}
+
 int CmdHFEMVScan(const char *cmd) {
 	uint8_t AID[APDU_AID_LEN] = {0};
 	size_t AIDlen = 0;
@@ -1269,8 +1300,8 @@ int CmdHFEMVScan(const char *cmd) {
 	if (!res) {	
 		TLVPrintAIDlistFromSelectTLV(tlvSelect);
 		
-		JsonSaveStr(root, "$.PPSE.ver", "1.0");
 		JsonSaveBufAsHex(root, "$.PPSE.AID", (uint8_t *)"2PAY.SYS.DDF01", 14);
+		JsonSaveTLVTreeElm(root, "$.PPSE.FCITemplate", tlvdb_find(tlvSelect, 0x6f), true);
 		// here save PSE result to JSON
 		
 	} else {
