@@ -1173,7 +1173,7 @@ int JsonSaveHex(json_t *elm, char *path, uint64_t data, int datalen) {
 int JsonSaveTLVElm(json_t *elm, char *path, struct tlv *tlvelm, bool saveValue) {
 	json_error_t error;
 
-	if (strlen(path) < 1)
+	if (strlen(path) < 1 || !tlvelm)
 		return 1;
 	
 	if (path[0] == '$') {
@@ -1197,7 +1197,18 @@ int JsonSaveTLVElm(json_t *elm, char *path, struct tlv *tlvelm, bool saveValue) 
 }
 
 int JsonSaveTLVTreeElm(json_t *elm, char *path, struct tlvdb *tlvdbelm, bool saveValue) {
-	JsonSaveTLVElm(elm, path, (struct tlv *)tlvdb_get_tlv(tlvdbelm), saveValue);
+	return JsonSaveTLVElm(elm, path, (struct tlv *)tlvdb_get_tlv(tlvdbelm), saveValue);
+}
+int JsonSaveTLVTree(json_t *elm, char *path, struct tlvdb *tlvdbelm) {
+	struct tlvdb *tlvp = tlvdbelm;
+	while (tlvp) {
+		JsonSaveTLVTreeElm(elm, path, tlvp, true);
+		if (tlvdb_elm_get_children(tlvp)) {
+			
+		}
+
+		tlvp = tlvdb_elm_get_next(tlvp);
+	}
 	return 0;
 }
 
@@ -1301,7 +1312,7 @@ int CmdHFEMVScan(const char *cmd) {
 		TLVPrintAIDlistFromSelectTLV(tlvSelect);
 		
 		JsonSaveBufAsHex(root, "$.PPSE.AID", (uint8_t *)"2PAY.SYS.DDF01", 14);
-		JsonSaveTLVTreeElm(root, "$.PPSE.FCITemplate", tlvdb_find(tlvSelect, 0x6f), true);
+		JsonSaveTLVTree(root, "$.PPSE.FCITemplate", tlvdb_find(tlvSelect, 0x6f));
 		// here save PSE result to JSON
 		
 	} else {
@@ -1343,7 +1354,7 @@ int CmdHFEMVScan(const char *cmd) {
 	if (decodeTLV)
 		TLVPrintFromBuffer(buf, len);
 
-	// here save Select result to JSON
+	JsonSaveTLVTree(root, "$.Application.FCITemplate", 	tlvdb_parse_multi(buf, len));
 
 	
 	

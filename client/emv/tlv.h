@@ -39,6 +39,10 @@ struct tlvdb *tlvdb_parse(const unsigned char *buf, size_t len);
 struct tlvdb *tlvdb_parse_multi(const unsigned char *buf, size_t len);
 void tlvdb_free(struct tlvdb *tlvdb);
 
+struct tlvdb *tlvdb_elm_get_next(struct tlvdb *tlvdb);
+struct tlvdb *tlvdb_elm_get_children(struct tlvdb *tlvdb);
+struct tlvdb *tlvdb_elm_get_parent(struct tlvdb *tlvdb);
+
 struct tlvdb *tlvdb_find_full(struct tlvdb *tlvdb, tlv_tag_t tag); // search also in childrens
 struct tlvdb *tlvdb_find(struct tlvdb *tlvdb, tlv_tag_t tag);
 struct tlvdb *tlvdb_find_next(struct tlvdb *tlvdb, tlv_tag_t tag);
