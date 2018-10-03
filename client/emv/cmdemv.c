@@ -1305,21 +1305,33 @@ int CmdHFEMVScan(const char *cmd) {
 	
 	// EMV PPSE
 	PrintAndLog("--> PPSE.");
-	res = EMVSearchPSE(true, true, decodeTLV, tlvSelect);
+	res = EMVSelectPSE(true, true, 2, buf, sizeof(buf), &len, &sw);
+
+	if (!res && sw == 0x9000){
+		if (decodeTLV)
+			TLVPrintFromBuffer(buf, len);
+		
+		JsonSaveBufAsHex(root, "$.PPSE.AID", (uint8_t *)"2PAY.SYS.DDF01", 14);
+		
+		struct tlvdb *fci = tlvdb_parse_multi(buf, len);
+		JsonSaveTLVTree(root, "$.PPSE.FCITemplate", fci);
+		const struct tlv *kernel = tlvdb_get_tlv(tlvdb_find_full(fci, 0x9f2a));
+		if (kernel) {
+			JsonSaveBufAsHex(root, "$.Application.KernelID", (uint8_t *)kernel->value, kernel->len);
+		}
+		tlvdb_free(fci);
+	}
+
+	res = EMVSearchPSE(false, true, decodeTLV, tlvSelect);
 
 	// check PPSE and select application id
 	if (!res) {	
-		TLVPrintAIDlistFromSelectTLV(tlvSelect);
-		
-		JsonSaveBufAsHex(root, "$.PPSE.AID", (uint8_t *)"2PAY.SYS.DDF01", 14);
-		JsonSaveTLVTree(root, "$.PPSE.FCITemplate", tlvdb_find(tlvSelect, 0x6f));
-		// here save PSE result to JSON
-		
+		TLVPrintAIDlistFromSelectTLV(tlvSelect);		
 	} else {
 		// EMV SEARCH with AID list
 		SetAPDULogging(false);
 		PrintAndLog("--> AID search.");
-		if (EMVSearch(true, true, decodeTLV, tlvSelect)) {
+		if (EMVSearch(false, true, decodeTLV, tlvSelect)) {
 			PrintAndLog("E->Can't found any of EMV AID. Exit...");
 			tlvdb_free(tlvSelect);
 			return 3;
@@ -1354,8 +1366,9 @@ int CmdHFEMVScan(const char *cmd) {
 	if (decodeTLV)
 		TLVPrintFromBuffer(buf, len);
 
-	JsonSaveTLVTree(root, "$.Application.FCITemplate", 	tlvdb_parse_multi(buf, len));
-
+	struct tlvdb *fci = tlvdb_parse_multi(buf, len);
+	JsonSaveTLVTree(root, "$.Application.FCITemplate", 	fci);
+	tlvdb_free(fci);
 	
 	
 	
