@@ -458,6 +458,10 @@ const struct tlv *tlvdb_get_inchild(const struct tlvdb *tlvdb, tlv_tag_t tag, co
 	return tlvdb_get(tlvdb, tag, prev);
 }
 
+const struct tlv *tlvdb_get_tlv(const struct tlvdb *tlvdb) {
+	return &tlvdb->tag;
+}
+
 unsigned char *tlv_encode(const struct tlv *tlv, size_t *len)
 {
 	size_t size = tlv->len;
