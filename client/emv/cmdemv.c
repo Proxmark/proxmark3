@@ -1122,6 +1122,54 @@ int CmdHFEMVExec(const char *cmd) {
 	return 0;
 }
 
+int JsonSaveStr(json_t *root, char *path, char *value) {
+	json_error_t error;
+
+	if (strlen(path) < 1)
+		return 1;
+	
+	if (path[0] == '$') {
+		if (json_path_set(root, path, json_string(value), 0, &error)) {
+			PrintAndLog("ERROR: can't set json path: ", error.text);
+			return 2;
+		} else {
+			return 0;
+		}
+	} else {
+		return json_object_set_new(root, path, json_string(value));
+	}
+};
+
+int JsonSaveBufAsHex(json_t *elm, char *path, uint8_t *data, size_t datalen) {
+	char * msg = sprint_hex(data, datalen);
+	if (msg && strlen(msg) && msg[strlen(msg) - 1] == ' ')
+		msg[strlen(msg) - 1] = '\0';
+
+	return JsonSaveStr(elm, path, msg);
+}
+
+int JsonSaveHex(json_t *elm, char *path, uint64_t data, int datalen) {
+	uint8_t bdata[8] = {0};
+	int len = 0;
+	if (!datalen) {
+		for (uint64_t u = 0xffffffffffffffff; u; u = u << 8) {
+			if (!(data & u)) {
+				break;
+			}
+			len++;
+		}
+		if (!len)
+			len = 1;
+	} else {
+		len = datalen;
+	}
+	PrintAndLog("--->len %d", len);
+	
+	num_to_bytes(data, len, bdata);
+	
+	return JsonSaveBufAsHex(elm, path, bdata, len);
+}
+
 int CmdHFEMVScan(const char *cmd) {
 	uint8_t AID[APDU_AID_LEN] = {0};
 	size_t AIDlen = 0;
@@ -1129,6 +1177,8 @@ int CmdHFEMVScan(const char *cmd) {
 	size_t len = 0;
 	uint16_t sw = 0;
 	int res;
+	json_t *root;
+	json_error_t error;
 
 	CLIParserInit("hf emv save", 
 		"Scan EMV card and save it contents to a file.", 
@@ -1165,16 +1215,47 @@ int CmdHFEMVScan(const char *cmd) {
 		TrType = TT_VSDC;
 
 	bool GenACGPO = arg_get_lit(7);
+	bool MergeJSON = arg_get_lit(8);
 	CLIParserFree();
 	
 	SetAPDULogging(showAPDU);
+	
+	// current path + file name
+	const char *relfname = "card.json"; 
+	char fname[strlen(get_my_executable_directory()) + strlen(relfname) + 1];
+	strcpy(fname, get_my_executable_directory());
+	strcat(fname, relfname);
 
+	if (MergeJSON) {
+		root = json_load_file(fname, 0, &error);
+		if (!root) {
+			PrintAndLog("ERROR: json error on line %d: %s", error.line, error.text);
+			return 1; 
+		}
+		
+		if (!json_is_object(root)) {
+			PrintAndLog("ERROR: Invalid json format. root must be object.");
+			return 1; 
+		}
+	} else {
+		root = json_object();
+	}
+
+	// iso 14443 select
 	PrintAndLog("--> GET UID, ATS.");
 	
 	iso14a_card_select_t card;
 	if (Hf14443_4aGetCardData(&card)) {
-		return 1;
+		return 2;
 	}
+
+	JsonSaveStr(root, "$.File.Created", "proxmark3 `hf emv scan`");
+	
+	JsonSaveStr(root, "$.Card.Communication", "iso14443-4a");
+	JsonSaveBufAsHex(root, "$.Card.UID", (uint8_t *)&card.uid, card.uidlen);
+	JsonSaveHex(root, "$.Card.ATQA", card.atqa[0] + (card.atqa[1] << 2), 2);
+	JsonSaveHex(root, "$.Card.SAK", card.sak, 0);
+	JsonSaveBufAsHex(root, "$.Card.ATS", (uint8_t *)card.ats, card.ats_len);
 	
 	// init applets list tree
 	const char *al = "Applets list";
@@ -1188,6 +1269,8 @@ int CmdHFEMVScan(const char *cmd) {
 	if (!res) {	
 		TLVPrintAIDlistFromSelectTLV(tlvSelect);
 		
+		JsonSaveStr(root, "$.PPSE.ver", "1.0");
+		JsonSaveBufAsHex(root, "$.PPSE.AID", (uint8_t *)"2PAY.SYS.DDF01", 14);
 		// here save PSE result to JSON
 		
 	} else {
@@ -1197,7 +1280,7 @@ int CmdHFEMVScan(const char *cmd) {
 		if (EMVSearch(true, true, decodeTLV, tlvSelect)) {
 			PrintAndLog("E->Can't found any of EMV AID. Exit...");
 			tlvdb_free(tlvSelect);
-			return 2;
+			return 3;
 		}
 
 		// check search and select application id
@@ -1205,15 +1288,16 @@ int CmdHFEMVScan(const char *cmd) {
 	}
 	tlvdb_free(tlvSelect);
 
-	
 	// EMV SELECT application
 	SetAPDULogging(showAPDU);
 	EMVSelectApplication(tlvSelect, AID, &AIDlen);
 
 	if (!AIDlen) {
 		PrintAndLog("Can't select AID. EMV AID not found. Exit...");
-		return 3;
+		return 4;
 	}
+
+	JsonSaveBufAsHex(root, "$.Application.AID", AID, AIDlen);
 	
 	// EMV SELECT applet
 	PrintAndLog("\n-->Selecting AID:%s.", sprint_hex_inrow(AID, AIDlen));
@@ -1222,7 +1306,7 @@ int CmdHFEMVScan(const char *cmd) {
 	
 	if (res) {	
 		PrintAndLog("E->Can't select AID (%d). Exit...", res);
-		return 4;
+		return 5;
 	}
 	
 	if (decodeTLV)
@@ -1233,9 +1317,18 @@ int CmdHFEMVScan(const char *cmd) {
 	
 	
 	
-	
 	// DropField
 	DropField();
+	
+	res = json_dump_file(root, fname, JSON_INDENT(2));
+	if (res) {
+		PrintAndLog("ERROR: can't save the file: %s", fname);
+		return 200;
+	}
+	PrintAndLog("File `%s` saved.", fname);
+	
+	// free json
+	json_decref(root);
 	
 	return 0;
 }

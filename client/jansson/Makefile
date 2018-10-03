@@ -19,6 +19,7 @@ libjansson_la_SOURCES = \
 	strconv.c \
 	utf.c \
 	utf.h \
+	path.c \
 	value.c
 libjansson_la_LDFLAGS = \
 	-no-undefined \
