@@ -1183,20 +1183,31 @@ int JsonSaveTLVElm(json_t *elm, char *path, struct tlv *tlvelm, bool saveValue) 
 		return 1;
 	
 	if (path[0] == '$') {
-		json_t *obj = json_object();
+
+		json_t *obj = json_path_get(elm, path);
+		if (!obj) {
+			obj = json_object();
 		
-		if (json_path_set(elm, path, obj, 0, &error)) {
-			PrintAndLog("ERROR: can't set json path: ", error.text);
-			return 2;
-		} else {
-			char * name = emv_get_tag_name(tlvelm);
-			if (name && strlen(name) > 0 && strncmp(name, "Unknown", 7))
-				JsonSaveStr(obj, "name", emv_get_tag_name(tlvelm));
-			JsonSaveHex(obj, "tag", tlvelm->tag, 0);
-			JsonSaveHex(obj, "length", tlvelm->len, 0);
-			if (saveValue)
-				JsonSaveBufAsHex(obj, "value", (uint8_t *)tlvelm->value, tlvelm->len);
+			if (json_is_array(elm)) {
+				if (json_array_append_new(elm, obj)) {
+					PrintAndLog("ERROR: can't append array: %s", path);
+					return 2;
+				}
+			} else {
+				if (json_path_set(elm, path, obj, 0, &error)) {
+					PrintAndLog("ERROR: can't set json path: ", error.text);
+					return 2;
+				}
+			}
 		}
+		
+		char * name = emv_get_tag_name(tlvelm);
+		if (name && strlen(name) > 0 && strncmp(name, "Unknown", 7))
+			JsonSaveStr(obj, "name", emv_get_tag_name(tlvelm));
+		JsonSaveHex(obj, "tag", tlvelm->tag, 0);
+		JsonSaveHex(obj, "length", tlvelm->len, 0);
+		if (saveValue)
+			JsonSaveBufAsHex(obj, "value", (uint8_t *)tlvelm->value, tlvelm->len);
 	}
 
 	return 0;
@@ -1205,12 +1216,42 @@ int JsonSaveTLVElm(json_t *elm, char *path, struct tlv *tlvelm, bool saveValue) 
 int JsonSaveTLVTreeElm(json_t *elm, char *path, struct tlvdb *tlvdbelm, bool saveValue) {
 	return JsonSaveTLVElm(elm, path, (struct tlv *)tlvdb_get_tlv(tlvdbelm), saveValue);
 }
+
 int JsonSaveTLVTree(json_t *elm, char *path, struct tlvdb *tlvdbelm) {
 	struct tlvdb *tlvp = tlvdbelm;
 	while (tlvp) {
-		JsonSaveTLVTreeElm(elm, path, tlvp, true);
+		json_t *pelm = json_path_get(elm, path);
+		if (pelm && json_is_array(pelm)) {
+			json_t *appendelm = json_object();
+			json_array_append_new(pelm, appendelm);
+			JsonSaveTLVTreeElm(appendelm, "$", tlvp, true);
+			pelm = appendelm;
+		} else {
+			JsonSaveTLVTreeElm(elm, path, tlvp, true);
+			pelm = json_path_get(elm, path);
+		}
+		
 		if (tlvdb_elm_get_children(tlvp)) {
+			// get path element
+			if(!pelm)
+				return 1;
 			
+			// check childs element and add it if not found
+			json_t *chjson = json_path_get(pelm, "$.Childs");
+			if (!chjson) {
+				json_object_set_new(pelm, "Childs", json_array());
+				
+				chjson = json_path_get(pelm, "$.Childs");
+			}
+			
+			// check
+			if (!json_is_array(chjson)) {
+				PrintAndLog("E->Internal logic error. `$.Childs` is not an array.");
+				break;
+			}
+
+			// Recursion
+			JsonSaveTLVTree(chjson, "$", tlvdb_elm_get_children(tlvp));
 		}
 
 		tlvp = tlvdb_elm_get_next(tlvp);
@@ -1282,7 +1323,7 @@ int CmdHFEMVScan(const char *cmd) {
 		}
 		
 		if (!json_is_object(root)) {
-			PrintAndLog("ERROR: Invalid json format. root must be object.");
+			PrintAndLog("ERROR: Invalid json format. root must be an object.");
 			return 1; 
 		}
 	} else {
@@ -1509,11 +1550,6 @@ int CmdHFEMVScan(const char *cmd) {
 		
 		break;
 	}	
-
-
-	
-	
-	
 	
 	// DropField
 	DropField();
