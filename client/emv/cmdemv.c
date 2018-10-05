@@ -1443,8 +1443,8 @@ int CmdHFEMVScan(const char *cmd) {
 	struct tlvdb *gpofci = tlvdb_parse_multi(buf, len);
 	JsonSaveTLVTree(root, "$.Application.GPO", 	gpofci);
 
-	JsonSaveTLVValue(root, "$.Application.AIP", tlvdb_find_full(gpofci, 0x82));
-	JsonSaveTLVValue(root, "$.Application.AFL", tlvdb_find_full(gpofci, 0x94));
+	JsonSaveTLVValue(root, "$.ApplicationData.AIP", tlvdb_find_full(gpofci, 0x82));
+	JsonSaveTLVValue(root, "$.ApplicationData.AFL", tlvdb_find_full(gpofci, 0x94));
 
 	tlvdb_free(gpofci);
 
@@ -1456,8 +1456,18 @@ int CmdHFEMVScan(const char *cmd) {
 			PrintAndLog("E->Wrong AFL length: %d", AFL->len);
 			break;
 		}
-/*
-		json_t *sfijson = ;
+
+		json_t *sfijson = json_path_get(root, "$.Application.Records");
+		if (!sfijson) {
+			json_t *app = json_path_get(root, "$.Application");
+			json_object_set_new(app, "Records", json_array());
+			
+			sfijson = json_path_get(root, "$.Application.Records");
+		}
+		if (!json_is_array(sfijson)) {
+			PrintAndLog("E->Internal logic error. `$.Application.Records` is not an array.");
+			break;
+		}
 		for (int i = 0; i < AFL->len / 4; i++) {
 			uint8_t SFI = AFL->value[i * 4 + 0] >> 3;
 			uint8_t SFIstart = AFL->value[i * 4 + 1];
@@ -1484,14 +1494,19 @@ int CmdHFEMVScan(const char *cmd) {
 					PrintAndLog("");
 				}
 				
-				// here save
-				struct tlvdb *rsfi = tlvdb_parse_multi(buf, len);
-				JsonSaveTLVTree(sfijson, "", rsfi);
-				tlvdb_free(rsfi);
+				json_t *jsonelm = json_object();
+				json_array_append_new(sfijson, jsonelm);
 
+				JsonSaveHex(jsonelm, "SFI", SFI, 1);
+				JsonSaveHex(jsonelm, "RecordNum", n, 1);
+				JsonSaveHex(jsonelm, "Offline", SFIoffline, 1);
+				
+				struct tlvdb *rsfi = tlvdb_parse_multi(buf, len);
+				JsonSaveTLVTree(jsonelm, "$.Data", rsfi);
+				tlvdb_free(rsfi);
 			}
 		}
-		*/
+		
 		break;
 	}	
 
