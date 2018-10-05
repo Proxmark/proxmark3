@@ -15,6 +15,36 @@
 #include "cliparser/cliparser.h"
 #include <jansson.h>
 
+struct ApplicationDataElm {
+	tlv_tag_t Tag;
+	char *Name;
+};
+
+static const struct ApplicationDataElm ApplicationData[] = {
+{0x82,    "AIP"},
+{0x94,    "AFL"},
+
+{0x5A,    "PAN"},
+{0x5F34,  "PANSeqNo"},
+{0x5F24,  "ExpirationDate"},
+{0x5F25,  "EffectiveDate"},
+{0x5F28,  "IssuerCountryCode"},
+
+{0x50,    "ApplicationLabel"},
+{0x5F2D,  "LanguagePreference"},
+{0x87,    "PriorityIndicator"},
+
+{0x5F34,  "PAN"},
+{0x5F34,  "PAN"},
+{0x5F34,  "PAN"},
+{0x5F34,  "PAN"},
+{0x5F34,  "PAN"},
+{0x5F34,  "PAN"},
+{0x5F34,  "PAN"},
+{0x5F34,  "PAN"},
+{0x5F34,  "PAN"}
+};
+
 #define TLV_ADD(tag, value)( tlvdb_change_or_add_node(tlvRoot, tag, sizeof(value) - 1, (const unsigned char *)value) )
 void ParamLoadDefaults(struct tlvdb *tlvRoot) {
 	//9F02:(Amount, authorized (Numeric)) len:6
