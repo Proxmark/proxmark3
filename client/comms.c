@@ -18,6 +18,7 @@
 #include "uart.h"
 #include "ui.h"
 #include "common.h"
+#include "util_darwin.h"
 #include "util_posix.h"
 
 
@@ -198,6 +199,10 @@ __attribute__((force_align_arg_pointer))
 	UsbCommand rx;
 	UsbCommand *prx = &rx;
 
+#if defined(__MACH__) && defined(__APPLE__)
+	disableAppNap("Proxmark3 polling UART");
+#endif
+
 	while (conn->run) {
 		rxlen = 0;
 		bool ACK_received = false;
@@ -235,6 +240,10 @@ __attribute__((force_align_arg_pointer))
 
 		pthread_mutex_unlock(&txBufferMutex);
 	}
+
+#if defined(__MACH__) && defined(__APPLE__)
+	enableAppNap();
+#endif
 
 	pthread_exit(NULL);
 	return NULL;
