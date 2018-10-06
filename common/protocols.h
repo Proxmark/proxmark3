@@ -167,22 +167,50 @@ NXP/Philips CUSTOM COMMANDS
 #define ISO14443B_COMPLETION   0x0F
 #define ISO14443B_AUTHENTICATE 0x0A
 
-//First byte is 26
-#define ISO15693_INVENTORY     0x01
-#define ISO15693_STAYQUIET     0x02
-//First byte is 02
-#define ISO15693_READBLOCK            0x20
-#define ISO15693_WRITEBLOCK           0x21
-#define ISO15693_LOCKBLOCK            0x22
-#define ISO15693_READ_MULTI_BLOCK     0x23
-#define ISO15693_SELECT               0x25
-#define ISO15693_RESET_TO_READY       0x26
-#define ISO15693_WRITE_AFI            0x27
-#define ISO15693_LOCK_AFI             0x28
-#define ISO15693_WRITE_DSFID          0x29
-#define ISO15693_LOCK_DSFID           0x2A
-#define ISO15693_GET_SYSTEM_INFO      0x2B
-#define ISO15693_READ_MULTI_SECSTATUS 0x2C
+// ISO15693 COMMANDS
+#define ISO15693_INVENTORY                   0x01
+#define ISO15693_STAYQUIET                   0x02
+#define ISO15693_READBLOCK                   0x20
+#define ISO15693_WRITEBLOCK                  0x21
+#define ISO15693_LOCKBLOCK                   0x22
+#define ISO15693_READ_MULTI_BLOCK            0x23
+#define ISO15693_SELECT                      0x25
+#define ISO15693_RESET_TO_READY              0x26
+#define ISO15693_WRITE_AFI                   0x27
+#define ISO15693_LOCK_AFI                    0x28
+#define ISO15693_WRITE_DSFID                 0x29
+#define ISO15693_LOCK_DSFID                  0x2A
+#define ISO15693_GET_SYSTEM_INFO             0x2B
+#define ISO15693_READ_MULTI_SECSTATUS        0x2C
+
+// ISO15693 REQUEST FLAGS
+#define ISO15693_REQ_SUBCARRIER_TWO          (1<<0)
+#define ISO15693_REQ_DATARATE_HIGH           (1<<1)
+#define ISO15693_REQ_INVENTORY               (1<<2)
+#define ISO15693_REQ_PROTOCOL_EXT            (1<<3) // RFU
+#define ISO15693_REQ_OPTION                  (1<<6) // Command specific option selector
+// when REQ_INVENTORY is not set
+#define ISO15693_REQ_SELECT                  (1<<4) // only selected cards response
+#define ISO15693_REQ_ADDRESS                 (1<<5) // this req contains an address
+// when REQ_INVENTORY is set
+#define ISO15693_REQINV_AFI                  (1<<4) // AFI Field is present
+#define ISO15693_REQINV_SLOT1                (1<<5) // 1 Slot     (16 slots if not set)
+
+// ISO15693 RESPONSE FLAGS
+#define ISO15693_RES_ERROR                   (1<<0)
+#define ISO15693_RES_EXT                     (1<<3) // Protocol Extention	
+
+// ISO15693 RESPONSE ERROR CODES
+#define ISO15693_NOERROR                     0x00
+#define ISO15693_ERROR_CMD_NOT_SUP           0x01 // Command not supported
+#define ISO15693_ERROR_CMD_NOT_REC           0x02 // Command not recognized (eg. parameter error)
+#define ISO15693_ERROR_CMD_OPTION            0x03 // Command option not supported
+#define ISO15693_ERROR_GENERIC               0x0F // No additional Info about this error
+#define ISO15693_ERROR_BLOCK_UNAVAILABLE     0x10
+#define ISO15693_ERROR_BLOCK_LOCKED_ALREADY  0x11 // cannot lock again
+#define ISO15693_ERROR_BLOCK_LOCKED          0x12 // cannot be changed
+#define ISO15693_ERROR_BLOCK_WRITE           0x13 // Writing was unsuccessful
+#define ISO15693_ERROR_BLOCL_WRITELOCK       0x14 // Locking was unsuccessful
 
 
 // Topaz command set:
