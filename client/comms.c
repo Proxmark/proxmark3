@@ -364,7 +364,9 @@ void CloseProxmark(void) {
 	// Clean up our state
 	sp = NULL;
 	serial_port_name = NULL;
+#ifdef __BIONIC__
 	memset(&USB_communication_thread, 0, sizeof(pthread_t));
+#endif
 }
 
 
