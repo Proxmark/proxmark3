@@ -742,7 +742,7 @@ int CmdHF14AAPDU(const char *cmd) {
 		arg_lit0("sS",  "select",  "activate field and select card"),
 		arg_lit0("kK",  "keep",    "leave the signal field ON after receive response"),
 		arg_lit0("tT",  "tlv",     "executes TLV decoder if it possible"),
-		arg_str1(NULL,  NULL,      "<APDU (hex)>", NULL),
+		arg_strx1(NULL, NULL,      "<APDU (hex)>", NULL),
 		arg_param_end
 	};
 	CLIExecWithReturn(cmd, argtable, false);
@@ -807,7 +807,7 @@ int CmdHF14ACmdRaw(const char *cmd) {
 		arg_int0("t",   "timeout", NULL, "timeout in ms"),
 		arg_lit0("T",   "topaz",   "use Topaz protocol to send command"),
 		arg_lit0("3",   NULL,      "ISO14443-3 select only (skip RATS)"),
-		arg_str1(NULL,  NULL,      "<data (hex)>", NULL),
+		arg_strx1(NULL, NULL,      "<data (hex)>", NULL),
 		arg_param_end
 	};
 	// defaults

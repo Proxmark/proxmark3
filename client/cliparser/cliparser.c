@@ -80,6 +80,10 @@ enum ParserState {
 #define isSpace(c)(c == ' ' || c == '\t')
 
 int CLIParserParseString(const char* str, void* vargtable[], size_t vargtableLen, bool allowEmptyExec) {
+	return CLIParserParseStringEx(str, vargtable, vargtableLen, allowEmptyExec, false);
+}
+
+int CLIParserParseStringEx(const char* str, void* vargtable[], size_t vargtableLen, bool allowEmptyExec, bool clueData) {
 	int argc = 0;
 	char *argv[200] = {NULL};
 	
@@ -99,7 +103,7 @@ int CLIParserParseString(const char* str, void* vargtable[], size_t vargtableLen
 	for (int i = 0; i < len; i++) {
 		switch(state){
 			case PS_FIRST: // first char
-				if (str[i] == '-'){ // first char before space is '-' - next element - option
+				if (!clueData || str[i] == '-'){ // first char before space is '-' - next element - option OR not "clueData" for not-option fields
 					state = PS_OPTION;
 
 					if (spaceptr) {
@@ -149,10 +153,23 @@ void CLIParserFree() {
 // convertors
 int CLIParamHexToBuf(struct arg_str *argstr, uint8_t *data, int maxdatalen, int *datalen) {
 	*datalen = 0;
-	if (!strlen(argstr->sval[0]))
+	if (!argstr->count)
 		return 0;
 	
-	switch(param_gethex_to_eol(argstr->sval[0], 0, data, maxdatalen, datalen)) {
+	char buf[256] = {0};
+	int ibuf = 0;
+	
+	for (int i = 0; i < argstr->count; i++) {
+		int len = strlen(argstr->sval[i]);
+		memcpy(&buf[ibuf], argstr->sval[i], len);
+		ibuf += len;
+	}
+	buf[ibuf] = 0;
+  
+	if (!ibuf)
+		return 0;
+	
+	switch(param_gethex_to_eol(buf, 0, data, maxdatalen, datalen)) {
 	case 1:
 		printf("Parameter error: Invalid HEX value.\n");
 		return 1;
