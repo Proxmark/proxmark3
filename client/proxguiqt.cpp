@@ -203,13 +203,17 @@ ProxWidget::ProxWidget(QWidget *parent, ProxGuiQT *master) : QWidget(parent)
 	QObject::connect(opsController->horizontalSlider_dirthr_down, SIGNAL(valueChanged(int)), this, SLOT(vchange_dthr_down(int)));
 	QObject::connect(opsController->horizontalSlider_askedge, SIGNAL(valueChanged(int)), this, SLOT(vchange_askedge(int)));
 
-	controlWidget->show();
-
 	// Set up the plot widget, which does the actual plotting
 	plot = new Plot(this);
 	QVBoxLayout *layout = new QVBoxLayout;
 	layout->addWidget(plot);
 	setLayout(layout);
+	show(); // places the window on the screen.
+
+	// Move controller widget below plot
+	controlWidget->move(x(),y()+frameSize().height());
+	controlWidget->resize(size().width(), controlWidget->size().height());
+	controlWidget->show();
 }
 
 // not 100% sure what i need in this block
