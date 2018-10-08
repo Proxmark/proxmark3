@@ -26,6 +26,7 @@ This project uses the changelog in accordance with [keepchangelog](http://keepac
 - Changed start sequence in Qt mode (fix: short commands hangs main Qt thread) (Merlok)
 - Changed driver file proxmark3.inf to support both old and new Product/Vendor IDs (piwi)
 - Changed all command line parsers in `hf emv` commands to argtable (Merlok)
+- Implemented AppNap API, fixing #283 and #627 OSX USB comm issues (AntiCat)
 
 ### Added
 - Added `sc` smartcard (contact card) commands - reader, info, raw, upgrade, setclock, list (hardware version RDV4.0 only) must turn option on in makefile options (Willok, Iceman, marshmellow)
