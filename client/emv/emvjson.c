@@ -34,6 +34,13 @@ static const ApplicationDataElm ApplicationData[] = {
 {0x9F42,  "CurrencyCode"},
 {0x5F2D,  "LanguagePreference"},
 {0x87,    "PriorityIndicator"},
+{0x9F36,  "ATC"}, //Application Transaction Counter
+
+{0x5F20,  "CardholderName"},
+
+{0x9F38,  "PDOL"},
+{0x8C,    "CDOL1"},
+{0x8D,    "CDOL2"},
 
 {0x9F07,  "AUC"},   // Application Usage Control
 {0x9F6C,  "CTQ"},
