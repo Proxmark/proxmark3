@@ -270,7 +270,7 @@ bool ParamLoadFromJson(struct tlvdb *tlv) {
 	PrintAndLog("Load params: json OK");
 	
 	for(int i = 0; i < json_array_size(root); i++) {
-		json_t *data, *jtype, *jlength, *jvalue;
+		json_t *data, *jtag, *jlength, *jvalue;
 
 		data = json_array_get(root, i);
 		if(!json_is_object(data))
@@ -280,14 +280,14 @@ bool ParamLoadFromJson(struct tlvdb *tlv) {
 			return false;
 		}
 		
-		jtype = json_object_get(data, "type");
-		if(!json_is_string(jtype))
+		jtag = json_object_get(data, "tag");
+		if(!json_is_string(jtag))
 		{
-			PrintAndLog("Load params: data [%d] type is not a string", i + 1);
+			PrintAndLog("Load params: data [%d] tag is not a string", i + 1);
 			json_decref(root);
 			return false;
 		}
-		const char *tlvType = json_string_value(jtype);
+		const char *tlvTag = json_string_value(jtag);
 
 		jvalue = json_object_get(data, "value");
 		if(!json_is_string(jvalue))
@@ -313,12 +313,12 @@ bool ParamLoadFromJson(struct tlvdb *tlv) {
 			return false;
 		}
 		
-		PrintAndLog("TLV param: %s[%d]=%s", tlvType, tlvLength, tlvValue);
+		PrintAndLog("TLV param: %s[%d]=%s", tlvTag, tlvLength, tlvValue);
 		uint8_t buf[251] = {0};
 		size_t buflen = 0;
 		
 		// here max length must be 4, but now tlv_tag_t is 2-byte var. so let it be 2 by now...  TODO: needs refactoring tlv_tag_t...
-		if (!HexToBuffer("TLV Error type:", tlvType, buf, 2, &buflen)) { 
+		if (!HexToBuffer("TLV Error type:", tlvTag, buf, 2, &buflen)) { 
 			json_decref(root);
 			return false;
 		}
