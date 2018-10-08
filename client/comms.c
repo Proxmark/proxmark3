@@ -18,6 +18,7 @@
 #include "uart.h"
 #include "ui.h"
 #include "common.h"
+#include "util_darwin.h"
 #include "util_posix.h"
 
 
@@ -198,6 +199,10 @@ __attribute__((force_align_arg_pointer))
 	UsbCommand rx;
 	UsbCommand *prx = &rx;
 
+#if defined(__MACH__) && defined(__APPLE__)
+	disableAppNap("Proxmark3 polling UART");
+#endif
+
 	while (conn->run) {
 		rxlen = 0;
 		bool ACK_received = false;
@@ -235,6 +240,10 @@ __attribute__((force_align_arg_pointer))
 
 		pthread_mutex_unlock(&txBufferMutex);
 	}
+
+#if defined(__MACH__) && defined(__APPLE__)
+	enableAppNap();
+#endif
 
 	pthread_exit(NULL);
 	return NULL;
@@ -333,7 +342,20 @@ bool OpenProxmark(void *port, bool wait_for_port, int timeout, bool flash_mode) 
 
 void CloseProxmark(void) {
 	conn.run = false;
+
+#ifdef __BIONIC__
+	// In Android O and later, if an invalid pthread_t is passed to pthread_join, it calls fatal().
+	// https://github.com/aosp-mirror/platform_bionic/blob/ed16b344e75f422fb36fbfd91fb30de339475880/libc/bionic/pthread_internal.cpp#L116-L128
+	//
+	// In Bionic libc, pthread_t is an integer.
+
+	if (USB_communication_thread != 0) {
+		pthread_join(USB_communication_thread, NULL);
+	}
+#else
+	// pthread_t is a struct on other libc, treat as an opaque memory reference
 	pthread_join(USB_communication_thread, NULL);
+#endif
 
 	if (sp) {
 		uart_close(sp);
@@ -351,6 +373,9 @@ void CloseProxmark(void) {
 	// Clean up our state
 	sp = NULL;
 	serial_port_name = NULL;
+#ifdef __BIONIC__
+	memset(&USB_communication_thread, 0, sizeof(pthread_t));
+#endif
 }
 
 
