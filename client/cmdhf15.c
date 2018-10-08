@@ -373,7 +373,8 @@ int CmdHF15Read(const char *Cmd)
 	return 0;
 }
 
-// Record Activity without enabeling carrier
+// Record Activity without enabling carrier
+// TODO: currently it DOES enable the carrier
 int CmdHF15Record(const char *Cmd)
 {
 	UsbCommand c = {CMD_RECORD_RAW_ADC_SAMPLES_ISO_15693};
@@ -519,7 +520,7 @@ static command_t CommandTable15[] =
 	{"cmd",     CmdHF15Cmd,     0, "Send direct commands to ISO15693 tag"},
 	{"findafi", CmdHF15Afi,     0, "Brute force AFI of an ISO15693 tag"},
 	{"dumpmemory", CmdHF15DumpMem,     0, "Read all memory pages of an ISO15693 tag"},
-		{NULL, NULL, 0, NULL}
+	{NULL, NULL, 0, NULL}
 };
 
 int CmdHF15(const char *Cmd)
@@ -572,9 +573,9 @@ int CmdHF15CmdInquiry(const char *Cmd)
 
 // Turns debugging on(1)/off(0)
 int CmdHF15CmdDebug( const char *cmd) {
-	int debug=atoi(cmd);
-	if (strlen(cmd)<1) {
-		PrintAndLog("Usage: hf 15 cmd debug  <0|1>");
+	int debug = atoi(cmd);
+	if (strlen(cmd) < 1) {
+		PrintAndLog("Usage: hf 15 debug <0|1>");
 		PrintAndLog("	0 no debugging");
 		PrintAndLog("	1 turn debugging on");	
 		return 0;

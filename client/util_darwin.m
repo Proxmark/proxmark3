@@ -34,6 +34,7 @@ void enableAppNap() {
 		activity = nil;
 	}
 }
+
 #else
 void disableAppNap(const char* reason) { }
 void enableAppNap() { }
