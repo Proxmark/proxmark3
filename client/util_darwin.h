@@ -14,4 +14,7 @@
 void disableAppNap(const char* reason);
 void enableAppNap();
 
+void makeUnfocusable();
+void makeFocusable();
+
 #endif

@@ -26,6 +26,10 @@
 #include <string.h>
 #include "proxgui.h"
 #include <QtGui>
+
+extern "C" {
+#include "util_darwin.h"
+}
 //#include <ctime>
 
 bool g_useOverlays = false;
@@ -60,7 +64,12 @@ void ProxGuiQT::_ShowGraphWindow(void)
 		return;
 
 	if (!plotwidget)
+	{
+#if defined(__MACH__) && defined(__APPLE__)
+		makeFocusable();
+#endif
 		plotwidget = new ProxWidget();
+	}
 
 	plotwidget->show();
 }
@@ -107,6 +116,11 @@ void ProxGuiQT::MainLoop()
 
 	//start proxmark thread after starting event loop
 	QTimer::singleShot(200, this, SLOT(_StartProxmarkThread()));
+
+#if defined(__MACH__) && defined(__APPLE__)
+	//Prevent the terminal from loosing focus during launch by making the client unfocusable
+	makeUnfocusable();
+#endif
 
 	plotapp->exec();
 }
