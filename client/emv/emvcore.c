@@ -905,4 +905,6 @@ int RecoveryCertificates(struct tlvdb *tlvRoot, json_t *root) {
 	JsonSaveStr(root, "$.ApplicationData.ICCPublicKeyDec", icc_pk_c);
 	JsonSaveBufAsHex(root, "$.ApplicationData.ICCPublicKeyModulus", icc_pk->modulus, icc_pk->mlen);
 	free(issuer_pk_c);
+	
+	return 0;
 }
