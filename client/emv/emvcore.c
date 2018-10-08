@@ -884,6 +884,8 @@ int RecoveryCertificates(struct tlvdb *tlvRoot, json_t *root) {
 			issuer_pk->serial[2]
 			);
 
+	JsonSaveBufAsHex(root, "$.ApplicationData.RID", issuer_pk->rid, 5);
+
 	char *issuer_pk_c = emv_pk_dump_pk(issuer_pk);
 	JsonSaveStr(root, "$.ApplicationData.IssuerPublicKeyDec", issuer_pk_c);
 	JsonSaveBufAsHex(root, "$.ApplicationData.IssuerPublicKeyModulus", issuer_pk->modulus, issuer_pk->mlen);
