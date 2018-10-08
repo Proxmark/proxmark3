@@ -598,6 +598,36 @@ void InitTransactionParameters(struct tlvdb *tlvRoot, bool paramLoadJSON, enum T
 	}
 }
 
+void ProcessGPOResponseFormat1(struct tlvdb *tlvRoot, uint8_t *buf, size_t len, bool decodeTLV) {
+	if (buf[0] == 0x80) {
+		if (decodeTLV){
+			PrintAndLog("GPO response format1:");
+			TLVPrintFromBuffer(buf, len);
+		}
+		
+		if (len < 4 || (len - 4) % 4) {
+			PrintAndLog("ERROR: GPO response format1 parsing error. length=%d", len);
+		} else {
+			// AIP
+			struct tlvdb * f1AIP = tlvdb_fixed(0x82, 2, buf + 2);
+			tlvdb_add(tlvRoot, f1AIP);
+			if (decodeTLV){
+				PrintAndLog("\n* * Decode response format 1 (0x80) AIP and AFL:");
+				TLVPrintFromTLV(f1AIP);
+			}
+
+			// AFL
+			struct tlvdb * f1AFL = tlvdb_fixed(0x94, len - 4, buf + 2 + 2);
+			tlvdb_add(tlvRoot, f1AFL);
+			if (decodeTLV)
+				TLVPrintFromTLV(f1AFL);
+		}		
+	} else {
+		if (decodeTLV)
+			TLVPrintFromBuffer(buf, len);
+	}
+}
+
 int CmdHFEMVExec(const char *cmd) {
 	uint8_t buf[APDU_RES_LEN] = {0};
 	size_t len = 0;
@@ -740,33 +770,7 @@ int CmdHFEMVExec(const char *cmd) {
 	}
 
 	// process response template format 1 [id:80  2b AIP + x4b AFL] and format 2 [id:77 TLV]
-	if (buf[0] == 0x80) {
-		if (decodeTLV){
-			PrintAndLog("GPO response format1:");
-			TLVPrintFromBuffer(buf, len);
-		}
-		
-		if (len < 4 || (len - 4) % 4) {
-			PrintAndLog("ERROR: GPO response format1 parsing error. length=%d", len);
-		} else {
-			// AIP
-			struct tlvdb * f1AIP = tlvdb_fixed(0x82, 2, buf + 2);
-			tlvdb_add(tlvRoot, f1AIP);
-			if (decodeTLV){
-				PrintAndLog("\n* * Decode response format 1 (0x80) AIP and AFL:");
-				TLVPrintFromTLV(f1AIP);
-			}
-
-			// AFL
-			struct tlvdb * f1AFL = tlvdb_fixed(0x94, len - 4, buf + 2 + 2);
-			tlvdb_add(tlvRoot, f1AFL);
-			if (decodeTLV)
-				TLVPrintFromTLV(f1AFL);
-		}		
-	} else {
-		if (decodeTLV)
-			TLVPrintFromBuffer(buf, len);
-	}
+	ProcessGPOResponseFormat1(tlvRoot, buf, len, decodeTLV);
 	
 	// extract PAN from track2
 	{
@@ -1266,6 +1270,7 @@ int CmdHFEMVScan(const char *cmd) {
 		PrintAndLog("GPO error(%d): %4x. Exit...", res, sw);
 		return 7;
 	}
+	ProcessGPOResponseFormat1(tlvRoot, buf, len, decodeTLV);
 	
 	struct tlvdb *gpofci = tlvdb_parse_multi(buf, len);
 	if (extractTLVElements)
