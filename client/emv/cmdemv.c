@@ -1109,15 +1109,15 @@ int CmdHFEMVScan(const char *cmd) {
 	bool paramLoadJSON = arg_get_lit(4);
 
 	enum TransactionType TrType = TT_MSD;
-	if (arg_get_lit(5))
-		TrType = TT_QVSDCMCHIP;
 	if (arg_get_lit(6))
-		TrType = TT_CDA;
+		TrType = TT_QVSDCMCHIP;
 	if (arg_get_lit(7))
+		TrType = TT_CDA;
+	if (arg_get_lit(8))
 		TrType = TT_VSDC;
 
-	bool GenACGPO = arg_get_lit(8);
-	bool MergeJSON = arg_get_lit(9);
+	bool GenACGPO = arg_get_lit(9);
+	bool MergeJSON = arg_get_lit(10);
 	CLIParserFree();
 	
 	SetAPDULogging(showAPDU);
