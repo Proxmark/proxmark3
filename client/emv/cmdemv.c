@@ -1489,7 +1489,10 @@ int CmdHFEMVScan(const char *cmd) {
 		TLVPrintFromBuffer(buf, len);
 
 	struct tlvdb *fci = tlvdb_parse_multi(buf, len);
-	JsonSaveTLVTree(root, root, "$.Application.FCITemplate", 	fci);
+	if (extractTLVElements)
+		JsonSaveTLVTree(root, root, "$.Application.FCITemplate", fci);
+	else
+		JsonSaveTLVTreeElm(root, "$.Application.FCITemplate", fci, true, true, false);
 	tlvdb_free(fci);
 
 	// create transaction parameters
@@ -1552,7 +1555,10 @@ int CmdHFEMVScan(const char *cmd) {
 	}
 	
 	struct tlvdb *gpofci = tlvdb_parse_multi(buf, len);
-	JsonSaveTLVTree(root, root, "$.Application.GPO", 	gpofci);
+	if (extractTLVElements)
+		JsonSaveTLVTree(root, root, "$.Application.GPO", gpofci);
+	else
+		JsonSaveTLVTreeElm(root, "$.Application.GPO", gpofci, true, true, false);
 
 	JsonSaveTLVValue(root, "$.ApplicationData.AIP", tlvdb_find_full(gpofci, 0x82));
 	JsonSaveTLVValue(root, "$.ApplicationData.AFL", tlvdb_find_full(gpofci, 0x94));
@@ -1613,7 +1619,10 @@ int CmdHFEMVScan(const char *cmd) {
 				JsonSaveHex(jsonelm, "Offline", SFIoffline, 1);
 				
 				struct tlvdb *rsfi = tlvdb_parse_multi(buf, len);
-				JsonSaveTLVTree(root, jsonelm, "$.Data", rsfi);
+				if (extractTLVElements)
+					JsonSaveTLVTree(root, jsonelm, "$.Data", rsfi);
+				else
+					JsonSaveTLVTreeElm(jsonelm, "$.Data", rsfi, true, true, false);
 				tlvdb_free(rsfi);
 			}
 		}
