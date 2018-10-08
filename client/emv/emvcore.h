@@ -39,6 +39,8 @@ enum TransactionType {
 	TT_CDA,
 };
 
+extern char *TransactionTypeStr[];
+
 typedef struct {
 	uint8_t CLA;
 	uint8_t INS;

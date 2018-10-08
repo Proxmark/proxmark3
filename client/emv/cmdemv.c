@@ -1234,6 +1234,11 @@ int CmdHFEMVScan(const char *cmd) {
 	if (decodeTLV)
 		TLVPrintFromBuffer(buf, len);
 
+	// check mode
+	if (tlvdb_get(tlvRoot, 0x9f38, NULL)) {
+		JsonSaveStr(root, "$.Application.Mode", TransactionTypeStr[TrType]);
+	}
+
 	struct tlvdb *fci = tlvdb_parse_multi(buf, len);
 	if (extractTLVElements)
 		JsonSaveTLVTree(root, root, "$.Application.FCITemplate", fci);

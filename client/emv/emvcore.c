@@ -19,6 +19,13 @@ static const char *PSElist [] = {
 };
 //static const size_t PSElistLen = sizeof(PSElist)/sizeof(char*);
 
+char *TransactionTypeStr[] = {
+	"MSD",
+	"VSDC",
+	"qVCDCMCHIP",
+	"CDA"
+};
+
 typedef struct {
 	enum CardPSVendor vendor;
 	const char* aid;
