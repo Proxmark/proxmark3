@@ -565,6 +565,39 @@ int CmdHFEMVInternalAuthenticate(const char *cmd) {
 
 #define dreturn(n) {free(pdol_data_tlv);tlvdb_free(tlvSelect);tlvdb_free(tlvRoot);DropField();return n;}
 
+void InitTransactionParameters(struct tlvdb *tlvRoot, bool paramLoadJSON, enum TransactionType TrType, bool GenACGPO) {
+	
+	ParamLoadDefaults(tlvRoot);
+
+	if (paramLoadJSON) {
+		PrintAndLog("* * Transaction parameters loading from JSON...");
+		ParamLoadFromJson(tlvRoot);
+	}
+	
+	//9F66:(Terminal Transaction Qualifiers (TTQ)) len:4
+	char *qVSDC = "\x26\x00\x00\x00";
+	if (GenACGPO) {
+		qVSDC = "\x26\x80\x00\x00";
+	}
+	switch(TrType) {
+		case TT_MSD:
+			TLV_ADD(0x9F66, "\x86\x00\x00\x00"); // MSD
+			break;
+		// not standard for contactless. just for test.
+		case TT_VSDC:  
+			TLV_ADD(0x9F66, "\x46\x00\x00\x00"); // VSDC
+			break;
+		case TT_QVSDCMCHIP:
+			TLV_ADD(0x9F66, qVSDC); // qVSDC
+			break;
+		case TT_CDA:
+			TLV_ADD(0x9F66, qVSDC); // qVSDC (VISA CDA not enabled)
+			break;
+		default:
+			break;
+	}
+}
+
 int CmdHFEMVExec(const char *cmd) {
 	uint8_t buf[APDU_RES_LEN] = {0};
 	size_t len = 0;
@@ -677,37 +710,7 @@ int CmdHFEMVExec(const char *cmd) {
 	PrintAndLog("* Selected.");
 	
 	PrintAndLog("\n* Init transaction parameters.");
-
-	ParamLoadDefaults(tlvRoot);
-
-	if (paramLoadJSON) {
-		PrintAndLog("* * Transaction parameters loading from JSON...");
-		ParamLoadFromJson(tlvRoot);
-	}
-	
-	//9F66:(Terminal Transaction Qualifiers (TTQ)) len:4
-	char *qVSDC = "\x26\x00\x00\x00";
-	if (GenACGPO) {
-		qVSDC = "\x26\x80\x00\x00";
-	}
-	switch(TrType) {
-		case TT_MSD:
-			TLV_ADD(0x9F66, "\x86\x00\x00\x00"); // MSD
-			break;
-		// not standard for contactless. just for test.
-		case TT_VSDC:  
-			TLV_ADD(0x9F66, "\x46\x00\x00\x00"); // VSDC
-			break;
-		case TT_QVSDCMCHIP:
-			TLV_ADD(0x9F66, qVSDC); // qVSDC
-			break;
-		case TT_CDA:
-			TLV_ADD(0x9F66, qVSDC); // qVSDC (VISA CDA not enabled)
-			break;
-		default:
-			break;
-	}
-	
+	InitTransactionParameters(tlvRoot, paramLoadJSON, TrType, GenACGPO);
 	TLVPrintFromTLV(tlvRoot); // TODO delete!!!
 	
 	PrintAndLog("\n* Calc PDOL.");
@@ -1236,36 +1239,7 @@ int CmdHFEMVScan(const char *cmd) {
 
 	// create transaction parameters
 	PrintAndLog("-->Init transaction parameters.");
-
-	ParamLoadDefaults(tlvRoot);
-
-	if (paramLoadJSON) {
-		PrintAndLog("-->Transaction parameters loading from JSON...");
-		ParamLoadFromJson(tlvRoot);
-	}
-	
-	//9F66:(Terminal Transaction Qualifiers (TTQ)) len:4
-	char *qVSDC = "\x26\x00\x00\x00";
-	if (GenACGPO) {
-		qVSDC = "\x26\x80\x00\x00";
-	}
-	switch(TrType) {
-		case TT_MSD:
-			TLV_ADD(0x9F66, "\x86\x00\x00\x00"); // MSD
-			break;
-		// not standard for contactless. just for test.
-		case TT_VSDC:  
-			TLV_ADD(0x9F66, "\x46\x00\x00\x00"); // VSDC
-			break;
-		case TT_QVSDCMCHIP:
-			TLV_ADD(0x9F66, qVSDC); // qVSDC
-			break;
-		case TT_CDA:
-			TLV_ADD(0x9F66, qVSDC); // qVSDC (VISA CDA not enabled)
-			break;
-		default:
-			break;
-	}
+	InitTransactionParameters(tlvRoot, paramLoadJSON, TrType, GenACGPO);
 	
 	PrintAndLog("-->Calc PDOL.");
 	struct tlv *pdol_data_tlv = dol_process(tlvdb_get(tlvRoot, 0x9f38, NULL), tlvRoot, 0x83);
@@ -1367,7 +1341,11 @@ int CmdHFEMVScan(const char *cmd) {
 		}
 		
 		break;
-	}	
+	}
+	
+	// getting certificates
+	PrintAndLog("-->Recovering certificates.");
+	RecoveryCertificates(tlvRoot, root);
 	
 	// DropField
 	DropField();

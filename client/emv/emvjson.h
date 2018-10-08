@@ -30,4 +30,6 @@ extern int JsonSaveTLVTreeElm(json_t *elm, char *path, struct tlvdb *tlvdbelm, b
 
 extern int JsonSaveTLVTree(json_t *root, json_t *elm, char *path, struct tlvdb *tlvdbelm);
 
+extern bool ParamLoadFromJson(struct tlvdb *tlv);
+
 #endif
