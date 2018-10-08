@@ -15,12 +15,12 @@
 #include "cliparser/cliparser.h"
 #include <jansson.h>
 
-struct ApplicationDataElm {
+typedef struct {
 	tlv_tag_t Tag;
 	char *Name;
-};
+} ApplicationDataElm;
 
-static const struct ApplicationDataElm ApplicationData[] = {
+static const ApplicationDataElm ApplicationData[] = {
 {0x82,    "AIP"},
 {0x94,    "AFL"},
 
@@ -31,19 +31,36 @@ static const struct ApplicationDataElm ApplicationData[] = {
 {0x5F28,  "IssuerCountryCode"},
 
 {0x50,    "ApplicationLabel"},
+{0x9F08,  "VersionNumber"},
+{0x9F42,  "CurrencyCode"},
 {0x5F2D,  "LanguagePreference"},
 {0x87,    "PriorityIndicator"},
 
-{0x5F34,  "PAN"},
-{0x5F34,  "PAN"},
-{0x5F34,  "PAN"},
-{0x5F34,  "PAN"},
-{0x5F34,  "PAN"},
-{0x5F34,  "PAN"},
-{0x5F34,  "PAN"},
-{0x5F34,  "PAN"},
-{0x5F34,  "PAN"}
+{0x9F07,  "AUC"},   // Application Usage Control
+{0x9F6C,  "CTQ"},
+{0x8E,    "CVMList"},
+{0x9F0D,  "IACDefault"},
+{0x9F0E,  "IACDeny"},
+{0x9F0F,  "IACOnline"},
+
+{0x8F,    "CertificationAuthorityPublicKeyIndex"},
+{0x9F32,  "IssuerPublicKeyExponent"},
+{0x92,    "IssuerPublicKeyRemainder"},
+{0x90,    "IssuerPublicKeyCertificate"},
+{0x9F47,  "ICCPublicKeyExponent"},
+{0x9F46,  "ICCPublicKeyCertificate"},
+
+{0x00,    "end..."}
 };
+int ApplicationDataLen = sizeof(ApplicationData) / sizeof(ApplicationDataElm);
+
+char* GetApplicationDataName(tlv_tag_t tag) {
+	for (int i = 0; i < ApplicationDataLen; i++)
+		if (ApplicationData[i].Tag == tag)
+			return ApplicationData[i].Name;
+		
+	return NULL;
+}
 
 #define TLV_ADD(tag, value)( tlvdb_change_or_add_node(tlvRoot, tag, sizeof(value) - 1, (const unsigned char *)value) )
 void ParamLoadDefaults(struct tlvdb *tlvRoot) {
@@ -1206,7 +1223,7 @@ int JsonSaveTLVValue(json_t *root, char *path, struct tlvdb *tlvdbelm) {
 		return 1;	
 }
 
-int JsonSaveTLVElm(json_t *elm, char *path, struct tlv *tlvelm, bool saveValue) {
+int JsonSaveTLVElm(json_t *elm, char *path, struct tlv *tlvelm, bool saveName, bool saveValue, bool saveAppDataLink) {
 	json_error_t error;
 
 	if (strlen(path) < 1 || !tlvelm)
@@ -1231,33 +1248,51 @@ int JsonSaveTLVElm(json_t *elm, char *path, struct tlv *tlvelm, bool saveValue) 
 			}
 		}
 		
-		char * name = emv_get_tag_name(tlvelm);
-		if (name && strlen(name) > 0 && strncmp(name, "Unknown", 7))
-			JsonSaveStr(obj, "name", emv_get_tag_name(tlvelm));
-		JsonSaveHex(obj, "tag", tlvelm->tag, 0);
-		JsonSaveHex(obj, "length", tlvelm->len, 0);
-		if (saveValue)
-			JsonSaveBufAsHex(obj, "value", (uint8_t *)tlvelm->value, tlvelm->len);
+		if (saveAppDataLink) {
+			char * AppDataName = GetApplicationDataName(tlvelm->tag);
+			if (AppDataName)
+				JsonSaveStr(obj, "appdata", AppDataName);
+		} else {		
+			char * name = emv_get_tag_name(tlvelm);
+			if (saveName && name && strlen(name) > 0 && strncmp(name, "Unknown", 7))
+				JsonSaveStr(obj, "name", emv_get_tag_name(tlvelm));
+			JsonSaveHex(obj, "tag", tlvelm->tag, 0);
+			if (saveValue) {
+				JsonSaveHex(obj, "length", tlvelm->len, 0);
+				JsonSaveBufAsHex(obj, "value", (uint8_t *)tlvelm->value, tlvelm->len);
+			};
+		}
 	}
 
 	return 0;
 }
 
-int JsonSaveTLVTreeElm(json_t *elm, char *path, struct tlvdb *tlvdbelm, bool saveValue) {
-	return JsonSaveTLVElm(elm, path, (struct tlv *)tlvdb_get_tlv(tlvdbelm), saveValue);
+int JsonSaveTLVTreeElm(json_t *elm, char *path, struct tlvdb *tlvdbelm, bool saveName, bool saveValue, bool saveAppDataLink) {
+	return JsonSaveTLVElm(elm, path, (struct tlv *)tlvdb_get_tlv(tlvdbelm), saveName, saveValue, saveAppDataLink);
 }
 
-int JsonSaveTLVTree(json_t *elm, char *path, struct tlvdb *tlvdbelm) {
+int JsonSaveTLVTree(json_t *root, json_t *elm, char *path, struct tlvdb *tlvdbelm) {
 	struct tlvdb *tlvp = tlvdbelm;
 	while (tlvp) {
+		const struct tlv * tlvpelm = tlvdb_get_tlv(tlvp);
+		char * AppDataName = NULL;
+		if (tlvpelm)
+			AppDataName = GetApplicationDataName(tlvpelm->tag);
+		
+		if (AppDataName) {
+			char appdatalink[200] = {0};
+			sprintf(appdatalink, "$.ApplicationData.%s", AppDataName);
+			JsonSaveBufAsHex(root, appdatalink, (uint8_t *)tlvpelm->value, tlvpelm->len);
+		}
+		
 		json_t *pelm = json_path_get(elm, path);
 		if (pelm && json_is_array(pelm)) {
 			json_t *appendelm = json_object();
 			json_array_append_new(pelm, appendelm);
-			JsonSaveTLVTreeElm(appendelm, "$", tlvp, true);
+			JsonSaveTLVTreeElm(appendelm, "$", tlvp, !AppDataName, !tlvdb_elm_get_children(tlvp), AppDataName);
 			pelm = appendelm;
 		} else {
-			JsonSaveTLVTreeElm(elm, path, tlvp, true);
+			JsonSaveTLVTreeElm(elm, path, tlvp, !AppDataName, !tlvdb_elm_get_children(tlvp), AppDataName);
 			pelm = json_path_get(elm, path);
 		}
 		
@@ -1281,7 +1316,7 @@ int JsonSaveTLVTree(json_t *elm, char *path, struct tlvdb *tlvdbelm) {
 			}
 
 			// Recursion
-			JsonSaveTLVTree(chjson, "$", tlvdb_elm_get_children(tlvp));
+			JsonSaveTLVTree(root, chjson, "$", tlvdb_elm_get_children(tlvp));
 		}
 
 		tlvp = tlvdb_elm_get_next(tlvp);
@@ -1309,6 +1344,7 @@ int CmdHFEMVScan(const char *cmd) {
 		arg_param_begin,
 		arg_lit0("aA",  "apdu",     "show APDU reqests and responses."),
 		arg_lit0("tT",  "tlv",      "TLV decode results."),
+		arg_lit0("eE",  "extract",  "Extract TLV elements and fill Application Data"),
 		arg_lit0("jJ",  "jload",    "Load transaction parameters from `emv/defparams.json` file."),
 		arg_rem("By default:",      "Transaction type - MSD"),
 		arg_lit0("vV",  "qvsdc",    "Transaction type - qVSDC or M/Chip."),
@@ -1323,18 +1359,19 @@ int CmdHFEMVScan(const char *cmd) {
 	
 	bool showAPDU = arg_get_lit(1);
 	bool decodeTLV = arg_get_lit(2);
-	bool paramLoadJSON = arg_get_lit(3);
+	bool extractTLVElements = arg_get_lit(3);
+	bool paramLoadJSON = arg_get_lit(4);
 
 	enum TransactionType TrType = TT_MSD;
-	if (arg_get_lit(4))
-		TrType = TT_QVSDCMCHIP;
 	if (arg_get_lit(5))
-		TrType = TT_CDA;
+		TrType = TT_QVSDCMCHIP;
 	if (arg_get_lit(6))
+		TrType = TT_CDA;
+	if (arg_get_lit(7))
 		TrType = TT_VSDC;
 
-	bool GenACGPO = arg_get_lit(7);
-	bool MergeJSON = arg_get_lit(8);
+	bool GenACGPO = arg_get_lit(8);
+	bool MergeJSON = arg_get_lit(9);
 	CLIParserFree();
 	
 	SetAPDULogging(showAPDU);
@@ -1394,7 +1431,10 @@ int CmdHFEMVScan(const char *cmd) {
 		JsonSaveBufAsHex(root, "$.PPSE.AID", (uint8_t *)"2PAY.SYS.DDF01", 14);
 		
 		struct tlvdb *fci = tlvdb_parse_multi(buf, len);
-		JsonSaveTLVTree(root, "$.PPSE.FCITemplate", fci);
+		if (extractTLVElements)
+			JsonSaveTLVTree(root, root, "$.PPSE.FCITemplate", fci);
+		else
+			JsonSaveTLVTreeElm(root, "$.PPSE.FCITemplate", fci, true, true, false);
 		JsonSaveTLVValue(root, "$.Application.KernelID", tlvdb_find_full(fci, 0x9f2a));
 		tlvdb_free(fci);
 	}
@@ -1449,7 +1489,7 @@ int CmdHFEMVScan(const char *cmd) {
 		TLVPrintFromBuffer(buf, len);
 
 	struct tlvdb *fci = tlvdb_parse_multi(buf, len);
-	JsonSaveTLVTree(root, "$.Application.FCITemplate", 	fci);
+	JsonSaveTLVTree(root, root, "$.Application.FCITemplate", 	fci);
 	tlvdb_free(fci);
 
 	// create transaction parameters
@@ -1512,7 +1552,7 @@ int CmdHFEMVScan(const char *cmd) {
 	}
 	
 	struct tlvdb *gpofci = tlvdb_parse_multi(buf, len);
-	JsonSaveTLVTree(root, "$.Application.GPO", 	gpofci);
+	JsonSaveTLVTree(root, root, "$.Application.GPO", 	gpofci);
 
 	JsonSaveTLVValue(root, "$.ApplicationData.AIP", tlvdb_find_full(gpofci, 0x82));
 	JsonSaveTLVValue(root, "$.ApplicationData.AFL", tlvdb_find_full(gpofci, 0x94));
@@ -1573,7 +1613,7 @@ int CmdHFEMVScan(const char *cmd) {
 				JsonSaveHex(jsonelm, "Offline", SFIoffline, 1);
 				
 				struct tlvdb *rsfi = tlvdb_parse_multi(buf, len);
-				JsonSaveTLVTree(jsonelm, "$.Data", rsfi);
+				JsonSaveTLVTree(root, jsonelm, "$.Data", rsfi);
 				tlvdb_free(rsfi);
 			}
 		}
