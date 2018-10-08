@@ -862,7 +862,7 @@ int RecoveryCertificates(struct tlvdb *tlvRoot, json_t *root) {
 	struct emv_pk *issuer_pk = emv_pki_recover_issuer_cert(pk, tlvRoot);
 	if (!issuer_pk) {
 		emv_pk_free(pk);
-		PrintAndLog("ERROR: Issuer certificate not found. Exit.");
+		PrintAndLog("WARNING: Issuer certificate not found. Exit.");
 		return 2;
 	}
 	PrintAndLog("Issuer PK recovered. RID %02hhx:%02hhx:%02hhx:%02hhx:%02hhx IDX %02hhx CSN %02hhx:%02hhx:%02hhx",
@@ -886,7 +886,7 @@ int RecoveryCertificates(struct tlvdb *tlvRoot, json_t *root) {
 	if (!icc_pk) {
 		emv_pk_free(pk);
 		emv_pk_free(issuer_pk);
-		PrintAndLog("ERROR: ICC setrificate not found. Exit.");
+		PrintAndLog("WARNING: ICC certificate not found. Exit.");
 		return 2;
 	}
 	printf("ICC PK recovered. RID %02hhx:%02hhx:%02hhx:%02hhx:%02hhx IDX %02hhx CSN %02hhx:%02hhx:%02hhx\n",
