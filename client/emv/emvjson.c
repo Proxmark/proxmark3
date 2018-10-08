@@ -16,6 +16,7 @@
 #include <string.h>
 #include "util.h"
 #include "ui.h"
+#include "proxmark3.h"
 #include "emv_tags.h"
 
 static const ApplicationDataElm ApplicationData[] = {
@@ -214,3 +215,134 @@ int JsonSaveTLVTree(json_t *root, json_t *elm, char *path, struct tlvdb *tlvdbel
 	}
 	return 0;
 }
+
+bool HexToBuffer(const char *errormsg, const char *hexvalue, uint8_t * buffer, size_t maxbufferlen, size_t *bufferlen) {
+	int buflen = 0;	
+	
+	switch(param_gethex_to_eol(hexvalue, 0, buffer, maxbufferlen, &buflen)) {
+	case 1:
+		PrintAndLog("%s Invalid HEX value.", errormsg);
+		return false;
+	case 2:
+		PrintAndLog("%s Hex value too large.", errormsg);
+		return false;
+	case 3:
+		PrintAndLog("%s Hex value must have even number of digits.", errormsg);
+		return false;
+	}
+	
+	if (buflen > maxbufferlen) {
+		PrintAndLog("%s HEX length (%d) more than %d", errormsg, *bufferlen, maxbufferlen);
+		return false;
+	}
+	
+	*bufferlen = buflen;
+	
+	return true;
+}
+
+bool ParamLoadFromJson(struct tlvdb *tlv) {
+	json_t *root;
+	json_error_t error;
+
+	if (!tlv) {
+		PrintAndLog("ERROR load params: tlv tree is NULL.");
+		return false; 
+	}
+
+	// current path + file name
+	const char *relfname = "emv/defparams.json"; 
+	char fname[strlen(get_my_executable_directory()) + strlen(relfname) + 1];
+	strcpy(fname, get_my_executable_directory());
+	strcat(fname, relfname);
+
+	root = json_load_file(fname, 0, &error);
+	if (!root) {
+		PrintAndLog("Load params: json error on line %d: %s", error.line, error.text);
+		return false; 
+	}
+	
+	if (!json_is_array(root)) {
+		PrintAndLog("Load params: Invalid json format. root must be array.");
+		return false; 
+	}
+	
+	PrintAndLog("Load params: json OK");
+	
+	for(int i = 0; i < json_array_size(root); i++) {
+		json_t *data, *jtype, *jlength, *jvalue;
+
+		data = json_array_get(root, i);
+		if(!json_is_object(data))
+		{
+			PrintAndLog("Load params: data [%d] is not an object", i + 1);
+			json_decref(root);
+			return false;
+		}
+		
+		jtype = json_object_get(data, "type");
+		if(!json_is_string(jtype))
+		{
+			PrintAndLog("Load params: data [%d] type is not a string", i + 1);
+			json_decref(root);
+			return false;
+		}
+		const char *tlvType = json_string_value(jtype);
+
+		jvalue = json_object_get(data, "value");
+		if(!json_is_string(jvalue))
+		{
+			PrintAndLog("Load params: data [%d] value is not a string", i + 1);
+			json_decref(root);
+			return false;
+		}
+		const char *tlvValue = json_string_value(jvalue);
+
+		jlength = json_object_get(data, "length");
+		if(!json_is_number(jlength))
+		{
+			PrintAndLog("Load params: data [%d] length is not a number", i + 1);
+			json_decref(root);
+			return false;
+		}
+		
+		int tlvLength = json_integer_value(jlength);
+		if (tlvLength > 250) {
+			PrintAndLog("Load params: data [%d] length more than 250", i + 1);
+			json_decref(root);
+			return false;
+		}
+		
+		PrintAndLog("TLV param: %s[%d]=%s", tlvType, tlvLength, tlvValue);
+		uint8_t buf[251] = {0};
+		size_t buflen = 0;
+		
+		// here max length must be 4, but now tlv_tag_t is 2-byte var. so let it be 2 by now...  TODO: needs refactoring tlv_tag_t...
+		if (!HexToBuffer("TLV Error type:", tlvType, buf, 2, &buflen)) { 
+			json_decref(root);
+			return false;
+		}
+		tlv_tag_t tag = 0;
+		for (int i = 0; i < buflen; i++) {
+			tag = (tag << 8) + buf[i];
+		}	
+		
+		if (!HexToBuffer("TLV Error value:", tlvValue, buf, sizeof(buf) - 1, &buflen)) {
+			json_decref(root);
+			return false;
+		}
+		
+		if (buflen != tlvLength) {
+			PrintAndLog("Load params: data [%d] length of HEX must(%d) be identical to length in TLV param(%d)", i + 1, buflen, tlvLength);
+			json_decref(root);
+			return false;
+		}
+		
+		tlvdb_change_or_add_node(tlv, tag, tlvLength, (const unsigned char *)buf);		
+	}
+
+	json_decref(root);
+
+	return true;
+}
+
