@@ -1234,7 +1234,7 @@ int CmdHFEMVScan(const char *cmd) {
 	if (decodeTLV)
 		TLVPrintFromBuffer(buf, len);
 
-	// check mode
+	// save mode
 	if (tlvdb_get(tlvRoot, 0x9f38, NULL)) {
 		JsonSaveStr(root, "$.Application.Mode", TransactionTypeStr[TrType]);
 	}
@@ -1354,8 +1354,10 @@ int CmdHFEMVScan(const char *cmd) {
 	}
 	
 	// getting certificates
-	PrintAndLog("-->Recovering certificates.");
-	RecoveryCertificates(tlvRoot, root);
+	if (tlvdb_get(tlvRoot, 0x90, NULL)) {
+		PrintAndLog("-->Recovering certificates.");
+		RecoveryCertificates(tlvRoot, root);
+	}
 	
 	// DropField
 	DropField();
