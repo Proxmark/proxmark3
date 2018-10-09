@@ -60,7 +60,7 @@ int CmdHFEMVSelect(const char *cmd) {
 	bool leaveSignalON = arg_get_lit(2);
 	bool APDULogging = arg_get_lit(3);
 	bool decodeTLV = arg_get_lit(4);
-	CLIGetStrWithReturn(5, data, &datalen);
+	CLIGetHexWithReturn(5, data, &datalen);
 	CLIParserFree();
 	
 	SetAPDULogging(APDULogging);
@@ -205,7 +205,7 @@ int CmdHFEMVGPO(const char *cmd) {
 	bool dataMakeFromPDOL = arg_get_lit(3);
 	bool APDULogging = arg_get_lit(4);
 	bool decodeTLV = arg_get_lit(5);
-	CLIGetStrWithReturn(6, data, &datalen);
+	CLIGetHexWithReturn(6, data, &datalen);
 	CLIParserFree();	
 	
 	SetAPDULogging(APDULogging);
@@ -294,7 +294,7 @@ int CmdHFEMVReadRecord(const char *cmd) {
 	bool leaveSignalON = arg_get_lit(1);
 	bool APDULogging = arg_get_lit(2);
 	bool decodeTLV = arg_get_lit(3);
-	CLIGetStrWithReturn(4, data, &datalen);
+	CLIGetHexWithReturn(4, data, &datalen);
 	CLIParserFree();
 	
 	if (datalen != 2) {
@@ -372,7 +372,7 @@ int CmdHFEMVAC(const char *cmd) {
 	bool dataMakeFromCDOL = arg_get_lit(5);
 	bool APDULogging = arg_get_lit(6);
 	bool decodeTLV = arg_get_lit(7);
-	CLIGetStrWithReturn(8, data, &datalen);
+	CLIGetHexWithReturn(8, data, &datalen);
 	CLIParserFree();	
 	
 	SetAPDULogging(APDULogging);
@@ -501,7 +501,7 @@ int CmdHFEMVInternalAuthenticate(const char *cmd) {
 	bool dataMakeFromDDOL = arg_get_lit(3);
 	bool APDULogging = arg_get_lit(4);
 	bool decodeTLV = arg_get_lit(5);
-	CLIGetStrWithReturn(6, data, &datalen);
+	CLIGetHexWithReturn(6, data, &datalen);
 	CLIParserFree();	
 	
 	SetAPDULogging(APDULogging);
@@ -1080,7 +1080,7 @@ int CmdHFEMVScan(const char *cmd) {
 	json_t *root;
 	json_error_t error;
 
-	CLIParserInit("hf emv save", 
+	CLIParserInit("hf emv scan", 
 		"Scan EMV card and save it contents to a file.", 
 		"It executes EMV contactless transaction and saves result to a file which can be used for emulation\n"
 			"Usage:\n\thf emv scan -at -> scan MSD transaction mode and show APDU and TLV\n"
@@ -1118,15 +1118,20 @@ int CmdHFEMVScan(const char *cmd) {
 
 	bool GenACGPO = arg_get_lit(9);
 	bool MergeJSON = arg_get_lit(10);
+	uint8_t relfname[250] ={0};
+	char *crelfname = (char *)relfname;
+	int relfnamelen = 0;
+	CLIGetStrWithReturn(11, relfname, &relfnamelen);
 	CLIParserFree();
 	
 	SetAPDULogging(showAPDU);
 	
 	// current path + file name
-	const char *relfname = "card.json"; 
-	char fname[strlen(get_my_executable_directory()) + strlen(relfname) + 1];
+	if (!strstr(crelfname, ".json"))
+		strcat(crelfname, ".json");
+	char fname[strlen(get_my_executable_directory()) + strlen(crelfname) + 1];
 	strcpy(fname, get_my_executable_directory());
-	strcat(fname, relfname);
+	strcat(fname, crelfname);
 
 	if (MergeJSON) {
 		root = json_load_file(fname, 0, &error);
