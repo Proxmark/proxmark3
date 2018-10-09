@@ -12,6 +12,7 @@
 #include "mifare.h"
 #include "cmdemv.h"
 #include "emvjson.h"
+#include "emv_pki.h"
 #include "test/cryptotest.h"
 #include "cliparser/cliparser.h"
 #include <jansson.h>
@@ -1148,7 +1149,7 @@ int CmdHFEMVScan(const char *cmd) {
 		root = json_object();
 	}
 
-	// drop field
+	// drop field at start
 	DropField();
 
 	// iso 14443 select
@@ -1202,6 +1203,7 @@ int CmdHFEMVScan(const char *cmd) {
 		if (EMVSearch(false, true, decodeTLV, tlvSelect)) {
 			PrintAndLog("E->Can't found any of EMV AID. Exit...");
 			tlvdb_free(tlvSelect);
+			DropField();
 			return 3;
 		}
 
@@ -1217,6 +1219,7 @@ int CmdHFEMVScan(const char *cmd) {
 
 	if (!AIDlen) {
 		PrintAndLog("Can't select AID. EMV AID not found. Exit...");
+		DropField();
 		return 4;
 	}
 
@@ -1234,6 +1237,8 @@ int CmdHFEMVScan(const char *cmd) {
 	
 	if (res) {	
 		PrintAndLog("E->Can't select AID (%d). Exit...", res);
+		tlvdb_free(tlvRoot);
+		DropField();
 		return 5;
 	}
 	
@@ -1260,6 +1265,8 @@ int CmdHFEMVScan(const char *cmd) {
 	struct tlv *pdol_data_tlv = dol_process(tlvdb_get(tlvRoot, 0x9f38, NULL), tlvRoot, 0x83);
 	if (!pdol_data_tlv){
 		PrintAndLog("E->Can't create PDOL TLV.");
+		tlvdb_free(tlvRoot);
+		DropField();
 		return 6;
 	}
 	
@@ -1267,6 +1274,8 @@ int CmdHFEMVScan(const char *cmd) {
 	unsigned char *pdol_data_tlv_data = tlv_encode(pdol_data_tlv, &pdol_data_tlv_data_len);
 	if (!pdol_data_tlv_data) {
 		PrintAndLog("E->Can't create PDOL data.");
+		tlvdb_free(tlvRoot);
+		DropField();
 		return 6;
 	}
 	PrintAndLog("PDOL data[%d]: %s", pdol_data_tlv_data_len, sprint_hex(pdol_data_tlv_data, pdol_data_tlv_data_len));
@@ -1279,6 +1288,8 @@ int CmdHFEMVScan(const char *cmd) {
 	
 	if (res) {	
 		PrintAndLog("GPO error(%d): %4x. Exit...", res, sw);
+		tlvdb_free(tlvRoot);
+		DropField();
 		return 7;
 	}
 	ProcessGPOResponseFormat1(tlvRoot, buf, len, decodeTLV);
@@ -1362,9 +1373,14 @@ int CmdHFEMVScan(const char *cmd) {
 	// getting certificates
 	if (tlvdb_get(tlvRoot, 0x90, NULL)) {
 		PrintAndLog("-->Recovering certificates.");
+		PKISetStrictExecution(false);
 		RecoveryCertificates(tlvRoot, root);
+		PKISetStrictExecution(true);
 	}
 	
+	// free tlv object
+	tlvdb_free(tlvRoot);
+
 	// DropField
 	DropField();
 	
@@ -1375,7 +1391,7 @@ int CmdHFEMVScan(const char *cmd) {
 	}
 	PrintAndLog("File `%s` saved.", fname);
 	
-	// free json
+	// free json object
 	json_decref(root);
 	
 	return 0;
