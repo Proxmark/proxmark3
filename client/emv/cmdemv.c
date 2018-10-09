@@ -1208,11 +1208,12 @@ int CmdHFEMVScan(const char *cmd) {
 		// check search and select application id
 		TLVPrintAIDlistFromSelectTLV(tlvSelect);
 	}
-	tlvdb_free(tlvSelect);
 
 	// EMV SELECT application
 	SetAPDULogging(showAPDU);
 	EMVSelectApplication(tlvSelect, AID, &AIDlen);
+
+	tlvdb_free(tlvSelect);
 
 	if (!AIDlen) {
 		PrintAndLog("Can't select AID. EMV AID not found. Exit...");
