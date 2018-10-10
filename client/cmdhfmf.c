@@ -2682,7 +2682,7 @@ int CmdHF14AMfAuth4(const char *cmd) {
 	
 	
 	CLIParserInit("hf mf auth4", 
-		"Executes AES authentication command in ISO1443-4", 
+		"Executes AES authentication command in ISO14443-4", 
 		"Usage:\n\thf mf auth4 4000 000102030405060708090a0b0c0d0e0f -> executes authentication\n"
 			"\thf mf auth4 9003 FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF -> executes authentication\n");
 
