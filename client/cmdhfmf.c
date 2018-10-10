@@ -2704,7 +2704,7 @@ int CmdHF14AMfAuth4(const char *cmd) {
 	}
 	
 	if (keylen != 16) {
-		PrintAndLog("ERROR: <Key Num> must be 16 bytes long instead of: %d", keylen);
+		PrintAndLog("ERROR: <Key Value> must be 16 bytes long instead of: %d", keylen);
 		return 1;
 	}
 
