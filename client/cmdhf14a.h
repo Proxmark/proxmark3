@@ -26,7 +26,9 @@ int CmdHF14ASnoop(const char *Cmd);
 char* getTagInfo(uint8_t uid);
 
 extern void DropField();
+
 extern int Hf14443_4aGetCardData(iso14a_card_select_t * card);
+extern int ExchangeRAW14a(uint8_t *datain, int datainlen, bool activateField, bool leaveSignalON, uint8_t *dataout, int maxdataoutlen, int *dataoutlen);
 extern int ExchangeAPDU14a(uint8_t *datain, int datainlen, bool activateField, bool leaveSignalON, uint8_t *dataout, int maxdataoutlen, int *dataoutlen);
 
 #endif
