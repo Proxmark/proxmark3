@@ -2712,6 +2712,7 @@ int CmdHF14AMfAuth4(const char *cmd) {
 	int res = ExchangeRAW14a(cmd1, sizeof(cmd1), true, true, data, sizeof(data), &datalen);
 	if (res) {
 		PrintAndLog("ERROR exchande raw error: %d", res);
+		DropField();
 		return 2;
 	}
 	
@@ -2719,21 +2720,25 @@ int CmdHF14AMfAuth4(const char *cmd) {
 		
 	if (datalen < 3) {
 		PrintAndLog("ERROR: card response length: %d", datalen);
+		DropField();
 		return 3;
 	}
 	
 	if (data[0] != 0x0a || data[1] != 0x00) {
 		PrintAndLog("ERROR: card response. Framing error. :%s", sprint_hex(data, 2));
+		DropField();
 		return 3;
 	}
 
 	if (data[2] != 0x90) {
 		PrintAndLog("ERROR: card response error: %02x", data[2]);
+		DropField();
 		return 3;
 	}
 
 	if (datalen != 19) {
 		PrintAndLog("ERROR: card response must be 16 bytes long instead of: %d", datalen);
+		DropField();
 		return 3;
 	}
 	
