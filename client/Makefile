@@ -155,6 +155,7 @@ CMDSRCS = 	$(SRC_SMARTCARD) \
 			cmdhflegic.c \
 			cmdhficlass.c \
 			cmdhfmf.c \
+			cmdhfmfp.c \
 			cmdhfmfu.c \
 			cmdhfmfhard.c \
 			hardnested/hardnested_bruteforce.c \
