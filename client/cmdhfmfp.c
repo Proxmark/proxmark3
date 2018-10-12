@@ -25,9 +25,14 @@
 static int CmdHelp(const char *Cmd);
 
 int CmdHFMFPInfo(const char *cmd) {
+	
+	if (cmd && strlen(cmd) > 0)
+		PrintAndLog("WARNING: command don't have any parameters.\n");
+	
 	// info about 14a part
 	CmdHF14AInfo("");
-	
+
+	// Mifare Plus info
 	UsbCommand c = {CMD_READER_ISO_14443a, {ISO14A_CONNECT | ISO14A_NO_DISCONNECT, 0, 0}};
 	SendCommand(&c);
 
@@ -77,7 +82,7 @@ int CmdHFMFPInfo(const char *cmd) {
 				uint8_t data[250] = {0};
 				int datalen = 0;
 				// https://github.com/Proxmark/proxmark3/blob/master/client/scripts/mifarePlus.lua#L161
-				uint8_t cmd[16 + 5] = {0x0a, 0x00, 0xa8, 0x90, 0x90, 0x00};
+				uint8_t cmd[5 + 16] = {0x0a, 0x00, 0xa8, 0x90, 0x90, 0x00};
 				int res = ExchangeRAW14a(cmd, sizeof(cmd), false, false, data, sizeof(data), &datalen);
 				if (!res && datalen > 2 && data[2] == 0x09) {
 					SLmode = 0;
@@ -89,7 +94,9 @@ int CmdHFMFPInfo(const char *cmd) {
 			PrintAndLog("Mifare Plus SL mode: SL%d", SLmode);
 		else
 			PrintAndLog("Mifare Plus SL mode: unknown(");
-	};
+	} else {
+		PrintAndLog("Mifare Plus info not available.");
+	}
 	
 	DropField();
 	
