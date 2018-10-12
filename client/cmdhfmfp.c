@@ -82,9 +82,9 @@ int CmdHFMFPInfo(const char *cmd) {
 				uint8_t data[250] = {0};
 				int datalen = 0;
 				// https://github.com/Proxmark/proxmark3/blob/master/client/scripts/mifarePlus.lua#L161
-				uint8_t cmd[5 + 16] = {0x0a, 0x00, 0xa8, 0x90, 0x90, 0x00};
+				uint8_t cmd[3 + 16] = {0xa8, 0x90, 0x90, 0x00};
 				int res = ExchangeRAW14a(cmd, sizeof(cmd), false, false, data, sizeof(data), &datalen);
-				if (!res && datalen > 2 && data[2] == 0x09) {
+				if (!res && datalen > 1 && data[0] == 0x09) {
 					SLmode = 0;
 				}
 			}
