@@ -2708,7 +2708,7 @@ int CmdHF14AMfAuth4(const char *cmd) {
 		return 1;
 	}
 
-	uint8_t cmd1[] = {0x0a, 0x00, 0x70, keyn[1], keyn[0], 0x00};
+	uint8_t cmd1[] = {0x70, keyn[1], keyn[0], 0x00};
 	int res = ExchangeRAW14a(cmd1, sizeof(cmd1), true, true, data, sizeof(data), &datalen);
 	if (res) {
 		PrintAndLog("ERROR exchande raw error: %d", res);
@@ -2718,45 +2718,37 @@ int CmdHF14AMfAuth4(const char *cmd) {
 	
 	PrintAndLog("<phase1: %s", sprint_hex(data, datalen));
 		
-	if (datalen < 3) {
+	if (datalen < 1) {
 		PrintAndLog("ERROR: card response length: %d", datalen);
 		DropField();
 		return 3;
 	}
 	
-	if (data[0] != 0x0a || data[1] != 0x00) {
-		PrintAndLog("ERROR: card response. Framing error. :%s", sprint_hex(data, 2));
-		DropField();
-		return 3;
-	}
-
-	if (data[2] != 0x90) {
+	if (data[0] != 0x90) {
 		PrintAndLog("ERROR: card response error: %02x", data[2]);
 		DropField();
 		return 3;
 	}
 
-	if (datalen != 19) {
-		PrintAndLog("ERROR: card response must be 16 bytes long instead of: %d", datalen);
+	if (datalen != 19) { // code 1b + 16b + crc 2b
+		PrintAndLog("ERROR: card response must be 19 bytes long instead of: %d", datalen);
 		DropField();
 		return 3;
 	}
 	
-    aes_decode(NULL, key, &data[3], Rnd2, 16);
+    aes_decode(NULL, key, &data[1], Rnd2, 16);
 	Rnd2[16] = Rnd2[0];
 	PrintAndLog("Rnd2: %s", sprint_hex(Rnd2, 16));
 
-	uint8_t cmd2[35] = {0};
-	cmd2[0] = 0x0b;
-	cmd2[1] = 0x00;
-	cmd2[2] = 0x72;
+	uint8_t cmd2[33] = {0};
+	cmd2[0] = 0x72;
 
 	uint8_t raw[32] = {0};
 	memmove(raw, Rnd1, 16);
 	memmove(&raw[16], &Rnd2[1], 16);
 
-    aes_encode(NULL, key, raw, &cmd2[3], 32);
-	PrintAndLog(">phase2: %s", sprint_hex(cmd2, 35));
+    aes_encode(NULL, key, raw, &cmd2[1], 32);
+	PrintAndLog(">phase2: %s", sprint_hex(cmd2, 33));
 	
 	res = ExchangeRAW14a(cmd2, sizeof(cmd2), false, false, data, sizeof(data), &datalen);
 	if (res) {
@@ -2767,7 +2759,7 @@ int CmdHF14AMfAuth4(const char *cmd) {
 	
 	PrintAndLog("<phase2: %s", sprint_hex(data, datalen));
 
-    aes_decode(NULL, key, &data[3], raw, 32);
+    aes_decode(NULL, key, &data[1], raw, 32);
 	PrintAndLog("res: %s", sprint_hex(raw, 32));
 	
 	PrintAndLog("Rnd1`: %s", sprint_hex(&raw[4], 16));

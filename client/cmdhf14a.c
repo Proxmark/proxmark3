@@ -649,10 +649,12 @@ void DropField() {
 }
 
 int ExchangeRAW14a(uint8_t *datain, int datainlen, bool activateField, bool leaveSignalON, uint8_t *dataout, int maxdataoutlen, int *dataoutlen) {
+	static bool responseNum = false;
 	uint16_t cmdc = 0;
 	*dataoutlen = 0;
 	
 	if (activateField) {
+		responseNum = false;
 		UsbCommand resp;
 
 		// Anticollision + SELECT card
@@ -695,8 +697,11 @@ int ExchangeRAW14a(uint8_t *datain, int datainlen, bool activateField, bool leav
 	if (leaveSignalON)
 		cmdc |= ISO14A_NO_DISCONNECT;
 
-	UsbCommand c = {CMD_READER_ISO_14443a, {ISO14A_RAW | ISO14A_APPEND_CRC | cmdc, (datainlen & 0xFFFF), 0}}; 
-	memcpy(c.d.asBytes, datain, datainlen);
+	UsbCommand c = {CMD_READER_ISO_14443a, {ISO14A_RAW | ISO14A_APPEND_CRC | cmdc, (datainlen & 0xFFFF) + 2, 0}}; 
+	uint8_t header[] = {0x0a | responseNum, 0x00};
+	responseNum ^= 1;
+	memcpy(c.d.asBytes, header, 2);
+	memcpy(&c.d.asBytes[2], datain, datainlen);
 	SendCommand(&c);
 	
     uint8_t *recv;
@@ -715,7 +720,12 @@ int ExchangeRAW14a(uint8_t *datain, int datainlen, bool activateField, bool leav
 			return 2;
 		}
 		
-		memcpy(dataout, recv, *dataoutlen);
+		if (recv[0] != header[0]) {
+			PrintAndLog("14aRAW ERROR: iso14443-4 framing error. Card send %2x must be %2x", dataout[0], header[0]);
+			return 2;
+		}
+		
+		memcpy(dataout, &recv[2], *dataoutlen);
 		
         if(!iLen) {
 			PrintAndLog("14aRAW ERROR: No card response.");
