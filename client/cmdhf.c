@@ -33,6 +33,7 @@
 #include "protocols.h"
 #include "emv/cmdemv.h"
 #include "cmdhflist.h"
+#include "cmdhffido.h"
 
 static int CmdHelp(const char *Cmd);
 
@@ -596,6 +597,7 @@ static command_t CommandTable[] =
 	{"mf",		CmdHFMF,		1, "{ MIFARE RFIDs... }"},
 	{"mfu",		CmdHFMFUltra,	1, "{ MIFARE Ultralight RFIDs... }"},
 	{"topaz",	CmdHFTopaz,		1, "{ TOPAZ (NFC Type 1) RFIDs... }"},
+	{"fido",	CmdHFFido,		1, "{ FIDO and FIDO2 authenticators... }"},
 	{"tune",	CmdHFTune,		0, "Continuously measure HF antenna tuning"},
 	{"list",	CmdHFList,		1, "List protocol data in trace buffer"},
 	{"search",	CmdHFSearch,	1, "Search for known HF tags [preliminary]"},
