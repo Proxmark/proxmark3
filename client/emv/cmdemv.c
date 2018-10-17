@@ -9,35 +9,13 @@
 //-----------------------------------------------------------------------------
 
 #include <ctype.h>
+#include "mifare.h"
 #include "cmdemv.h"
+#include "emvjson.h"
+#include "emv_pki.h"
 #include "test/cryptotest.h"
 #include "cliparser/cliparser.h"
 #include <jansson.h>
-
-bool HexToBuffer(const char *errormsg, const char *hexvalue, uint8_t * buffer, size_t maxbufferlen, size_t *bufferlen) {
-	int buflen = 0;	
-	
-	switch(param_gethex_to_eol(hexvalue, 0, buffer, maxbufferlen, &buflen)) {
-	case 1:
-		PrintAndLog("%s Invalid HEX value.", errormsg);
-		return false;
-	case 2:
-		PrintAndLog("%s Hex value too large.", errormsg);
-		return false;
-	case 3:
-		PrintAndLog("%s Hex value must have even number of digits.", errormsg);
-		return false;
-	}
-	
-	if (buflen > maxbufferlen) {
-		PrintAndLog("%s HEX length (%d) more than %d", errormsg, *bufferlen, maxbufferlen);
-		return false;
-	}
-	
-	*bufferlen = buflen;
-	
-	return true;
-}
 
 #define TLV_ADD(tag, value)( tlvdb_change_or_add_node(tlvRoot, tag, sizeof(value) - 1, (const unsigned char *)value) )
 void ParamLoadDefaults(struct tlvdb *tlvRoot) {
@@ -58,111 +36,6 @@ void ParamLoadDefaults(struct tlvdb *tlvRoot) {
 	TLV_ADD(0x9F6A, "\x01\x02\x03\x04");
 	//9F66:(Terminal Transaction Qualifiers (TTQ)) len:4
 	TLV_ADD(0x9F66, "\x26\x00\x00\x00"); // qVSDC
-}
-
-bool ParamLoadFromJson(struct tlvdb *tlv) {
-	json_t *root;
-	json_error_t error;
-
-	if (!tlv) {
-		PrintAndLog("ERROR load params: tlv tree is NULL.");
-		return false; 
-	}
-
-	// current path + file name
-	const char *relfname = "emv/defparams.json"; 
-	char fname[strlen(get_my_executable_directory()) + strlen(relfname) + 1];
-	strcpy(fname, get_my_executable_directory());
-	strcat(fname, relfname);
-
-	root = json_load_file(fname, 0, &error);
-	if (!root) {
-		PrintAndLog("Load params: json error on line %d: %s", error.line, error.text);
-		return false; 
-	}
-	
-	if (!json_is_array(root)) {
-		PrintAndLog("Load params: Invalid json format. root must be array.");
-		return false; 
-	}
-	
-	PrintAndLog("Load params: json OK");
-	
-	for(int i = 0; i < json_array_size(root); i++) {
-		json_t *data, *jtype, *jlength, *jvalue;
-
-		data = json_array_get(root, i);
-		if(!json_is_object(data))
-		{
-			PrintAndLog("Load params: data [%d] is not an object", i + 1);
-			json_decref(root);
-			return false;
-		}
-		
-		jtype = json_object_get(data, "type");
-		if(!json_is_string(jtype))
-		{
-			PrintAndLog("Load params: data [%d] type is not a string", i + 1);
-			json_decref(root);
-			return false;
-		}
-		const char *tlvType = json_string_value(jtype);
-
-		jvalue = json_object_get(data, "value");
-		if(!json_is_string(jvalue))
-		{
-			PrintAndLog("Load params: data [%d] value is not a string", i + 1);
-			json_decref(root);
-			return false;
-		}
-		const char *tlvValue = json_string_value(jvalue);
-
-		jlength = json_object_get(data, "length");
-		if(!json_is_number(jlength))
-		{
-			PrintAndLog("Load params: data [%d] length is not a number", i + 1);
-			json_decref(root);
-			return false;
-		}
-		
-		int tlvLength = json_integer_value(jlength);
-		if (tlvLength > 250) {
-			PrintAndLog("Load params: data [%d] length more than 250", i + 1);
-			json_decref(root);
-			return false;
-		}
-		
-		PrintAndLog("TLV param: %s[%d]=%s", tlvType, tlvLength, tlvValue);
-		uint8_t buf[251] = {0};
-		size_t buflen = 0;
-		
-		// here max length must be 4, but now tlv_tag_t is 2-byte var. so let it be 2 by now...  TODO: needs refactoring tlv_tag_t...
-		if (!HexToBuffer("TLV Error type:", tlvType, buf, 2, &buflen)) { 
-			json_decref(root);
-			return false;
-		}
-		tlv_tag_t tag = 0;
-		for (int i = 0; i < buflen; i++) {
-			tag = (tag << 8) + buf[i];
-		}	
-		
-		if (!HexToBuffer("TLV Error value:", tlvValue, buf, sizeof(buf) - 1, &buflen)) {
-			json_decref(root);
-			return false;
-		}
-		
-		if (buflen != tlvLength) {
-			PrintAndLog("Load params: data [%d] length of HEX must(%d) be identical to length in TLV param(%d)", i + 1, buflen, tlvLength);
-			json_decref(root);
-			return false;
-		}
-		
-		tlvdb_change_or_add_node(tlv, tag, tlvLength, (const unsigned char *)buf);		
-	}
-
-	json_decref(root);
-
-	return true;
 }
 
 int CmdHFEMVSelect(const char *cmd) {
@@ -188,7 +61,7 @@ int CmdHFEMVSelect(const char *cmd) {
 	bool leaveSignalON = arg_get_lit(2);
 	bool APDULogging = arg_get_lit(3);
 	bool decodeTLV = arg_get_lit(4);
-	CLIGetStrWithReturn(5, data, &datalen);
+	CLIGetHexWithReturn(5, data, &datalen);
 	CLIParserFree();
 	
 	SetAPDULogging(APDULogging);
@@ -333,7 +206,7 @@ int CmdHFEMVGPO(const char *cmd) {
 	bool dataMakeFromPDOL = arg_get_lit(3);
 	bool APDULogging = arg_get_lit(4);
 	bool decodeTLV = arg_get_lit(5);
-	CLIGetStrWithReturn(6, data, &datalen);
+	CLIGetHexWithReturn(6, data, &datalen);
 	CLIParserFree();	
 	
 	SetAPDULogging(APDULogging);
@@ -422,7 +295,7 @@ int CmdHFEMVReadRecord(const char *cmd) {
 	bool leaveSignalON = arg_get_lit(1);
 	bool APDULogging = arg_get_lit(2);
 	bool decodeTLV = arg_get_lit(3);
-	CLIGetStrWithReturn(4, data, &datalen);
+	CLIGetHexWithReturn(4, data, &datalen);
 	CLIParserFree();
 	
 	if (datalen != 2) {
@@ -500,7 +373,7 @@ int CmdHFEMVAC(const char *cmd) {
 	bool dataMakeFromCDOL = arg_get_lit(5);
 	bool APDULogging = arg_get_lit(6);
 	bool decodeTLV = arg_get_lit(7);
-	CLIGetStrWithReturn(8, data, &datalen);
+	CLIGetHexWithReturn(8, data, &datalen);
 	CLIParserFree();	
 	
 	SetAPDULogging(APDULogging);
@@ -629,7 +502,7 @@ int CmdHFEMVInternalAuthenticate(const char *cmd) {
 	bool dataMakeFromDDOL = arg_get_lit(3);
 	bool APDULogging = arg_get_lit(4);
 	bool decodeTLV = arg_get_lit(5);
-	CLIGetStrWithReturn(6, data, &datalen);
+	CLIGetHexWithReturn(6, data, &datalen);
 	CLIParserFree();	
 	
 	SetAPDULogging(APDULogging);
@@ -692,6 +565,69 @@ int CmdHFEMVInternalAuthenticate(const char *cmd) {
 }
 
 #define dreturn(n) {free(pdol_data_tlv);tlvdb_free(tlvSelect);tlvdb_free(tlvRoot);DropField();return n;}
+
+void InitTransactionParameters(struct tlvdb *tlvRoot, bool paramLoadJSON, enum TransactionType TrType, bool GenACGPO) {
+	
+	ParamLoadDefaults(tlvRoot);
+
+	if (paramLoadJSON) {
+		PrintAndLog("* * Transaction parameters loading from JSON...");
+		ParamLoadFromJson(tlvRoot);
+	}
+	
+	//9F66:(Terminal Transaction Qualifiers (TTQ)) len:4
+	char *qVSDC = "\x26\x00\x00\x00";
+	if (GenACGPO) {
+		qVSDC = "\x26\x80\x00\x00";
+	}
+	switch(TrType) {
+		case TT_MSD:
+			TLV_ADD(0x9F66, "\x86\x00\x00\x00"); // MSD
+			break;
+		// not standard for contactless. just for test.
+		case TT_VSDC:  
+			TLV_ADD(0x9F66, "\x46\x00\x00\x00"); // VSDC
+			break;
+		case TT_QVSDCMCHIP:
+			TLV_ADD(0x9F66, qVSDC); // qVSDC
+			break;
+		case TT_CDA:
+			TLV_ADD(0x9F66, qVSDC); // qVSDC (VISA CDA not enabled)
+			break;
+		default:
+			break;
+	}
+}
+
+void ProcessGPOResponseFormat1(struct tlvdb *tlvRoot, uint8_t *buf, size_t len, bool decodeTLV) {
+	if (buf[0] == 0x80) {
+		if (decodeTLV){
+			PrintAndLog("GPO response format1:");
+			TLVPrintFromBuffer(buf, len);
+		}
+		
+		if (len < 4 || (len - 4) % 4) {
+			PrintAndLog("ERROR: GPO response format1 parsing error. length=%d", len);
+		} else {
+			// AIP
+			struct tlvdb * f1AIP = tlvdb_fixed(0x82, 2, buf + 2);
+			tlvdb_add(tlvRoot, f1AIP);
+			if (decodeTLV){
+				PrintAndLog("\n* * Decode response format 1 (0x80) AIP and AFL:");
+				TLVPrintFromTLV(f1AIP);
+			}
+
+			// AFL
+			struct tlvdb * f1AFL = tlvdb_fixed(0x94, len - 4, buf + 2 + 2);
+			tlvdb_add(tlvRoot, f1AFL);
+			if (decodeTLV)
+				TLVPrintFromTLV(f1AFL);
+		}		
+	} else {
+		if (decodeTLV)
+			TLVPrintFromBuffer(buf, len);
+	}
+}
 
 int CmdHFEMVExec(const char *cmd) {
 	uint8_t buf[APDU_RES_LEN] = {0};
@@ -805,37 +741,7 @@ int CmdHFEMVExec(const char *cmd) {
 	PrintAndLog("* Selected.");
 	
 	PrintAndLog("\n* Init transaction parameters.");
-
-	ParamLoadDefaults(tlvRoot);
-
-	if (paramLoadJSON) {
-		PrintAndLog("* * Transaction parameters loading from JSON...");
-		ParamLoadFromJson(tlvRoot);
-	}
-	
-	//9F66:(Terminal Transaction Qualifiers (TTQ)) len:4
-	char *qVSDC = "\x26\x00\x00\x00";
-	if (GenACGPO) {
-		qVSDC = "\x26\x80\x00\x00";
-	}
-	switch(TrType) {
-		case TT_MSD:
-			TLV_ADD(0x9F66, "\x86\x00\x00\x00"); // MSD
-			break;
-		// not standard for contactless. just for test.
-		case TT_VSDC:  
-			TLV_ADD(0x9F66, "\x46\x00\x00\x00"); // VSDC
-			break;
-		case TT_QVSDCMCHIP:
-			TLV_ADD(0x9F66, qVSDC); // qVSDC
-			break;
-		case TT_CDA:
-			TLV_ADD(0x9F66, qVSDC); // qVSDC (VISA CDA not enabled)
-			break;
-		default:
-			break;
-	}
-	
+	InitTransactionParameters(tlvRoot, paramLoadJSON, TrType, GenACGPO);
 	TLVPrintFromTLV(tlvRoot); // TODO delete!!!
 	
 	PrintAndLog("\n* Calc PDOL.");
@@ -865,33 +771,7 @@ int CmdHFEMVExec(const char *cmd) {
 	}
 
 	// process response template format 1 [id:80  2b AIP + x4b AFL] and format 2 [id:77 TLV]
-	if (buf[0] == 0x80) {
-		if (decodeTLV){
-			PrintAndLog("GPO response format1:");
-			TLVPrintFromBuffer(buf, len);
-		}
-		
-		if (len < 4 || (len - 4) % 4) {
-			PrintAndLog("ERROR: GPO response format1 parsing error. length=%d", len);
-		} else {
-			// AIP
-			struct tlvdb * f1AIP = tlvdb_fixed(0x82, 2, buf + 2);
-			tlvdb_add(tlvRoot, f1AIP);
-			if (decodeTLV){
-				PrintAndLog("\n* * Decode response format 1 (0x80) AIP and AFL:");
-				TLVPrintFromTLV(f1AIP);
-			}
-
-			// AFL
-			struct tlvdb * f1AFL = tlvdb_fixed(0x94, len - 4, buf + 2 + 2);
-			tlvdb_add(tlvRoot, f1AFL);
-			if (decodeTLV)
-				TLVPrintFromTLV(f1AFL);
-		}		
-	} else {
-		if (decodeTLV)
-			TLVPrintFromBuffer(buf, len);
-	}
+	ProcessGPOResponseFormat1(tlvRoot, buf, len, decodeTLV);
 	
 	// extract PAN from track2
 	{
@@ -1191,26 +1071,328 @@ int CmdHFEMVExec(const char *cmd) {
 	return 0;
 }
 
-int UsageCmdHFEMVScan(void) {
-	PrintAndLog("HELP :  Scan EMV card and save it contents to a file. \n");
-	PrintAndLog("        It executes EMV contactless transaction and saves result to a file which can be used for emulation.\n");
-	PrintAndLog("Usage:  hf emv scan [-a][-t][-v][-c][-x][-g] <file_name>\n");
-	PrintAndLog("  Options:");
-	PrintAndLog("  -a       : show APDU reqests and responses\n");
-	PrintAndLog("  -t       : TLV decode results\n");
-	PrintAndLog("  -v       : transaction type - qVSDC or M/Chip.\n");
-	PrintAndLog("  -c       : transaction type - qVSDC or M/Chip plus CDA (SDAD generation).\n");
-	PrintAndLog("  -x       : transaction type - VSDC. For test only. Not a standart behavior.\n");
-	PrintAndLog("  -g       : VISA. generate AC from GPO\n");
-	PrintAndLog("By default : transaction type - MSD.\n");
-	PrintAndLog("Samples:");
-	PrintAndLog(" hf emv scan -a -t -> scan MSD transaction mode");
-	PrintAndLog(" hf emv scan -a -t -c -> scan CDA transaction mode");
-	return 0;
-}
-
 int CmdHFEMVScan(const char *cmd) {
-	UsageCmdHFEMVScan();
+	uint8_t AID[APDU_AID_LEN] = {0};
+	size_t AIDlen = 0;
+	uint8_t buf[APDU_RES_LEN] = {0};
+	size_t len = 0;
+	uint16_t sw = 0;
+	int res;
+	json_t *root;
+	json_error_t error;
+
+	CLIParserInit("hf emv scan", 
+		"Scan EMV card and save it contents to a file.", 
+		"It executes EMV contactless transaction and saves result to a file which can be used for emulation\n"
+			"Usage:\n\thf emv scan -at -> scan MSD transaction mode and show APDU and TLV\n"
+			"\thf emv scan -c -> scan CDA transaction mode\n");
+
+	void* argtable[] = {
+		arg_param_begin,
+		arg_lit0("aA",  "apdu",     "show APDU reqests and responses."),
+		arg_lit0("tT",  "tlv",      "TLV decode results."),
+		arg_lit0("eE",  "extract",  "Extract TLV elements and fill Application Data"),
+		arg_lit0("jJ",  "jload",    "Load transaction parameters from `emv/defparams.json` file."),
+		arg_rem("By default:",      "Transaction type - MSD"),
+		arg_lit0("vV",  "qvsdc",    "Transaction type - qVSDC or M/Chip."),
+		arg_lit0("cC",  "qvsdccda", "Transaction type - qVSDC or M/Chip plus CDA (SDAD generation)."),
+		arg_lit0("xX",  "vsdc",     "Transaction type - VSDC. For test only. Not a standart behavior."),
+		arg_lit0("gG",  "acgpo",    "VISA. generate AC from GPO."),
+		arg_lit0("mM",  "merge",    "Merge output file with card's data. (warning: the file may be corrupted!)"),
+		arg_str1(NULL,  NULL,		"output.json", "JSON output file name"),
+		arg_param_end
+	};
+	CLIExecWithReturn(cmd, argtable, true);
+	
+	bool showAPDU = arg_get_lit(1);
+	bool decodeTLV = arg_get_lit(2);
+	bool extractTLVElements = arg_get_lit(3);
+	bool paramLoadJSON = arg_get_lit(4);
+
+	enum TransactionType TrType = TT_MSD;
+	if (arg_get_lit(6))
+		TrType = TT_QVSDCMCHIP;
+	if (arg_get_lit(7))
+		TrType = TT_CDA;
+	if (arg_get_lit(8))
+		TrType = TT_VSDC;
+
+	bool GenACGPO = arg_get_lit(9);
+	bool MergeJSON = arg_get_lit(10);
+	uint8_t relfname[250] ={0};
+	char *crelfname = (char *)relfname;
+	int relfnamelen = 0;
+	CLIGetStrWithReturn(11, relfname, &relfnamelen);
+	CLIParserFree();
+	
+	SetAPDULogging(showAPDU);
+	
+	// current path + file name
+	if (!strstr(crelfname, ".json"))
+		strcat(crelfname, ".json");
+	char fname[strlen(get_my_executable_directory()) + strlen(crelfname) + 1];
+	strcpy(fname, get_my_executable_directory());
+	strcat(fname, crelfname);
+
+	if (MergeJSON) {
+		root = json_load_file(fname, 0, &error);
+		if (!root) {
+			PrintAndLog("ERROR: json error on line %d: %s", error.line, error.text);
+			return 1; 
+		}
+		
+		if (!json_is_object(root)) {
+			PrintAndLog("ERROR: Invalid json format. root must be an object.");
+			return 1; 
+		}
+	} else {
+		root = json_object();
+	}
+
+	// drop field at start
+	DropField();
+
+	// iso 14443 select
+	PrintAndLog("--> GET UID, ATS.");
+	
+	iso14a_card_select_t card;
+	if (Hf14443_4aGetCardData(&card)) {
+		return 2;
+	}
+
+	JsonSaveStr(root, "$.File.Created", "proxmark3 `hf emv scan`");
+	
+	JsonSaveStr(root, "$.Card.Communication", "iso14443-4a");
+	JsonSaveBufAsHex(root, "$.Card.UID", (uint8_t *)&card.uid, card.uidlen);
+	JsonSaveHex(root, "$.Card.ATQA", card.atqa[0] + (card.atqa[1] << 2), 2);
+	JsonSaveHex(root, "$.Card.SAK", card.sak, 0);
+	JsonSaveBufAsHex(root, "$.Card.ATS", (uint8_t *)card.ats, card.ats_len);
+	
+	// init applets list tree
+	const char *al = "Applets list";
+	struct tlvdb *tlvSelect = tlvdb_fixed(1, strlen(al), (const unsigned char *)al);
+	
+	// EMV PPSE
+	PrintAndLog("--> PPSE.");
+	res = EMVSelectPSE(true, true, 2, buf, sizeof(buf), &len, &sw);
+
+	if (!res && sw == 0x9000){
+		if (decodeTLV)
+			TLVPrintFromBuffer(buf, len);
+		
+		JsonSaveBufAsHex(root, "$.PPSE.AID", (uint8_t *)"2PAY.SYS.DDF01", 14);
+		
+		struct tlvdb *fci = tlvdb_parse_multi(buf, len);
+		if (extractTLVElements)
+			JsonSaveTLVTree(root, root, "$.PPSE.FCITemplate", fci);
+		else
+			JsonSaveTLVTreeElm(root, "$.PPSE.FCITemplate", fci, true, true, false);
+		JsonSaveTLVValue(root, "$.Application.KernelID", tlvdb_find_full(fci, 0x9f2a));
+		tlvdb_free(fci);
+	}
+
+	res = EMVSearchPSE(false, true, decodeTLV, tlvSelect);
+
+	// check PPSE and select application id
+	if (!res) {	
+		TLVPrintAIDlistFromSelectTLV(tlvSelect);		
+	} else {
+		// EMV SEARCH with AID list
+		SetAPDULogging(false);
+		PrintAndLog("--> AID search.");
+		if (EMVSearch(false, true, decodeTLV, tlvSelect)) {
+			PrintAndLog("E->Can't found any of EMV AID. Exit...");
+			tlvdb_free(tlvSelect);
+			DropField();
+			return 3;
+		}
+
+		// check search and select application id
+		TLVPrintAIDlistFromSelectTLV(tlvSelect);
+	}
+
+	// EMV SELECT application
+	SetAPDULogging(showAPDU);
+	EMVSelectApplication(tlvSelect, AID, &AIDlen);
+
+	tlvdb_free(tlvSelect);
+
+	if (!AIDlen) {
+		PrintAndLog("Can't select AID. EMV AID not found. Exit...");
+		DropField();
+		return 4;
+	}
+
+	JsonSaveBufAsHex(root, "$.Application.AID", AID, AIDlen);
+	
+	// Init TLV tree
+	const char *alr = "Root terminal TLV tree";
+	struct tlvdb *tlvRoot = tlvdb_fixed(1, strlen(alr), (const unsigned char *)alr);
+
+	// EMV SELECT applet
+
+	PrintAndLog("\n-->Selecting AID:%s.", sprint_hex_inrow(AID, AIDlen));
+	SetAPDULogging(showAPDU);
+	res = EMVSelect(false, true, AID, AIDlen, buf, sizeof(buf), &len, &sw, tlvRoot);
+	
+	if (res) {	
+		PrintAndLog("E->Can't select AID (%d). Exit...", res);
+		tlvdb_free(tlvRoot);
+		DropField();
+		return 5;
+	}
+	
+	if (decodeTLV)
+		TLVPrintFromBuffer(buf, len);
+
+	// save mode
+	if (tlvdb_get(tlvRoot, 0x9f38, NULL)) {
+		JsonSaveStr(root, "$.Application.Mode", TransactionTypeStr[TrType]);
+	}
+
+	struct tlvdb *fci = tlvdb_parse_multi(buf, len);
+	if (extractTLVElements)
+		JsonSaveTLVTree(root, root, "$.Application.FCITemplate", fci);
+	else
+		JsonSaveTLVTreeElm(root, "$.Application.FCITemplate", fci, true, true, false);
+	tlvdb_free(fci);
+
+	// create transaction parameters
+	PrintAndLog("-->Init transaction parameters.");
+	InitTransactionParameters(tlvRoot, paramLoadJSON, TrType, GenACGPO);
+	
+	PrintAndLog("-->Calc PDOL.");
+	struct tlv *pdol_data_tlv = dol_process(tlvdb_get(tlvRoot, 0x9f38, NULL), tlvRoot, 0x83);
+	if (!pdol_data_tlv){
+		PrintAndLog("E->Can't create PDOL TLV.");
+		tlvdb_free(tlvRoot);
+		DropField();
+		return 6;
+	}
+	
+	size_t pdol_data_tlv_data_len;
+	unsigned char *pdol_data_tlv_data = tlv_encode(pdol_data_tlv, &pdol_data_tlv_data_len);
+	if (!pdol_data_tlv_data) {
+		PrintAndLog("E->Can't create PDOL data.");
+		tlvdb_free(tlvRoot);
+		DropField();
+		return 6;
+	}
+	PrintAndLog("PDOL data[%d]: %s", pdol_data_tlv_data_len, sprint_hex(pdol_data_tlv_data, pdol_data_tlv_data_len));
+
+	PrintAndLog("-->GPO.");
+	res = EMVGPO(true, pdol_data_tlv_data, pdol_data_tlv_data_len, buf, sizeof(buf), &len, &sw, tlvRoot);
+	
+	free(pdol_data_tlv_data);
+	free(pdol_data_tlv);
+	
+	if (res) {	
+		PrintAndLog("GPO error(%d): %4x. Exit...", res, sw);
+		tlvdb_free(tlvRoot);
+		DropField();
+		return 7;
+	}
+	ProcessGPOResponseFormat1(tlvRoot, buf, len, decodeTLV);
+	
+	struct tlvdb *gpofci = tlvdb_parse_multi(buf, len);
+	if (extractTLVElements)
+		JsonSaveTLVTree(root, root, "$.Application.GPO", gpofci);
+	else
+		JsonSaveTLVTreeElm(root, "$.Application.GPO", gpofci, true, true, false);
+
+	JsonSaveTLVValue(root, "$.ApplicationData.AIP", tlvdb_find_full(gpofci, 0x82));
+	JsonSaveTLVValue(root, "$.ApplicationData.AFL", tlvdb_find_full(gpofci, 0x94));
+
+	tlvdb_free(gpofci);
+
+	PrintAndLog("-->Read records from AFL.");
+	const struct tlv *AFL = tlvdb_get(tlvRoot, 0x94, NULL);
+	
+	while(AFL && AFL->len) {
+		if (AFL->len % 4) {
+			PrintAndLog("E->Wrong AFL length: %d", AFL->len);
+			break;
+		}
+
+		json_t *sfijson = json_path_get(root, "$.Application.Records");
+		if (!sfijson) {
+			json_t *app = json_path_get(root, "$.Application");
+			json_object_set_new(app, "Records", json_array());
+			
+			sfijson = json_path_get(root, "$.Application.Records");
+		}
+		if (!json_is_array(sfijson)) {
+			PrintAndLog("E->Internal logic error. `$.Application.Records` is not an array.");
+			break;
+		}
+		for (int i = 0; i < AFL->len / 4; i++) {
+			uint8_t SFI = AFL->value[i * 4 + 0] >> 3;
+			uint8_t SFIstart = AFL->value[i * 4 + 1];
+			uint8_t SFIend = AFL->value[i * 4 + 2];
+			uint8_t SFIoffline = AFL->value[i * 4 + 3];
+			
+			PrintAndLog("--->SFI[%02x] start:%02x end:%02x offline:%02x", SFI, SFIstart, SFIend, SFIoffline);
+			if (SFI == 0 || SFI == 31 || SFIstart == 0 || SFIstart > SFIend) {
+				PrintAndLog("SFI ERROR! Skipped...");
+				continue;
+			}
+			
+			for(int n = SFIstart; n <= SFIend; n++) {
+				PrintAndLog("---->SFI[%02x] %d", SFI, n);
+				
+				res = EMVReadRecord(true, SFI, n, buf, sizeof(buf), &len, &sw, tlvRoot);
+				if (res) {
+					PrintAndLog("E->SFI[%02x]. APDU error %4x", SFI, sw);
+					continue;
+				}
+				
+				if (decodeTLV) {
+					TLVPrintFromBuffer(buf, len);
+					PrintAndLog("");
+				}
+				
+				json_t *jsonelm = json_object();
+				json_array_append_new(sfijson, jsonelm);
+
+				JsonSaveHex(jsonelm, "SFI", SFI, 1);
+				JsonSaveHex(jsonelm, "RecordNum", n, 1);
+				JsonSaveHex(jsonelm, "Offline", SFIoffline, 1);
+				
+				struct tlvdb *rsfi = tlvdb_parse_multi(buf, len);
+				if (extractTLVElements)
+					JsonSaveTLVTree(root, jsonelm, "$.Data", rsfi);
+				else
+					JsonSaveTLVTreeElm(jsonelm, "$.Data", rsfi, true, true, false);
+				tlvdb_free(rsfi);
+			}
+		}
+		
+		break;
+	}
+	
+	// getting certificates
+	if (tlvdb_get(tlvRoot, 0x90, NULL)) {
+		PrintAndLog("-->Recovering certificates.");
+		PKISetStrictExecution(false);
+		RecoveryCertificates(tlvRoot, root);
+		PKISetStrictExecution(true);
+	}
+	
+	// free tlv object
+	tlvdb_free(tlvRoot);
+
+	// DropField
+	DropField();
+	
+	res = json_dump_file(root, fname, JSON_INDENT(2));
+	if (res) {
+		PrintAndLog("ERROR: can't save the file: %s", fname);
+		return 200;
+	}
+	PrintAndLog("File `%s` saved.", fname);
+	
+	// free json object
+	json_decref(root);
 	
 	return 0;
 }
@@ -1231,7 +1413,7 @@ static command_t CommandTable[] =  {
 	{"genac",		CmdHFEMVAC,						0,	"Generate ApplicationCryptogram."},
 	{"challenge",	CmdHFEMVGenerateChallenge,		0,	"Generate challenge."},
 	{"intauth",		CmdHFEMVInternalAuthenticate,	0,	"Internal authentication."},
-//	{"scan",	CmdHFEMVScan,	0,	"Scan EMV card and save it contents to json file for emulator."},
+	{"scan",		CmdHFEMVScan,					0,	"Scan EMV card and save it contents to json file for emulator."},
 	{"test",		CmdHFEMVTest,					0,	"Crypto logic test."},
 	{NULL, NULL, 0, NULL}
 };

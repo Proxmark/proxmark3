@@ -140,6 +140,7 @@ CMDSRCS = 	$(SRC_SMARTCARD) \
 			emv/tlv.c\
 			emv/emv_tags.c\
 			emv/dol.c\
+			emv/emvjson.c\
 			emv/emvcore.c\
 			emv/test/crypto_test.c\
 			emv/test/sda_test.c\

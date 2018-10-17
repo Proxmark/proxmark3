@@ -686,3 +686,17 @@ bool emv_tag_dump(const struct tlv *tlv, FILE *f, int level)
 
 	return true;
 }
+
+char *emv_get_tag_name(const struct tlv *tlv)
+{
+	static char *defstr = "";
+	
+	if (!tlv) 
+		return defstr;
+
+	const struct emv_tag *tag = emv_get_tag(tlv);
+	if (tag)
+		return tag->name;
+	
+	return defstr;
+}

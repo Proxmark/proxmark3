@@ -458,6 +458,10 @@ const struct tlv *tlvdb_get_inchild(const struct tlvdb *tlvdb, tlv_tag_t tag, co
 	return tlvdb_get(tlvdb, tag, prev);
 }
 
+const struct tlv *tlvdb_get_tlv(const struct tlvdb *tlvdb) {
+	return &tlvdb->tag;
+}
+
 unsigned char *tlv_encode(const struct tlv *tlv, size_t *len)
 {
 	size_t size = tlv->len;
@@ -515,4 +519,19 @@ bool tlv_equal(const struct tlv *a, const struct tlv *b)
 		return false;
 
 	return a->tag == b->tag && a->len == b->len && !memcmp(a->value, b->value, a->len);
+}
+
+struct tlvdb *tlvdb_elm_get_next(struct tlvdb *tlvdb)
+{
+	return tlvdb->next;
+}
+
+struct tlvdb *tlvdb_elm_get_children(struct tlvdb *tlvdb)
+{
+	return tlvdb->children;
+}
+
+struct tlvdb *tlvdb_elm_get_parent(struct tlvdb *tlvdb)
+{
+	return tlvdb->parent;
 }
