@@ -158,8 +158,14 @@ int CmdHFFidoRegister(const char *cmd) {
 	uint8_t keyHandleLen = buf[66];
 	PrintAndLog("Key handle[%d]: %s", keyHandleLen, sprint_hex(&buf[67], keyHandleLen));
 	
-	PrintAndLog("DER certificate[%d]: %s", keyHandleLen, sprint_hex(&buf[67 + keyHandleLen], 20));
-	int derLen = 700;
+	int derp = 67 + keyHandleLen;
+	int derLen = (buf[derp + 2] << 8) + buf[derp + 3] + 4;
+	// needs to decode DER certificate
+	PrintAndLog("DER certificate[%d]: %s...", derLen, sprint_hex(&buf[derp], 20));
+	dump_buffer_simple((const unsigned char *)&buf[67 + keyHandleLen], derLen, NULL);
+	PrintAndLog("---------------------------------------------------------------");
+	
+	
 	int hashp = 1 + 65 + 1 + keyHandleLen + derLen;
 	PrintAndLog("Hash[%d]: %s", len - hashp, sprint_hex(&buf[hashp], len - hashp));
 	
