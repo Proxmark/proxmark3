@@ -43,6 +43,21 @@ int FIDOSelect(bool ActivateField, bool LeaveFieldON, uint8_t *Result, size_t Ma
 	return EMVSelect(ActivateField, LeaveFieldON, data, sizeof(data), Result, MaxResultLen, ResultLen, sw, NULL);
 }
 
+int FIDOExchange(sAPDU apdu, uint8_t *Result, size_t MaxResultLen, size_t *ResultLen, uint16_t *sw) {
+	int res = EMVExchange(true, apdu, Result, MaxResultLen, ResultLen, sw, NULL);
+	// software chaining
+	while ((*sw >> 8) == 0x61) {
+		size_t oldlen = *ResultLen;
+		res = EMVExchange(true, (sAPDU){0x00, 0xC0, 0x00, 0x00, 0x00, NULL}, &Result[oldlen], MaxResultLen, ResultLen, sw, NULL);
+		*ResultLen += oldlen;
+	}
+	return res;
+}
+
+int FIDORegister(uint8_t *params, uint8_t *Result, size_t MaxResultLen, size_t *ResultLen, uint16_t *sw) {
+	return FIDOExchange((sAPDU){0x00, 0x01, 0x03, 0x00, 64, params}, Result, MaxResultLen, ResultLen, sw);
+}
+
 int CmdHFFidoInfo(const char *cmd) {
 	
 	if (cmd && strlen(cmd) > 0)
@@ -92,24 +107,48 @@ int CmdHFFidoRegister(const char *cmd) {
 	// challenge parameter [32 bytes] - The challenge parameter is the SHA-256 hash of the Client Data, a stringified JSON data structure that the FIDO Client prepares
 	// application parameter [32 bytes] - The application parameter is the SHA-256 hash of the UTF-8 encoding of the application identity
 	
+	uint8_t data[64] = {0};
+	
 	SetAPDULogging(true);
 	
-	uint8_t buf[APDU_RES_LEN] = {0};
+	uint8_t buf[2048] = {0};
 	size_t len = 0;
 	uint16_t sw = 0;
-	int res = FIDOSelect(true, false, buf, sizeof(buf), &len, &sw);
+	int res = FIDOSelect(true, true, buf, sizeof(buf), &len, &sw);
 
 	if (res) {
-		PrintAndLog("Can't select authenticator. Exit...");
+		PrintAndLog("Can't select authenticator. res=%x. Exit...", res);
 		return res;
 	}
 	
 	if (sw != 0x9000) {
-		PrintAndLog("APDU response status: %04x - %s", sw, GetAPDUCodeDescription(sw >> 8, sw & 0xff)); 
+		PrintAndLog("Can't select FIDO application. APDU response status: %04x - %s", sw, GetAPDUCodeDescription(sw >> 8, sw & 0xff)); 
 		return 2;
 	}
 
+	res = FIDORegister(data, buf,  sizeof(buf), &len, &sw);
+/*	if (res) {
+		PrintAndLog("Can't execute register command. res=%x. Exit...", res);
+		return res;
+	}
 	
+	if (sw != 0x9000) {
+		PrintAndLog("Can't execute register command. APDU response status: %04x - %s", sw, GetAPDUCodeDescription(sw >> 8, sw & 0xff)); 
+		return 3;
+	}*/
+	
+	//PrintAndLog("data: %s", sprint_hex(buf, len));
+
+	if (buf[0] != 0x05) {
+		PrintAndLog("ERROR: First byte must be 0x05, but it %2x", buf[0]);
+		return 5;
+	}
+	PrintAndLog("User public key: %s", sprint_hex(&buf[1], 65));
+	
+	uint8_t keyHandleLen = buf[66];
+	PrintAndLog("Key handle[%d]: %s", keyHandleLen, sprint_hex(&buf[67], keyHandleLen));
+	
+	PrintAndLog("DER certificate[%d]: %s", keyHandleLen, sprint_hex(&buf[67 + keyHandleLen], 20));
 
 
 	return 0;

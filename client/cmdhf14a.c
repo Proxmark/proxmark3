@@ -749,6 +749,8 @@ int ExchangeRAW14a(uint8_t *datain, int datainlen, bool activateField, bool leav
 
 int ExchangeAPDU14a(uint8_t *datain, int datainlen, bool activateField, bool leaveSignalON, uint8_t *dataout, int maxdataoutlen, int *dataoutlen) {
 	uint16_t cmdc = 0;
+	int dlen;
+	*dataoutlen = 0;
 	
 	if (activateField) {
 		cmdc |= ISO14A_CONNECT | ISO14A_CLEAR_TRACE;
@@ -760,7 +762,7 @@ int ExchangeAPDU14a(uint8_t *datain, int datainlen, bool activateField, bool lea
 	// https://stackoverflow.com/questions/32994936/safe-max-java-card-apdu-data-command-and-respond-size
 	// here length USB_CMD_DATA_SIZE=512
 	// timeout must be authomatically set by "get ATS"
-	UsbCommand c = {CMD_READER_ISO_14443a, {ISO14A_APDU | cmdc, (datainlen & 0xFFFF), 0}}; 
+	UsbCommand c = {CMD_READER_ISO_14443a, {ISO14A_APDU | ISO14A_NO_DISCONNECT | cmdc, (datainlen & 0xFFFF), 0}}; 
 	memcpy(c.d.asBytes, datain, datainlen);
 	SendCommand(&c);
 	
@@ -781,10 +783,12 @@ int ExchangeAPDU14a(uint8_t *datain, int datainlen, bool activateField, bool lea
     if (WaitForResponseTimeout(CMD_ACK, &resp, 1500)) {
         recv = resp.d.asBytes;
         int iLen = resp.arg[0];
+		uint8_t res = resp.arg[1];
 		
-		*dataoutlen = iLen - 2;
-		if (*dataoutlen < 0)
-			*dataoutlen = 0;
+		dlen = iLen - 2;
+		if (dlen < 0)
+			dlen = 0;
+		*dataoutlen += dlen;
 		
 		if (maxdataoutlen && *dataoutlen > maxdataoutlen) {
 			PrintAndLog("APDU ERROR: Buffer too small(%d). Needs %d bytes", *dataoutlen, maxdataoutlen);
@@ -792,7 +796,7 @@ int ExchangeAPDU14a(uint8_t *datain, int datainlen, bool activateField, bool lea
 		}
 		
 		memcpy(dataout, recv, *dataoutlen);
-		
+
         if(!iLen) {
 			PrintAndLog("APDU ERROR: No APDU response.");
             return 1;
@@ -810,6 +814,33 @@ int ExchangeAPDU14a(uint8_t *datain, int datainlen, bool activateField, bool lea
 			return 3;
 		}
 
+		if ((res & 0x10) != 0) {
+			// I-block with chaining
+			int oldlen = *dataoutlen;
+			printf("-->%02x   oldlen:%d\n", res, oldlen);
+			UsbCommand c1 = {CMD_READER_ISO_14443a, {ISO14A_APDU | ISO14A_NO_DISCONNECT, 0, 0}}; 
+			SendCommand(&c1);
+			
+			uint8_t *recv1;
+			UsbCommand resp1;
+			if (WaitForResponseTimeout(CMD_ACK, &resp1, 1500)) {
+				dlen = resp1.arg[0] - 2;
+				if (dlen < 0)
+					dlen = 0;
+				*dataoutlen += dlen;
+				
+				recv1 = resp1.d.asBytes;
+				printf("vlen:%d dlen:%d\n", resp1.arg[0] & 0xFFFF, dlen);
+				
+				if (maxdataoutlen && *dataoutlen > maxdataoutlen) {
+					PrintAndLog("APDU ERROR: Buffer too small(%d). Needs %d bytes", *dataoutlen, maxdataoutlen);
+					return 2;
+				}
+				memcpy(&dataout[oldlen], recv1, dlen);
+			}
+		}
+		
+		
 		// check apdu length
 		if (iLen < 4) {
 			PrintAndLog("APDU ERROR: Small APDU response. Len=%d", iLen);
@@ -820,6 +851,9 @@ int ExchangeAPDU14a(uint8_t *datain, int datainlen, bool activateField, bool lea
         PrintAndLog("APDU ERROR: Reply timeout.");
 		return 4;
     }
+	
+	if (!leaveSignalON)
+		DropField();
 	
 	return 0;
 }
