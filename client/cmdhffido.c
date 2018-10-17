@@ -117,6 +117,7 @@ int CmdHFFidoRegister(const char *cmd) {
 	uint8_t data[64] = {0};
 	
 	SetAPDULogging(true);
+	DropField();
 	
 	uint8_t buf[2048] = {0};
 	size_t len = 0;
@@ -146,6 +147,7 @@ int CmdHFFidoRegister(const char *cmd) {
 	
 	PrintAndLog("---------------------------------------------------------------");
 	PrintAndLog("data len: %d", len);
+	dump_buffer((const unsigned char *)buf, len, NULL, 0);
 
 	if (buf[0] != 0x05) {
 		PrintAndLog("ERROR: First byte must be 0x05, but it %2x", buf[0]);
@@ -158,6 +160,7 @@ int CmdHFFidoRegister(const char *cmd) {
 	
 	PrintAndLog("DER certificate[%d]: %s", keyHandleLen, sprint_hex(&buf[67 + keyHandleLen], 20));
 
+	DropField();
 
 	return 0;
 };

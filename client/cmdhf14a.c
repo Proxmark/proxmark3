@@ -747,7 +747,10 @@ int ExchangeRAW14a(uint8_t *datain, int datainlen, bool activateField, bool leav
 	return 0;
 }
 
-int CmdExchangeAPDU(uint8_t *datain, int datainlen, bool activateField, uint8_t *dataout, int maxdataoutlen, int *dataoutlen) {
+int CmdExchangeAPDU(uint8_t *datain, int datainlen, bool activateField, uint8_t *dataout, int maxdataoutlen, int *dataoutlen, bool *chaining) {
+	uint16_t cmdc = 0;
+
+	*chaining = false;
 	
 	if (activateField) {
 		cmdc |= ISO14A_CONNECT | ISO14A_CLEAR_TRACE;
@@ -771,6 +774,7 @@ int CmdExchangeAPDU(uint8_t *datain, int datainlen, bool activateField, uint8_t 
 		}
 		if (resp.arg[0] != 1) {
 			PrintAndLog("APDU ERROR: Proxmark error %d.", resp.arg[0]);
+			DropField();
 			return 1;
 		}
 	}
@@ -794,6 +798,12 @@ int CmdExchangeAPDU(uint8_t *datain, int datainlen, bool activateField, uint8_t 
 			PrintAndLog("APDU ERROR: No APDU response.");
             return 1;
 		}
+
+		// check apdu length
+		if (iLen < 4 && iLen >= 0) {
+			PrintAndLog("APDU ERROR: Small APDU response. Len=%d", iLen);
+			return 2;
+		}
 		
 		// check block TODO
 		if (iLen == -2) {
@@ -803,123 +813,42 @@ int CmdExchangeAPDU(uint8_t *datain, int datainlen, bool activateField, uint8_t 
 
 		memcpy(dataout, recv, dlen);
 		
+		// chaining
+		if ((res & 0x10) != 0) {
+			*chaining = true;
+		}
+		
 		// CRC Check
 		if (iLen == -1) {
 			PrintAndLog("APDU ERROR: ISO 14443A CRC error.");
 			return 3;
 		}
-	}	
+    } else {
+        PrintAndLog("APDU ERROR: Reply timeout.");
+		return 4;
+    }
 
 	return 0;
 }
 
 
 int ExchangeAPDU14a(uint8_t *datain, int datainlen, bool activateField, bool leaveSignalON, uint8_t *dataout, int maxdataoutlen, int *dataoutlen) {
-	uint16_t cmdc = 0;
-	int dlen;
 	*dataoutlen = 0;
+	bool chaining = false;
 	
-	int res = CmdExchangeAPDU(datain, datainlen, activateField, dataout, maxdataoutlen, dataoutlen);
-//start refactoring...
-	if (activateField) {
-		cmdc |= ISO14A_CONNECT | ISO14A_CLEAR_TRACE;
-	}
-	if (leaveSignalON)
-		cmdc |= ISO14A_NO_DISCONNECT;
+	int res = CmdExchangeAPDU(datain, datainlen, activateField, dataout, maxdataoutlen, dataoutlen, &chaining);
 
-	// "Command APDU" length should be 5+255+1, but javacard's APDU buffer might be smaller - 133 bytes
-	// https://stackoverflow.com/questions/32994936/safe-max-java-card-apdu-data-command-and-respond-size
-	// here length USB_CMD_DATA_SIZE=512
-	// timeout must be authomatically set by "get ATS"
-	UsbCommand c = {CMD_READER_ISO_14443a, {ISO14A_APDU | ISO14A_NO_DISCONNECT | cmdc, (datainlen & 0xFFFF), 0}}; 
-	memcpy(c.d.asBytes, datain, datainlen);
-	SendCommand(&c);
-	
-    uint8_t *recv;
-    UsbCommand resp;
-
-	if (activateField) {
-		if (!WaitForResponseTimeout(CMD_ACK, &resp, 1500)) {
-			PrintAndLog("APDU ERROR: Proxmark connection timeout.");
-			return 1;
-		}
-		if (resp.arg[0] != 1) {
-			PrintAndLog("APDU ERROR: Proxmark error %d.", resp.arg[0]);
-			return 1;
-		}
-	}
-
-    if (WaitForResponseTimeout(CMD_ACK, &resp, 1500)) {
-        recv = resp.d.asBytes;
-        int iLen = resp.arg[0];
-		uint8_t res = resp.arg[1];
+	while (chaining) {
+		// I-block with chaining
+		res = CmdExchangeAPDU(NULL, 0, false, &dataout[*dataoutlen], maxdataoutlen, dataoutlen, &chaining);
 		
-		dlen = iLen - 2;
-		if (dlen < 0)
-			dlen = 0;
-		*dataoutlen += dlen;
-		
-		if (maxdataoutlen && *dataoutlen > maxdataoutlen) {
-			PrintAndLog("APDU ERROR: Buffer too small(%d). Needs %d bytes", *dataoutlen, maxdataoutlen);
-			return 2;
-		}
-		
-		memcpy(dataout, recv, *dataoutlen);
-
-        if(!iLen) {
-			PrintAndLog("APDU ERROR: No APDU response.");
-            return 1;
-		}
-
-		// check block TODO
-		if (iLen == -2) {
-			PrintAndLog("APDU ERROR: Block type mismatch.");
-			return 2;
-		}
-		
-		// CRC Check
-		if (iLen == -1) {
-			PrintAndLog("APDU ERROR: ISO 14443A CRC error.");
-			return 3;
-		}
-
-		if ((res & 0x10) != 0) {
-			// I-block with chaining
-			int oldlen = *dataoutlen;
-			printf("-->%02x   oldlen:%d\n", res, oldlen);
-			UsbCommand c1 = {CMD_READER_ISO_14443a, {ISO14A_APDU | ISO14A_NO_DISCONNECT, 0, 0}}; 
-			SendCommand(&c1);
+		if (res) {
+			if (!leaveSignalON)
+				DropField();
 			
-			uint8_t *recv1;
-			UsbCommand resp1;
-			if (WaitForResponseTimeout(CMD_ACK, &resp1, 1500)) {
-				dlen = resp1.arg[0] - 2;
-				if (dlen < 0)
-					dlen = 0;
-				*dataoutlen += dlen;
-				
-				recv1 = resp1.d.asBytes;
-				printf("dlen:%d\n", dlen);
-				
-				if (maxdataoutlen && *dataoutlen > maxdataoutlen) {
-					PrintAndLog("APDU ERROR: Buffer too small(%d). Needs %d bytes", *dataoutlen, maxdataoutlen);
-					return 2;
-				}
-				memcpy(&dataout[oldlen], recv1, dlen);
-			}
+			return 100;
 		}
-		
-		
-		// check apdu length
-		if (iLen < 4) {
-			PrintAndLog("APDU ERROR: Small APDU response. Len=%d", iLen);
-			return 2;
-		}
-		
-    } else {
-        PrintAndLog("APDU ERROR: Reply timeout.");
-		return 4;
-    }
+	}	
 	
 	if (!leaveSignalON)
 		DropField();
