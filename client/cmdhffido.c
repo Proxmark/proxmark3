@@ -159,6 +159,11 @@ int CmdHFFidoRegister(const char *cmd) {
 	PrintAndLog("Key handle[%d]: %s", keyHandleLen, sprint_hex(&buf[67], keyHandleLen));
 	
 	PrintAndLog("DER certificate[%d]: %s", keyHandleLen, sprint_hex(&buf[67 + keyHandleLen], 20));
+	int derLen = 700;
+	int hashp = 1 + 65 + 1 + keyHandleLen + derLen;
+	PrintAndLog("Hash[%d]: %s", len - hashp, sprint_hex(&buf[hashp], len - hashp));
+	
+	// check ANSI X9.62 format ECDSA signature (on P-256)
 
 	DropField();
 
