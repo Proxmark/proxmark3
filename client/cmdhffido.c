@@ -134,7 +134,7 @@ int CmdHFFidoRegister(const char *cmd) {
 	}
 
 	res = FIDORegister(data, buf,  sizeof(buf), &len, &sw);
-/*	if (res) {
+	if (res) {
 		PrintAndLog("Can't execute register command. res=%x. Exit...", res);
 		return res;
 	}
@@ -142,9 +142,10 @@ int CmdHFFidoRegister(const char *cmd) {
 	if (sw != 0x9000) {
 		PrintAndLog("Can't execute register command. APDU response status: %04x - %s", sw, GetAPDUCodeDescription(sw >> 8, sw & 0xff)); 
 		return 3;
-	}*/
+	}
 	
-	//PrintAndLog("data: %s", sprint_hex(buf, len));
+	PrintAndLog("---------------------------------------------------------------");
+	PrintAndLog("data len: %d", len);
 
 	if (buf[0] != 0x05) {
 		PrintAndLog("ERROR: First byte must be 0x05, but it %2x", buf[0]);
