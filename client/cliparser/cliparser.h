@@ -19,6 +19,10 @@
 #define arg_get_lit(n)(((struct arg_lit*)argtable[n])->count)
 #define arg_get_int(n)(((struct arg_int*)argtable[n])->ival[0])
 #define arg_get_str(n)((struct arg_str*)argtable[n])
+#define arg_get_str_len(n)(strlen(((struct arg_str*)argtable[n])->sval[0]))
+
+#define arg_strx1(shortopts, longopts, datatype, glossary) (arg_strn((shortopts), (longopts), (datatype), 1, 250, (glossary)))
+#define arg_strx0(shortopts, longopts, datatype, glossary) (arg_strn((shortopts), (longopts), (datatype), 0, 250, (glossary)))
 
 #define CLIExecWithReturn(cmd, atbl, ifempty) if (CLIParserParseString(cmd, atbl, arg_getsize(atbl), ifempty)){CLIParserFree();return 0;}
 #define CLIGetStrBLessWithReturn(paramnum, data, datalen, delta) if (CLIParamHexToBuf(arg_get_str(paramnum), data, sizeof(data) - (delta), datalen)) {CLIParserFree();return 1;}
@@ -26,6 +30,7 @@
 
 extern int CLIParserInit(char *vprogramName, char *vprogramHint, char *vprogramHelp);
 extern int CLIParserParseString(const char* str, void* argtable[], size_t vargtableLen, bool allowEmptyExec);
+extern int CLIParserParseStringEx(const char* str, void* vargtable[], size_t vargtableLen, bool allowEmptyExec, bool clueData);
 extern int CLIParserParseArg(int argc, char **argv, void* argtable[], size_t vargtableLen, bool allowEmptyExec);
 extern void CLIParserFree();
 

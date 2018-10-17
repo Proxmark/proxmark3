@@ -2,19 +2,26 @@
 All notable changes to this project will be documented in this file.
 This project uses the changelog in accordance with [keepchangelog](http://keepachangelog.com/). Please use this to write notable changes, which is not the same as git commit log...
 
-
 ## [unreleased][unreleased]
 
 ### Changed
+
+### Fixed
+
+### Added
+
+## [v3.1.0][2018-10-10]
+
+### Changed
 - Adjusted `lf cmdread` to respond to client when complete and the client will then automatically call `data samples`
-- Improved backdoor detection missbehaving magic s50/1k tag (Fl0-0)
+- Improved backdoor detection misbehaving magic s50/1k tag (Fl0-0)
 - Deleted wipe functionality from `hf mf csetuid` (Merlok)
 - Changed `hf mf nested` logic (Merlok)
 - Added `hf mf nested` mode: autosearch keys for attack (from well known keys) (Merlok)
 - `hf mf nested` Check keys after they have found (Merlok)
 - `hf mf chk` Move main cycle to arm (Merlok)
 - Changed proxmark command line parameter `flush` to `-f` or `-flush` (Merlok)
-- Changed `hf 14a reader` to just reqest-anticilission-select sequence (Merlok)
+- Changed `hf 14a reader` to just request-anticolission-select sequence (Merlok)
 - Changed `hf 14a raw` - works with LED's and some exchange logic (Merlok)
 - Changed TLV parser messages to more convenient (Merlok)
 - Rewritten Legic Prime reader (`hf legic reader`, `write` and `fill`) - it is using xcorrelation now (AntiCat)
@@ -25,20 +32,22 @@ This project uses the changelog in accordance with [keepchangelog](http://keepac
 ### Fixed
 - Changed start sequence in Qt mode (fix: short commands hangs main Qt thread) (Merlok)
 - Changed driver file proxmark3.inf to support both old and new Product/Vendor IDs (piwi)
+- Changed all command line parsers in `hf emv` commands to argtable (Merlok)
+- Implemented AppNap API, fixing #283 and #627 OSX USB comm issues (AntiCat)
 
 ### Added
 - Added `sc` smartcard (contact card) commands - reader, info, raw, upgrade, setclock, list (hardware version RDV4.0 only) must turn option on in makefile options (Willok, Iceman, marshmellow)
 - Added a bitbang mode to `lf cmdread` if delay is 0 the cmd bits turn off and on the antenna with 0 and 1 respectively (marshmellow)
 - Added PAC/Stanley detection to lf search (marshmellow)
 - Added lf pac demod and lf pac read - extracts the raw blocks from a PAC/Stanley tag (marshmellow)
-- Added hf mf c* commands compatibity for 4k and gen1b backdoor (Fl0-0)
+- Added hf mf c* commands compatibility for 4k and gen1b backdoor (Fl0-0)
 - Added backdoor detection for gen1b magic s70/4k tag (Fl0-0)
 - Added data fsktonrz, a fsk cleaning/demodulating routine for weak fsk signal. Note: follow this up with a `data rawdemod nr` to finish demoding your signal. (marshmellow)
 - Added lf em 410xbrute, LF EM410x reader bruteforce attack by simulating UIDs from a file (Fl0-0)
 - Added `hf mf cwipe` command. It wipes "magic Chinese" card. For 1a generation it uses card's "wipe" command. For gen1a and gen1b it uses a write command. (Merlok)
 - Added to `hf mf nested` source key check before attack (Merlok)
 - Added to `hf mf nested` after attack it checks all found keys on non-open sectors (Merlok)
-- `hf mf chk` Added setings to set iso14443a operations timeout. default timeout set to 500us (Merlok)
+- `hf mf chk` Added settings to set iso14443a operations timeout. default timeout set to 500us (Merlok)
 - Added to `hf mf nested` parameters `s` and `ss` for checking slow cards (Merlok)
 - Added to proxmark command line parameters `w` - wait 20s for serial port (Merlok)
 - Added to proxmark command line parameters `c` and `l` - execute command and lua script from command line (Merlok)
@@ -55,6 +64,7 @@ This project uses the changelog in accordance with [keepchangelog](http://keepac
 - Added to `hf emv exec` SDA, DDA, fast DDA, CDA calculations for VISA and Mastercard and some other compatible EMV cards (Merlok)
 - Added `hf emv test` - crypto tests for DES, AES, SHA, RSA, SDA, DDA, CDA and some other crypto functions (Merlok)
 - Added `hf list mf` - deciphers crypto1 stream and works with first authentication and weak nested authentications (Merlok)
+- Added to `hf emv` commands: `gpo`, `readrec`, `genac`, `challenge`, `intauth` - commands working with EMV cards (Merlok)
 - Added `lf hid encode` and `lf hid decode` commands to translate printed HID card data to and from the packed data transmitted by a prox tag (grauerfuchs)
 - Added `lf hid write` command, which operates as a macro for encode followed by clone operations (grauerfuchs)
 

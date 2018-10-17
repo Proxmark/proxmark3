@@ -648,6 +648,95 @@ void DropField() {
 	SendCommand(&c);
 }
 
+int ExchangeRAW14a(uint8_t *datain, int datainlen, bool activateField, bool leaveSignalON, uint8_t *dataout, int maxdataoutlen, int *dataoutlen) {
+	uint16_t cmdc = 0;
+	*dataoutlen = 0;
+	
+	if (activateField) {
+		UsbCommand resp;
+
+		// Anticollision + SELECT card
+		UsbCommand ca = {CMD_READER_ISO_14443a, {ISO14A_CONNECT | ISO14A_NO_DISCONNECT | ISO14A_CLEAR_TRACE, 0, 0}};
+		SendCommand(&ca);
+		if (!WaitForResponseTimeout(CMD_ACK, &resp, 1500)) {
+			PrintAndLog("14aRAW ERROR: Proxmark connection timeout.");
+			return 1;
+		}
+
+		// check result
+		if (resp.arg[0] == 0) {
+			PrintAndLog("14aRAW ERROR: No card in field.");
+			return 1;
+		}
+
+		if (resp.arg[0] != 1 && resp.arg[0] != 2) {
+			PrintAndLog("14aRAW ERROR: card not in iso14443-4. res=%d.", resp.arg[0]);
+			return 1;
+		}
+
+		if (resp.arg[0] == 2) {		// 0: couldn't read, 1: OK, with ATS, 2: OK, no ATS, 3: proprietary Anticollision
+			// get ATS 
+			UsbCommand cr = {CMD_READER_ISO_14443a, {ISO14A_RAW | ISO14A_APPEND_CRC | ISO14A_NO_DISCONNECT, 2, 0}}; 
+			uint8_t rats[] = { 0xE0, 0x80 }; // FSDI=8 (FSD=256), CID=0
+			memcpy(cr.d.asBytes, rats, 2);
+			SendCommand(&cr);
+			if (!WaitForResponseTimeout(CMD_ACK, &resp, 1500)) {
+				PrintAndLog("14aRAW ERROR: Proxmark connection timeout.");
+				return 1;
+			}
+			
+			if (resp.arg[0] <= 0) { // ats_len
+				PrintAndLog("14aRAW ERROR: Can't get ATS.");
+				return 1;
+			}
+		}
+	}
+	
+	if (leaveSignalON)
+		cmdc |= ISO14A_NO_DISCONNECT;
+
+	UsbCommand c = {CMD_READER_ISO_14443a, {ISO14A_RAW | ISO14A_APPEND_CRC | cmdc, (datainlen & 0xFFFF), 0}}; 
+	memcpy(c.d.asBytes, datain, datainlen);
+	SendCommand(&c);
+	
+    uint8_t *recv;
+    UsbCommand resp;
+
+    if (WaitForResponseTimeout(CMD_ACK, &resp, 1500)) {
+        recv = resp.d.asBytes;
+        int iLen = resp.arg[0];
+		
+		*dataoutlen = iLen - 2;
+		if (*dataoutlen < 0)
+			*dataoutlen = 0;
+		
+		if (maxdataoutlen && *dataoutlen > maxdataoutlen) {
+			PrintAndLog("14aRAW ERROR: Buffer too small(%d). Needs %d bytes", *dataoutlen, maxdataoutlen);
+			return 2;
+		}
+		
+		memcpy(dataout, recv, *dataoutlen);
+		
+        if(!iLen) {
+			PrintAndLog("14aRAW ERROR: No card response.");
+            return 1;
+		}
+
+		// CRC Check
+		if (iLen == -1) {
+			PrintAndLog("14aRAW ERROR: ISO 14443A CRC error.");
+			return 3;
+		}
+
+
+    } else {
+        PrintAndLog("14aRAW ERROR: Reply timeout.");
+		return 4;
+    }
+	
+	return 0;
+}
+
 int ExchangeAPDU14a(uint8_t *datain, int datainlen, bool activateField, bool leaveSignalON, uint8_t *dataout, int maxdataoutlen, int *dataoutlen) {
 	uint16_t cmdc = 0;
 	
@@ -742,7 +831,7 @@ int CmdHF14AAPDU(const char *cmd) {
 		arg_lit0("sS",  "select",  "activate field and select card"),
 		arg_lit0("kK",  "keep",    "leave the signal field ON after receive response"),
 		arg_lit0("tT",  "tlv",     "executes TLV decoder if it possible"),
-		arg_str1(NULL,  NULL,      "<APDU (hex)>", NULL),
+		arg_strx1(NULL, NULL,      "<APDU (hex)>", NULL),
 		arg_param_end
 	};
 	CLIExecWithReturn(cmd, argtable, false);
@@ -807,7 +896,7 @@ int CmdHF14ACmdRaw(const char *cmd) {
 		arg_int0("t",   "timeout", NULL, "timeout in ms"),
 		arg_lit0("T",   "topaz",   "use Topaz protocol to send command"),
 		arg_lit0("3",   NULL,      "ISO14443-3 select only (skip RATS)"),
-		arg_str1(NULL,  NULL,      "<data (hex)>", NULL),
+		arg_strx1(NULL, NULL,      "<data (hex)>", NULL),
 		arg_param_end
 	};
 	// defaults

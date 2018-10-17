@@ -175,8 +175,6 @@ static void CodeIso15693AsReader(uint8_t *cmd, int n)
 	for(i = 0; i < 4; i++) {
 		ToSendStuffBit(1);
 	}
-
-	ToSendMax++;
 }
 
 // encode data using "1 out of 256" scheme
