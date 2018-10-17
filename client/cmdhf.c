@@ -28,6 +28,7 @@
 #include "cmdhflegic.h"
 #include "cmdhficlass.h"
 #include "cmdhfmf.h"
+#include "cmdhfmfp.h"
 #include "cmdhfmfu.h"
 #include "cmdhftopaz.h"
 #include "protocols.h"
@@ -595,6 +596,7 @@ static command_t CommandTable[] =
 	{"iclass",	CmdHFiClass,	1, "{ ICLASS RFIDs... }"},
 	{"mf",		CmdHFMF,		1, "{ MIFARE RFIDs... }"},
 	{"mfu",		CmdHFMFUltra,	1, "{ MIFARE Ultralight RFIDs... }"},
+	{"mfp",		CmdHFMFP,		1, "{ MIFARE Plus RFIDs... }"},
 	{"topaz",	CmdHFTopaz,		1, "{ TOPAZ (NFC Type 1) RFIDs... }"},
 	{"tune",	CmdHFTune,		0, "Continuously measure HF antenna tuning"},
 	{"list",	CmdHFList,		1, "List protocol data in trace buffer"},
