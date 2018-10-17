@@ -45,11 +45,18 @@ int FIDOSelect(bool ActivateField, bool LeaveFieldON, uint8_t *Result, size_t Ma
 
 int FIDOExchange(sAPDU apdu, uint8_t *Result, size_t MaxResultLen, size_t *ResultLen, uint16_t *sw) {
 	int res = EMVExchange(true, apdu, Result, MaxResultLen, ResultLen, sw, NULL);
+	if (res == 5) // apdu result (sw) not a 0x9000
+		res = 0;
 	// software chaining
-	while ((*sw >> 8) == 0x61) {
+	while (!res && (*sw >> 8) == 0x61) {
 		size_t oldlen = *ResultLen;
-		res = EMVExchange(true, (sAPDU){0x00, 0xC0, 0x00, 0x00, 0x00, NULL}, &Result[oldlen], MaxResultLen, ResultLen, sw, NULL);
+		res = EMVExchange(true, (sAPDU){0x00, 0xC0, 0x00, 0x00, 0x00, NULL}, &Result[oldlen], MaxResultLen - oldlen, ResultLen, sw, NULL);
+		if (res == 5) // apdu result (sw) not a 0x9000
+			res = 0;
+		
 		*ResultLen += oldlen;
+		if (*ResultLen > MaxResultLen) 
+			return 100;
 	}
 	return res;
 }
