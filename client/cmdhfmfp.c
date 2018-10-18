@@ -32,19 +32,23 @@ void SetVerboseMode(bool verbose) {
 	VerboseMode = verbose;
 }
 
+int intExchangeRAW14aPlus(uint8_t *datain, int datainlen, bool activateField, bool leaveSignalON, uint8_t *dataout, int maxdataoutlen, int *dataoutlen) {
+	if(VerboseMode)
+		PrintAndLog(">>> %s", sprint_hex(datain, datainlen));
+	
+	int res = ExchangeRAW14a(datain, datainlen, activateField, leaveSignalON, dataout, maxdataoutlen, dataoutlen);
+
+	if(VerboseMode)
+		PrintAndLog("<<< %s", sprint_hex(dataout, *dataoutlen));
+	
+	return res;
+}
+
 int MFPWritePerso(uint8_t *keyNum, uint8_t *key, bool activateField, bool leaveSignalON, uint8_t *dataout, int maxdataoutlen, int *dataoutlen) {
 	uint8_t rcmd[3 + 16] = {0xa8, keyNum[1], keyNum[0], 0x00};
 	memmove(&rcmd[3], key, 16);
 	
-	if(VerboseMode)
-		PrintAndLog(">>> %s", sprint_hex(rcmd, sizeof(rcmd)));
-	
-	int res = ExchangeRAW14a(rcmd, sizeof(rcmd), activateField, leaveSignalON, dataout, maxdataoutlen, dataoutlen);
-	
-	if(VerboseMode)
-		PrintAndLog("<<< %s", sprint_hex(dataout, *dataoutlen));
-
-	return res;
+	return intExchangeRAW14aPlus(rcmd, sizeof(rcmd), activateField, leaveSignalON, dataout, maxdataoutlen, dataoutlen);
 }
 
 int CmdHFMFPInfo(const char *cmd) {
