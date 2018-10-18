@@ -65,6 +65,10 @@ int FIDORegister(uint8_t *params, uint8_t *Result, size_t MaxResultLen, size_t *
 	return FIDOExchange((sAPDU){0x00, 0x01, 0x03, 0x00, 64, params}, Result, MaxResultLen, ResultLen, sw);
 }
 
+int FIDOAuthentication(uint8_t *params, uint8_t paramslen, uint8_t controlb, uint8_t *Result, size_t MaxResultLen, size_t *ResultLen, uint16_t *sw) {
+	return FIDOExchange((sAPDU){0x00, 0x02, controlb, 0x00, paramslen, params}, Result, MaxResultLen, ResultLen, sw);
+}
+
 int CmdHFFidoInfo(const char *cmd) {
 	
 	if (cmd && strlen(cmd) > 0)
@@ -172,12 +176,58 @@ int CmdHFFidoRegister(const char *cmd) {
 	// check ANSI X9.62 format ECDSA signature (on P-256)
 
 	DropField();
-
 	return 0;
 };
 
 int CmdHFFidoAuthenticate(const char *cmd) {
+
+	// here will be command extraction
+	// conrtol byte 0x07 - check only, 0x03 - user presense + cign. 0x08 - sign only
+ 	// challenge parameter [32 bytes]
+	// application parameter [32 bytes]
+	// key handle length [1b] = N
+	// key handle [N]
+
+	uint8_t keyHandleLen = 64;
+	uint8_t data[512] = {0};
+	uint8_t datalen = 1 + 32 + 32 + 1 + keyHandleLen;
+	uint8_t controlByte = 0x03;
+	data[0] = controlByte;
+	data[65] = keyHandleLen;
 	
+	SetAPDULogging(true);
+	DropField();
+	
+	uint8_t buf[2048] = {0};
+	size_t len = 0;
+	uint16_t sw = 0;
+	int res = FIDOSelect(true, true, buf, sizeof(buf), &len, &sw);
+
+	if (res) {
+		PrintAndLog("Can't select authenticator. res=%x. Exit...", res);
+		return res;
+	}
+	
+	if (sw != 0x9000) {
+		PrintAndLog("Can't select FIDO application. APDU response status: %04x - %s", sw, GetAPDUCodeDescription(sw >> 8, sw & 0xff)); 
+		return 2;
+	}
+
+	res = FIDOAuthentication(data, datalen, controlByte,  buf,  sizeof(buf), &len, &sw);
+	if (res) {
+		PrintAndLog("Can't execute authentication command. res=%x. Exit...", res);
+		return res;
+	}
+	
+	if (sw != 0x9000) {
+		PrintAndLog("Can't execute authentication command. APDU response status: %04x - %s", sw, GetAPDUCodeDescription(sw >> 8, sw & 0xff)); 
+		return 3;
+	}
+	
+	PrintAndLog("---------------------------------------------------------------");
+
+	
+	DropField();
 	return 0;
 };
 
