@@ -21,6 +21,7 @@
 #include "ui.h"
 #include "cmdhf14a.h"
 #include "mifare.h"
+#include "cliparser/cliparser.h"
 
 static int CmdHelp(const char *Cmd);
 
@@ -103,10 +104,86 @@ int CmdHFMFPInfo(const char *cmd) {
 	return 0;
 }
 
+int CmdHFMFPWritePerso(const char *cmd) {
+	uint8_t keyNum[64] = {0};
+	int keyNumLen = 0;
+	uint8_t key[64] = {0};
+	int keyLen = 0;
+
+	CLIParserInit("hf mfp wrp", 
+		"Executes Write Perso command. Can be used in SL0 mode only.", 
+		"Usage:\n\thf mfp wrp 4000 000102030405060708090a0b0c0d0e0f -> write key (00..0f) to key number 4000 \n");
+
+	void* argtable[] = {
+		arg_param_begin,
+		arg_lit0("vV",  "verbose", "show internal data."),
+		arg_str1(NULL,  NULL,      "<HEX key number (2b)>", NULL),
+		arg_strx1(NULL,  NULL,     "<HEX key (16b)>", NULL),
+		arg_param_end
+	};
+	CLIExecWithReturn(cmd, argtable, true);
+	
+	bool verbose = arg_get_lit(1);
+	CLIGetHexWithReturn(2, keyNum, &keyNumLen);
+	CLIGetHexWithReturn(3, key, &keyLen);
+	CLIParserFree();
+	
+	if (keyNumLen != 2) {
+		PrintAndLog("Key number length must be 2 bytes instead of: %d", keyNumLen);
+		return 1;
+	}
+	if (keyLen != 16) {
+		PrintAndLog("Key length must be 16 bytes instead of: %d", keyLen);
+		return 1;
+	}
+
+	uint8_t rcmd[3 + 16] = {0xa8, keyNum[1], keyNum[0], 0x00};
+	memmove(&rcmd[3], key, 16);
+	
+	uint8_t data[250] = {0};
+	int datalen = 0;
+
+	if(verbose)
+		PrintAndLog(">>> %s", sprint_hex(rcmd, sizeof(rcmd)));
+	int res = ExchangeRAW14a(rcmd, sizeof(rcmd), true, false, data, sizeof(data), &datalen);
+	if(verbose)
+		PrintAndLog("<<< %s", sprint_hex(data, datalen));
+	if (res) {
+		PrintAndLog("Exchange error: %d", res);
+		return res;
+	}
+	
+	if (datalen != 3) {
+		PrintAndLog("Command must return 3 bytes instead of: %d", datalen);
+		return 1;
+	}
+
+	if (data[0] != 0x90) {
+		PrintAndLog("Command error: %02x", data[0]);
+		return 1;
+	}
+	PrintAndLog("Write OK.");
+	
+	return 0;
+}
+
+int CmdHFMFPInitPerso(const char *cmd) {
+
+	return 0;
+}
+
+int CmdHFMFPCommitPerso(const char *cmd) {
+
+	return 0;
+}
+
 static command_t CommandTable[] =
 {
   {"help",             CmdHelp,					1, "This help"},
   {"info",  	       CmdHFMFPInfo,			0, "Info about Mifare Plus tag"},
+  {"wrp",	  	       CmdHFMFPWritePerso,		0, "Write Perso command"},
+  {"initp",  	       CmdHFMFPInitPerso,		0, "Fills all the card's keys"},
+  {"commitp",  	       CmdHFMFPCommitPerso,		0, "Move card to SL1 or SL3 mode"},
   {NULL,               NULL,					0, NULL}
 };
 
