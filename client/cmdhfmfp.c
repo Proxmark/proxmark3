@@ -23,6 +23,8 @@
 #include "mifare.h"
 #include "cliparser/cliparser.h"
 
+static const uint8_t DefaultKey[16] = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
+
 static int CmdHelp(const char *Cmd);
 
 int CmdHFMFPInfo(const char *cmd) {
@@ -112,13 +114,14 @@ int CmdHFMFPWritePerso(const char *cmd) {
 
 	CLIParserInit("hf mfp wrp", 
 		"Executes Write Perso command. Can be used in SL0 mode only.", 
-		"Usage:\n\thf mfp wrp 4000 000102030405060708090a0b0c0d0e0f -> write key (00..0f) to key number 4000 \n");
+		"Usage:\n\thf mfp wrp 4000 000102030405060708090a0b0c0d0e0f -> write key (00..0f) to key number 4000 \n"
+			"\thf mfp wrp 4000 -> write default key(0xff..0xff) to key number 4000");
 
 	void* argtable[] = {
 		arg_param_begin,
 		arg_lit0("vV",  "verbose", "show internal data."),
 		arg_str1(NULL,  NULL,      "<HEX key number (2b)>", NULL),
-		arg_strx1(NULL,  NULL,     "<HEX key (16b)>", NULL),
+		arg_strx0(NULL,  NULL,     "<HEX key (16b)>", NULL),
 		arg_param_end
 	};
 	CLIExecWithReturn(cmd, argtable, true);
@@ -127,6 +130,11 @@ int CmdHFMFPWritePerso(const char *cmd) {
 	CLIGetHexWithReturn(2, keyNum, &keyNumLen);
 	CLIGetHexWithReturn(3, key, &keyLen);
 	CLIParserFree();
+	
+	if (!keyLen) {
+		memmove(key, DefaultKey, 16);
+		keyLen = 16;
+	}
 	
 	if (keyNumLen != 2) {
 		PrintAndLog("Key number length must be 2 bytes instead of: %d", keyNumLen);
