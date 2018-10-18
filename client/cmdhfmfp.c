@@ -25,6 +25,28 @@
 
 static const uint8_t DefaultKey[16] = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
 
+typedef struct {
+	uint8_t Code;
+	const char *Description;
+} PlusErrorsElm;
+
+static const PlusErrorsElm PlusErrors[] = {
+	{0x00, ""},
+	{0x09, "targeted block is invalid for writes"},
+	{0x0b, "command invalid"},
+	{0x0c, "unexpected command length"},
+	{0x90, "OK"},
+};
+int PlusErrorsLen = sizeof(PlusErrors) / sizeof(PlusErrorsElm);
+
+const char * GetErrorDescription(uint8_t errorCode) {
+	for(int i = 0; i < PlusErrorsLen; i++)
+		if (errorCode == PlusErrors[i].Code)
+			return PlusErrors[i].Description;
+		
+	return PlusErrors[0].Description;
+}
+
 static int CmdHelp(const char *Cmd);
 
 static bool VerboseMode = false;
@@ -192,7 +214,7 @@ int CmdHFMFPWritePerso(const char *cmd) {
 	}
 
 	if (data[0] != 0x90) {
-		PrintAndLog("Command error: %02x", data[0]);
+		PrintAndLog("Command error: %02x %s", data[0], GetErrorDescription(data[0]));
 		return 1;
 	}
 	PrintAndLog("Write OK.");
@@ -246,7 +268,7 @@ int CmdHFMFPCommitPerso(const char *cmd) {
 	}
 
 	if (data[0] != 0x90) {
-		PrintAndLog("Command error: %02x", data[0]);
+		PrintAndLog("Command error: %02x %s", data[0], GetErrorDescription(data[0]));
 		return 1;
 	}
 	PrintAndLog("Write OK.");
