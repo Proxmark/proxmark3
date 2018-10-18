@@ -51,6 +51,12 @@ int MFPWritePerso(uint8_t *keyNum, uint8_t *key, bool activateField, bool leaveS
 	return intExchangeRAW14aPlus(rcmd, sizeof(rcmd), activateField, leaveSignalON, dataout, maxdataoutlen, dataoutlen);
 }
 
+int MFPCommitPerso(uint8_t mode, bool activateField, bool leaveSignalON, uint8_t *dataout, int maxdataoutlen, int *dataoutlen) {
+	uint8_t rcmd[2] = {0xaa, mode};
+	
+	return intExchangeRAW14aPlus(rcmd, sizeof(rcmd), activateField, leaveSignalON, dataout, maxdataoutlen, dataoutlen);
+}
+
 int CmdHFMFPInfo(const char *cmd) {
 	
 	if (cmd && strlen(cmd) > 0)
@@ -200,6 +206,50 @@ int CmdHFMFPInitPerso(const char *cmd) {
 }
 
 int CmdHFMFPCommitPerso(const char *cmd) {
+	CLIParserInit("hf mfp commitp", 
+		"Executes Commit Perso command. Can be used in SL0 mode only.", 
+		"Usage:\n\thf mfp commitp 01 ->  \n");
+
+	void* argtable[] = {
+		arg_param_begin,
+		arg_lit0("vV",  "verbose", "show internal data."),
+		arg_int0(NULL,  NULL,      "SL mode", NULL),
+		arg_param_end
+	};
+	CLIExecWithReturn(cmd, argtable, true);
+	
+	bool verbose = arg_get_lit(1);
+	uint32_t mode = 1; // SL1
+	if (arg_get_int_count(2) > 0)
+		mode = arg_get_int(2);
+	CLIParserFree();
+	
+	if (mode > 0xff) {
+		PrintAndLog("Mode must not more 255 instead of: %d", mode);
+		return 1;
+	}
+	
+	SetVerboseMode(verbose);
+	
+	uint8_t data[250] = {0};
+	int datalen = 0;
+
+	int res = MFPCommitPerso(mode, true, false, data, sizeof(data), &datalen);
+	if (res) {
+		PrintAndLog("Exchange error: %d", res);
+		return res;
+	}
+	
+	if (datalen != 3) {
+		PrintAndLog("Command must return 3 bytes instead of: %d", datalen);
+		return 1;
+	}
+
+	if (data[0] != 0x90) {
+		PrintAndLog("Command error: %02x", data[0]);
+		return 1;
+	}
+	PrintAndLog("Write OK.");
 
 	return 0;
 }
