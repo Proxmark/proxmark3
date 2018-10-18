@@ -112,6 +112,9 @@ int CmdHFFidoInfo(const char *cmd) {
 	return 0;
 }
 
+// test only!!!
+static uint8_t GkeyHandle[512] = {0};
+
 int CmdHFFidoRegister(const char *cmd) {
 	
 	// here will be command extraction
@@ -161,6 +164,7 @@ int CmdHFFidoRegister(const char *cmd) {
 	
 	uint8_t keyHandleLen = buf[66];
 	PrintAndLog("Key handle[%d]: %s", keyHandleLen, sprint_hex(&buf[67], keyHandleLen));
+	memmove(GkeyHandle, &buf[67], keyHandleLen);
 	
 	int derp = 67 + keyHandleLen;
 	int derLen = (buf[derp + 2] << 8) + buf[derp + 3] + 4;
@@ -182,7 +186,7 @@ int CmdHFFidoRegister(const char *cmd) {
 int CmdHFFidoAuthenticate(const char *cmd) {
 
 	// here will be command extraction
-	// conrtol byte 0x07 - check only, 0x03 - user presense + cign. 0x08 - sign only
+	// (in parameter) conrtol byte 0x07 - check only, 0x03 - user presense + cign. 0x08 - sign only
  	// challenge parameter [32 bytes]
 	// application parameter [32 bytes]
 	// key handle length [1b] = N
@@ -190,10 +194,10 @@ int CmdHFFidoAuthenticate(const char *cmd) {
 
 	uint8_t keyHandleLen = 64;
 	uint8_t data[512] = {0};
-	uint8_t datalen = 1 + 32 + 32 + 1 + keyHandleLen;
-	uint8_t controlByte = 0x03;
-	data[0] = controlByte;
-	data[65] = keyHandleLen;
+	uint8_t datalen = 32 + 32 + 1 + keyHandleLen;
+	uint8_t controlByte = 0x08;
+	data[64] = keyHandleLen;
+	memmove(&data[65], GkeyHandle, keyHandleLen);
 	
 	SetAPDULogging(true);
 	DropField();
@@ -225,6 +229,10 @@ int CmdHFFidoAuthenticate(const char *cmd) {
 	}
 	
 	PrintAndLog("---------------------------------------------------------------");
+	PrintAndLog("User presence: %s", (buf[0]?"verified":"not verified"));
+	uint32_t cntr =  (uint32_t)bytes_to_num(&buf[1], 4);
+	PrintAndLog("Counter: %d", cntr);
+	PrintAndLog("Hash[%d]: %s", len - 5, sprint_hex(&buf[5], len - 5));
 
 	
 	DropField();
