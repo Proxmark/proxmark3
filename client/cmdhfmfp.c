@@ -27,6 +27,26 @@ static const uint8_t DefaultKey[16] = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
 
 static int CmdHelp(const char *Cmd);
 
+static bool VerboseMode = false;
+void SetVerboseMode(bool verbose) {
+	VerboseMode = verbose;
+}
+
+int MFPWritePerso(uint8_t *keyNum, uint8_t *key, bool activateField, bool leaveSignalON, uint8_t *dataout, int maxdataoutlen, int *dataoutlen) {
+	uint8_t rcmd[3 + 16] = {0xa8, keyNum[1], keyNum[0], 0x00};
+	memmove(&rcmd[3], key, 16);
+	
+	if(VerboseMode)
+		PrintAndLog(">>> %s", sprint_hex(rcmd, sizeof(rcmd)));
+	
+	int res = ExchangeRAW14a(rcmd, sizeof(rcmd), activateField, leaveSignalON, dataout, maxdataoutlen, dataoutlen);
+	
+	if(VerboseMode)
+		PrintAndLog("<<< %s", sprint_hex(dataout, *dataoutlen));
+
+	return res;
+}
+
 int CmdHFMFPInfo(const char *cmd) {
 	
 	if (cmd && strlen(cmd) > 0)
@@ -131,6 +151,8 @@ int CmdHFMFPWritePerso(const char *cmd) {
 	CLIGetHexWithReturn(3, key, &keyLen);
 	CLIParserFree();
 	
+	SetVerboseMode(verbose);
+	
 	if (!keyLen) {
 		memmove(key, DefaultKey, 16);
 		keyLen = 16;
@@ -145,17 +167,10 @@ int CmdHFMFPWritePerso(const char *cmd) {
 		return 1;
 	}
 
-	uint8_t rcmd[3 + 16] = {0xa8, keyNum[1], keyNum[0], 0x00};
-	memmove(&rcmd[3], key, 16);
-	
 	uint8_t data[250] = {0};
 	int datalen = 0;
 
-	if(verbose)
-		PrintAndLog(">>> %s", sprint_hex(rcmd, sizeof(rcmd)));
-	int res = ExchangeRAW14a(rcmd, sizeof(rcmd), true, false, data, sizeof(data), &datalen);
-	if(verbose)
-		PrintAndLog("<<< %s", sprint_hex(data, datalen));
+	int res = MFPWritePerso(keyNum, key, true, false, data, sizeof(data), &datalen);
 	if (res) {
 		PrintAndLog("Exchange error: %d", res);
 		return res;
