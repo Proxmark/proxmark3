@@ -145,7 +145,7 @@ int CmdHFFidoRegister(const char *cmd) {
 	}
 	
 	if (sw != 0x9000) {
-		PrintAndLog("Can't execute register command. APDU response status: %04x - %s", sw, GetAPDUCodeDescription(sw >> 8, sw & 0xff)); 
+		PrintAndLog("ERROR execute register command. APDU response status: %04x - %s", sw, GetAPDUCodeDescription(sw >> 8, sw & 0xff)); 
 		return 3;
 	}
 	
@@ -220,7 +220,7 @@ int CmdHFFidoAuthenticate(const char *cmd) {
 	}
 	
 	if (sw != 0x9000) {
-		PrintAndLog("Can't execute authentication command. APDU response status: %04x - %s", sw, GetAPDUCodeDescription(sw >> 8, sw & 0xff)); 
+		PrintAndLog("ERROR execute authentication command. APDU response status: %04x - %s", sw, GetAPDUCodeDescription(sw >> 8, sw & 0xff)); 
 		return 3;
 	}
 	
