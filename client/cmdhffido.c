@@ -34,6 +34,7 @@
 #include "mifare.h"
 #include "emv/emvcore.h"
 #include "emv/dump.h"
+#include "cliparser/cliparser.h"
 
 static int CmdHelp(const char *Cmd);
 
@@ -112,23 +113,54 @@ int CmdHFFidoInfo(const char *cmd) {
 	return 0;
 }
 
-// test only!!!
-static uint8_t GkeyHandle[512] = {0};
-
 int CmdHFFidoRegister(const char *cmd) {
+	uint8_t data[64] = {0};
+	uint8_t hdata[32] = {0};
+	int datalen = 0;
 	
-	// here will be command extraction
+	CLIParserInit("hf fido reg", 
+		"Initiate a U2F token registration. Needs two 32-byte hash number. \nchallenge parameter (32b) and application parameter (32b).", 
+		"Usage:\n\thf fido reg -> execute command with 2 parameters, filled 0x00\n"
+			"\thf fido reg 000102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e0f 000102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e0f -> execute command with parameters");
+
+	void* argtable[] = {
+		arg_param_begin,
+		arg_lit0("aA",  "apdu",     "show APDU reqests and responses"),
+		arg_lit0("vV",  "verbose",  "show technical data"),
+		arg_str0(NULL,  NULL,       "<HEX challenge parameter (32b)>", NULL),
+		arg_str0(NULL,  NULL,       "<HEX application parameter (32b)>", NULL),
+		arg_param_end
+	};
+	CLIExecWithReturn(cmd, argtable, true);
+	
+	bool APDULogging = arg_get_lit(1);
+	bool verbose = arg_get_lit(2);
+	CLIGetStrWithReturn(3, hdata, &datalen);
+	if (datalen && datalen != 32) {
+		PrintAndLog("ERROR: challenge parameter length must be 32 bytes only.");
+		return 1;
+	}
+	if (datalen)
+		memmove(data, hdata, 32);
+	CLIGetStrWithReturn(4, hdata, &datalen);
+	if (datalen && datalen != 32) {
+		PrintAndLog("ERROR: application parameter length must be 32 bytes only.");
+		return 1;
+	}
+	if (datalen)
+		memmove(&data[32], hdata, 32);
+	CLIParserFree();	
+	
+	SetAPDULogging(APDULogging);
+
 	// challenge parameter [32 bytes] - The challenge parameter is the SHA-256 hash of the Client Data, a stringified JSON data structure that the FIDO Client prepares
 	// application parameter [32 bytes] - The application parameter is the SHA-256 hash of the UTF-8 encoding of the application identity
-	
-	uint8_t data[64] = {0};
-	
-	SetAPDULogging(true);
-	DropField();
 	
 	uint8_t buf[2048] = {0};
 	size_t len = 0;
 	uint16_t sw = 0;
+
+	DropField();
 	int res = FIDOSelect(true, true, buf, sizeof(buf), &len, &sw);
 
 	if (res) {
@@ -152,9 +184,15 @@ int CmdHFFidoRegister(const char *cmd) {
 		return 3;
 	}
 	
-	PrintAndLog("---------------------------------------------------------------");
+	PrintAndLog("");
+	if (APDULogging)
+		PrintAndLog("---------------------------------------------------------------");
 	PrintAndLog("data len: %d", len);
-	dump_buffer((const unsigned char *)buf, len, NULL, 0);
+	if (verbose) {
+		PrintAndLog("--------------data----------------------");
+		dump_buffer((const unsigned char *)buf, len, NULL, 0);
+		PrintAndLog("--------------data----------------------");
+	}
 
 	if (buf[0] != 0x05) {
 		PrintAndLog("ERROR: First byte must be 0x05, but it %2x", buf[0]);
@@ -164,47 +202,108 @@ int CmdHFFidoRegister(const char *cmd) {
 	
 	uint8_t keyHandleLen = buf[66];
 	PrintAndLog("Key handle[%d]: %s", keyHandleLen, sprint_hex(&buf[67], keyHandleLen));
-	memmove(GkeyHandle, &buf[67], keyHandleLen);
 	
 	int derp = 67 + keyHandleLen;
 	int derLen = (buf[derp + 2] << 8) + buf[derp + 3] + 4;
 	// needs to decode DER certificate
-	PrintAndLog("DER certificate[%d]: %s...", derLen, sprint_hex(&buf[derp], 20));
-	dump_buffer_simple((const unsigned char *)&buf[67 + keyHandleLen], derLen, NULL);
-	PrintAndLog("---------------------------------------------------------------");
+	if (verbose) {
+		PrintAndLog("DER certificate[%d]:------------------DER-------------------", derLen);
+		dump_buffer_simple((const unsigned char *)&buf[67 + keyHandleLen], derLen, NULL);
+		PrintAndLog("\n----------------DER---------------------");
+	} else {
+		PrintAndLog("DER certificate[%d]: %s...", derLen, sprint_hex(&buf[derp], 20));
+	}
 	
 	
 	int hashp = 1 + 65 + 1 + keyHandleLen + derLen;
 	PrintAndLog("Hash[%d]: %s", len - hashp, sprint_hex(&buf[hashp], len - hashp));
 	
 	// check ANSI X9.62 format ECDSA signature (on P-256)
+	
+	PrintAndLog("\nauth command: hf fido auth %s", sprint_hex_inrow(&buf[67], keyHandleLen));
 
 	DropField();
 	return 0;
 };
 
 int CmdHFFidoAuthenticate(const char *cmd) {
+	uint8_t data[512] = {0};
+	uint8_t hdata[128] = {0};
+	int hdatalen = 0;
+	uint8_t keyHandleLen = 0;
+	
+	CLIParserInit("hf fido auth", 
+		"Initiate a U2F token authentication. Needs key handle and two 32-byte hash number. \nkey handle(var 0..255), challenge parameter (32b) and application parameter (32b).", 
+		"Usage:\n\thf fido auth 000102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e0f -> execute command with 2 parameters, filled 0x00 and key handle\n"
+			"\thf fido auth 000102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e0f "
+				"000102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e0f 000102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e0f -> execute command with parameters");
 
-	// here will be command extraction
+	void* argtable[] = {
+		arg_param_begin,
+		arg_lit0("aA",  "apdu",     "show APDU reqests and responses"),
+		arg_lit0("vV",  "verbose",  "show technical data"),
+		arg_rem("default mode:",    "dont-enforce-user-presence-and-sign"),
+		arg_lit0("pP",  "presence", "mode: enforce-user-presence-and-sign"),
+		arg_lit0("cC",  "check",    "mode: check-only"),
+		arg_str1(NULL,  NULL,       "<HEX key handle (var 0..255b)>", NULL),
+		arg_str0(NULL,  NULL,       "<HEX challenge parameter (32b)>", NULL),
+		arg_str0(NULL,  NULL,       "<HEX application parameter (32b)>", NULL),
+		arg_param_end
+	};
+	CLIExecWithReturn(cmd, argtable, true);
+	
+	bool APDULogging = arg_get_lit(1);
+	//bool verbose = arg_get_lit(2);
+	uint8_t controlByte = 0x08;
+	if (arg_get_lit(4))
+		controlByte = 0x03;
+	if (arg_get_lit(5))
+		controlByte = 0x07;
+	
+	CLIGetStrWithReturn(6, hdata, &hdatalen);
+	if (hdatalen > 255) {
+		PrintAndLog("ERROR: application parameter length must be less than 255.");
+		return 1;
+	}
+	if (hdatalen) {
+		keyHandleLen = hdatalen;
+		data[64] = keyHandleLen;
+		memmove(&data[65], hdata, keyHandleLen);
+	}
+
+	CLIGetStrWithReturn(7, hdata, &hdatalen);
+	if (hdatalen && hdatalen != 32) {
+		PrintAndLog("ERROR: challenge parameter length must be 32 bytes only.");
+		return 1;
+	}
+	if (hdatalen)
+		memmove(data, hdata, 32);
+
+	CLIGetStrWithReturn(8, hdata, &hdatalen);
+	if (hdatalen && hdatalen != 32) {
+		PrintAndLog("ERROR: application parameter length must be 32 bytes only.");
+		return 1;
+	}
+	if (hdatalen)
+		memmove(&data[32], hdata, 32);
+
+	CLIParserFree();	
+	
+	SetAPDULogging(APDULogging);
+
 	// (in parameter) conrtol byte 0x07 - check only, 0x03 - user presense + cign. 0x08 - sign only
  	// challenge parameter [32 bytes]
 	// application parameter [32 bytes]
 	// key handle length [1b] = N
 	// key handle [N]
 
-	uint8_t keyHandleLen = 64;
-	uint8_t data[512] = {0};
 	uint8_t datalen = 32 + 32 + 1 + keyHandleLen;
-	uint8_t controlByte = 0x08;
-	data[64] = keyHandleLen;
-	memmove(&data[65], GkeyHandle, keyHandleLen);
-	
-	SetAPDULogging(true);
-	DropField();
 	
 	uint8_t buf[2048] = {0};
 	size_t len = 0;
 	uint16_t sw = 0;
+
+	DropField();
 	int res = FIDOSelect(true, true, buf, sizeof(buf), &len, &sw);
 
 	if (res) {
