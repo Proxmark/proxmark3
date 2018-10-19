@@ -156,7 +156,7 @@ int CLIParamHexToBuf(struct arg_str *argstr, uint8_t *data, int maxdatalen, int 
 	
 	int ibuf = 0;
 	uint8_t buf[256] = {0};
-	int res = CLIParamStrToBuf(argstr, buf, maxdatalen, &ibuf);
+	int res = CLIParamStrToBuf(argstr, buf, maxdatalen * 2, &ibuf); // *2 because here HEX
 	if (res || !ibuf)
 		return res;
 	
