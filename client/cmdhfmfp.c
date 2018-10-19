@@ -351,7 +351,7 @@ int CmdHFMFPAuth(const char *cmd) {
 	CLIParserInit("hf mfp auth", 
 		"Executes AES authentication command in ISO14443-4", 
 		"Usage:\n\thf mfp auth 4000 000102030405060708090a0b0c0d0e0f -> executes authentication\n"
-			"\thf mfp auth 9003 FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF -> executes authentication\n");
+			"\thf mfp auth 9003 FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF -v -> executes authentication and shows all the system data\n");
 
 	void* argtable[] = {
 		arg_param_begin,
@@ -377,10 +377,13 @@ int CmdHFMFPAuth(const char *cmd) {
 		return 1;
 	}
 
-	return MifareAuth4(keyn, key, true, false, verbose);
+	return MifareAuth4(NULL, keyn, key, true, false, verbose);
 }
 
 int CmdHFMFPRdbl(const char *cmd) {
+	//mf4Session session
+	//int res = MifareAuth4(&session, keyn, key, true, false, verbose);
+	//res = Read();
 	
 	return 0;
 }

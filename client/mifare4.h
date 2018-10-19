@@ -15,7 +15,15 @@
 #include <stdbool.h>
 #include <stddef.h>
 
-extern int MifareAuth4(uint8_t *keyn, uint8_t *key, bool activateField, bool leaveSignalON, bool verbose);
+typedef struct {
+	bool Authenticated;
+	uint16_t KeyNum;
+	uint8_t Rnd1[16];
+	uint8_t Rnd2[16];
+	
+}mf4Session;
+
+extern int MifareAuth4(mf4Session *session, uint8_t *keyn, uint8_t *key, bool activateField, bool leaveSignalON, bool verbose);
 
 
 

@@ -16,13 +16,15 @@
 #include "ui.h"
 #include "polarssl/libpcrypto.h"
 
-int MifareAuth4(uint8_t *keyn, uint8_t *key, bool activateField, bool leaveSignalON, bool verbose) {
+int MifareAuth4(mf4Session *session, uint8_t *keyn, uint8_t *key, bool activateField, bool leaveSignalON, bool verbose) {
 	uint8_t data[257] = {0};
 	int datalen = 0;
 	
 	uint8_t Rnd1[17] = {0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x00};
 	uint8_t Rnd2[17] = {0};
 	
+	if (session)
+		session->Authenticated = false;	
 	
 	uint8_t cmd1[] = {0x70, keyn[1], keyn[0], 0x00};
 	int res = ExchangeRAW14a(cmd1, sizeof(cmd1), activateField, true, data, sizeof(data), &datalen);
@@ -102,6 +104,13 @@ int MifareAuth4(uint8_t *keyn, uint8_t *key, bool activateField, bool leaveSigna
 	if (verbose)
 		PrintAndLog("");
 
+	if (session) {
+		session->Authenticated = true;
+		session->KeyNum = keyn[1] + (keyn[0] << 8);
+		memmove(session->Rnd1, Rnd1, 16);
+		memmove(session->Rnd2, Rnd2, 16);
+	}
+	
 	PrintAndLog("Authentication OK");
 	
 	return 0;

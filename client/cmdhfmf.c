@@ -2670,7 +2670,7 @@ int CmdHF14AMfAuth4(const char *cmd) {
 		return 1;
 	}
 
-	return MifareAuth4(keyn, key, true, false, true);
+	return MifareAuth4(NULL, keyn, key, true, false, true);
 }
 
 static command_t CommandTable[] =
