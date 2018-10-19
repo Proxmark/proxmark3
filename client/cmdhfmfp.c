@@ -341,6 +341,26 @@ int CmdHFMFPCommitPerso(const char *cmd) {
 	return 0;
 }
 
+int CmdHFMFPAuth(const char *cmd) {
+	
+	return 0;
+}
+
+int CmdHFMFPRdbl(const char *cmd) {
+	
+	return 0;
+}
+
+int CmdHFMFPRdsc(const char *cmd) {
+	
+	return 0;
+}
+
+int CmdHFMFPWrbl(const char *cmd) {
+	
+	return 0;
+}
+
 static command_t CommandTable[] =
 {
   {"help",             CmdHelp,					1, "This help"},
@@ -348,6 +368,10 @@ static command_t CommandTable[] =
   {"wrp",	  	       CmdHFMFPWritePerso,		0, "Write Perso command"},
   {"initp",  	       CmdHFMFPInitPerso,		0, "Fills all the card's keys"},
   {"commitp",  	       CmdHFMFPCommitPerso,		0, "Move card to SL1 or SL3 mode"},
+//  {"auth",  	       CmdHFMFPAuth,			0, "Authentication in iso1443-4"},
+//  {"rdbl",  	       CmdHFMFPRdbl,			0, "Read blocks"},
+//  {"rdsc",  	       CmdHFMFPRdsc,			0, "Read sectors"},
+//  {"wrbl",  	       CmdHFMFPWrbl,			0, "Write blocks"},
   {NULL,               NULL,					0, NULL}
 };
 
