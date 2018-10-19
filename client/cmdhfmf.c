@@ -29,7 +29,7 @@
 #include "hardnested/hardnested_bf_core.h"
 #include "cliparser/cliparser.h"
 #include "cmdhf14a.h"
-#include <polarssl/aes.h>
+#include "polarssl/libpcrypto.h"
 
 #define NESTED_SECTOR_RETRY     10			// how often we try mfested() until we give up
 
@@ -2635,38 +2635,6 @@ int CmdDecryptTraceCmds(const char *Cmd){
 	int len = 0;
 	param_gethex_ex(Cmd,3,data,&len);
 	return tryDecryptWord(param_get32ex(Cmd,0,0,16),param_get32ex(Cmd,1,0,16),param_get32ex(Cmd,2,0,16),data,len/2);
-}
-
-int aes_encode(uint8_t *iv, uint8_t *key, uint8_t *input, uint8_t *output, int length){
-	uint8_t iiv[16] = {0};
-	if (iv)
-		memcpy(iiv, iv, 16);
-	
-	aes_context aes;
-	aes_init(&aes);
-	if (aes_setkey_enc(&aes, key, 128))
-		return 1;
-	if (aes_crypt_cbc(&aes, AES_ENCRYPT, length, iiv, input, output))
-		return 2;
-	aes_free(&aes);
-
-	return 0;
-}
-
-int aes_decode(uint8_t *iv, uint8_t *key, uint8_t *input, uint8_t *output, int length){
-	uint8_t iiv[16] = {0};
-	if (iv)
-		memcpy(iiv, iv, 16);
-	
-	aes_context aes;
-	aes_init(&aes);
-	if (aes_setkey_dec(&aes, key, 128))
-		return 1;
-	if (aes_crypt_cbc(&aes, AES_DECRYPT, length, iiv, input, output))
-		return 2;
-	aes_free(&aes);
-
-	return 0;
 }
 
 int CmdHF14AMfAuth4(const char *cmd) {

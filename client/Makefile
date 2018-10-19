@@ -110,6 +110,7 @@ CMDSRCS = 	$(SRC_SMARTCARD) \
 			polarssl/bignum.c\
 			polarssl/rsa.c\
 			polarssl/sha1.c\
+			polarssl/libpcrypto.c\
 			cliparser/argtable3.c\
 			cliparser/cliparser.c\
 			mfkey.c\
