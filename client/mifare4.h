@@ -1,0 +1,22 @@
+//-----------------------------------------------------------------------------
+// Copyright (C) 2018 Merlok
+//
+// This code is licensed to you under the terms of the GNU GPL, version 2 or,
+// at your option, any later version. See the LICENSE.txt file for the text of
+// the license.
+//-----------------------------------------------------------------------------
+// iso14443-4 mifare commands
+//-----------------------------------------------------------------------------
+
+#ifndef MIFARE4_H
+#define MIFARE4_H
+
+#include <stdint.h>
+#include <stdbool.h>
+#include <stddef.h>
+
+extern int MifareAuth4(uint8_t *keyn, uint8_t *key, bool activateField, bool leaveSignalON, bool verbose);
+
+
+
+#endif // mifare4.h

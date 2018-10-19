@@ -29,7 +29,7 @@
 #include "hardnested/hardnested_bf_core.h"
 #include "cliparser/cliparser.h"
 #include "cmdhf14a.h"
-#include "polarssl/libpcrypto.h"
+#include "mifare4.h"
 
 #define NESTED_SECTOR_RETRY     10			// how often we try mfested() until we give up
 
@@ -2642,13 +2642,7 @@ int CmdHF14AMfAuth4(const char *cmd) {
 	int keynlen = 0;
 	uint8_t key[16] = {0};
 	int keylen = 0;
-	uint8_t data[257] = {0};
-	int datalen = 0;
-	
-	uint8_t Rnd1[17] = {0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x00};
-	uint8_t Rnd2[17] = {0};
-	
-	
+
 	CLIParserInit("hf mf auth4", 
 		"Executes AES authentication command in ISO14443-4", 
 		"Usage:\n\thf mf auth4 4000 000102030405060708090a0b0c0d0e0f -> executes authentication\n"
@@ -2676,73 +2670,7 @@ int CmdHF14AMfAuth4(const char *cmd) {
 		return 1;
 	}
 
-	uint8_t cmd1[] = {0x70, keyn[1], keyn[0], 0x00};
-	int res = ExchangeRAW14a(cmd1, sizeof(cmd1), true, true, data, sizeof(data), &datalen);
-	if (res) {
-		PrintAndLog("ERROR exchande raw error: %d", res);
-		DropField();
-		return 2;
-	}
-	
-	PrintAndLog("<phase1: %s", sprint_hex(data, datalen));
-		
-	if (datalen < 1) {
-		PrintAndLog("ERROR: card response length: %d", datalen);
-		DropField();
-		return 3;
-	}
-	
-	if (data[0] != 0x90) {
-		PrintAndLog("ERROR: card response error: %02x", data[2]);
-		DropField();
-		return 3;
-	}
-
-	if (datalen != 19) { // code 1b + 16b + crc 2b
-		PrintAndLog("ERROR: card response must be 19 bytes long instead of: %d", datalen);
-		DropField();
-		return 3;
-	}
-	
-    aes_decode(NULL, key, &data[1], Rnd2, 16);
-	Rnd2[16] = Rnd2[0];
-	PrintAndLog("Rnd2: %s", sprint_hex(Rnd2, 16));
-
-	uint8_t cmd2[33] = {0};
-	cmd2[0] = 0x72;
-
-	uint8_t raw[32] = {0};
-	memmove(raw, Rnd1, 16);
-	memmove(&raw[16], &Rnd2[1], 16);
-
-    aes_encode(NULL, key, raw, &cmd2[1], 32);
-	PrintAndLog(">phase2: %s", sprint_hex(cmd2, 33));
-	
-	res = ExchangeRAW14a(cmd2, sizeof(cmd2), false, false, data, sizeof(data), &datalen);
-	if (res) {
-		PrintAndLog("ERROR exchande raw error: %d", res);
-		DropField();
-		return 4;
-	}
-	
-	PrintAndLog("<phase2: %s", sprint_hex(data, datalen));
-
-    aes_decode(NULL, key, &data[1], raw, 32);
-	PrintAndLog("res: %s", sprint_hex(raw, 32));
-	
-	PrintAndLog("Rnd1`: %s", sprint_hex(&raw[4], 16));
-	if (memcmp(&raw[4], &Rnd1[1], 16)) {
-		PrintAndLog("\nERROR: Authentication FAILED. rnd not equal");
-		PrintAndLog("rnd1 reader: %s", sprint_hex(&Rnd1[1], 16));
-		PrintAndLog("rnd1   card: %s", sprint_hex(&raw[4], 16));
-		DropField();
-		return 5;
-	}
-
-	DropField();
-	PrintAndLog("\nAuthentication OK");
-	
-	return 0;
+	return MifareAuth4(keyn, key, true, false, true);
 }
 
 static command_t CommandTable[] =

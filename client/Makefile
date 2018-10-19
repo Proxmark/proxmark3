@@ -121,6 +121,7 @@ CMDSRCS = 	$(SRC_SMARTCARD) \
 			loclass/fileutils.c\
 			whereami.c\
 			mifarehost.c\
+			mifare4.c\
 			parity.c\
 			crc.c \
 			crc16.c \

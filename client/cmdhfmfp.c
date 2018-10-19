@@ -21,6 +21,7 @@
 #include "ui.h"
 #include "cmdhf14a.h"
 #include "mifare.h"
+#include "mifare4.h"
 #include "cliparser/cliparser.h"
 #include "polarssl/libpcrypto.h"
 
@@ -342,8 +343,41 @@ int CmdHFMFPCommitPerso(const char *cmd) {
 }
 
 int CmdHFMFPAuth(const char *cmd) {
+	uint8_t keyn[250] = {0};
+	int keynlen = 0;
+	uint8_t key[250] = {0};
+	int keylen = 0;
 	
-	return 0;
+	CLIParserInit("hf mfp auth", 
+		"Executes AES authentication command in ISO14443-4", 
+		"Usage:\n\thf mfp auth 4000 000102030405060708090a0b0c0d0e0f -> executes authentication\n"
+			"\thf mfp auth 9003 FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF -> executes authentication\n");
+
+	void* argtable[] = {
+		arg_param_begin,
+		arg_lit0("vV",  "verbose", "show internal data."),
+		arg_str1(NULL,  NULL,     "<Key Num (HEX 2 bytes)>", NULL),
+		arg_str1(NULL,  NULL,     "<Key Value (HEX 16 bytes)>", NULL),
+		arg_param_end
+	};
+	CLIExecWithReturn(cmd, argtable, true);
+	
+	bool verbose = arg_get_lit(1);
+	CLIGetHexWithReturn(2, keyn, &keynlen);
+	CLIGetHexWithReturn(3, key, &keylen);
+	CLIParserFree();
+	
+	if (keynlen != 2) {
+		PrintAndLog("ERROR: <Key Num> must be 2 bytes long instead of: %d", keynlen);
+		return 1;
+	}
+	
+	if (keylen != 16) {
+		PrintAndLog("ERROR: <Key Value> must be 16 bytes long instead of: %d", keylen);
+		return 1;
+	}
+
+	return MifareAuth4(keyn, key, true, false, verbose);
 }
 
 int CmdHFMFPRdbl(const char *cmd) {
@@ -368,7 +402,7 @@ static command_t CommandTable[] =
   {"wrp",	  	       CmdHFMFPWritePerso,		0, "Write Perso command"},
   {"initp",  	       CmdHFMFPInitPerso,		0, "Fills all the card's keys"},
   {"commitp",  	       CmdHFMFPCommitPerso,		0, "Move card to SL1 or SL3 mode"},
-//  {"auth",  	       CmdHFMFPAuth,			0, "Authentication in iso1443-4"},
+  {"auth",  	       CmdHFMFPAuth,			0, "Authentication in iso1443-4"},
 //  {"rdbl",  	       CmdHFMFPRdbl,			0, "Read blocks"},
 //  {"rdsc",  	       CmdHFMFPRdsc,			0, "Read sectors"},
 //  {"wrbl",  	       CmdHFMFPWrbl,			0, "Write blocks"},
