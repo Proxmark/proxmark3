@@ -31,10 +31,11 @@ typedef struct {
 } PlusErrorsElm;
 
 static const PlusErrorsElm PlusErrors[] = {
-	{0x00, ""},
-	{0x09, "targeted block is invalid for writes"},
-	{0x0b, "command invalid"},
-	{0x0c, "unexpected command length"},
+	{0xFF, ""},
+	{0x00, "Unknown error"},
+	{0x09, "Invalid block number"},
+	{0x0b, "Command code error"},
+	{0x0c, "Length error"},
 	{0x90, "OK"},
 };
 int PlusErrorsLen = sizeof(PlusErrors) / sizeof(PlusErrorsElm);
@@ -222,15 +223,86 @@ int CmdHFMFPWritePerso(const char *cmd) {
 	return 0;
 }
 
-int CmdHFMFPInitPerso(const char *cmd) {
+uint16_t CardAddresses[] = {0x9000, 0x9001, 0x9003, 0x9004, 0xA000, 0xA001, 0xA080, 0xA081, 0xC000, 0xC001};
 
+int CmdHFMFPInitPerso(const char *cmd) {
+	int res;
+	uint8_t key[256] = {0};
+	int keyLen = 0;
+	uint8_t keyNum[2] = {0};
+	uint8_t data[250] = {0};
+	int datalen = 0;
+
+	CLIParserInit("hf mfp initp", 
+		"Executes Write Perso command for all card's keys. Can be used in SL0 mode only.", 
+		"Usage:\n\thf mfp initp 000102030405060708090a0b0c0d0e0f -> fill all the keys with key (00..0f)\n"
+			"\thf mfp initp -vv -> fill all the keys with default key(0xff..0xff) and show all the data exchange");
+
+	void* argtable[] = {
+		arg_param_begin,
+		arg_litn("vV",  "verbose", 0, 2, "show internal data."),
+		arg_strx0(NULL,  NULL,      "<HEX key (16b)>", NULL),
+		arg_param_end
+	};
+	CLIExecWithReturn(cmd, argtable, true);
+	
+	bool verbose = arg_get_lit(1);
+	bool verbose2 = arg_get_lit(1) > 1;
+	CLIGetHexWithReturn(2, key, &keyLen);
+	CLIParserFree();
+
+	if (keyLen && keyLen != 16) {
+		PrintAndLog("Key length must be 16 bytes instead of: %d", keyLen);
+		return 1;
+	}
+	
+	if (!keyLen)
+		memmove(key, DefaultKey, 16);
+
+	SetVerboseMode(verbose2);
+	for (uint16_t sn = 0x4000; sn < 0x4050; sn++) {
+		keyNum[0] = sn >> 8;
+		keyNum[1] = sn & 0xff;
+		res = MFPWritePerso(keyNum, key, (sn == 0x4000), true, data, sizeof(data), &datalen);
+		if (!res && (datalen == 3) && data[0] == 0x09) {
+			PrintAndLog("2k card detected.");
+			break;
+		}
+		if (res || (datalen != 3) || data[0] != 0x90) {
+			PrintAndLog("Write error on address %04x", sn);
+			break;
+		}
+	}
+	
+	SetVerboseMode(verbose);
+	for (int i = 0; i < sizeof(CardAddresses) / 2; i++) {
+		keyNum[0] = CardAddresses[i] >> 8;
+		keyNum[1] = CardAddresses[i] & 0xff;
+		res = MFPWritePerso(keyNum, key, false, true, data, sizeof(data), &datalen);
+		if (!res && (datalen == 3) && data[0] == 0x09) {
+			PrintAndLog("Skipped[%04x]...", CardAddresses[i]);
+		} else {
+			if (res || (datalen != 3) || data[0] != 0x90) {
+				PrintAndLog("Write error on address %04x", CardAddresses[i]);
+				break;
+			}
+		}
+	}
+	
+	DropField();
+	
+	if (res)
+		return res;
+	
+	PrintAndLog("Done.");
+	
 	return 0;
 }
 
 int CmdHFMFPCommitPerso(const char *cmd) {
 	CLIParserInit("hf mfp commitp", 
 		"Executes Commit Perso command. Can be used in SL0 mode only.", 
-		"Usage:\n\thf mfp commitp 01 ->  \n");
+		"Usage:\n\thf mfp commitp ->  \n");
 
 	void* argtable[] = {
 		arg_param_begin,
