@@ -2694,8 +2694,8 @@ int CmdHF14AMfAuth4(const char *cmd) {
 	};
 	CLIExecWithReturn(cmd, argtable, true);
 	
-	CLIGetStrWithReturn(1, keyn, &keynlen);
-	CLIGetStrWithReturn(2, key, &keylen);
+	CLIGetHexWithReturn(1, keyn, &keynlen);
+	CLIGetHexWithReturn(2, key, &keylen);
 	CLIParserFree();
 	
 	if (keynlen != 2) {
