@@ -11,7 +11,7 @@
 $ENV{'LC_ALL'} = "C";
 $ENV{'LANG'} = "C";
 
-my $gitversion = `git describe --dirty`;
+my $gitversion = `git describe --dirty --tags`;
 my $gitbranch = `git rev-parse --abbrev-ref HEAD`;
 my $clean = 2;
 my @compiletime = gmtime();
