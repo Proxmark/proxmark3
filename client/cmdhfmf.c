@@ -1040,7 +1040,7 @@ int CmdHF14AMfChk(const char *Cmd)
 	int	keycnt = 0;
 	char ctmp	= 0x00;
 	int clen = 0;
-	char ctmp3[3]	= {0x00};
+	char ctmp3[4]	= {0x00,0x00,0x00,0x00};
 	uint8_t blockNo = 0;
 	uint8_t SectorsCnt = 0;
 	uint8_t keyType = 0;
@@ -1050,7 +1050,8 @@ int CmdHF14AMfChk(const char *Cmd)
 
 	int transferToEml = 0;
 	int createDumpFile = 0;
-	
+	int slower = 0;
+
 	sector_t *e_sector = NULL;
 
 	keyBlock = calloc(stKeyBlock, 6);
@@ -1088,31 +1089,33 @@ int CmdHF14AMfChk(const char *Cmd)
 	}
 
 	// transfer to emulator & create dump file
-	ctmp = param_getchar(Cmd, 2);
-	clen = param_getlength(Cmd, 2);
-	if (clen == 1 && (ctmp == 't' || ctmp == 'T')) transferToEml = 1;
-	if (clen == 1 && (ctmp == 'd' || ctmp == 'D')) createDumpFile = 1;
-	
-	param3InUse = transferToEml | createDumpFile;
-	
 	timeout14a = 500; // fast by default
-	// double parameters - ts, ds
+
 	clen = param_getlength(Cmd, 2);
-	if (clen == 2 || clen == 3){
-		param_getstr(Cmd, 2, ctmp3, sizeof(ctmp3));
-		ctmp = ctmp3[1];
-	}
-	//parse
-	if (ctmp == 's' || ctmp == 'S') {
-		timeout14a = 1000; // slow
-		if (!param3InUse && clen == 2 && (ctmp3[1] == 's' || ctmp3[1] == 'S')) {
-			timeout14a = 5000; // very slow
+	param_getstr(Cmd, 2, ctmp3, sizeof(ctmp3));
+
+	for (i = 0; i < sizeof(ctmp3); i++) {
+		ctmp = ctmp3[i];
+		if (!createDumpFile && (ctmp == 't' || ctmp == 'T')) {
+			transferToEml = 1; // mutually exclusive with d
 		}
-		if (param3InUse && clen == 3 && (ctmp3[2] == 's' || ctmp3[2] == 'S')) {
-			timeout14a = 5000; // very slow
+		if (!transferToEml && (ctmp == 'd' || ctmp == 'D' )) {
+			createDumpFile = 1; // mutually exclusive with t
 		}
-		param3InUse = true;
+		if (ctmp == 's' || ctmp == 'S') {
+			if (timeout14a == 500) {
+				timeout14a = 1000; // slow
+				slower = 1;
+                                PrintAndLog("Using 1ms timeout");
+			} else if (timeout14a == 1000) {
+				timeout14a = 5000; // very slow
+				slower = 1;
+                                PrintAndLog("Using 5ms timeout");
+			}
+		}
 	}
+
+	param3InUse = transferToEml | createDumpFile | slower;
 
 	for (i = param3InUse; param_getchar(Cmd, 2 + i); i++) {
 		if (!param_gethex(Cmd, 2 + i, keyBlock + 6 * keycnt, 12)) {
