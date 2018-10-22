@@ -270,7 +270,7 @@ int CmdHFFidoAuthenticate(const char *cmd) {
 		arg_lit0("vV",  "verbose",  "show technical data"),
 		arg_lit0("pP",  "plain",    "send plain ASCII to challenge and application parameters instead of HEX"),
 		arg_rem("default mode:",    "dont-enforce-user-presence-and-sign"),
-		arg_lit0("pP",  "presence", "mode: enforce-user-presence-and-sign"),
+		arg_lit0("uU",  "user",     "mode: enforce-user-presence-and-sign"),
 		arg_lit0("cC",  "check",    "mode: check-only"),
 		arg_str1(NULL,  NULL,       "<HEX key handle (var 0..255b)>", NULL),
 		arg_str0(NULL,  NULL,       "<HEX/ASCII challenge parameter (32b HEX/1..16 chars)>", NULL),
