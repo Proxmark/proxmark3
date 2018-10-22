@@ -115,40 +115,66 @@ int CmdHFFidoInfo(const char *cmd) {
 
 int CmdHFFidoRegister(const char *cmd) {
 	uint8_t data[64] = {0};
-	uint8_t hdata[32] = {0};
-	int datalen = 0;
+	int chlen = 0;
+	uint8_t cdata[250] = {0};
+	int applen = 0;
+	uint8_t adata[250] = {0};
 	
 	CLIParserInit("hf fido reg", 
 		"Initiate a U2F token registration. Needs two 32-byte hash number. \nchallenge parameter (32b) and application parameter (32b).", 
 		"Usage:\n\thf fido reg -> execute command with 2 parameters, filled 0x00\n"
-			"\thf fido reg 000102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e0f 000102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e0f -> execute command with parameters");
+			"\thf fido reg 000102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e0f 000102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e0f -> execute command with parameters"
+			"\thf fido reg -p s0 s1 -> execute command with plain parameters");
 
 	void* argtable[] = {
 		arg_param_begin,
 		arg_lit0("aA",  "apdu",     "show APDU reqests and responses"),
 		arg_lit0("vV",  "verbose",  "show technical data"),
-		arg_str0(NULL,  NULL,       "<HEX challenge parameter (32b)>", NULL),
-		arg_str0(NULL,  NULL,       "<HEX application parameter (32b)>", NULL),
+		arg_lit0("pP",  "plain",    "send plain ASCII to challenge and application parameters instead of HEX"),
+		arg_str0(NULL,  NULL,       "<HEX/ASCII challenge parameter (32b HEX/1..16 chars)>", NULL),
+		arg_str0(NULL,  NULL,       "<HEX/ASCII application parameter (32b HEX/1..16 chars)>", NULL),
 		arg_param_end
 	};
 	CLIExecWithReturn(cmd, argtable, true);
 	
 	bool APDULogging = arg_get_lit(1);
 	bool verbose = arg_get_lit(2);
-	CLIGetStrWithReturn(3, hdata, &datalen);
-	if (datalen && datalen != 32) {
-		PrintAndLog("ERROR: challenge parameter length must be 32 bytes only.");
-		return 1;
+	bool paramsPlain = arg_get_lit(3);
+	if (paramsPlain) {
+		memset(cdata, 0x00, 32);
+		CLIGetStrWithReturn(4, cdata, &chlen);
+		if (chlen && chlen > 16) {
+			PrintAndLog("ERROR: challenge parameter length in ASCII mode must be less than 16 chars instead of: %d", chlen);
+			return 1;
+		}
+	} else {
+		CLIGetHexWithReturn(4, cdata, &chlen);
+		if (chlen && chlen != 32) {
+			PrintAndLog("ERROR: challenge parameter length must be 32 bytes only.");
+			return 1;
+		}
 	}
-	if (datalen)
-		memmove(data, hdata, 32);
-	CLIGetStrWithReturn(4, hdata, &datalen);
-	if (datalen && datalen != 32) {
-		PrintAndLog("ERROR: application parameter length must be 32 bytes only.");
-		return 1;
+	if (chlen)
+		memmove(data, cdata, 32);
+	
+	
+	if (paramsPlain) {
+		memset(adata, 0x00, 32);
+		CLIGetStrWithReturn(5, adata, &applen);
+		if (applen && applen > 16) {
+			PrintAndLog("ERROR: application parameter length in ASCII mode must be less than 16 chars instead of: %d", applen);
+			return 1;
+		}
+	} else {
+		CLIGetHexWithReturn(5, adata, &applen);
+		if (applen && applen != 32) {
+			PrintAndLog("ERROR: application parameter length must be 32 bytes only.");
+			return 1;
+		}
 	}
-	if (datalen)
-		memmove(&data[32], hdata, 32);
+	if (applen)
+		memmove(&data[32], adata, 32);
+	
 	CLIParserFree();	
 	
 	SetAPDULogging(APDULogging);
@@ -220,7 +246,7 @@ int CmdHFFidoRegister(const char *cmd) {
 	
 	// check ANSI X9.62 format ECDSA signature (on P-256)
 	
-	PrintAndLog("\nauth command: hf fido auth %s", sprint_hex_inrow(&buf[67], keyHandleLen));
+	PrintAndLog("\nauth command: hf fido auth %s %s %s %s", paramsPlain?"-p":"",	sprint_hex_inrow(&buf[67], keyHandleLen), cdata, adata);
 
 	DropField();
 	return 0;
@@ -228,7 +254,7 @@ int CmdHFFidoRegister(const char *cmd) {
 
 int CmdHFFidoAuthenticate(const char *cmd) {
 	uint8_t data[512] = {0};
-	uint8_t hdata[128] = {0};
+	uint8_t hdata[250] = {0};
 	int hdatalen = 0;
 	uint8_t keyHandleLen = 0;
 	
@@ -242,25 +268,27 @@ int CmdHFFidoAuthenticate(const char *cmd) {
 		arg_param_begin,
 		arg_lit0("aA",  "apdu",     "show APDU reqests and responses"),
 		arg_lit0("vV",  "verbose",  "show technical data"),
+		arg_lit0("pP",  "plain",    "send plain ASCII to challenge and application parameters instead of HEX"),
 		arg_rem("default mode:",    "dont-enforce-user-presence-and-sign"),
 		arg_lit0("pP",  "presence", "mode: enforce-user-presence-and-sign"),
 		arg_lit0("cC",  "check",    "mode: check-only"),
 		arg_str1(NULL,  NULL,       "<HEX key handle (var 0..255b)>", NULL),
-		arg_str0(NULL,  NULL,       "<HEX challenge parameter (32b)>", NULL),
-		arg_str0(NULL,  NULL,       "<HEX application parameter (32b)>", NULL),
+		arg_str0(NULL,  NULL,       "<HEX/ASCII challenge parameter (32b HEX/1..16 chars)>", NULL),
+		arg_str0(NULL,  NULL,       "<HEX/ASCII application parameter (32b HEX/1..16 chars)>", NULL),
 		arg_param_end
 	};
 	CLIExecWithReturn(cmd, argtable, true);
 	
 	bool APDULogging = arg_get_lit(1);
 	//bool verbose = arg_get_lit(2);
+	bool paramsPlain = arg_get_lit(3);
 	uint8_t controlByte = 0x08;
-	if (arg_get_lit(4))
-		controlByte = 0x03;
 	if (arg_get_lit(5))
+		controlByte = 0x03;
+	if (arg_get_lit(6))
 		controlByte = 0x07;
 	
-	CLIGetStrWithReturn(6, hdata, &hdatalen);
+	CLIGetHexWithReturn(7, hdata, &hdatalen);
 	if (hdatalen > 255) {
 		PrintAndLog("ERROR: application parameter length must be less than 255.");
 		return 1;
@@ -271,18 +299,36 @@ int CmdHFFidoAuthenticate(const char *cmd) {
 		memmove(&data[65], hdata, keyHandleLen);
 	}
 
-	CLIGetStrWithReturn(7, hdata, &hdatalen);
-	if (hdatalen && hdatalen != 32) {
-		PrintAndLog("ERROR: challenge parameter length must be 32 bytes only.");
-		return 1;
+	if (paramsPlain) {
+		memset(hdata, 0x00, 32);
+		CLIGetStrWithReturn(8, hdata, &hdatalen);
+		if (hdatalen && hdatalen > 16) {
+			PrintAndLog("ERROR: challenge parameter length in ASCII mode must be less than 16 chars instead of: %d", hdatalen);
+			return 1;
+		}
+	} else {
+		CLIGetHexWithReturn(8, hdata, &hdatalen);
+		if (hdatalen && hdatalen != 32) {
+			PrintAndLog("ERROR: challenge parameter length must be 32 bytes only.");
+			return 1;
+		}
 	}
 	if (hdatalen)
 		memmove(data, hdata, 32);
 
-	CLIGetStrWithReturn(8, hdata, &hdatalen);
-	if (hdatalen && hdatalen != 32) {
-		PrintAndLog("ERROR: application parameter length must be 32 bytes only.");
-		return 1;
+	if (paramsPlain) {
+		memset(hdata, 0x00, 32);
+		CLIGetStrWithReturn(9, hdata, &hdatalen);
+		if (hdatalen && hdatalen > 16) {
+			PrintAndLog("ERROR: application parameter length in ASCII mode must be less than 16 chars instead of: %d", hdatalen);
+			return 1;
+		}
+	} else {
+		CLIGetHexWithReturn(9, hdata, &hdatalen);
+		if (hdatalen && hdatalen != 32) {
+			PrintAndLog("ERROR: application parameter length must be 32 bytes only.");
+			return 1;
+		}
 	}
 	if (hdatalen)
 		memmove(&data[32], hdata, 32);
