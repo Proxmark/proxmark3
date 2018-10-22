@@ -140,6 +140,7 @@ CMDSRCS = 	$(SRC_SMARTCARD) \
 			emv/tlv.c\
 			emv/emv_tags.c\
 			emv/dol.c\
+			emv/emvjson.c\
 			emv/emvcore.c\
 			emv/test/crypto_test.c\
 			emv/test/sda_test.c\
@@ -155,6 +156,7 @@ CMDSRCS = 	$(SRC_SMARTCARD) \
 			cmdhflegic.c \
 			cmdhficlass.c \
 			cmdhfmf.c \
+			cmdhfmfp.c \
 			cmdhfmfu.c \
 			cmdhfmfhard.c \
 			hardnested/hardnested_bruteforce.c \
