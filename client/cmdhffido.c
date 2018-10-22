@@ -246,8 +246,14 @@ int CmdHFFidoRegister(const char *cmd) {
 	
 	// check ANSI X9.62 format ECDSA signature (on P-256)
 	
-	PrintAndLog("\nauth command: hf fido auth %s %s %s %s", paramsPlain?"-p":"",	sprint_hex_inrow(&buf[67], keyHandleLen), cdata, adata);
-
+	PrintAndLog("\nauth command: ");
+	printf("hf fido auth %s %s", paramsPlain?"-p":"", sprint_hex_inrow(&buf[67], keyHandleLen));
+	if(chlen || applen)
+		printf(" %s", paramsPlain?(char *)cdata:sprint_hex_inrow(cdata, 32));
+	if(applen)
+		printf(" %s", paramsPlain?(char *)adata:sprint_hex_inrow(adata, 32));
+	printf("\n");
+	
 	DropField();
 	return 0;
 };
