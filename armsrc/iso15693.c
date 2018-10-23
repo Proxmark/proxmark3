@@ -837,6 +837,7 @@ static void DecodeReaderInit(uint8_t *data, uint16_t max_len, DecodeReader_t* De
 	DecodeReader->state = STATE_READER_UNSYNCD;
 	DecodeReader->byteCount = 0;
 	DecodeReader->bitCount = 0;
+	DecodeReader->posCount = 0;
 	DecodeReader->shiftReg = 0;
 }
 
