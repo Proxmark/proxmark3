@@ -16,6 +16,13 @@
 // Jonathan Westhues, October 2006
 //-----------------------------------------------------------------------------
 
+// possible mod_types:
+`define NO_MODULATION        3'b000
+`define MODULATE_BPSK        3'b001
+`define MODULATE_212K        3'b010
+`define MODULATE_424K        3'b100
+`define MODULATE_424K_8BIT   3'b101
+
 module hi_simulate(
     pck0, ck_1356meg, ck_1356megb,
     pwr_lo, pwr_hi, pwr_oe1, pwr_oe2, pwr_oe3, pwr_oe4,
@@ -35,10 +42,6 @@ module hi_simulate(
     output dbg;
     input [2:0] mod_type;
 
-// Power amp goes between LOW and tri-state, so pwr_hi (and pwr_lo) can
-// always be low.
-assign pwr_hi = 1'b0;
-assign pwr_lo = 1'b0;
 
 // The comparator with hysteresis on the output from the peak detector.
 reg after_hysteresis;
@@ -52,8 +55,8 @@ end
 
 
 // Divide 13.56 MHz to produce various frequencies for SSP_CLK
-// and modulation. 11 bits allow for factors of up to /128.
-reg [10:0] ssp_clk_divider;
+// and modulation.
+reg [7:0] ssp_clk_divider;
 
 always @(posedge adc_clk)
     ssp_clk_divider <= (ssp_clk_divider + 1);
@@ -62,10 +65,10 @@ reg ssp_clk;
 
 always @(negedge adc_clk)
 begin
-    if(mod_type == 3'b101)
+    if(mod_type == `MODULATE_424K_8BIT)
       // Get bit every at 53KHz (every 8th carrier bit of 424kHz)
       ssp_clk <= ssp_clk_divider[7];
-    else if(mod_type == 3'b010)
+    else if(mod_type == `MODULATE_212K)
       // Get next bit at 212kHz
       ssp_clk <= ssp_clk_divider[5];
     else
@@ -89,7 +92,7 @@ always @(negedge ssp_clk)
 
 reg ssp_frame;
 always @(ssp_frame_divider_to_arm or ssp_frame_divider_from_arm or mod_type)
-    if(mod_type == 3'b000) // not modulating, so listening, to ARM
+    if(mod_type == `NO_MODULATION) // not modulating, so listening, to ARM
         ssp_frame = (ssp_frame_divider_to_arm == 3'b000);
     else
         ssp_frame = (ssp_frame_divider_from_arm == 3'b000);
@@ -102,27 +105,29 @@ always @(posedge ssp_clk)
 // Modulating carrier frequency is fc/64 (212kHz) to fc/16 (848kHz). Reuse ssp_clk divider for that.
 reg modulating_carrier;
 always @(mod_type or ssp_clk or ssp_dout)
-    if(mod_type == 3'b000)
+    if (mod_type == `NO_MODULATION)
         modulating_carrier <= 1'b0;                          // no modulation
-    else if(mod_type == 3'b001)
+    else if (mod_type == `MODULATE_BPSK)
         modulating_carrier <= ssp_dout ^ ssp_clk_divider[3]; // XOR means BPSK
-    else if(mod_type == 3'b010)
+    else if (mod_type == `MODULATE_212K)
         modulating_carrier <= ssp_dout & ssp_clk_divider[5]; // switch 212kHz subcarrier on/off
-    else if(mod_type == 3'b100 || mod_type == 3'b101)
+    else if (mod_type == `MODULATE_424K || mod_type == `MODULATE_424K_8BIT)
         modulating_carrier <= ssp_dout & ssp_clk_divider[4]; // switch 424kHz modulation on/off
     else
         modulating_carrier <= 1'b0;                           // yet unused
 
-// This one is all LF, so doesn't matter
-assign pwr_oe2 = modulating_carrier;
 
-// Toggle only one of these, since we are already producing much deeper
+// Load modulation. Toggle only one of these, since we are already producing much deeper
 // modulation than a real tag would.
-assign pwr_oe1 = modulating_carrier;
-assign pwr_oe4 = modulating_carrier;
+assign pwr_hi = 1'b0;                   // HF antenna connected to GND
+assign pwr_oe3 = 1'b0;                  // 10k Load
+assign pwr_oe1 = modulating_carrier;    // 33 Ohms Load
+assign pwr_oe4 = modulating_carrier;    // 33 Ohms Load
 
-// This one is always on, so that we can watch the carrier.
-assign pwr_oe3 = 1'b0;
+// This is all LF and doesn't matter
+assign pwr_lo = 1'b0;
+assign pwr_oe2 = 1'b0;
+
 
 assign dbg = ssp_din;
 
