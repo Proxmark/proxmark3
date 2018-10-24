@@ -35,6 +35,9 @@ typedef struct {
 static const PlusErrorsElm PlusErrors[] = {
 	{0xFF, ""},
 	{0x00, "Unknown error"},
+	{0x06, "Block use error"},
+	{0x07, "Command use error"},
+	{0x08, "Invalid write command"},
 	{0x09, "Invalid block number"},
 	{0x0b, "Command code error"},
 	{0x0c, "Length error"},
@@ -80,6 +83,37 @@ int MFPCommitPerso(bool activateField, bool leaveSignalON, uint8_t *dataout, int
 	uint8_t rcmd[1] = {0xaa};
 	
 	return intExchangeRAW14aPlus(rcmd, sizeof(rcmd), activateField, leaveSignalON, dataout, maxdataoutlen, dataoutlen);
+}
+
+int MFPReadBlock(mf4Session *session, bool plain, uint8_t blockNum, uint8_t blockCount, bool activateField, bool leaveSignalON, uint8_t *dataout, int maxdataoutlen, int *dataoutlen, uint8_t *mac) {
+	uint8_t rcmd[4 + 8] = {(plain?(0x37):(0x33)), blockNum, 0x00, blockCount}; 
+	if (!plain && session)
+		CalulateMAC(session, rcmd, 4, &rcmd[4]);
+	
+	int res = intExchangeRAW14aPlus(rcmd, plain?4:sizeof(rcmd), activateField, leaveSignalON, dataout, maxdataoutlen, dataoutlen);
+	if(res)
+		return res;
+
+	if(session && mac)
+		CalulateMAC(session, dataout, *dataoutlen, mac);
+	
+	return 0;
+}
+
+int MFPWriteBlock(mf4Session *session, uint8_t blockNum, uint8_t *data, bool activateField, bool leaveSignalON, uint8_t *dataout, int maxdataoutlen, int *dataoutlen) {
+	uint8_t rcmd[1 + 2 + 16 + 8] = {0xA3, blockNum, 0x00};
+	memmove(&rcmd[3], data, 16);
+	if (session)
+		CalulateMAC(session, rcmd, 19, &rcmd[19]);
+	
+	int res = intExchangeRAW14aPlus(rcmd, sizeof(rcmd), activateField, leaveSignalON, dataout, maxdataoutlen, dataoutlen);
+	if(res)
+		return res;
+
+	if(session && mac)
+		CalulateMAC(session, dataout, *dataoutlen, mac);
+	
+	return 0;
 }
 
 int CmdHFMFPInfo(const char *cmd) {
@@ -349,7 +383,7 @@ int CmdHFMFPAuth(const char *cmd) {
 	int keylen = 0;
 	
 	CLIParserInit("hf mfp auth", 
-		"Executes AES authentication command in ISO14443-4", 
+		"Executes AES authentication command for Mifare Plus card", 
 		"Usage:\n\thf mfp auth 4000 000102030405060708090a0b0c0d0e0f -> executes authentication\n"
 			"\thf mfp auth 9003 FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF -v -> executes authentication and shows all the system data\n");
 
@@ -381,19 +415,295 @@ int CmdHFMFPAuth(const char *cmd) {
 }
 
 int CmdHFMFPRdbl(const char *cmd) {
-	//mf4Session session
-	//int res = MifareAuth4(&session, keyn, key, true, false, verbose);
-	//res = Read();
+	uint8_t keyn[2] = {0};
+	uint8_t key[250] = {0};
+	int keylen = 0;
+	
+	CLIParserInit("hf mfp rdbl", 
+		"Reads several blocks from Mifare Plus card in plain mode.", 
+		"Usage:\n\thf mfp rdbl 0 000102030405060708090a0b0c0d0e0f -> executes authentication and read block 0 data\n"
+			"\thf mfp rdbl 1 -v -> executes authentication and shows sector 1 data with default key 0xFF..0xFF and some additional data\n");
+
+	void* argtable[] = {
+		arg_param_begin,
+		arg_lit0("vV",  "verbose", "show internal data."),
+		arg_int0("nN",  "count",   "blocks count (by default 1).", NULL),
+		arg_lit0("bB",  "keyb",    "use key B (by default keyA)."),
+		arg_lit0("pP",  "plain",   "plain communication between reader and card."),
+		arg_int1(NULL,  NULL,      "<Block Num (0..255)>", NULL),
+		arg_str0(NULL,  NULL,      "<Key Value (HEX 16 bytes)>", NULL),
+		arg_param_end
+	};
+	CLIExecWithReturn(cmd, argtable, false);
+	
+	bool verbose = arg_get_lit(1);
+	int blocksCount = arg_get_int_def(2, 1);
+	bool keyB = arg_get_lit(3);
+	int plain = arg_get_lit(4) | true;
+	uint32_t blockn = arg_get_int(5);
+	CLIGetHexWithReturn(6, key, &keylen);
+	CLIParserFree();
+	
+	if (!keylen) {
+		memmove(key, DefaultKey, 16);
+		keylen = 16;
+	}
+	
+	if (blockn > 255) {
+		PrintAndLog("ERROR: <Block Num> must be in range [0..255] instead of: %d", blockn);
+		return 1;
+	}
+	
+	if (keylen != 16) {
+		PrintAndLog("ERROR: <Key Value> must be 16 bytes long instead of: %d", keylen);
+		return 1;
+	}
+
+	// 3 blocks - wo iso14443-4 chaining
+	if (blocksCount > 3) {
+		PrintAndLog("ERROR: blocks count must be less than 3 instead of: %d", blocksCount);
+		return 1;
+	}
+	
+	uint8_t sectorNum = mfSectorNum(blockn & 0xff);
+	uint16_t uKeyNum = 0x4000 + sectorNum * 2 + (keyB ? 1 : 0);
+	keyn[0] = uKeyNum >> 8;
+	keyn[1] = uKeyNum & 0xff;
+	if (verbose)
+		PrintAndLog("--block:%d sector[%d]:%02x key:%04x", blockn, mfNumBlocksPerSector(sectorNum), sectorNum, uKeyNum);
+	
+	mf4Session session;
+	int res = MifareAuth4(&session, keyn, key, true, true, verbose);
+	if (res) {
+		PrintAndLog("Authentication error: %d", res);
+		return res;
+	}
+	
+	uint8_t data[250] = {0};
+	int datalen = 0;
+	uint8_t mac[8] = {0};
+	res = MFPReadBlock(&session, plain, blockn & 0xff, blocksCount, false, false, data, sizeof(data), &datalen, mac);
+	if (res) {
+		PrintAndLog("Read error: %d", res);
+		return res;
+	}
+	
+	if (datalen && data[0] != 0x90) {
+		PrintAndLog("Card read error: %02x %s", data[0], GetErrorDescription(data[0]));
+		return 6;
+	}
+	
+	if (datalen != 1 + blocksCount * 16 + 8 + 2) {
+		PrintAndLog("Error return length:%d", datalen);
+		return 5;
+	}
+
+	int indx = blockn;
+	for(int i = 0; i < blocksCount; i++)  {
+		PrintAndLog("data[%03d]: %s", indx, sprint_hex(&data[1 + i * 16], 16));
+		indx++;
+		if (mfIsSectorTrailer(indx)){
+			PrintAndLog("data[%03d]: ------------------- trailer -------------------", indx);
+			indx++;
+		}
+	}
+
+	if (!memcmp(&data[blocksCount * 16 + 1], mac, 8)) {
+		PrintAndLog("WARNING: mac not equal...");
+		PrintAndLog("MAC   card: %s", sprint_hex(&data[blocksCount * 16 + 1], 8));
+		PrintAndLog("MAC reader: %s", sprint_hex(mac, 8));
+	} else {	
+		if(verbose)
+			PrintAndLog("MAC: %s", sprint_hex(&data[blocksCount * 16 + 1], 8));
+	}
 	
 	return 0;
 }
 
 int CmdHFMFPRdsc(const char *cmd) {
+	uint8_t keyn[2] = {0};
+	uint8_t key[250] = {0};
+	int keylen = 0;
+	
+	CLIParserInit("hf mfp rdsc", 
+		"Reads one sector from Mifare Plus card in plain mode.", 
+		"Usage:\n\thf mfp rdsc 0 000102030405060708090a0b0c0d0e0f -> executes authentication and read sector 0 data\n"
+			"\thf mfp rdsc 1 -v -> executes authentication and shows sector 1 data with default key 0xFF..0xFF and some additional data\n");
+
+	void* argtable[] = {
+		arg_param_begin,
+		arg_lit0("vV",  "verbose", "show internal data."),
+		arg_lit0("bB",  "keyb",    "use key B (by default keyA)."),
+		arg_lit0("pP",  "plain",   "plain communication between reader and card."),
+		arg_int1(NULL,  NULL,      "<Sector Num (0..255)>", NULL),
+		arg_str0(NULL,  NULL,      "<Key Value (HEX 16 bytes)>", NULL),
+		arg_param_end
+	};
+	CLIExecWithReturn(cmd, argtable, false);
+	
+	bool verbose = arg_get_lit(1);
+	bool keyB = arg_get_lit(2);
+	bool plain = arg_get_lit(3) | true;
+	uint32_t sectorNum = arg_get_int(4);
+	CLIGetHexWithReturn(5, key, &keylen);
+	CLIParserFree();
+	
+	if (!keylen) {
+		memmove(key, DefaultKey, 16);
+		keylen = 16;
+	}
+	
+	if (sectorNum > 39) {
+		PrintAndLog("ERROR: <Sector Num> must be in range [0..39] instead of: %d", sectorNum);
+		return 1;
+	}
+	
+	if (keylen != 16) {
+		PrintAndLog("ERROR: <Key Value> must be 16 bytes long instead of: %d", keylen);
+		return 1;
+	}
+	
+	uint16_t uKeyNum = 0x4000 + sectorNum * 2 + (keyB ? 1 : 0);
+	keyn[0] = uKeyNum >> 8;
+	keyn[1] = uKeyNum & 0xff;
+	if (verbose)
+		PrintAndLog("--sector[%d]:%02x key:%04x", mfNumBlocksPerSector(sectorNum), sectorNum, uKeyNum);
+	
+	mf4Session session;
+	int res = MifareAuth4(&session, keyn, key, true, true, verbose);
+	if (res) {
+		PrintAndLog("Authentication error: %d", res);
+		return res;
+	}
+	
+	uint8_t data[250] = {0};
+	int datalen = 0;
+	uint8_t mac[8] = {0};
+	for(int n = mfFirstBlockOfSector(sectorNum); n < mfFirstBlockOfSector(sectorNum) + mfNumBlocksPerSector(sectorNum); n++) {
+		res = MFPReadBlock(&session, plain, n & 0xff, 1, false, true, data, sizeof(data), &datalen, mac);
+		if (res) {
+			PrintAndLog("Read error: %d", res);
+			DropField();
+			return res;
+		}
+		
+		if (datalen && data[0] != 0x90) {
+			PrintAndLog("Card read error: %02x %s", data[0], GetErrorDescription(data[0]));
+			DropField();
+			return 6;
+		}
+		if (datalen != 1 + 16 + 8 + 2) {
+			PrintAndLog("Error return length:%d", datalen);
+			DropField();
+			return 5;
+		}
+
+		PrintAndLog("data[%03d]: %s", n, sprint_hex(&data[1], 16));
+			
+		if (!memcmp(&data[1 + 16], mac, 8)) {
+			PrintAndLog("WARNING: mac on block %d not equal...", n);
+			PrintAndLog("MAC   card: %s", sprint_hex(&data[1 + 16], 8));
+			PrintAndLog("MAC reader: %s", sprint_hex(mac, 8));
+		} else {	
+			if(verbose)
+				PrintAndLog("MAC: %s", sprint_hex(&data[1 + 16], 8));
+		}
+	}
+	DropField();
 	
 	return 0;
 }
 
 int CmdHFMFPWrbl(const char *cmd) {
+	uint8_t keyn[2] = {0};
+	uint8_t key[250] = {0};
+	int keylen = 0;
+	uint8_t datain[250] = {0};
+	int datainlen = 0;
+	
+	CLIParserInit("hf mfp wrbl", 
+		"Writes one block to Mifare Plus card.", 
+		"Usage:\n\thf mfp wrbl 1 ff0000000000000000000000000000ff 000102030405060708090a0b0c0d0e0f -> writes block 1 data\n"
+			"\thf mfp wrbl 2 ff0000000000000000000000000000ff -v -> writes block 2 data with default key 0xFF..0xFF and some additional data\n");
+
+	void* argtable[] = {
+		arg_param_begin,
+		arg_lit0("vV",  "verbose", "show internal data."),
+		arg_lit0("bB",  "keyb",    "use key B (by default keyA)."),
+		arg_int1(NULL,  NULL,      "<Block Num (0..255)>", NULL),
+		arg_str1(NULL,  NULL,      "<Data (HEX 16 bytes)>", NULL),
+		arg_str0(NULL,  NULL,      "<Key (HEX 16 bytes)>", NULL),
+		arg_param_end
+	};
+	CLIExecWithReturn(cmd, argtable, false);
+	
+	bool verbose = arg_get_lit(1);
+	bool keyB = arg_get_lit(2);
+	uint32_t blockNum = arg_get_int(3);
+	CLIGetHexWithReturn(4, datain, &datainlen);
+	CLIGetHexWithReturn(5, key, &keylen);
+	CLIParserFree();
+	
+	if (!keylen) {
+		memmove(key, DefaultKey, 16);
+		keylen = 16;
+	}
+	
+	if (blockNum > 39) {
+		PrintAndLog("ERROR: <Block Num> must be in range [0..255] instead of: %d", blockNum);
+		return 1;
+	}
+	
+	if (keylen != 16) {
+		PrintAndLog("ERROR: <Key> must be 16 bytes long instead of: %d", keylen);
+		return 1;
+	}
+
+	if (datainlen != 16) {
+		PrintAndLog("ERROR: <Data> must be 16 bytes long instead of: %d", datainlen);
+		return 1;
+	}
+	
+	uint8_t sectorNum = mfSectorNum(blockNum & 0xff);
+	uint16_t uKeyNum = 0x4000 + sectorNum * 2 + (keyB ? 1 : 0);
+	keyn[0] = uKeyNum >> 8;
+	keyn[1] = uKeyNum & 0xff;
+	if (verbose)
+		PrintAndLog("--block:%d sector[%d]:%02x key:%04x", blockNum & 0xff, mfNumBlocksPerSector(sectorNum), sectorNum, uKeyNum);
+	
+	mf4Session session;
+	int res = MifareAuth4(&session, keyn, key, true, true, verbose);
+	if (res) {
+		PrintAndLog("Authentication error: %d", res);
+		return res;
+	}
+
+	uint8_t data[250] = {0};
+	int datalen = 0;
+	res = MFPWriteBlock(&session, blockNum & 0xff, datain, false, false, data, sizeof(data), &datalen);
+	if (res) {
+		PrintAndLog("Write error: %d", res);
+		return res;
+	}
+	
+	if (datalen != 3 && (datalen != 3 + 8)) {
+		PrintAndLog("Error return length:%d", datalen);
+		return 5;
+	}
+	
+	if (datalen && data[0] != 0x90) {
+		PrintAndLog("Card write error: %02x %s", data[0], GetErrorDescription(data[0]));
+		return 6;
+	}
+	
+	if (!memcmp(&data[1], mac, 8)) {
+		PrintAndLog("WARNING: mac on block %d not equal...", n);
+		PrintAndLog("MAC   card: %s", sprint_hex(&data[1], 8));
+		PrintAndLog("MAC reader: %s", sprint_hex(mac, 8));
+	} else {	
+		if(verbose)
+			PrintAndLog("MAC: %s", sprint_hex(&data[1], 8));
+	}
 	
 	return 0;
 }
@@ -405,9 +715,9 @@ static command_t CommandTable[] =
   {"wrp",	  	       CmdHFMFPWritePerso,		0, "Write Perso command"},
   {"initp",  	       CmdHFMFPInitPerso,		0, "Fills all the card's keys"},
   {"commitp",  	       CmdHFMFPCommitPerso,		0, "Move card to SL1 or SL3 mode"},
-  {"auth",  	       CmdHFMFPAuth,			0, "Authentication in iso1443-4"},
-//  {"rdbl",  	       CmdHFMFPRdbl,			0, "Read blocks"},
-//  {"rdsc",  	       CmdHFMFPRdsc,			0, "Read sectors"},
+  {"auth",  	       CmdHFMFPAuth,			0, "Authentication"},
+  {"rdbl",  	       CmdHFMFPRdbl,			0, "Read blocks"},
+  {"rdsc",  	       CmdHFMFPRdsc,			0, "Read sectors"},
 //  {"wrbl",  	       CmdHFMFPWrbl,			0, "Write blocks"},
   {NULL,               NULL,					0, NULL}
 };

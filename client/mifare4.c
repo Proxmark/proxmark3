@@ -16,6 +16,17 @@
 #include "ui.h"
 #include "polarssl/libpcrypto.h"
 
+int CalulateMAC(mf4Session *session, uint8_t *data, int datalen, uint8_t *mac, bool verbose) {
+	memset(mac, 0x00, 8);
+	if (!session || !session->Authenticated || !mac || !data || !datalen)
+		return 1;
+	
+	if (verbose)
+		PrintAndLog("MAC data[%d]: %s", datalen, sprint_hex(data, datalen));
+	
+	return aes_cmac8(NULL, session->Key, data, mac, datalen);
+}
+
 int MifareAuth4(mf4Session *session, uint8_t *keyn, uint8_t *key, bool activateField, bool leaveSignalON, bool verbose) {
 	uint8_t data[257] = {0};
 	int datalen = 0;
@@ -71,7 +82,7 @@ int MifareAuth4(mf4Session *session, uint8_t *keyn, uint8_t *key, bool activateF
 	if (verbose)
 		PrintAndLog(">phase2: %s", sprint_hex(cmd2, 33));
 	
-	res = ExchangeRAW14a(cmd2, sizeof(cmd2), false, false, data, sizeof(data), &datalen);
+	res = ExchangeRAW14a(cmd2, sizeof(cmd2), false, true, data, sizeof(data), &datalen);
 	if (res) {
 		PrintAndLog("ERROR exchande raw error: %d", res);
 		DropField();
@@ -109,6 +120,7 @@ int MifareAuth4(mf4Session *session, uint8_t *keyn, uint8_t *key, bool activateF
 		session->KeyNum = keyn[1] + (keyn[0] << 8);
 		memmove(session->Rnd1, Rnd1, 16);
 		memmove(session->Rnd2, Rnd2, 16);
+		memmove(session->Key, key, 16);
 	}
 	
 	PrintAndLog("Authentication OK");
@@ -116,3 +128,38 @@ int MifareAuth4(mf4Session *session, uint8_t *keyn, uint8_t *key, bool activateF
 	return 0;
 }
 
+// Mifare Memory Structure: up to 32 Sectors with 4 blocks each (1k and 2k cards),
+// plus evtl. 8 sectors with 16 blocks each (4k cards)
+uint8_t mfNumBlocksPerSector(uint8_t sectorNo) {
+	if (sectorNo < 32) 
+		return 4;
+	else
+		return 16;
+}
+
+uint8_t mfFirstBlockOfSector(uint8_t sectorNo) {
+	if (sectorNo < 32)
+		return sectorNo * 4;
+	else
+		return 32 * 4 + (sectorNo - 32) * 16;
+}
+
+uint8_t mfSectorTrailer(uint8_t blockNo) {
+	if (blockNo < 32*4) {
+		return (blockNo | 0x03);
+	} else {
+		return (blockNo | 0x0f);
+	}
+}
+
+bool mfIsSectorTrailer(uint8_t blockNo) {
+	return (blockNo == mfSectorTrailer(blockNo));
+}
+
+uint8_t mfSectorNum(uint8_t blockNo) {
+	if (blockNo < 32 * 4)
+		return blockNo / 4;
+	else
+		return 32 + (blockNo - 32 * 4) / 16;
+		
+}

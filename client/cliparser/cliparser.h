@@ -19,6 +19,7 @@
 #define arg_get_lit(n)(((struct arg_lit*)argtable[n])->count)
 #define arg_get_int_count(n)(((struct arg_int*)argtable[n])->count)
 #define arg_get_int(n)(((struct arg_int*)argtable[n])->ival[0])
+#define arg_get_int_def(n,def)(arg_get_int_count(n)?(arg_get_int(n)):(def))
 #define arg_get_str(n)((struct arg_str*)argtable[n])
 #define arg_get_str_len(n)(strlen(((struct arg_str*)argtable[n])->sval[0]))
 
