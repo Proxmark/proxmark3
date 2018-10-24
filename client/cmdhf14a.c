@@ -750,6 +750,11 @@ int ExchangeRAW14a(uint8_t *datain, int datainlen, bool activateField, bool leav
         recv = resp.d.asBytes;
         int iLen = resp.arg[0];
 		
+        if(!iLen) {
+			PrintAndLog("14aRAW ERROR: No card response.");
+            return 1;
+		}
+		
 		*dataoutlen = iLen - 2;
 		if (*dataoutlen < 0)
 			*dataoutlen = 0;
@@ -766,11 +771,6 @@ int ExchangeRAW14a(uint8_t *datain, int datainlen, bool activateField, bool leav
 		
 		memcpy(dataout, &recv[2], *dataoutlen);
 		
-        if(!iLen) {
-			PrintAndLog("14aRAW ERROR: No card response.");
-            return 1;
-		}
-
 		// CRC Check
 		if (iLen == -1) {
 			PrintAndLog("14aRAW ERROR: ISO 14443A CRC error.");

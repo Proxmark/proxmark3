@@ -9,6 +9,7 @@ This project uses the changelog in accordance with [keepchangelog](http://keepac
 ### Fixed
 
 ### Added
+- `hf mfp` group of commands (Merlok)
 
 ## [v3.1.0][2018-10-10]
 

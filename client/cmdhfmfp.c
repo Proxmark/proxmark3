@@ -21,8 +21,66 @@
 #include "ui.h"
 #include "cmdhf14a.h"
 #include "mifare.h"
+#include "mifare4.h"
+#include "cliparser/cliparser.h"
+#include "polarssl/libpcrypto.h"
+
+static const uint8_t DefaultKey[16] = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
+
+typedef struct {
+	uint8_t Code;
+	const char *Description;
+} PlusErrorsElm;
+
+static const PlusErrorsElm PlusErrors[] = {
+	{0xFF, ""},
+	{0x00, "Unknown error"},
+	{0x09, "Invalid block number"},
+	{0x0b, "Command code error"},
+	{0x0c, "Length error"},
+	{0x90, "OK"},
+};
+int PlusErrorsLen = sizeof(PlusErrors) / sizeof(PlusErrorsElm);
+
+const char * GetErrorDescription(uint8_t errorCode) {
+	for(int i = 0; i < PlusErrorsLen; i++)
+		if (errorCode == PlusErrors[i].Code)
+			return PlusErrors[i].Description;
+		
+	return PlusErrors[0].Description;
+}
 
 static int CmdHelp(const char *Cmd);
+
+static bool VerboseMode = false;
+void SetVerboseMode(bool verbose) {
+	VerboseMode = verbose;
+}
+
+int intExchangeRAW14aPlus(uint8_t *datain, int datainlen, bool activateField, bool leaveSignalON, uint8_t *dataout, int maxdataoutlen, int *dataoutlen) {
+	if(VerboseMode)
+		PrintAndLog(">>> %s", sprint_hex(datain, datainlen));
+	
+	int res = ExchangeRAW14a(datain, datainlen, activateField, leaveSignalON, dataout, maxdataoutlen, dataoutlen);
+
+	if(VerboseMode)
+		PrintAndLog("<<< %s", sprint_hex(dataout, *dataoutlen));
+	
+	return res;
+}
+
+int MFPWritePerso(uint8_t *keyNum, uint8_t *key, bool activateField, bool leaveSignalON, uint8_t *dataout, int maxdataoutlen, int *dataoutlen) {
+	uint8_t rcmd[3 + 16] = {0xa8, keyNum[1], keyNum[0], 0x00};
+	memmove(&rcmd[3], key, 16);
+	
+	return intExchangeRAW14aPlus(rcmd, sizeof(rcmd), activateField, leaveSignalON, dataout, maxdataoutlen, dataoutlen);
+}
+
+int MFPCommitPerso(bool activateField, bool leaveSignalON, uint8_t *dataout, int maxdataoutlen, int *dataoutlen) {
+	uint8_t rcmd[1] = {0xaa};
+	
+	return intExchangeRAW14aPlus(rcmd, sizeof(rcmd), activateField, leaveSignalON, dataout, maxdataoutlen, dataoutlen);
+}
 
 int CmdHFMFPInfo(const char *cmd) {
 	
@@ -103,10 +161,254 @@ int CmdHFMFPInfo(const char *cmd) {
 	return 0;
 }
 
+int CmdHFMFPWritePerso(const char *cmd) {
+	uint8_t keyNum[64] = {0};
+	int keyNumLen = 0;
+	uint8_t key[64] = {0};
+	int keyLen = 0;
+
+	CLIParserInit("hf mfp wrp", 
+		"Executes Write Perso command. Can be used in SL0 mode only.", 
+		"Usage:\n\thf mfp wrp 4000 000102030405060708090a0b0c0d0e0f -> write key (00..0f) to key number 4000 \n"
+			"\thf mfp wrp 4000 -> write default key(0xff..0xff) to key number 4000");
+
+	void* argtable[] = {
+		arg_param_begin,
+		arg_lit0("vV",  "verbose", "show internal data."),
+		arg_str1(NULL,  NULL,      "<HEX key number (2b)>", NULL),
+		arg_strx0(NULL,  NULL,     "<HEX key (16b)>", NULL),
+		arg_param_end
+	};
+	CLIExecWithReturn(cmd, argtable, true);
+	
+	bool verbose = arg_get_lit(1);
+	CLIGetHexWithReturn(2, keyNum, &keyNumLen);
+	CLIGetHexWithReturn(3, key, &keyLen);
+	CLIParserFree();
+	
+	SetVerboseMode(verbose);
+	
+	if (!keyLen) {
+		memmove(key, DefaultKey, 16);
+		keyLen = 16;
+	}
+	
+	if (keyNumLen != 2) {
+		PrintAndLog("Key number length must be 2 bytes instead of: %d", keyNumLen);
+		return 1;
+	}
+	if (keyLen != 16) {
+		PrintAndLog("Key length must be 16 bytes instead of: %d", keyLen);
+		return 1;
+	}
+
+	uint8_t data[250] = {0};
+	int datalen = 0;
+
+	int res = MFPWritePerso(keyNum, key, true, false, data, sizeof(data), &datalen);
+	if (res) {
+		PrintAndLog("Exchange error: %d", res);
+		return res;
+	}
+	
+	if (datalen != 3) {
+		PrintAndLog("Command must return 3 bytes instead of: %d", datalen);
+		return 1;
+	}
+
+	if (data[0] != 0x90) {
+		PrintAndLog("Command error: %02x %s", data[0], GetErrorDescription(data[0]));
+		return 1;
+	}
+	PrintAndLog("Write OK.");
+	
+	return 0;
+}
+
+uint16_t CardAddresses[] = {0x9000, 0x9001, 0x9002, 0x9003, 0x9004, 0xA000, 0xA001, 0xA080, 0xA081, 0xC000, 0xC001};
+
+int CmdHFMFPInitPerso(const char *cmd) {
+	int res;
+	uint8_t key[256] = {0};
+	int keyLen = 0;
+	uint8_t keyNum[2] = {0};
+	uint8_t data[250] = {0};
+	int datalen = 0;
+
+	CLIParserInit("hf mfp initp", 
+		"Executes Write Perso command for all card's keys. Can be used in SL0 mode only.", 
+		"Usage:\n\thf mfp initp 000102030405060708090a0b0c0d0e0f -> fill all the keys with key (00..0f)\n"
+			"\thf mfp initp -vv -> fill all the keys with default key(0xff..0xff) and show all the data exchange");
+
+	void* argtable[] = {
+		arg_param_begin,
+		arg_litn("vV",  "verbose", 0, 2, "show internal data."),
+		arg_strx0(NULL,  NULL,      "<HEX key (16b)>", NULL),
+		arg_param_end
+	};
+	CLIExecWithReturn(cmd, argtable, true);
+	
+	bool verbose = arg_get_lit(1);
+	bool verbose2 = arg_get_lit(1) > 1;
+	CLIGetHexWithReturn(2, key, &keyLen);
+	CLIParserFree();
+
+	if (keyLen && keyLen != 16) {
+		PrintAndLog("Key length must be 16 bytes instead of: %d", keyLen);
+		return 1;
+	}
+	
+	if (!keyLen)
+		memmove(key, DefaultKey, 16);
+
+	SetVerboseMode(verbose2);
+	for (uint16_t sn = 0x4000; sn < 0x4050; sn++) {
+		keyNum[0] = sn >> 8;
+		keyNum[1] = sn & 0xff;
+		res = MFPWritePerso(keyNum, key, (sn == 0x4000), true, data, sizeof(data), &datalen);
+		if (!res && (datalen == 3) && data[0] == 0x09) {
+			PrintAndLog("2k card detected.");
+			break;
+		}
+		if (res || (datalen != 3) || data[0] != 0x90) {
+			PrintAndLog("Write error on address %04x", sn);
+			break;
+		}
+	}
+	
+	SetVerboseMode(verbose);
+	for (int i = 0; i < sizeof(CardAddresses) / 2; i++) {
+		keyNum[0] = CardAddresses[i] >> 8;
+		keyNum[1] = CardAddresses[i] & 0xff;
+		res = MFPWritePerso(keyNum, key, false, true, data, sizeof(data), &datalen);
+		if (!res && (datalen == 3) && data[0] == 0x09) {
+			PrintAndLog("Skipped[%04x]...", CardAddresses[i]);
+		} else {
+			if (res || (datalen != 3) || data[0] != 0x90) {
+				PrintAndLog("Write error on address %04x", CardAddresses[i]);
+				break;
+			}
+		}
+	}
+	
+	DropField();
+	
+	if (res)
+		return res;
+	
+	PrintAndLog("Done.");
+	
+	return 0;
+}
+
+int CmdHFMFPCommitPerso(const char *cmd) {
+	CLIParserInit("hf mfp commitp", 
+		"Executes Commit Perso command. Can be used in SL0 mode only.", 
+		"Usage:\n\thf mfp commitp ->  \n");
+
+	void* argtable[] = {
+		arg_param_begin,
+		arg_lit0("vV",  "verbose", "show internal data."),
+		arg_int0(NULL,  NULL,      "SL mode", NULL),
+		arg_param_end
+	};
+	CLIExecWithReturn(cmd, argtable, true);
+	
+	bool verbose = arg_get_lit(1);
+	CLIParserFree();
+	
+	SetVerboseMode(verbose);
+	
+	uint8_t data[250] = {0};
+	int datalen = 0;
+
+	int res = MFPCommitPerso(true, false, data, sizeof(data), &datalen);
+	if (res) {
+		PrintAndLog("Exchange error: %d", res);
+		return res;
+	}
+	
+	if (datalen != 3) {
+		PrintAndLog("Command must return 3 bytes instead of: %d", datalen);
+		return 1;
+	}
+
+	if (data[0] != 0x90) {
+		PrintAndLog("Command error: %02x %s", data[0], GetErrorDescription(data[0]));
+		return 1;
+	}
+	PrintAndLog("Switch level OK.");
+
+	return 0;
+}
+
+int CmdHFMFPAuth(const char *cmd) {
+	uint8_t keyn[250] = {0};
+	int keynlen = 0;
+	uint8_t key[250] = {0};
+	int keylen = 0;
+	
+	CLIParserInit("hf mfp auth", 
+		"Executes AES authentication command in ISO14443-4", 
+		"Usage:\n\thf mfp auth 4000 000102030405060708090a0b0c0d0e0f -> executes authentication\n"
+			"\thf mfp auth 9003 FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF -v -> executes authentication and shows all the system data\n");
+
+	void* argtable[] = {
+		arg_param_begin,
+		arg_lit0("vV",  "verbose", "show internal data."),
+		arg_str1(NULL,  NULL,     "<Key Num (HEX 2 bytes)>", NULL),
+		arg_str1(NULL,  NULL,     "<Key Value (HEX 16 bytes)>", NULL),
+		arg_param_end
+	};
+	CLIExecWithReturn(cmd, argtable, true);
+	
+	bool verbose = arg_get_lit(1);
+	CLIGetHexWithReturn(2, keyn, &keynlen);
+	CLIGetHexWithReturn(3, key, &keylen);
+	CLIParserFree();
+	
+	if (keynlen != 2) {
+		PrintAndLog("ERROR: <Key Num> must be 2 bytes long instead of: %d", keynlen);
+		return 1;
+	}
+	
+	if (keylen != 16) {
+		PrintAndLog("ERROR: <Key Value> must be 16 bytes long instead of: %d", keylen);
+		return 1;
+	}
+
+	return MifareAuth4(NULL, keyn, key, true, false, verbose);
+}
+
+int CmdHFMFPRdbl(const char *cmd) {
+	//mf4Session session
+	//int res = MifareAuth4(&session, keyn, key, true, false, verbose);
+	//res = Read();
+	
+	return 0;
+}
+
+int CmdHFMFPRdsc(const char *cmd) {
+	
+	return 0;
+}
+
+int CmdHFMFPWrbl(const char *cmd) {
+	
+	return 0;
+}
+
 static command_t CommandTable[] =
 {
   {"help",             CmdHelp,					1, "This help"},
   {"info",  	       CmdHFMFPInfo,			0, "Info about Mifare Plus tag"},
+  {"wrp",	  	       CmdHFMFPWritePerso,		0, "Write Perso command"},
+  {"initp",  	       CmdHFMFPInitPerso,		0, "Fills all the card's keys"},
+  {"commitp",  	       CmdHFMFPCommitPerso,		0, "Move card to SL1 or SL3 mode"},
+  {"auth",  	       CmdHFMFPAuth,			0, "Authentication in iso1443-4"},
+//  {"rdbl",  	       CmdHFMFPRdbl,			0, "Read blocks"},
+//  {"rdsc",  	       CmdHFMFPRdsc,			0, "Read sectors"},
+//  {"wrbl",  	       CmdHFMFPWrbl,			0, "Write blocks"},
   {NULL,               NULL,					0, NULL}
 };
 
