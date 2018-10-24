@@ -88,30 +88,30 @@ int MFPCommitPerso(bool activateField, bool leaveSignalON, uint8_t *dataout, int
 int MFPReadBlock(mf4Session *session, bool plain, uint8_t blockNum, uint8_t blockCount, bool activateField, bool leaveSignalON, uint8_t *dataout, int maxdataoutlen, int *dataoutlen, uint8_t *mac) {
 	uint8_t rcmd[4 + 8] = {(plain?(0x37):(0x33)), blockNum, 0x00, blockCount}; 
 	if (!plain && session)
-		CalulateMAC(session, rcmd, 4, &rcmd[4]);
+		CalulateMAC(session, rcmd, 4, &rcmd[4], VerboseMode);
 	
 	int res = intExchangeRAW14aPlus(rcmd, plain?4:sizeof(rcmd), activateField, leaveSignalON, dataout, maxdataoutlen, dataoutlen);
 	if(res)
 		return res;
 
 	if(session && mac)
-		CalulateMAC(session, dataout, *dataoutlen, mac);
+		CalulateMAC(session, dataout, *dataoutlen, mac, VerboseMode);
 	
 	return 0;
 }
 
-int MFPWriteBlock(mf4Session *session, uint8_t blockNum, uint8_t *data, bool activateField, bool leaveSignalON, uint8_t *dataout, int maxdataoutlen, int *dataoutlen) {
+int MFPWriteBlock(mf4Session *session, uint8_t blockNum, uint8_t *data, bool activateField, bool leaveSignalON, uint8_t *dataout, int maxdataoutlen, int *dataoutlen, uint8_t *mac) {
 	uint8_t rcmd[1 + 2 + 16 + 8] = {0xA3, blockNum, 0x00};
 	memmove(&rcmd[3], data, 16);
 	if (session)
-		CalulateMAC(session, rcmd, 19, &rcmd[19]);
+		CalulateMAC(session, rcmd, 19, &rcmd[19], VerboseMode);
 	
 	int res = intExchangeRAW14aPlus(rcmd, sizeof(rcmd), activateField, leaveSignalON, dataout, maxdataoutlen, dataoutlen);
 	if(res)
 		return res;
 
 	if(session && mac)
-		CalulateMAC(session, dataout, *dataoutlen, mac);
+		CalulateMAC(session, dataout, *dataoutlen, mac, VerboseMode);
 	
 	return 0;
 }
@@ -680,7 +680,8 @@ int CmdHFMFPWrbl(const char *cmd) {
 
 	uint8_t data[250] = {0};
 	int datalen = 0;
-	res = MFPWriteBlock(&session, blockNum & 0xff, datain, false, false, data, sizeof(data), &datalen);
+	uint8_t mac[8] = {0};
+	res = MFPWriteBlock(&session, blockNum & 0xff, datain, false, false, data, sizeof(data), &datalen, mac);
 	if (res) {
 		PrintAndLog("Write error: %d", res);
 		return res;
@@ -697,7 +698,7 @@ int CmdHFMFPWrbl(const char *cmd) {
 	}
 	
 	if (!memcmp(&data[1], mac, 8)) {
-		PrintAndLog("WARNING: mac on block %d not equal...", n);
+		PrintAndLog("WARNING: mac not equal...");
 		PrintAndLog("MAC   card: %s", sprint_hex(&data[1], 8));
 		PrintAndLog("MAC reader: %s", sprint_hex(mac, 8));
 	} else {	

@@ -44,16 +44,16 @@ int aes_decode(uint8_t *iv, uint8_t *key, uint8_t *input, uint8_t *output, int l
 }
 
 int aes_cmac(uint8_t *iv, uint8_t *key, uint8_t *input, uint8_t *mac, int length) {
-	setmem(mac, 0x00, 16);
+	memset(mac, 0x00, 16);
 	uint8_t iiv[16] = {0};
 	if (iv)
 		memcpy(iiv, iv, 16);
 	
 	// padding nist...
-	uint8_t data[length + 16] = {0};
+	uint8_t data[2049] = {0}; // length + 16
 	memcpy(data, input, length);
 	data[length] = 0x80;
-	int datalen = length & 0xfffffff0 + 0x10;
+	int datalen = (length & 0xfffffff0) + 0x10;
 	
 	// cmac
 	aes_context aes;
@@ -66,7 +66,7 @@ int aes_cmac(uint8_t *iv, uint8_t *key, uint8_t *input, uint8_t *mac, int length
 
 int aes_cmac8(uint8_t *iv, uint8_t *key, uint8_t *input, uint8_t *mac, int length) {
 	uint8_t cmac[16] = {0};
-	setmem(mac, 0x00, 8);
+	memset(mac, 0x00, 8);
 	
 	int res = aes_cmac(iv, key, input, cmac, length);
 	if (res)
