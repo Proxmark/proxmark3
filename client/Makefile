@@ -107,6 +107,7 @@ CMDSRCS = 	$(SRC_SMARTCARD) \
 			crapto1/crypto1.c\
 			polarssl/des.c \
 			polarssl/aes.c\
+			polarssl/aes_cmac128.c\
 			polarssl/bignum.c\
 			polarssl/rsa.c\
 			polarssl/sha1.c\

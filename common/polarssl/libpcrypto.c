@@ -10,7 +10,9 @@
 
 #include "polarssl/libpcrypto.h"
 #include <polarssl/aes.h>
+#include <polarssl/aes_cmac128.h>
 
+// NIST Special Publication 800-38A — Recommendation for block cipher modes of operation: methods and techniques, 2001.
 int aes_encode(uint8_t *iv, uint8_t *key, uint8_t *input, uint8_t *output, int length){
 	uint8_t iiv[16] = {0};
 	if (iv)
@@ -43,23 +45,25 @@ int aes_decode(uint8_t *iv, uint8_t *key, uint8_t *input, uint8_t *output, int l
 	return 0;
 }
 
+//  NIST Special Publication 800-38B — Recommendation for block cipher modes of operation: The CMAC mode for authentication.
+// https://csrc.nist.gov/CSRC/media/Projects/Cryptographic-Standards-and-Guidelines/documents/examples/AES_CMAC.pdf
 int aes_cmac(uint8_t *iv, uint8_t *key, uint8_t *input, uint8_t *mac, int length) {
 	memset(mac, 0x00, 16);
 	uint8_t iiv[16] = {0};
 	if (iv)
 		memcpy(iiv, iv, 16);
 	
-	// padding nist...
+	// padding:  ISO/IEC 9797-1 Message Authentication Codes (MACs) - Part 1: Mechanisms using a block cipher
 	uint8_t data[2049] = {0}; // length + 16
 	memcpy(data, input, length);
 	data[length] = 0x80;
 	int datalen = (length & 0xfffffff0) + 0x10;
 	
-	// cmac
-	aes_context aes;
-	aes_init(&aes);
-
-	aes_free(&aes);
+	//  NIST 800-38B 
+	aes_cmac128_context ctx;
+	aes_cmac128_starts(&ctx, key);
+	aes_cmac128_update(&ctx, data, datalen);
+	aes_cmac128_final(&ctx, mac);
 
 	return 0;
 }
