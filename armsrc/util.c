@@ -373,13 +373,13 @@ void StartCountSspClk()
 	AT91C_BASE_TC1->TC_CMR = AT91C_TC_CLKS_TIMER_DIV1_CLOCK // TC1 Clock = MCK(48MHz)/2 = 24MHz
 							| AT91C_TC_CPCSTOP				// Stop clock on RC compare
 							| AT91C_TC_EEVTEDG_RISING		// Trigger on rising edge of Event
-							| AT91C_TC_EEVT_TIOB			// Event-Source: TIOB1 (= ssp_clk from FPGA = 13,56MHz/16)
+							| AT91C_TC_EEVT_TIOB			// Event-Source: TIOB1 (= ssp_clk from FPGA = 13,56MHz/16 ... 13,56MHz/4)
 							| AT91C_TC_ENETRG				// Enable external trigger event
 							| AT91C_TC_WAVESEL_UP	 		// Upmode without automatic trigger on RC compare
 							| AT91C_TC_WAVE 				// Waveform Mode
 							| AT91C_TC_AEEVT_SET 			// Set TIOA1 on external event
 							| AT91C_TC_ACPC_CLEAR; 			// Clear TIOA1 on RC Compare
-	AT91C_BASE_TC1->TC_RC = 0x04; 							// RC Compare value = 0x04
+	AT91C_BASE_TC1->TC_RC = 0x02; 							// RC Compare value = 0x02
 
 	// use TC0 to count TIOA1 pulses
 	AT91C_BASE_TC0->TC_CCR = AT91C_TC_CLKDIS;				// disable TC0
@@ -402,7 +402,7 @@ void StartCountSspClk()
 	AT91C_BASE_TC2->TC_CCR = AT91C_TC_CLKEN;				// enable TC2
 
 	//
-	// synchronize the counter with the ssp_frame signal. Note: FPGA must be in any iso14443 mode, otherwise SSC_FRAME and SSC_CLK signals would not be present 
+	// synchronize the counter with the ssp_frame signal. Note: FPGA must be in a FPGA mode with SSC transfer, otherwise SSC_FRAME and SSC_CLK signals would not be present 
 	//
 	while(!(AT91C_BASE_PIOA->PIO_PDSR & GPIO_SSC_FRAME)); 	// wait for ssp_frame to go high (start of frame)
 	while(AT91C_BASE_PIOA->PIO_PDSR & GPIO_SSC_FRAME); 		// wait for ssp_frame to be low
@@ -430,15 +430,15 @@ void ResetSspClk(void) {
 }
 
 
-uint32_t RAMFUNC GetCountSspClk(){
-	uint32_t tmp_count;
-	tmp_count = (AT91C_BASE_TC2->TC_CV << 16) | AT91C_BASE_TC0->TC_CV;
-	if ((tmp_count & 0x0000ffff) == 0) { //small chance that we may have missed an increment in TC2
-		return (AT91C_BASE_TC2->TC_CV << 16);
-	} 
-	else {
-		return tmp_count;
-	}
+uint32_t GetCountSspClk(){
+	uint32_t hi, lo;
+
+	do {
+		hi = AT91C_BASE_TC2->TC_CV;
+		lo = AT91C_BASE_TC0->TC_CV;
+	} while(hi != AT91C_BASE_TC2->TC_CV);
+
+	return (hi << 16) | lo;
 }
 
 
