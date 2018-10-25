@@ -17,9 +17,10 @@
 #include "polarssl/libpcrypto.h"
 
 int CalulateMAC(mf4Session *session, uint8_t *data, int datalen, uint8_t *mac, bool verbose) {
-	memset(mac, 0x00, 8);
 	if (!session || !session->Authenticated || !mac || !data || !datalen)
 		return 1;
+	
+	memset(mac, 0x00, 8);
 	
 	if (verbose)
 		PrintAndLog("MAC data[%d]: %s", datalen, sprint_hex(data, datalen));
