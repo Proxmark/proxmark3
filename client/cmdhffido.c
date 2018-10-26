@@ -140,6 +140,47 @@ int CmdHFFidoInfo(const char *cmd) {
 	return 0;
 }
 
+json_t *OpenJson(int paramnum, char *fname, void* argtable[]) {	
+	json_t *root = NULL;
+	json_error_t error;
+
+	uint8_t jsonname[250] ={0};
+	char *cjsonname = (char *)jsonname;
+	int jsonnamelen = 0;
+	
+	// CLIGetStrWithReturn(paramnum, jsonname, &jsonnamelen);
+	if (CLIParamStrToBuf(arg_get_str(paramnum), jsonname, sizeof(jsonname), &jsonnamelen))  {
+		CLIParserFree();
+		return NULL;
+	}
+	
+	// current path + file name
+	if (!strstr(cjsonname, ".json"))
+		strcat(cjsonname, ".json");
+	
+	if (jsonnamelen) {
+		strcpy(fname, get_my_executable_directory());
+		strcat(fname, cjsonname);
+		if (access(fname, F_OK) != -1) {
+			root = json_load_file(fname, 0, &error);
+			if (!root) {
+				PrintAndLog("ERROR: json error on line %d: %s", error.line, error.text);
+				return NULL; 
+			}
+			
+			if (!json_is_object(root)) {
+				PrintAndLog("ERROR: Invalid json format. root must be an object.");
+				json_decref(root);
+				return NULL; 
+			}
+			
+		} else {
+			root = json_object();
+		}
+	}
+	return root;
+}
+
 int CmdHFFidoRegister(const char *cmd) {
 	uint8_t data[64] = {0};
 	int chlen = 0;
@@ -147,7 +188,6 @@ int CmdHFFidoRegister(const char *cmd) {
 	int applen = 0;
 	uint8_t adata[250] = {0};
 	json_t *root = NULL;
-	json_error_t error;
 	
 	CLIParserInit("hf fido reg", 
 		"Initiate a U2F token registration. Needs two 32-byte hash number. \nchallenge parameter (32b) and application parameter (32b).", 
@@ -171,37 +211,16 @@ int CmdHFFidoRegister(const char *cmd) {
 	bool verbose = arg_get_lit(2);
 	bool paramsPlain = arg_get_lit(3);
 
-	uint8_t jsonname[250] ={0};
-	char *cjsonname = (char *)jsonname;
-	int jsonnamelen = 0;
-	CLIGetStrWithReturn(4, jsonname, &jsonnamelen);
-	// current path + file name
-	if (!strstr(cjsonname, ".json"))
-		strcat(cjsonname, ".json");
-	char fname[strlen(get_my_executable_directory()) + strlen(cjsonname) + 1];
-	if (jsonnamelen) {
-		strcpy(fname, get_my_executable_directory());
-		strcat(fname, cjsonname);
-		if (access(fname, F_OK) != -1) {
-			root = json_load_file(fname, 0, &error);
-			if (!root) {
-				PrintAndLog("ERROR: json error on line %d: %s", error.line, error.text);
-				return 1; 
-			}
-			
-			if (!json_is_object(root)) {
-				PrintAndLog("ERROR: Invalid json format. root must be an object.");
-				return 1; 
-			}
-			
-			size_t jlen;
-			JsonLoadBufAsHex(root, "$.ChallengeParam", data, 32, &jlen);
-			JsonLoadBufAsHex(root, "$.ApplicationParam", &data[32], 32, &jlen);
-		} else {
-			root = json_object();
-		}
+	char fname[250] = {0};
+	root = OpenJson(4, fname, argtable);
+	if (root) {	
+		size_t jlen;
+		JsonLoadBufAsHex(root, "$.ChallengeParam", data, 32, &jlen);
+		JsonLoadBufAsHex(root, "$.ApplicationParam", &data[32], 32, &jlen);
+	} else {
+		return 1;
 	}
-
+	
 	if (paramsPlain) {
 		memset(cdata, 0x00, 32);
 		CLIGetStrWithReturn(5, cdata, &chlen);
@@ -345,6 +364,7 @@ int CmdHFFidoAuthenticate(const char *cmd) {
 	uint8_t hdata[250] = {0};
 	int hdatalen = 0;
 	uint8_t keyHandleLen = 0;
+	json_t *root = NULL;
 	
 	CLIParserInit("hf fido auth", 
 		"Initiate a U2F token authentication. Needs key handle and two 32-byte hash number. \nkey handle(var 0..255), challenge parameter (32b) and application parameter (32b).", 
@@ -360,7 +380,8 @@ int CmdHFFidoAuthenticate(const char *cmd) {
 		arg_rem("default mode:",    "dont-enforce-user-presence-and-sign"),
 		arg_lit0("uU",  "user",     "mode: enforce-user-presence-and-sign"),
 		arg_lit0("cC",  "check",    "mode: check-only"),
-		arg_str1(NULL,  NULL,       "<HEX key handle (var 0..255b)>", NULL),
+		arg_str0("jJ",  "json",		"fido.json", "JSON input / output file name for parameters."),
+		arg_str0(NULL,  NULL,       "<HEX key handle (var 0..255b)>", NULL),
 		arg_str0(NULL,  NULL,       "<HEX/ASCII challenge parameter (32b HEX/1..16 chars)>", NULL),
 		arg_str0(NULL,  NULL,       "<HEX/ASCII application parameter (32b HEX/1..16 chars)>", NULL),
 		arg_param_end
@@ -376,7 +397,20 @@ int CmdHFFidoAuthenticate(const char *cmd) {
 	if (arg_get_lit(6))
 		controlByte = 0x07;
 	
-	CLIGetHexWithReturn(7, hdata, &hdatalen);
+	char fname[250] = {0};
+	root = OpenJson(7, fname, argtable);
+	if (root) {	
+		size_t jlen;
+		JsonLoadBufAsHex(root, "$.ChallengeParam", data, 32, &jlen);
+		JsonLoadBufAsHex(root, "$.ApplicationParam", &data[32], 32, &jlen);
+		JsonLoadBufAsHex(root, "$.KeyHandle", &data[65], 512 - 67, &jlen);
+		keyHandleLen = jlen & 0xff;
+		data[64] = keyHandleLen;
+	} else {
+		return 1;
+	}
+
+	CLIGetHexWithReturn(8, hdata, &hdatalen);
 	if (hdatalen > 255) {
 		PrintAndLog("ERROR: application parameter length must be less than 255.");
 		return 1;
@@ -389,13 +423,13 @@ int CmdHFFidoAuthenticate(const char *cmd) {
 
 	if (paramsPlain) {
 		memset(hdata, 0x00, 32);
-		CLIGetStrWithReturn(8, hdata, &hdatalen);
+		CLIGetStrWithReturn(9, hdata, &hdatalen);
 		if (hdatalen && hdatalen > 16) {
 			PrintAndLog("ERROR: challenge parameter length in ASCII mode must be less than 16 chars instead of: %d", hdatalen);
 			return 1;
 		}
 	} else {
-		CLIGetHexWithReturn(8, hdata, &hdatalen);
+		CLIGetHexWithReturn(9, hdata, &hdatalen);
 		if (hdatalen && hdatalen != 32) {
 			PrintAndLog("ERROR: challenge parameter length must be 32 bytes only.");
 			return 1;
@@ -406,13 +440,13 @@ int CmdHFFidoAuthenticate(const char *cmd) {
 
 	if (paramsPlain) {
 		memset(hdata, 0x00, 32);
-		CLIGetStrWithReturn(9, hdata, &hdatalen);
+		CLIGetStrWithReturn(10, hdata, &hdatalen);
 		if (hdatalen && hdatalen > 16) {
 			PrintAndLog("ERROR: application parameter length in ASCII mode must be less than 16 chars instead of: %d", hdatalen);
 			return 1;
 		}
 	} else {
-		CLIGetHexWithReturn(9, hdata, &hdatalen);
+		CLIGetHexWithReturn(10, hdata, &hdatalen);
 		if (hdatalen && hdatalen != 32) {
 			PrintAndLog("ERROR: application parameter length must be 32 bytes only.");
 			return 1;
@@ -470,6 +504,23 @@ int CmdHFFidoAuthenticate(const char *cmd) {
 	PrintAndLog("Counter: %d", cntr);
 	PrintAndLog("Hash[%d]: %s", len - 5, sprint_hex(&buf[5], len - 5));
 
+	if (root) {
+		JsonSaveBufAsHex(root, "ChallengeParam", data, 32);
+		JsonSaveBufAsHex(root, "ApplicationParam", &data[32], 32);
+		JsonSaveInt(root, "KeyHandleLen", keyHandleLen);
+		JsonSaveBufAsHexCompact(root, "KeyHandle", &data[65], keyHandleLen);
+		JsonSaveInt(root, "Counter", cntr);
+	
+		res = json_dump_file(root, fname, JSON_INDENT(2));
+		if (res) {
+			PrintAndLog("ERROR: can't save the file: %s", fname);
+			return 200;
+		}
+		PrintAndLog("File `%s` saved.", fname);
+		
+		// free json object
+		json_decref(root);
+	}
 	return 0;
 };
 
