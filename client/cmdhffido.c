@@ -140,9 +140,10 @@ int CmdHFFidoInfo(const char *cmd) {
 	return 0;
 }
 
-json_t *OpenJson(int paramnum, char *fname, void* argtable[]) {	
+json_t *OpenJson(int paramnum, char *fname, void* argtable[], bool *err) {	
 	json_t *root = NULL;
 	json_error_t error;
+	*err = false;
 
 	uint8_t jsonname[250] ={0};
 	char *cjsonname = (char *)jsonname;
@@ -165,12 +166,14 @@ json_t *OpenJson(int paramnum, char *fname, void* argtable[]) {
 			root = json_load_file(fname, 0, &error);
 			if (!root) {
 				PrintAndLog("ERROR: json error on line %d: %s", error.line, error.text);
+				*err = true;
 				return NULL; 
 			}
 			
 			if (!json_is_object(root)) {
 				PrintAndLog("ERROR: Invalid json format. root must be an object.");
 				json_decref(root);
+				*err = true;
 				return NULL; 
 			}
 			
@@ -212,13 +215,14 @@ int CmdHFFidoRegister(const char *cmd) {
 	bool paramsPlain = arg_get_lit(3);
 
 	char fname[250] = {0};
-	root = OpenJson(4, fname, argtable);
+	bool err;
+	root = OpenJson(4, fname, argtable, &err);
+	if(err)
+		return 1;
 	if (root) {	
 		size_t jlen;
 		JsonLoadBufAsHex(root, "$.ChallengeParam", data, 32, &jlen);
 		JsonLoadBufAsHex(root, "$.ApplicationParam", &data[32], 32, &jlen);
-	} else {
-		return 1;
 	}
 	
 	if (paramsPlain) {
@@ -396,9 +400,12 @@ int CmdHFFidoAuthenticate(const char *cmd) {
 		controlByte = 0x03;
 	if (arg_get_lit(6))
 		controlByte = 0x07;
-	
+
 	char fname[250] = {0};
-	root = OpenJson(7, fname, argtable);
+	bool err;
+	root = OpenJson(7, fname, argtable, &err);
+	if(err)
+		return 1;
 	if (root) {	
 		size_t jlen;
 		JsonLoadBufAsHex(root, "$.ChallengeParam", data, 32, &jlen);
@@ -406,9 +413,7 @@ int CmdHFFidoAuthenticate(const char *cmd) {
 		JsonLoadBufAsHex(root, "$.KeyHandle", &data[65], 512 - 67, &jlen);
 		keyHandleLen = jlen & 0xff;
 		data[64] = keyHandleLen;
-	} else {
-		return 1;
-	}
+	} 
 
 	CLIGetHexWithReturn(8, hdata, &hdatalen);
 	if (hdatalen > 255) {
