@@ -26,13 +26,17 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <ctype.h>
+#include <unistd.h>
+#include <jansson.h>
 #include "comms.h"
 #include "cmdmain.h"
 #include "util.h"
 #include "ui.h"
+#include "proxmark3.h"
 #include "cmdhf14a.h"
 #include "mifare.h"
 #include "emv/emvcore.h"
+#include "emv/emvjson.h"
 #include "emv/dump.h"
 #include "cliparser/cliparser.h"
 
@@ -142,6 +146,8 @@ int CmdHFFidoRegister(const char *cmd) {
 	uint8_t cdata[250] = {0};
 	int applen = 0;
 	uint8_t adata[250] = {0};
+	json_t *root = NULL;
+	json_error_t error;
 	
 	CLIParserInit("hf fido reg", 
 		"Initiate a U2F token registration. Needs two 32-byte hash number. \nchallenge parameter (32b) and application parameter (32b).", 
@@ -154,6 +160,7 @@ int CmdHFFidoRegister(const char *cmd) {
 		arg_lit0("aA",  "apdu",     "show APDU reqests and responses"),
 		arg_lit0("vV",  "verbose",  "show technical data"),
 		arg_lit0("pP",  "plain",    "send plain ASCII to challenge and application parameters instead of HEX"),
+		arg_str0("jJ",  "json",		"fido.json", "JSON input / output file name for parameters."),
 		arg_str0(NULL,  NULL,       "<HEX/ASCII challenge parameter (32b HEX/1..16 chars)>", NULL),
 		arg_str0(NULL,  NULL,       "<HEX/ASCII application parameter (32b HEX/1..16 chars)>", NULL),
 		arg_param_end
@@ -163,15 +170,45 @@ int CmdHFFidoRegister(const char *cmd) {
 	bool APDULogging = arg_get_lit(1);
 	bool verbose = arg_get_lit(2);
 	bool paramsPlain = arg_get_lit(3);
+
+	uint8_t jsonname[250] ={0};
+	char *cjsonname = (char *)jsonname;
+	int jsonnamelen = 0;
+	CLIGetStrWithReturn(4, jsonname, &jsonnamelen);
+	// current path + file name
+	if (!strstr(cjsonname, ".json"))
+		strcat(cjsonname, ".json");
+	char fname[strlen(get_my_executable_directory()) + strlen(cjsonname) + 1];
+	if (jsonnamelen) {
+		strcpy(fname, get_my_executable_directory());
+		strcat(fname, cjsonname);
+		if (access(fname, F_OK) != -1) {
+			root = json_load_file(fname, 0, &error);
+			if (!root) {
+				PrintAndLog("ERROR: json error on line %d: %s", error.line, error.text);
+				return 1; 
+			}
+			
+			if (!json_is_object(root)) {
+				PrintAndLog("ERROR: Invalid json format. root must be an object.");
+				return 1; 
+			}
+			
+			
+		} else {
+			root = json_object();
+		}
+	}
+
 	if (paramsPlain) {
 		memset(cdata, 0x00, 32);
-		CLIGetStrWithReturn(4, cdata, &chlen);
+		CLIGetStrWithReturn(5, cdata, &chlen);
 		if (chlen && chlen > 16) {
 			PrintAndLog("ERROR: challenge parameter length in ASCII mode must be less than 16 chars instead of: %d", chlen);
 			return 1;
 		}
 	} else {
-		CLIGetHexWithReturn(4, cdata, &chlen);
+		CLIGetHexWithReturn(5, cdata, &chlen);
 		if (chlen && chlen != 32) {
 			PrintAndLog("ERROR: challenge parameter length must be 32 bytes only.");
 			return 1;
@@ -183,13 +220,13 @@ int CmdHFFidoRegister(const char *cmd) {
 	
 	if (paramsPlain) {
 		memset(adata, 0x00, 32);
-		CLIGetStrWithReturn(5, adata, &applen);
+		CLIGetStrWithReturn(6, adata, &applen);
 		if (applen && applen > 16) {
 			PrintAndLog("ERROR: application parameter length in ASCII mode must be less than 16 chars instead of: %d", applen);
 			return 1;
 		}
 	} else {
-		CLIGetHexWithReturn(5, adata, &applen);
+		CLIGetHexWithReturn(6, adata, &applen);
 		if (applen && applen != 32) {
 			PrintAndLog("ERROR: application parameter length must be 32 bytes only.");
 			return 1;
@@ -279,6 +316,24 @@ int CmdHFFidoRegister(const char *cmd) {
 	if(applen)
 		printf(" %s", paramsPlain?(char *)adata:sprint_hex_inrow(adata, 32));
 	printf("\n");
+	
+	if (root) {
+		JsonSaveBufAsHex(root, "ChallengeParam", data, 32);
+		JsonSaveBufAsHex(root, "ApplicationParam", &data[32], 32);
+		JsonSaveInt(root, "KeyHandleLen", keyHandleLen);
+		JsonSaveBufAsHexCompact(root, "KeyHandle", &buf[67], keyHandleLen);
+		JsonSaveBufAsHexCompact(root, "DER", &buf[67 + keyHandleLen], derLen);
+	
+		res = json_dump_file(root, fname, JSON_INDENT(2));
+		if (res) {
+			PrintAndLog("ERROR: can't save the file: %s", fname);
+			return 200;
+		}
+		PrintAndLog("File `%s` saved.", fname);
+		
+		// free json object
+		json_decref(root);
+	}
 	
 	return 0;
 };
