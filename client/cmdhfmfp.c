@@ -690,16 +690,19 @@ int CmdHFMFPWrbl(const char *cmd) {
 	res = MFPWriteBlock(&session, blockNum & 0xff, datain, false, false, data, sizeof(data), &datalen, mac);
 	if (res) {
 		PrintAndLog("Write error: %d", res);
+		DropField();
 		return res;
 	}
 	
 	if (datalen != 3 && (datalen != 3 + 8)) {
 		PrintAndLog("Error return length:%d", datalen);
+		DropField();
 		return 5;
 	}
 	
 	if (datalen && data[0] != 0x90) {
 		PrintAndLog("Card write error: %02x %s", data[0], GetErrorDescription(data[0]));
+		DropField();
 		return 6;
 	}
 	
@@ -712,6 +715,7 @@ int CmdHFMFPWrbl(const char *cmd) {
 			PrintAndLog("MAC: %s", sprint_hex(&data[1], 8));
 	}
 	
+	DropField();
 	return 0;
 }
 
