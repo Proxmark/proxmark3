@@ -70,6 +70,11 @@ int FIDOAuthentication(uint8_t *params, uint8_t paramslen, uint8_t controlb, uin
 	return FIDOExchange((sAPDU){0x00, 0x02, controlb, 0x00, paramslen, params}, Result, MaxResultLen, ResultLen, sw);
 }
 
+int FIDO2GetInfo(uint8_t *Result, size_t MaxResultLen, size_t *ResultLen, uint16_t *sw) {
+	uint8_t data[] = {0x04};
+	return FIDOExchange((sAPDU){0x80, 0x10, 0x00, 0x00, sizeof(data), data}, Result, MaxResultLen, ResultLen, sw);
+}
+
 int CmdHFFidoInfo(const char *cmd) {
 	
 	if (cmd && strlen(cmd) > 0)
@@ -85,10 +90,12 @@ int CmdHFFidoInfo(const char *cmd) {
 	uint8_t buf[APDU_RES_LEN] = {0};
 	size_t len = 0;
 	uint16_t sw = 0;
-	int res = FIDOSelect(true, false, buf, sizeof(buf), &len, &sw);
+	int res = FIDOSelect(true, true, buf, sizeof(buf), &len, &sw);
 
-	if (res)
+	if (res) {
+		DropField();
 		return res;
+	}
 	
 	if (sw != 0x9000) {
 		if (sw)
@@ -96,19 +103,35 @@ int CmdHFFidoInfo(const char *cmd) {
 		else
 			PrintAndLog("APDU exchange error. Card returns 0x0000."); 
 		
+		DropField();
 		return 0;
 	}
 	
 	if (!strncmp((char *)buf, "U2F_V2", 7)) {
-		PrintAndLog("FIDO authenricator detected."); 
-		PrintAndLog("WARNING: strange version:"); 
-		dump_buffer((const unsigned char *)buf, len, NULL, 0);
+		if (!strncmp((char *)buf, "FIDO_2_0", 8)) {
+			PrintAndLog("FIDO2 authenricator detected. Version: %.*s", len, buf); 
+		} else {
+			PrintAndLog("FIDO authenricator detected (not standard U2F)."); 
+			PrintAndLog("Non U2F authenticator version:"); 
+			dump_buffer((const unsigned char *)buf, len, NULL, 0);
+		}
+	} else {
+		PrintAndLog("FIDO U2F authenricator detected. Version: %.*s", len, buf); 
+	}
+
+	res = FIDO2GetInfo(buf, sizeof(buf), &len, &sw);
+	DropField();
+	if (res) {
+		return res;
+	}
+	if (sw != 0x9000) {
+		PrintAndLog("FIDO2 version not exists (%04x - %s).", sw, GetAPDUCodeDescription(sw >> 8, sw & 0xff)); 
+		
 		return 0;
 	}
-	
-	PrintAndLog("FIDO authenricator detected. Version: %.*s", len, buf); 
-	
-	DropField();
+
+	PrintAndLog("FIDO2 version: (%d)", len); 
+	dump_buffer((const unsigned char *)buf, len, NULL, 0);
 	
 	return 0;
 }
@@ -191,15 +214,18 @@ int CmdHFFidoRegister(const char *cmd) {
 
 	if (res) {
 		PrintAndLog("Can't select authenticator. res=%x. Exit...", res);
+		DropField();
 		return res;
 	}
 	
 	if (sw != 0x9000) {
 		PrintAndLog("Can't select FIDO application. APDU response status: %04x - %s", sw, GetAPDUCodeDescription(sw >> 8, sw & 0xff)); 
+		DropField();
 		return 2;
 	}
 
 	res = FIDORegister(data, buf,  sizeof(buf), &len, &sw);
+	DropField();
 	if (res) {
 		PrintAndLog("Can't execute register command. res=%x. Exit...", res);
 		return res;
@@ -247,14 +273,13 @@ int CmdHFFidoRegister(const char *cmd) {
 	// check ANSI X9.62 format ECDSA signature (on P-256)
 	
 	PrintAndLog("\nauth command: ");
-	printf("hf fido auth %s %s", paramsPlain?"-p":"", sprint_hex_inrow(&buf[67], keyHandleLen));
+	printf("hf fido auth %s%s", paramsPlain?"-p ":"", sprint_hex_inrow(&buf[67], keyHandleLen));
 	if(chlen || applen)
 		printf(" %s", paramsPlain?(char *)cdata:sprint_hex_inrow(cdata, 32));
 	if(applen)
 		printf(" %s", paramsPlain?(char *)adata:sprint_hex_inrow(adata, 32));
 	printf("\n");
 	
-	DropField();
 	return 0;
 };
 
@@ -360,15 +385,18 @@ int CmdHFFidoAuthenticate(const char *cmd) {
 
 	if (res) {
 		PrintAndLog("Can't select authenticator. res=%x. Exit...", res);
+		DropField();
 		return res;
 	}
 	
 	if (sw != 0x9000) {
 		PrintAndLog("Can't select FIDO application. APDU response status: %04x - %s", sw, GetAPDUCodeDescription(sw >> 8, sw & 0xff)); 
+		DropField();
 		return 2;
 	}
 
 	res = FIDOAuthentication(data, datalen, controlByte,  buf,  sizeof(buf), &len, &sw);
+	DropField();
 	if (res) {
 		PrintAndLog("Can't execute authentication command. res=%x. Exit...", res);
 		return res;
@@ -385,8 +413,6 @@ int CmdHFFidoAuthenticate(const char *cmd) {
 	PrintAndLog("Counter: %d", cntr);
 	PrintAndLog("Hash[%d]: %s", len - 5, sprint_hex(&buf[5], len - 5));
 
-	
-	DropField();
 	return 0;
 };
 
