@@ -194,7 +194,9 @@ int CmdHFFidoRegister(const char *cmd) {
 				return 1; 
 			}
 			
-			
+			size_t jlen;
+			JsonLoadBufAsHex(root, "$.ChallengeParam", data, 32, &jlen);
+			JsonLoadBufAsHex(root, "$.ApplicationParam", &data[32], 32, &jlen);
 		} else {
 			root = json_object();
 		}

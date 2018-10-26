@@ -33,7 +33,7 @@ extern int JsonSaveTLVTreeElm(json_t *elm, char *path, struct tlvdb *tlvdbelm, b
 
 extern int JsonSaveTLVTree(json_t *root, json_t *elm, char *path, struct tlvdb *tlvdbelm);
 
-extern int JsonLoadBufAsHex(json_t *elm, char *path, uint8_t *data, size_t *datalen);
+extern int JsonLoadBufAsHex(json_t *elm, char *path, uint8_t *data, size_t maxbufferlen, size_t *datalen);
 
 extern bool ParamLoadFromJson(struct tlvdb *tlv);
 
