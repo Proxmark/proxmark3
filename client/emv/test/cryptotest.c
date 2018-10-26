@@ -14,6 +14,7 @@
 
 #include "bignum.h"
 #include "aes.h"
+#include "aes_cmac128.h"
 #include "des.h"
 #include "rsa.h"
 #include "sha1.h"
@@ -32,7 +33,10 @@ int ExecuteCryptoTests(bool verbose) {
 	
 	res = aes_self_test(verbose);
 	if (res) TestFail = true;
-	
+
+	res = aes_cmac_self_test(verbose);
+	if (res) TestFail = true;
+
 	res = des_self_test(verbose);
 	if (res) TestFail = true;
 	

@@ -17,14 +17,21 @@
 
 typedef struct {
 	bool Authenticated;
+	uint8_t Key[16];
 	uint16_t KeyNum;
 	uint8_t Rnd1[16];
 	uint8_t Rnd2[16];
 	
 }mf4Session;
 
+extern int CalculateMAC(mf4Session *session, uint8_t *data, int datalen, uint8_t *mac, bool verbose);
 extern int MifareAuth4(mf4Session *session, uint8_t *keyn, uint8_t *key, bool activateField, bool leaveSignalON, bool verbose);
 
+extern uint8_t mfNumBlocksPerSector(uint8_t sectorNo);
+extern uint8_t mfFirstBlockOfSector(uint8_t sectorNo);
+extern uint8_t mfSectorTrailer(uint8_t blockNo);
+extern bool mfIsSectorTrailer(uint8_t blockNo);
+extern uint8_t mfSectorNum(uint8_t blockNo);
 
 
 #endif // mifare4.h
