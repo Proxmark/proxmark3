@@ -24,7 +24,7 @@ typedef struct {
 	
 }mf4Session;
 
-extern int CalulateMAC(mf4Session *session, uint8_t *data, int datalen, uint8_t *mac, bool verbose);
+extern int CalculateMAC(mf4Session *session, uint8_t *data, int datalen, uint8_t *mac, bool verbose);
 extern int MifareAuth4(mf4Session *session, uint8_t *keyn, uint8_t *key, bool activateField, bool leaveSignalON, bool verbose);
 
 extern uint8_t mfNumBlocksPerSector(uint8_t sectorNo);

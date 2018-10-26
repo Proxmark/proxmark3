@@ -16,7 +16,7 @@
 #include "ui.h"
 #include "polarssl/libpcrypto.h"
 
-int CalulateMAC(mf4Session *session, uint8_t *data, int datalen, uint8_t *mac, bool verbose) {
+int CalculateMAC(mf4Session *session, uint8_t *data, int datalen, uint8_t *mac, bool verbose) {
 	if (!session || !session->Authenticated || !mac || !data || !datalen)
 		return 1;
 	
