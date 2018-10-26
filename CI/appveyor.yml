@@ -257,14 +257,14 @@ test_script:
 
       [bool]$res=$false
       # Wait 120 sec timeout for Job
-      if(Wait-Job $Job -Timeout 120){
+      if(Wait-Job $Job -Timeout 150){
         $Results = $Job | Receive-Job
         if($Results -like "true"){
           $res=$true
         }
       } else {
         Write-host "Test [$Name] timeout" -ForegroundColor Red
-        Add-AppveyorTest -Name "$Name" -Framework NUnit -Filename "$File" -Outcome Failed -Duration 40000 -ErrorMessage "timeout"
+        Add-AppveyorTest -Name "$Name" -Framework NUnit -Filename "$File" -Outcome Failed -Duration 60000 -ErrorMessage "timeout"
       }
       Remove-Job -Force $Job
 
