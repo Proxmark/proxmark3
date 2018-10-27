@@ -5,6 +5,7 @@ This project uses the changelog in accordance with [keepchangelog](http://keepac
 ## [unreleased][unreleased]
 
 ### Changed
+- Changed hf mfp security. Now it works in all the modes. (drHatson)
 
 ### Fixed
 

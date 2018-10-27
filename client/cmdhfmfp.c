@@ -1,5 +1,6 @@
 //-----------------------------------------------------------------------------
 // Copyright (C) 2018 Merlok
+// Copyright (C) 2018 drHatson
 //
 // This code is licensed to you under the terms of the GNU GPL, version 2 or,
 // at your option, any later version. See the LICENSE.txt file for the text of
@@ -34,13 +35,15 @@ typedef struct {
 
 static const PlusErrorsElm PlusErrors[] = {
 	{0xFF, ""},
-	{0x00, "Unknown error"},
-	{0x06, "Block use error"},
-	{0x07, "Command use error"},
-	{0x08, "Invalid write command"},
-	{0x09, "Invalid block number"},
-	{0x0b, "Command code error"},
+	{0x00, "Transfer cannot be granted within the current authentication."},
+	{0x06, "Access Conditions not fulfilled. Block does not exist, block is not a value block."},
+	{0x07, "Too many read or write commands in the session or in the transaction."},
+	{0x08, "Invalid MAC in command or response"},
+	{0x09, "Block Number is not valid"},
+	{0x0a, "Invalid block number, not existing block number"},
+	{0x0b, "The current command code not available at the current card state."},
 	{0x0c, "Length error"},
+	{0x0f, "General Manipulation Error. Failure in the operation of the PICC (cannot write to the data block), etc."},
 	{0x90, "OK"},
 };
 int PlusErrorsLen = sizeof(PlusErrors) / sizeof(PlusErrorsElm);
@@ -88,14 +91,17 @@ int MFPCommitPerso(bool activateField, bool leaveSignalON, uint8_t *dataout, int
 int MFPReadBlock(mf4Session *session, bool plain, uint8_t blockNum, uint8_t blockCount, bool activateField, bool leaveSignalON, uint8_t *dataout, int maxdataoutlen, int *dataoutlen, uint8_t *mac) {
 	uint8_t rcmd[4 + 8] = {(plain?(0x37):(0x33)), blockNum, 0x00, blockCount}; 
 	if (!plain && session)
-		CalculateMAC(session, rcmd, 4, &rcmd[4], VerboseMode);
+		CalculateMAC(session, mtypReadCmd, blockNum, blockCount, rcmd, 4, &rcmd[4], VerboseMode);
 	
 	int res = intExchangeRAW14aPlus(rcmd, plain?4:sizeof(rcmd), activateField, leaveSignalON, dataout, maxdataoutlen, dataoutlen);
 	if(res)
 		return res;
 
-	if(session && mac)
-		CalculateMAC(session, dataout, *dataoutlen, mac, VerboseMode);
+	if (session) 
+		session->R_Ctr++;
+	
+	if(session && mac && *dataoutlen > 11)
+		CalculateMAC(session, mtypReadResp, blockNum, blockCount, dataout, *dataoutlen - 8 - 2, mac, VerboseMode);
 	
 	return 0;
 }
@@ -104,14 +110,17 @@ int MFPWriteBlock(mf4Session *session, uint8_t blockNum, uint8_t *data, bool act
 	uint8_t rcmd[1 + 2 + 16 + 8] = {0xA3, blockNum, 0x00};
 	memmove(&rcmd[3], data, 16);
 	if (session)
-		CalculateMAC(session, rcmd, 19, &rcmd[19], VerboseMode);
+		CalculateMAC(session, mtypWriteCmd, blockNum, 1, rcmd, 19, &rcmd[19], VerboseMode);
 	
 	int res = intExchangeRAW14aPlus(rcmd, sizeof(rcmd), activateField, leaveSignalON, dataout, maxdataoutlen, dataoutlen);
 	if(res)
 		return res;
 
-	if(session && mac)
-		CalculateMAC(session, dataout, *dataoutlen, mac, VerboseMode);
+	if (session) 
+		session->W_Ctr++;
+
+	if(session && mac && *dataoutlen > 3)
+		CalculateMAC(session, mtypWriteResp, blockNum, 1, dataout, *dataoutlen, mac, VerboseMode);
 	
 	return 0;
 }
@@ -439,7 +448,7 @@ int CmdHFMFPRdbl(const char *cmd) {
 	bool verbose = arg_get_lit(1);
 	int blocksCount = arg_get_int_def(2, 1);
 	bool keyB = arg_get_lit(3);
-	int plain = arg_get_lit(4) | true;
+	int plain = arg_get_lit(4);
 	uint32_t blockn = arg_get_int(5);
 	CLIGetHexWithReturn(6, key, &keylen);
 	CLIParserFree();
@@ -465,6 +474,10 @@ int CmdHFMFPRdbl(const char *cmd) {
 	if (blocksCount > 3) {
 		PrintAndLog("ERROR: blocks count must be less than 3 instead of: %d", blocksCount);
 		return 1;
+	}
+	
+	if (blocksCount > 1 && mfIsSectorTrailer(blockn)) {
+		PrintAndLog("WARNING: trailer!");
 	}
 	
 	uint8_t sectorNum = mfSectorNum(blockn & 0xff);
@@ -504,13 +517,13 @@ int CmdHFMFPRdbl(const char *cmd) {
 	for(int i = 0; i < blocksCount; i++)  {
 		PrintAndLog("data[%03d]: %s", indx, sprint_hex(&data[1 + i * 16], 16));
 		indx++;
-		if (mfIsSectorTrailer(indx)){
+		if (mfIsSectorTrailer(indx) && i != blocksCount - 1){
 			PrintAndLog("data[%03d]: ------------------- trailer -------------------", indx);
 			indx++;
 		}
 	}
 
-	if (!memcmp(&data[blocksCount * 16 + 1], mac, 8)) {
+	if (memcmp(&data[blocksCount * 16 + 1], mac, 8)) {
 		PrintAndLog("WARNING: mac not equal...");
 		PrintAndLog("MAC   card: %s", sprint_hex(&data[blocksCount * 16 + 1], 8));
 		PrintAndLog("MAC reader: %s", sprint_hex(mac, 8));
@@ -545,7 +558,7 @@ int CmdHFMFPRdsc(const char *cmd) {
 	
 	bool verbose = arg_get_lit(1);
 	bool keyB = arg_get_lit(2);
-	bool plain = arg_get_lit(3) | true;
+	bool plain = arg_get_lit(3);
 	uint32_t sectorNum = arg_get_int(4);
 	CLIGetHexWithReturn(5, key, &keylen);
 	CLIParserFree();
@@ -604,7 +617,7 @@ int CmdHFMFPRdsc(const char *cmd) {
 
 		PrintAndLog("data[%03d]: %s", n, sprint_hex(&data[1], 16));
 			
-		if (!memcmp(&data[1 + 16], mac, 8)) {
+		if (memcmp(&data[1 + 16], mac, 8)) {
 			PrintAndLog("WARNING: mac on block %d not equal...", n);
 			PrintAndLog("MAC   card: %s", sprint_hex(&data[1 + 16], 8));
 			PrintAndLog("MAC reader: %s", sprint_hex(mac, 8));
@@ -706,7 +719,7 @@ int CmdHFMFPWrbl(const char *cmd) {
 		return 6;
 	}
 	
-	if (!memcmp(&data[1], mac, 8)) {
+	if (memcmp(&data[1], mac, 8)) {
 		PrintAndLog("WARNING: mac not equal...");
 		PrintAndLog("MAC   card: %s", sprint_hex(&data[1], 8));
 		PrintAndLog("MAC reader: %s", sprint_hex(mac, 8));
@@ -716,6 +729,7 @@ int CmdHFMFPWrbl(const char *cmd) {
 	}
 	
 	DropField();
+	PrintAndLog("Write OK.");	
 	return 0;
 }
 
@@ -729,7 +743,7 @@ static command_t CommandTable[] =
   {"auth",  	       CmdHFMFPAuth,			0, "Authentication"},
   {"rdbl",  	       CmdHFMFPRdbl,			0, "Read blocks"},
   {"rdsc",  	       CmdHFMFPRdsc,			0, "Read sectors"},
-//  {"wrbl",  	       CmdHFMFPWrbl,			0, "Write blocks"},
+  {"wrbl",  	       CmdHFMFPWrbl,			0, "Write blocks"},
   {NULL,               NULL,					0, NULL}
 };
 
