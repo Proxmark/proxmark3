@@ -1,5 +1,6 @@
 //-----------------------------------------------------------------------------
 // Copyright (C) 2018 Merlok
+// Copyright (C) 2018 drHatson
 //
 // This code is licensed to you under the terms of the GNU GPL, version 2 or,
 // at your option, any later version. See the LICENSE.txt file for the text of
@@ -45,7 +46,7 @@ int aes_decode(uint8_t *iv, uint8_t *key, uint8_t *input, uint8_t *output, int l
 	return 0;
 }
 
-//  NIST Special Publication 800-38B — Recommendation for block cipher modes of operation: The CMAC mode for authentication.
+// NIST Special Publication 800-38B — Recommendation for block cipher modes of operation: The CMAC mode for authentication.
 // https://csrc.nist.gov/CSRC/media/Projects/Cryptographic-Standards-and-Guidelines/documents/examples/AES_CMAC.pdf
 int aes_cmac(uint8_t *iv, uint8_t *key, uint8_t *input, uint8_t *mac, int length) {
 	memset(mac, 0x00, 16);
@@ -53,16 +54,10 @@ int aes_cmac(uint8_t *iv, uint8_t *key, uint8_t *input, uint8_t *mac, int length
 	if (iv)
 		memcpy(iiv, iv, 16);
 	
-	// padding:  ISO/IEC 9797-1 Message Authentication Codes (MACs) - Part 1: Mechanisms using a block cipher
-	uint8_t data[2049] = {0}; // length + 16
-	memcpy(data, input, length);
-	data[length] = 0x80;
-	int datalen = (length & 0xfffffff0) + 0x10;
-	
 	//  NIST 800-38B 
 	aes_cmac128_context ctx;
 	aes_cmac128_starts(&ctx, key);
-	aes_cmac128_update(&ctx, data, datalen);
+	aes_cmac128_update(&ctx, input, length);
 	aes_cmac128_final(&ctx, mac);
 
 	return 0;
