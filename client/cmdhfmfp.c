@@ -429,7 +429,7 @@ int CmdHFMFPRdbl(const char *cmd) {
 	int keylen = 0;
 	
 	CLIParserInit("hf mfp rdbl", 
-		"Reads several blocks from Mifare Plus card in plain mode.", 
+		"Reads several blocks from Mifare Plus card.", 
 		"Usage:\n\thf mfp rdbl 0 000102030405060708090a0b0c0d0e0f -> executes authentication and read block 0 data\n"
 			"\thf mfp rdbl 1 -v -> executes authentication and shows sector 1 data with default key 0xFF..0xFF and some additional data\n");
 
@@ -438,7 +438,7 @@ int CmdHFMFPRdbl(const char *cmd) {
 		arg_lit0("vV",  "verbose", "show internal data."),
 		arg_int0("nN",  "count",   "blocks count (by default 1).", NULL),
 		arg_lit0("bB",  "keyb",    "use key B (by default keyA)."),
-		arg_lit0("pP",  "plain",   "plain communication between reader and card."),
+		arg_lit0("pP",  "plain",   "plain communication mode between reader and card."),
 		arg_int1(NULL,  NULL,      "<Block Num (0..255)>", NULL),
 		arg_str0(NULL,  NULL,      "<Key Value (HEX 16 bytes)>", NULL),
 		arg_param_end
@@ -541,7 +541,7 @@ int CmdHFMFPRdsc(const char *cmd) {
 	int keylen = 0;
 	
 	CLIParserInit("hf mfp rdsc", 
-		"Reads one sector from Mifare Plus card in plain mode.", 
+		"Reads one sector from Mifare Plus card.", 
 		"Usage:\n\thf mfp rdsc 0 000102030405060708090a0b0c0d0e0f -> executes authentication and read sector 0 data\n"
 			"\thf mfp rdsc 1 -v -> executes authentication and shows sector 1 data with default key 0xFF..0xFF and some additional data\n");
 
@@ -549,7 +549,7 @@ int CmdHFMFPRdsc(const char *cmd) {
 		arg_param_begin,
 		arg_lit0("vV",  "verbose", "show internal data."),
 		arg_lit0("bB",  "keyb",    "use key B (by default keyA)."),
-		arg_lit0("pP",  "plain",   "plain communication between reader and card."),
+		arg_lit0("pP",  "plain",   "plain communication mode between reader and card."),
 		arg_int1(NULL,  NULL,      "<Sector Num (0..255)>", NULL),
 		arg_str0(NULL,  NULL,      "<Key Value (HEX 16 bytes)>", NULL),
 		arg_param_end
