@@ -9,8 +9,9 @@
 //-----------------------------------------------------------------------------
 
 #include "polarssl/libpcrypto.h"
-#include <polarssl/aes.h>
-#include <polarssl/aes_cmac128.h>
+#include <string.h>
+#include <mbedtls/aes.h>
+#include <mbedtls/cmac.h>
 
 // NIST Special Publication 800-38A — Recommendation for block cipher modes of operation: methods and techniques, 2001.
 int aes_encode(uint8_t *iv, uint8_t *key, uint8_t *input, uint8_t *output, int length){
@@ -18,13 +19,13 @@ int aes_encode(uint8_t *iv, uint8_t *key, uint8_t *input, uint8_t *output, int l
 	if (iv)
 		memcpy(iiv, iv, 16);
 	
-	aes_context aes;
-	aes_init(&aes);
-	if (aes_setkey_enc(&aes, key, 128))
+	mbedtls_aes_context aes;
+	mbedtls_aes_init(&aes);
+	if (mbedtls_aes_setkey_enc(&aes, key, 128))
 		return 1;
-	if (aes_crypt_cbc(&aes, AES_ENCRYPT, length, iiv, input, output))
+	if (mbedtls_aes_crypt_cbc(&aes, MBEDTLS_AES_ENCRYPT, length, iiv, input, output))
 		return 2;
-	aes_free(&aes);
+	mbedtls_aes_free(&aes);
 
 	return 0;
 }
@@ -34,13 +35,13 @@ int aes_decode(uint8_t *iv, uint8_t *key, uint8_t *input, uint8_t *output, int l
 	if (iv)
 		memcpy(iiv, iv, 16);
 	
-	aes_context aes;
-	aes_init(&aes);
-	if (aes_setkey_dec(&aes, key, 128))
+	mbedtls_aes_context aes;
+	mbedtls_aes_init(&aes);
+	if (mbedtls_aes_setkey_dec(&aes, key, 128))
 		return 1;
-	if (aes_crypt_cbc(&aes, AES_DECRYPT, length, iiv, input, output))
+	if (mbedtls_aes_crypt_cbc(&aes, MBEDTLS_AES_DECRYPT, length, iiv, input, output))
 		return 2;
-	aes_free(&aes);
+	mbedtls_aes_free(&aes);
 
 	return 0;
 }
@@ -60,10 +61,11 @@ int aes_cmac(uint8_t *iv, uint8_t *key, uint8_t *input, uint8_t *mac, int length
 	int datalen = (length & 0xfffffff0) + 0x10;
 	
 	//  NIST 800-38B 
-	aes_cmac128_context ctx;
-	aes_cmac128_starts(&ctx, key);
-	aes_cmac128_update(&ctx, data, datalen);
-	aes_cmac128_final(&ctx, mac);
+	mbedtls_cipher_context_t ctx;
+	mbedtls_cipher_init(&ctx);
+	mbedtls_cipher_cmac_starts(&ctx, key, 128);
+	mbedtls_cipher_cmac_update(&ctx, data, datalen);
+	mbedtls_cipher_cmac_finish(&ctx, mac);
 
 	return 0;
 }

@@ -12,12 +12,16 @@
 #include "util.h"
 #include "ui.h"
 
-#include "bignum.h"
-#include "aes.h"
-#include "aes_cmac128.h"
-#include "des.h"
-#include "rsa.h"
-#include "sha1.h"
+#include "mbedtls/bignum.h"
+#include "mbedtls/aes.h"
+#include "mbedtls/cmac.h"
+#include "mbedtls/des.h"
+#include "mbedtls/ecp.h"
+#include "mbedtls/rsa.h"
+#include "mbedtls/sha1.h"
+#include "mbedtls/md5.h"
+#include "mbedtls/x509.h"
+#include "mbedtls/base64.h"
 
 #include "crypto_test.h"
 #include "sda_test.h"
@@ -28,22 +32,33 @@ int ExecuteCryptoTests(bool verbose) {
 	int res;
 	bool TestFail = false;
 	
-	res = mpi_self_test(verbose);
+	res = mbedtls_mpi_self_test(verbose);
 	if (res) TestFail = true;
 	
-	res = aes_self_test(verbose);
+	res = mbedtls_aes_self_test(verbose);
+	if (res) TestFail = true;
+	res = mbedtls_des_self_test(verbose);
+	if (res) TestFail = true;
+	
+	res = mbedtls_sha1_self_test(verbose);
 	if (res) TestFail = true;
 
-	res = aes_cmac_self_test(verbose);
+	res = mbedtls_md5_self_test(verbose);
+	if (res) TestFail = true;
+	
+	res = mbedtls_rsa_self_test(verbose);
+	if (res) TestFail = true;
+	
+	res = mbedtls_base64_self_test(verbose);
 	if (res) TestFail = true;
 
-	res = des_self_test(verbose);
+	res = mbedtls_cmac_self_test(verbose);
 	if (res) TestFail = true;
-	
-	res = sha1_self_test(verbose);
+
+	res = mbedtls_ecp_self_test(verbose);
 	if (res) TestFail = true;
-	
-	res = rsa_self_test(verbose);
+
+	res = mbedtls_x509_self_test(verbose);
 	if (res) TestFail = true;
 	
 	res = exec_sda_test(verbose);
