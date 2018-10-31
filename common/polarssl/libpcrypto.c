@@ -1,5 +1,6 @@
 //-----------------------------------------------------------------------------
 // Copyright (C) 2018 Merlok
+// Copyright (C) 2018 drHatson
 //
 // This code is licensed to you under the terms of the GNU GPL, version 2 or,
 // at your option, any later version. See the LICENSE.txt file for the text of
@@ -13,7 +14,7 @@
 #include <mbedtls/aes.h>
 #include <mbedtls/cmac.h>
 
-// NIST Special Publication 800-38A — Recommendation for block cipher modes of operation: methods and techniques, 2001.
+// NIST Special Publication 800-38A â€” Recommendation for block cipher modes of operation: methods and techniques, 2001.
 int aes_encode(uint8_t *iv, uint8_t *key, uint8_t *input, uint8_t *output, int length){
 	uint8_t iiv[16] = {0};
 	if (iv)
@@ -46,20 +47,13 @@ int aes_decode(uint8_t *iv, uint8_t *key, uint8_t *input, uint8_t *output, int l
 	return 0;
 }
 
-//  NIST Special Publication 800-38B — Recommendation for block cipher modes of operation: The CMAC mode for authentication.
+// NIST Special Publication 800-38B â€” Recommendation for block cipher modes of operation: The CMAC mode for authentication.
 // https://csrc.nist.gov/CSRC/media/Projects/Cryptographic-Standards-and-Guidelines/documents/examples/AES_CMAC.pdf
 int aes_cmac(uint8_t *iv, uint8_t *key, uint8_t *input, uint8_t *mac, int length) {
 	memset(mac, 0x00, 16);
 	uint8_t iiv[16] = {0};
 	if (iv)
 		memcpy(iiv, iv, 16);
-	
-	// padding:  ISO/IEC 9797-1 Message Authentication Codes (MACs) - Part 1: Mechanisms using a block cipher
-	uint8_t data[2049] = {0}; // length + 16
-	memcpy(data, input, length);
-	data[length] = 0x80;
-	int datalen = (length & 0xfffffff0) + 0x10;
-	
 	
 //	int mbedtls_aes_cmac_prf_128( const unsigned char *key, size_t key_length,
 //                              const unsigned char *input, size_t in_len,
@@ -71,7 +65,7 @@ int aes_cmac(uint8_t *iv, uint8_t *key, uint8_t *input, uint8_t *mac, int length
 	mbedtls_cipher_init(&ctx);
 	mbedtls_cipher_setup(&ctx, mbedtls_cipher_info_from_type(MBEDTLS_CIPHER_AES_128_ECB));
 	mbedtls_cipher_cmac_starts(&ctx, key, 128);
-	mbedtls_cipher_cmac_update(&ctx, data, datalen);
+	mbedtls_cipher_cmac_update(&ctx, input, length);
 	mbedtls_cipher_cmac_finish(&ctx, mac);
 
 	return 0;
