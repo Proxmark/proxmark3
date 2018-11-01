@@ -8,21 +8,21 @@
 // Low frequency commands
 //-----------------------------------------------------------------------------
 
+#include "cmdlf.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <limits.h>
 #include <stdbool.h>
 #include <stdint.h>
-#include "proxmark3.h"
-#include "cmdlf.h"
+#include "comms.h"
 #include "lfdemod.h"     // for psk2TOpsk1
 #include "util.h"        // for parsing cli command utils
 #include "ui.h"          // for show graph controls
 #include "graph.h"       // for graph data
 #include "cmdparser.h"   // for getting cli commands included in cmdmain.h
 #include "cmdmain.h"     // for sending cmds to device
-#include "data.h"        // for GetFromBigBuf
 #include "cmddata.h"     // for `lf search`
 #include "cmdlfawid.h"   // for awid menu
 #include "cmdlfem4x.h"   // for em4x menu
@@ -54,26 +54,24 @@ static int CmdHelp(const char *Cmd);
 
 int usage_lf_cmdread(void)
 {
-	PrintAndLog("Usage: lf cmdread d <delay period> z <zero period> o <one period> c <cmdbytes> [H] ");
+	PrintAndLog("Usage: lf cmdread d <delay period> z <zero period> o <one period> c <cmdbytes> ");
 	PrintAndLog("Options:        ");
 	PrintAndLog("       h             This help");
-	PrintAndLog("       L             Low frequency (125 KHz)");
-	PrintAndLog("       H             High frequency (134 KHz)");
-	PrintAndLog("       d <delay>     delay OFF period");
-	PrintAndLog("       z <zero>      time period ZERO");
-	PrintAndLog("       o <one>       time period ONE");
+	PrintAndLog("       d <delay>     delay OFF period between bits (0 for bitbang mode)");
+	PrintAndLog("       z <zero>      time period ZERO (antenna off in bitbang mode)");
+	PrintAndLog("       o <one>       time period ONE (antenna on in bitbang mode)");
 	PrintAndLog("       c <cmd>       Command bytes");
 	PrintAndLog("       ************* All periods in microseconds");
+	PrintAndLog("       ************* Use lf config to configure options.");
 	PrintAndLog("Examples:");
 	PrintAndLog("      lf cmdread d 80 z 100 o 200 c 11000");
-	PrintAndLog("      lf cmdread d 80 z 100 o 100 c 11000 H");
+	PrintAndLog("      lf cmdread d 80 z 100 o 100 c 11000");
 	return 0;
 }
 
 /* send a command before reading */
 int CmdLFCommandRead(const char *Cmd)
 {
-	static char dummy[3] = {0x20,0x00,0x00};
 	UsbCommand c = {CMD_MOD_THEN_ACQUIRE_RAW_ADC_SAMPLES_125K};
 	bool errors = false;
 	//uint8_t divisor = 95; //125khz
@@ -84,16 +82,8 @@ int CmdLFCommandRead(const char *Cmd)
 		{
 		case 'h':
 			return usage_lf_cmdread();
-		case 'H':
-			//divisor = 88;
-			dummy[1]='h';
-			cmdp++;
-			break;
-		case 'L':
-			cmdp++;
-			break;
 		case 'c':
-			param_getstr(Cmd, cmdp+1, (char *)&c.d.asBytes);
+			param_getstr(Cmd, cmdp+1, (char *)&c.d.asBytes, sizeof(c.d.asBytes));
 			cmdp+=2;
 			break;
 		case 'd':
@@ -121,11 +111,13 @@ int CmdLFCommandRead(const char *Cmd)
 	//Validations
 	if(errors) return usage_lf_cmdread();
 	
-	// in case they specified 'H'
-	strcpy((char *)&c.d.asBytes + strlen((char *)c.d.asBytes), dummy);
-
 	clearCommandBuffer();
 	SendCommand(&c);
+
+	WaitForResponse(CMD_ACK,NULL);
+	getSamples(0, true);
+
+
 	return 0;
 }
 
@@ -335,7 +327,7 @@ int CmdLFSetConfig(const char *Cmd)
 }
 
 bool lf_read(bool silent, uint32_t samples) {
-	if (offline) return false;
+	if (IsOffline()) return false;
 	UsbCommand c = {CMD_ACQUIRE_RAW_ADC_SAMPLES_125K, {silent,samples,0}};
 	clearCommandBuffer();
 	//And ship it to device
@@ -491,7 +483,7 @@ int CmdLFfskSim(const char *Cmd)
 	uint8_t fcHigh=0, fcLow=0, clk=0;
 	uint8_t invert=0;
 	bool errors = false;
-	char hexData[32] = {0x00}; // store entered hex data
+	char hexData[64] = {0x00}; // store entered hex data
 	uint8_t data[255] = {0x00}; 
 	int dataLen = 0;
 	uint8_t cmdp = 0;
@@ -522,7 +514,7 @@ int CmdLFfskSim(const char *Cmd)
 		//  cmdp++;
 		//  break;
 		case 'd':
-			dataLen = param_getstr(Cmd, cmdp+1, hexData);
+			dataLen = param_getstr(Cmd, cmdp+1, hexData, sizeof(hexData));
 			if (dataLen==0) {
 				errors=true; 
 			} else {
@@ -593,7 +585,7 @@ int CmdLFaskSim(const char *Cmd)
 	uint8_t encoding = 1, separator = 0;
 	uint8_t clk=0, invert=0;
 	bool errors = false;
-	char hexData[32] = {0x00}; 
+	char hexData[64] = {0x00}; 
 	uint8_t data[255]= {0x00}; // store entered hex data
 	int dataLen = 0;
 	uint8_t cmdp = 0;
@@ -628,7 +620,7 @@ int CmdLFaskSim(const char *Cmd)
 			cmdp++;
 			break;
 		case 'd':
-			dataLen = param_getstr(Cmd, cmdp+1, hexData);
+			dataLen = param_getstr(Cmd, cmdp+1, hexData, sizeof(hexData));
 			if (dataLen==0) {
 				errors=true; 
 			} else {
@@ -687,7 +679,7 @@ int CmdLFpskSim(const char *Cmd)
 	uint8_t carrier=0, clk=0;
 	uint8_t invert=0;
 	bool errors = false;
-	char hexData[32] = {0x00}; // store entered hex data
+	char hexData[64] = {0x00}; // store entered hex data
 	uint8_t data[255] = {0x00}; 
 	int dataLen = 0;
 	uint8_t cmdp = 0;
@@ -723,7 +715,7 @@ int CmdLFpskSim(const char *Cmd)
 			cmdp++;
 			break;
 		case 'd':
-			dataLen = param_getstr(Cmd, cmdp+1, hexData);
+			dataLen = param_getstr(Cmd, cmdp+1, hexData, sizeof(hexData));
 			if (dataLen==0) {
 				errors=true; 
 			} else {
@@ -878,7 +870,7 @@ int CmdVchDemod(const char *Cmd)
 int CheckChipType(char cmdp) {
 	uint32_t wordData = 0;
 
-	if (offline || cmdp == '1') return 0;
+	if (IsOffline() || cmdp == '1') return 0;
 
 	save_restoreGB(GRAPH_SAVE);
 	save_restoreDB(GRAPH_SAVE);
@@ -923,7 +915,7 @@ int CmdLFfind(const char *Cmd)
 		return 0;
 	}
 
-	if (!offline && (cmdp != '1')) {
+	if (!IsOffline() && (cmdp != '1')) {
 		lf_read(true, 30000);
 	} else if (GraphTraceLen < minLength) {
 		PrintAndLog("Data in Graphbuffer was too small.");
@@ -939,13 +931,13 @@ int CmdLFfind(const char *Cmd)
 	// only run if graphbuffer is just noise as it should be for hitag/cotag
 	if (graphJustNoise(GraphBuffer, testLen)) {
 		// only run these tests if we are in online mode 
-		if (!offline && (cmdp != '1')) {
+		if (!IsOffline() && (cmdp != '1')) {
 			// test for em4x05 in reader talk first mode.
 			if (EM4x05Block0Test(&wordData)) {
 				PrintAndLog("\nValid EM4x05/EM4x69 Chip Found\nUse lf em 4x05readword/dump commands to read\n");
 				return 1;
 			}
-			ans=CmdLFHitagReader("26");
+			ans=CmdLFHitagReader("26"); // 26 = RHT2F_UID_ONLY
 			if (ans==0) {
 				return 1;
 			}
@@ -955,6 +947,7 @@ int CmdLFfind(const char *Cmd)
 				return 1;
 			}
 		}
+		PrintAndLog("\nNo Data Found! - maybe not an LF tag?\n");
 		return 0;
 	}
 

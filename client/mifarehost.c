@@ -16,10 +16,11 @@
 #include <pthread.h>
 
 #include "crapto1/crapto1.h"
-#include "proxmark3.h"
+#include "comms.h"
 #include "usb_cmd.h"
 #include "cmdmain.h"
 #include "ui.h"
+#include "parity.h"
 #include "util.h"
 #include "iso14443crc.h"
 
@@ -73,13 +74,12 @@ static uint32_t intersection(uint64_t *list1, uint64_t *list2)
 
 
 // Darkside attack (hf mf mifare)
-static uint32_t nonce2key(uint32_t uid, uint32_t nt, uint32_t nr, uint64_t par_info, uint64_t ks_info, uint64_t **keys) {
+static uint32_t nonce2key(uint32_t uid, uint32_t nt, uint32_t nr, uint32_t ar, uint64_t par_info, uint64_t ks_info, uint64_t **keys) {
 	struct Crypto1State *states;
-	uint32_t i, pos, rr; //nr_diff;
+	uint32_t i, pos;
 	uint8_t bt, ks3x[8], par[8][8];
 	uint64_t key_recovered;
-	static uint64_t *keylist;
-	rr = 0;
+	uint64_t *keylist;
 
 	// Reset the last three significant bits of the reader nonce
 	nr &= 0xffffff1f;
@@ -92,7 +92,7 @@ static uint32_t nonce2key(uint32_t uid, uint32_t nt, uint32_t nr, uint64_t par_i
 		}
 	}
 
-	states = lfsr_common_prefix(nr, rr, ks3x, par, (par_info == 0));
+	states = lfsr_common_prefix(nr, ar, ks3x, par, (par_info == 0));
 
 	if (states == NULL) {
 		*keys = NULL;
@@ -116,7 +116,7 @@ static uint32_t nonce2key(uint32_t uid, uint32_t nt, uint32_t nr, uint64_t par_i
 int mfDarkside(uint64_t *key)
 {
 	uint32_t uid = 0;
-	uint32_t nt = 0, nr = 0;
+	uint32_t nt = 0, nr = 0, ar = 0;
 	uint64_t par_list = 0, ks_list = 0;
 	uint64_t *keylist = NULL, *last_keylist = NULL;
 	uint32_t keycount = 0;
@@ -159,18 +159,18 @@ int mfDarkside(uint64_t *key)
 				nt =  (uint32_t)bytes_to_num(resp.d.asBytes +  4, 4);
 				par_list = bytes_to_num(resp.d.asBytes +  8, 8);
 				ks_list = bytes_to_num(resp.d.asBytes +  16, 8);
-				nr = bytes_to_num(resp.d.asBytes + 24, 4);
+				nr = (uint32_t)bytes_to_num(resp.d.asBytes + 24, 4);
+				ar = (uint32_t)bytes_to_num(resp.d.asBytes + 28, 4);
 				break;
 			}
 		}
 
 		if (par_list == 0 && c.arg[0] == true) {
 			PrintAndLog("Parity is all zero. Most likely this card sends NACK on every failed authentication.");
-			PrintAndLog("Attack will take a few seconds longer because we need two consecutive successful runs.");
 		}
 		c.arg[0] = false;
 
-		keycount = nonce2key(uid, nt, nr, par_list, ks_list, &keylist);
+		keycount = nonce2key(uid, nt, nr, ar, par_list, ks_list, &keylist);
 
 		if (keycount == 0) {
 			PrintAndLog("Key not found (lfsr_common_prefix list is null). Nt=%08x", nt);
@@ -178,12 +178,14 @@ int mfDarkside(uint64_t *key)
 			continue;
 		}
 
-		qsort(keylist, keycount, sizeof(*keylist), compare_uint64);
-		keycount = intersection(last_keylist, keylist);
-		if (keycount == 0) {
-			free(last_keylist);
-			last_keylist = keylist;
-			continue;
+		if (par_list == 0) {
+			qsort(keylist, keycount, sizeof(*keylist), compare_uint64);
+			keycount = intersection(last_keylist, keylist);
+			if (keycount == 0) {
+				free(last_keylist);
+				last_keylist = keylist;
+				continue;
+			}
 		}
 
 		if (keycount > 1) {
@@ -198,10 +200,10 @@ int mfDarkside(uint64_t *key)
 		for (int i = 0; i < keycount; i += max_keys) {
 			int size = keycount - i > max_keys ? max_keys : keycount - i;
 			for (int j = 0; j < size; j++) {
-				if (last_keylist == NULL) {
-					num_to_bytes(keylist[i*max_keys + j], 6, keyBlock);
+				if (par_list == 0) {
+					num_to_bytes(last_keylist[i*max_keys + j], 6, keyBlock+(j*6));
 				} else {
-					num_to_bytes(last_keylist[i*max_keys + j], 6, keyBlock);
+					num_to_bytes(keylist[i*max_keys + j], 6, keyBlock+(j*6));
 				}
 			}
 			if (!mfCheckKeys(0, 0, false, size, keyBlock, key)) {
@@ -228,15 +230,44 @@ int mfCheckKeys (uint8_t blockNo, uint8_t keyType, bool clear_trace, uint8_t key
 
 	*key = -1;
 
-	UsbCommand c = {CMD_MIFARE_CHKKEYS, {((blockNo & 0xff) | ((keyType&0xff)<<8)), clear_trace, keycnt}};
+	UsbCommand c = {CMD_MIFARE_CHKKEYS, {((blockNo & 0xff) | ((keyType & 0xff) << 8)), clear_trace, keycnt}}; 
 	memcpy(c.d.asBytes, keyBlock, 6 * keycnt);
 	SendCommand(&c);
 
 	UsbCommand resp;
-	if (!WaitForResponseTimeout(CMD_ACK,&resp,3000)) return 1;
+	if (!WaitForResponseTimeout(CMD_ACK,&resp,3000)) return 1; 
 	if ((resp.arg[0] & 0xff) != 0x01) return 2;
 	*key = bytes_to_num(resp.d.asBytes, 6);
 	return 0;
+}
+
+int mfCheckKeysSec(uint8_t sectorCnt, uint8_t keyType, uint8_t timeout14a, bool clear_trace, uint8_t keycnt, uint8_t * keyBlock, sector_t * e_sector){
+
+	uint8_t keyPtr = 0;
+
+	if (e_sector == NULL)
+		return -1;
+
+	UsbCommand c = {CMD_MIFARE_CHKKEYS, {((sectorCnt & 0xff) | ((keyType & 0xff) << 8)), (clear_trace | 0x02)|((timeout14a & 0xff) << 8), keycnt}}; 
+	memcpy(c.d.asBytes, keyBlock, 6 * keycnt);
+	SendCommand(&c);
+
+	UsbCommand resp;
+	if (!WaitForResponseTimeoutW(CMD_ACK, &resp, MAX(3000, 1000 + 13 * sectorCnt * keycnt * (keyType == 2 ? 2 : 1)), false)) return 1; // timeout: 13 ms / fail auth
+	if ((resp.arg[0] & 0xff) != 0x01) return 2;
+	
+	bool foundAKey = false;
+	for(int sec = 0; sec < sectorCnt; sec++){
+		for(int keyAB = 0; keyAB < 2; keyAB++){
+			keyPtr = *(resp.d.asBytes + keyAB * 40 + sec);
+			if (keyPtr){
+				e_sector[sec].foundKey[keyAB] = true;
+				e_sector[sec].Key[keyAB] = bytes_to_num(keyBlock + (keyPtr - 1) * 6, 6);
+				foundAKey = true;
+			}
+		}
+	}
+	return foundAKey ? 0 : 3;
 }
 
 // Compare 16 Bits out of cryptostate
@@ -266,7 +297,13 @@ typedef
 
 
 // wrapper function for multi-threaded lfsr_recovery32
-void* nested_worker_thread(void *arg)
+void
+#ifdef __has_attribute
+#if __has_attribute(force_align_arg_pointer)
+__attribute__((force_align_arg_pointer)) 
+#endif
+#endif
+*nested_worker_thread(void *arg)
 {
 	struct Crypto1State *p1;
 	StateList_t *statelist = arg;
@@ -280,6 +317,7 @@ void* nested_worker_thread(void *arg)
 	return statelist->head.slhead;
 }
 
+
 int mfnested(uint8_t blockNo, uint8_t keyType, uint8_t *key, uint8_t trgBlockNo, uint8_t trgKeyType, uint8_t *resultKey, bool calibrate)
 {
 	uint16_t i;
@@ -290,7 +328,7 @@ int mfnested(uint8_t blockNo, uint8_t keyType, uint8_t *key, uint8_t trgBlockNo,
 	struct Crypto1State *p1, *p2, *p3, *p4;
 
 	// flush queue
-	WaitForResponseTimeout(CMD_ACK, NULL, 100);
+	(void)WaitForResponseTimeout(CMD_ACK,NULL,100);
 
 	UsbCommand c = {CMD_MIFARE_NESTED, {blockNo + keyType * 0x100, trgBlockNo + trgKeyType * 0x100, calibrate}};
 	memcpy(c.d.asBytes, key, 6);
@@ -396,7 +434,8 @@ int mfnested(uint8_t blockNo, uint8_t keyType, uint8_t *key, uint8_t trgBlockNo,
 int mfEmlGetMem(uint8_t *data, int blockNum, int blocksCount) {
 	UsbCommand c = {CMD_MIFARE_EML_MEMGET, {blockNum, blocksCount, 0}};
  	SendCommand(&c);
-	UsbCommand resp;
+
+  UsbCommand resp;
 	if (!WaitForResponseTimeout(CMD_ACK,&resp,1500)) return 1;
 	memcpy(data, resp.d.asBytes, blocksCount * 16);
 	return 0;
@@ -416,6 +455,7 @@ int mfCGetBlock(uint8_t blockNo, uint8_t *data, uint8_t params) {
 
 	UsbCommand c = {CMD_MIFARE_CGETBLOCK, {params, 0, blockNo}};
 	SendCommand(&c);
+
 	UsbCommand resp;
 	if (WaitForResponseTimeout(CMD_ACK,&resp,1500)) {
 		isOK  = resp.arg[0] & 0xff;
@@ -434,8 +474,9 @@ int mfCSetBlock(uint8_t blockNo, uint8_t *data, uint8_t *uid, bool wantWipe, uin
 	UsbCommand c = {CMD_MIFARE_CSETBLOCK, {wantWipe, params & (0xFE | (uid == NULL ? 0:1)), blockNo}};
 	memcpy(c.d.asBytes, data, 16);
 	SendCommand(&c);
+
 	UsbCommand resp;
-	if (WaitForResponseTimeout(CMD_ACK,&resp,1500)) {
+	if (WaitForResponseTimeout(CMD_ACK, &resp, 1500)) {
 		isOK  = resp.arg[0] & 0xff;
 		if (uid != NULL)
 			memcpy(uid, resp.d.asBytes, 4);
@@ -445,25 +486,40 @@ int mfCSetBlock(uint8_t blockNo, uint8_t *data, uint8_t *uid, bool wantWipe, uin
 		PrintAndLog("Command execute timeout");
 		return 1;
 	}
+
 	return 0;
 }
 
-int mfCSetUID(uint8_t *uid, uint8_t *atqa, uint8_t *sak, uint8_t *oldUID, bool wantWipe) {
+int mfCWipe(uint32_t numSectors, bool gen1b, bool wantWipe, bool wantFill) {
+	uint8_t isOK = 0;
+	uint8_t cmdParams = wantWipe + wantFill * 0x02 + gen1b * 0x04;
+	UsbCommand c = {CMD_MIFARE_CWIPE, {numSectors, cmdParams, 0}};
+	SendCommand(&c);
+
+	UsbCommand resp;
+	WaitForResponse(CMD_ACK,&resp);
+	isOK  = resp.arg[0] & 0xff;
+	
+	return isOK;
+}
+
+int mfCSetUID(uint8_t *uid, uint8_t *atqa, uint8_t *sak, uint8_t *oldUID) {
 	uint8_t oldblock0[16] = {0x00};
 	uint8_t block0[16] = {0x00};
-	int old, gen = 0;
+	int gen = 0, res;
 
 	gen = mfCIdentify();
 
+	/* generation 1a magic card by default */
+	uint8_t cmdParams = CSETBLOCK_SINGLE_OPER;
 	if (gen == 2) {
 		/* generation 1b magic card */
-		old = mfCGetBlock(0, oldblock0, CSETBLOCK_SINGLE_OPER | CSETBLOCK_MAGIC_1B);
-	} else {
-		/* generation 1a magic card by default */
-		old = mfCGetBlock(0, oldblock0, CSETBLOCK_SINGLE_OPER);
+		cmdParams = CSETBLOCK_SINGLE_OPER | CSETBLOCK_MAGIC_1B;
 	}
+	
+	res = mfCGetBlock(0, oldblock0, cmdParams);
 
-	if (old == 0) {
+	if (res == 0) {
 		memcpy(block0, oldblock0, 16);
 		PrintAndLog("old block 0:  %s", sprint_hex(block0,16));
 	} else {
@@ -474,24 +530,41 @@ int mfCSetUID(uint8_t *uid, uint8_t *atqa, uint8_t *sak, uint8_t *oldUID, bool w
 	// UID
 	memcpy(block0, uid, 4);
 	// Mifare UID BCC
-	block0[4] = block0[0]^block0[1]^block0[2]^block0[3];
+	block0[4] = block0[0] ^ block0[1] ^ block0[2] ^ block0[3];
 	// mifare classic SAK(byte 5) and ATQA(byte 6 and 7, reversed)
-	if (sak!=NULL)
-		block0[5]=sak[0];
-	if (atqa!=NULL) {
-		block0[6]=atqa[1];
-		block0[7]=atqa[0];
+	if (sak != NULL)
+		block0[5] = sak[0];
+	if (atqa != NULL) {
+		block0[6] = atqa[1];
+		block0[7] = atqa[0];
 	}
-	PrintAndLog("new block 0:  %s", sprint_hex(block0,16));
+	PrintAndLog("new block 0:  %s", sprint_hex(block0, 16));
 
-	if (gen == 2) {
-		/* generation 1b magic card */
-		return mfCSetBlock(0, block0, oldUID, wantWipe, CSETBLOCK_SINGLE_OPER | CSETBLOCK_MAGIC_1B);
-	} else {
-		/* generation 1a magic card by default */
-		return mfCSetBlock(0, block0, oldUID, wantWipe, CSETBLOCK_SINGLE_OPER);
+	res = mfCSetBlock(0, block0, oldUID, false, cmdParams);
+	if (res) {
+		PrintAndLog("Can't set block 0. Error: %d", res);
+		return res;
 	}
+	
+	return 0;
 }
+
+int mfCIdentify() {
+	UsbCommand c = {CMD_MIFARE_CIDENT, {0, 0, 0}};
+	SendCommand(&c);
+	UsbCommand resp;
+	WaitForResponse(CMD_ACK,&resp);
+
+	uint8_t isGeneration = resp.arg[0] & 0xff;
+	switch( isGeneration ){
+		case 1: PrintAndLog("Chinese magic backdoor commands (GEN 1a) detected"); break;
+		case 2: PrintAndLog("Chinese magic backdoor command (GEN 1b) detected"); break;
+		default: PrintAndLog("No chinese magic backdoor command detected"); break;
+	}
+
+	return (int) isGeneration;
+}
+
 
 // SNIFFER
 
@@ -510,14 +583,19 @@ struct Crypto1State *traceCrypto1 = NULL;
 
 struct Crypto1State *revstate;
 uint64_t lfsr;
+uint64_t ui64Key;
 uint32_t ks2;
 uint32_t ks3;
 
-uint32_t uid;     // serial number
-uint32_t nt;      // tag challenge
-uint32_t nr_enc;  // encrypted reader challenge
-uint32_t ar_enc;  // encrypted reader response
-uint32_t at_enc;  // encrypted tag response
+uint32_t uid;       // serial number
+uint32_t nt;        // tag challenge
+uint32_t nt_enc;    // encrypted tag challenge
+uint8_t nt_enc_par; // encrypted tag challenge parity
+uint32_t nr_enc;    // encrypted reader challenge
+uint32_t ar_enc;    // encrypted reader response
+uint8_t ar_enc_par; // encrypted reader response parity
+uint32_t at_enc;    // encrypted tag response
+uint8_t at_enc_par; // encrypted tag response parity
 
 int isTraceCardEmpty(void) {
 	return ((traceCard[0] == 0) && (traceCard[1] == 0) && (traceCard[2] == 0) && (traceCard[3] == 0));
@@ -531,7 +609,7 @@ int isBlockEmpty(int blockN) {
 }
 
 int isBlockTrailer(int blockN) {
-	return ((blockN & 0x03) == 0x03);
+ return ((blockN & 0x03) == 0x03);
 }
 
 int saveTraceCard(void) {
@@ -545,7 +623,8 @@ int saveTraceCard(void) {
 	for (int i = 0; i < 64; i++) {  // blocks
 		for (int j = 0; j < 16; j++)  // bytes
 			fprintf(f, "%02x", *(traceCard + i * 16 + j));
-		fprintf(f,"\n");
+		if (i < 63)
+			fprintf(f,"\n");
 	}
 	fclose(f);
 	return 0;
@@ -593,6 +672,7 @@ int loadTraceCard(uint8_t *tuid) {
 		blockNum++;
 	}
 	fclose(f);
+
 	return 0;
 }
 
@@ -613,6 +693,7 @@ int mfTraceInit(uint8_t *tuid, uint8_t *atqa, uint8_t sak, bool wantSaveToEmlFil
 	uid = bytes_to_num(tuid + 3, 4);
 
 	traceState = TRACE_IDLE;
+
 	return 0;
 }
 
@@ -633,8 +714,36 @@ void mf_crypto1_decrypt(struct Crypto1State *pcs, uint8_t *data, int len, bool i
 	return;
 }
 
+bool NTParityCheck(uint32_t ntx) {
+	if (
+		(oddparity8(ntx >> 8 & 0xff) ^ (ntx & 0x01) ^ ((nt_enc_par >> 5) & 0x01) ^ (nt_enc & 0x01)) ||
+		(oddparity8(ntx >> 16 & 0xff) ^ (ntx >> 8 & 0x01) ^ ((nt_enc_par >> 6) & 0x01) ^ (nt_enc >> 8 & 0x01)) ||
+		(oddparity8(ntx >> 24 & 0xff) ^ (ntx >> 16 & 0x01) ^ ((nt_enc_par >> 7) & 0x01) ^ (nt_enc >> 16 & 0x01))
+		)
+		return false;
+	
+	uint32_t ar = prng_successor(ntx, 64);
+	if (
+		(oddparity8(ar >> 8 & 0xff) ^ (ar & 0x01) ^ ((ar_enc_par >> 5) & 0x01) ^ (ar_enc & 0x01)) ||
+		(oddparity8(ar >> 16 & 0xff) ^ (ar >> 8 & 0x01) ^ ((ar_enc_par >> 6) & 0x01) ^ (ar_enc >> 8 & 0x01)) ||
+		(oddparity8(ar >> 24 & 0xff) ^ (ar >> 16 & 0x01) ^ ((ar_enc_par >> 7) & 0x01) ^ (ar_enc >> 16 & 0x01))
+		)
+		return false;
 
-int mfTraceDecode(uint8_t *data_src, int len, bool wantSaveToEmlFile) {
+	uint32_t at = prng_successor(ntx, 96);
+	if (
+		(oddparity8(ar & 0xff) ^ (at >> 24 & 0x01) ^ ((ar_enc_par >> 4) & 0x01) ^ (at_enc >> 24 & 0x01)) ||
+		(oddparity8(at >> 8 & 0xff) ^ (at & 0x01) ^ ((at_enc_par >> 5) & 0x01) ^ (at_enc & 0x01)) ||
+		(oddparity8(at >> 16 & 0xff) ^ (at >> 8 & 0x01) ^ ((at_enc_par >> 6) & 0x01) ^ (at_enc >> 8 & 0x01)) ||
+		(oddparity8(at >> 24 & 0xff) ^ (at >> 16 & 0x01) ^ ((at_enc_par >> 7) & 0x01) ^ (at_enc >> 16 & 0x01))
+		)
+		return false;
+		
+	return true;
+}
+
+
+int mfTraceDecode(uint8_t *data_src, int len, uint8_t parity, bool wantSaveToEmlFile) {
 	uint8_t data[64];
 
 	if (traceState == TRACE_ERROR) return 1;
@@ -646,7 +755,9 @@ int mfTraceDecode(uint8_t *data_src, int len, bool wantSaveToEmlFile) {
 	memcpy(data, data_src, len);
 	if ((traceCrypto1) && ((traceState == TRACE_IDLE) || (traceState > TRACE_AUTH_OK))) {
 		mf_crypto1_decrypt(traceCrypto1, data, len, 0);
-		PrintAndLog("dec> %s", sprint_hex(data, len));
+		uint8_t parity[16];
+		oddparitybuf(data, len, parity);
+		PrintAndLog("dec> %s [%s]", sprint_hex(data, len), printBitsPar(parity, len));
 		AddLogHex(logHexFileName, "dec> ", data, len);
 	}
 
@@ -735,7 +846,12 @@ int mfTraceDecode(uint8_t *data_src, int len, bool wantSaveToEmlFile) {
 	case TRACE_AUTH1:
 		if (len == 4) {
 			traceState = TRACE_AUTH2;
-			nt = bytes_to_num(data, 4);
+			if (!traceCrypto1) {
+				nt = bytes_to_num(data, 4);
+			} else {
+				nt_enc = bytes_to_num(data, 4);
+				nt_enc_par = parity;
+			}
 			return 0;
 		} else {
 			traceState = TRACE_ERROR;
@@ -749,6 +865,7 @@ int mfTraceDecode(uint8_t *data_src, int len, bool wantSaveToEmlFile) {
 
 			nr_enc = bytes_to_num(data, 4);
 			ar_enc = bytes_to_num(data + 4, 4);
+			ar_enc_par = parity << 4;
 			return 0;
 		} else {
 			traceState = TRACE_ERROR;
@@ -761,19 +878,90 @@ int mfTraceDecode(uint8_t *data_src, int len, bool wantSaveToEmlFile) {
 			traceState = TRACE_IDLE;
 
 			at_enc = bytes_to_num(data, 4);
+			at_enc_par = parity;
+			if (!traceCrypto1) {
 
-			//  decode key here)
-			ks2 = ar_enc ^ prng_successor(nt, 64);
-			ks3 = at_enc ^ prng_successor(nt, 96);
-			revstate = lfsr_recovery64(ks2, ks3);
-			lfsr_rollback_word(revstate, 0, 0);
-			lfsr_rollback_word(revstate, 0, 0);
-			lfsr_rollback_word(revstate, nr_enc, 1);
-			lfsr_rollback_word(revstate, uid ^ nt, 0);
+				//  decode key here)
+				ks2 = ar_enc ^ prng_successor(nt, 64);
+				ks3 = at_enc ^ prng_successor(nt, 96);
+				revstate = lfsr_recovery64(ks2, ks3);
+				lfsr_rollback_word(revstate, 0, 0);
+				lfsr_rollback_word(revstate, 0, 0);
+				lfsr_rollback_word(revstate, nr_enc, 1);
+				lfsr_rollback_word(revstate, uid ^ nt, 0);
 
-			crypto1_get_lfsr(revstate, &lfsr);
-			printf("key> %x%x\n", (unsigned int)((lfsr & 0xFFFFFFFF00000000) >> 32), (unsigned int)(lfsr & 0xFFFFFFFF));
-			AddLogUint64(logHexFileName, "key> ", lfsr);
+				crypto1_get_lfsr(revstate, &lfsr);
+				crypto1_destroy(revstate);
+				ui64Key = lfsr;
+				printf("key> probable key:%x%x Prng:%s ks2:%08x ks3:%08x\n", 
+					(unsigned int)((lfsr & 0xFFFFFFFF00000000) >> 32), (unsigned int)(lfsr & 0xFFFFFFFF), 
+					validate_prng_nonce(nt) ? "WEAK": "HARDEND",
+					ks2,
+					ks3);
+				AddLogUint64(logHexFileName, "key> ", lfsr);
+			} else {
+				if (validate_prng_nonce(nt)) {
+					struct Crypto1State *pcs;
+					pcs = crypto1_create(ui64Key);
+					uint32_t nt1 = crypto1_word(pcs, nt_enc ^ uid, 1) ^ nt_enc;
+					uint32_t ar = prng_successor(nt1, 64);
+					uint32_t at = prng_successor(nt1, 96);
+					printf("key> nested auth uid: %08x nt: %08x nt_parity: %s ar: %08x at: %08x\n", uid, nt1, printBitsPar(&nt_enc_par, 4), ar, at);
+					uint32_t nr1 = crypto1_word(pcs, nr_enc, 1) ^ nr_enc;
+					uint32_t ar1 = crypto1_word(pcs, 0, 0) ^ ar_enc;
+					uint32_t at1 = crypto1_word(pcs, 0, 0) ^ at_enc;
+					crypto1_destroy(pcs);
+					printf("key> the same key test. nr1: %08x ar1: %08x at1: %08x \n", nr1, ar1, at1);
+
+					if (NTParityCheck(nt1))
+						printf("key> the same key test OK. key=%x%x\n", (unsigned int)((ui64Key & 0xFFFFFFFF00000000) >> 32), (unsigned int)(ui64Key & 0xFFFFFFFF));
+					else
+						printf("key> the same key test. check nt parity error.\n");
+					
+					uint32_t ntc = prng_successor(nt, 90);
+					uint32_t ntx = 0;
+					int ntcnt = 0;
+					for (int i = 0; i < 16383; i++) {
+						ntc = prng_successor(ntc, 1);
+						if (NTParityCheck(ntc)){
+							if (!ntcnt)
+								ntx = ntc;
+							ntcnt++;
+						}						
+					}
+					if (ntcnt)
+						printf("key> nt candidate=%08x nonce distance=%d candidates count=%d\n", ntx, nonce_distance(nt, ntx), ntcnt);
+					else
+						printf("key> don't have any nt candidate( \n");
+
+					nt = ntx;
+					ks2 = ar_enc ^ prng_successor(ntx, 64);
+					ks3 = at_enc ^ prng_successor(ntx, 96);
+
+					// decode key
+					revstate = lfsr_recovery64(ks2, ks3);
+					lfsr_rollback_word(revstate, 0, 0);
+					lfsr_rollback_word(revstate, 0, 0);
+					lfsr_rollback_word(revstate, nr_enc, 1);
+					lfsr_rollback_word(revstate, uid ^ nt, 0);
+
+					crypto1_get_lfsr(revstate, &lfsr);
+					crypto1_destroy(revstate);
+					ui64Key = lfsr;
+					printf("key> probable key:%x%x  ks2:%08x ks3:%08x\n", 
+						(unsigned int)((lfsr & 0xFFFFFFFF00000000) >> 32), (unsigned int)(lfsr & 0xFFFFFFFF),
+						ks2,
+						ks3);
+					AddLogUint64(logHexFileName, "key> ", lfsr);
+				} else {				
+					printf("key> hardnested not implemented!\n");
+				
+					crypto1_destroy(traceCrypto1);
+
+					// not implemented
+					traceState = TRACE_ERROR;
+				}
+			}
 
 			int blockShift = ((traceCurBlock & 0xFC) + 3) * 16;
 			if (isBlockEmpty((traceCurBlock & 0xFC) + 3)) memcpy(traceCard + blockShift + 6, trailerAccessBytes, 4);
@@ -791,15 +979,6 @@ int mfTraceDecode(uint8_t *data_src, int len, bool wantSaveToEmlFile) {
 
 			// set cryptosystem state
 			traceCrypto1 = lfsr_recovery64(ks2, ks3);
-
-//	nt = crypto1_word(traceCrypto1, nt ^ uid, 1) ^ nt;
-
-	/*	traceCrypto1 = crypto1_create(lfsr); // key in lfsr
-		crypto1_word(traceCrypto1, nt ^ uid, 0);
-		crypto1_word(traceCrypto1, ar, 1);
-		crypto1_word(traceCrypto1, 0, 0);
-		crypto1_word(traceCrypto1, 0, 0);*/
-
 			return 0;
 		} else {
 			traceState = TRACE_ERROR;
@@ -814,6 +993,8 @@ int mfTraceDecode(uint8_t *data_src, int len, bool wantSaveToEmlFile) {
 
 	return 0;
 }
+
+// DECODING
 
 int tryDecryptWord(uint32_t nt, uint32_t ar_enc, uint32_t at_enc, uint8_t *data, int len){
 	/*
@@ -835,48 +1016,72 @@ int tryDecryptWord(uint32_t nt, uint32_t ar_enc, uint32_t at_enc, uint8_t *data,
 	return 0;
 }
 
-int mfCIdentify()
-{
-	UsbCommand c = {CMD_READER_ISO_14443a, {ISO14A_CONNECT | ISO14A_NO_DISCONNECT, 0, 0}};
+/** validate_prng_nonce
+ * Determine if nonce is deterministic. ie: Suspectable to Darkside attack.
+ * returns
+ *   true = weak prng
+ *   false = hardend prng
+ */
+bool validate_prng_nonce(uint32_t nonce) {
+	uint16_t *dist = 0;
+	uint16_t x, i;
+
+	dist = malloc(2 << 16);
+	if(!dist)
+		return -1;
+
+	// init prng table:
+	for (x = i = 1; i; ++i) {
+		dist[(x & 0xff) << 8 | x >> 8] = i;
+		x = x >> 1 | (x ^ x >> 2 ^ x >> 3 ^ x >> 5) << 15;
+	}
+	
+	uint32_t res = (65535 - dist[nonce >> 16] + dist[nonce & 0xffff]) % 65535;
+	
+	free(dist);	
+	return (res == 16);
+}
+
+/* Detect Tag Prng, 
+* function performs a partial AUTH,  where it tries to authenticate against block0, key A, but only collects tag nonce.
+* the tag nonce is check to see if it has a predictable PRNG.
+* @returns 
+*	TRUE if tag uses WEAK prng (ie Now the NACK bug also needs to be present for Darkside attack)
+*   FALSE is tag uses HARDEND prng (ie hardnested attack possible, with known key)
+*/
+int DetectClassicPrng(void){
+
+	UsbCommand resp, respA;	
+	uint8_t cmd[] = {0x60, 0x00}; // MIFARE_AUTH_KEYA
+	uint32_t flags = ISO14A_CONNECT | ISO14A_RAW | ISO14A_APPEND_CRC | ISO14A_NO_RATS;
+	
+	UsbCommand c = {CMD_READER_ISO_14443a, {flags, sizeof(cmd), 0}};
+	memcpy(c.d.asBytes, cmd, sizeof(cmd));
+
+	clearCommandBuffer();
 	SendCommand(&c);
-	UsbCommand resp;
-	WaitForResponse(CMD_ACK,&resp);
-
-	iso14a_card_select_t card;
-	memcpy(&card, (iso14a_card_select_t *)resp.d.asBytes, sizeof(iso14a_card_select_t));
-
-	uint64_t select_status = resp.arg[0];		// 0: couldn't read, 1: OK, with ATS, 2: OK, no ATS, 3: proprietary Anticollision
-
-	if(select_status != 0) {
-		uint8_t rats[] = { 0xE0, 0x80 }; // FSDI=8 (FSD=256), CID=0
-		c.arg[0] = ISO14A_RAW | ISO14A_APPEND_CRC | ISO14A_NO_DISCONNECT;
-		c.arg[1] = 2;
-		c.arg[2] = 0;
-		memcpy(c.d.asBytes, rats, 2);
-		SendCommand(&c);
-		WaitForResponse(CMD_ACK,&resp);
+	if (!WaitForResponseTimeout(CMD_ACK, &resp, 2000)) {
+        PrintAndLog("PRNG UID: Reply timeout.");
+		return -1;
+	}
+	
+	// if select tag failed.
+	if (resp.arg[0] == 0) {
+		PrintAndLog("PRNG error: selecting tag failed, can't detect prng.");
+		return -1;
+	}
+	
+	if (!WaitForResponseTimeout(CMD_ACK, &respA, 5000)) {
+        PrintAndLog("PRNG data: Reply timeout.");
+		return -1;
 	}
 
-	c.cmd = CMD_MIFARE_CIDENT;
-	c.arg[0] = 0;
-	c.arg[1] = 0;
-	c.arg[2] = 0;
-	SendCommand(&c);
-	WaitForResponse(CMD_ACK,&resp);
-
-	uint8_t isGeneration = resp.arg[0] & 0xff;
-	switch( isGeneration ){
-		case 1: PrintAndLog("Chinese magic backdoor commands (GEN 1a) detected"); break;
-		case 2: PrintAndLog("Chinese magic backdoor command (GEN 1b) detected"); break;
-		default: PrintAndLog("No chinese magic backdoor command detected"); break;
+	// check respA
+	if (respA.arg[0] != 4) {
+		PrintAndLog("PRNG data error: Wrong length: %d", respA.arg[0]);
+		return -1;
 	}
 
-	// disconnect
-	c.cmd = CMD_READER_ISO_14443a;
-	c.arg[0] = 0;
-	c.arg[1] = 0;
-	c.arg[2] = 0;
-	SendCommand(&c);
-
-	return (int) isGeneration;
+	uint32_t nonce = bytes_to_num(respA.d.asBytes, respA.arg[0]);
+	return validate_prng_nonce(nonce);
 }

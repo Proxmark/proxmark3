@@ -9,13 +9,15 @@
 // Work with mifare cards.
 //-----------------------------------------------------------------------------
 
-#include <string.h>
 #include "mifareutil.h"
+
+#include <string.h>
+#include <stdbool.h>
+
 #include "proxmark3.h"
 #include "apps.h"
 #include "util.h"
 #include "parity.h"
-
 #include "iso14443crc.h"
 #include "iso14443a.h"
 #include "crapto1/crapto1.h"
@@ -24,21 +26,25 @@
 int MF_DBGLEVEL = MF_DBG_ALL;
 
 // crypto1 helpers
-void mf_crypto1_decrypt(struct Crypto1State *pcs, uint8_t *data, int len){
+void mf_crypto1_decryptEx(struct Crypto1State *pcs, uint8_t *data_in, int len, uint8_t *data_out){
 	uint8_t	bt = 0;
 	int i;
 	
 	if (len != 1) {
 		for (i = 0; i < len; i++)
-			data[i] = crypto1_byte(pcs, 0x00, 0) ^ data[i];
+			data_out[i] = crypto1_byte(pcs, 0x00, 0) ^ data_in[i];
 	} else {
 		bt = 0;
 		for (i = 0; i < 4; i++)
-			bt |= (crypto1_bit(pcs, 0, 0) ^ BIT(data[0], i)) << i;
+			bt |= (crypto1_bit(pcs, 0, 0) ^ BIT(data_in[0], i)) << i;
 				
-		data[0] = bt;
+		data_out[0] = bt;
 	}
 	return;
+}
+
+void mf_crypto1_decrypt(struct Crypto1State *pcs, uint8_t *data, int len){
+	mf_crypto1_decryptEx(pcs, data, len, data);
 }
 
 void mf_crypto1_encrypt(struct Crypto1State *pcs, uint8_t *data, uint16_t len, uint8_t *par) {
@@ -399,31 +405,48 @@ int mifare_ultra_auth(uint8_t *keybytes){
 	return 1;
 }
 
+
+#define MFU_MAX_RETRIES 5
 int mifare_ultra_readblock(uint8_t blockNo, uint8_t *blockData)
 {
 	uint16_t len;
 	uint8_t	bt[2];
 	uint8_t receivedAnswer[MAX_FRAME_SIZE];
 	uint8_t receivedAnswerPar[MAX_PARITY_SIZE];
-	
+	uint8_t retries;
+	int result = 0;
 
-	len = mifare_sendcmd_short(NULL, 1, 0x30, blockNo, receivedAnswer, receivedAnswerPar, NULL);
-	if (len == 1) {
-		if (MF_DBGLEVEL >= MF_DBG_ERROR) Dbprintf("Cmd Error: %02x", receivedAnswer[0]);
-		return 1;
+	for (retries = 0; retries < MFU_MAX_RETRIES; retries++) {
+		len = mifare_sendcmd_short(NULL, 1, 0x30, blockNo, receivedAnswer, receivedAnswerPar, NULL);
+		if (len == 1) {
+			if (MF_DBGLEVEL >= MF_DBG_ERROR) Dbprintf("Cmd Error: %02x", receivedAnswer[0]);
+			result = 1;
+			continue;
+		}
+		if (len != 18) {
+			if (MF_DBGLEVEL >= MF_DBG_ERROR) Dbprintf("Cmd Error: card timeout. len: %x", len);
+			result = 2;
+			continue;
+		}
+
+		memcpy(bt, receivedAnswer + 16, 2);
+		AppendCrc14443a(receivedAnswer, 16);
+		if (bt[0] != receivedAnswer[16] || bt[1] != receivedAnswer[17]) {
+			if (MF_DBGLEVEL >= MF_DBG_ERROR) Dbprintf("Cmd CRC response error.");
+			result = 3;
+			continue;
+		}
+
+		// No errors encountered; don't retry
+		result = 0;
+		break;
 	}
-	if (len != 18) {
-		if (MF_DBGLEVEL >= MF_DBG_ERROR) Dbprintf("Cmd Error: card timeout. len: %x", len);
-		return 2;
+
+	if (result != 0) {
+		Dbprintf("Cmd Error: too many retries; read failed");
+		return result;
 	}
-    
-	memcpy(bt, receivedAnswer + 16, 2);
-	AppendCrc14443a(receivedAnswer, 16);
-	if (bt[0] != receivedAnswer[16] || bt[1] != receivedAnswer[17]) {
-		if (MF_DBGLEVEL >= MF_DBG_ERROR) Dbprintf("Cmd CRC response error.");
-		return 3;
-	}
-	
+
 	memcpy(blockData, receivedAnswer, 14);
 	return 0;
 }
@@ -581,6 +604,19 @@ uint8_t FirstBlockOfSector(uint8_t sectorNo)
 		
 }
 
+uint8_t SectorTrailer(uint8_t blockNo)
+{
+	if (blockNo < 32*4) {
+		return (blockNo | 0x03);
+	} else {
+		return (blockNo | 0x0f);
+	}
+}
+
+bool IsSectorTrailer(uint8_t blockNo)
+{
+	return (blockNo == SectorTrailer(blockNo));
+}
 
 // work with emulator memory
 void emlSetMem(uint8_t *data, int blockNum, int blocksCount) {
@@ -764,3 +800,125 @@ int mifare_desfire_des_auth2(uint32_t uid, uint8_t *key, uint8_t *blockData){
 	}
 	return 1;
 }
+
+//-----------------------------------------------------------------------------
+// MIFARE check keys
+//
+//-----------------------------------------------------------------------------
+// one key check
+int MifareChkBlockKey(uint8_t *uid, uint32_t *cuid, uint8_t *cascade_levels, uint64_t ui64Key, uint8_t blockNo, uint8_t keyType, uint8_t debugLevel) {
+
+	struct Crypto1State mpcs = {0, 0};
+	struct Crypto1State *pcs;
+	pcs = &mpcs;
+
+	// Iceman: use piwi's faster nonce collecting part in hardnested.
+	if (*cascade_levels == 0) { // need a full select cycle to get the uid first
+		iso14a_card_select_t card_info;
+		if(!iso14443a_select_card(uid, &card_info, cuid, true, 0, true)) {
+			if (debugLevel >= 1) 	Dbprintf("ChkKeys: Can't select card");
+			return  1;
+		}
+		switch (card_info.uidlen) {
+			case 4 : *cascade_levels = 1; break;
+			case 7 : *cascade_levels = 2; break;
+			case 10: *cascade_levels = 3; break;
+			default: break;
+		}
+	} else { // no need for anticollision. We can directly select the card
+		if(!iso14443a_select_card(uid, NULL, NULL, false, *cascade_levels, true)) {
+			if (debugLevel >= 1)	Dbprintf("ChkKeys: Can't select card (UID) lvl=%d", *cascade_levels);
+			return  1;
+		}
+	}
+	
+	if(mifare_classic_auth(pcs, *cuid, blockNo, keyType, ui64Key, AUTH_FIRST)) {
+//		SpinDelayUs(AUTHENTICATION_TIMEOUT); // it not needs because mifare_classic_auth have timeout from iso14a_set_timeout()
+		return 2;
+	} else {
+/*		// let it be here. it like halt command, but maybe it will work in some strange cases
+		uint8_t dummy_answer = 0;
+		ReaderTransmit(&dummy_answer, 1, NULL);
+		int timeout = GetCountSspClk() + AUTHENTICATION_TIMEOUT;			
+		// wait for the card to become ready again
+		while(GetCountSspClk() < timeout) {};
+*/
+		// it needs after success authentication
+		mifare_classic_halt(pcs, *cuid);
+	}
+	
+	return 0;
+}
+
+// multi key check
+int MifareChkBlockKeys(uint8_t *keys, uint8_t keyCount, uint8_t blockNo, uint8_t keyType, uint8_t debugLevel) {
+	uint8_t uid[10];
+	uint32_t cuid = 0;
+	uint8_t cascade_levels = 0;
+	uint64_t ui64Key = 0;
+
+	int retryCount = 0;
+	for (uint8_t i = 0; i < keyCount; i++) {
+
+		// Allow button press / usb cmd to interrupt device
+		if (BUTTON_PRESS() && !usb_poll_validate_length()) { 
+			Dbprintf("ChkKeys: Cancel operation. Exit...");
+			return -2;
+		}
+
+		ui64Key = bytes_to_num(keys + i * 6, 6);
+		int res = MifareChkBlockKey(uid, &cuid, &cascade_levels, ui64Key, blockNo, keyType, debugLevel);
+		
+		// can't select
+		if (res == 1) {
+			retryCount++;
+			if (retryCount >= 5) {
+				Dbprintf("ChkKeys: block=%d key=%d. Can't select. Exit...", blockNo, keyType);
+				return -1;
+			}
+			--i; // try the same key once again
+
+			SpinDelay(20);
+//			Dbprintf("ChkKeys: block=%d key=%d. Try the same key once again...", blockNo, keyType);
+			continue;
+		}
+		
+		// can't authenticate
+		if (res == 2) {
+			retryCount = 0;
+			continue; // can't auth. wrong key.
+		}
+
+		return i + 1;
+	}
+	
+	return 0;
+}
+
+// multisector multikey check
+int MifareMultisectorChk(uint8_t *keys, uint8_t keyCount, uint8_t SectorCount, uint8_t keyType, uint8_t debugLevel, TKeyIndex *keyIndex) {
+	int res = 0;
+	
+//	int clk = GetCountSspClk();
+
+	for(int sc = 0; sc < SectorCount; sc++){
+		WDT_HIT();
+
+		int keyAB = keyType;
+		do {
+			res = MifareChkBlockKeys(keys, keyCount, FirstBlockOfSector(sc), keyAB & 0x01, debugLevel);
+			if (res < 0){
+				return res;
+			}
+			if (res > 0){
+				(*keyIndex)[keyAB & 0x01][sc] = res;
+			}
+		} while(--keyAB > 0);
+	}
+	
+//	Dbprintf("%d %d", GetCountSspClk() - clk, (GetCountSspClk() - clk)/(SectorCount*keyCount*(keyType==2?2:1)));
+	
+	return 0;
+}
+
+

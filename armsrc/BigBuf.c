@@ -136,6 +136,10 @@ void set_tracing(bool enable) {
 	tracing = enable;
 }
 
+bool get_tracing(void) {
+	return tracing;
+}
+
 /**
  * Get the number of bytes traced
  * @return

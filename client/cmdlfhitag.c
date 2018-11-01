@@ -8,11 +8,12 @@
 // Low frequency Hitag support
 //-----------------------------------------------------------------------------
 
+#include "cmdlfhitag.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "data.h"
-#include "proxmark3.h"
+#include "comms.h"
 #include "ui.h"
 #include "cmdparser.h"
 #include "common.h"
@@ -34,8 +35,7 @@ int CmdLFHitagList(const char *Cmd)
 
 	// Query for the actual size of the trace
 	UsbCommand response;
-	GetFromBigBuf(got, USB_CMD_DATA_SIZE, 0);
-	WaitForResponse(CMD_ACK, &response);
+	GetFromBigBuf(got, USB_CMD_DATA_SIZE, 0, &response, -1, false);
 	uint16_t traceLen = response.arg[2];
 	if (traceLen > USB_CMD_DATA_SIZE) {
 		uint8_t *p = realloc(got, traceLen);
@@ -45,8 +45,7 @@ int CmdLFHitagList(const char *Cmd)
 			return 2;
 		}
 		got = p;
-		GetFromBigBuf(got, traceLen, 0);
-		WaitForResponse(CMD_ACK,NULL);
+		GetFromBigBuf(got, traceLen, 0, NULL, -1, false);
 	}
 	
 	PrintAndLog("recorded activity (TraceLen = %d bytes):");
@@ -67,6 +66,7 @@ int CmdLFHitagList(const char *Cmd)
 	if (strlen(filename) > 0) {
 		if ((pf = fopen(filename,"wb")) == NULL) {
 			PrintAndLog("Error: Could not open file [%s]",filename);
+			free(got);
 			return 1;
 		}
 	}
@@ -167,11 +167,11 @@ int CmdLFHitagSim(const char *Cmd) {
 			return 1;
 		}
 		tag_mem_supplied = true;
-		if (fread(c.d.asBytes,48,1,pf) == 0) {
-      PrintAndLog("Error: File reading error");
-      fclose(pf);
+		if (fread(c.d.asBytes,1,48,pf) != 48) {
+			PrintAndLog("Error: File reading error");
+			fclose(pf);
 			return 1;
-    }
+		}
 		fclose(pf);
 	} else {
 		tag_mem_supplied = false;
@@ -239,6 +239,7 @@ int CmdLFHitagReader(const char *Cmd) {
 	c.arg[0] = htf;
 
 	// Send the command to the proxmark
+	clearCommandBuffer();
 	SendCommand(&c);
 
 	UsbCommand resp;
@@ -289,7 +290,7 @@ int CmdLFHitagSimS(const char *Cmd) {
 			return 1;
 		}
 		tag_mem_supplied = true;
-		if (fread(c.d.asBytes, 4*64, 1, pf) == 0) {
+		if (fread(c.d.asBytes, 1, 4*64, pf) != 4*64) {
 			PrintAndLog("Error: File reading error");
 			fclose(pf);
 			return 1;
@@ -321,9 +322,9 @@ int CmdLFHitagCheckChallenges(const char *Cmd) {
 			return 1;
 		}
 		file_given = true;
-		if (fread(c.d.asBytes,8*60,1,pf) == 0) {
-      PrintAndLog("Error: File reading error");
-      fclose(pf);
+		if (fread(c.d.asBytes,1,8*60,pf) != 8*60) {
+			PrintAndLog("Error: File reading error");
+			fclose(pf);
 			return 1;
         }
 		fclose(pf);

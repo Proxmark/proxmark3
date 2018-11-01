@@ -6,19 +6,136 @@
 // the license.
 //-----------------------------------------------------------------------------
 // Low frequency HID commands (known)
+//
+// Useful resources:
+// RF interface, programming a T55x7 clone, 26-bit HID H10301 encoding:
+// http://www.proxmark.org/files/Documents/125%20kHz%20-%20HID/HID_format_example.pdf
+//
+// "Understanding Card Data Formats"
+// https://www.hidglobal.com/sites/default/files/hid-understanding_card_data_formats-wp-en.pdf
+//
+// "What Format Do You Need?"
+// https://www.hidglobal.com/sites/default/files/resource_files/hid-prox-br-en.pdf
 //-----------------------------------------------------------------------------
+
+#include "cmdlfhid.h"
 
 #include <stdio.h>
 #include <string.h>
-#include "cmdlfhid.h"
-#include "proxmark3.h"
+#include "comms.h"
 #include "ui.h"
 #include "graph.h"
 #include "cmdparser.h"
 #include "cmddata.h"  //for g_debugMode, demodbuff cmds
 #include "lfdemod.h" // for HIDdemodFSK
+#include "hidcardformats.h"
+#include "hidcardformatutils.h"
+#include "util.h" // for param_get8,32,64
 
-static int CmdHelp(const char *Cmd);
+
+/**
+ * Converts a hex string to component "hi2", "hi" and "lo" 32-bit integers, one nibble
+ * at a time.
+ *
+ * Returns the number of nibbles (4 bits) entered.
+ */
+int hexstring_to_int96(/* out */ uint32_t* hi2,/* out */ uint32_t* hi, /* out */ uint32_t* lo, const char* str) {
+  // TODO: Replace this with param_gethex when it supports arbitrary length
+  // inputs.
+  int n = 0, i = 0;
+
+  while (sscanf(&str[i++], "%1x", &n ) == 1) {
+    *hi2 = (*hi2 << 4) | (*hi >> 28);
+    *hi = (*hi << 4) | (*lo >> 28);
+    *lo = (*lo << 4) | (n & 0xf);
+  }
+
+  return i - 1;
+}
+
+void usage_encode(){
+  PrintAndLog("Usage:  lf hid encode <format> [<field> <value (decimal)>] {...}");
+  PrintAndLog("   Fields:    c: Card number");
+  PrintAndLog("              f: Facility code");
+  PrintAndLog("              i: Issue Level");
+  PrintAndLog("              o: OEM code");
+  PrintAndLog("   example: lf hid encode H10301 f 123 c 4567");
+}
+void PrintProxTagId(hidproxmessage_t *packed){
+  if (packed->top != 0) {
+      PrintAndLog("HID Prox TAG ID: %x%08x%08x",
+        (uint32_t)packed->top, (uint32_t)packed->mid, (uint32_t)packed->bot);
+    } else {
+      PrintAndLog("HID Prox TAG ID: %x%08x",
+        (uint32_t)packed->mid, (uint32_t)packed->bot); 
+    }
+}
+bool Encode(/* in */ const char *Cmd, /* out */ hidproxmessage_t *packed){
+  int formatIndex = -1;
+  char format[16];
+  memset(format, 0, sizeof(format));
+  if (!strcmp(Cmd, "help") || !strcmp(Cmd, "h") || !strcmp(Cmd, "list") || !strcmp(Cmd, "?")){
+    usage_encode();
+    return false;
+  } else {
+    param_getstr(Cmd, 0, format, sizeof(format));
+    formatIndex = HIDFindCardFormat(format);
+    if (formatIndex == -1) {
+      printf("Unknown format: %s\r\n", format);
+      return false;
+    }
+  }
+  hidproxcard_t data;
+  memset(&data, 0, sizeof(hidproxcard_t));
+  uint8_t cmdp = 1;
+	while(param_getchar(Cmd, cmdp) != 0x00) {
+		switch(param_getchar(Cmd, cmdp)) {
+      case 'I':
+      case 'i':
+        data.IssueLevel = param_get32ex(Cmd, cmdp+1, 0, 10);
+        cmdp += 2;
+        break;
+      case 'F':
+      case 'f':
+        data.FacilityCode = param_get32ex(Cmd, cmdp+1, 0, 10);
+        cmdp += 2;
+        break;
+      case 'C':
+      case 'c':
+        data.CardNumber = param_get64ex(Cmd, cmdp+1, 0, 10);
+        cmdp += 2;
+			  break;
+      case 'o':
+      case 'O':
+        data.OEM = param_get32ex(Cmd, cmdp+1, 0, 10);
+        cmdp += 2;
+			break;
+      default:
+        PrintAndLog("Unknown parameter '%c'", param_getchar(Cmd, cmdp));
+        return false;
+		}
+	}
+	memset(packed, 0, sizeof(hidproxmessage_t));
+  if (!HIDPack(formatIndex, &data, packed))
+  {
+    PrintAndLog("The card data could not be encoded in the selected format.");
+    return false;
+  } else {
+    return true;
+  }
+
+}
+void Write(hidproxmessage_t *packed){
+  UsbCommand c;
+  c.d.asBytes[0] = (packed->top != 0 && ((packed->mid & 0xFFFFFFC0) != 0))
+    ? 1 : 0; // Writing long format?
+  c.cmd = CMD_HID_CLONE_TAG;
+  c.arg[0] = (packed->top & 0x000FFFFF);
+  c.arg[1] = packed->mid;
+  c.arg[2] = packed->bot;
+  SendCommand(&c);
+}
+
 
 //by marshmellow (based on existing demod + holiman's refactor)
 //HID Prox demod - FSK RF/50 with preamble of 00011101 (then manchester encoded)
@@ -54,50 +171,13 @@ int CmdFSKdemodHID(const char *Cmd)
     if (g_debugMode) PrintAndLog("DEBUG: Error - no values found");
     return 0;
   }
-  if (hi2 != 0){ //extra large HID tags
-    PrintAndLog("HID Prox TAG ID: %x%08x%08x (%d)",
-       (unsigned int) hi2, (unsigned int) hi, (unsigned int) lo, (unsigned int) (lo>>1) & 0xFFFF);
-  }
-  else {  //standard HID tags <38 bits
-    uint8_t fmtLen = 0;
-    uint32_t fc = 0;
-    uint32_t cardnum = 0;
-    if (((hi>>5)&1)==1){//if bit 38 is set then < 37 bit format is used
-      uint32_t lo2=0;
-      lo2=(((hi & 31) << 12) | (lo>>20)); //get bits 21-37 to check for format len bit
-      uint8_t idx3 = 1;
-      while(lo2>1){ //find last bit set to 1 (format len bit)
-        lo2=lo2>>1;
-        idx3++;
-      }
-      fmtLen =idx3+19;
-      fc =0;
-      cardnum=0;
-      if(fmtLen==26){
-        cardnum = (lo>>1)&0xFFFF;
-        fc = (lo>>17)&0xFF;
-      }
-      if(fmtLen==34){
-        cardnum = (lo>>1)&0xFFFF;
-        fc= ((hi&1)<<15)|(lo>>17);
-      }
-      if(fmtLen==35){
-        cardnum = (lo>>1)&0xFFFFF;
-        fc = ((hi&1)<<11)|(lo>>21);
-      }
-    }
-    else { //if bit 38 is not set then 37 bit format is used
-      fmtLen = 37;
-      fc = 0;
-      cardnum = 0;
-      if(fmtLen == 37){
-        cardnum = (lo>>1)&0x7FFFF;
-        fc = ((hi&0xF)<<12)|(lo>>20);
-      }
-    }
-    PrintAndLog("HID Prox TAG ID: %x%08x (%d) - Format Len: %dbit - FC: %d - Card: %d",
-      (unsigned int) hi, (unsigned int) lo, (unsigned int) (lo>>1) & 0xFFFF,
-      (unsigned int) fmtLen, (unsigned int) fc, (unsigned int) cardnum);
+  
+  hidproxmessage_t packed = initialize_proxmessage_object(hi2, hi, lo);
+  PrintProxTagId(&packed);
+
+  bool ret = HIDTryUnpack(&packed, false);
+  if (!ret) {
+    PrintAndLog("Invalid or unsupported tag length.");
   }
   setDemodBuf(BitStream,BitLen,idx);
   setClockGrid(50, waveIdx + (idx*50));
@@ -111,7 +191,7 @@ int CmdFSKdemodHID(const char *Cmd)
 int CmdHIDReadFSK(const char *Cmd)
 {
   int findone=0;
-	if(Cmd[0]=='1') findone=1;
+  if(Cmd[0]=='1') findone=1;
   UsbCommand c={CMD_HID_DEMOD_FSK};
   c.arg[0]=findone;
   SendCommand(&c);
@@ -120,67 +200,92 @@ int CmdHIDReadFSK(const char *Cmd)
 
 int CmdHIDSim(const char *Cmd)
 {
-	uint32_t hi = 0, lo = 0;
-	int n = 0, i = 0;
-
-	while (sscanf(&Cmd[i++], "%1x", &n ) == 1) {
-		hi = (hi << 4) | (lo >> 28);
-		lo = (lo << 4) | (n & 0xf);
-	}
-
-	PrintAndLog("Emulating tag with ID %x%08x", hi, lo);
-	PrintAndLog("Press pm3-button to abort simulation");
-
-	UsbCommand c = {CMD_HID_SIM_TAG, {hi, lo, 0}};
-	SendCommand(&c);
-	return 0;
-}
-
-int CmdHIDClone(const char *Cmd)
-{
-  unsigned int hi2 = 0, hi = 0, lo = 0;
-  int n = 0, i = 0;
-  UsbCommand c;
-
-  if (strchr(Cmd,'l') != 0) {
-  	while (sscanf(&Cmd[i++], "%1x", &n ) == 1) {
-      hi2 = (hi2 << 4) | (hi >> 28);
-      hi = (hi << 4) | (lo >> 28);
-      lo = (lo << 4) | (n & 0xf);
-    }
-
-    PrintAndLog("Cloning tag with long ID %x%08x%08x", hi2, hi, lo);
-
-    c.d.asBytes[0] = 1;
-  }
-  else {
-  	while (sscanf(&Cmd[i++], "%1x", &n ) == 1) {
-      hi = (hi << 4) | (lo >> 28);
-      lo = (lo << 4) | (n & 0xf);
-    }
-
-    PrintAndLog("Cloning tag with ID %x%08x", hi, lo);
-
-    hi2 = 0;
-    c.d.asBytes[0] = 0;
+  uint32_t hi2 = 0, hi = 0, lo = 0;
+  hexstring_to_int96(&hi2, &hi, &lo, Cmd);
+  if (hi2 != 0) {
+    PrintAndLog("Emulating tag with ID %x%08x%08x", hi2, hi, lo);
+  } else {
+    PrintAndLog("Emulating tag with ID %x%08x", hi, lo);
   }
 
-  c.cmd = CMD_HID_CLONE_TAG;
-  c.arg[0] = hi2;
-  c.arg[1] = hi;
-  c.arg[2] = lo;
+  PrintAndLog("Press pm3-button to abort simulation");
 
+  UsbCommand c = {CMD_HID_SIM_TAG, {hi2, hi, lo}};
   SendCommand(&c);
   return 0;
 }
 
+int CmdHIDClone(const char *Cmd)
+{
+  unsigned int top = 0, mid = 0, bot = 0;
+  hexstring_to_int96(&top, &mid, &bot, Cmd);
+  hidproxmessage_t packed = initialize_proxmessage_object(top, mid, bot);
+  Write(&packed);
+  return 0;
+}
+
+int CmdHIDDecode(const char *Cmd){
+  if (strlen(Cmd)<3) {
+    PrintAndLog("Usage:  lf hid decode <id> {p}");
+    PrintAndLog("        (optional) p: Ignore invalid parity");
+    PrintAndLog("        sample: lf hid decode 2006f623ae");
+    return 0;
+  }
+
+  uint32_t top = 0, mid = 0, bot = 0;
+  bool ignoreParity = false;
+  hexstring_to_int96(&top, &mid, &bot, Cmd);
+  hidproxmessage_t packed = initialize_proxmessage_object(top, mid, bot);
+
+  char opt = param_getchar(Cmd, 1);
+  if (opt == 'p') ignoreParity = true;
+
+  HIDTryUnpack(&packed, ignoreParity);
+  return 0;
+}
+int CmdHIDEncode(const char *Cmd) {
+  if (strlen(Cmd) == 0) {
+    usage_encode();
+    return 0;
+  }
+
+  hidproxmessage_t packed;
+  memset(&packed, 0, sizeof(hidproxmessage_t));
+  if (Encode(Cmd, &packed))
+    PrintProxTagId(&packed);
+  return 0;
+}
+
+int CmdHIDWrite(const char *Cmd) {
+  if (strlen(Cmd) == 0) {
+    usage_encode();
+    return 0;
+  }
+  hidproxmessage_t packed;
+  memset(&packed, 0, sizeof(hidproxmessage_t));
+  if (Encode(Cmd, &packed)){
+    PrintProxTagId(&packed);
+    Write(&packed);
+  }
+  return 0;
+}
+
+int CmdHIDFormats(){
+  HIDListFormats();
+  return 0;
+}
+static int CmdHelp(const char *Cmd); // define this now so the below won't error out.
 static command_t CommandTable[] = 
 {
   {"help",      CmdHelp,        1, "This help"},
   {"demod",     CmdFSKdemodHID, 1, "Demodulate HID Prox from GraphBuffer"},
   {"read",      CmdHIDReadFSK,  0, "['1'] Realtime HID FSK Read from antenna (option '1' for one tag only)"},
   {"sim",       CmdHIDSim,      0, "<ID> -- HID tag simulator"},
-  {"clone",     CmdHIDClone,    0, "<ID> ['l'] -- Clone HID to T55x7 (tag must be in antenna)(option 'l' for 84bit ID)"},
+  {"clone",     CmdHIDClone,    0, "<ID> -- Clone HID to T55x7 (tag must be in antenna)"},
+  {"decode",    CmdHIDDecode,   1, "<ID> -- Try to decode an HID tag and show its contents"},
+  {"encode",    CmdHIDEncode,   1, "<format> <fields> -- Encode an HID ID with the specified format and fields"},
+  {"formats",   CmdHIDFormats,  1, "List supported card formats"},
+  {"write",     CmdHIDWrite,    0, "<format> <fields> -- Encode and write to a T55x7 tag (tag must be in antenna)"},
   {NULL, NULL, 0, NULL}
 };
 

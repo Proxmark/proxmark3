@@ -11,6 +11,8 @@
 #ifndef CMDHFMF_H__
 #define CMDHFMF_H__
 
+#include "mifaredefault.h"
+
 extern int CmdHFMF(const char *Cmd);
 
 extern int CmdHF14AMfDbg(const char* cmd);
@@ -34,6 +36,7 @@ extern int CmdHF14AMfELoad(const char* cmd);
 extern int CmdHF14AMfESave(const char* cmd);
 extern int CmdHF14AMfECFill(const char* cmd);
 extern int CmdHF14AMfEKeyPrn(const char* cmd);
+extern int CmdHF14AMfCWipe(const char* cmd);
 extern int CmdHF14AMfCSetUID(const char* cmd);
 extern int CmdHF14AMfCSetBlk(const char* cmd);
 extern int CmdHF14AMfCGetBlk(const char* cmd);

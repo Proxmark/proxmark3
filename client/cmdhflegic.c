@@ -8,16 +8,17 @@
 // High frequency Legic commands
 //-----------------------------------------------------------------------------
 
+#include "cmdhflegic.h"
+
 #include <stdio.h>
 #include <string.h>
 #include <inttypes.h>
-#include "proxmark3.h"
-#include "data.h"
+#include "comms.h"
 #include "ui.h"
 #include "cmdparser.h"
-#include "cmdhflegic.h"
 #include "cmdmain.h"
 #include "util.h"
+
 static int CmdHelp(const char *Cmd);
 
 static command_t CommandTable[] = 
@@ -27,7 +28,7 @@ static command_t CommandTable[] =
   {"reader",      CmdLegicRFRead, 0, "[offset [length]] -- read bytes from a LEGIC card"},
   {"save",        CmdLegicSave,   0, "<filename> [<length>] -- Store samples"},
   {"load",        CmdLegicLoad,   0, "<filename> -- Restore samples"},
-  {"sim",         CmdLegicRfSim,  0, "[phase drift [frame drift [req/resp drift]]] Start tag simulator (use after load or read)"},
+  {"sim",         CmdLegicRfSim,  0, "[tagtype, 0:MIM22, 1:MIM256, 2:MIM1024] Start tag simulator (use after load or read)"},
   {"write",       CmdLegicRfWrite,0, "<offset> <length> -- Write sample buffer (user after load or read)"},
   {"fill",        CmdLegicRfFill, 0, "<offset> <length> <value> -- Fill/Write tag with constant value"},
   {NULL, NULL, 0, NULL}
@@ -64,8 +65,7 @@ int CmdLegicDecode(const char *Cmd)
   char token_type[4];
   
   // copy data from proxmark into buffer
-   GetFromBigBuf(data_buf,sizeof(data_buf),0);
-   WaitForResponse(CMD_ACK,NULL);
+   GetFromBigBuf(data_buf, sizeof(data_buf), 0, NULL, -1, false);
     
   // Output CDF System area (9 bytes) plus remaining header area (12 bytes)
   
@@ -294,8 +294,7 @@ int CmdLegicSave(const char *Cmd)
     return -1;
   }
 
-  GetFromBigBuf(got,requested,offset);
-  WaitForResponse(CMD_ACK,NULL);
+  GetFromBigBuf(got, requested, offset, NULL, -1, false);
 
   for (int j = 0; j < requested; j += 8) {
     fprintf(f, "%02x %02x %02x %02x %02x %02x %02x %02x\n",
@@ -321,10 +320,8 @@ int CmdLegicSave(const char *Cmd)
 int CmdLegicRfSim(const char *Cmd)
 {
    UsbCommand c={CMD_SIMULATE_TAG_LEGIC_RF};
-   c.arg[0] = 6;
-   c.arg[1] = 3;
-   c.arg[2] = 0;
-   sscanf(Cmd, " %" SCNi64 " %" SCNi64 " %" SCNi64, &c.arg[0], &c.arg[1], &c.arg[2]);
+   c.arg[0] = 1;
+   sscanf(Cmd, " %" SCNi64, &c.arg[0]);
    SendCommand(&c);
    return 0;
 }

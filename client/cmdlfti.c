@@ -8,16 +8,17 @@
 // Low frequency TI commands
 //-----------------------------------------------------------------------------
 
+#include "cmdlfti.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <inttypes.h>
 #include "crc16.h"
-#include "proxmark3.h"
-#include "data.h"
+#include "comms.h"
 #include "ui.h"
 #include "graph.h"
 #include "cmdparser.h"
-#include "cmdlfti.h"
+#include "util.h"
 
 static int CmdHelp(const char *Cmd);
 

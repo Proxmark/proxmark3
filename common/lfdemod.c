@@ -10,8 +10,8 @@
 //
 // NOTES: 
 // LF Demod functions are placed here to allow the flexability to use client or
-// device side. Most BUT NOT ALL of these functions are currenlty safe for 
-// device side use currently. (DetectST for example...)
+// device side. Most BUT NOT ALL of these functions are currently safe for 
+// device side use. (DetectST for example...)
 //
 // There are likely many improvements to the code that could be made, please
 // make suggestions...

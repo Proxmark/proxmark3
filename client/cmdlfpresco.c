@@ -7,11 +7,13 @@
 // Low frequency Presco tag commands
 // ASK/Manchester, rf/32, 128 bits (complete)
 //-----------------------------------------------------------------------------
+
+#include "cmdlfpresco.h"
+
 #include <string.h>
 #include <inttypes.h>
 #include <stdio.h>
-#include "cmdlfpresco.h"
-#include "proxmark3.h"
+#include "comms.h"
 #include "ui.h"
 #include "util.h"
 #include "graph.h"
@@ -71,7 +73,7 @@ int GetWiegandFromPresco(const char *Cmd, uint32_t *sitecode, uint32_t *usercode
 			case 'D':
 			case 'd':
 				//param get string int param_getstr(const char *line, int paramnum, char * str)
-				stringlen = param_getstr(Cmd, cmdp+1, id);
+				stringlen = param_getstr(Cmd, cmdp+1, id, sizeof(id));
 				if (stringlen < 2) return -1;
 				cmdp+=2;
 				break;

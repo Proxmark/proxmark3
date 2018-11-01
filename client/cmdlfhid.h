@@ -11,10 +11,15 @@
 #ifndef CMDLFHID_H__
 #define CMDLFHID_H__
 
+#include <stdint.h>
+#include <stdbool.h>
+
 int CmdLFHID(const char *Cmd);
 int CmdFSKdemodHID(const char *Cmd);
 int CmdHIDReadDemod(const char *Cmd);
 int CmdHIDSim(const char *Cmd);
 int CmdHIDClone(const char *Cmd);
-
+int CmdHIDDecode(const char *Cmd);
+int CmdHIDEncode(const char *Cmd);
+int CmdHIDWrite(const char *Cmd);
 #endif

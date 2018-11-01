@@ -42,9 +42,10 @@ void Dbprintf(const char *fmt, ...);
 void Dbhexdump(int len, uint8_t *d, bool bAsci);
 
 // ADC Vref = 3300mV, and an (10M+1M):1M voltage divider on the HF input can measure voltages up to 36300 mV
-#define MAX_ADC_HF_VOLTAGE 36300
+#define MAX_ADC_HF_VOLTAGE_LOW   36300
 // ADC Vref = 3300mV, and an (10000k+240k):240k voltage divider on the LF input can measure voltages up to 140800 mV
-#define MAX_ADC_LF_VOLTAGE 140800
+#define MAX_ADC_HF_VOLTAGE_HIGH 140800
+#define MAX_ADC_LF_VOLTAGE      140800
 int AvgAdc(int ch);
 
 void ToSendStuffBit(int b);
@@ -68,11 +69,11 @@ void AcquireTiType(void);
 void AcquireRawBitsTI(void);
 void SimulateTagLowFrequency(int period, int gap, int ledcontrol);
 void SimulateTagLowFrequencyBidir(int divisor, int max_bitlen);
-void CmdHIDsimTAG(int hi, int lo, int ledcontrol);
+void CmdHIDsimTAG(int hi2, int hi, int lo, int ledcontrol);
 void CmdFSKsimTAG(uint16_t arg1, uint16_t arg2, size_t size, uint8_t *BitStream);
 void CmdASKsimTag(uint16_t arg1, uint16_t arg2, size_t size, uint8_t *BitStream);
 void CmdPSKsimTag(uint16_t arg1, uint16_t arg2, size_t size, uint8_t *BitStream);
-void CmdHIDdemodFSK(int findone, int *high, int *low, int ledcontrol);
+void CmdHIDdemodFSK(int findone, int *high2, int *high, int *low, int ledcontrol);
 void CmdAWIDdemodFSK(int findone, int *high, int *low, int ledcontrol); // Realtime demodulation mode for AWID26
 void CmdEM410xdemod(int findone, int *high, int *low, int ledcontrol);
 void CmdIOdemodFSK(int findone, int *high, int *low, int ledcontrol);
@@ -99,14 +100,9 @@ void ReadSTMemoryIso14443b(uint32_t);
 void RAMFUNC SnoopIso14443b(void);
 void SendRawCommand14443B(uint32_t, uint32_t, uint8_t, uint8_t[]);
 
-/// iso14443a.h
-void RAMFUNC SnoopIso14443a(uint8_t param);
-void SimulateIso14443aTag(int tagType, int uid_1st, int uid_2nd, byte_t* data);
-void ReaderIso14443a(UsbCommand * c);
 // Also used in iclass.c
 bool RAMFUNC LogTrace(const uint8_t *btBytes, uint16_t len, uint32_t timestamp_start, uint32_t timestamp_end, uint8_t *parity, bool readerToTag);
 void GetParity(const uint8_t *pbtCmd, uint16_t len, uint8_t *parity);
-void iso14a_set_trigger(bool enable);
 
 void RAMFUNC SniffMifare(uint8_t param);
 
@@ -115,8 +111,6 @@ void EPA_PACE_Collect_Nonce(UsbCommand * c);
 void EPA_PACE_Replay(UsbCommand *c);
 
 // mifarecmd.h
-void ReaderMifare(bool first_try);
-int32_t dist_nt(uint32_t nt1, uint32_t nt2);
 void MifareReadBlock(uint8_t arg0, uint8_t arg1, uint8_t arg2, uint8_t *data);
 void MifareUReadBlock(uint8_t arg0, uint8_t arg1, uint8_t *datain);
 void MifareUC_Auth(uint8_t arg0, uint8_t *datain);
@@ -127,14 +121,15 @@ void MifareWriteBlock(uint8_t arg0, uint8_t arg1, uint8_t arg2, uint8_t *datain)
 void MifareUWriteBlock(uint8_t arg0, uint8_t arg1, uint8_t *datain);
 void MifareNested(uint32_t arg0, uint32_t arg1, uint32_t arg2, uint8_t *datain);
 void MifareAcquireEncryptedNonces(uint32_t arg0, uint32_t arg1, uint32_t flags, uint8_t *datain);
-void MifareChkKeys(uint16_t arg0, uint8_t arg1, uint8_t arg2, uint8_t *datain);
+void MifareChkKeys(uint16_t arg0, uint16_t arg1, uint8_t arg2, uint8_t *datain);
 void Mifare1ksim(uint8_t arg0, uint8_t arg1, uint8_t arg2, uint8_t *datain);
 void MifareSetDbgLvl(uint32_t arg0, uint32_t arg1, uint32_t arg2, uint8_t *datain);
 void MifareEMemClr(uint32_t arg0, uint32_t arg1, uint32_t arg2, uint8_t *datain);
 void MifareEMemSet(uint32_t arg0, uint32_t arg1, uint32_t arg2, uint8_t *datain);
 void MifareEMemGet(uint32_t arg0, uint32_t arg1, uint32_t arg2, uint8_t *datain);
 void MifareECardLoad(uint32_t arg0, uint32_t arg1, uint32_t arg2, uint8_t *datain);
-void MifareCSetBlock(uint32_t arg0, uint32_t arg1, uint32_t arg2, uint8_t *datain);  // Work with "magic Chinese" card
+void MifareCWipe(uint32_t arg0, uint32_t arg1, uint32_t arg2, uint8_t *datain);       // Work with "magic Chinese" card
+void MifareCSetBlock(uint32_t arg0, uint32_t arg1, uint32_t arg2, uint8_t *datain);  
 void MifareCGetBlock(uint32_t arg0, uint32_t arg1, uint32_t arg2, uint8_t *datain);
 void MifareCIdent();  // is "magic chinese" card?
 void MifareUSetPwd(uint8_t arg0, uint8_t *datain);

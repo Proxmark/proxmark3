@@ -8,17 +8,17 @@
 // Hardware commands
 //-----------------------------------------------------------------------------
 
+#include "cmdhw.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <limits.h>
 #include "ui.h"
-#include "proxmark3.h"
+#include "comms.h"
 #include "cmdparser.h"
-#include "cmdhw.h"
 #include "cmdmain.h"
 #include "cmddata.h"
-#include "data.h"
 
 /* low-level hardware control */
 
@@ -408,34 +408,23 @@ int CmdVersion(const char *Cmd)
 
 	clearCommandBuffer();
 	UsbCommand c = {CMD_VERSION};
-	static UsbCommand resp = {0, {0, 0, 0}};
+	UsbCommand resp = {0, {0, 0, 0}};
 
-	if (resp.arg[0] == 0 && resp.arg[1] == 0) { // no cached information available
-		SendCommand(&c);
-		if (WaitForResponseTimeout(CMD_ACK,&resp,1000)) {
-			PrintAndLog("Prox/RFID mark3 RFID instrument");
-			PrintAndLog((char*)resp.d.asBytes);
-			lookupChipID(resp.arg[0], resp.arg[1]);
-		}
-	} else {
-		PrintAndLog("[[[ Cached information ]]]\n");
+	SendCommand(&c);
+	if (WaitForResponseTimeout(CMD_ACK,&resp,1000)) {
 		PrintAndLog("Prox/RFID mark3 RFID instrument");
 		PrintAndLog((char*)resp.d.asBytes);
 		lookupChipID(resp.arg[0], resp.arg[1]);
-		PrintAndLog("");
 	}
 	return 0;
 }
 
 int CmdStatus(const char *Cmd)
 {
-	uint8_t speed_test_buffer[USB_CMD_DATA_SIZE];
-	sample_buf = speed_test_buffer;
-
 	clearCommandBuffer();
 	UsbCommand c = {CMD_STATUS};
 	SendCommand(&c);
-	if (!WaitForResponseTimeout(CMD_ACK,&c,1900)) {
+	if (!WaitForResponseTimeout(CMD_ACK, &c, 1900)) {
 		PrintAndLog("Status command failed. USB Speed Test timed out");
 	}
 	return 0;

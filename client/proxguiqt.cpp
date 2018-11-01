@@ -26,6 +26,10 @@
 #include <string.h>
 #include "proxgui.h"
 #include <QtGui>
+
+extern "C" {
+#include "util_darwin.h"
+}
 //#include <ctime>
 
 bool g_useOverlays = false;
@@ -60,7 +64,12 @@ void ProxGuiQT::_ShowGraphWindow(void)
 		return;
 
 	if (!plotwidget)
+	{
+#if defined(__MACH__) && defined(__APPLE__)
+		makeFocusable();
+#endif
 		plotwidget = new ProxWidget();
+	}
 
 	plotwidget->show();
 }
@@ -85,6 +94,17 @@ void ProxGuiQT::_Exit(void) {
 	delete this;
 }
 
+void ProxGuiQT::_StartProxmarkThread(void) {
+	if (!proxmarkThread)
+		return;
+
+	// if thread finished delete self and delete application
+	QObject::connect(proxmarkThread, SIGNAL(finished()), proxmarkThread, SLOT(deleteLater()));
+	QObject::connect(proxmarkThread, SIGNAL(finished()), this, SLOT(_Exit()));
+	// start proxmark thread
+	proxmarkThread->start();
+}
+
 void ProxGuiQT::MainLoop()
 {
 	plotapp = new QApplication(argc, argv);
@@ -94,11 +114,19 @@ void ProxGuiQT::MainLoop()
 	connect(this, SIGNAL(HideGraphWindowSignal()), this, SLOT(_HideGraphWindow()));
 	connect(this, SIGNAL(ExitSignal()), this, SLOT(_Exit()));
 
+	//start proxmark thread after starting event loop
+	QTimer::singleShot(200, this, SLOT(_StartProxmarkThread()));
+
+#if defined(__MACH__) && defined(__APPLE__)
+	//Prevent the terminal from loosing focus during launch by making the client unfocusable
+	makeUnfocusable();
+#endif
+
 	plotapp->exec();
 }
 
-ProxGuiQT::ProxGuiQT(int argc, char **argv) : plotapp(NULL), plotwidget(NULL),
-	argc(argc), argv(argv)
+ProxGuiQT::ProxGuiQT(int argc, char **argv, WorkerThread *wthread) : plotapp(NULL), plotwidget(NULL),
+	argc(argc), argv(argv), proxmarkThread(wthread)
 {
 }
 
@@ -167,8 +195,7 @@ ProxWidget::ProxWidget(QWidget *parent, ProxGuiQT *master) : QWidget(parent)
 	this->master = master;
 	resize(800,500);
 
-	/** Setup the controller widget **/
-
+	// Setup the controller widget
 	controlWidget = new QWidget();
 	opsController = new Ui::Form();
 	opsController->setupUi(controlWidget);
@@ -190,23 +217,17 @@ ProxWidget::ProxWidget(QWidget *parent, ProxGuiQT *master) : QWidget(parent)
 	QObject::connect(opsController->horizontalSlider_dirthr_down, SIGNAL(valueChanged(int)), this, SLOT(vchange_dthr_down(int)));
 	QObject::connect(opsController->horizontalSlider_askedge, SIGNAL(valueChanged(int)), this, SLOT(vchange_askedge(int)));
 
-	controlWidget->show();
-
 	// Set up the plot widget, which does the actual plotting
-
 	plot = new Plot(this);
-	/*
-	QSlider* slider = new QSlider(Qt::Horizontal);
-	slider->setFocusPolicy(Qt::StrongFocus);
-	slider->setTickPosition(QSlider::TicksBothSides);
-	slider->setTickInterval(10);
-	slider->setSingleStep(1);
-	*/
 	QVBoxLayout *layout = new QVBoxLayout;
-	//layout->addWidget(slider);
 	layout->addWidget(plot);
 	setLayout(layout);
-	//printf("Proxwidget Constructor just set layout\r\n");
+	show(); // places the window on the screen.
+
+	// Move controller widget below plot
+	controlWidget->move(x(),y()+frameSize().height());
+	controlWidget->resize(size().width(), controlWidget->size().height());
+	controlWidget->show();
 }
 
 // not 100% sure what i need in this block
@@ -255,6 +276,7 @@ int Plot::xCoordOf(int i, QRect r )
 int Plot::yCoordOf(int v, QRect r, int maxVal)
 {
 	int z = (r.bottom() - r.top())/2;
+	if ( maxVal == 0 ) maxVal++;
 	return -(z * v) / maxVal + z;
 }
 
@@ -565,6 +587,8 @@ Plot::Plot(QWidget *parent) : QWidget(parent), GraphStart(0), GraphPixelsPerPoin
 	CursorBPos = 0;
 
 	setWindowTitle(tr("Sliders"));
+
+	master = parent;
 }
 
 void Plot::closeEvent(QCloseEvent *event)
@@ -674,7 +698,7 @@ void Plot::keyPressEvent(QKeyEvent *event)
 			break;
 
 		case Qt::Key_Q:
-			this->hide();
+			master->hide();
 			break;
 
 		default:

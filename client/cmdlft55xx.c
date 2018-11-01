@@ -7,21 +7,21 @@
 // Low frequency T55xx commands
 //-----------------------------------------------------------------------------
 
+#include "cmdlft55xx.h"
+
 #include <stdio.h>
 #include <string.h>
 #include <inttypes.h>
 #include <ctype.h>
 #include <time.h>
-#include "proxmark3.h"
+#include "comms.h"
 #include "ui.h"
 #include "graph.h"
 #include "cmdmain.h"
 #include "cmdparser.h"
 #include "cmddata.h"
 #include "cmdlf.h"
-#include "cmdlft55xx.h"
 #include "util.h"
-#include "data.h"
 #include "lfdemod.h"
 #include "cmdhf14a.h" //for getTagInfo
 #include "protocols.h"
@@ -207,7 +207,7 @@ void printT5xxHeader(uint8_t page){
 int CmdT55xxSetConfig(const char *Cmd) {
 
 	uint8_t offset = 0;
-	char modulation[5] = {0x00};
+	char modulation[6] = {0x00};
 	char tmp = 0x00;
 	uint8_t bitRate = 0;
 	uint8_t rates[9] = {8,16,32,40,50,64,100,128,0};
@@ -236,7 +236,7 @@ int CmdT55xxSetConfig(const char *Cmd) {
 			cmdp+=2;
 			break;
 		case 'd':
-			param_getstr(Cmd, cmdp+1, modulation);
+			param_getstr(Cmd, cmdp+1, modulation, sizeof(modulation));
 			cmdp += 2;
 
 			if ( strcmp(modulation, "FSK" ) == 0) {
@@ -1355,8 +1355,7 @@ int CmdResetRead(const char *Cmd) {
 	}
 
 	uint8_t got[BIGBUF_SIZE-1];
-	GetFromBigBuf(got,sizeof(got),0);
-	WaitForResponse(CMD_ACK,NULL);
+	GetFromBigBuf(got, sizeof(got), 0, NULL, -1 , 0);
 	setGraphBuf(got, sizeof(got));
 	return 1;
 }
@@ -1433,7 +1432,7 @@ int CmdT55xxBruteForce(const char *Cmd) {
 			//The line start with # is comment, skip
 			if( buf[0]=='#' ) continue;
 
-			if (!isxdigit(buf[0])) {
+			if (!isxdigit((unsigned char)buf[0])) {
 				PrintAndLog("File content error. '%s' must include 8 HEX symbols", buf);
 				continue;
 			}

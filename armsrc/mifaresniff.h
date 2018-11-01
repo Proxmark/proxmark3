@@ -27,6 +27,7 @@
 #define SNF_CARD_IDLE			9
 #define SNF_CARD_CMD			10
 #define SNF_CARD_RESP			11
+#define SNF_MAGIC_WUPC2			12
 
 #define SNF_UID_4				0
 #define SNF_UID_7				0

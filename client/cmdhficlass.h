@@ -34,6 +34,7 @@ int CmdHFiClassSnoop(const char *Cmd);
 int CmdHFiClassSim(const char *Cmd);
 int CmdHFiClassWriteKeyFile(const char *Cmd);
 int CmdHFiClass_WriteBlock(const char *Cmd);
+int CmdHFiClassCheckKeys(const char *Cmd);
 void printIclassDumpContents(uint8_t *iclass_dump, uint8_t startblock, uint8_t endblock, size_t filesize);
 void HFiClassCalcDivKey(uint8_t	*CSN, uint8_t	*KEY, uint8_t *div_key, bool elite);
 #endif

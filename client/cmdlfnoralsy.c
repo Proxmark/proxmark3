@@ -7,11 +7,13 @@
 // Low frequency Noralsy tag commands
 // ASK/Manchester, STT, RF/32, 96 bits long (some bits unknown)
 //-----------------------------------------------------------------------------
+
 #include "cmdlfnoralsy.h"
+
 #include <string.h>
 #include <inttypes.h>
 #include <math.h>
-#include "proxmark3.h"
+#include "comms.h"
 #include "ui.h"
 #include "util.h"
 #include "graph.h"

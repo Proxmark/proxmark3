@@ -22,19 +22,20 @@
 // the client. Signal Processing & decoding is done on the pc. This is the slowest
 // variant, but offers the possibility to analyze the waveforms directly. 
 
+#include "cmdhf15.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
 
-#include "proxmark3.h"
-#include "data.h"
+#include "comms.h"
 #include "graph.h"
 #include "ui.h"
 #include "util.h"
 #include "cmdparser.h"
-#include "cmdhf15.h"
 #include "iso15693tools.h"
+#include "protocols.h"
 #include "cmdmain.h"
 
 #define FrameSOF              Iso15693FrameSOF
@@ -212,18 +213,17 @@ int getUID(uint8_t *buf)
 	
 	for (int retry=0;retry<3; retry++) { // don't give up the at the first try		
 		
-		req[0]= ISO15_REQ_SUBCARRIER_SINGLE | ISO15_REQ_DATARATE_HIGH | 
-		        ISO15_REQ_INVENTORY | ISO15_REQINV_SLOT1;
-		req[1]=ISO15_CMD_INVENTORY;
-		req[2]=0; // mask length
-		reqlen=AddCrc(req,3);
-		c.arg[0]=reqlen;
+		req[0] = ISO15693_REQ_DATARATE_HIGH | ISO15693_REQ_INVENTORY | ISO15693_REQINV_SLOT1;
+		req[1] = ISO15693_INVENTORY;
+		req[2] = 0; // mask length
+		reqlen = AddCrc(req,3);
+		c.arg[0] = reqlen;
 	
 		SendCommand(&c);
 		
 		if (WaitForResponseTimeout(CMD_ACK,&resp,1000)) {
 			recv = resp.d.asBytes;
-			if (resp.arg[0]>=12 && ISO15_CRC_CHECK==Crc(recv,12)) {
+			if (resp.arg[0]>=12 && ISO15693_CRC_CHECK==Crc(recv,12)) {
 			   memcpy(buf,&recv[2],8);
 			   return 1;
 			} 
@@ -268,7 +268,7 @@ static char* TagErrorStr(uint8_t error) {
 		case 0x02: return "The command is not recognised";
 		case 0x03: return "The option is not supported.";
 		case 0x0f: return "Unknown error.";
-		case 0x10: return "The specified block is not available (doesn’t exist).";
+		case 0x10: return "The specified block is not available (doesn't exist).";
 		case 0x11: return "The specified block is already -locked and thus cannot be locked again";
 		case 0x12: return "The specified block is locked and its content cannot be changed.";
 		case 0x13: return "The specified block was not successfully programmed.";
@@ -286,12 +286,12 @@ int CmdHF15Demod(const char *Cmd)
 	int i, j;
 	int max = 0, maxPos = 0;
 
-	int skip = 4;
+	int skip = 2;
 
-	if (GraphTraceLen < 1000) return 0;
+	if (GraphTraceLen < 2000) return 0;
 
 	// First, correlate for SOF
-	for (i = 0; i < 100; i++) {
+	for (i = 0; i < 200; i++) {
 		int corr = 0;
 		for (j = 0; j < arraylen(FrameSOF); j += skip) {
 			corr += FrameSOF[j] * GraphBuffer[i + (j / skip)];
@@ -310,23 +310,30 @@ int CmdHF15Demod(const char *Cmd)
 	memset(outBuf, 0, sizeof(outBuf));
 	uint8_t mask = 0x01;
 	for (;;) {
-		int corr0 = 0, corr1 = 0, corrEOF = 0;
-		for (j = 0; j < arraylen(Logic0); j += skip) {
-			corr0 += Logic0[j] * GraphBuffer[i + (j / skip)];
-		}
-		for (j = 0; j < arraylen(Logic1); j += skip) {
-			corr1 += Logic1[j] * GraphBuffer[i + (j / skip)];
-		}
-		for (j = 0; j < arraylen(FrameEOF); j += skip) {
-			corrEOF += FrameEOF[j] * GraphBuffer[i + (j / skip)];
-		}
-		// Even things out by the length of the target waveform.
-		corr0 *= 4;
-		corr1 *= 4;
-		
-		if (corrEOF > corr1 && corrEOF > corr0) {
-			PrintAndLog("EOF at %d", i);
-			break;
+			int corr0 = 0, corr00 = 0, corr01 = 0, corr1 = 0, corrEOF = 0;
+			for(j = 0; j < arraylen(Logic0); j += skip) {
+				corr0 += Logic0[j]*GraphBuffer[i+(j/skip)];
+			}
+			corr01 = corr00 = corr0;
+			for(j = 0; j < arraylen(Logic0); j += skip) {
+				corr00 += Logic0[j]*GraphBuffer[i+arraylen(Logic0)/skip+(j/skip)];
+				corr01 += Logic1[j]*GraphBuffer[i+arraylen(Logic0)/skip+(j/skip)];
+			}
+			for(j = 0; j < arraylen(Logic1); j += skip) {
+				corr1 += Logic1[j]*GraphBuffer[i+(j/skip)];
+			}
+			for(j = 0; j < arraylen(FrameEOF); j += skip) {
+				corrEOF += FrameEOF[j]*GraphBuffer[i+(j/skip)];
+			}
+			// Even things out by the length of the target waveform.
+			corr00 *= 2;
+			corr01 *= 2;
+			corr0 *= 4;
+			corr1 *= 4;
+	
+			if(corrEOF > corr1 && corrEOF > corr00 && corrEOF > corr01) {
+				PrintAndLog("EOF at %d", i);
+				break;
 		} else if (corr1 > corr0) {
 			i += arraylen(Logic1) / skip;
 			outBuf[k] |= mask;
@@ -366,7 +373,8 @@ int CmdHF15Read(const char *Cmd)
 	return 0;
 }
 
-// Record Activity without enabeling carrier
+// Record Activity without enabling carrier
+// TODO: currently it DOES enable the carrier
 int CmdHF15Record(const char *Cmd)
 {
 	UsbCommand c = {CMD_RECORD_RAW_ADC_SAMPLES_ISO_15693};
@@ -416,6 +424,7 @@ int CmdHF15Sim(const char *Cmd)
 	
 	PrintAndLog("Starting simulating UID %02X %02X %02X %02X %02X %02X %02X %02X",
 			uid[0],uid[1],uid[2],uid[3],uid[4], uid[5], uid[6], uid[7]);
+	PrintAndLog("Press the button to stop simulation");
 
 	UsbCommand c = {CMD_SIMTAG_ISO_15693, {0, 0, 0}};
 	memcpy(c.d.asBytes,uid,8);
@@ -454,20 +463,19 @@ int CmdHF15DumpMem(const char*Cmd) {
 
 	for (int retry=0; retry<5; retry++) {
 		
-		req[0]= ISO15_REQ_SUBCARRIER_SINGLE | ISO15_REQ_DATARATE_HIGH | 
-		        ISO15_REQ_NONINVENTORY | ISO15_REQ_ADDRESS;
-		req[1]=ISO15_CMD_READ;
+		req[0]= ISO15693_REQ_DATARATE_HIGH | ISO15693_REQ_ADDRESS;
+		req[1] = ISO15693_READBLOCK;
 		memcpy(&req[2],uid,8);
-		req[10]=blocknum;
-		reqlen=AddCrc(req,11);
-		c.arg[0]=reqlen;
+		req[10] = blocknum;
+		reqlen = AddCrc(req,11);
+		c.arg[0] = reqlen;
 	
 		SendCommand(&c);
 		
 		if (WaitForResponseTimeout(CMD_ACK,&resp,1000)) {
 			recv = resp.d.asBytes;
-			if (ISO15_CRC_CHECK==Crc(recv,resp.arg[0])) {
-				if (!(recv[0] & ISO15_RES_ERROR)) {
+			if (ISO15693_CRC_CHECK==Crc(recv,resp.arg[0])) {
+				if (!(recv[0] & ISO15693_RES_ERROR)) {
 					retry=0;
 					*output=0; // reset outputstring
 					sprintf(output, "Block %02x   ",blocknum);
@@ -491,7 +499,7 @@ int CmdHF15DumpMem(const char*Cmd) {
   // TODO: need fix
 //	if (resp.arg[0]<3)
 //		PrintAndLog("Lost Connection");
-//	else if (ISO15_CRC_CHECK!=Crc(resp.d.asBytes,resp.arg[0]))
+//	else if (ISO15693_CRC_CHECK!=Crc(resp.d.asBytes,resp.arg[0]))
 //		PrintAndLog("CRC Failed");
 //	else 
 //		PrintAndLog("Tag returned Error %i: %s",recv[1],TagErrorStr(recv[1])); 
@@ -512,7 +520,7 @@ static command_t CommandTable15[] =
 	{"cmd",     CmdHF15Cmd,     0, "Send direct commands to ISO15693 tag"},
 	{"findafi", CmdHF15Afi,     0, "Brute force AFI of an ISO15693 tag"},
 	{"dumpmemory", CmdHF15DumpMem,     0, "Read all memory pages of an ISO15693 tag"},
-		{NULL, NULL, 0, NULL}
+	{NULL, NULL, 0, NULL}
 };
 
 int CmdHF15(const char *Cmd)
@@ -539,12 +547,11 @@ int CmdHF15CmdInquiry(const char *Cmd)
 	uint8_t *req=c.d.asBytes;
 	int reqlen=0;
 	
-	req[0]= ISO15_REQ_SUBCARRIER_SINGLE | ISO15_REQ_DATARATE_HIGH | 
-	        ISO15_REQ_INVENTORY | ISO15_REQINV_SLOT1;
-	req[1]=ISO15_CMD_INVENTORY;
-	req[2]=0; // mask length
+	req[0] = ISO15693_REQ_DATARATE_HIGH | ISO15693_REQ_INVENTORY | ISO15693_REQINV_SLOT1;
+	req[1] = ISO15693_INVENTORY;
+	req[2] = 0; // mask length
 	reqlen=AddCrc(req,3);
-	c.arg[0]=reqlen;
+	c.arg[0] = reqlen;
 
 	SendCommand(&c);
 	
@@ -565,9 +572,9 @@ int CmdHF15CmdInquiry(const char *Cmd)
 
 // Turns debugging on(1)/off(0)
 int CmdHF15CmdDebug( const char *cmd) {
-	int debug=atoi(cmd);
-	if (strlen(cmd)<1) {
-		PrintAndLog("Usage: hf 15 cmd debug  <0|1>");
+	int debug = atoi(cmd);
+	if (strlen(cmd) < 1) {
+		PrintAndLog("Usage: hf 15 debug <0|1>");
 		PrintAndLog("	0 no debugging");
 		PrintAndLog("	1 turn debugging on");	
 		return 0;
@@ -698,7 +705,7 @@ int prepareHF15Cmd(char **cmd, UsbCommand *c, uint8_t iso15cmd[], int iso15cmdle
 	while (**cmd==' ' || **cmd=='\t') (*cmd)++;
 	
 	if (strstr(*cmd,"-o")==*cmd) {
-	 	req[reqlen]=ISO15_REQ_OPTION;
+	 	req[reqlen]=ISO15693_REQ_OPTION;
 	 	(*cmd)+=2;
 	}
 	
@@ -713,36 +720,32 @@ int prepareHF15Cmd(char **cmd, UsbCommand *c, uint8_t iso15cmd[], int iso15cmdle
 		case 's':
 		case 'S':
 			// you must have selected the tag earlier
-			req[reqlen++]|= ISO15_REQ_SUBCARRIER_SINGLE | ISO15_REQ_DATARATE_HIGH | 
-		       ISO15_REQ_NONINVENTORY | ISO15_REQ_SELECT;
-		   memcpy(&req[reqlen],&iso15cmd[0],iso15cmdlen);
-			reqlen+=iso15cmdlen;		   
+			req[reqlen++] |= ISO15693_REQ_DATARATE_HIGH | ISO15693_REQ_SELECT;
+			memcpy(&req[reqlen],&iso15cmd[0],iso15cmdlen);
+			reqlen += iso15cmdlen;		   
 		   break;
 		case 'u':
 		case 'U':
 			// unaddressed mode may not be supported by all vendors
-			req[reqlen++]|= ISO15_REQ_SUBCARRIER_SINGLE | ISO15_REQ_DATARATE_HIGH | 
-		       ISO15_REQ_NONINVENTORY;
-		   memcpy(&req[reqlen],&iso15cmd[0],iso15cmdlen);
-			reqlen+=iso15cmdlen;		   
+			req[reqlen++] |= ISO15693_REQ_DATARATE_HIGH;
+			memcpy(&req[reqlen],&iso15cmd[0],iso15cmdlen);
+			reqlen += iso15cmdlen;		   
 		   break;
 		case '*':
 			// we scan for the UID ourself
-			req[reqlen++]|= ISO15_REQ_SUBCARRIER_SINGLE | ISO15_REQ_DATARATE_HIGH | 
-		       ISO15_REQ_NONINVENTORY | ISO15_REQ_ADDRESS;
-		   memcpy(&req[reqlen],&iso15cmd[0],iso15cmdlen);
+			req[reqlen++] |= ISO15693_REQ_DATARATE_HIGH | ISO15693_REQ_ADDRESS;
+			memcpy(&req[reqlen],&iso15cmd[0],iso15cmdlen);
 			reqlen+=iso15cmdlen;		   
-		   if (!getUID(uid)) {
-		   	PrintAndLog("No Tag found");
-		   	return 0;
-		   }
-		   memcpy(req+reqlen,uid,8);
-		   PrintAndLog("Detected UID %s",sprintUID(NULL,uid));
-		   reqlen+=8;
+			if (!getUID(uid)) {
+				PrintAndLog("No Tag found");
+				return 0;
+			}
+			memcpy(req+reqlen,uid,8);
+			PrintAndLog("Detected UID %s",sprintUID(NULL,uid));
+			reqlen+=8;
 			break;			
 		default:
-			req[reqlen++]|= ISO15_REQ_SUBCARRIER_SINGLE | ISO15_REQ_DATARATE_HIGH | 
-		       ISO15_REQ_NONINVENTORY | ISO15_REQ_ADDRESS;
+			req[reqlen++] |= ISO15693_REQ_DATARATE_HIGH | ISO15693_REQ_ADDRESS;
 			memcpy(&req[reqlen],&iso15cmd[0],iso15cmdlen);
 			reqlen+=iso15cmdlen;		   
 		   
@@ -801,7 +804,7 @@ int CmdHF15CmdSysinfo(const char *Cmd) {
 		return 0;
 	}	
 	
-	prepareHF15Cmd(&cmd, &c,(uint8_t[]){ISO15_CMD_SYSINFO},1);	
+	prepareHF15Cmd(&cmd, &c,(uint8_t[]){ISO15693_GET_SYSTEM_INFO},1);	
 	reqlen=c.arg[0];
 	
 	reqlen=AddCrc(req,reqlen);
@@ -811,8 +814,8 @@ int CmdHF15CmdSysinfo(const char *Cmd) {
 
 	if (WaitForResponseTimeout(CMD_ACK,&resp,1000) && resp.arg[0]>2) {
 		recv = resp.d.asBytes;
-		if (ISO15_CRC_CHECK==Crc(recv,resp.arg[0])) {
-			if (!(recv[0] & ISO15_RES_ERROR)) {
+		if (ISO15693_CRC_CHECK==Crc(recv,resp.arg[0])) {
+			if (!(recv[0] & ISO15693_RES_ERROR)) {
 				*output=0; // reset outputstring
 				for ( i=1; i<resp.arg[0]-2; i++) {
 					sprintf(output+strlen(output),"%02X ",recv[i]);
@@ -888,7 +891,7 @@ int CmdHF15CmdReadmulti(const char *Cmd) {
 		return 0;
 	}	
 	
-	prepareHF15Cmd(&cmd, &c,(uint8_t[]){ISO15_CMD_READMULTI},1);	
+	prepareHF15Cmd(&cmd, &c,(uint8_t[]){ISO15693_READ_MULTI_BLOCK},1);	
 	reqlen=c.arg[0];
 
 	pagenum=strtol(cmd,NULL,0);
@@ -912,8 +915,8 @@ int CmdHF15CmdReadmulti(const char *Cmd) {
 
 	if (WaitForResponseTimeout(CMD_ACK,&resp,1000) && resp.arg[0]>2) {
 		recv = resp.d.asBytes;
-		if (ISO15_CRC_CHECK==Crc(recv,resp.arg[0])) {
-			if (!(recv[0] & ISO15_RES_ERROR)) {
+		if (ISO15693_CRC_CHECK==Crc(recv,resp.arg[0])) {
+			if (!(recv[0] & ISO15693_RES_ERROR)) {
 				*output=0; // reset outputstring
 				for ( int i=1; i<resp.arg[0]-2; i++) {
 					sprintf(output+strlen(output),"%02X ",recv[i]);
@@ -966,7 +969,7 @@ int CmdHF15CmdRead(const char *Cmd) {
 		return 0;
 	}	
 	
-	prepareHF15Cmd(&cmd, &c,(uint8_t[]){ISO15_CMD_READ},1);	
+	prepareHF15Cmd(&cmd, &c,(uint8_t[]){ISO15693_READBLOCK},1);	
 	reqlen=c.arg[0];
 
 	pagenum=strtol(cmd,NULL,0);
@@ -985,8 +988,8 @@ int CmdHF15CmdRead(const char *Cmd) {
 
 	if (WaitForResponseTimeout(CMD_ACK,&resp,1000) && resp.arg[0]>2) {
 		recv = resp.d.asBytes;
-		if (ISO15_CRC_CHECK==Crc(recv,resp.arg[0])) {
-			if (!(recv[0] & ISO15_RES_ERROR)) {
+		if (ISO15693_CRC_CHECK==Crc(recv,resp.arg[0])) {
+			if (!(recv[0] & ISO15693_RES_ERROR)) {
 				*output=0; // reset outputstring
 				//sprintf(output, "Block %2i   ",blocknum);
 				for ( int i=1; i<resp.arg[0]-2; i++) {
@@ -1043,7 +1046,7 @@ int CmdHF15CmdWrite(const char *Cmd) {
 		return 0;
 	}	
 	
-	prepareHF15Cmd(&cmd, &c,(uint8_t[]){ISO15_CMD_WRITE},1);	
+	prepareHF15Cmd(&cmd, &c,(uint8_t[]){ISO15693_WRITEBLOCK},1);	
 	reqlen=c.arg[0];
 	
 	// *cmd -> page num ; *cmd2 -> data 
@@ -1078,8 +1081,8 @@ int CmdHF15CmdWrite(const char *Cmd) {
 
 	if (WaitForResponseTimeout(CMD_ACK,&resp,2000) && resp.arg[0]>2) {
 		recv = resp.d.asBytes;
-		if (ISO15_CRC_CHECK==Crc(recv,resp.arg[0])) {
-			if (!(recv[0] & ISO15_RES_ERROR)) {					
+		if (ISO15693_CRC_CHECK==Crc(recv,resp.arg[0])) {
+			if (!(recv[0] & ISO15693_RES_ERROR)) {					
 				PrintAndLog("OK");	
 			} else {
 				PrintAndLog("Tag returned Error %i: %s",recv[1],TagErrorStr(recv[1])); 
