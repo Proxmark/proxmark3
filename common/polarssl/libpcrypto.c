@@ -55,20 +55,8 @@ int aes_cmac(uint8_t *iv, uint8_t *key, uint8_t *input, uint8_t *mac, int length
 	if (iv)
 		memcpy(iiv, iv, 16);
 	
-//	int mbedtls_aes_cmac_prf_128( const unsigned char *key, size_t key_length,
-//                              const unsigned char *input, size_t in_len,
-//                              unsigned char *output )
-// mbedtls_aes_cmac_prf_128(key, 16, input, length, mac);
-
 	//  NIST 800-38B 
-	mbedtls_cipher_context_t ctx;
-	mbedtls_cipher_init(&ctx);
-	mbedtls_cipher_setup(&ctx, mbedtls_cipher_info_from_type(MBEDTLS_CIPHER_AES_128_ECB));
-	mbedtls_cipher_cmac_starts(&ctx, key, 128);
-	mbedtls_cipher_cmac_update(&ctx, input, length);
-	mbedtls_cipher_cmac_finish(&ctx, mac);
-
-	return 0;
+	return mbedtls_aes_cmac_prf_128(key, 16, input, length, mac);
 }
 
 int aes_cmac8(uint8_t *iv, uint8_t *key, uint8_t *input, uint8_t *mac, int length) {
