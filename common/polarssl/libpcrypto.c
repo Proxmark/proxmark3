@@ -51,12 +51,9 @@ int aes_decode(uint8_t *iv, uint8_t *key, uint8_t *input, uint8_t *output, int l
 // https://csrc.nist.gov/CSRC/media/Projects/Cryptographic-Standards-and-Guidelines/documents/examples/AES_CMAC.pdf
 int aes_cmac(uint8_t *iv, uint8_t *key, uint8_t *input, uint8_t *mac, int length) {
 	memset(mac, 0x00, 16);
-	uint8_t iiv[16] = {0};
-	if (iv)
-		memcpy(iiv, iv, 16);
 	
 	//  NIST 800-38B 
-	return mbedtls_aes_cmac_prf_128(key, 16, input, length, mac);
+	return mbedtls_aes_cmac_prf_128(key, MBEDTLS_AES_BLOCK_SIZE, input, length, mac);
 }
 
 int aes_cmac8(uint8_t *iv, uint8_t *key, uint8_t *input, uint8_t *mac, int length) {
