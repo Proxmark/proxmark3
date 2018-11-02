@@ -6,6 +6,7 @@ mbedtls_SOURCES = \
 	asn1write.c \
 	base64.c \
 	bignum.c \
+	ctr_drbg.c \
 	ecp.c \
 	ecp_curves.c \
 	certs.c \

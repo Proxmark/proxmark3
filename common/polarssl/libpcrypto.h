@@ -19,4 +19,6 @@ extern int aes_decode(uint8_t *iv, uint8_t *key, uint8_t *input, uint8_t *output
 extern int aes_cmac(uint8_t *iv, uint8_t *key, uint8_t *input, uint8_t *mac, int length);
 extern int aes_cmac8(uint8_t *iv, uint8_t *key, uint8_t *input, uint8_t *mac, int length);
 
+extern int ecdsa_signature_verify(uint8_t *key_xy, uint8_t *input, uint8_t *mac, int length);
+
 #endif /* libpcrypto.h */
