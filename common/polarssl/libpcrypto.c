@@ -13,6 +13,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
+#include <mbedtls/asn1.h>
 #include <mbedtls/aes.h>
 #include <mbedtls/cmac.h>
 #include <mbedtls/ecdsa.h>
@@ -180,6 +181,62 @@ int ecdsa_signature_verify_keystr(char *key_x, char *key_y, uint8_t *input, int 
 	return res;
 }
 
+int ecdsa_signature_verify(uint8_t *key_xy, uint8_t *input, int length, uint8_t *signature, size_t signaturelen) {
+	int res;
+	uint8_t shahash[32] = {0}; 
+	res = sha256hash(input, length, shahash);
+	if (res)
+		return res;
+
+//	mbedtls_ecdsa_context ctx;	
+//...	
+	return 0;
+}
+
+int ecdsa_asn1_get_signature(uint8_t *signature, size_t signaturelen, uint8_t *rval, uint8_t *sval) {
+	if (!signature || !signaturelen || !rval || !sval)
+		return 1;
+
+	int res = 0;
+	unsigned char *p = signature;
+	const unsigned char *end = p + signaturelen;
+	size_t len;
+	mbedtls_mpi xmpi;
+
+	if ((res = mbedtls_asn1_get_tag(&p, end, &len, MBEDTLS_ASN1_CONSTRUCTED | MBEDTLS_ASN1_SEQUENCE)) == 0) {
+		mbedtls_mpi_init(&xmpi);
+		res = mbedtls_asn1_get_mpi(&p, end, &xmpi);
+		if (res) {
+			mbedtls_mpi_free(&xmpi);
+			goto exit;
+		}
+		
+		res = mbedtls_mpi_write_binary(&xmpi, rval, 32);
+		mbedtls_mpi_free(&xmpi);
+		if (res) 
+			goto exit;
+
+		mbedtls_mpi_init(&xmpi);
+		res = mbedtls_asn1_get_mpi(&p, end, &xmpi);
+		if (res) {
+			mbedtls_mpi_free(&xmpi);
+			goto exit;
+		}
+		
+		res = mbedtls_mpi_write_binary(&xmpi, sval, 32);
+		mbedtls_mpi_free(&xmpi);
+		if (res) 
+			goto exit;
+
+		// check size
+		if (end != p)
+			return 2;
+		}
+
+exit:
+	return res;
+}
+
 #define T_PRIVATE_KEY "C477F9F65C22CCE20657FAA5B2D1D8122336F851A508A1ED04E479C34985BF96"
 #define T_Q_X         "B7E08AFDFE94BAD3F1DC8C734798BA1C62B3A0AD1E9EA2A38201CD0889BC7A19"
 #define T_Q_Y         "3603F747959DBF7A4BB226E41928729063ADC7AE43529E61B563BBC606CC5E09"
@@ -201,8 +258,22 @@ int ecdsa_nist_test(bool verbose) {
 		goto exit;
 
 	// check vectors
-
-
+	uint8_t rval[300] = {0}; 
+	uint8_t sval[300] = {0}; 
+	res = ecdsa_asn1_get_signature(signature, siglen, rval, sval);
+	if (res)
+		goto exit;
+	
+	int slen = 0;
+	uint8_t rval_s[33] = {0};
+	param_gethex_to_eol(T_R, 0, rval_s, sizeof(rval_s), &slen);
+	uint8_t sval_s[33] = {0}; 
+	param_gethex_to_eol(T_S, 0, sval_s, sizeof(sval_s), &slen);
+	if (strncmp((char *)rval, (char *)rval_s, 32) || strncmp((char *)sval, (char *)sval_s, 32)) {
+		printf("R or S check error\n");
+		res = 100;
+		goto exit;
+	}
 	
 	// verify signature
 	res = ecdsa_signature_verify_keystr(T_Q_X, T_Q_Y, input, length, signature, siglen);
