@@ -77,6 +77,109 @@ int aes_cmac8(uint8_t *iv, uint8_t *key, uint8_t *input, uint8_t *mac, int lengt
 	return 0;
 }
 
+static uint8_t fixed_rand_value[250] = {0};
+static int fixed_rand(void *rng_state, unsigned char *output, size_t len) {
+	if (len <= 250) {
+		memcpy(output, fixed_rand_value, len);
+	} else {
+		memset(output, 0x00, len);
+	}
+	
+	return 0;
+}
+
+int sha256hash(uint8_t *input, int length, uint8_t *hash) {
+	if (!hash || !input)
+		return 1;
+	
+	mbedtls_sha256_context sctx;
+	mbedtls_sha256_init(&sctx);
+	mbedtls_sha256_starts(&sctx, 0); // SHA-256, not 224 
+	mbedtls_sha256_update(&sctx, input, length);
+	mbedtls_sha256_finish(&sctx, hash);	
+	mbedtls_sha256_free(&sctx);
+	
+	return 0;
+}
+
+int ecdsa_init_str(mbedtls_ecdsa_context *ctx, char * key_d, char *key_x, char *key_y) {
+	if (!ctx)
+		return 1;
+	
+	int res;
+
+	mbedtls_ecdsa_init(ctx);
+	res = mbedtls_ecp_group_load(&ctx->grp, MBEDTLS_ECP_DP_SECP256R1); // secp256r1
+	if (res) 
+		return res;
+	
+	if (key_d) {
+		res = mbedtls_mpi_read_string(&ctx->d, 16, key_d);
+		if (res) 
+			return res;
+	}
+	
+	if (key_x && key_y) {
+		res = mbedtls_ecp_point_read_string(&ctx->Q, 16, key_x, key_y);
+		if (res) 
+			return res;
+	}
+	
+	return 0;
+}
+
+int ecdsa_signature_create(char * key_d, char *key_x, char *key_y, uint8_t *input, int length, uint8_t *signature, size_t *signaturelen) {
+	int res;
+	*signaturelen = 0;
+	
+	uint8_t shahash[32] = {0}; 
+	res = sha256hash(input, length, shahash);
+	if (res)
+		return res;
+
+	mbedtls_ecdsa_context ctx;	
+	ecdsa_init_str(&ctx, key_d, key_x, key_y);
+	res = mbedtls_ecdsa_write_signature(&ctx, MBEDTLS_MD_SHA256, shahash, sizeof(shahash), signature, signaturelen, fixed_rand, NULL);
+	
+	mbedtls_ecdsa_free(&ctx);
+	return res;
+}
+
+int ecdsa_signature_create_test(char * key_d, char *key_x, char *key_y, char *random, uint8_t *input, int length, uint8_t *signature, size_t *signaturelen) {
+	int res;
+	*signaturelen = 0;
+	
+	uint8_t shahash[32] = {0}; 
+	res = sha256hash(input, length, shahash);
+	if (res)
+		return res;
+
+	int rndlen = 0;
+	param_gethex_to_eol(random, 0, fixed_rand_value, sizeof(fixed_rand_value), &rndlen);
+	
+	mbedtls_ecdsa_context ctx;	
+	ecdsa_init_str(&ctx, key_d, key_x, key_y);
+	res = mbedtls_ecdsa_write_signature(&ctx, MBEDTLS_MD_SHA256, shahash, sizeof(shahash), signature, signaturelen, fixed_rand, NULL);
+	
+	mbedtls_ecdsa_free(&ctx);
+	return res;
+}
+
+int ecdsa_signature_verify_keystr(char *key_x, char *key_y, uint8_t *input, int length, uint8_t *signature, size_t signaturelen) {
+	int res;
+	uint8_t shahash[32] = {0}; 
+	res = sha256hash(input, length, shahash);
+	if (res)
+		return res;
+
+	mbedtls_ecdsa_context ctx;	
+	ecdsa_init_str(&ctx, NULL, key_x, key_y);
+	res = mbedtls_ecdsa_read_signature(&ctx, shahash, sizeof(shahash), signature, signaturelen);
+	
+	mbedtls_ecdsa_free(&ctx);
+	return res;
+}
+
 #define T_PRIVATE_KEY "C477F9F65C22CCE20657FAA5B2D1D8122336F851A508A1ED04E479C34985BF96"
 #define T_Q_X         "B7E08AFDFE94BAD3F1DC8C734798BA1C62B3A0AD1E9EA2A38201CD0889BC7A19"
 #define T_Q_Y         "3603F747959DBF7A4BB226E41928729063ADC7AE43529E61B563BBC606CC5E09"
@@ -84,73 +187,39 @@ int aes_cmac8(uint8_t *iv, uint8_t *key, uint8_t *input, uint8_t *mac, int lengt
 #define T_R           "2B42F576D07F4165FF65D1F3B1500F81E44C316F1F0B3EF57325B69ACA46104F"
 #define T_S           "DC42C2122D6392CD3E3A993A89502A8198C1886FE69D262C4B329BDB6B63FAF1"
 
-static int fixed_rand( void *rng_state, unsigned char *output, size_t len ) {
-	memset(output, 0x00, len);
-	if (len <= 32) {
-		uint8_t rnd[33] = {0};
-		int rndlen = 0;
-		param_gethex_to_eol(T_K, 0, rnd, sizeof(rnd), &rndlen);
-		memcpy(output, rnd, len);
-	}
-	return 0;
-}
-
-int ecdsa_signature_verify(uint8_t *key_xy, uint8_t *input, uint8_t *mac, int length) {
-	int ret;
-	
-	uint8_t shahash[32] = {0}; // SHA-256
-	
-	mbedtls_sha256_context sctx;
-	mbedtls_sha256_init(&sctx);
-	mbedtls_sha256_starts(&sctx, 0); // SHA-256, not 224 
-	mbedtls_sha256_update(&sctx, input, length);
-	mbedtls_sha256_finish(&sctx, shahash);	
-	mbedtls_sha256_free(&sctx);
-	printf("hash: %s\n", sprint_hex(shahash, sizeof(shahash)));
-	
+int ecdsa_nist_test(bool verbose) {
 	int res;
-	
-	mbedtls_ecdsa_context ctx;	
-	mbedtls_ecdsa_init(&ctx);
-	// secp256r1
-	mbedtls_ecp_group_load(&ctx.grp, MBEDTLS_ECP_DP_SECP256R1);
-	mbedtls_mpi_read_string(&ctx.d, 16, T_PRIVATE_KEY);
-	mbedtls_ecp_point_read_string(&ctx.Q, 16, T_Q_X, T_Q_Y);
-	
-//	mbedtls_ctr_drbg_context ctr_drbg;
-//	mbedtls_ctr_drbg_init(&ctr_drbg);
-
-	// init keys
-	uint8_t buf[257] = {0};
-	size_t buflen = 0;
-	mbedtls_mpi_write_string(&ctx.d, 16, (char *)buf, sizeof(buf), &buflen);
-	printf("prvkey[%d]: %s\n", buflen, buf);
-	mbedtls_ecp_point_write_binary(&ctx.grp, &ctx.Q, MBEDTLS_ECP_PF_UNCOMPRESSED,
-								   &buflen, buf, sizeof(buf));
-	printf("pubkey[%d]: %s\n", buflen, sprint_hex_inrow(buf, buflen));
-
-
-	// make signature
+	uint8_t input[] = "Example of ECDSA with P-256";
+	int length = strlen((char *)input);
 	uint8_t signature[300] = {0}; 
 	size_t siglen = 0; 
-	res = mbedtls_ecdsa_write_signature(&ctx, MBEDTLS_MD_SHA256, shahash, sizeof(shahash), signature, &siglen, fixed_rand, NULL);
+
+	// make signature
+	res = ecdsa_signature_create_test(T_PRIVATE_KEY, T_Q_X, T_Q_Y, T_K, input, length, signature, &siglen);
 	printf("res: %x signature[%x]: %s\n", (res<0)?-res:res, siglen, sprint_hex(signature, siglen));
+	if (res) 
+		goto exit;
 
 	// check vectors
-	
+
+
 	
 	// verify signature
-	res = mbedtls_ecdsa_read_signature(&ctx, shahash, sizeof(shahash), signature, siglen);
+	res = ecdsa_signature_verify_keystr(T_Q_X, T_Q_Y, input, length, signature, siglen);
 	printf("signature check res: %x\n", (res<0)?-res:res);
+	if (res) 
+		goto exit;
 		
 	// verify wrong signature
-	shahash[0] ^= 0xFF;
-	res = mbedtls_ecdsa_read_signature(&ctx, shahash, sizeof(shahash), signature, siglen);
+	input[0] ^= 0xFF;
+	res = ecdsa_signature_verify_keystr(T_Q_X, T_Q_Y, input, length, signature, siglen);
 	printf("wrong signature check res: %x\n", (res<0)?-res:res);
+	if (!res) {
+		res = 1;
+		goto exit;
+	}
 
-	ret = 1;
-	goto exit;
+	return 0;
 exit:
-	mbedtls_ecdsa_free(&ctx);
-	return ret;
+	return res;
 }

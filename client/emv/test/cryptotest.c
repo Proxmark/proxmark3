@@ -22,21 +22,28 @@
 #include "mbedtls/md5.h"
 #include "mbedtls/x509.h"
 #include "mbedtls/base64.h"
+#include "mbedtls/ctr_drbg.h"
 
 #include "crypto_test.h"
 #include "sda_test.h"
 #include "dda_test.h"
 #include "cda_test.h"
+#include "libpcrypto.h"
 
 int ExecuteCryptoTests(bool verbose) {
 	int res;
 	bool TestFail = false;
+	
+	res = ecdsa_nist_test(verbose);
+	if (res) TestFail = true;
+return 0;
 	
 	res = mbedtls_mpi_self_test(verbose);
 	if (res) TestFail = true;
 	
 	res = mbedtls_aes_self_test(verbose);
 	if (res) TestFail = true;
+
 	res = mbedtls_des_self_test(verbose);
 	if (res) TestFail = true;
 	
@@ -47,6 +54,9 @@ int ExecuteCryptoTests(bool verbose) {
 	if (res) TestFail = true;
 	
 	res = mbedtls_rsa_self_test(verbose);
+	if (res) TestFail = true;
+	
+	res = mbedtls_ctr_drbg_self_test(verbose);
 	if (res) TestFail = true;
 	
 	res = mbedtls_base64_self_test(verbose);
