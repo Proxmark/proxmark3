@@ -7,6 +7,10 @@ mbedtls_SOURCES = \
 	base64.c \
 	bignum.c \
 	ctr_drbg.c \
+	entropy_poll.c \
+	entropy.c \
+	error.c \
+	timing.c \
 	ecp.c \
 	ecp_curves.c \
 	certs.c \

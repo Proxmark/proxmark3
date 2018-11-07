@@ -18,7 +18,9 @@
 #include <mbedtls/cmac.h>
 #include <mbedtls/ecdsa.h>
 #include <mbedtls/sha256.h>
-#include "mbedtls/ctr_drbg.h"
+#include <mbedtls/ctr_drbg.h>
+#include <mbedtls/entropy.h>
+#include <mbedtls/error.h>
 //test!!!
 #include <util.h>
 
@@ -129,7 +131,84 @@ int ecdsa_init_str(mbedtls_ecdsa_context *ctx, char * key_d, char *key_x, char *
 	return 0;
 }
 
-int ecdsa_signature_create(char * key_d, char *key_x, char *key_y, uint8_t *input, int length, uint8_t *signature, size_t *signaturelen) {
+int ecdsa_init(mbedtls_ecdsa_context *ctx, uint8_t * key_d, uint8_t *key_xy) {
+	if (!ctx)
+		return 1;
+	
+	int res;
+
+	mbedtls_ecdsa_init(ctx);
+	res = mbedtls_ecp_group_load(&ctx->grp, MBEDTLS_ECP_DP_SECP256R1); // secp256r1
+	if (res) 
+		return res;
+	
+	if (key_d) {
+		res = mbedtls_mpi_read_binary(&ctx->d, key_d, 32);
+		if (res) 
+			return res;
+	}
+	
+	if (key_xy) {
+		res = mbedtls_ecp_point_read_binary(&ctx->grp, &ctx->Q, key_xy, 32 * 2 + 1);
+		if (res) 
+			return res;
+	}
+	
+	return 0;
+}
+
+int ecdsa_key_create(uint8_t * key_d, uint8_t *key_xy) {
+	int res;
+	mbedtls_ecdsa_context ctx;
+	ecdsa_init(&ctx, NULL, NULL);
+
+
+    mbedtls_entropy_context entropy;
+    mbedtls_ctr_drbg_context ctr_drbg;
+	const char *pers = "ecdsaproxmark";
+
+    mbedtls_entropy_init(&entropy);
+    mbedtls_ctr_drbg_init(&ctr_drbg);
+
+    res = mbedtls_ctr_drbg_seed(&ctr_drbg, mbedtls_entropy_func, &entropy, (const unsigned char *)pers, strlen(pers));
+	if (res)
+        goto exit;
+
+    res = mbedtls_ecdsa_genkey(&ctx, MBEDTLS_ECP_DP_SECP256R1, mbedtls_ctr_drbg_random, &ctr_drbg);
+	if (res)
+		goto exit;
+
+	res = mbedtls_mpi_write_binary(&ctx.d, key_d, 32);
+	if (res)
+		goto exit;
+
+	size_t keylen = 0;
+	uint8_t public_key[200] = {0};
+	res = mbedtls_ecp_point_write_binary(&ctx.grp, &ctx.Q, MBEDTLS_ECP_PF_UNCOMPRESSED, &keylen, public_key, sizeof(public_key));
+	if (res)
+		goto exit;
+	
+	if (keylen != 65) { // 0x04 <key x 32b><key y 32b>
+		res = 1;
+		goto exit;
+	}
+	memcpy(key_xy, public_key, 65);
+
+exit:
+    mbedtls_entropy_free(&entropy);
+    mbedtls_ctr_drbg_free(&ctr_drbg);
+	mbedtls_ecdsa_free(&ctx);
+	return res;
+}
+
+char *ecdsa_get_error(int ret) {
+	static char retstr[300];
+	memset(retstr, 0x00, sizeof(retstr));
+	mbedtls_strerror(ret, retstr, sizeof(retstr));
+	return retstr;
+}
+
+int ecdsa_signature_create(uint8_t *key_d, uint8_t *key_xy, uint8_t *input, int length, uint8_t *signature, size_t *signaturelen) {
 	int res;
 	*signaturelen = 0;
 	
@@ -138,10 +217,23 @@ int ecdsa_signature_create(char * key_d, char *key_x, char *key_y, uint8_t *inpu
 	if (res)
 		return res;
 
+    mbedtls_entropy_context entropy;
+    mbedtls_ctr_drbg_context ctr_drbg;
+	const char *pers = "ecdsaproxmark";
+
+    mbedtls_entropy_init(&entropy);
+    mbedtls_ctr_drbg_init(&ctr_drbg);
+
+    res = mbedtls_ctr_drbg_seed(&ctr_drbg, mbedtls_entropy_func, &entropy, (const unsigned char *)pers, strlen(pers));
+	if (res)
+        goto exit;
+
 	mbedtls_ecdsa_context ctx;	
-	ecdsa_init_str(&ctx, key_d, key_x, key_y);
-	res = mbedtls_ecdsa_write_signature(&ctx, MBEDTLS_MD_SHA256, shahash, sizeof(shahash), signature, signaturelen, fixed_rand, NULL);
+	ecdsa_init(&ctx, key_d, key_xy);
+	res = mbedtls_ecdsa_write_signature(&ctx, MBEDTLS_MD_SHA256, shahash, sizeof(shahash), signature, signaturelen, mbedtls_ctr_drbg_random, &ctr_drbg);
 	
+exit:
+    mbedtls_ctr_drbg_free(&ctr_drbg);
 	mbedtls_ecdsa_free(&ctx);
 	return res;
 }
@@ -188,9 +280,12 @@ int ecdsa_signature_verify(uint8_t *key_xy, uint8_t *input, int length, uint8_t 
 	if (res)
 		return res;
 
-//	mbedtls_ecdsa_context ctx;	
-//...	
-	return 0;
+	mbedtls_ecdsa_context ctx;	
+	ecdsa_init(&ctx, NULL, key_xy);
+	res = mbedtls_ecdsa_read_signature(&ctx, shahash, sizeof(shahash), signature, signaturelen);
+	
+	mbedtls_ecdsa_free(&ctx);
+	return res;
 }
 
 int ecdsa_asn1_get_signature(uint8_t *signature, size_t signaturelen, uint8_t *rval, uint8_t *sval) {
@@ -251,9 +346,12 @@ int ecdsa_nist_test(bool verbose) {
 	uint8_t signature[300] = {0}; 
 	size_t siglen = 0; 
 
+	// NIST ecdsa test
+	if (verbose)
+		printf("ECDSA NIST test: ");
 	// make signature
 	res = ecdsa_signature_create_test(T_PRIVATE_KEY, T_Q_X, T_Q_Y, T_K, input, length, signature, &siglen);
-	printf("res: %x signature[%x]: %s\n", (res<0)?-res:res, siglen, sprint_hex(signature, siglen));
+//	printf("res: %x signature[%x]: %s\n", (res<0)?-res:res, siglen, sprint_hex(signature, siglen));
 	if (res) 
 		goto exit;
 
@@ -277,20 +375,51 @@ int ecdsa_nist_test(bool verbose) {
 	
 	// verify signature
 	res = ecdsa_signature_verify_keystr(T_Q_X, T_Q_Y, input, length, signature, siglen);
-	printf("signature check res: %x\n", (res<0)?-res:res);
 	if (res) 
 		goto exit;
 		
 	// verify wrong signature
 	input[0] ^= 0xFF;
 	res = ecdsa_signature_verify_keystr(T_Q_X, T_Q_Y, input, length, signature, siglen);
-	printf("wrong signature check res: %x\n", (res<0)?-res:res);
 	if (!res) {
 		res = 1;
 		goto exit;
 	}
+	if (verbose)
+		printf("passed\n");
 
+	// random ecdsa test
+	if (verbose)
+		printf("ECDSA binary signature create/check test: ");
+
+	uint8_t key_d[32] = {0};
+	uint8_t key_xy[32 * 2 + 2] = {0};
+	memset(signature, 0x00, sizeof(signature));
+	siglen = 0;
+	
+	res = ecdsa_key_create(key_d, key_xy);
+	if (res) 
+		goto exit;
+
+	res = ecdsa_signature_create(key_d, key_xy, input, length, signature, &siglen);
+	if (res) 
+		goto exit;
+
+	res = ecdsa_signature_verify(key_xy, input, length, signature, siglen);
+	if (res) 
+		goto exit;
+
+	input[0] ^= 0xFF;
+	res = ecdsa_signature_verify(key_xy, input, length, signature, siglen);
+	if (!res) 
+		goto exit;
+	
+	if (verbose)
+		printf("passed\n");
+	
 	return 0;
 exit:
+	if (verbose)
+		printf("failed\n");
 	return res;
 }

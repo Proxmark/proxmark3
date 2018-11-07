@@ -23,6 +23,8 @@
 #include "mbedtls/x509.h"
 #include "mbedtls/base64.h"
 #include "mbedtls/ctr_drbg.h"
+#include "mbedtls/entropy.h"
+#include "mbedtls/timing.h"
 
 #include "crypto_test.h"
 #include "sda_test.h"
@@ -56,6 +58,12 @@ return 0;
 	res = mbedtls_rsa_self_test(verbose);
 	if (res) TestFail = true;
 	
+	res = mbedtls_entropy_self_test(verbose);
+	if (res) TestFail = true;
+
+	res = mbedtls_timing_self_test(verbose);
+	if (res) TestFail = true;
+
 	res = mbedtls_ctr_drbg_self_test(verbose);
 	if (res) TestFail = true;
 	
