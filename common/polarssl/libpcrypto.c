@@ -348,7 +348,7 @@ int ecdsa_nist_test(bool verbose) {
 
 	// NIST ecdsa test
 	if (verbose)
-		printf("ECDSA NIST test: ");
+		printf("  ECDSA NIST test: ");
 	// make signature
 	res = ecdsa_signature_create_test(T_PRIVATE_KEY, T_Q_X, T_Q_Y, T_K, input, length, signature, &siglen);
 //	printf("res: %x signature[%x]: %s\n", (res<0)?-res:res, siglen, sprint_hex(signature, siglen));
@@ -390,7 +390,7 @@ int ecdsa_nist_test(bool verbose) {
 
 	// random ecdsa test
 	if (verbose)
-		printf("ECDSA binary signature create/check test: ");
+		printf("  ECDSA binary signature create/check test: ");
 
 	uint8_t key_d[32] = {0};
 	uint8_t key_xy[32 * 2 + 2] = {0};
@@ -415,11 +415,11 @@ int ecdsa_nist_test(bool verbose) {
 		goto exit;
 	
 	if (verbose)
-		printf("passed\n");
+		printf("passed\n\n");
 	
 	return 0;
 exit:
 	if (verbose)
-		printf("failed\n");
+		printf("failed\n\n");
 	return res;
 }
