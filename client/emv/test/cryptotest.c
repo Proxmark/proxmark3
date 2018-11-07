@@ -36,10 +36,6 @@ int ExecuteCryptoTests(bool verbose) {
 	int res;
 	bool TestFail = false;
 	
-	res = ecdsa_nist_test(verbose);
-	if (res) TestFail = true;
-return 0;
-	
 	res = mbedtls_mpi_self_test(verbose);
 	if (res) TestFail = true;
 	
@@ -71,6 +67,9 @@ return 0;
 	if (res) TestFail = true;
 
 	res = mbedtls_cmac_self_test(verbose);
+	if (res) TestFail = true;
+
+	res = ecdsa_nist_test(verbose);
 	if (res) TestFail = true;
 
 	res = mbedtls_ecp_self_test(verbose);
