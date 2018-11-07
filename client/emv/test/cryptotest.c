@@ -30,7 +30,7 @@
 #include "sda_test.h"
 #include "dda_test.h"
 #include "cda_test.h"
-#include "libpcrypto.h"
+#include "crypto/libpcrypto.h"
 
 int ExecuteCryptoTests(bool verbose) {
 	int res;

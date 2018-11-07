@@ -9,7 +9,7 @@
 // crypto commands
 //-----------------------------------------------------------------------------
 
-#include "polarssl/libpcrypto.h"
+#include "crypto/libpcrypto.h"
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
