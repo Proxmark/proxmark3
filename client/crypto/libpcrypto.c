@@ -21,7 +21,7 @@
 #include <mbedtls/ctr_drbg.h>
 #include <mbedtls/entropy.h>
 #include <mbedtls/error.h>
-//test!!!
+#include <crypto/asn1utils.h>
 #include <util.h>
 
 // NIST Special Publication 800-38A — Recommendation for block cipher modes of operation: methods and techniques, 2001.
@@ -285,50 +285,6 @@ int ecdsa_signature_verify(uint8_t *key_xy, uint8_t *input, int length, uint8_t 
 	res = mbedtls_ecdsa_read_signature(&ctx, shahash, sizeof(shahash), signature, signaturelen);
 	
 	mbedtls_ecdsa_free(&ctx);
-	return res;
-}
-
-int ecdsa_asn1_get_signature(uint8_t *signature, size_t signaturelen, uint8_t *rval, uint8_t *sval) {
-	if (!signature || !signaturelen || !rval || !sval)
-		return 1;
-
-	int res = 0;
-	unsigned char *p = signature;
-	const unsigned char *end = p + signaturelen;
-	size_t len;
-	mbedtls_mpi xmpi;
-
-	if ((res = mbedtls_asn1_get_tag(&p, end, &len, MBEDTLS_ASN1_CONSTRUCTED | MBEDTLS_ASN1_SEQUENCE)) == 0) {
-		mbedtls_mpi_init(&xmpi);
-		res = mbedtls_asn1_get_mpi(&p, end, &xmpi);
-		if (res) {
-			mbedtls_mpi_free(&xmpi);
-			goto exit;
-		}
-		
-		res = mbedtls_mpi_write_binary(&xmpi, rval, 32);
-		mbedtls_mpi_free(&xmpi);
-		if (res) 
-			goto exit;
-
-		mbedtls_mpi_init(&xmpi);
-		res = mbedtls_asn1_get_mpi(&p, end, &xmpi);
-		if (res) {
-			mbedtls_mpi_free(&xmpi);
-			goto exit;
-		}
-		
-		res = mbedtls_mpi_write_binary(&xmpi, sval, 32);
-		mbedtls_mpi_free(&xmpi);
-		if (res) 
-			goto exit;
-
-		// check size
-		if (end != p)
-			return 2;
-		}
-
-exit:
 	return res;
 }
 

@@ -25,6 +25,7 @@ extern int sha256hash(uint8_t *input, int length, uint8_t *hash);
 extern int ecdsa_key_create(uint8_t * key_d, uint8_t *key_xy);
 extern int ecdsa_signature_create(uint8_t *key_d, uint8_t *key_xy, uint8_t *input, int length, uint8_t *signature, size_t *signaturelen);
 extern int ecdsa_signature_verify(uint8_t *key_xy, uint8_t *input, int length, uint8_t *signature, size_t signaturelen);
+extern char *ecdsa_get_error(int ret);
 
 extern int ecdsa_nist_test(bool verbose);
 

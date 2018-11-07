@@ -109,6 +109,7 @@ CMDSRCS = 	$(SRC_SMARTCARD) \
 			crapto1/crypto1.c\
 			polarssl/des.c\
 			crypto/libpcrypto.c\
+			crypto/asn1utils.c\
 			cliparser/argtable3.c\
 			cliparser/cliparser.c\
 			mfkey.c\
