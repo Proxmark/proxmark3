@@ -20,6 +20,7 @@
 #include "cmdmain.h"
 #include "util.h"
 #include "mifarehost.h"
+#include "hardnested/hardnested_bruteforce.h"
 #include "../common/iso15693tools.h"
 #include "iso14443crc.h"
 #include "../common/crc16.h"
@@ -65,6 +66,24 @@ static int l_SendCommand(lua_State *L){
 	SendCommand((UsbCommand* )data);
 	return 0; // no return values
 }
+
+static int l_HardNested(lua_State *L){
+	size_t size;
+	const char *data = luaL_checklstring(L, 1, &size);
+	bool isOK = CmdHF14AMfNestedHard(data);
+	if (isOK == 0){
+		char destination[17];
+		snprintf(destination, 16, "%012" PRIx64, cracked_key);
+		destination[16] = 0;
+		lua_pushnil(L);
+		lua_pushstring(L, destination);
+	} else {
+		lua_pushstring(L, "key not found");
+		lua_pushstring(L, "FFFFFFFFFFFF");
+	}
+	return 2;
+}
+
 /**
  * @brief The following params expected:
  * uint32_t cmd
@@ -424,6 +443,7 @@ int set_pm3_libraries(lua_State *L)
 		{"SendCommand",                 l_SendCommand},
 		{"WaitForResponseTimeout",      l_WaitForResponseTimeout},
 		{"mfDarkside",                  l_mfDarkside},
+		{"hardnested",					l_HardNested},
 		//{"PrintAndLog",                 l_PrintAndLog},
 		{"foobar",                      l_foobar},
 		{"ukbhit",                      l_ukbhit},
