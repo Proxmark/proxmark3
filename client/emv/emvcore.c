@@ -10,6 +10,7 @@
 
 #include "emvcore.h"
 #include "emvjson.h"
+#include "util_posix.h"
 
 // Got from here. Thanks)
 // https://eftlab.co.uk/index.php/site-map/knowledge-base/211-emv-aid-rid-pix
@@ -236,8 +237,10 @@ int EMVExchangeEx(bool ActivateField, bool LeaveFieldON, sAPDU apdu, bool Includ
 	if (sw)	*sw = 0;
 	uint16_t isw = 0;
 	
-	if (ActivateField)
+	if (ActivateField){
 		DropField();
+		msleep(50);
+	}
 	
 	// COMPUTE APDU
 	memcpy(data, &apdu, 5);
