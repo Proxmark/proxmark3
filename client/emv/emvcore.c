@@ -266,9 +266,14 @@ int EMVExchangeEx(bool ActivateField, bool LeaveFieldON, sAPDU apdu, bool Includ
 		*sw = isw;
 
 	if (isw != 0x9000) {
-		if (APDULogging)
-			PrintAndLog("APDU(%02x%02x) ERROR: [%4X] %s", apdu.CLA, apdu.INS, isw, GetAPDUCodeDescription(*sw >> 8, *sw & 0xff));
-		return 5;
+		if (APDULogging) {
+			if (*sw >> 8 == 0x61) {
+				PrintAndLog("APDU chaining len:%02x -->", *sw & 0xff);
+			} else {
+				PrintAndLog("APDU(%02x%02x) ERROR: [%4X] %s", apdu.CLA, apdu.INS, isw, GetAPDUCodeDescription(*sw >> 8, *sw & 0xff));
+				return 5;
+			}
+		}
 	}
 
 	// add to tlv tree

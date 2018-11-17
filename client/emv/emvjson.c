@@ -68,23 +68,39 @@ char* GetApplicationDataName(tlv_tag_t tag) {
 	return NULL;
 }
 
-int JsonSaveStr(json_t *root, char *path, char *value) {
+int JsonSaveJsonObject(json_t *root, char *path, json_t *value) {
 	json_error_t error;
 
 	if (strlen(path) < 1)
 		return 1;
 	
 	if (path[0] == '$') {
-		if (json_path_set(root, path, json_string(value), 0, &error)) {
+		if (json_path_set(root, path, value, 0, &error)) {
 			PrintAndLog("ERROR: can't set json path: ", error.text);
 			return 2;
 		} else {
 			return 0;
 		}
 	} else {
-		return json_object_set_new(root, path, json_string(value));
+		return json_object_set_new(root, path, value);
 	}
+}
+
+int JsonSaveInt(json_t *root, char *path, int value) {
+	return JsonSaveJsonObject(root, path, json_integer(value));
+}
+
+int JsonSaveStr(json_t *root, char *path, char *value) {
+	return JsonSaveJsonObject(root, path, json_string(value));
 };
+
+int JsonSaveBufAsHexCompact(json_t *elm, char *path, uint8_t *data, size_t datalen) {
+	char * msg = sprint_hex_inrow(data, datalen);
+	if (msg && strlen(msg) && msg[strlen(msg) - 1] == ' ')
+		msg[strlen(msg) - 1] = '\0';
+
+	return JsonSaveStr(elm, path, msg);
+}
 
 int JsonSaveBufAsHex(json_t *elm, char *path, uint8_t *data, size_t datalen) {
 	char * msg = sprint_hex(data, datalen);
@@ -247,6 +263,20 @@ bool HexToBuffer(const char *errormsg, const char *hexvalue, uint8_t * buffer, s
 	
 	return true;
 }
+
+int JsonLoadBufAsHex(json_t *elm, char *path, uint8_t *data, size_t maxbufferlen, size_t *datalen) {
+	if (datalen)
+		*datalen = 0;
+	
+	json_t *jelm = json_path_get((const json_t *)elm, path);
+	if (!jelm || !json_is_string(jelm))
+		return 1;
+	
+	if (!HexToBuffer("ERROR load", json_string_value(jelm), data, maxbufferlen, datalen))
+		return 2;
+	
+	return 0;
+};
 
 bool ParamLoadFromJson(struct tlvdb *tlv) {
 	json_t *root;

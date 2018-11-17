@@ -139,7 +139,7 @@ void hex_to_buffer(const uint8_t *buf, const uint8_t *hex_data, const size_t hex
 // printing and converting functions
 
 char *sprint_hex(const uint8_t *data, const size_t len) {
-	static char buf[1025] = {0};
+	static char buf[4097] = {0};
 	
 	hex_to_buffer((uint8_t *)buf, data, len, sizeof(buf) - 1, 0, 1, false);
 
@@ -147,7 +147,7 @@ char *sprint_hex(const uint8_t *data, const size_t len) {
 }
 
 char *sprint_hex_inrow_ex(const uint8_t *data, const size_t len, const size_t min_str_len) {
-	static char buf[1025] = {0};
+	static char buf[4097] = {0};
 
 	hex_to_buffer((uint8_t *)buf, data, len, sizeof(buf) - 1, min_str_len, 0, false);
 

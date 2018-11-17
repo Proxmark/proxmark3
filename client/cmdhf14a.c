@@ -786,20 +786,20 @@ int ExchangeRAW14a(uint8_t *datain, int datainlen, bool activateField, bool leav
 	return 0;
 }
 
-int ExchangeAPDU14a(uint8_t *datain, int datainlen, bool activateField, bool leaveSignalON, uint8_t *dataout, int maxdataoutlen, int *dataoutlen) {
+int CmdExchangeAPDU(uint8_t *datain, int datainlen, bool activateField, uint8_t *dataout, int maxdataoutlen, int *dataoutlen, bool *chaining) {
 	uint16_t cmdc = 0;
+
+	*chaining = false;
 	
 	if (activateField) {
 		cmdc |= ISO14A_CONNECT | ISO14A_CLEAR_TRACE;
 	}
-	if (leaveSignalON)
-		cmdc |= ISO14A_NO_DISCONNECT;
 
 	// "Command APDU" length should be 5+255+1, but javacard's APDU buffer might be smaller - 133 bytes
 	// https://stackoverflow.com/questions/32994936/safe-max-java-card-apdu-data-command-and-respond-size
 	// here length USB_CMD_DATA_SIZE=512
 	// timeout must be authomatically set by "get ATS"
-	UsbCommand c = {CMD_READER_ISO_14443a, {ISO14A_APDU | cmdc, (datainlen & 0xFFFF), 0}}; 
+	UsbCommand c = {CMD_READER_ISO_14443a, {ISO14A_APDU | ISO14A_NO_DISCONNECT | cmdc, (datainlen & 0xFFFF), 0}}; 
 	memcpy(c.d.asBytes, datain, datainlen);
 	SendCommand(&c);
 	
@@ -813,6 +813,7 @@ int ExchangeAPDU14a(uint8_t *datain, int datainlen, bool activateField, bool lea
 		}
 		if (resp.arg[0] != 1) {
 			PrintAndLog("APDU ERROR: Proxmark error %d.", resp.arg[0]);
+			DropField();
 			return 1;
 		}
 	}
@@ -820,27 +821,40 @@ int ExchangeAPDU14a(uint8_t *datain, int datainlen, bool activateField, bool lea
     if (WaitForResponseTimeout(CMD_ACK, &resp, 1500)) {
         recv = resp.d.asBytes;
         int iLen = resp.arg[0];
+		uint8_t res = resp.arg[1];
 		
-		*dataoutlen = iLen - 2;
-		if (*dataoutlen < 0)
-			*dataoutlen = 0;
+		int dlen = iLen - 2;
+		if (dlen < 0)
+			dlen = 0;
+		*dataoutlen += dlen;
 		
 		if (maxdataoutlen && *dataoutlen > maxdataoutlen) {
 			PrintAndLog("APDU ERROR: Buffer too small(%d). Needs %d bytes", *dataoutlen, maxdataoutlen);
 			return 2;
 		}
 		
-		memcpy(dataout, recv, *dataoutlen);
-		
         if(!iLen) {
 			PrintAndLog("APDU ERROR: No APDU response.");
             return 1;
 		}
 
+		// check apdu length
+		if (iLen < 4 && iLen >= 0) {
+			PrintAndLog("APDU ERROR: Small APDU response. Len=%d", iLen);
+			return 2;
+		}
+		
 		// check block TODO
 		if (iLen == -2) {
 			PrintAndLog("APDU ERROR: Block type mismatch.");
 			return 2;
+		}
+
+		memcpy(dataout, recv, dlen);
+		
+		// chaining
+		if ((res & 0x10) != 0) {
+			*chaining = true;
 		}
 		
 		// CRC Check
@@ -848,17 +862,35 @@ int ExchangeAPDU14a(uint8_t *datain, int datainlen, bool activateField, bool lea
 			PrintAndLog("APDU ERROR: ISO 14443A CRC error.");
 			return 3;
 		}
-
-		// check apdu length
-		if (iLen < 4) {
-			PrintAndLog("APDU ERROR: Small APDU response. Len=%d", iLen);
-			return 2;
-		}
-		
     } else {
         PrintAndLog("APDU ERROR: Reply timeout.");
 		return 4;
     }
+
+	return 0;
+}
+
+
+int ExchangeAPDU14a(uint8_t *datain, int datainlen, bool activateField, bool leaveSignalON, uint8_t *dataout, int maxdataoutlen, int *dataoutlen) {
+	*dataoutlen = 0;
+	bool chaining = false;
+	
+	int res = CmdExchangeAPDU(datain, datainlen, activateField, dataout, maxdataoutlen, dataoutlen, &chaining);
+
+	while (chaining) {
+		// I-block with chaining
+		res = CmdExchangeAPDU(NULL, 0, false, &dataout[*dataoutlen], maxdataoutlen, dataoutlen, &chaining);
+		
+		if (res) {
+			if (!leaveSignalON)
+				DropField();
+			
+			return 100;
+		}
+	}	
+	
+	if (!leaveSignalON)
+		DropField();
 	
 	return 0;
 }
