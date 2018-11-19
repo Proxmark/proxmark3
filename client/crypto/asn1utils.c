@@ -16,6 +16,7 @@
 #include "emv/dump.h"
 #include "asn1dump.h"
 #include "util.h"
+#include "ui.h" // PrintAndLog
 
 int ecdsa_asn1_get_signature(uint8_t *signature, size_t signaturelen, uint8_t *rval, uint8_t *sval) {
 	if (!signature || !signaturelen || !rval || !sval)
