@@ -21,8 +21,10 @@ LDLIBS = -L/opt/local/lib -L/usr/local/lib -lreadline -lpthread -lm
 LUALIB = ../liblua/liblua.a
 JANSSONLIBPATH = ./jansson
 JANSSONLIB = $(JANSSONLIBPATH)/libjansson.a
+MBEDTLSLIBPATH = ../common/mbedtls
+MBEDTLSLIB = $(MBEDTLSLIBPATH)/libmbedtls.a
 LDFLAGS = $(ENV_LDFLAGS)
-CFLAGS = $(ENV_CFLAGS) -std=c99 -D_ISOC99_SOURCE -I. -I../include -I../common -I../common/polarssl -I../zlib -I../uart -I/opt/local/include -I../liblua -I$(JANSSONLIBPATH) -Wall -g -O3
+CFLAGS = $(ENV_CFLAGS) -std=c99 -D_ISOC99_SOURCE -I. -I../include -I../common -I../common/polarssl -I../zlib -I../uart -I/opt/local/include -I../liblua -I$(JANSSONLIBPATH) -I$(MBEDTLSLIBPATH) -Wall -g -O3
 CXXFLAGS = -I../include -Wall -O3
 
 APP_CFLAGS =
@@ -105,13 +107,9 @@ CORESRCS = 	uart_posix.c \
 CMDSRCS = 	$(SRC_SMARTCARD) \
 			crapto1/crapto1.c\
 			crapto1/crypto1.c\
-			polarssl/des.c \
-			polarssl/aes.c\
-			polarssl/aes_cmac128.c\
-			polarssl/bignum.c\
-			polarssl/rsa.c\
-			polarssl/sha1.c\
-			polarssl/libpcrypto.c\
+			polarssl/des.c\
+			crypto/libpcrypto.c\
+			crypto/asn1utils.c\
 			cliparser/argtable3.c\
 			cliparser/cliparser.c\
 			mfkey.c\
@@ -247,12 +245,12 @@ WINBINS = $(patsubst %, %.exe, $(BINS))
 CLEAN = $(BINS) $(WINBINS) $(COREOBJS) $(CMDOBJS) $(OBJCOBJS) $(ZLIBOBJS) $(QTGUIOBJS) $(MULTIARCHOBJS) $(OBJDIR)/*.o *.moc.cpp ui/ui_overlays.h
 
 # need to assign dependancies to build these first...
-all: lua_build jansson_build $(BINS)
+all: lua_build jansson_build mbedtls_build $(BINS)
 
 all-static: LDLIBS:=-static $(LDLIBS)
 all-static: proxmark3 flasher fpga_compress
 
-proxmark3: LDLIBS+=$(LUALIB) $(JANSSONLIB) $(QTLDLIBS)
+proxmark3: LDLIBS+=$(LUALIB) $(JANSSONLIB) $(MBEDTLSLIB) $(QTLDLIBS)
 proxmark3: $(OBJDIR)/proxmark3.o $(COREOBJS) $(CMDOBJS) $(OBJCOBJS) $(QTGUIOBJS) $(MULTIARCHOBJS) $(ZLIBOBJS) lualibs/usb_cmd.lua
 	$(LD) $(LDFLAGS) $(OBJDIR)/proxmark3.o $(COREOBJS) $(CMDOBJS) $(OBJCOBJS) $(QTGUIOBJS) $(MULTIARCHOBJS) $(ZLIBOBJS) $(LDLIBS) -o $@
 
@@ -277,6 +275,7 @@ clean:
 	$(RM) $(CLEAN)
 	cd ../liblua && make clean
 	cd ./jansson && make clean
+	cd $(MBEDTLSLIBPATH) && make clean
 
 tarbin: $(BINS)
 	$(TAR) $(TARFLAGS) ../proxmark3-$(platform)-bin.tar $(BINS:%=client/%) $(WINBINS:%=client/%)
@@ -288,6 +287,10 @@ lua_build:
 jansson_build:
 	@echo Compiling jansson
 	cd ./jansson && make all
+	
+mbedtls_build:
+	@echo Compiling mbedtls
+	cd $(MBEDTLSLIBPATH) && make all
 
 .PHONY: all clean
 
