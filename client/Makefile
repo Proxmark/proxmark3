@@ -107,7 +107,6 @@ CORESRCS = 	uart_posix.c \
 CMDSRCS = 	$(SRC_SMARTCARD) \
 			crapto1/crapto1.c\
 			crapto1/crypto1.c\
-			polarssl/des.c\
 			crypto/libpcrypto.c\
 			crypto/asn1utils.c\
 			cliparser/argtable3.c\
