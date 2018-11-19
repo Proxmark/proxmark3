@@ -23,7 +23,7 @@
 #include "common.h"
 #include "util.h"
 #include "cmdmain.h"
-#include "polarssl/des.h"
+#include "mbedtls/des.h"
 #include "loclass/cipherutils.h"
 #include "loclass/cipher.h"
 #include "loclass/ikeys.h"
@@ -414,8 +414,8 @@ int CmdHFiClassDecrypt(const char *Cmd) {
 	fseek(f, 0, SEEK_SET);
 	uint8_t enc_dump[8] = {0};
 	uint8_t *decrypted = malloc(fsize);
-	des3_context ctx = { DES_DECRYPT ,{ 0 } };
-	des3_set2key_dec( &ctx, key);
+	mbedtls_des3_context ctx = { 0 };
+	mbedtls_des3_set2key_dec( &ctx, key);
 	size_t bytes_read = fread(enc_dump, 1, 8, f);
 
 	//Use the first block (CSN) for filename
@@ -431,7 +431,7 @@ int CmdHFiClassDecrypt(const char *Cmd) {
 		{
 			memcpy(decrypted+(blocknum*8), enc_dump, 8);
 		}else{
-			des3_crypt_ecb(&ctx, enc_dump,decrypted +(blocknum*8) );
+			mbedtls_des3_crypt_ecb(&ctx, enc_dump,decrypted +(blocknum*8) );
 		}
 		printvar("decrypted block", decrypted +(blocknum*8), 8);
 		bytes_read = fread(enc_dump, 1, 8, f);
@@ -466,10 +466,10 @@ static int iClassEncryptBlkData(uint8_t *blkData) {
 
 	uint8_t encryptedData[16];
 	uint8_t *encrypted = encryptedData;
-	des3_context ctx = { DES_DECRYPT ,{ 0 } };
-	des3_set2key_enc( &ctx, key);
+	mbedtls_des3_context ctx = { 0 };
+	mbedtls_des3_set2key_enc( &ctx, key);
 	
-	des3_crypt_ecb(&ctx, blkData,encrypted);
+	mbedtls_des3_crypt_ecb(&ctx, blkData,encrypted);
 	//printvar("decrypted block", decrypted, 8);
 	memcpy(blkData,encrypted,8);
 
