@@ -21,7 +21,7 @@
 #include "iso14443crc.h"
 #include "iso14443a.h"
 #include "crapto1/crapto1.h"
-#include "polarssl/des.h"
+#include "mbedtls/des.h"
 
 int MF_DBGLEVEL = MF_DBG_ALL;
 
@@ -296,7 +296,7 @@ int mifare_ultra_auth(uint8_t *keybytes){
 
 	/// 3des2k
 
-	des3_context ctx = { 0x00 };
+	mbedtls_des3_context ctx = { 0x00 };
 	uint8_t random_a[8] = {1,1,1,1,1,1,1,1};
 	uint8_t random_b[8] = {0x00};
 	uint8_t enc_random_b[8] = {0x00};
@@ -321,9 +321,9 @@ int mifare_ultra_auth(uint8_t *keybytes){
 
 	// decrypt nonce.
 	// tdes_2key_dec(random_b, enc_random_b, sizeof(random_b), key, IV );
-	des3_set2key_dec(&ctx, key);
-	des3_crypt_cbc(&ctx  	// des3_context
-		, DES_DECRYPT    	// int mode
+	mbedtls_des3_set2key_dec(&ctx, key);
+	mbedtls_des3_crypt_cbc(&ctx  	// des3_context
+		, MBEDTLS_DES_DECRYPT    	// int mode
 		, sizeof(random_b)	// length
 		, IV            	// iv[8]
 		, enc_random_b		// input
@@ -350,9 +350,9 @@ int mifare_ultra_auth(uint8_t *keybytes){
 
 	// encrypt    out, in, length, key, iv
 	//tdes_2key_enc(rnd_ab, rnd_ab, sizeof(rnd_ab), key, enc_random_b);
-	des3_set2key_enc(&ctx, key);
-	des3_crypt_cbc(&ctx  	// des3_context
-		, DES_ENCRYPT    	// int mode
+	mbedtls_des3_set2key_enc(&ctx, key);
+	mbedtls_des3_crypt_cbc(&ctx  	// des3_context
+		, MBEDTLS_DES_ENCRYPT    	// int mode
 		, sizeof(rnd_ab)	// length
 		, enc_random_b     	// iv[8]
 		, rnd_ab			// input
@@ -372,9 +372,9 @@ int mifare_ultra_auth(uint8_t *keybytes){
 
 	// decrypt    out, in, length, key, iv 
 	// tdes_2key_dec(resp_random_a, enc_resp, 8, key, enc_random_b);
-	des3_set2key_dec(&ctx, key);
-	des3_crypt_cbc(&ctx  	// des3_context
-		, DES_DECRYPT    	// int mode
+	mbedtls_des3_set2key_dec(&ctx, key);
+	mbedtls_des3_crypt_cbc(&ctx  	// des3_context
+		, MBEDTLS_DES_DECRYPT    	// int mode
 		, 8					// length
 		, enc_random_b     	// iv[8]
 		, enc_resp			// input
