@@ -68,12 +68,12 @@ From "Dismantling iclass":
 #include <inttypes.h>
 #include "fileutils.h"
 #include "cipherutils.h"
-#include "polarssl/des.h"
+#include "mbedtls/des.h"
 
 uint8_t pi[35] = {0x0F,0x17,0x1B,0x1D,0x1E,0x27,0x2B,0x2D,0x2E,0x33,0x35,0x39,0x36,0x3A,0x3C,0x47,0x4B,0x4D,0x4E,0x53,0x55,0x56,0x59,0x5A,0x5C,0x63,0x65,0x66,0x69,0x6A,0x6C,0x71,0x72,0x74,0x78};
 
-static des_context ctx_enc = {DES_ENCRYPT,{0}};
-static des_context ctx_dec = {DES_DECRYPT,{0}};
+static mbedtls_des_context ctx_enc = {0};
+static mbedtls_des_context ctx_dec = {0};
 
 static int debug_print = 0;
 
@@ -393,12 +393,12 @@ void diversifyKey(uint8_t csn[8], uint8_t key[8], uint8_t div_key[8])
 {
 
 	// Prepare the DES key
-	des_setkey_enc( &ctx_enc, key);
+	mbedtls_des_setkey_enc( &ctx_enc, key);
 
 	uint8_t crypted_csn[8] = {0};
 
 	// Calculate DES(CSN, KEY)
-	des_crypt_ecb(&ctx_enc,csn, crypted_csn);
+	mbedtls_des_crypt_ecb(&ctx_enc,csn, crypted_csn);
 
 	//Calculate HASH0(DES))
     uint64_t crypt_csn = x_bytes_to_num(crypted_csn, 8);
@@ -466,13 +466,13 @@ typedef struct
 } Testcase;
 
 
-int testDES(Testcase testcase, des_context ctx_enc, des_context ctx_dec)
+int testDES(Testcase testcase, mbedtls_des_context ctx_enc, mbedtls_des_context ctx_dec)
 {
 	uint8_t des_encrypted_csn[8] = {0};
 	uint8_t decrypted[8] = {0};
 	uint8_t div_key[8] = {0};
-	int retval = des_crypt_ecb(&ctx_enc,testcase.uid,des_encrypted_csn);
-	retval |= des_crypt_ecb(&ctx_dec,des_encrypted_csn,decrypted);
+	int retval = mbedtls_des_crypt_ecb(&ctx_enc,testcase.uid,des_encrypted_csn);
+	retval |= mbedtls_des_crypt_ecb(&ctx_dec,des_encrypted_csn,decrypted);
 
 	if(memcmp(testcase.uid,decrypted,8) != 0)
 	{
@@ -678,7 +678,7 @@ int testDES2(uint64_t csn, uint64_t expected)
 	print64bits("   csn ", csn);
     x_num_to_bytes(csn, 8,input);
 
-	des_crypt_ecb(&ctx_enc,input, result);
+	mbedtls_des_crypt_ecb(&ctx_enc,input, result);
 
     uint64_t crypt_csn = x_bytes_to_num(result, 8);
 	print64bits("   {csn}    ", crypt_csn );
@@ -709,7 +709,7 @@ int doTestsWithKnownInputs()
 	prnlog("[+] Testing foo");
 	uint8_t key[8] = {0x6c,0x8d,0x44,0xf9,0x2a,0x2d,0x01,0xbf};
 
-	des_setkey_enc( &ctx_enc, key);
+	mbedtls_des_setkey_enc( &ctx_enc, key);
 	testDES2(0xbbbbaaaabbbbeeee,0xd6ad3ca619659e6b);
 
 	prnlog("[+] Testing hashing algorithm");
@@ -776,8 +776,8 @@ int doKeyTests(uint8_t debuglevel)
 
 			prnlog("[+] Checking key parity...");
 			des_checkParity(key);
-			des_setkey_enc( &ctx_enc, key);
-			des_setkey_dec( &ctx_dec, key);
+			mbedtls_des_setkey_enc( &ctx_enc, key);
+			mbedtls_des_setkey_dec( &ctx_dec, key);
 			// Test hashing functions
 			prnlog("[+] The following tests require the correct 8-byte master key");
 			testKeyDiversificationWithMasterkeyTestcases();
