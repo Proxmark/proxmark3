@@ -32,7 +32,6 @@ size_t nbytes(size_t nbits) {
 int CmdLFHitagList(const char *Cmd)
 {
  	uint8_t *got = malloc(USB_CMD_DATA_SIZE);
-
 	// Query for the actual size of the trace
 	UsbCommand response;
 	GetFromBigBuf(got, USB_CMD_DATA_SIZE, 0, &response, -1, false);
@@ -52,6 +51,7 @@ int CmdLFHitagList(const char *Cmd)
 	PrintAndLog(" ETU     :nbits: who bytes");
 	PrintAndLog("---------+-----+----+-----------");
 
+	int j;
 	int i = 0;
 	int prev = -1;
 	int len = strlen(Cmd);
@@ -93,7 +93,7 @@ int CmdLFHitagList(const char *Cmd)
 		// or each half bit period in 256 levels.
 
 		int bits = got[i+8];
-		int len = nbytes(got[i+8]);
+		int len = nbytes(bits);
 
 		if (len > 100) {
 		  break;
@@ -101,19 +101,43 @@ int CmdLFHitagList(const char *Cmd)
 		if (i + len > traceLen) { break;}
 
 		uint8_t *frame = (got+i+9);
+/*
+		int fillupBits = 8 - (bits % 8);
+		byte_t framefilled[bits+fillupBits];
+		byte_t* ff = framefilled;
+		
+		int response_bit[200] = {0};
+		int z = 0;
+		for (int y = 0; y < len; y++) {
+			for (j = 0; j < 8; j++) {
+				response_bit[z] = 0;
+				if ((frame[y] & ((mask << 7) >> j)) != 0)
+					response_bit[z] = 1;
+				z++;
+			}
+		}
+		z = 0;
+		for (int y = 0; y < len; y++) {
+			ff[y] = (response_bit[z] << 7) | (response_bit[z + 1] << 6)
+					| (response_bit[z + 2] << 5) | (response_bit[z + 3] << 4)
+					| (response_bit[z + 4] << 3) | (response_bit[z + 5] << 2)
+					| (response_bit[z + 6] << 1) | response_bit[z + 7];
+			z += 8;
+		}
+*/
+
+
+
 
 		// Break and stick with current result if buffer was not completely full
 		if (frame[0] == 0x44 && frame[1] == 0x44 && frame[3] == 0x44) { break; }
 
 		char line[1000] = "";
-		int j;
 		for (j = 0; j < len; j++) {
-
 		  //if((parityBits >> (len - j - 1)) & 0x01) {
 		  if (isResponse && (oddparity8(frame[j]) != ((parityBits >> (len - j - 1)) & 0x01))) {
 			sprintf(line+(j*4), "%02x!  ", frame[j]);
-		  }
-		  else {
+		  } else {
 			sprintf(line+(j*4), "%02x   ", frame[j]);
 		  }
 		}
@@ -194,10 +218,27 @@ int CmdLFHitagReader(const char *Cmd) {
 			c = (UsbCommand){ CMD_READ_HITAG_S };
 			num_to_bytes(param_get32ex(Cmd,1,0,16),4,htd->auth.NrAr);
 			num_to_bytes(param_get32ex(Cmd,2,0,16),4,htd->auth.NrAr+4);
+			c.arg[1] = param_get64ex(Cmd,3,0,0); //firstpage
+			c.arg[2] = param_get64ex(Cmd,4,0,0); //tag mode
 		} break;
 		case 02: { //RHTSF_KEY
 			c = (UsbCommand){ CMD_READ_HITAG_S };
 			num_to_bytes(param_get64ex(Cmd,1,0,16),6,htd->crypto.key);
+			c.arg[1] = param_get64ex(Cmd,2,0,0); //firstpage
+			c.arg[2] = param_get64ex(Cmd,3,0,0); //tag mode
+		} break;
+		case 03: { //RHTSF_CHALLENGE BLOCK
+			c = (UsbCommand){ CMD_READ_HITAG_S_BLK };
+			num_to_bytes(param_get32ex(Cmd,1,0,16),4,htd->auth.NrAr);
+			num_to_bytes(param_get32ex(Cmd,2,0,16),4,htd->auth.NrAr+4);
+			c.arg[1] = param_get64ex(Cmd,3,0,0); //firstpage
+			c.arg[2] = param_get64ex(Cmd,4,0,0); //tag mode
+		} break;
+		case 04: { //RHTSF_KEY BLOCK
+			c = (UsbCommand){ CMD_READ_HITAG_S_BLK };
+			num_to_bytes(param_get64ex(Cmd,1,0,16),6,htd->crypto.key);
+			c.arg[1] = param_get64ex(Cmd,2,0,0); //firstpage
+			c.arg[2] = param_get64ex(Cmd,3,0,0); //tag mode
 		} break;
 		case RHT2F_PASSWORD: {
 			num_to_bytes(param_get32ex(Cmd,1,0,16),4,htd->pwd.password);
@@ -222,8 +263,11 @@ int CmdLFHitagReader(const char *Cmd) {
 			PrintAndLog("Usage: hitag reader <Reader Function #>");
 			PrintAndLog("Reader Functions:");
 			PrintAndLog(" HitagS (0*)");
-			PrintAndLog("  01 <nr> <ar> (Challenge) read all pages from a Hitag S tag");
-			PrintAndLog("  02 <key> (set to 0 if no authentication is needed) read all pages from a Hitag S tag");
+			PrintAndLog("  01 <nr> <ar> <firstPage> <tagmode> (Challenge) read all pages from a Hitag S tag");
+			PrintAndLog("  02 <key> <firstPage> <tagmode> (set to 0 if no authentication is needed) read all pages from a Hitag S tag");
+			PrintAndLog("  03 <nr> <ar> <firstPage> <tagmode> (Challenge) read all blocks from a Hitag S tag");
+			PrintAndLog("  04 <key> <firstPage> <tagmode> (set to 0 if no authentication is needed) read all blocks from a Hitag S tag");
+			PrintAndLog("  Valid tagmodes are 0=STANDARD, 1=ADVANCED, 2=FAST_ADVANCED (default is ADVANCED)");
 			PrintAndLog(" Hitag1 (1*)");
 			PrintAndLog(" Hitag2 (2*)");
 			PrintAndLog("  21 <password> (password mode)");
@@ -334,6 +378,7 @@ int CmdLFHitagCheckChallenges(const char *Cmd) {
 	
 	//file with all the challenges to try
 	c.arg[0] = (uint32_t)file_given;
+	c.arg[1] = param_get64ex(Cmd,2,0,0); //get mode
 
   SendCommand(&c);
   return 0;
@@ -394,7 +439,7 @@ static command_t CommandTable[] =
   {"snoop",   		CmdLFHitagSnoop,   1, "Eavesdrop Hitag communication"},
   {"writer",   		CmdLFHitagWP,      1, "Act like a Hitag Writer" },
   {"simS",   		CmdLFHitagSimS,    1, "<hitagS.hts> Simulate HitagS transponder" }, 
-  {"checkChallenges",	CmdLFHitagCheckChallenges,   1, "<challenges.cc> test all challenges" }, {
+  {"checkChallenges",	CmdLFHitagCheckChallenges,   1, "<challenges.cc> <tagmode> test all challenges" }, {
 				NULL,NULL, 0, NULL }
 };
 

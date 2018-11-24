@@ -1086,10 +1086,13 @@ void UsbPacketReceived(uint8_t *packet, int len)
 			SimulateHitagSTag((bool)c->arg[0],(byte_t*)c->d.asBytes);
 			break;
 		case CMD_TEST_HITAGS_TRACES:// Tests every challenge within the given file
-			check_challenges((bool)c->arg[0],(byte_t*)c->d.asBytes);
+			check_challenges_cmd((bool)c->arg[0], (byte_t*)c->d.asBytes, (uint8_t)c->arg[1]);
 			break;
 		case CMD_READ_HITAG_S://Reader for only Hitag S tags, args = key or challenge
-			ReadHitagS((hitag_function)c->arg[0],(hitag_data*)c->d.asBytes);
+			ReadHitagSCmd((hitag_function)c->arg[0], (hitag_data*)c->d.asBytes, (uint8_t)c->arg[1], (uint8_t)c->arg[2], false);
+			break;
+		case CMD_READ_HITAG_S_BLK:
+			ReadHitagSCmd((hitag_function)c->arg[0], (hitag_data*)c->d.asBytes, (uint8_t)c->arg[1], (uint8_t)c->arg[2], true);
 			break;
 		case CMD_WR_HITAG_S://writer for Hitag tags args=data to write,page and key or challenge
 			if ((hitag_function)c->arg[0] < 10) {
