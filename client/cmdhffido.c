@@ -39,6 +39,12 @@
 #include "emv/emvjson.h"
 #include "emv/dump.h"
 #include "cliparser/cliparser.h"
+#include "crypto/asn1utils.h"
+#include "crypto/libpcrypto.h"
+#include "fido/additional_ca.h"
+#include "mbedtls/x509_crt.h"
+#include "mbedtls/x509.h"
+#include "mbedtls/pk.h"
 
 static int CmdHelp(const char *Cmd);
 
@@ -201,8 +207,9 @@ int CmdHFFidoRegister(const char *cmd) {
 	void* argtable[] = {
 		arg_param_begin,
 		arg_lit0("aA",  "apdu",     "show APDU reqests and responses"),
-		arg_lit0("vV",  "verbose",  "show technical data"),
+		arg_litn("vV",  "verbose",  0, 2, "show technical data. vv - show full certificates data"),
 		arg_lit0("pP",  "plain",    "send plain ASCII to challenge and application parameters instead of HEX"),
+		arg_lit0("tT",  "tlv",      "Show DER certificate contents in TLV representation"),
 		arg_str0("jJ",  "json",		"fido.json", "JSON input / output file name for parameters."),
 		arg_str0(NULL,  NULL,       "<HEX/ASCII challenge parameter (32b HEX/1..16 chars)>", NULL),
 		arg_str0(NULL,  NULL,       "<HEX/ASCII application parameter (32b HEX/1..16 chars)>", NULL),
@@ -212,11 +219,13 @@ int CmdHFFidoRegister(const char *cmd) {
 	
 	bool APDULogging = arg_get_lit(1);
 	bool verbose = arg_get_lit(2);
+	bool verbose2 = arg_get_lit(2) > 1;
 	bool paramsPlain = arg_get_lit(3);
+	bool showDERTLV = arg_get_lit(4);
 
 	char fname[250] = {0};
 	bool err;
-	root = OpenJson(4, fname, argtable, &err);
+	root = OpenJson(5, fname, argtable, &err);
 	if(err)
 		return 1;
 	if (root) {	
@@ -227,13 +236,13 @@ int CmdHFFidoRegister(const char *cmd) {
 	
 	if (paramsPlain) {
 		memset(cdata, 0x00, 32);
-		CLIGetStrWithReturn(5, cdata, &chlen);
+		CLIGetStrWithReturn(6, cdata, &chlen);
 		if (chlen && chlen > 16) {
 			PrintAndLog("ERROR: challenge parameter length in ASCII mode must be less than 16 chars instead of: %d", chlen);
 			return 1;
 		}
 	} else {
-		CLIGetHexWithReturn(5, cdata, &chlen);
+		CLIGetHexWithReturn(6, cdata, &chlen);
 		if (chlen && chlen != 32) {
 			PrintAndLog("ERROR: challenge parameter length must be 32 bytes only.");
 			return 1;
@@ -245,13 +254,13 @@ int CmdHFFidoRegister(const char *cmd) {
 	
 	if (paramsPlain) {
 		memset(adata, 0x00, 32);
-		CLIGetStrWithReturn(6, adata, &applen);
+		CLIGetStrWithReturn(7, adata, &applen);
 		if (applen && applen > 16) {
 			PrintAndLog("ERROR: application parameter length in ASCII mode must be less than 16 chars instead of: %d", applen);
 			return 1;
 		}
 	} else {
-		CLIGetHexWithReturn(6, adata, &applen);
+		CLIGetHexWithReturn(7, adata, &applen);
 		if (applen && applen != 32) {
 			PrintAndLog("ERROR: application parameter length must be 32 bytes only.");
 			return 1;
@@ -302,7 +311,7 @@ int CmdHFFidoRegister(const char *cmd) {
 	if (APDULogging)
 		PrintAndLog("---------------------------------------------------------------");
 	PrintAndLog("data len: %d", len);
-	if (verbose) {
+	if (verbose2) {
 		PrintAndLog("--------------data----------------------");
 		dump_buffer((const unsigned char *)buf, len, NULL, 0);
 		PrintAndLog("--------------data----------------------");
@@ -319,20 +328,119 @@ int CmdHFFidoRegister(const char *cmd) {
 	
 	int derp = 67 + keyHandleLen;
 	int derLen = (buf[derp + 2] << 8) + buf[derp + 3] + 4;
-	// needs to decode DER certificate
-	if (verbose) {
-		PrintAndLog("DER certificate[%d]:------------------DER-------------------", derLen);
-		dump_buffer_simple((const unsigned char *)&buf[67 + keyHandleLen], derLen, NULL);
+	if (verbose2) {
+		PrintAndLog("DER certificate[%d]:\n------------------DER-------------------", derLen);
+		dump_buffer_simple((const unsigned char *)&buf[derp], derLen, NULL);
 		PrintAndLog("\n----------------DER---------------------");
 	} else {
+		if (verbose)
+			PrintAndLog("------------------DER-------------------");
 		PrintAndLog("DER certificate[%d]: %s...", derLen, sprint_hex(&buf[derp], 20));
 	}
 	
+	// check and print DER certificate
+	uint8_t public_key[65] = {0};
 	
+	// print DER certificate in TLV view
+	if (showDERTLV) {
+		PrintAndLog("----------------DER TLV-----------------");
+		asn1_print(&buf[derp], derLen, "  ");
+		PrintAndLog("----------------DER TLV-----------------");
+	}
+	
+	// load CA's
+	mbedtls_x509_crt cacert;
+	mbedtls_x509_crt_init(&cacert);
+	res = mbedtls_x509_crt_parse(&cacert, (const unsigned char *) additional_ca_pem, additional_ca_pem_len);
+	if (res < 0) {
+		PrintAndLog("ERROR: CA parse certificate returned -0x%x - %s", -res, ecdsa_get_error(res));
+	}
+	if (verbose) 
+		PrintAndLog("CA load OK. %d skipped", res);
+	
+	// load DER certificate from authenticator's data
+	mbedtls_x509_crt cert;
+	mbedtls_x509_crt_init(&cert);
+	res = mbedtls_x509_crt_parse_der(&cert, &buf[derp], derLen);
+	if (res) {
+		PrintAndLog("ERROR: DER parse returned 0x%x - %s", (res<0)?-res:res, ecdsa_get_error(res));
+	}
+	
+	// get certificate info
+	char linfo[300] = {0};
+	if (verbose) {
+		mbedtls_x509_crt_info(linfo, sizeof(linfo), "  ", &cert);
+		PrintAndLog("DER certificate info:\n%s", linfo);
+	}
+	
+	// verify certificate
+	uint32_t verifyflags = 0;
+	res = mbedtls_x509_crt_verify(&cert, &cacert, NULL, NULL, &verifyflags, NULL, NULL);
+	if (res) {
+		PrintAndLog("ERROR: DER verify returned 0x%x - %s", (res<0)?-res:res, ecdsa_get_error(res));
+	} else {
+		PrintAndLog("Certificate OK.");
+	}
+	
+	if (verbose) {
+		memset(linfo, 0x00, sizeof(linfo));
+		mbedtls_x509_crt_verify_info(linfo, sizeof(linfo), "  ", verifyflags);
+		PrintAndLog("Verification info:\n%s", linfo);
+	}
+	
+	// get public key
+	res = ecdsa_public_key_from_pk(&cert.pk, public_key, sizeof(public_key));
+	if (res) {
+		PrintAndLog("ERROR: getting public key from certificate 0x%x - %s", (res<0)?-res:res, ecdsa_get_error(res));
+	} else {
+		if (verbose)
+			PrintAndLog("Got a public key from certificate:\n%s", sprint_hex_inrow(public_key, 65));
+	}
+
+	if (verbose)
+		PrintAndLog("------------------DER-------------------");
+
+	mbedtls_x509_crt_free(&cert);
+	mbedtls_x509_crt_free(&cacert);
+	
+	// get hash
 	int hashp = 1 + 65 + 1 + keyHandleLen + derLen;
 	PrintAndLog("Hash[%d]: %s", len - hashp, sprint_hex(&buf[hashp], len - hashp));
-	
+
 	// check ANSI X9.62 format ECDSA signature (on P-256)
+	uint8_t rval[300] = {0}; 
+	uint8_t sval[300] = {0}; 
+	res = ecdsa_asn1_get_signature(&buf[hashp], len - hashp, rval, sval);
+	if (!res) {
+		if (verbose) {
+			PrintAndLog("  r: %s", sprint_hex(rval, 32));
+			PrintAndLog("  s: %s", sprint_hex(sval, 32));
+		}
+
+		uint8_t xbuf[4096] = {0};
+		size_t xbuflen = 0;
+		res = FillBuffer(xbuf, sizeof(xbuf), &xbuflen,
+			"\x00", 1,
+			&data[32], 32,           // application parameter  
+			&data[0], 32,            // challenge parameter
+			&buf[67], keyHandleLen,  // keyHandle
+			&buf[1], 65,             // user public key
+			NULL, 0);
+		//PrintAndLog("--xbuf(%d)[%d]: %s", res, xbuflen, sprint_hex(xbuf, xbuflen));
+		res = ecdsa_signature_verify(public_key, xbuf, xbuflen, &buf[hashp], len - hashp);
+		if (res) {
+			if (res == -0x4e00) {
+				PrintAndLog("Signature is NOT VALID.");
+			} else {
+				PrintAndLog("Other signature check error: %x %s", (res<0)?-res:res, ecdsa_get_error(res));
+			}
+		} else {
+			PrintAndLog("Signature is OK.");
+		}
+		
+	} else {
+		PrintAndLog("Invalid signature. res=%d.", res);
+	}
 	
 	PrintAndLog("\nauth command: ");
 	printf("hf fido auth %s%s", paramsPlain?"-p ":"", sprint_hex_inrow(&buf[67], keyHandleLen));
@@ -345,6 +453,7 @@ int CmdHFFidoRegister(const char *cmd) {
 	if (root) {
 		JsonSaveBufAsHex(root, "ChallengeParam", data, 32);
 		JsonSaveBufAsHex(root, "ApplicationParam", &data[32], 32);
+		JsonSaveBufAsHexCompact(root, "PublicKey", &buf[1], 65);
 		JsonSaveInt(root, "KeyHandleLen", keyHandleLen);
 		JsonSaveBufAsHexCompact(root, "KeyHandle", &buf[67], keyHandleLen);
 		JsonSaveBufAsHexCompact(root, "DER", &buf[67 + keyHandleLen], derLen);
@@ -366,6 +475,8 @@ int CmdHFFidoRegister(const char *cmd) {
 int CmdHFFidoAuthenticate(const char *cmd) {
 	uint8_t data[512] = {0};
 	uint8_t hdata[250] = {0};
+	bool public_key_loaded = false;
+	uint8_t public_key[65] = {0}; 
 	int hdatalen = 0;
 	uint8_t keyHandleLen = 0;
 	json_t *root = NULL;
@@ -385,6 +496,7 @@ int CmdHFFidoAuthenticate(const char *cmd) {
 		arg_lit0("uU",  "user",     "mode: enforce-user-presence-and-sign"),
 		arg_lit0("cC",  "check",    "mode: check-only"),
 		arg_str0("jJ",  "json",		"fido.json", "JSON input / output file name for parameters."),
+		arg_str0("kK",  "key",		"public key to verify signature", NULL),
 		arg_str0(NULL,  NULL,       "<HEX key handle (var 0..255b)>", NULL),
 		arg_str0(NULL,  NULL,       "<HEX/ASCII challenge parameter (32b HEX/1..16 chars)>", NULL),
 		arg_str0(NULL,  NULL,       "<HEX/ASCII application parameter (32b HEX/1..16 chars)>", NULL),
@@ -393,7 +505,7 @@ int CmdHFFidoAuthenticate(const char *cmd) {
 	CLIExecWithReturn(cmd, argtable, true);
 	
 	bool APDULogging = arg_get_lit(1);
-	//bool verbose = arg_get_lit(2);
+	bool verbose = arg_get_lit(2);
 	bool paramsPlain = arg_get_lit(3);
 	uint8_t controlByte = 0x08;
 	if (arg_get_lit(5))
@@ -413,9 +525,22 @@ int CmdHFFidoAuthenticate(const char *cmd) {
 		JsonLoadBufAsHex(root, "$.KeyHandle", &data[65], 512 - 67, &jlen);
 		keyHandleLen = jlen & 0xff;
 		data[64] = keyHandleLen;
+		JsonLoadBufAsHex(root, "$.PublicKey", public_key, 65, &jlen);
+		public_key_loaded = (jlen > 0);
 	} 
 
+	// public key
 	CLIGetHexWithReturn(8, hdata, &hdatalen);
+	if (hdatalen && hdatalen != 130) {
+		PrintAndLog("ERROR: public key length must be 65 bytes only.");
+		return 1;
+	}
+	if (hdatalen) {
+		memmove(public_key, hdata, hdatalen);
+		public_key_loaded = true;
+	}	
+	
+	CLIGetHexWithReturn(9, hdata, &hdatalen);
 	if (hdatalen > 255) {
 		PrintAndLog("ERROR: application parameter length must be less than 255.");
 		return 1;
@@ -434,7 +559,7 @@ int CmdHFFidoAuthenticate(const char *cmd) {
 			return 1;
 		}
 	} else {
-		CLIGetHexWithReturn(9, hdata, &hdatalen);
+		CLIGetHexWithReturn(10, hdata, &hdatalen);
 		if (hdatalen && hdatalen != 32) {
 			PrintAndLog("ERROR: challenge parameter length must be 32 bytes only.");
 			return 1;
@@ -445,7 +570,7 @@ int CmdHFFidoAuthenticate(const char *cmd) {
 
 	if (paramsPlain) {
 		memset(hdata, 0x00, 32);
-		CLIGetStrWithReturn(10, hdata, &hdatalen);
+		CLIGetStrWithReturn(11, hdata, &hdatalen);
 		if (hdatalen && hdatalen > 16) {
 			PrintAndLog("ERROR: application parameter length in ASCII mode must be less than 16 chars instead of: %d", hdatalen);
 			return 1;
@@ -509,6 +634,42 @@ int CmdHFFidoAuthenticate(const char *cmd) {
 	PrintAndLog("Counter: %d", cntr);
 	PrintAndLog("Hash[%d]: %s", len - 5, sprint_hex(&buf[5], len - 5));
 
+	// check ANSI X9.62 format ECDSA signature (on P-256)
+	uint8_t rval[300] = {0}; 
+	uint8_t sval[300] = {0}; 
+	res = ecdsa_asn1_get_signature(&buf[5], len - 5, rval, sval);
+	if (!res) {
+		if (verbose) {
+			PrintAndLog("  r: %s", sprint_hex(rval, 32));
+			PrintAndLog("  s: %s", sprint_hex(sval, 32));
+		}
+		if (public_key_loaded) {
+			uint8_t xbuf[4096] = {0};
+			size_t xbuflen = 0;
+			res = FillBuffer(xbuf, sizeof(xbuf), &xbuflen,
+				&data[32], 32, // application parameter
+				&buf[0], 1,    // user presence
+				&buf[1], 4,    // counter
+				data, 32,      // challenge parameter
+				NULL, 0);
+			//PrintAndLog("--xbuf(%d)[%d]: %s", res, xbuflen, sprint_hex(xbuf, xbuflen));
+			res = ecdsa_signature_verify(public_key, xbuf, xbuflen, &buf[5], len - 5);
+			if (res) {
+				if (res == -0x4e00) {
+					PrintAndLog("Signature is NOT VALID.");
+				} else {
+					PrintAndLog("Other signature check error: %x %s", (res<0)?-res:res, ecdsa_get_error(res));
+				}
+			} else {
+				PrintAndLog("Signature is OK.");
+			}
+		} else {		
+			PrintAndLog("No public key provided. can't check signature.");
+		}
+	} else {
+		PrintAndLog("Invalid signature. res=%d.", res);
+	}
+	
 	if (root) {
 		JsonSaveBufAsHex(root, "ChallengeParam", data, 32);
 		JsonSaveBufAsHex(root, "ApplicationParam", &data[32], 32);

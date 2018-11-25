@@ -110,6 +110,35 @@ void FillFileNameByUID(char *fileName, uint8_t * uid, char *ext, int byteCount) 
 	sprintf(fnameptr, "%s", ext); 
 }
 
+// fill buffer from structure [{uint8_t data, size_t length},...]
+int FillBuffer(uint8_t *data, size_t maxDataLength, size_t *dataLength, ...) {
+	*dataLength = 0;
+	va_list valist;
+	va_start(valist, dataLength);
+	
+	uint8_t *vdata = NULL;
+	size_t vlength = 0;
+	do{
+		vdata = va_arg(valist, uint8_t *);
+		if (!vdata)
+			break;
+		
+		vlength = va_arg(valist, size_t);
+		if (*dataLength + vlength >  maxDataLength) {
+			va_end(valist);
+			return 1;
+		}
+		
+		memcpy(&data[*dataLength], vdata, vlength);
+		*dataLength += vlength;
+		
+	} while (vdata);
+	
+	va_end(valist);
+
+	return 0;
+}
+
 void hex_to_buffer(const uint8_t *buf, const uint8_t *hex_data, const size_t hex_len, const size_t hex_max_len, 
 	const size_t min_str_len, const size_t spaces_between, bool uppercase) {
 		

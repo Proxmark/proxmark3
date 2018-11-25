@@ -6,6 +6,7 @@ This project uses the changelog in accordance with [keepchangelog](http://keepac
 
 ### Changed
 - Changed hf mfp security. Now it works in all the modes. (drHatson)
+- `hf fido` - show/check DER certificate and signatures (Merlok)
 
 ### Fixed
 

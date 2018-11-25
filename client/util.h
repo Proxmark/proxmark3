@@ -35,6 +35,46 @@
 #define FILE_PATH_SIZE           2000
 #endif
 
+#ifndef ARRAYLEN
+# define ARRAYLEN(x) (sizeof(x)/sizeof((x)[0]))
+#endif
+
+#if defined(__linux__)	|| (__APPLE__)
+# define _BLUE_(s) "\x1b[34m" #s "\x1b[0m "
+#else
+# define _BLUE_(s) #s " "
+#endif
+
+#if defined(__linux__)	|| (__APPLE__)
+# define _RED_(s) "\x1b[31m" #s "\x1b[0m "
+#else
+# define _RED_(s) #s " "
+#endif
+
+#if defined(__linux__)	|| (__APPLE__)
+# define _GREEN_(s) "\x1b[32m" #s "\x1b[0m "
+#else
+# define _GREEN_(s) #s " "
+#endif
+
+#if defined(__linux__)	|| (__APPLE__)
+# define _YELLOW_(s) "\x1b[33m" #s "\x1b[0m "
+#else
+# define _YELLOW_(s) #s " "
+#endif
+
+#if defined(__linux__)	|| (__APPLE__)
+# define _MAGENTA_(s) "\x1b[35m" #s "\x1b[0m "
+#else
+# define _MAGENTA_(s) #s " "
+#endif
+
+#if defined(__linux__)	|| (__APPLE__)
+# define _CYAN_(s) "\x1b[36m" #s "\x1b[0m "
+#else
+# define _CYAN_(s) #s " "
+#endif
+
 extern int ukbhit(void);
 
 extern void AddLogLine(char *fileName, char *extData, char *c);
@@ -42,6 +82,9 @@ extern void AddLogHex(char *fileName, char *extData, const uint8_t * data, const
 extern void AddLogUint64(char *fileName, char *extData, const uint64_t data);
 extern void AddLogCurrentDT(char *fileName);
 extern void FillFileNameByUID(char *fileName, uint8_t * uid, char *ext, int byteCount);
+
+// fill buffer from structure [{uint8_t data, size_t length},...]
+extern int FillBuffer(uint8_t *data, size_t maxDataLength, size_t *dataLength, ...);
 
 extern void hex_to_buffer(const uint8_t *buf, const uint8_t *hex_data, const size_t hex_len, 
 	const size_t hex_max_len, const size_t min_str_len, const size_t spaces_between, bool uppercase);
