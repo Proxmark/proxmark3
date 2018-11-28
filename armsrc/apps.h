@@ -25,7 +25,6 @@
 
 extern const uint8_t OddByteParity[256];
 extern int rsamples;   // = 0;
-extern int tracing;    // = TRUE;
 extern uint8_t trigger;
 
 // This may be used (sparingly) to declare a function to be copied to
@@ -101,7 +100,6 @@ void RAMFUNC SnoopIso14443b(void);
 void SendRawCommand14443B(uint32_t, uint32_t, uint8_t, uint8_t[]);
 
 // Also used in iclass.c
-bool RAMFUNC LogTrace(const uint8_t *btBytes, uint16_t len, uint32_t timestamp_start, uint32_t timestamp_end, uint8_t *parity, bool readerToTag);
 void GetParity(const uint8_t *pbtCmd, uint16_t len, uint8_t *parity);
 
 void RAMFUNC SniffMifare(uint8_t param);
@@ -149,15 +147,6 @@ size_t	CreateAPDU( uint8_t *datain, size_t len, uint8_t *dataout);
 void 	OnSuccess();
 void 	OnError(uint8_t reason);
 
-
-/// iso15693.h
-void RecordRawAdcSamplesIso15693(void);
-void AcquireRawAdcSamplesIso15693(void);
-void ReaderIso15693(uint32_t parameter);	// Simulate an ISO15693 reader - greg
-void SimTagIso15693(uint32_t parameter, uint8_t *uid);	// simulate an ISO15693 tag - greg
-void BruteforceIso15693Afi(uint32_t speed); // find an AFI of a tag - atrox
-void DirectTag15693Command(uint32_t datalen,uint32_t speed, uint32_t recv, uint8_t data[]); // send arbitrary commands from CLI - atrox 
-void SetDebugIso15693(uint32_t flag);
 
 /// iclass.h
 void RAMFUNC SnoopIClass(void);

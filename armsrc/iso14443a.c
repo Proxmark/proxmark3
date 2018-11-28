@@ -1220,7 +1220,7 @@ void SimulateIso14443aTag(int tagType, int uid_1st, int uid_2nd, byte_t* data)
 			EmSendPrecompiledCmd(p_response);
 		}
 		
-		if (!tracing) {
+		if (!get_tracing()) {
 			Dbprintf("Trace Full. Simulation stopped.");
 			break;
 		}
@@ -1619,9 +1619,7 @@ void ReaderTransmitBitsPar(uint8_t* frame, uint16_t bits, uint8_t *par, uint32_t
 		LED_A_ON();
   
 	// Log reader command in trace buffer
-	if (tracing) {
-		LogTrace(frame, nbytes(bits), LastTimeProxToAirStart*16 + DELAY_ARM2AIR_AS_READER, (LastTimeProxToAirStart + LastProxToAirDuration)*16 + DELAY_ARM2AIR_AS_READER, par, true);
-	}
+	LogTrace(frame, nbytes(bits), LastTimeProxToAirStart*16 + DELAY_ARM2AIR_AS_READER, (LastTimeProxToAirStart + LastProxToAirDuration)*16 + DELAY_ARM2AIR_AS_READER, par, true);
 }
 
 
@@ -1652,9 +1650,7 @@ void ReaderTransmit(uint8_t* frame, uint16_t len, uint32_t *timing)
 static int ReaderReceiveOffset(uint8_t* receivedAnswer, uint16_t offset, uint8_t *parity)
 {
 	if (!GetIso14443aAnswerFromTag(receivedAnswer, parity, offset)) return false;
-	if (tracing) {
-		LogTrace(receivedAnswer, Demod.len, Demod.startTime*16 - DELAY_AIR2ARM_AS_READER, Demod.endTime*16 - DELAY_AIR2ARM_AS_READER, parity, false);
-	}
+	LogTrace(receivedAnswer, Demod.len, Demod.startTime*16 - DELAY_AIR2ARM_AS_READER, Demod.endTime*16 - DELAY_AIR2ARM_AS_READER, parity, false);
 	return Demod.len;
 }
 
@@ -1662,9 +1658,7 @@ static int ReaderReceiveOffset(uint8_t* receivedAnswer, uint16_t offset, uint8_t
 int ReaderReceive(uint8_t *receivedAnswer, uint8_t *parity)
 {
 	if (!GetIso14443aAnswerFromTag(receivedAnswer, parity, 0)) return false;
-	if (tracing) {
-		LogTrace(receivedAnswer, Demod.len, Demod.startTime*16 - DELAY_AIR2ARM_AS_READER, Demod.endTime*16 - DELAY_AIR2ARM_AS_READER, parity, false);
-	}
+	LogTrace(receivedAnswer, Demod.len, Demod.startTime*16 - DELAY_AIR2ARM_AS_READER, Demod.endTime*16 - DELAY_AIR2ARM_AS_READER, parity, false);
 	return Demod.len;
 }
 

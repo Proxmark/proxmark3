@@ -10,7 +10,7 @@ module hi_read_rx_xcorr(
     ssp_frame, ssp_din, ssp_dout, ssp_clk,
     cross_hi, cross_lo,
     dbg,
-    xcorr_is_848, snoop, xcorr_quarter_freq
+    xcorr_is_848, snoop, xcorr_quarter_freq, hi_read_rx_xcorr_amplitude
 );
     input pck0, ck_1356meg, ck_1356megb;
     output pwr_lo, pwr_hi, pwr_oe1, pwr_oe2, pwr_oe3, pwr_oe4;
@@ -20,7 +20,7 @@ module hi_read_rx_xcorr(
     output ssp_frame, ssp_din, ssp_clk;
     input cross_hi, cross_lo;
     output dbg;
-    input xcorr_is_848, snoop, xcorr_quarter_freq;
+    input xcorr_is_848, snoop, xcorr_quarter_freq, hi_read_rx_xcorr_amplitude;
 
 // Carrier is steady on through this, unless we're snooping.
 assign pwr_hi = ck_1356megb & (~snoop);
@@ -83,9 +83,44 @@ reg signed [13:0] corr_q_accum;
 // we will report maximum 8 significant bits
 reg signed [7:0] corr_i_out;
 reg signed [7:0] corr_q_out;
+
 // clock and frame signal for communication to ARM
 reg ssp_clk;
 reg ssp_frame;
+
+
+
+// the amplitude of the subcarrier is sqrt(ci^2 + cq^2).
+// approximate by amplitude = max(|ci|,|cq|) + 1/2*min(|ci|,|cq|)
+reg [13:0] corr_amplitude, abs_ci, abs_cq, max_ci_cq, min_ci_cq;
+
+
+always @(corr_i_accum or corr_q_accum)
+begin
+	if (corr_i_accum[13] == 1'b0)
+		abs_ci <= corr_i_accum;
+	else
+		abs_ci <= -corr_i_accum;
+	
+	if (corr_q_accum[13] == 1'b0)
+		abs_cq <= corr_q_accum;
+	else
+		abs_cq <= -corr_q_accum;
+	
+	if (abs_ci > abs_cq)
+	begin
+		max_ci_cq <= abs_ci;
+		min_ci_cq <= abs_cq;
+	end
+	else
+	begin
+		max_ci_cq <= abs_cq;
+		min_ci_cq <= abs_ci;
+	end
+
+	corr_amplitude <= max_ci_cq + min_ci_cq/2;
+
+end
 
 
 // The subcarrier reference signals
@@ -110,52 +145,75 @@ begin
 			subcarrier_Q = ~(corr_i_cnt[4] ^ corr_i_cnt[3]);
 		end
 end
-	
+
+
 // ADC data appears on the rising edge, so sample it on the falling edge
 always @(negedge adc_clk)
 begin
     // These are the correlators: we correlate against in-phase and quadrature
-    // versions of our reference signal, and keep the (signed) result to
-    // send out later over the SSP.
+    // versions of our reference signal, and keep the (signed) results or the
+    // resulting amplitude to send out later over the SSP.
     if(corr_i_cnt == 6'd0)
     begin
         if(snoop)
         begin
-			// Send 7 most significant bits of tag signal (signed), plus 1 bit reader signal
-			if (corr_i_accum[13:11] == 3'b000 || corr_i_accum[13:11] == 3'b111) 
-				corr_i_out <= {corr_i_accum[11:5], after_hysteresis_prev_prev};
-			else // truncate to maximum value
-				if (corr_i_accum[13] == 1'b0)
-					corr_i_out <= {7'b0111111, after_hysteresis_prev_prev};
-				else
-					corr_i_out <= {7'b1000000, after_hysteresis_prev_prev};
-			if (corr_q_accum[13:11] == 3'b000 || corr_q_accum[13:11] == 3'b111) 
-				corr_q_out <= {corr_q_accum[11:5], after_hysteresis_prev};
-			else // truncate to maximum value
-				if (corr_q_accum[13] == 1'b0)
-					corr_q_out <= {7'b0111111, after_hysteresis_prev};
-				else
-					corr_q_out <= {7'b1000000, after_hysteresis_prev};
-			after_hysteresis_prev_prev <= after_hysteresis;
+			if (hi_read_rx_xcorr_amplitude)
+			begin
+				// send amplitude plus 2 bits reader signal
+				corr_i_out <= corr_amplitude[13:6];
+				corr_q_out <= {corr_amplitude[5:0], after_hysteresis_prev_prev, after_hysteresis_prev};
+			end	
+			else
+			begin
+				// Send 7 most significant bits of in phase tag signal (signed), plus 1 bit reader signal
+				if (corr_i_accum[13:11] == 3'b000 || corr_i_accum[13:11] == 3'b111) 
+					corr_i_out <= {corr_i_accum[11:5], after_hysteresis_prev_prev};
+				else // truncate to maximum value
+					if (corr_i_accum[13] == 1'b0)
+						corr_i_out <= {7'b0111111, after_hysteresis_prev_prev};
+					else
+						corr_i_out <= {7'b1000000, after_hysteresis_prev_prev};
+				// Send 7 most significant bits of quadrature phase tag signal (signed), plus 1 bit reader signal
+				if (corr_q_accum[13:11] == 3'b000 || corr_q_accum[13:11] == 3'b111) 
+					corr_q_out <= {corr_q_accum[11:5], after_hysteresis_prev};
+				else // truncate to maximum value
+					if (corr_q_accum[13] == 1'b0)
+						corr_q_out <= {7'b0111111, after_hysteresis_prev};
+					else
+						corr_q_out <= {7'b1000000, after_hysteresis_prev};
+			end
         end
         else
         begin
-            // Send 8 bits of tag signal
-			if (corr_i_accum[13:11] == 3'b000 || corr_i_accum[13:11] == 3'b111) 
-				corr_i_out <= corr_i_accum[11:4];
-			else // truncate to maximum value
-				if (corr_i_accum[13] == 1'b0)
-					corr_i_out <= 8'b01111111;
-				else
-					corr_i_out <= 8'b10000000;
-			if (corr_q_accum[13:11] == 3'b000 || corr_q_accum[13:11] == 3'b111) 
-				corr_q_out <= corr_q_accum[11:4];
-			else // truncate to maximum value
-				if (corr_q_accum[13] == 1'b0)
-					corr_q_out <= 8'b01111111;
-				else
-					corr_q_out <= 8'b10000000;
+			if (hi_read_rx_xcorr_amplitude)
+			begin
+				// send amplitude
+				corr_i_out <= {2'b00, corr_amplitude[13:8]};
+				corr_q_out <= corr_amplitude[7:0];
+			end	
+			else
+			begin
+				// Send 8 bits of in phase tag signal
+				if (corr_i_accum[13:11] == 3'b000 || corr_i_accum[13:11] == 3'b111) 
+					corr_i_out <= corr_i_accum[11:4];
+				else // truncate to maximum value
+					if (corr_i_accum[13] == 1'b0)
+						corr_i_out <= 8'b01111111;
+					else
+						corr_i_out <= 8'b10000000;
+				// Send 8 bits of quadrature phase tag signal
+				if (corr_q_accum[13:11] == 3'b000 || corr_q_accum[13:11] == 3'b111) 
+					corr_q_out <= corr_q_accum[11:4];
+				else // truncate to maximum value
+					if (corr_q_accum[13] == 1'b0)
+						corr_q_out <= 8'b01111111;
+					else
+						corr_q_out <= 8'b10000000;
+			end
         end
+
+		// for each Q/I pair report two reader signal samples when sniffing. Store the 1st.
+		after_hysteresis_prev_prev <= after_hysteresis;
 		// Initialize next correlation. 
 		// Both I and Q reference signals are high when corr_i_nct == 0. Therefore need to accumulate.
         corr_i_accum <= $signed({1'b0,adc_d});
@@ -172,16 +230,16 @@ begin
             corr_q_accum <= corr_q_accum + $signed({1'b0,adc_d});
         else
             corr_q_accum <= corr_q_accum - $signed({1'b0,adc_d});
-
     end
 
-	// for each Q/I pair report two reader signal samples when sniffing
+	// for each Q/I pair report two reader signal samples when sniffing. Store the 2nd.
     if(corr_i_cnt == 6'd32)
         after_hysteresis_prev <= after_hysteresis;
 
     // Then the result from last time is serialized and send out to the ARM.
     // We get one report each cycle, and each report is 16 bits, so the
-    // ssp_clk should be the adc_clk divided by 64/16 = 4.
+    // ssp_clk should be the adc_clk divided by 64/16 = 4. 
+	// ssp_clk frequency = 13,56MHz / 4 = 3.39MHz
 
     if(corr_i_cnt[1:0] == 2'b10)
         ssp_clk <= 1'b0;

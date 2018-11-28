@@ -38,14 +38,53 @@
 #include "protocols.h"
 #include "cmdmain.h"
 
-#define FrameSOF              Iso15693FrameSOF
-#define Logic0						Iso15693Logic0
-#define Logic1						Iso15693Logic1
-#define FrameEOF					Iso15693FrameEOF
-
 #define Crc(data,datalen)     Iso15693Crc(data,datalen)
 #define AddCrc(data,datalen)  Iso15693AddCrc(data,datalen)
 #define sprintUID(target,uid)	Iso15693sprintUID(target,uid)
+
+// SOF defined as
+// 1) Unmodulated time of 56.64us
+// 2) 24 pulses of 423.75khz
+// 3) logic '1' (unmodulated for 18.88us followed by 8 pulses of 423.75khz)
+
+static const int Iso15693FrameSOF[] = {
+	-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+	-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+	 1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,
+	 1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,
+	-1, -1, -1, -1,
+	-1, -1, -1, -1,
+	 1,  1,  1,  1,
+	 1,  1,  1,  1
+};
+static const int Iso15693Logic0[] = {
+	 1,  1,  1,  1,
+	 1,  1,  1,  1,
+	-1, -1, -1, -1,
+	-1, -1, -1, -1
+};
+static const int Iso15693Logic1[] = {
+	-1, -1, -1, -1,
+	-1, -1, -1, -1,
+	 1,  1,  1,  1,
+	 1,  1,  1,  1
+};
+
+// EOF defined as
+// 1) logic '0' (8 pulses of 423.75khz followed by unmodulated for 18.88us)
+// 2) 24 pulses of 423.75khz
+// 3) Unmodulated time of 56.64us
+
+static const int Iso15693FrameEOF[] = {
+	 1,  1,  1,  1,
+	 1,  1,  1,  1,
+	-1, -1, -1, -1,
+	-1, -1, -1, -1,
+	 1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,
+	 1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,
+	-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+	-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1
+};
 
 // structure and database for uid -> tagtype lookups 
 typedef struct { 
@@ -293,8 +332,8 @@ int CmdHF15Demod(const char *Cmd)
 	// First, correlate for SOF
 	for (i = 0; i < 200; i++) {
 		int corr = 0;
-		for (j = 0; j < arraylen(FrameSOF); j += skip) {
-			corr += FrameSOF[j] * GraphBuffer[i + (j / skip)];
+		for (j = 0; j < arraylen(Iso15693FrameSOF); j += skip) {
+			corr += Iso15693FrameSOF[j] * GraphBuffer[i + (j / skip)];
 		}
 		if (corr > max) {
 			max = corr;
@@ -302,28 +341,28 @@ int CmdHF15Demod(const char *Cmd)
 		}
 	}
 	PrintAndLog("SOF at %d, correlation %d", maxPos,
-		max / (arraylen(FrameSOF) / skip));
+		max / (arraylen(Iso15693FrameSOF) / skip));
 	
-	i = maxPos + arraylen(FrameSOF) / skip;
+	i = maxPos + arraylen(Iso15693FrameSOF) / skip;
 	int k = 0;
 	uint8_t outBuf[20];
 	memset(outBuf, 0, sizeof(outBuf));
 	uint8_t mask = 0x01;
 	for (;;) {
 			int corr0 = 0, corr00 = 0, corr01 = 0, corr1 = 0, corrEOF = 0;
-			for(j = 0; j < arraylen(Logic0); j += skip) {
-				corr0 += Logic0[j]*GraphBuffer[i+(j/skip)];
+			for(j = 0; j < arraylen(Iso15693Logic0); j += skip) {
+				corr0 += Iso15693Logic0[j]*GraphBuffer[i+(j/skip)];
 			}
 			corr01 = corr00 = corr0;
-			for(j = 0; j < arraylen(Logic0); j += skip) {
-				corr00 += Logic0[j]*GraphBuffer[i+arraylen(Logic0)/skip+(j/skip)];
-				corr01 += Logic1[j]*GraphBuffer[i+arraylen(Logic0)/skip+(j/skip)];
+			for(j = 0; j < arraylen(Iso15693Logic0); j += skip) {
+				corr00 += Iso15693Logic0[j]*GraphBuffer[i+arraylen(Iso15693Logic0)/skip+(j/skip)];
+				corr01 += Iso15693Logic1[j]*GraphBuffer[i+arraylen(Iso15693Logic0)/skip+(j/skip)];
 			}
-			for(j = 0; j < arraylen(Logic1); j += skip) {
-				corr1 += Logic1[j]*GraphBuffer[i+(j/skip)];
+			for(j = 0; j < arraylen(Iso15693Logic1); j += skip) {
+				corr1 += Iso15693Logic1[j]*GraphBuffer[i+(j/skip)];
 			}
-			for(j = 0; j < arraylen(FrameEOF); j += skip) {
-				corrEOF += FrameEOF[j]*GraphBuffer[i+(j/skip)];
+			for(j = 0; j < arraylen(Iso15693FrameEOF); j += skip) {
+				corrEOF += Iso15693FrameEOF[j]*GraphBuffer[i+(j/skip)];
 			}
 			// Even things out by the length of the target waveform.
 			corr00 *= 2;
@@ -335,17 +374,17 @@ int CmdHF15Demod(const char *Cmd)
 				PrintAndLog("EOF at %d", i);
 				break;
 		} else if (corr1 > corr0) {
-			i += arraylen(Logic1) / skip;
+			i += arraylen(Iso15693Logic1) / skip;
 			outBuf[k] |= mask;
 		} else {
-			i += arraylen(Logic0) / skip;
+			i += arraylen(Iso15693Logic0) / skip;
 		}
 		mask <<= 1;
 		if (mask == 0) {
 			k++;
 			mask = 0x01;
 		}
-		if ((i + (int)arraylen(FrameEOF)) >= GraphTraceLen) {
+		if ((i + (int)arraylen(Iso15693FrameEOF)) >= GraphTraceLen) {
 			PrintAndLog("ran off end!");
 			break;
 		}
@@ -374,10 +413,9 @@ int CmdHF15Read(const char *Cmd)
 }
 
 // Record Activity without enabling carrier
-// TODO: currently it DOES enable the carrier
-int CmdHF15Record(const char *Cmd)
+int CmdHF15Snoop(const char *Cmd)
 {
-	UsbCommand c = {CMD_RECORD_RAW_ADC_SAMPLES_ISO_15693};
+	UsbCommand c = {CMD_SNOOP_ISO_15693};
 	SendCommand(&c);
 	return 0;
 }
@@ -514,7 +552,7 @@ static command_t CommandTable15[] =
 	{"help",    CmdHF15Help,    1, "This help"},
 	{"demod",   CmdHF15Demod,   1, "Demodulate ISO15693 from tag"},
 	{"read",    CmdHF15Read,    0, "Read HF tag (ISO 15693)"},
-	{"record",  CmdHF15Record,  0, "Record Samples (ISO 15693)"}, // atrox
+	{"snoop",   CmdHF15Snoop,   0, "Eavesdrop ISO 15693 communications"},
 	{"reader",  CmdHF15Reader,  0, "Act like an ISO15693 reader"},
 	{"sim",     CmdHF15Sim,     0, "Fake an ISO15693 tag"},
 	{"cmd",     CmdHF15Cmd,     0, "Send direct commands to ISO15693 tag"},
