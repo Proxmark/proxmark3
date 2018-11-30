@@ -18,7 +18,7 @@
 #include "crypto/libpcrypto.h"
 
 AccessConditions_t MFAccessConditions[] = {
-	{0x00, "read AB; wrAB increment AB; decrement transfer restore AB"},
+	{0x00, "read AB; write AB; increment AB; decrement transfer restore AB"},
 	{0x01, "read AB; dectrAB"},
 	{0x02, "read AB"},
 	{0x03, "read B; write B"},
