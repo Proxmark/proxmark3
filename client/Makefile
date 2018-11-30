@@ -23,8 +23,12 @@ JANSSONLIBPATH = ./jansson
 JANSSONLIB = $(JANSSONLIBPATH)/libjansson.a
 MBEDTLSLIBPATH = ../common/mbedtls
 MBEDTLSLIB = $(MBEDTLSLIBPATH)/libmbedtls.a
+CBORLIBPATH = ./tinycbor
+CBORLIB = $(CBORLIBPATH)/tinycbor.a
+LIBS = -I../zlib -I../uart -I../liblua -I$(MBEDTLSLIBPATH) -I$(JANSSONLIBPATH) -I$(CBORLIBPATH)
+INCLUDES_CLIENT = -I. -I../include -I../common -I/opt/local/include $(LIBS)
 LDFLAGS = $(ENV_LDFLAGS)
-CFLAGS = $(ENV_CFLAGS) -std=c99 -D_ISOC99_SOURCE -I. -I../include -I../common -I../common/polarssl -I../zlib -I../uart -I/opt/local/include -I../liblua -I$(JANSSONLIBPATH) -I$(MBEDTLSLIBPATH) -Wall -g -O3
+CFLAGS = $(ENV_CFLAGS) -std=c99 -D_ISOC99_SOURCE $(INCLUDES_CLIENT) -Wall -g -O3
 CXXFLAGS = -I../include -Wall -O3
 
 APP_CFLAGS =
@@ -113,7 +117,10 @@ CMDSRCS = 	$(SRC_SMARTCARD) \
 			cliparser/argtable3.c\
 			cliparser/cliparser.c\
 			fido/additional_ca.c \
-			mfkey.c\
+			fido/cose.c \
+			fido/cbortools.c \
+			fido/fidocore.c \
+			mfkey.c \
 			loclass/cipher.c \
 			loclass/cipherutils.c \
 			loclass/ikeys.c \
@@ -246,12 +253,12 @@ WINBINS = $(patsubst %, %.exe, $(BINS))
 CLEAN = $(BINS) $(WINBINS) $(COREOBJS) $(CMDOBJS) $(OBJCOBJS) $(ZLIBOBJS) $(QTGUIOBJS) $(MULTIARCHOBJS) $(OBJDIR)/*.o *.moc.cpp ui/ui_overlays.h
 
 # need to assign dependancies to build these first...
-all: lua_build jansson_build mbedtls_build $(BINS)
+all: lua_build jansson_build mbedtls_build cbor_build $(BINS)
 
 all-static: LDLIBS:=-static $(LDLIBS)
 all-static: proxmark3 flasher fpga_compress
 
-proxmark3: LDLIBS+=$(LUALIB) $(JANSSONLIB) $(MBEDTLSLIB) $(QTLDLIBS)
+proxmark3: LDLIBS+=$(LUALIB) $(JANSSONLIB) $(MBEDTLSLIB) $(CBORLIB) $(QTLDLIBS)
 proxmark3: $(OBJDIR)/proxmark3.o $(COREOBJS) $(CMDOBJS) $(OBJCOBJS) $(QTGUIOBJS) $(MULTIARCHOBJS) $(ZLIBOBJS) lualibs/usb_cmd.lua
 	$(LD) $(LDFLAGS) $(OBJDIR)/proxmark3.o $(COREOBJS) $(CMDOBJS) $(OBJCOBJS) $(QTGUIOBJS) $(MULTIARCHOBJS) $(ZLIBOBJS) $(LDLIBS) -o $@
 
@@ -275,8 +282,9 @@ lualibs/usb_cmd.lua: ../include/usb_cmd.h
 clean:
 	$(RM) $(CLEAN)
 	cd ../liblua && make clean
-	cd ./jansson && make clean
+	cd $(JANSSONLIBPATH) && make clean
 	cd $(MBEDTLSLIBPATH) && make clean
+	cd $(CBORLIBPATH) && make clean
 
 tarbin: $(BINS)
 	$(TAR) $(TARFLAGS) ../proxmark3-$(platform)-bin.tar $(BINS:%=client/%) $(WINBINS:%=client/%)
@@ -292,7 +300,11 @@ jansson_build:
 mbedtls_build:
 	@echo Compiling mbedtls
 	cd $(MBEDTLSLIBPATH) && make all
-
+	
+cbor_build:
+	@echo Compiling tinycbor
+	cd $(CBORLIBPATH) && make all
+	
 .PHONY: all clean
 
 $(OBJDIR)/%_NOSIMD.o : %.c $(OBJDIR)/%.d
