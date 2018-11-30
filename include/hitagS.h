@@ -16,14 +16,14 @@
 #include "hitag2.h"
 
 typedef enum PROTO_STATE {READY=0,INIT,AUTHENTICATE,SELECTED,QUIET,TTF,FAIL} PSTATE;				//protocol-state
-typedef enum TAG_STATE   {NO_OP=0,READING_PAGE,WRITING_PAGE_ACK,WRITING_PAGE_DATA,WRITING_BLOCK_DATA} TSATE;	//tag-state
+typedef enum TAG_STATE   {NO_OP=0,READING_PAGE,READING_BLOCK,WRITING_PAGE_ACK,WRITING_PAGE_DATA,WRITING_BLOCK_DATA} TSATE;	//tag-state
 typedef enum SOF_TYPE    {STANDARD=0,ADVANCED,FAST_ADVANCED,ONE,NO_BITS} stype;					//number of start-of-frame bits
 
 struct hitagS_tag {
 	PSTATE pstate; //protocol-state
 	TSATE tstate;  //tag-state
 	uint32_t uid;
-	uint32_t pages[16][4];
+	uint8_t  pages[64][4];
 	uint64_t key;
 	byte_t pwdl0,pwdl1,pwdh0;
 	//con0

@@ -137,6 +137,7 @@ typedef struct{
 #define CMD_SIMULATE_HITAG_S                                              0x0368
 #define CMD_TEST_HITAGS_TRACES                                            0x0367
 #define CMD_READ_HITAG_S                                                  0x0373
+#define CMD_READ_HITAG_S_BLK                                              0x0374
 #define CMD_WR_HITAG_S                                                    0x0375
 #define CMD_EMU_HITAG_S                                                   0x0376
 
