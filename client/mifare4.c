@@ -19,7 +19,7 @@
 
 AccessConditions_t MFAccessConditions[] = {
 	{0x00, "read AB; write AB; increment AB; decrement transfer restore AB"},
-	{0x01, "read AB; dectrAB"},
+	{0x01, "read AB; decrement transfer restore AB"},
 	{0x02, "read AB"},
 	{0x03, "read B; write B"},
 	{0x04, "read AB; writeB"},
