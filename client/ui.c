@@ -16,6 +16,7 @@
 #include <stdarg.h>
 #include <readline/readline.h>
 #include <pthread.h>
+#include "util.h"
 #endif
 
 #include "ui.h"
@@ -31,6 +32,77 @@ static char *logfilename = "proxmark3.log";
 
 #ifndef EXTERNAL_PRINTANDLOG
 static pthread_mutex_t print_lock = PTHREAD_MUTEX_INITIALIZER;
+
+void PrintAndLogEx(logLevel_t level, char *fmt, ...) {
+
+	// skip debug messages if client debugging is turned off i.e. 'DATA SETDEBUG 0' 
+//	if (g_debugMode	== 0 && level == DEBUG)
+//		return;
+	
+	char buffer[MAX_PRINT_BUFFER] = {0};
+	char buffer2[MAX_PRINT_BUFFER] = {0};
+	char prefix[20] = {0};
+	char *token = NULL;
+	int size = 0;
+						//   {NORMAL, SUCCESS, INFO, FAILED, WARNING, ERR, DEBUG}
+	static char *prefixes[7] = { "", "", "INFO: ", "FAILED: ", "WARNING: ", "ERROR: ", "#: "};
+	
+	switch( level ) {
+		case FAILED:
+			strncpy(prefix,_RED_(FAILED: ), sizeof(prefix)-1);
+			break;
+		case DEBUG:
+			strncpy(prefix,_BLUE_(#: ), sizeof(prefix)-1);			
+			break;
+		case SUCCESS: 
+			strncpy(prefix,_GREEN_( ), sizeof(prefix)-1);
+			break;
+		case WARNING:
+			strncpy(prefix,_CYAN_(WARNING: ), sizeof(prefix)-1);
+			break;		
+		default:
+			strncpy(prefix, prefixes[level], sizeof(prefix)-1);
+			break;
+	}
+	
+	va_list args;
+	va_start(args, fmt);
+	vsnprintf(buffer, sizeof(buffer), fmt, args);
+	va_end(args);
+
+	// no prefixes for normal
+	if ( level == NORMAL ) {
+		PrintAndLog(buffer);
+		return;
+	}
+	
+	if (strchr(buffer, '\n')) {
+
+		const char delim[2] = "\n";
+			
+		// line starts with newline
+		if (buffer[0] == '\n') 
+			PrintAndLog("");
+		
+		token = strtok(buffer, delim);
+		
+		while (token != NULL) {
+			
+			size = strlen(buffer2);
+		
+			if (strlen(token))
+				snprintf(buffer2+size, sizeof(buffer2)-size, "%s%s\n", prefix, token);
+			else
+				snprintf(buffer2+size, sizeof(buffer2)-size, "\n");
+			
+			token = strtok(NULL, delim);
+		}
+		PrintAndLog(buffer2);
+	} else {
+		snprintf(buffer2, sizeof(buffer2), "%s%.*s", prefix, MAX_PRINT_BUFFER - 20, buffer);
+		PrintAndLog(buffer2);
+	}
+}
 
 void PrintAndLog(char *fmt, ...)
 {

@@ -6,6 +6,7 @@ This project uses the changelog in accordance with [keepchangelog](http://keepac
 
 ### Changed
 - Changed hf mfp security. Now it works in all the modes. (drHatson)
+- `hf fido` - show/check DER certificate and signatures (Merlok)
 - Changed `lf hitag reader 0x ... <firstPage> <tagmode>` - to select first page to read and tagmode (0=STANDARD, 1=ADVANCED, 2=FAST_ADVANCED)
 - Accept hitagS con0 tags with memory bits set to 11 and handle like 2048 tag
 

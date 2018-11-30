@@ -5,17 +5,17 @@
 // at your option, any later version. See the LICENSE.txt file for the text of
 // the license.
 //-----------------------------------------------------------------------------
-// asn.1 utils
+// CA PEM certificates 
 //-----------------------------------------------------------------------------
+//
 
-#ifndef ASN1UTILS_H
-#define ASN1UTILS_H
+#ifndef __ADDITIONAL_CA_H__
+#define __ADDITIONAL_CA_H__
 
-#include <stdint.h>
-#include <stdbool.h>
 #include <stddef.h>
 
-extern int asn1_print(uint8_t *asn1buf, size_t asn1buflen, char *indent);
-extern int ecdsa_asn1_get_signature(uint8_t *signature, size_t signaturelen, uint8_t *rval, uint8_t *sval);
+// Concatenation of all CA certificates in PEM format if available 
+extern const char   additional_ca_pem[];
+extern const size_t additional_ca_pem_len;
 
-#endif /* asn1utils.h */
+#endif /* __ADDITIONAL_CA_H__ */
