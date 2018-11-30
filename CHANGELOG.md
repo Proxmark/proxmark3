@@ -14,6 +14,7 @@ This project uses the changelog in accordance with [keepchangelog](http://keepac
 - Added `hf emv scan` - commands for scan EMV card and dump data to json file (Merlok)
 - `hf mfp` group of commands (Merlok)
 - Added `hf fido` - FIDO U2F authenticator commands https://fidoalliance.org/ (Merlok)
+- Added `hf fido` `assert` and `make` commands from fido2 protocol (authenticatorMakeCredential and authenticatorGetAssertion) (Merlok)
 
 ## [v3.1.0][2018-10-10]
 
