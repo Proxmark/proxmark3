@@ -263,10 +263,10 @@ int CmdLFHitagReader(const char *Cmd) {
 			PrintAndLog("Usage: hitag reader <Reader Function #>");
 			PrintAndLog("Reader Functions:");
 			PrintAndLog(" HitagS (0*)");
-			PrintAndLog("  01 <nr> <ar> <firstPage> <tagmode> (Challenge) read all pages from a Hitag S tag");
-			PrintAndLog("  02 <key> <firstPage> <tagmode> (set to 0 if no authentication is needed) read all pages from a Hitag S tag");
-			PrintAndLog("  03 <nr> <ar> <firstPage> <tagmode> (Challenge) read all blocks from a Hitag S tag");
-			PrintAndLog("  04 <key> <firstPage> <tagmode> (set to 0 if no authentication is needed) read all blocks from a Hitag S tag");
+			PrintAndLog("  01 <nr> <ar> (Challenge) <firstPage> <tagmode> read all pages from a Hitag S tag");
+			PrintAndLog("  02 <key> (set to 0 if no authentication is needed) <firstPage> <tagmode> read all pages from a Hitag S tag");
+			PrintAndLog("  03 <nr> <ar> (Challenge) <firstPage> <tagmode> read all blocks from a Hitag S tag");
+			PrintAndLog("  04 <key> (set to 0 if no authentication is needed) <firstPage> <tagmode> read all blocks from a Hitag S tag");
 			PrintAndLog("  Valid tagmodes are 0=STANDARD, 1=ADVANCED, 2=FAST_ADVANCED (default is ADVANCED)");
 			PrintAndLog(" Hitag1 (1*)");
 			PrintAndLog(" Hitag2 (2*)");
