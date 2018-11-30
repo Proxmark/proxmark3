@@ -141,12 +141,23 @@ int CmdHF14AMfRdBl(const char *Cmd)
 		uint8_t isOK  = resp.arg[0] & 0xff;
 		uint8_t *data = resp.d.asBytes;
 
-		if (isOK)
+		if (isOK) {
 			PrintAndLog("isOk:%02x data:%s", isOK, sprint_hex(data, 16));
-		else
+		} else {
 			PrintAndLog("isOk:%02x", isOK);
+			return 1;
+		}
+
+		if (mfIsSectorTrailer(blockNo) && (data[6] || data[7] || data[8])) {
+			PrintAndLogEx(NORMAL, "Trailer decoded:");
+			for (int i = 0; i < 4; i++) {
+				PrintAndLogEx(NORMAL, "Access block %d: %s", i + mfFirstBlockOfSector(mfSectorNum(blockNo)), mfGetAccessConditionsDesc(i, &data[6]));
+			}
+			PrintAndLogEx(NORMAL, "UserData: %s", sprint_hex_inrow(&data[9], 1));
+		}
 	} else {
 		PrintAndLog("Command execute timeout");
+		return 2;
 	}
 
   return 0;
@@ -2272,6 +2283,17 @@ int CmdHF14AMfCGetBlk(const char *Cmd) {
 		}
 
 	PrintAndLog("block data:%s", sprint_hex(memBlock, 16));
+	
+	if (mfIsSectorTrailer(blockNo)) {
+		PrintAndLogEx(NORMAL, "Trailer decoded:");
+		PrintAndLogEx(NORMAL, "Key A: %s", sprint_hex_inrow(memBlock, 6));
+		PrintAndLogEx(NORMAL, "Key B: %s", sprint_hex_inrow(&memBlock[10], 6));
+		for (int i = 0; i < 4; i++) {
+			PrintAndLogEx(NORMAL, "Access block %d: %s", i + mfFirstBlockOfSector(mfSectorNum(blockNo)), mfGetAccessConditionsDesc(i, &memBlock[6]));
+		}
+		PrintAndLogEx(NORMAL, "UserData: %s", sprint_hex_inrow(&memBlock[9], 1));
+	}
+	
 	return 0;
 }
 
