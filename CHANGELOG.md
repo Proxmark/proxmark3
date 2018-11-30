@@ -7,13 +7,20 @@ This project uses the changelog in accordance with [keepchangelog](http://keepac
 ### Changed
 - Changed hf mfp security. Now it works in all the modes. (drHatson)
 - `hf fido` - show/check DER certificate and signatures (Merlok)
+- Changed `lf hitag reader 0x ... <firstPage> <tagmode>` - to select first page to read and tagmode (0=STANDARD, 1=ADVANCED, 2=FAST_ADVANCED)
+- Accept hitagS con0 tags with memory bits set to 11 and handle like 2048 tag
 
 ### Fixed
+- AC-Mode decoding for HitagS
+- Wrong UID at HitagS simulation 
 
 ### Added
+- Support Standard Communication Mode in HITAG S
 - Added `hf emv scan` - commands for scan EMV card and dump data to json file (Merlok)
 - `hf mfp` group of commands (Merlok)
 - Added `hf fido` - FIDO U2F authenticator commands https://fidoalliance.org/ (Merlok)
+- Added `lf hitag reader 03` - read block (instead of pages) 
+- Added `lf hitag reader 04` - read block (instead of pages) 
 - Added `hf fido` `assert` and `make` commands from fido2 protocol (authenticatorMakeCredential and authenticatorGetAssertion) (Merlok)
 
 ## [v3.1.0][2018-10-10]

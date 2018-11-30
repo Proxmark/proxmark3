@@ -180,10 +180,11 @@ void ReaderHitag(hitag_function htf, hitag_data* htd);
 void WriterHitag(hitag_function htf, hitag_data* htd, int page);
 
 //hitagS.h
+void ReadHitagSCmd(hitag_function htf, hitag_data* htd, uint64_t startPage, uint64_t tagMode, bool readBlock);
 void SimulateHitagSTag(bool tag_mem_supplied, byte_t* data);
-void ReadHitagS(hitag_function htf, hitag_data* htd);
 void WritePageHitagS(hitag_function htf, hitag_data* htd,int page);
-void check_challenges(bool file_given, byte_t* data);
+void check_challenges_cmd(bool file_given, byte_t* data, uint64_t tagMode);
+
 
 
 // cmd.h
