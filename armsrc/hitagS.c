@@ -1489,7 +1489,7 @@ void SimulateHitagSTag(bool tag_mem_supplied, byte_t* data) {
 	//tag.TTFDR in response_bit[10] and response_bit[11]
 	//tag.TTFM in response_bit[12] and response_bit[13]
 	tag.LCON = ((con1 & 0x2) == 0x2) ? 1 : 0;
-	tag.LKP  = ((con1 & 0x2) == 0x1) ? 1 : 0;
+	tag.LKP  = ((con1 & 0x1) == 0x1) ? 1 : 0;
 		
 	//CON2
 	tag.LCK7 = ((con2 & 0x80) == 0x80) ? 1 : 0;
