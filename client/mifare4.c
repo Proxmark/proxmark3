@@ -17,6 +17,52 @@
 #include "ui.h"
 #include "crypto/libpcrypto.h"
 
+AccessConditions_t MFAccessConditions[] = {
+	{0x00, "read AB; write AB; increment AB; decrement transfer restore AB"},
+	{0x01, "read AB; decrement transfer restore AB"},
+	{0x02, "read AB"},
+	{0x03, "read B; write B"},
+	{0x04, "read AB; writeB"},
+	{0x05, "read B"},
+	{0x06, "read AB; write B; increment B; decrement transfer restore AB"},
+	{0x07, "none"}
+};
+
+AccessConditions_t MFAccessConditionsTrailer[] = {
+	{0x00, "read A by A; read ACCESS by A; read B by A; write B by A"},
+	{0x01, "write A by A; read ACCESS by A write ACCESS by A; read B by A; write B by A"},
+	{0x02, "read ACCESS by A; read B by A"},
+	{0x03, "write A by B; read ACCESS by AB; write ACCESS by B; write B by B"},
+	{0x04, "write A by B; read ACCESS by AB; write B by B"},
+	{0x05, "read ACCESS by AB; write ACCESS by B"},
+	{0x06, "read ACCESS by AB"},
+	{0x07, "read ACCESS by AB"}
+};
+
+char *mfGetAccessConditionsDesc(uint8_t blockn, uint8_t *data) {
+	static char StaticNone[] = "none";
+	
+	uint8_t data1 = ((data[1] >> 4) & 0x0f) >> blockn;
+	uint8_t data2 = ((data[2]) & 0x0f) >> blockn;
+	uint8_t data3 = ((data[2] >> 4) & 0x0f) >> blockn;
+	
+	uint8_t cond = (data1 & 0x01) << 2 | (data2 & 0x01) << 1 | (data3 & 0x01);
+
+	if (blockn == 3) {
+		for (int i = 0; i < ARRAYLEN(MFAccessConditionsTrailer); i++)
+			if (MFAccessConditionsTrailer[i].cond == cond) {
+				return MFAccessConditionsTrailer[i].description;
+			}
+	} else {
+		for (int i = 0; i < ARRAYLEN(MFAccessConditions); i++)
+			if (MFAccessConditions[i].cond == cond) {
+				return MFAccessConditions[i].description;
+			}
+	};
+	
+	return StaticNone;
+};
+
 int CalculateEncIVCommand(mf4Session *session, uint8_t *iv, bool verbose) {
 	memcpy(&iv[0], session->TI, 4);
 	memcpy(&iv[4], &session->R_Ctr, 2);
