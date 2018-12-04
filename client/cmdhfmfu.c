@@ -1742,7 +1742,7 @@ int CmdHF14AMfuGenDiverseKeys(const char *Cmd){
 	mix[6] = block ^ uid[2];
 	mix[7] = uid[3];
 
-	mbedtls_des3_context ctx = { 0x00 };
+	mbedtls_des3_context ctx = { {0} };
 	mbedtls_des3_set2key_enc(&ctx, masterkey);
 
 	mbedtls_des3_crypt_cbc(&ctx  // des3_context
