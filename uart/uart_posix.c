@@ -55,6 +55,12 @@
 #include <arpa/inet.h>
 #include <netdb.h>
 
+// Fix missing definition on OS X.
+// Taken from https://github.com/unbit/uwsgi/commit/b608eb1772641d525bfde268fe9d6d8d0d5efde7
+#ifndef SOL_TCP
+#define SOL_TCP IPPROTO_TCP
+#endif
+
 typedef struct termios term_info;
 typedef struct {
   int fd;           // Serial port file descriptor
