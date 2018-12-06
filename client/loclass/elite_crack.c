@@ -179,8 +179,8 @@ void rk(uint8_t *key, uint8_t n, uint8_t *outp_key)
     return;
 }
 
-static mbedtls_des_context ctx_enc = {0};
-static mbedtls_des_context ctx_dec = {0};
+static mbedtls_des_context ctx_enc = { {0} };
+static mbedtls_des_context ctx_dec = { {0} };
 
 void desdecrypt_iclass(uint8_t *iclass_key, uint8_t *input, uint8_t *output)
 {
@@ -449,7 +449,7 @@ int bruteforceItem(dumpdata item, uint16_t keytable[])
  */
 int calculateMasterKey(uint8_t first16bytes[], uint64_t master_key[] )
 {
-	mbedtls_des_context ctx_e = {0};
+	mbedtls_des_context ctx_e = { {0} };
 
 	uint8_t z_0[8] = {0};
 	uint8_t y_0[8] = {0};

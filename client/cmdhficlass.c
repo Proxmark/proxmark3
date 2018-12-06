@@ -414,7 +414,7 @@ int CmdHFiClassDecrypt(const char *Cmd) {
 	fseek(f, 0, SEEK_SET);
 	uint8_t enc_dump[8] = {0};
 	uint8_t *decrypted = malloc(fsize);
-	mbedtls_des3_context ctx = { 0 };
+	mbedtls_des3_context ctx = { {0} };
 	mbedtls_des3_set2key_dec( &ctx, key);
 	size_t bytes_read = fread(enc_dump, 1, 8, f);
 
@@ -466,7 +466,7 @@ static int iClassEncryptBlkData(uint8_t *blkData) {
 
 	uint8_t encryptedData[16];
 	uint8_t *encrypted = encryptedData;
-	mbedtls_des3_context ctx = { 0 };
+	mbedtls_des3_context ctx = { {0} };
 	mbedtls_des3_set2key_enc( &ctx, key);
 	
 	mbedtls_des3_crypt_ecb(&ctx, blkData,encrypted);
