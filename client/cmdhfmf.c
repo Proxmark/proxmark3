@@ -215,6 +215,15 @@ int CmdHF14AMfRdSc(const char *Cmd)
 				PrintAndLog("data   : %s", sprint_hex(data + i * 16, 16));
 			}
 			PrintAndLog("trailer: %s", sprint_hex(data + (sectorNo<32?3:15) * 16, 16));
+			
+			PrintAndLogEx(NORMAL, "Trailer decoded:");
+                        int bln = mfFirstBlockOfSector(sectorNo);
+                        int blinc = (mfNumBlocksPerSector(sectorNo) > 4) ? 5 : 1;
+                        for (i = 0; i < 4; i++) {
+                                PrintAndLogEx(NORMAL, "Access block %d%s: %s", bln, ((blinc > 1) && (i < 3) ? "+" : "") , mfGetAccessConditionsDesc(i, &(data + (sectorNo<32?3:15) * 16)[6]));
+                                bln += blinc;
+                        }
+                        PrintAndLogEx(NORMAL, "UserData: %s", sprint_hex_inrow(&(data + (sectorNo<32?3:15) * 16)[9], 1));
 		}
 	} else {
 		PrintAndLog("Command execute timeout");
@@ -2350,6 +2359,19 @@ int CmdHF14AMfCGetSc(const char *Cmd) {
 		}
 
 		PrintAndLog("block %3d data:%s", baseblock + i, sprint_hex(memBlock, 16));
+		
+		if (mfIsSectorTrailer(baseblock + i)) {
+                PrintAndLogEx(NORMAL, "Trailer decoded:");
+                PrintAndLogEx(NORMAL, "Key A: %s", sprint_hex_inrow(memBlock, 6));
+                PrintAndLogEx(NORMAL, "Key B: %s", sprint_hex_inrow(&memBlock[10], 6));
+                int bln = baseblock;
+                int blinc = (mfNumBlocksPerSector(sectorNo) > 4) ? 5 : 1;
+                for (int i = 0; i < 4; i++) {
+                        PrintAndLogEx(NORMAL, "Access block %d%s: %s", bln, ((blinc > 1) && (i < 3) ? "+" : "") , mfGetAccessConditionsDesc(i, &memBlock[6]));
+                        bln += blinc;
+                }
+                PrintAndLogEx(NORMAL, "UserData: %s", sprint_hex_inrow(&memBlock[9], 1));
+        }
 	}
 	return 0;
 }
