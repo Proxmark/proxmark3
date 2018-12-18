@@ -131,7 +131,7 @@ int CmdHF14AMfRdBl(const char *Cmd)
 		return 1;
 	}
 	PrintAndLog("--block no:%d, key type:%c, key:%s ", blockNo, keyType?'B':'A', sprint_hex(key, 6));
-
+	
   UsbCommand c = {CMD_MIFARE_READBL, {blockNo, keyType, 0}};
 	memcpy(c.d.asBytes, key, 6);
   SendCommand(&c);
@@ -331,11 +331,17 @@ int CmdHF14AMfDump(const char *Cmd)
 	PrintAndLog("|-----------------------------------------|");
 	uint8_t tries = 0;
 	for (sectorNo = 0; sectorNo < numSectors; sectorNo++) {
-		for (tries = 0; tries < 3; tries++) {
-			UsbCommand c = {CMD_MIFARE_READBL, {FirstBlockOfSector(sectorNo) + NumBlocksPerSector(sectorNo) - 1, 0, 0}};
-			memcpy(c.d.asBytes, keyA[sectorNo], 6);
-			SendCommand(&c);
-
+		bool doesKeyAWork = true;
+		for (tries = 0; tries < 6; tries++) {
+			if(doesKeyAWork){
+				UsbCommand c = {CMD_MIFARE_READBL, {FirstBlockOfSector(sectorNo) + NumBlocksPerSector(sectorNo) - 1, 0, 0}};
+				memcpy(c.d.asBytes, keyA[sectorNo], 6);
+				SendCommand(&c);
+			} else {
+				UsbCommand c = {CMD_MIFARE_READBL, {FirstBlockOfSector(sectorNo) + NumBlocksPerSector(sectorNo) - 1, 1, 0}};
+				memcpy(c.d.asBytes, keyB[sectorNo], 6);
+				SendCommand(&c);			
+			}
 			if (WaitForResponseTimeout(CMD_ACK,&resp,1500)) {
 				uint8_t isOK  = resp.arg[0] & 0xff;
 				uint8_t *data  = resp.d.asBytes;
@@ -349,6 +355,8 @@ int CmdHF14AMfDump(const char *Cmd)
 					PrintAndLog("Could not get access rights for sector %2d. Trying with defaults...", sectorNo);
 					rights[sectorNo][0] = rights[sectorNo][1] = rights[sectorNo][2] = 0x00;
 					rights[sectorNo][3] = 0x01;
+				} else {
+					doesKeyAWork = !doesKeyAWork;
 				}
 			} else {
 				PrintAndLog("Command execute timeout when trying to read access rights for sector %2d. Trying with defaults...", sectorNo);
@@ -365,13 +373,21 @@ int CmdHF14AMfDump(const char *Cmd)
 	bool isOK = true;
 	for (sectorNo = 0; isOK && sectorNo < numSectors; sectorNo++) {
 		for (blockNo = 0; isOK && blockNo < NumBlocksPerSector(sectorNo); blockNo++) {
+			bool doesKeyAWork = true;
 			bool received = false;
-			for (tries = 0; tries < 3; tries++) {
+			for (tries = 0; tries < 6; tries++) {
 				if (blockNo == NumBlocksPerSector(sectorNo) - 1) {		// sector trailer. At least the Access Conditions can always be read with key A.
-					UsbCommand c = {CMD_MIFARE_READBL, {FirstBlockOfSector(sectorNo) + blockNo, 0, 0}};
-					memcpy(c.d.asBytes, keyA[sectorNo], 6);
-					SendCommand(&c);
-					received = WaitForResponseTimeout(CMD_ACK,&resp,1500);
+					if(doesKeyAWork){
+						UsbCommand c = {CMD_MIFARE_READBL, {FirstBlockOfSector(sectorNo) + blockNo, 0, 0}};
+						memcpy(c.d.asBytes, keyA[sectorNo], 6);
+						SendCommand(&c);
+						received = WaitForResponseTimeout(CMD_ACK,&resp,1500);
+					} else {
+						UsbCommand c = {CMD_MIFARE_READBL, {FirstBlockOfSector(sectorNo) + blockNo, 1, 0}};
+						memcpy(c.d.asBytes, keyB[sectorNo], 6);
+						SendCommand(&c);
+						received = WaitForResponseTimeout(CMD_ACK,&resp,1500);
+					}
 				} else {												// data block. Check if it can be read with key A or key B
 					uint8_t data_area = sectorNo<32?blockNo:blockNo/5;
 					if ((rights[sectorNo][data_area] == 0x03) || (rights[sectorNo][data_area] == 0x05)) {	// only key B would work
@@ -383,14 +399,22 @@ int CmdHF14AMfDump(const char *Cmd)
 						isOK = false;
 						PrintAndLog("Access rights do not allow reading of sector %2d block %3d", sectorNo, blockNo);
 						tries = 2;
-					} else {																				// key A would work
-						UsbCommand c = {CMD_MIFARE_READBL, {FirstBlockOfSector(sectorNo) + blockNo, 0, 0}};
-						memcpy(c.d.asBytes, keyA[sectorNo], 6);
-						SendCommand(&c);
-						received = WaitForResponseTimeout(CMD_ACK,&resp,1500);
+					} else {															// key A might work
+						if(doesKeyAWork){
+							UsbCommand c = {CMD_MIFARE_READBL, {FirstBlockOfSector(sectorNo) + blockNo, 0, 0}};
+							memcpy(c.d.asBytes, keyA[sectorNo], 6);
+							SendCommand(&c);
+							received = WaitForResponseTimeout(CMD_ACK,&resp,1500);
+						} else {
+							UsbCommand c = {CMD_MIFARE_READBL, {FirstBlockOfSector(sectorNo) + blockNo, 1, 0}};
+							memcpy(c.d.asBytes, keyB[sectorNo], 6);
+							SendCommand(&c);
+							received = WaitForResponseTimeout(CMD_ACK,&resp,1500);
+						}
 					}
 				}
 				if (received) {
+					doesKeyAWork = !doesKeyAWork;
 					isOK  = resp.arg[0] & 0xff;
 					if (isOK) break;
 				}
