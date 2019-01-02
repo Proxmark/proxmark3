@@ -402,8 +402,8 @@ void BruteForcePCF7931(uint64_t password, uint8_t tries, uint16_t init_delay, in
 		pass_array[2] = (password >> 16) & 0xFF;
 		pass_array[3] = (password >> 24) & 0xFF;
 		pass_array[4] = (password >> 32) & 0xFF;
-		pass_array[5] = (password >> 48) & 0xFF;
-		pass_array[6] = (password >> 56) & 0xFF;
+		pass_array[5] = (password >> 40) & 0xFF;
+		pass_array[6] = (password >> 48) & 0xFF;
 
 		Dbprintf("Trying: %02x %02x %02x %02x %02x %02x %02x ...",
 			pass_array[0],
