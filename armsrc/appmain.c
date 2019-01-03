@@ -744,7 +744,7 @@ void SamyRun()
 					/* need this delay to prevent catching some weird data */
 					SpinDelay(500);
 
-					CopyHIDtoT55x7(tops[selected] & 0x000FFFFF, high[selected], low[selected], (tops[selected] != 0 && ((high[selected]& 0xFFFFFFC0) != 0)));
+					CopyHIDtoT55x7(tops[selected] & 0x000FFFFF, high[selected], low[selected], (tops[selected] != 0 && ((high[selected]& 0xFFFFFFC0) != 0)), 0x1D);
 					if (tops[selected] > 0)
 						Dbprintf("Cloned %x %x%08x%08x", selected, tops[selected], high[selected], low[selected]);
 					else
@@ -1003,7 +1003,11 @@ void UsbPacketReceived(uint8_t *packet, int len)
 			CmdPSKsimTag(c->arg[0], c->arg[1], c->arg[2], c->d.asBytes);
 			break;
 		case CMD_HID_CLONE_TAG:
-			CopyHIDtoT55x7(c->arg[0], c->arg[1], c->arg[2], c->d.asBytes[0]);
+			CopyHIDtoT55x7(c->arg[0], c->arg[1], c->arg[2], c->d.asBytes[0], 0x1D);
+			break;
+		case CMD_PARADOX_CLONE_TAG:
+			// Paradox cards are the same as HID, with a different preamble, so we can reuse the same function
+			CopyHIDtoT55x7(c->arg[0], c->arg[1], c->arg[2], c->d.asBytes[0], 0x0F);
 			break;
 		case CMD_IO_DEMOD_FSK:
 			CmdIOdemodFSK(c->arg[0], 0, 0, 1);

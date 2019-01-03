@@ -22,6 +22,7 @@ This project uses the changelog in accordance with [keepchangelog](http://keepac
 - Added `lf hitag reader 03` - read block (instead of pages) 
 - Added `lf hitag reader 04` - read block (instead of pages) 
 - Added `hf fido` `assert` and `make` commands from fido2 protocol (authenticatorMakeCredential and authenticatorGetAssertion) (Merlok)
+- Added `lf paradox clone` to clone a Paradox card
 
 ## [v3.1.0][2018-10-10]
 

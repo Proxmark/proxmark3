@@ -19,7 +19,14 @@
 #include "cmddata.h"
 #include "cmdlf.h"
 #include "lfdemod.h"
+#include "comms.h"
+// This card type is similar to HID, so we include the utils from there
+#include "cmdlfhid.h"
+#include "hidcardformats.h"
+#include "hidcardformatutils.h"
+
 static int CmdHelp(const char *Cmd);
+void ParadoxWrite(hidproxmessage_t *packed);
 
 //by marshmellow
 //Paradox Prox demod - FSK RF/50 with preamble of 00001111 (then manchester encoded)
@@ -55,14 +62,24 @@ int CmdFSKdemodParadox(const char *Cmd)
 		if (g_debugMode) PrintAndLog("DEBUG: Error - no value found");
 		return 0;
 	}
+
 	uint32_t fc = ((hi & 0x3)<<6) | (lo>>26);
 	uint32_t cardnum = (lo>>10)&0xFFFF;
 	uint32_t rawLo = bytebits_to_byte(BitStream+idx+64,32);
 	uint32_t rawHi = bytebits_to_byte(BitStream+idx+32,32);
 	uint32_t rawHi2 = bytebits_to_byte(BitStream+idx,32);
 
-	PrintAndLog("Paradox TAG ID: %x%08x - FC: %d - Card: %d - Checksum: %02x - RAW: %08x%08x%08x",
-		hi>>10, (hi & 0x3)<<26 | (lo>>10), fc, cardnum, (lo>>2) & 0xFF, rawHi2, rawHi, rawLo);
+	// Steal the HID parsing to output a "full" ID we can send to the HID cloning function
+	hidproxmessage_t packed = initialize_proxmessage_object(hi2, hi, lo);
+
+	if (packed.top != 0) {
+		PrintAndLog("Paradox TAG ID: %x%08x (Full ID: %x%08x%08x) - FC: %d - Card: %d - Checksum: %02x - RAW: %08x%08x%08x",
+			hi>>10, (hi & 0x3)<<26 | (lo>>10), (uint32_t)packed.top, (uint32_t)packed.mid, (uint32_t)packed.bot, fc, cardnum, (lo>>2) & 0xFF, rawHi2, rawHi, rawLo);
+	} else {
+		PrintAndLog("Paradox TAG ID: %x%08x (Full ID: %x%08x) - FC: %d - Card: %d - Checksum: %02x - RAW: %08x%08x%08x",
+			hi>>10, (hi & 0x3)<<26 | (lo>>10), (uint32_t)packed.mid, (uint32_t)packed.bot, fc, cardnum, (lo>>2) & 0xFF, rawHi2, rawHi, rawLo);
+
+	}
 	setDemodBuf(BitStream,BitLen,idx);
 	setClockGrid(50, waveIdx + (idx*50));
 	if (g_debugMode){ 
@@ -80,10 +97,31 @@ int CmdParadoxRead(const char *Cmd) {
 	return CmdFSKdemodParadox(Cmd);
 }
 
+int CmdParadoxClone(const char *Cmd)
+{
+	unsigned int top = 0, mid = 0, bot = 0;
+	hid_hexstring_to_int96(&top, &mid, &bot, Cmd);
+	hidproxmessage_t packed = initialize_proxmessage_object(top, mid, bot);
+	ParadoxWrite(&packed);
+	return 0;
+}
+
+void ParadoxWrite(hidproxmessage_t *packed){
+	UsbCommand c;
+	c.d.asBytes[0] = (packed->top != 0 && ((packed->mid & 0xFFFFFFC0) != 0))
+	? 1 : 0; // Writing long format?
+	c.cmd = CMD_PARADOX_CLONE_TAG;
+	c.arg[0] = (packed->top & 0x000FFFFF);
+	c.arg[1] = packed->mid;
+	c.arg[2] = packed->bot;
+	SendCommand(&c);
+}
+
 static command_t CommandTable[] = {
 	{"help",  CmdHelp,            1, "This help"},
 	{"demod", CmdFSKdemodParadox, 1, "Demodulate a Paradox FSK tag from the GraphBuffer"},
 	{"read",  CmdParadoxRead,     0, "Attempt to read and Extract tag data from the antenna"},
+	{"clone", CmdParadoxClone,    0, "<ID> -- Clone Paradox to T55x7 (tag must be in antenna)"},
 	{NULL, NULL, 0, NULL}
 };
 
