@@ -389,7 +389,9 @@ static void warnx(const char *fmt, ...)
 #endif
 	va_end(ap);
 
+#if defined(_MSC_VER)
 #pragma warning(suppress: 6053)
+#endif
 	fprintf(stderr, "%s\n", opterrmsg);
 }
 
