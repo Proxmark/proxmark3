@@ -111,6 +111,8 @@ typedef struct{
 #define CMD_VIKING_CLONE_TAG                                              0x0223
 #define CMD_T55XX_WAKEUP                                                  0x0224
 #define CMD_COTAG                                                         0x0225
+// misc extra
+#define CMD_PARADOX_CLONE_TAG                                             0x0226
 
 
 /* CMD_SET_ADC_MUX: ext1 is 0 for lopkd, 1 for loraw, 2 for hipkd, 3 for hiraw */

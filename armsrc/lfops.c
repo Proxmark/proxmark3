@@ -1417,8 +1417,8 @@ void WriteT55xx(uint32_t *blockdata, uint8_t startblock, uint8_t numblocks) {
 	}
 }
 
-// Copy HID id to card and setup block 0 config
-void CopyHIDtoT55x7(uint32_t hi2, uint32_t hi, uint32_t lo, uint8_t longFMT) {
+// Copy a HID-like card (e.g. HID Proximity, Paradox) to a T55x7 compatible card
+void CopyHIDtoT55x7(uint32_t hi2, uint32_t hi, uint32_t lo, uint8_t longFMT, uint8_t preamble) {
 	uint32_t data[] = {0,0,0,0,0,0,0};
 	uint8_t last_block = 0;
 
@@ -1430,15 +1430,15 @@ void CopyHIDtoT55x7(uint32_t hi2, uint32_t hi, uint32_t lo, uint8_t longFMT) {
 		}
 		// Build the 6 data blocks for supplied 84bit ID
 		last_block = 6;
-		// load preamble (1D) & long format identifier (9E manchester encoded)
-		data[1] = 0x1D96A900 | (manchesterEncode2Bytes((hi2 >> 16) & 0xF) & 0xFF);
+		// load preamble & long format identifier (9E manchester encoded)
+		data[1] = (preamble << 24) | 0x96A900 | (manchesterEncode2Bytes((hi2 >> 16) & 0xF) & 0xFF);
 		// load raw id from hi2, hi, lo to data blocks (manchester encoded)
 		data[2] = manchesterEncode2Bytes(hi2 & 0xFFFF);
 		data[3] = manchesterEncode2Bytes(hi >> 16);
 		data[4] = manchesterEncode2Bytes(hi & 0xFFFF);
 		data[5] = manchesterEncode2Bytes(lo >> 16);
 		data[6] = manchesterEncode2Bytes(lo & 0xFFFF);
-	}	else {
+	} else {
 		// Ensure no more than 44 bits supplied
 		if (hi>0xFFF) {
 			DbpString("Tags can only have 44 bits.");
@@ -1447,7 +1447,7 @@ void CopyHIDtoT55x7(uint32_t hi2, uint32_t hi, uint32_t lo, uint8_t longFMT) {
 		// Build the 3 data blocks for supplied 44bit ID
 		last_block = 3;
 		// load preamble
-		data[1] = 0x1D000000 | (manchesterEncode2Bytes(hi) & 0xFFFFFF);
+		data[1] = (preamble << 24) | (manchesterEncode2Bytes(hi) & 0xFFFFFF);
 		data[2] = manchesterEncode2Bytes(lo >> 16);
 		data[3] = manchesterEncode2Bytes(lo & 0xFFFF);
 	}

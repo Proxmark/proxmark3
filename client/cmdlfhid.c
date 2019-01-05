@@ -39,7 +39,7 @@
  *
  * Returns the number of nibbles (4 bits) entered.
  */
-int hexstring_to_int96(/* out */ uint32_t* hi2,/* out */ uint32_t* hi, /* out */ uint32_t* lo, const char* str) {
+int hid_hexstring_to_int96(/* out */ uint32_t* hi2,/* out */ uint32_t* hi, /* out */ uint32_t* lo, const char* str) {
   // TODO: Replace this with param_gethex when it supports arbitrary length
   // inputs.
   int n = 0, i = 0;
@@ -201,7 +201,7 @@ int CmdHIDReadFSK(const char *Cmd)
 int CmdHIDSim(const char *Cmd)
 {
   uint32_t hi2 = 0, hi = 0, lo = 0;
-  hexstring_to_int96(&hi2, &hi, &lo, Cmd);
+  hid_hexstring_to_int96(&hi2, &hi, &lo, Cmd);
   if (hi2 != 0) {
     PrintAndLog("Emulating tag with ID %x%08x%08x", hi2, hi, lo);
   } else {
@@ -218,7 +218,7 @@ int CmdHIDSim(const char *Cmd)
 int CmdHIDClone(const char *Cmd)
 {
   unsigned int top = 0, mid = 0, bot = 0;
-  hexstring_to_int96(&top, &mid, &bot, Cmd);
+  hid_hexstring_to_int96(&top, &mid, &bot, Cmd);
   hidproxmessage_t packed = initialize_proxmessage_object(top, mid, bot);
   Write(&packed);
   return 0;
@@ -234,7 +234,7 @@ int CmdHIDDecode(const char *Cmd){
 
   uint32_t top = 0, mid = 0, bot = 0;
   bool ignoreParity = false;
-  hexstring_to_int96(&top, &mid, &bot, Cmd);
+  hid_hexstring_to_int96(&top, &mid, &bot, Cmd);
   hidproxmessage_t packed = initialize_proxmessage_object(top, mid, bot);
 
   char opt = param_getchar(Cmd, 1);
