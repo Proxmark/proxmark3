@@ -345,7 +345,7 @@ int CmdEMVReadRecord(const char *cmd) {
 	CLIParserFree();
 	
 	if (datalen != 2) {
-		PrintAndLogEx(ERROR, "Command needs to have 2 bytes of data");
+		PrintAndLogEx(ERR, "Command needs to have 2 bytes of data");
 		return 1;
 	}
 	
@@ -997,7 +997,7 @@ int CmdEMVExec(const char *cmd) {
 				}
 				
 			} else {
-				PrintAndLogEx(ERROR, "AC: Application Transaction Counter (ATC) not found.");
+				PrintAndLogEx(ERR, "AC: Application Transaction Counter (ATC) not found.");
 			}
 		}
 	}
@@ -1238,12 +1238,12 @@ int CmdEMVScan(const char *cmd) {
 	if (MergeJSON) {
 		root = json_load_file(fname, 0, &error);
 		if (!root) {
-			PrintAndLogEx(ERROR, "json error on line %d: %s", error.line, error.text);
+			PrintAndLogEx(ERR, "json error on line %d: %s", error.line, error.text);
 			return 1; 
 		}
 		
 		if (!json_is_object(root)) {
-			PrintAndLogEx(ERROR, "Invalid json format. root must be an object.");
+			PrintAndLogEx(ERR, "Invalid json format. root must be an object.");
 			return 1; 
 		}
 	} else {
@@ -1302,7 +1302,7 @@ int CmdEMVScan(const char *cmd) {
 		SetAPDULogging(false);
 		PrintAndLogEx(NORMAL, "--> AID search.");
 		if (EMVSearch(channel, false, true, decodeTLV, tlvSelect)) {
-			PrintAndLogEx(ERROR, "Can't found any of EMV AID. Exit...");
+			PrintAndLogEx(ERR, "Can't found any of EMV AID. Exit...");
 			tlvdb_free(tlvSelect);
 			DropField();
 			return 3;
@@ -1337,7 +1337,7 @@ int CmdEMVScan(const char *cmd) {
 	res = EMVSelect(channel, false, true, AID, AIDlen, buf, sizeof(buf), &len, &sw, tlvRoot);
 	
 	if (res) {  
-		PrintAndLogEx(ERROR, "Can't select AID (%d). Exit...", res);
+		PrintAndLogEx(ERR, "Can't select AID (%d). Exit...", res);
 		tlvdb_free(tlvRoot);
 		DropField();
 		return 5;
@@ -1365,7 +1365,7 @@ int CmdEMVScan(const char *cmd) {
 	PrintAndLogEx(NORMAL, "-->Calc PDOL.");
 	struct tlv *pdol_data_tlv = dol_process(tlvdb_get(tlvRoot, 0x9f38, NULL), tlvRoot, 0x83);
 	if (!pdol_data_tlv){
-		PrintAndLogEx(ERROR, "Can't create PDOL TLV.");
+		PrintAndLogEx(ERR, "Can't create PDOL TLV.");
 		tlvdb_free(tlvRoot);
 		DropField();
 		return 6;
@@ -1374,7 +1374,7 @@ int CmdEMVScan(const char *cmd) {
 	size_t pdol_data_tlv_data_len;
 	unsigned char *pdol_data_tlv_data = tlv_encode(pdol_data_tlv, &pdol_data_tlv_data_len);
 	if (!pdol_data_tlv_data) {
-		PrintAndLogEx(ERROR, "Can't create PDOL data.");
+		PrintAndLogEx(ERR, "Can't create PDOL data.");
 		tlvdb_free(tlvRoot);
 		DropField();
 		return 6;
@@ -1388,7 +1388,7 @@ int CmdEMVScan(const char *cmd) {
 	free(pdol_data_tlv);
 	
 	if (res) {  
-		PrintAndLogEx(ERROR, "GPO error(%d): %4x. Exit...", res, sw);
+		PrintAndLogEx(ERR, "GPO error(%d): %4x. Exit...", res, sw);
 		tlvdb_free(tlvRoot);
 		DropField();
 		return 7;
@@ -1411,7 +1411,7 @@ int CmdEMVScan(const char *cmd) {
 	
 	while(AFL && AFL->len) {
 		if (AFL->len % 4) {
-			PrintAndLogEx(ERROR, "Wrong AFL length: %d", AFL->len);
+			PrintAndLogEx(ERR, "Wrong AFL length: %d", AFL->len);
 			break;
 		}
 
@@ -1423,7 +1423,7 @@ int CmdEMVScan(const char *cmd) {
 			sfijson = json_path_get(root, "$.Application.Records");
 		}
 		if (!json_is_array(sfijson)) {
-			PrintAndLogEx(ERROR, "Internal logic error. `$.Application.Records` is not an array.");
+			PrintAndLogEx(ERR, "Internal logic error. `$.Application.Records` is not an array.");
 			break;
 		}
 		for (int i = 0; i < AFL->len / 4; i++) {
@@ -1434,7 +1434,7 @@ int CmdEMVScan(const char *cmd) {
 			
 			PrintAndLogEx(INFO, "--->SFI[%02x] start:%02x end:%02x offline:%02x", SFI, SFIstart, SFIend, SFIoffline);
 			if (SFI == 0 || SFI == 31 || SFIstart == 0 || SFIstart > SFIend) {
-				PrintAndLogEx(ERROR, "SFI ERROR! Skipped...");
+				PrintAndLogEx(ERR, "SFI ERROR! Skipped...");
 				continue;
 			}
 			
@@ -1443,7 +1443,7 @@ int CmdEMVScan(const char *cmd) {
 				
 				res = EMVReadRecord(channel, true, SFI, n, buf, sizeof(buf), &len, &sw, tlvRoot);
 				if (res) {
-					PrintAndLogEx(ERROR, "SFI[%02x]. APDU error %4x", SFI, sw);
+					PrintAndLogEx(ERR, "SFI[%02x]. APDU error %4x", SFI, sw);
 					continue;
 				}
 				
@@ -1487,7 +1487,7 @@ int CmdEMVScan(const char *cmd) {
 	
 	res = json_dump_file(root, fname, JSON_INDENT(2));
 	if (res) {
-		PrintAndLogEx(ERROR, "Can't save the file: %s", fname);
+		PrintAndLogEx(ERR, "Can't save the file: %s", fname);
 		return 200;
 	}
 	PrintAndLogEx(SUCCESS, "File `%s` saved.", fname);
