@@ -187,7 +187,7 @@ void ReadPCF7931() {
 			++errors;
 		
 		// exit if no block is received 
-		if (errors >= 10 && found_blocks == 0) {
+		if (errors >= 10 && found_blocks == 0 && single_blocks_cnt == 0) {
 			Dbprintf("Error, no tag or bad tag");
 			return;
 		}
@@ -200,6 +200,9 @@ void ReadPCF7931() {
 		
 		// our logic breaks if we don't get at least two blocks
 		if (n < 2) {
+			if (n == 0 || !memcmp(tmp_blocks[0], "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00", 16))
+				continue;
+
 			if (single_blocks_cnt < max_blocks) {
 				for (i = 0; i < single_blocks_cnt; ++i) {
 					if (!memcmp(single_blocks[i], tmp_blocks[0], 16)) {
