@@ -80,11 +80,13 @@ int usage_pcf7931_write(){
 int usage_pcf7931_bruteforce()
 {
 	PrintAndLog("Usage: lf pcf7931 bruteforce [h] <start password> <tries>");
-	PrintAndLog("This command tries to write a PCF7931 tag.");
+	PrintAndLog("This command tries to disable PAC of a PCF7931 transponder by bruteforcing the password.");
+	PrintAndLog("!! THIS IS NOT INTENDED TO RECOVER THE FULL PASSWORD !!");
+	PrintAndLog("!! DO NOT USE UNLESS THE FIRST 5 BYTES OF THE PASSWORD ARE KNOWN !!");
 	PrintAndLog("Options:");
-	PrintAndLog("       h          This help");
+	PrintAndLog("       h                This help");
 	PrintAndLog("       start password   hex password to start from");
-	PrintAndLog("       tries    How many times to send the same data frame");
+	PrintAndLog("       tries            How many times to send the same data frame");
 	PrintAndLog("Examples:");
 	PrintAndLog("      lf pcf7931 bruteforce 00000000123456 3");
 	return 0;
