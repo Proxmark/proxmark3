@@ -97,7 +97,7 @@ typedef struct{
 #define CMD_T55XX_RESET_READ                                              0x0216
 #define CMD_PCF7931_READ                                                  0x0217
 #define CMD_PCF7931_WRITE                                                 0x0222
-#define CMD_PCF7931_BRUTEFORCE											  0x0226
+#define CMD_PCF7931_BRUTEFORCE                                            0x0227
 #define CMD_EM4X_READ_WORD                                                0x0218
 #define CMD_EM4X_WRITE_WORD                                               0x0219
 #define CMD_IO_DEMOD_FSK                                                  0x021A
