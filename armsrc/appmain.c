@@ -745,7 +745,7 @@ void SamyRun()
 					/* need this delay to prevent catching some weird data */
 					SpinDelay(500);
 
-					CopyHIDtoT55x7(tops[selected] & 0x000FFFFF, high[selected], low[selected], (tops[selected] != 0 && ((high[selected]& 0xFFFFFFC0) != 0)));
+					CopyHIDtoT55x7(tops[selected] & 0x000FFFFF, high[selected], low[selected], (tops[selected] != 0 && ((high[selected]& 0xFFFFFFC0) != 0)), 0x1D);
 					if (tops[selected] > 0)
 						Dbprintf("Cloned %x %x%08x%08x", selected, tops[selected], high[selected], low[selected]);
 					else
@@ -1004,7 +1004,11 @@ void UsbPacketReceived(uint8_t *packet, int len)
 			CmdPSKsimTag(c->arg[0], c->arg[1], c->arg[2], c->d.asBytes);
 			break;
 		case CMD_HID_CLONE_TAG:
-			CopyHIDtoT55x7(c->arg[0], c->arg[1], c->arg[2], c->d.asBytes[0]);
+			CopyHIDtoT55x7(c->arg[0], c->arg[1], c->arg[2], c->d.asBytes[0], 0x1D);
+			break;
+		case CMD_PARADOX_CLONE_TAG:
+			// Paradox cards are the same as HID, with a different preamble, so we can reuse the same function
+			CopyHIDtoT55x7(c->arg[0], c->arg[1], c->arg[2], c->d.asBytes[0], 0x0F);
 			break;
 		case CMD_IO_DEMOD_FSK:
 			CmdIOdemodFSK(c->arg[0], 0, 0, 1);
@@ -1056,6 +1060,9 @@ void UsbPacketReceived(uint8_t *packet, int len)
 		case CMD_PCF7931_WRITE:
 			WritePCF7931(c->d.asBytes[0],c->d.asBytes[1],c->d.asBytes[2],c->d.asBytes[3],c->d.asBytes[4],c->d.asBytes[5],c->d.asBytes[6], c->d.asBytes[9], c->d.asBytes[7]-128,c->d.asBytes[8]-128, c->arg[0], c->arg[1], c->arg[2]);
 			break;
+		case CMD_PCF7931_BRUTEFORCE:
+			BruteForcePCF7931(c->arg[0], (c->arg[1] & 0xFF), c->d.asBytes[9], c->d.asBytes[7]-128,c->d.asBytes[8]-128);
+			break;
 		case CMD_EM4X_READ_WORD:
 			EM4xReadWord(c->arg[0], c->arg[1],c->arg[2]);
 			break;
@@ -1087,10 +1094,13 @@ void UsbPacketReceived(uint8_t *packet, int len)
 			SimulateHitagSTag((bool)c->arg[0],(byte_t*)c->d.asBytes);
 			break;
 		case CMD_TEST_HITAGS_TRACES:// Tests every challenge within the given file
-			check_challenges((bool)c->arg[0],(byte_t*)c->d.asBytes);
+			check_challenges_cmd((bool)c->arg[0], (byte_t*)c->d.asBytes, (uint8_t)c->arg[1]);
 			break;
 		case CMD_READ_HITAG_S://Reader for only Hitag S tags, args = key or challenge
-			ReadHitagS((hitag_function)c->arg[0],(hitag_data*)c->d.asBytes);
+			ReadHitagSCmd((hitag_function)c->arg[0], (hitag_data*)c->d.asBytes, (uint8_t)c->arg[1], (uint8_t)c->arg[2], false);
+			break;
+		case CMD_READ_HITAG_S_BLK:
+			ReadHitagSCmd((hitag_function)c->arg[0], (hitag_data*)c->d.asBytes, (uint8_t)c->arg[1], (uint8_t)c->arg[2], true);
 			break;
 		case CMD_WR_HITAG_S://writer for Hitag tags args=data to write,page and key or challenge
 			if ((hitag_function)c->arg[0] < 10) {

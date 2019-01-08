@@ -141,12 +141,26 @@ int CmdHF14AMfRdBl(const char *Cmd)
 		uint8_t isOK  = resp.arg[0] & 0xff;
 		uint8_t *data = resp.d.asBytes;
 
-		if (isOK)
+		if (isOK) {
 			PrintAndLog("isOk:%02x data:%s", isOK, sprint_hex(data, 16));
-		else
+		} else {
 			PrintAndLog("isOk:%02x", isOK);
+			return 1;
+		}
+
+		if (mfIsSectorTrailer(blockNo) && (data[6] || data[7] || data[8])) {
+			PrintAndLogEx(NORMAL, "Trailer decoded:");
+			int bln = mfFirstBlockOfSector(mfSectorNum(blockNo));
+			int blinc = (mfNumBlocksPerSector(mfSectorNum(blockNo)) > 4) ? 5 : 1;
+			for (int i = 0; i < 4; i++) {
+				PrintAndLogEx(NORMAL, "Access block %d%s: %s", bln, ((blinc > 1) && (i < 3) ? "+" : "") , mfGetAccessConditionsDesc(i, &data[6]));
+				bln += blinc;
+			}
+			PrintAndLogEx(NORMAL, "UserData: %s", sprint_hex_inrow(&data[9], 1));
+		}
 	} else {
 		PrintAndLog("Command execute timeout");
+		return 2;
 	}
 
   return 0;
@@ -201,6 +215,15 @@ int CmdHF14AMfRdSc(const char *Cmd)
 				PrintAndLog("data   : %s", sprint_hex(data + i * 16, 16));
 			}
 			PrintAndLog("trailer: %s", sprint_hex(data + (sectorNo<32?3:15) * 16, 16));
+			
+			PrintAndLogEx(NORMAL, "Trailer decoded:");
+                        int bln = mfFirstBlockOfSector(sectorNo);
+                        int blinc = (mfNumBlocksPerSector(sectorNo) > 4) ? 5 : 1;
+                        for (i = 0; i < 4; i++) {
+                                PrintAndLogEx(NORMAL, "Access block %d%s: %s", bln, ((blinc > 1) && (i < 3) ? "+" : "") , mfGetAccessConditionsDesc(i, &(data + (sectorNo<32?3:15) * 16)[6]));
+                                bln += blinc;
+                        }
+                        PrintAndLogEx(NORMAL, "UserData: %s", sprint_hex_inrow(&(data + (sectorNo<32?3:15) * 16)[9], 1));
 		}
 	} else {
 		PrintAndLog("Command execute timeout");
@@ -534,7 +557,7 @@ int CmdHF14AMfRestore(const char *Cmd)
 //----------------------------------------------
 
 static void parseParamTDS(const char *Cmd, const uint8_t indx, bool *paramT, bool *paramD, uint8_t *timeout) {
-	char ctmp3[3] = {0};
+	char ctmp3[4] = {0};
 	int len = param_getlength(Cmd, indx);
 	if (len > 0 && len < 4){
 		param_getstr(Cmd, indx, ctmp3, sizeof(ctmp3));
@@ -1018,10 +1041,10 @@ int CmdHF14AMfChk(const char *Cmd)
 		PrintAndLog("Usage:  hf mf chk <block number>|<*card memory> <key type (A/B/?)> [t|d|s|ss] [<key (12 hex symbols)>] [<dic (*.dic)>]");
 		PrintAndLog("          * - all sectors");
 		PrintAndLog("card memory - 0 - MINI(320 bytes), 1 - 1K, 2 - 2K, 4 - 4K, <other> - 1K");
-		PrintAndLog("d - write keys to binary file\n");
-		PrintAndLog("t - write keys to emulator memory");
-		PrintAndLog("s - slow execute. timeout 1ms");
-		PrintAndLog("ss- very slow execute. timeout 5ms");
+		PrintAndLog("d  - write keys to binary file\n");
+		PrintAndLog("t  - write keys to emulator memory");
+		PrintAndLog("s  - slow execute. timeout 1ms");
+		PrintAndLog("ss - very slow execute. timeout 5ms");
 		PrintAndLog("      sample: hf mf chk 0 A 1234567890ab keys.dic");
 		PrintAndLog("              hf mf chk *1 ? t");
 		PrintAndLog("              hf mf chk *1 ? d");
@@ -1040,16 +1063,16 @@ int CmdHF14AMfChk(const char *Cmd)
 	int	keycnt = 0;
 	char ctmp	= 0x00;
 	int clen = 0;
-	char ctmp3[3]	= {0x00};
 	uint8_t blockNo = 0;
 	uint8_t SectorsCnt = 0;
 	uint8_t keyType = 0;
 	uint64_t key64 = 0;
-	uint32_t timeout14a = 0; // timeout in us
+	// timeout in units. (ms * 106)/10 or us*0.0106
+	uint8_t btimeout14a = MF_CHKKEYS_DEFTIMEOUT; // fast by default
 	bool param3InUse = false;
 
-	int transferToEml = 0;
-	int createDumpFile = 0;
+	bool transferToEml = 0;
+	bool createDumpFile = 0;
 	
 	sector_t *e_sector = NULL;
 
@@ -1087,33 +1110,13 @@ int CmdHF14AMfChk(const char *Cmd)
 		};
 	}
 
-	// transfer to emulator & create dump file
-	ctmp = param_getchar(Cmd, 2);
-	clen = param_getlength(Cmd, 2);
-	if (clen == 1 && (ctmp == 't' || ctmp == 'T')) transferToEml = 1;
-	if (clen == 1 && (ctmp == 'd' || ctmp == 'D')) createDumpFile = 1;
+	parseParamTDS(Cmd, 2, &transferToEml, &createDumpFile, &btimeout14a);
 	
-	param3InUse = transferToEml | createDumpFile;
-	
-	timeout14a = 500; // fast by default
-	// double parameters - ts, ds
-	clen = param_getlength(Cmd, 2);
-	if (clen == 2 || clen == 3){
-		param_getstr(Cmd, 2, ctmp3, sizeof(ctmp3));
-		ctmp = ctmp3[1];
-	}
-	//parse
-	if (ctmp == 's' || ctmp == 'S') {
-		timeout14a = 1000; // slow
-		if (!param3InUse && clen == 2 && (ctmp3[1] == 's' || ctmp3[1] == 'S')) {
-			timeout14a = 5000; // very slow
-		}
-		if (param3InUse && clen == 3 && (ctmp3[2] == 's' || ctmp3[2] == 'S')) {
-			timeout14a = 5000; // very slow
-		}
-		param3InUse = true;
-	}
+	param3InUse = transferToEml | createDumpFile | (btimeout14a != MF_CHKKEYS_DEFTIMEOUT);
 
+	PrintAndLog("--chk keys. sectors:%2d, block no:%3d, key type:%c, eml:%c, dmp=%c checktimeout=%d us", 
+			SectorsCnt, blockNo, keyType?'B':'A', transferToEml?'y':'n', createDumpFile?'y':'n', ((int)btimeout14a * 10000) / 106);
+	
 	for (i = param3InUse; param_getchar(Cmd, 2 + i); i++) {
 		if (!param_gethex(Cmd, 2 + i, keyBlock + 6 * keycnt, 12)) {
 			if ( stKeyBlock - keycnt < 2) {
@@ -1210,7 +1213,7 @@ int CmdHF14AMfChk(const char *Cmd)
 		for (uint32_t c = 0; c < keycnt; c += max_keys) {
 
 			uint32_t size = keycnt-c > max_keys ? max_keys : keycnt-c;
-			res = mfCheckKeysSec(SectorsCnt, keyType, timeout14a * 1.06 / 100, true, size, &keyBlock[6 * c], e_sector); // timeout is (ms * 106)/10 or us*0.0106
+			res = mfCheckKeysSec(SectorsCnt, keyType, btimeout14a, true, size, &keyBlock[6 * c], e_sector); // timeout is (ms * 106)/10 or us*0.0106
 
 			if (res != 1) {
 				if (!res) {
@@ -2292,6 +2295,20 @@ int CmdHF14AMfCGetBlk(const char *Cmd) {
 		}
 
 	PrintAndLog("block data:%s", sprint_hex(memBlock, 16));
+	
+	if (mfIsSectorTrailer(blockNo)) {
+		PrintAndLogEx(NORMAL, "Trailer decoded:");
+		PrintAndLogEx(NORMAL, "Key A: %s", sprint_hex_inrow(memBlock, 6));
+		PrintAndLogEx(NORMAL, "Key B: %s", sprint_hex_inrow(&memBlock[10], 6));
+		int bln = mfFirstBlockOfSector(mfSectorNum(blockNo));
+		int blinc = (mfNumBlocksPerSector(mfSectorNum(blockNo)) > 4) ? 5 : 1;
+		for (int i = 0; i < 4; i++) {
+			PrintAndLogEx(NORMAL, "Access block %d%s: %s", bln, ((blinc > 1) && (i < 3) ? "+" : "") , mfGetAccessConditionsDesc(i, &memBlock[6]));
+			bln += blinc;
+		}
+		PrintAndLogEx(NORMAL, "UserData: %s", sprint_hex_inrow(&memBlock[9], 1));
+	}
+	
 	return 0;
 }
 
@@ -2342,6 +2359,19 @@ int CmdHF14AMfCGetSc(const char *Cmd) {
 		}
 
 		PrintAndLog("block %3d data:%s", baseblock + i, sprint_hex(memBlock, 16));
+		
+		if (mfIsSectorTrailer(baseblock + i)) {
+                PrintAndLogEx(NORMAL, "Trailer decoded:");
+                PrintAndLogEx(NORMAL, "Key A: %s", sprint_hex_inrow(memBlock, 6));
+                PrintAndLogEx(NORMAL, "Key B: %s", sprint_hex_inrow(&memBlock[10], 6));
+                int bln = baseblock;
+                int blinc = (mfNumBlocksPerSector(sectorNo) > 4) ? 5 : 1;
+                for (int i = 0; i < 4; i++) {
+                        PrintAndLogEx(NORMAL, "Access block %d%s: %s", bln, ((blinc > 1) && (i < 3) ? "+" : "") , mfGetAccessConditionsDesc(i, &memBlock[6]));
+                        bln += blinc;
+                }
+                PrintAndLogEx(NORMAL, "UserData: %s", sprint_hex_inrow(&memBlock[9], 1));
+        }
 	}
 	return 0;
 }

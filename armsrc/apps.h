@@ -77,7 +77,7 @@ void CmdAWIDdemodFSK(int findone, int *high, int *low, int ledcontrol); // Realt
 void CmdEM410xdemod(int findone, int *high, int *low, int ledcontrol);
 void CmdIOdemodFSK(int findone, int *high, int *low, int ledcontrol);
 void CopyIOtoT55x7(uint32_t hi, uint32_t lo); // Clone an ioProx card to T5557/T5567
-void CopyHIDtoT55x7(uint32_t hi2, uint32_t hi, uint32_t lo, uint8_t longFMT); // Clone an HID card to T5557/T5567
+void CopyHIDtoT55x7(uint32_t hi2, uint32_t hi, uint32_t lo, uint8_t longFMT, uint8_t preamble); // Clone an HID-like card to T5557/T5567
 void CopyVikingtoT55xx(uint32_t block1, uint32_t block2, uint8_t Q5);
 void WriteEM410x(uint32_t card, uint32_t id_hi, uint32_t id_lo);
 void CopyIndala64toT55x7(uint32_t hi, uint32_t lo); // Clone Indala 64-bit tag by UID to T55x7
@@ -169,10 +169,11 @@ void ReaderHitag(hitag_function htf, hitag_data* htd);
 void WriterHitag(hitag_function htf, hitag_data* htd, int page);
 
 //hitagS.h
+void ReadHitagSCmd(hitag_function htf, hitag_data* htd, uint64_t startPage, uint64_t tagMode, bool readBlock);
 void SimulateHitagSTag(bool tag_mem_supplied, byte_t* data);
-void ReadHitagS(hitag_function htf, hitag_data* htd);
 void WritePageHitagS(hitag_function htf, hitag_data* htd,int page);
-void check_challenges(bool file_given, byte_t* data);
+void check_challenges_cmd(bool file_given, byte_t* data, uint64_t tagMode);
+
 
 
 // cmd.h

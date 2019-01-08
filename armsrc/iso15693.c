@@ -53,8 +53,8 @@
 #include "iso15693.h"
 
 #include "proxmark3.h"
-#include "apps.h"
 #include "util.h"
+#include "apps.h"
 #include "string.h"
 #include "iso15693tools.h"
 #include "protocols.h"
@@ -993,7 +993,7 @@ void AcquireRawAdcSamplesIso15693(void)
 	LEDsoff();
 	LED_A_ON();
 
-	uint16_t *dest = (uint16_t*)BigBuf_get_addr();
+	uint8_t *dest = BigBuf_get_addr();
 
 	FpgaDownloadAndGo(FPGA_BITSTREAM_HF);
 	BuildIdentifyRequest();
@@ -1028,7 +1028,7 @@ void AcquireRawAdcSamplesIso15693(void)
 	for(int c = 0; c < 4000; ) {
 		if(AT91C_BASE_SSC->SSC_SR & (AT91C_SSC_RXRDY)) {
 			uint16_t r = AT91C_BASE_SSC->SSC_RHR;
-			dest[c++] = r; // >> 5;
+			dest[c++] = r >> 5;
 		}
 	}
 

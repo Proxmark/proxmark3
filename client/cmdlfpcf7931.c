@@ -1,6 +1,7 @@
 //-----------------------------------------------------------------------------
 // Copyright (C) 2012 Chalk <chalk.secu at gmail.com>
 //               2015 Dake <thomas.cayrou at gmail.com>
+//				 2018 sguerrini97 <sguerrini97 at gmail.com>
 
 // This code is licensed to you under the terms of the GNU GPL, version 2 or,
 // at your option, any later version. See the LICENSE.txt file for the text of
@@ -73,6 +74,21 @@ int usage_pcf7931_write(){
 	PrintAndLog("       data           one byte of data (hex)");
 	PrintAndLog("Examples:");
 	PrintAndLog("      lf pcf7931 write 2 1 FF");
+	return 0;
+}
+
+int usage_pcf7931_bruteforce()
+{
+	PrintAndLog("Usage: lf pcf7931 bruteforce [h] <start password> <tries>");
+	PrintAndLog("This command tries to disable PAC of a PCF7931 transponder by bruteforcing the password.");
+	PrintAndLog("!! THIS IS NOT INTENDED TO RECOVER THE FULL PASSWORD !!");
+	PrintAndLog("!! DO NOT USE UNLESS THE FIRST 5 BYTES OF THE PASSWORD ARE KNOWN !!");
+	PrintAndLog("Options:");
+	PrintAndLog("       h                This help");
+	PrintAndLog("       start password   hex password to start from");
+	PrintAndLog("       tries            How many times to send the same data frame");
+	PrintAndLog("Examples:");
+	PrintAndLog("      lf pcf7931 bruteforce 00000000123456 3");
 	return 0;
 }
 
@@ -159,12 +175,47 @@ int CmdLFPCF7931Write(const char *Cmd){
 	return 0;
 }
 
+int CmdLFPCF7931BruteForce(const char *Cmd){
+
+	uint8_t ctmp = param_getchar(Cmd, 0);
+	if (strlen(Cmd) < 1 || ctmp == 'h' || ctmp == 'H') return usage_pcf7931_bruteforce();  
+
+	uint64_t start_password = 0;
+	uint8_t tries = 3;
+	
+	if (param_gethex(Cmd, 0, (uint8_t*)(&start_password), 14)) return usage_pcf7931_bruteforce();
+	if (param_getdec(Cmd, 1, &tries)) return usage_pcf7931_bruteforce();
+	
+	PrintAndLog("Bruteforcing from password: %02x %02x %02x %02x %02x %02x %02x",
+			start_password & 0xFF,
+			(start_password >> 8) & 0xFF,
+			(start_password >> 16) & 0xFF,
+			(start_password >> 24) & 0xFF,
+			(start_password >> 32) & 0xFF,
+			(start_password >> 48) & 0xFF,
+			(start_password >> 56) & 0xFF);
+			
+	PrintAndLog("Trying each password %d times", tries);
+
+	UsbCommand c = {CMD_PCF7931_BRUTEFORCE, {start_password, tries} };
+	
+	c.d.asDwords[7] = (configPcf.OffsetWidth + 128);
+	c.d.asDwords[8] = (configPcf.OffsetPosition + 128);
+	c.d.asDwords[9] = configPcf.InitDelay;
+
+	clearCommandBuffer();
+	SendCommand(&c);
+	//no ack?
+	return 0;
+}
+
 static command_t CommandTable[] = 
 {
 	{"help",   CmdHelp,            1, "This help"},
 	{"read",   CmdLFPCF7931Read,   0, "Read content of a PCF7931 transponder"},
 	{"write",  CmdLFPCF7931Write,  0, "Write data on a PCF7931 transponder."},
 	{"config", CmdLFPCF7931Config, 1, "Configure the password, the tags initialization delay and time offsets (optional)"},
+	{"bruteforce", CmdLFPCF7931BruteForce, 0, "Bruteforce a PCF7931 transponder password."},
 	{NULL,     NULL,               0, NULL}
 };
 

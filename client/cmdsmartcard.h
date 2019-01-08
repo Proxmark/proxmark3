@@ -11,19 +11,8 @@
 #ifndef CMDSMARTCARD_H__
 #define CMDSMARTCARD_H__
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <ctype.h>
-#include "proxmark3.h"
-#include "ui.h"
-#include "cmdparser.h"
-#include "common.h"
-#include "util.h"
-#include "loclass/fileutils.h"  // saveFile
-#include "cmdmain.h"            // getfromdevice
-#include "emv/emvcore.h"        // decodeTVL
-#include "emv/apduinfo.h"       // APDUcode description
+#include <stdint.h>
+#include <stdbool.h>
 
 extern int CmdSmartcard(const char *Cmd);
 
@@ -32,8 +21,6 @@ extern int CmdSmartUpgrade(const char* cmd);
 extern int CmdSmartInfo(const char* cmd);
 extern int CmdSmartReader(const char *Cmd);
 
-extern int usage_sm_raw(void);
-extern int usage_sm_reader(void);
-extern int usage_sm_info(void);
-extern int usage_sm_upgrade(void);
+extern int ExchangeAPDUSC(uint8_t *datain, int datainlen, bool activateCard, bool leaveSignalON, uint8_t *dataout, int maxdataoutlen, int *dataoutlen);
+
 #endif

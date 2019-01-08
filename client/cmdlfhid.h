@@ -22,4 +22,6 @@ int CmdHIDClone(const char *Cmd);
 int CmdHIDDecode(const char *Cmd);
 int CmdHIDEncode(const char *Cmd);
 int CmdHIDWrite(const char *Cmd);
+// This is used by the Paradox code
+int hid_hexstring_to_int96(/* out */ uint32_t* hi2,/* out */ uint32_t* hi, /* out */ uint32_t* lo, const char* str);
 #endif

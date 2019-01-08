@@ -97,6 +97,7 @@ typedef struct{
 #define CMD_T55XX_RESET_READ                                              0x0216
 #define CMD_PCF7931_READ                                                  0x0217
 #define CMD_PCF7931_WRITE                                                 0x0222
+#define CMD_PCF7931_BRUTEFORCE                                            0x0227
 #define CMD_EM4X_READ_WORD                                                0x0218
 #define CMD_EM4X_WRITE_WORD                                               0x0219
 #define CMD_IO_DEMOD_FSK                                                  0x021A
@@ -111,6 +112,8 @@ typedef struct{
 #define CMD_VIKING_CLONE_TAG                                              0x0223
 #define CMD_T55XX_WAKEUP                                                  0x0224
 #define CMD_COTAG                                                         0x0225
+// misc extra
+#define CMD_PARADOX_CLONE_TAG                                             0x0226
 
 
 /* CMD_SET_ADC_MUX: ext1 is 0 for lopkd, 1 for loraw, 2 for hipkd, 3 for hiraw */
@@ -137,6 +140,7 @@ typedef struct{
 #define CMD_SIMULATE_HITAG_S                                              0x0368
 #define CMD_TEST_HITAGS_TRACES                                            0x0367
 #define CMD_READ_HITAG_S                                                  0x0373
+#define CMD_READ_HITAG_S_BLK                                              0x0374
 #define CMD_WR_HITAG_S                                                    0x0375
 #define CMD_EMU_HITAG_S                                                   0x0376
 

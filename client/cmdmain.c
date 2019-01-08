@@ -26,6 +26,7 @@
 #include "util.h"
 #include "util_posix.h"
 #include "cmdscript.h"
+#include "emv/cmdemv.h"		// EMV				  
 #ifdef WITH_SMARTCARD 
   #include "cmdsmartcard.h"
 #endif
@@ -36,18 +37,21 @@ static int CmdQuit(const char *Cmd);
 
 static command_t CommandTable[] = 
 {
-  {"help",  CmdHelp,  1, "This help. Use '<command> help' for details of a particular command."},
-  {"data",  CmdData,  1, "{ Plot window / data buffer manipulation... }"},
-  {"hf",    CmdHF,    1, "{ High Frequency commands... }"},
-  {"hw",    CmdHW,    1, "{ Hardware commands... }"},
-  {"lf",    CmdLF,    1, "{ Low Frequency commands... }"},
+	{"help",  CmdHelp,  1, "This help. Use '<command> help' for details of a particular command."},
+	{"data",  CmdData,  1, "{ Plot window / data buffer manipulation... }"},
+	{"hf",    CmdHF,    1, "{ High Frequency commands... }"},
+	{"hw",    CmdHW,    1, "{ Hardware commands... }"},
+	{"lf",    CmdLF,    1, "{ Low Frequency commands... }"},
 #ifdef WITH_SMARTCARD
-  {"sc",    CmdSmartcard,1,"{ Smartcard commands... }"},
+	{"emv",   CmdEMV,   1, "{ EMV iso14443 and iso7816... }"},
+	{"sc",    CmdSmartcard,1,"{ Smartcard commands... }"},
+#else
+	{"emv",   CmdEMV,   1, "{ EMV iso14443 }"},
 #endif
-  {"script",CmdScript,1, "{ Scripting commands }"},
-  {"quit",  CmdQuit,  1, "Exit program"},
-  {"exit",  CmdQuit,  1, "Exit program"},
-  {NULL, NULL, 0, NULL}
+	{"script",CmdScript,1, "{ Scripting commands }"},
+	{"quit",  CmdQuit,  1, "Exit program"},
+	{"exit",  CmdQuit,  1, "Exit program"},
+	{NULL, NULL, 0, NULL}
 };
 
 command_t* getTopLevelCommandTable()

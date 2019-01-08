@@ -296,7 +296,7 @@ int mifare_ultra_auth(uint8_t *keybytes){
 
 	/// 3des2k
 
-	mbedtls_des3_context ctx = { 0x00 };
+	mbedtls_des3_context ctx = { {0} };
 	uint8_t random_a[8] = {1,1,1,1,1,1,1,1};
 	uint8_t random_b[8] = {0x00};
 	uint8_t enc_random_b[8] = {0x00};

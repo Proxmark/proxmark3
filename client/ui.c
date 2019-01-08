@@ -99,7 +99,7 @@ void PrintAndLogEx(logLevel_t level, char *fmt, ...) {
 		}
 		PrintAndLog(buffer2);
 	} else {
-		snprintf(buffer2, sizeof(buffer2), "%s%s", prefix, buffer);
+		snprintf(buffer2, sizeof(buffer2), "%s%.*s", prefix, MAX_PRINT_BUFFER - 20, buffer);
 		PrintAndLog(buffer2);
 	}
 }

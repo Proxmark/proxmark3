@@ -233,14 +233,19 @@ int LogTraceHitag(const uint8_t * btBytes, int iBits, int iSamples, uint32_t dwP
 
 	uint8_t *trace = BigBuf_get_addr();
 	uint16_t iLen = nbytes(iBits);
+
 	// Return when trace is full
-	if (traceLen + sizeof(rsamples) + sizeof(dwParity) + sizeof(iBits) + iLen > BigBuf_max_traceLen()) return false;
+	if (traceLen + sizeof(rsamples) + sizeof(dwParity) + sizeof(iBits) + iLen > BigBuf_max_traceLen()) {
+		return false;
+	}	
 
 	//Hitag traces appear to use this traceformat:
 	// 32 bits timestamp (little endian,Highest Bit used as readerToTag flag)
 	// 32 bits parity
 	// 8 bits size (number of bits in the trace entry, not number of bytes)
 	// y Bytes data
+
+
 
 	rsamples += iSamples;
 	trace[traceLen++] = ((rsamples >> 0) & 0xff);
