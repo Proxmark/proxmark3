@@ -28,6 +28,8 @@
 #include "cmdhw.h"
 #include "whereami.h"
 #include "comms.h"
+#include "pcsc.h"
+
 
 void
 #ifdef __has_attribute
@@ -47,6 +49,7 @@ main_loop(char *script_cmds_file, char *script_cmd, bool usb_present) {
 	} else {
 		SetOffline(true);
 	}
+
 
 	// file with script
 	FILE *script_file = NULL;

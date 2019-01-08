@@ -76,6 +76,11 @@
 #endif
 
 extern int ukbhit(void);
+#ifndef _WIN32
+extern char getch(void);
+#else
+#include <conio.h>
+#endif
 
 extern void AddLogLine(char *fileName, char *extData, char *c);
 extern void AddLogHex(char *fileName, char *extData, const uint8_t * data, const size_t len);

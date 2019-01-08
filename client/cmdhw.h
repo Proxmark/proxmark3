@@ -11,6 +11,8 @@
 #ifndef CMDHW_H__
 #define CMDHW_H__
 
+#include <stdbool.h>
+
 int CmdHW(const char *Cmd);
 
 int CmdDetectReader(const char *Cmd);
@@ -23,5 +25,6 @@ int CmdSetDivisor(const char *Cmd);
 int CmdSetMux(const char *Cmd);
 int CmdTune(const char *Cmd);
 int CmdVersion(const char *Cmd);
+bool PM3hasSmartcardSlot(void);
 
 #endif

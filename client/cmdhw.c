@@ -20,7 +20,8 @@
 #include "cmdmain.h"
 #include "cmddata.h"
 
-/* low-level hardware control */
+
+static uint32_t hw_capabilities = 0;
 
 static int CmdHelp(const char *Cmd);
 
@@ -403,6 +404,10 @@ int CmdTune(const char *Cmd)
     return CmdTuneSamples(Cmd);
 }
 
+bool PM3hasSmartcardSlot(void) {
+	return (hw_capabilities & HAS_SMARTCARD_SLOT);
+}
+
 int CmdVersion(const char *Cmd)
 {
 
@@ -411,10 +416,11 @@ int CmdVersion(const char *Cmd)
 	UsbCommand resp = {0, {0, 0, 0}};
 
 	SendCommand(&c);
-	if (WaitForResponseTimeout(CMD_ACK,&resp,1000)) {
+	if (WaitForResponseTimeout(CMD_ACK, &resp, 1000)) {
 		PrintAndLog("Prox/RFID mark3 RFID instrument");
 		PrintAndLog((char*)resp.d.asBytes);
 		lookupChipID(resp.arg[0], resp.arg[1]);
+		hw_capabilities = resp.arg[2];
 	}
 	return 0;
 }

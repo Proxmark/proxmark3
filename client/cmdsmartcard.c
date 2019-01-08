@@ -18,13 +18,17 @@
 #include "smartcard.h"
 #include "comms.h"
 #include "protocols.h"
+#include "cmdhw.h"
 #include "cmdhflist.h"
 #include "emv/apduinfo.h"       // APDUcode description
 #include "emv/emvcore.h"        // decodeTVL
 #include "crypto/libpcrypto.h"	// sha512hash
 #include "emv/dump.h"			// dump_buffer
+#include "pcsc.h"
 
 #define SC_UPGRADE_FILES_DIRECTORY          "sc_upgrade_firmware/"
+
+static bool UseAlternativeSmartcardReader = false;	// default: use PM3 RDV40 Smartcard Slot (if available)
 
 static int CmdHelp(const char *Cmd);
 
@@ -41,6 +45,17 @@ static int usage_sm_raw(void) {
 	PrintAndLogEx(NORMAL, "Examples:");
 	PrintAndLogEx(NORMAL, "        sc raw s 0 d 00a404000e315041592e5359532e4444463031  - `1PAY.SYS.DDF01` PPSE directory with get ATR");
 	PrintAndLogEx(NORMAL, "        sc raw 0 d 00a404000e325041592e5359532e4444463031    - `2PAY.SYS.DDF01` PPSE directory");
+	return 0;
+}
+
+static int usage_sm_select(void) {
+	PrintAndLogEx(NORMAL, "Usage: sc select [h|<reader name>] ");
+	PrintAndLogEx(NORMAL, "       h             :  this help");
+	PrintAndLogEx(NORMAL, "       <reader name> :  a card reader's name, wildcards allowed, leave empty to pick from available readers");
+	PrintAndLogEx(NORMAL, "");
+	PrintAndLogEx(NORMAL, "Examples:");
+	PrintAndLogEx(NORMAL, "        sc select          : list available card readers and pick");
+	PrintAndLogEx(NORMAL, "        sc select Gemalto* : select a connected Gemalto card reader" );
 	return 0;
 }
 
@@ -379,6 +394,32 @@ static int smart_response(uint8_t *data) {
 	return datalen;
 }
 
+
+int CmdSmartSelect(const char *Cmd) {
+
+	const char *readername;
+	
+	if (tolower(param_getchar(Cmd, 0)) == 'h') {
+		return usage_sm_select();
+	}
+	
+	if (!PM3hasSmartcardSlot() && !pcscCheckForCardReaders()) {
+		PrintAndLogEx(WARNING, "No Smartcard Readers available");
+		UseAlternativeSmartcardReader = false;
+		return 1;
+	}
+	
+	int bg, en;
+	if (param_getptr(Cmd, &bg, &en, 0)) {
+		UseAlternativeSmartcardReader = pcscSelectAlternativeCardReader(NULL);
+	} else {
+		readername = Cmd + bg;
+		UseAlternativeSmartcardReader = pcscSelectAlternativeCardReader(readername);
+	}
+
+	return 0;
+}
+
 int CmdSmartRaw(const char *Cmd) {
 
 	int hexlen = 0;
@@ -584,7 +625,7 @@ int CmdSmartUpgrade(const char *Cmd) {
 		return 1;
 	}
 
-	char sha512filename[FILE_PATH_SIZE];
+	char sha512filename[FILE_PATH_SIZE] = {'\0'};
 	char *bin_extension = filename;
 	char *dot_position = NULL;
 	while ((dot_position = strchr(bin_extension, '.')) != NULL) {
@@ -595,7 +636,7 @@ int CmdSmartUpgrade(const char *Cmd) {
 	    || !strcmp(bin_extension, "bin")
 #endif
 	    ) {
-		strncpy(sha512filename, filename, strlen(filename) - strlen("bin"));
+		memcpy(sha512filename, filename, strlen(filename) - strlen("bin"));
 		strcat(sha512filename, "sha512.txt");
 	} else {
 		PrintAndLogEx(FAILED, "Filename extension of Firmware Upgrade File must be .BIN");
@@ -970,6 +1011,7 @@ int CmdSmartBruteforceSFI(const char *Cmd) {
 
 static command_t CommandTable[] = {
 	{"help",     CmdHelp,               1, "This help"},
+	{"select",   CmdSmartSelect,        1, "Select the Smartcard Reader to use"},
 	{"list",     CmdSmartList,          0, "List ISO 7816 history"},
 	{"info",     CmdSmartInfo,          0, "Tag information"},
 	{"reader",   CmdSmartReader,        0, "Act like an IS07816 reader"},
