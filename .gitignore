@@ -12,6 +12,7 @@
 *.map
 *.bin
 !client/hardnested/*.bin
+!client/sc_upgrade_firmware/*.bin
 *.dll
 *.moc.cpp
 *.z

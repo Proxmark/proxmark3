@@ -13,6 +13,7 @@
 
 #include "ui.h"
 #include "cmdparser.h"
+#include "proxmark3.h"
 #include "util.h"
 #include "smartcard.h"
 #include "comms.h"
@@ -20,7 +21,10 @@
 #include "cmdhflist.h"
 #include "emv/apduinfo.h"       // APDUcode description
 #include "emv/emvcore.h"        // decodeTVL
+#include "crypto/libpcrypto.h"			// sha512hash
+#include "emv/dump.h"			// dump_buffer
 
+#define SC_UPGRADE_FILES_DIRECTORY          "sc_upgrade_firmware/"
 
 static int CmdHelp(const char *Cmd);
 
@@ -60,13 +64,13 @@ static int usage_sm_info(void) {
 }
 
 static int usage_sm_upgrade(void) {
-	PrintAndLogEx(NORMAL, "Upgrade firmware");
+	PrintAndLogEx(NORMAL, "Upgrade RDV4.0 Smartcard Socket Firmware");
 	PrintAndLogEx(NORMAL, "Usage:  sc upgrade f <file name>");
 	PrintAndLogEx(NORMAL, "       h               :  this help");
 	PrintAndLogEx(NORMAL, "       f <filename>    :  firmware file name");
 	PrintAndLogEx(NORMAL, "");
 	PrintAndLogEx(NORMAL, "Examples:");
-	PrintAndLogEx(NORMAL, "        sc upgrade f myfile");
+	PrintAndLogEx(NORMAL, "        sc upgrade f SIM010.BIN");
 	return 0;
 }
 
@@ -89,6 +93,193 @@ static int usage_sm_brute(void) {
 	PrintAndLogEx(NORMAL, "        sc brute");
 	return 0;
 }
+
+uint8_t GetATRTA1(uint8_t *atr, size_t atrlen) {
+	if (atrlen > 2) {
+		uint8_t T0 = atr[1];
+		if (T0 & 0x10)
+			return atr[2];
+	}
+
+	return 0x11; // default value is 0x11, corresponding to fmax=5 MHz, Fi=372, Di=1.
+}
+
+int DiArray[] = {
+	0,  // b0000 RFU
+	1,  // b0001
+	2,
+	4,
+	8,
+	16,
+	32,  // b0110
+	64,  // b0111. This was RFU in ISO/IEC 7816-3:1997 and former. Some card readers or drivers may erroneously reject cards using this value
+	12,
+	20,
+	0,   // b1010 RFU
+	0,
+	0,   // ...
+	0,
+	0,
+	0    // b1111 RFU
+};
+
+int FiArray[] = {
+	372,    // b0000 Historical note: in ISO/IEC 7816-3:1989, this was assigned to cards with internal clock
+	372,    // b0001
+	558,    // b0010
+	744,    // b0011
+	1116,   // b0100
+	1488,   // b0101
+	1860,   // b0110
+	0,      // b0111 RFU
+	0,      // b1000 RFU
+	512,    // b1001
+	768,    // b1010
+	1024,   // b1011
+	1536,   // b1100
+	2048,   // b1101
+	0,      // b1110 RFU
+	0       // b1111 RFU
+};
+
+float FArray[] = {
+	4,    // b0000 Historical note: in ISO/IEC 7816-3:1989, this was assigned to cards with internal clock
+	5,    // b0001
+	6,    // b0010
+	8,    // b0011
+	12,   // b0100
+	16,   // b0101
+	20,   // b0110
+	0,    // b0111 RFU
+	0,    // b1000 RFU
+	5,    // b1001
+	7.5,  // b1010
+	10,   // b1011
+	15,   // b1100
+	20,   // b1101
+	0,    // b1110 RFU
+	0     // b1111 RFU
+};
+
+int GetATRDi(uint8_t *atr, size_t atrlen) {
+	uint8_t TA1 = GetATRTA1(atr, atrlen);
+
+	return DiArray[TA1 & 0x0f];  // The 4 low-order bits of TA1 (4th MSbit to 1st LSbit) encode Di
+}
+
+int GetATRFi(uint8_t *atr, size_t atrlen) {
+	uint8_t TA1 = GetATRTA1(atr, atrlen);
+
+	return FiArray[TA1 >> 4];  // The 4 high-order bits of TA1 (8th MSbit to 5th LSbit) encode fmax and Fi
+}
+
+float GetATRF(uint8_t *atr, size_t atrlen) {
+	uint8_t TA1 = GetATRTA1(atr, atrlen);
+
+	return FArray[TA1 >> 4];  // The 4 high-order bits of TA1 (8th MSbit to 5th LSbit) encode fmax and Fi
+}
+
+static int PrintATR(uint8_t *atr, size_t atrlen) {
+	uint8_t vxor = 0;
+	for (int i = 1; i < atrlen; i++)
+		vxor ^= atr[i];
+
+	if (vxor)
+		PrintAndLogEx(WARNING, "Check summ error. Must be 0 but: 0x%02x", vxor);
+	else
+		PrintAndLogEx(INFO, "Check summ OK.");
+
+	if (atr[0] != 0x3b)
+		PrintAndLogEx(WARNING, "Not a direct convention: 0x%02x", atr[0]);
+
+	uint8_t T0 = atr[1];
+	uint8_t K = T0 & 0x0F;
+	uint8_t TD1 = 0;
+
+	uint8_t T1len = 0;
+	uint8_t TD1len = 0;
+	uint8_t TDilen = 0;
+
+	if (T0 & 0x10) {
+		PrintAndLog("TA1 (Maximum clock frequency, proposed bit duration): 0x%02x", atr[2 + T1len]);
+		T1len++;
+	}
+	if (T0 & 0x20) {
+		PrintAndLog("TB1 (Deprecated: VPP requirements): 0x%02x", atr[2 + T1len]);
+		T1len++;
+	}
+	if (T0 & 0x40) {
+		PrintAndLog("TC1 (Extra delay between bytes required by card): 0x%02x", atr[2 + T1len]);
+		T1len++;
+	}
+	if (T0 & 0x80) {
+		TD1 = atr[2 + T1len];
+		PrintAndLog("TD1 (First offered transmission protocol, presence of TA2..TD2): 0x%02x. Protocol T=%d", TD1, TD1 & 0x0f);
+		T1len++;
+
+		if (TD1 & 0x10) {
+			PrintAndLog("TA2 (Specific protocol and parameters to be used after the ATR): 0x%02x", atr[2 + T1len + TD1len]);
+			TD1len++;
+		}
+		if (TD1 & 0x20) {
+			PrintAndLog("TB2 (Deprecated: VPP precise voltage requirement): 0x%02x", atr[2 + T1len + TD1len]);
+			TD1len++;
+		}
+		if (TD1 & 0x40) {
+			PrintAndLog("TC2 (Maximum waiting time for protocol T=0): 0x%02x", atr[2 + T1len + TD1len]);
+			TD1len++;
+		}
+		if (TD1 & 0x80) {
+			uint8_t TDi = atr[2 + T1len + TD1len];
+			PrintAndLog("TD2 (A supported protocol or more global parameters, presence of TA3..TD3): 0x%02x. Protocol T=%d", TDi, TDi & 0x0f);
+			TD1len++;
+
+			bool nextCycle = true;
+			uint8_t vi = 3;
+			while (nextCycle) {
+				nextCycle = false;
+				if (TDi & 0x10) {
+					PrintAndLog("TA%d: 0x%02x", vi, atr[2 + T1len + TD1len + TDilen]);
+					TDilen++;
+				}
+				if (TDi & 0x20) {
+					PrintAndLog("TB%d: 0x%02x", vi, atr[2 + T1len + TD1len + TDilen]);
+					TDilen++;
+				}
+				if (TDi & 0x40) {
+					PrintAndLog("TC%d: 0x%02x", vi, atr[2 + T1len + TD1len + TDilen]);
+					TDilen++;
+				}
+				if (TDi & 0x80) {
+					TDi = atr[2 + T1len + TD1len + TDilen];
+					PrintAndLog("TD%d: 0x%02x. Protocol T=%d", vi, TDi, TDi & 0x0f);
+					TDilen++;
+
+					nextCycle = true;
+					vi++;
+				}
+			}
+		}
+	}
+
+	uint8_t calen = 2 + T1len + TD1len + TDilen + K;
+
+	if (atrlen != calen && atrlen != calen + 1)  // may be CRC
+		PrintAndLogEx(ERR, "ATR length error. len: %d, T1len: %d, TD1len: %d, TDilen: %d, K: %d", atrlen, T1len, TD1len, TDilen, K);
+	else
+		PrintAndLogEx(INFO, "ATR length OK.");
+
+	PrintAndLog("Historical bytes len: 0x%02x", K);
+	if (K > 0)
+		PrintAndLog("The format of historical bytes: %02x", atr[2 + T1len + TD1len + TDilen]);
+	if (K > 1) {
+		PrintAndLog("Historical bytes:");
+		dump_buffer(&atr[2 + T1len + TD1len + TDilen], K, NULL, 1);
+	}
+
+	return 0;
+}
+
 
 static bool smart_select(bool silent) {
 	UsbCommand c = {CMD_SMART_ATR, {0, 0, 0}};
@@ -137,29 +328,55 @@ static int smart_wait(uint8_t *data) {
 	return len;
 }
 
-static int smart_response(uint8_t *data) {
+static int smart_response(uint8_t apduINS, uint8_t *data) {
 
-	int len = -1;
 	int datalen = smart_wait(data);
+	bool needGetData = false;
 
-	if ( data[datalen - 2] == 0x61 || data[datalen - 2] == 0x9F ) {
-		len = data[datalen - 1];
-	}
-
-	if (len == -1 ) {
+	if (datalen < 2 ) {
 		goto out;
 	}
 
-	PrintAndLogEx(INFO, "Requesting response. len=0x%x", len);
-	uint8_t getstatus[] = {ISO7816_GETSTATUS, 0x00, 0x00, len};
-	UsbCommand cStatus = {CMD_SMART_RAW, {SC_RAW, sizeof(getstatus), 0}};
-	memcpy(cStatus.d.asBytes, getstatus, sizeof(getstatus) );
-	clearCommandBuffer();
-	SendCommand(&cStatus);
+	if (datalen > 2 && data[0] != apduINS) {
+		PrintAndLogEx(ERR, "Card ACK error. len=0x%x data[0]=%02x", datalen, data[0]);
+		datalen = 0;
+		goto out;
+	}
 
-	datalen = smart_wait(data);
-out:
+	if ( data[datalen - 2] == 0x61 || data[datalen - 2] == 0x9F ) {
+		needGetData = true;
+	}
 
+	if (needGetData) {
+		int len = data[datalen - 1];
+		PrintAndLogEx(INFO, "Requesting response. len=0x%x", len);
+		uint8_t getstatus[] = {ISO7816_GETSTATUS, 0x00, 0x00, len};
+		UsbCommand cStatus = {CMD_SMART_RAW, {SC_RAW, sizeof(getstatus), 0}};
+		memcpy(cStatus.d.asBytes, getstatus, sizeof(getstatus) );
+		clearCommandBuffer();
+		SendCommand(&cStatus);
+
+		datalen = smart_wait(data);
+
+		if (datalen < 2 ) {
+			goto out;
+		}
+		if (datalen > 2 && data[0] != ISO7816_GETSTATUS) {
+			PrintAndLogEx(ERR, "GetResponse ACK error. len=0x%x data[0]=%02x", len, data[0]);
+			datalen = 0;
+			goto out;
+		}
+
+		if (datalen != len + 2 + 1) { // 2 - response, 1 - ACK
+			PrintAndLogEx(WARNING, "GetResponse wrong length. Must be: 0x%02x but: 0x%02x", len, datalen - 3);
+		}
+	}
+
+	if (datalen > 2) {
+		datalen--;
+		memmove(data, &data[1], datalen);
+	}
+	out:
 	return datalen;
 }
 
@@ -225,13 +442,13 @@ int CmdSmartRaw(const char *Cmd) {
 	UsbCommand c = {CMD_SMART_RAW, {0, hexlen, 0}};
 
 	if (active || active_select) {
-        c.arg[0] |= SC_CONNECT;
-        if (active_select)
-            c.arg[0] |= SC_SELECT;
-    }
+		c.arg[0] |= SC_CONNECT;
+		if (active_select)
+			c.arg[0] |= SC_SELECT;
+	}
 
 	if (hexlen > 0) {
-        c.arg[0] |= SC_RAW;
+		c.arg[0] |= SC_RAW;
 	}
 
 	memcpy(c.d.asBytes, data, hexlen );
@@ -245,19 +462,19 @@ int CmdSmartRaw(const char *Cmd) {
 		if ( !buf )
 			return 1;
 
-		int len = smart_response(buf);
+		int len = smart_response(data[1], buf);
 		if ( len < 0 ) {
 			free(buf);
 			return 2;
 		}
 
 		if ( buf[0] == 0x6C ) {
-			data[4]	= buf[1];
+			data[4] = buf[1];
 
 			memcpy(c.d.asBytes, data, sizeof(data) );
 			clearCommandBuffer();
 			SendCommand(&c);
-			len = smart_response(buf);
+			len = smart_response(data[1], buf);
 
 			data[4] = 0;
 		}
@@ -285,12 +502,29 @@ int ExchangeAPDUSC(uint8_t *datain, int datainlen, bool activateCard, bool leave
 	clearCommandBuffer();
 	SendCommand(&c);
 
-	int len = smart_response(dataout);
+	int len = smart_response(datain[1], dataout);
 
 	if ( len < 0 ) {
 		return 2;
 	}
 
+
+	// retry
+	if (len > 1 && dataout[len - 2] == 0x6c && datainlen > 4) {
+		UsbCommand c2 = {CMD_SMART_RAW, {SC_RAW, datainlen, 0}};
+		memcpy(c2.d.asBytes, datain, datainlen);
+
+		int vlen = 5 + datain[4];
+		if (datainlen == vlen)
+			datainlen++;
+
+		c2.d.asBytes[vlen] = dataout[len - 1];
+
+		clearCommandBuffer();
+		SendCommand(&c2);
+
+		len = smart_response(datain[1], dataout);
+	}
 	*dataoutlen = len;
 
 	return 0;
@@ -299,8 +533,10 @@ int ExchangeAPDUSC(uint8_t *datain, int datainlen, bool activateCard, bool leave
 
 int CmdSmartUpgrade(const char *Cmd) {
 
-	PrintAndLogEx(WARNING, "WARNING - Smartcard socket firmware upgrade.");
+	PrintAndLogEx(NORMAL, "");
+	PrintAndLogEx(WARNING, "WARNING - RDV4.0 Smartcard Socket Firmware upgrade.");
 	PrintAndLogEx(WARNING, "A dangerous command, do wrong and you will brick the smart card socket");
+	PrintAndLogEx(NORMAL, "");
 
 	FILE *f;
 	char filename[FILE_PATH_SIZE] = {0};
@@ -316,6 +552,7 @@ int CmdSmartUpgrade(const char *Cmd) {
 				errors = true;
 				break;
 			}
+
 			cmdp += 2;
 			break;
 		case 'h':
@@ -330,40 +567,131 @@ int CmdSmartUpgrade(const char *Cmd) {
 	//Validations
 	if (errors || cmdp == 0 ) return usage_sm_upgrade();
 
-	// load file
-	f = fopen(filename, "rb");
+	if (strchr(filename, '\\') || strchr(filename, '/')) {
+		PrintAndLogEx(FAILED, "Filename must not contain \\ or /. Firmware file will be found in client/sc_upgrade_firmware directory.");
+		return 1;
+	}
+	
+	char sc_upgrade_file_path[strlen(get_my_executable_directory()) + strlen(SC_UPGRADE_FILES_DIRECTORY) + strlen(filename) + 1];
+	strcpy(sc_upgrade_file_path, get_my_executable_directory());
+	strcat(sc_upgrade_file_path, SC_UPGRADE_FILES_DIRECTORY);
+	strcat(sc_upgrade_file_path, filename);
+	if (strlen(sc_upgrade_file_path) >= FILE_PATH_SIZE ) {
+		PrintAndLogEx(FAILED, "Filename too long");
+		return 1;
+	}
+
+	char sha512filename[FILE_PATH_SIZE];
+	char *bin_extension = filename;
+	char *dot_position = NULL;
+	while ((dot_position = strchr(bin_extension, '.')) != NULL) {
+		bin_extension = dot_position + 1;
+	}
+	if (!strcmp(bin_extension, "BIN") 
+#ifdef _WIN32
+	    || !strcmp(bin_extension, "bin")
+#endif
+	    ) {
+		strncpy(sha512filename, filename, strlen(filename) - strlen("bin"));
+		strcat(sha512filename, "sha512.txt");
+	} else {
+		PrintAndLogEx(FAILED, "Filename extension of Firmware Upgrade File must be .BIN");
+		return 1;
+	}
+	
+	PrintAndLogEx(INFO, "Checking integrity using SHA512 File %s ...", sha512filename);
+	char sc_upgrade_sha512file_path[strlen(get_my_executable_directory()) + strlen(SC_UPGRADE_FILES_DIRECTORY) + strlen(sha512filename) + 1];
+	strcpy(sc_upgrade_sha512file_path, get_my_executable_directory());
+	strcat(sc_upgrade_sha512file_path, SC_UPGRADE_FILES_DIRECTORY);
+	strcat(sc_upgrade_sha512file_path, sha512filename);
+	if (strlen(sc_upgrade_sha512file_path) >= FILE_PATH_SIZE ) {
+		PrintAndLogEx(FAILED, "Filename too long");
+		return 1;
+	}
+		
+	// load firmware file
+	f = fopen(sc_upgrade_file_path, "rb");
 	if ( !f ){
-		PrintAndLogEx(FAILED, "File: %s: not found or locked.", filename);
+		PrintAndLogEx(FAILED, "Firmware file not found or locked.");
 		return 1;
 	}
 
 	// get filesize in order to malloc memory
 	fseek(f, 0, SEEK_END);
-	long fsize = ftell(f);
+	size_t fsize = ftell(f);
 	fseek(f, 0, SEEK_SET);
 
-	if (fsize < 0) 	{
-		PrintAndLogEx(WARNING, "error, when getting filesize");
+	if (fsize < 0)  {
+		PrintAndLogEx(FAILED, "Could not determine size of firmware file");
 		fclose(f);
 		return 1;
 	}
 
 	uint8_t *dump = calloc(fsize, sizeof(uint8_t));
 	if (!dump) {
-		PrintAndLogEx(WARNING, "error, cannot allocate memory ");
+		PrintAndLogEx(FAILED, "Could not allocate memory for firmware");
 		fclose(f);
 		return 1;
 	}
 
-	size_t bytes_read = fread(dump, 1, fsize, f);
+	size_t firmware_size = fread(dump, 1, fsize, f);
 	if (f)
 		fclose(f);
 
-	PrintAndLogEx(SUCCESS, "Smartcard socket firmware uploading to PM3");
+	// load sha512 file
+	f = fopen(sc_upgrade_sha512file_path, "rb");
+	if ( !f ){
+		PrintAndLogEx(FAILED, "SHA-512 file not found or locked.");
+		return 1;
+	}
+
+	// get filesize in order to malloc memory
+	fseek(f, 0, SEEK_END);
+	fsize = ftell(f);
+	fseek(f, 0, SEEK_SET);
+
+	if (fsize < 0)  {
+		PrintAndLogEx(FAILED, "Could not determine size of SHA-512 file");
+		fclose(f);
+		return 1;
+	}
+	
+	if (fsize < 128) {
+		PrintAndLogEx(FAILED, "SHA-512 file too short");
+		fclose(f);
+		return 1;
+	}
+
+	char hashstring[129];
+	size_t bytes_read = fread(hashstring, 1, 128, f);
+	hashstring[128] = '\0';
+
+	if (f)
+		fclose(f);
+
+	uint8_t hash1[64];
+	if (bytes_read != 128 || param_gethex(hashstring, 0, hash1, 128)) {
+		PrintAndLogEx(FAILED, "Couldn't read SHA-512 file");
+		return 1;
+	}
+	
+	uint8_t hash2[64];
+	if (sha512hash(dump, firmware_size, hash2)) {
+		PrintAndLogEx(FAILED, "Couldn't calculate SHA-512 of Firmware");
+		return 1;
+	}
+
+	if (memcmp(hash1, hash2, 64)) {
+		PrintAndLogEx(FAILED, "Couldn't verify integrity of Firmware file (wrong SHA-512)");
+		return 1;
+	}
+		
+	PrintAndLogEx(SUCCESS, "RDV4.0 Smartcard Socket Firmware uploading to PM3");
+
 	//Send to device
 	uint32_t index = 0;
 	uint32_t bytes_sent = 0;
-	uint32_t bytes_remaining = bytes_read;
+	uint32_t bytes_remaining = firmware_size;
 
 	while (bytes_remaining > 0){
 		uint32_t bytes_in_packet = MIN(USB_CMD_DATA_SIZE, bytes_remaining);
@@ -386,10 +714,10 @@ int CmdSmartUpgrade(const char *Cmd) {
 	}
 	free(dump);
 	printf("\n");
-	PrintAndLogEx(SUCCESS, "Smartcard socket firmware updating,  don\'t turn off your PM3!");
+	PrintAndLogEx(SUCCESS, "RDV4.0 Smartcard Socket Firmware updating,  don\'t turn off your PM3!");
 
 	// trigger the firmware upgrade
-	UsbCommand c = {CMD_SMART_UPGRADE, {bytes_read, 0, 0}};
+	UsbCommand c = {CMD_SMART_UPGRADE, {firmware_size, 0, 0}};
 	clearCommandBuffer();
 	SendCommand(&c);
 	UsbCommand resp;
@@ -398,9 +726,9 @@ int CmdSmartUpgrade(const char *Cmd) {
 		return 1;
 	}
 	if ( (resp.arg[0] & 0xFF ) )
-		PrintAndLogEx(SUCCESS, "Smartcard socket firmware upgraded successful");
+		PrintAndLogEx(SUCCESS, "RDV4.0 Smartcard Socket Firmware upgraded successful");
 	else
-		PrintAndLogEx(FAILED, "Smartcard socket firmware updating failed");
+		PrintAndLogEx(FAILED, "RDV4.0 Smartcard Socket Firmware Upgrade failed");
 	return 0;
 }
 
@@ -449,6 +777,28 @@ int CmdSmartInfo(const char *Cmd){
 	PrintAndLogEx(INFO, "ISO76183 ATR : %s", sprint_hex(card.atr, card.atr_len));
 	PrintAndLogEx(INFO, "look up ATR");
 	PrintAndLogEx(INFO, "http://smartcard-atr.appspot.com/parse?ATR=%s", sprint_hex_inrow(card.atr, card.atr_len) );
+
+	// print ATR
+	PrintAndLogEx(NORMAL, "");
+	PrintAndLogEx(NORMAL, "* ATR:");
+	PrintATR(card.atr, card.atr_len);
+
+	// print D/F (brom byte TA1 or defaults)
+	PrintAndLogEx(NORMAL, "");
+	PrintAndLogEx(NORMAL, "* D/F (TA1):");
+	int Di = GetATRDi(card.atr, card.atr_len);
+	int Fi = GetATRFi(card.atr, card.atr_len);
+	float F = GetATRF(card.atr, card.atr_len);
+	if (GetATRTA1(card.atr, card.atr_len) == 0x11)
+		PrintAndLogEx(INFO, "Using default values...");
+
+	PrintAndLogEx(NORMAL, "Di=%d", Di);
+	PrintAndLogEx(NORMAL, "Fi=%d", Fi);
+	PrintAndLogEx(NORMAL, "F=%.1f MHz", F);
+	PrintAndLogEx(NORMAL, "Cycles/ETU=%d", Fi/Di);
+	PrintAndLogEx(NORMAL, "%.1f bits/sec at 4MHz", (float)4000000 / (Fi/Di));
+	PrintAndLogEx(NORMAL, "%.1f bits/sec at Fmax=%.1fMHz", (F * 1000000) / (Fi/Di), F);
+
 	return 0;
 }
 
@@ -587,16 +937,16 @@ int CmdSmartBruteforceSFI(const char *Cmd) {
 			clearCommandBuffer();
 			SendCommand(&c);
 
-			smart_response(buf);
+			smart_response(data[1], buf);
 
 			// if 0x6C
 			if ( buf[0] == 0x6C ) {
-				data[4]	= buf[1];
+				data[4] = buf[1];
 
 				memcpy(c.d.asBytes, data, sizeof(data) );
 				clearCommandBuffer();
 				SendCommand(&c);
-				uint8_t len = smart_response(buf);
+				uint8_t len = smart_response(data[1], buf);
 
 				// TLV decoder
 				if (len > 4)
@@ -612,15 +962,15 @@ int CmdSmartBruteforceSFI(const char *Cmd) {
 }
 
 static command_t CommandTable[] = {
-	{"help",	CmdHelp,            1, "This help"},
-	{"list",	CmdSmartList,       0, "List ISO 7816 history"},
-	{"info",	CmdSmartInfo,		1, "Tag information"},
-	{"reader",	CmdSmartReader,		1, "Act like an IS07816 reader"},
-	{"raw",		CmdSmartRaw,		1, "Send raw hex data to tag"},
-	{"upgrade",	CmdSmartUpgrade,	1, "Upgrade firmware"},
-	{"setclock", CmdSmartSetClock,	1, "Set clock speed"},
-	{"brute", 	CmdSmartBruteforceSFI, 1, "Bruteforce SFI"},
-	{NULL, NULL, 0, NULL}
+	{"help",     CmdHelp,               1, "This help"},
+	{"list",     CmdSmartList,          0, "List ISO 7816 history"},
+	{"info",     CmdSmartInfo,          0, "Tag information"},
+	{"reader",   CmdSmartReader,        0, "Act like an IS07816 reader"},
+	{"raw",      CmdSmartRaw,           0, "Send raw hex data to tag"},
+	{"upgrade",  CmdSmartUpgrade,       0, "Upgrade firmware"},
+	{"setclock", CmdSmartSetClock,      0, "Set clock speed"},
+	{"brute",    CmdSmartBruteforceSFI, 0, "Bruteforce SFI"},
+	{NULL,       NULL,                  0, NULL}
 };
 
 int CmdSmartcard(const char *Cmd) {
