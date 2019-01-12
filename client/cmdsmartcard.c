@@ -13,6 +13,7 @@
 
 #include "ui.h"
 #include "cmdparser.h"
+#include "proxmark3.h"
 #include "util.h"
 #include "smartcard.h"
 #include "comms.h"
@@ -20,8 +21,10 @@
 #include "cmdhf.h"              // CmdHFlist
 #include "emv/apduinfo.h"       // APDUcode description
 #include "emv/emvcore.h"        // decodeTVL
+#include "crypto/libpcrypto.h"			// sha512hash
 #include "emv/dump.h"			// dump_buffer
 
+#define SC_UPGRADE_FILES_DIRECTORY          "sc_upgrade_firmware/"
 
 static int CmdHelp(const char *Cmd);
 
@@ -61,13 +64,13 @@ static int usage_sm_info(void) {
 }
 
 static int usage_sm_upgrade(void) {
-	PrintAndLogEx(NORMAL, "Upgrade firmware");
+	PrintAndLogEx(NORMAL, "Upgrade RDV4.0 Smartcard Socket Firmware");
 	PrintAndLogEx(NORMAL, "Usage:  sc upgrade f <file name>");
 	PrintAndLogEx(NORMAL, "       h               :  this help");
 	PrintAndLogEx(NORMAL, "       f <filename>    :  firmware file name");
 	PrintAndLogEx(NORMAL, "");
 	PrintAndLogEx(NORMAL, "Examples:");
-	PrintAndLogEx(NORMAL, "        sc upgrade f myfile");
+	PrintAndLogEx(NORMAL, "        sc upgrade f SIM010.BIN");
 	return 0;
 }
 
@@ -466,7 +469,7 @@ int CmdSmartRaw(const char *Cmd) {
 		}
 
 		if ( buf[0] == 0x6C ) {
-			data[4]	= buf[1];
+			data[4] = buf[1];
 
 			memcpy(c.d.asBytes, data, sizeof(data) );
 			clearCommandBuffer();
@@ -530,8 +533,10 @@ int ExchangeAPDUSC(uint8_t *datain, int datainlen, bool activateCard, bool leave
 
 int CmdSmartUpgrade(const char *Cmd) {
 
-	PrintAndLogEx(WARNING, "WARNING - Smartcard socket firmware upgrade.");
+	PrintAndLogEx(NORMAL, "");
+	PrintAndLogEx(WARNING, "WARNING - RDV4.0 Smartcard Socket Firmware upgrade.");
 	PrintAndLogEx(WARNING, "A dangerous command, do wrong and you will brick the smart card socket");
+	PrintAndLogEx(NORMAL, "");
 
 	FILE *f;
 	char filename[FILE_PATH_SIZE] = {0};
@@ -547,6 +552,7 @@ int CmdSmartUpgrade(const char *Cmd) {
 				errors = true;
 				break;
 			}
+
 			cmdp += 2;
 			break;
 		case 'h':
@@ -561,40 +567,131 @@ int CmdSmartUpgrade(const char *Cmd) {
 	//Validations
 	if (errors || cmdp == 0 ) return usage_sm_upgrade();
 
-	// load file
-	f = fopen(filename, "rb");
+	if (strchr(filename, '\\') || strchr(filename, '/')) {
+		PrintAndLogEx(FAILED, "Filename must not contain \\ or /. Firmware file will be found in client/sc_upgrade_firmware directory.");
+		return 1;
+	}
+	
+	char sc_upgrade_file_path[strlen(get_my_executable_directory()) + strlen(SC_UPGRADE_FILES_DIRECTORY) + strlen(filename) + 1];
+	strcpy(sc_upgrade_file_path, get_my_executable_directory());
+	strcat(sc_upgrade_file_path, SC_UPGRADE_FILES_DIRECTORY);
+	strcat(sc_upgrade_file_path, filename);
+	if (strlen(sc_upgrade_file_path) >= FILE_PATH_SIZE ) {
+		PrintAndLogEx(FAILED, "Filename too long");
+		return 1;
+	}
+
+	char sha512filename[FILE_PATH_SIZE];
+	char *bin_extension = filename;
+	char *dot_position = NULL;
+	while ((dot_position = strchr(bin_extension, '.')) != NULL) {
+		bin_extension = dot_position + 1;
+	}
+	if (!strcmp(bin_extension, "BIN") 
+#ifdef _WIN32
+	    || !strcmp(bin_extension, "bin")
+#endif
+	    ) {
+		strncpy(sha512filename, filename, strlen(filename) - strlen("bin"));
+		strcat(sha512filename, "sha512.txt");
+	} else {
+		PrintAndLogEx(FAILED, "Filename extension of Firmware Upgrade File must be .BIN");
+		return 1;
+	}
+	
+	PrintAndLogEx(INFO, "Checking integrity using SHA512 File %s ...", sha512filename);
+	char sc_upgrade_sha512file_path[strlen(get_my_executable_directory()) + strlen(SC_UPGRADE_FILES_DIRECTORY) + strlen(sha512filename) + 1];
+	strcpy(sc_upgrade_sha512file_path, get_my_executable_directory());
+	strcat(sc_upgrade_sha512file_path, SC_UPGRADE_FILES_DIRECTORY);
+	strcat(sc_upgrade_sha512file_path, sha512filename);
+	if (strlen(sc_upgrade_sha512file_path) >= FILE_PATH_SIZE ) {
+		PrintAndLogEx(FAILED, "Filename too long");
+		return 1;
+	}
+		
+	// load firmware file
+	f = fopen(sc_upgrade_file_path, "rb");
 	if ( !f ){
-		PrintAndLogEx(FAILED, "File: %s: not found or locked.", filename);
+		PrintAndLogEx(FAILED, "Firmware file not found or locked.");
 		return 1;
 	}
 
 	// get filesize in order to malloc memory
 	fseek(f, 0, SEEK_END);
-	long fsize = ftell(f);
+	size_t fsize = ftell(f);
 	fseek(f, 0, SEEK_SET);
 
-	if (fsize < 0) 	{
-		PrintAndLogEx(WARNING, "error, when getting filesize");
+	if (fsize < 0)  {
+		PrintAndLogEx(FAILED, "Could not determine size of firmware file");
 		fclose(f);
 		return 1;
 	}
 
 	uint8_t *dump = calloc(fsize, sizeof(uint8_t));
 	if (!dump) {
-		PrintAndLogEx(WARNING, "error, cannot allocate memory ");
+		PrintAndLogEx(FAILED, "Could not allocate memory for firmware");
 		fclose(f);
 		return 1;
 	}
 
-	size_t bytes_read = fread(dump, 1, fsize, f);
+	size_t firmware_size = fread(dump, 1, fsize, f);
 	if (f)
 		fclose(f);
 
-	PrintAndLogEx(SUCCESS, "Smartcard socket firmware uploading to PM3");
+	// load sha512 file
+	f = fopen(sc_upgrade_sha512file_path, "rb");
+	if ( !f ){
+		PrintAndLogEx(FAILED, "SHA-512 file not found or locked.");
+		return 1;
+	}
+
+	// get filesize in order to malloc memory
+	fseek(f, 0, SEEK_END);
+	fsize = ftell(f);
+	fseek(f, 0, SEEK_SET);
+
+	if (fsize < 0)  {
+		PrintAndLogEx(FAILED, "Could not determine size of SHA-512 file");
+		fclose(f);
+		return 1;
+	}
+	
+	if (fsize < 128) {
+		PrintAndLogEx(FAILED, "SHA-512 file too short");
+		fclose(f);
+		return 1;
+	}
+
+	char hashstring[129];
+	size_t bytes_read = fread(hashstring, 1, 128, f);
+	hashstring[128] = '\0';
+
+	if (f)
+		fclose(f);
+
+	uint8_t hash1[64];
+	if (bytes_read != 128 || param_gethex(hashstring, 0, hash1, 128)) {
+		PrintAndLogEx(FAILED, "Couldn't read SHA-512 file");
+		return 1;
+	}
+	
+	uint8_t hash2[64];
+	if (sha512hash(dump, firmware_size, hash2)) {
+		PrintAndLogEx(FAILED, "Couldn't calculate SHA-512 of Firmware");
+		return 1;
+	}
+
+	if (memcmp(hash1, hash2, 64)) {
+		PrintAndLogEx(FAILED, "Couldn't verify integrity of Firmware file (wrong SHA-512)");
+		return 1;
+	}
+		
+	PrintAndLogEx(SUCCESS, "RDV4.0 Smartcard Socket Firmware uploading to PM3");
+
 	//Send to device
 	uint32_t index = 0;
 	uint32_t bytes_sent = 0;
-	uint32_t bytes_remaining = bytes_read;
+	uint32_t bytes_remaining = firmware_size;
 
 	while (bytes_remaining > 0){
 		uint32_t bytes_in_packet = MIN(USB_CMD_DATA_SIZE, bytes_remaining);
@@ -617,10 +714,10 @@ int CmdSmartUpgrade(const char *Cmd) {
 	}
 	free(dump);
 	printf("\n");
-	PrintAndLogEx(SUCCESS, "Smartcard socket firmware updating,  don\'t turn off your PM3!");
+	PrintAndLogEx(SUCCESS, "RDV4.0 Smartcard Socket Firmware updating,  don\'t turn off your PM3!");
 
 	// trigger the firmware upgrade
-	UsbCommand c = {CMD_SMART_UPGRADE, {bytes_read, 0, 0}};
+	UsbCommand c = {CMD_SMART_UPGRADE, {firmware_size, 0, 0}};
 	clearCommandBuffer();
 	SendCommand(&c);
 	UsbCommand resp;
@@ -629,9 +726,9 @@ int CmdSmartUpgrade(const char *Cmd) {
 		return 1;
 	}
 	if ( (resp.arg[0] & 0xFF ) )
-		PrintAndLogEx(SUCCESS, "Smartcard socket firmware upgraded successful");
+		PrintAndLogEx(SUCCESS, "RDV4.0 Smartcard Socket Firmware upgraded successful");
 	else
-		PrintAndLogEx(FAILED, "Smartcard socket firmware updating failed");
+		PrintAndLogEx(FAILED, "RDV4.0 Smartcard Socket Firmware Upgrade failed");
 	return 0;
 }
 
@@ -844,7 +941,7 @@ int CmdSmartBruteforceSFI(const char *Cmd) {
 
 			// if 0x6C
 			if ( buf[0] == 0x6C ) {
-				data[4]	= buf[1];
+				data[4] = buf[1];
 
 				memcpy(c.d.asBytes, data, sizeof(data) );
 				clearCommandBuffer();
@@ -865,15 +962,15 @@ int CmdSmartBruteforceSFI(const char *Cmd) {
 }
 
 static command_t CommandTable[] = {
-	{"help",	CmdHelp,            1, "This help"},
-	{"list",	CmdSmartList,       0, "List ISO 7816 history"},
-	{"info",	CmdSmartInfo,		1, "Tag information"},
-	{"reader",	CmdSmartReader,		1, "Act like an IS07816 reader"},
-	{"raw",		CmdSmartRaw,		1, "Send raw hex data to tag"},
-	{"upgrade",	CmdSmartUpgrade,	1, "Upgrade firmware"},
-	{"setclock", CmdSmartSetClock,	1, "Set clock speed"},
-	{"brute", 	CmdSmartBruteforceSFI, 1, "Bruteforce SFI"},
-	{NULL, NULL, 0, NULL}
+	{"help",     CmdHelp,               1, "This help"},
+	{"list",     CmdSmartList,          0, "List ISO 7816 history"},
+	{"info",     CmdSmartInfo,          0, "Tag information"},
+	{"reader",   CmdSmartReader,        0, "Act like an IS07816 reader"},
+	{"raw",      CmdSmartRaw,           0, "Send raw hex data to tag"},
+	{"upgrade",  CmdSmartUpgrade,       0, "Upgrade firmware"},
+	{"setclock", CmdSmartSetClock,      0, "Set clock speed"},
+	{"brute",    CmdSmartBruteforceSFI, 0, "Bruteforce SFI"},
+	{NULL,       NULL,                  0, NULL}
 };
 
 int CmdSmartcard(const char *Cmd) {
