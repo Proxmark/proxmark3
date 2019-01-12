@@ -20,6 +20,7 @@
 #include "cmdhf.h"              // CmdHFlist
 #include "emv/apduinfo.h"       // APDUcode description
 #include "emv/emvcore.h"        // decodeTVL
+#include "emv/dump.h"			// dump_buffer
 
 
 static int CmdHelp(const char *Cmd);
@@ -90,6 +91,193 @@ static int usage_sm_brute(void) {
 	return 0;
 }
 
+uint8_t GetATRTA1(uint8_t *atr, size_t atrlen) {
+	if (atrlen > 2) {
+		uint8_t T0 = atr[1];
+		if (T0 & 0x10)
+			return atr[2];
+	}
+
+	return 0x11; // default value is 0x11, corresponding to fmax=5 MHz, Fi=372, Di=1.
+}
+
+int DiArray[] = {
+	0,  // b0000 RFU
+	1,  // b0001
+	2,
+	4,
+	8,
+	16,
+	32,  // b0110
+	64,  // b0111. This was RFU in ISO/IEC 7816-3:1997 and former. Some card readers or drivers may erroneously reject cards using this value
+	12,
+	20,
+	0,   // b1010 RFU
+	0,
+	0,   // ...
+	0,
+	0,
+	0    // b1111 RFU
+};
+
+int FiArray[] = {
+	372,    // b0000 Historical note: in ISO/IEC 7816-3:1989, this was assigned to cards with internal clock
+	372,    // b0001
+	558,    // b0010
+	744,    // b0011
+	1116,   // b0100
+	1488,   // b0101
+	1860,   // b0110
+	0,      // b0111 RFU
+	0,      // b1000 RFU
+	512,    // b1001
+	768,    // b1010
+	1024,   // b1011
+	1536,   // b1100
+	2048,   // b1101
+	0,      // b1110 RFU
+	0       // b1111 RFU
+};
+
+float FArray[] = {
+	4,    // b0000 Historical note: in ISO/IEC 7816-3:1989, this was assigned to cards with internal clock
+	5,    // b0001
+	6,    // b0010
+	8,    // b0011
+	12,   // b0100
+	16,   // b0101
+	20,   // b0110
+	0,    // b0111 RFU
+	0,    // b1000 RFU
+	5,    // b1001
+	7.5,  // b1010
+	10,   // b1011
+	15,   // b1100
+	20,   // b1101
+	0,    // b1110 RFU
+	0     // b1111 RFU
+};
+
+int GetATRDi(uint8_t *atr, size_t atrlen) {
+	uint8_t TA1 = GetATRTA1(atr, atrlen);
+
+	return DiArray[TA1 & 0x0f];  // The 4 low-order bits of TA1 (4th MSbit to 1st LSbit) encode Di
+}
+
+int GetATRFi(uint8_t *atr, size_t atrlen) {
+	uint8_t TA1 = GetATRTA1(atr, atrlen);
+
+	return FiArray[TA1 >> 4];  // The 4 high-order bits of TA1 (8th MSbit to 5th LSbit) encode fmax and Fi
+}
+
+float GetATRF(uint8_t *atr, size_t atrlen) {
+	uint8_t TA1 = GetATRTA1(atr, atrlen);
+
+	return FArray[TA1 >> 4];  // The 4 high-order bits of TA1 (8th MSbit to 5th LSbit) encode fmax and Fi
+}
+
+static int PrintATR(uint8_t *atr, size_t atrlen) {
+	uint8_t vxor = 0;
+	for (int i = 1; i < atrlen; i++)
+		vxor ^= atr[i];
+
+	if (vxor)
+		PrintAndLogEx(WARNING, "Check summ error. Must be 0 but: 0x%02x", vxor);
+	else
+		PrintAndLogEx(INFO, "Check summ OK.");
+
+	if (atr[0] != 0x3b)
+		PrintAndLogEx(WARNING, "Not a direct convention: 0x%02x", atr[0]);
+
+	uint8_t T0 = atr[1];
+	uint8_t K = T0 & 0x0F;
+	uint8_t TD1 = 0;
+
+	uint8_t T1len = 0;
+	uint8_t TD1len = 0;
+	uint8_t TDilen = 0;
+
+	if (T0 & 0x10) {
+		PrintAndLog("TA1 (Maximum clock frequency, proposed bit duration): 0x%02x", atr[2 + T1len]);
+		T1len++;
+	}
+	if (T0 & 0x20) {
+		PrintAndLog("TB1 (Deprecated: VPP requirements): 0x%02x", atr[2 + T1len]);
+		T1len++;
+	}
+	if (T0 & 0x40) {
+		PrintAndLog("TC1 (Extra delay between bytes required by card): 0x%02x", atr[2 + T1len]);
+		T1len++;
+	}
+	if (T0 & 0x80) {
+		TD1 = atr[2 + T1len];
+		PrintAndLog("TD1 (First offered transmission protocol, presence of TA2..TD2): 0x%02x. Protocol T=%d", TD1, TD1 & 0x0f);
+		T1len++;
+
+		if (TD1 & 0x10) {
+			PrintAndLog("TA2 (Specific protocol and parameters to be used after the ATR): 0x%02x", atr[2 + T1len + TD1len]);
+			TD1len++;
+		}
+		if (TD1 & 0x20) {
+			PrintAndLog("TB2 (Deprecated: VPP precise voltage requirement): 0x%02x", atr[2 + T1len + TD1len]);
+			TD1len++;
+		}
+		if (TD1 & 0x40) {
+			PrintAndLog("TC2 (Maximum waiting time for protocol T=0): 0x%02x", atr[2 + T1len + TD1len]);
+			TD1len++;
+		}
+		if (TD1 & 0x80) {
+			uint8_t TDi = atr[2 + T1len + TD1len];
+			PrintAndLog("TD2 (A supported protocol or more global parameters, presence of TA3..TD3): 0x%02x. Protocol T=%d", TDi, TDi & 0x0f);
+			TD1len++;
+
+			bool nextCycle = true;
+			uint8_t vi = 3;
+			while (nextCycle) {
+				nextCycle = false;
+				if (TDi & 0x10) {
+					PrintAndLog("TA%d: 0x%02x", vi, atr[2 + T1len + TD1len + TDilen]);
+					TDilen++;
+				}
+				if (TDi & 0x20) {
+					PrintAndLog("TB%d: 0x%02x", vi, atr[2 + T1len + TD1len + TDilen]);
+					TDilen++;
+				}
+				if (TDi & 0x40) {
+					PrintAndLog("TC%d: 0x%02x", vi, atr[2 + T1len + TD1len + TDilen]);
+					TDilen++;
+				}
+				if (TDi & 0x80) {
+					TDi = atr[2 + T1len + TD1len + TDilen];
+					PrintAndLog("TD%d: 0x%02x. Protocol T=%d", vi, TDi, TDi & 0x0f);
+					TDilen++;
+
+					nextCycle = true;
+					vi++;
+				}
+			}
+		}
+	}
+
+	uint8_t calen = 2 + T1len + TD1len + TDilen + K;
+
+	if (atrlen != calen && atrlen != calen + 1)  // may be CRC
+		PrintAndLogEx(ERR, "ATR length error. len: %d, T1len: %d, TD1len: %d, TDilen: %d, K: %d", atrlen, T1len, TD1len, TDilen, K);
+	else
+		PrintAndLogEx(INFO, "ATR length OK.");
+
+	PrintAndLog("Historical bytes len: 0x%02x", K);
+	if (K > 0)
+		PrintAndLog("The format of historical bytes: %02x", atr[2 + T1len + TD1len + TDilen]);
+	if (K > 1) {
+		PrintAndLog("Historical bytes:");
+		dump_buffer(&atr[2 + T1len + TD1len + TDilen], K, NULL, 1);
+	}
+
+	return 0;
+}
+
+
 static bool smart_select(bool silent) {
 	UsbCommand c = {CMD_SMART_ATR, {0, 0, 0}};
 	clearCommandBuffer();
@@ -137,29 +325,55 @@ static int smart_wait(uint8_t *data) {
 	return len;
 }
 
-static int smart_response(uint8_t *data) {
+static int smart_response(uint8_t apduINS, uint8_t *data) {
 
-	int len = -1;
 	int datalen = smart_wait(data);
+	bool needGetData = false;
 
-	if ( data[datalen - 2] == 0x61 || data[datalen - 2] == 0x9F ) {
-		len = data[datalen - 1];
-	}
-
-	if (len == -1 ) {
+	if (datalen < 2 ) {
 		goto out;
 	}
 
-	PrintAndLogEx(INFO, "Requesting response. len=0x%x", len);
-	uint8_t getstatus[] = {ISO7816_GETSTATUS, 0x00, 0x00, len};
-	UsbCommand cStatus = {CMD_SMART_RAW, {SC_RAW, sizeof(getstatus), 0}};
-	memcpy(cStatus.d.asBytes, getstatus, sizeof(getstatus) );
-	clearCommandBuffer();
-	SendCommand(&cStatus);
+	if (datalen > 2 && data[0] != apduINS) {
+		PrintAndLogEx(ERR, "Card ACK error. len=0x%x data[0]=%02x", datalen, data[0]);
+		datalen = 0;
+		goto out;
+	}
 
-	datalen = smart_wait(data);
-out:
+	if ( data[datalen - 2] == 0x61 || data[datalen - 2] == 0x9F ) {
+		needGetData = true;
+	}
 
+	if (needGetData) {
+		int len = data[datalen - 1];
+		PrintAndLogEx(INFO, "Requesting response. len=0x%x", len);
+		uint8_t getstatus[] = {ISO7816_GETSTATUS, 0x00, 0x00, len};
+		UsbCommand cStatus = {CMD_SMART_RAW, {SC_RAW, sizeof(getstatus), 0}};
+		memcpy(cStatus.d.asBytes, getstatus, sizeof(getstatus) );
+		clearCommandBuffer();
+		SendCommand(&cStatus);
+
+		datalen = smart_wait(data);
+
+		if (datalen < 2 ) {
+			goto out;
+		}
+		if (datalen > 2 && data[0] != ISO7816_GETSTATUS) {
+			PrintAndLogEx(ERR, "GetResponse ACK error. len=0x%x data[0]=%02x", len, data[0]);
+			datalen = 0;
+			goto out;
+		}
+
+		if (datalen != len + 2 + 1) { // 2 - response, 1 - ACK
+			PrintAndLogEx(WARNING, "GetResponse wrong length. Must be: 0x%02x but: 0x%02x", len, datalen - 3);
+		}
+	}
+
+	if (datalen > 2) {
+		datalen--;
+		memmove(data, &data[1], datalen);
+	}
+	out:
 	return datalen;
 }
 
@@ -225,13 +439,13 @@ int CmdSmartRaw(const char *Cmd) {
 	UsbCommand c = {CMD_SMART_RAW, {0, hexlen, 0}};
 
 	if (active || active_select) {
-        c.arg[0] |= SC_CONNECT;
-        if (active_select)
-            c.arg[0] |= SC_SELECT;
-    }
+		c.arg[0] |= SC_CONNECT;
+		if (active_select)
+			c.arg[0] |= SC_SELECT;
+	}
 
 	if (hexlen > 0) {
-        c.arg[0] |= SC_RAW;
+		c.arg[0] |= SC_RAW;
 	}
 
 	memcpy(c.d.asBytes, data, hexlen );
@@ -245,7 +459,7 @@ int CmdSmartRaw(const char *Cmd) {
 		if ( !buf )
 			return 1;
 
-		int len = smart_response(buf);
+		int len = smart_response(data[1], buf);
 		if ( len < 0 ) {
 			free(buf);
 			return 2;
@@ -257,7 +471,7 @@ int CmdSmartRaw(const char *Cmd) {
 			memcpy(c.d.asBytes, data, sizeof(data) );
 			clearCommandBuffer();
 			SendCommand(&c);
-			len = smart_response(buf);
+			len = smart_response(data[1], buf);
 
 			data[4] = 0;
 		}
@@ -285,12 +499,29 @@ int ExchangeAPDUSC(uint8_t *datain, int datainlen, bool activateCard, bool leave
 	clearCommandBuffer();
 	SendCommand(&c);
 
-	int len = smart_response(dataout);
+	int len = smart_response(datain[1], dataout);
 
 	if ( len < 0 ) {
 		return 2;
 	}
 
+
+	// retry
+	if (len > 1 && dataout[len - 2] == 0x6c && datainlen > 4) {
+		UsbCommand c2 = {CMD_SMART_RAW, {SC_RAW, datainlen, 0}};
+		memcpy(c2.d.asBytes, datain, datainlen);
+
+		int vlen = 5 + datain[4];
+		if (datainlen == vlen)
+			datainlen++;
+
+		c2.d.asBytes[vlen] = dataout[len - 1];
+
+		clearCommandBuffer();
+		SendCommand(&c2);
+
+		len = smart_response(datain[1], dataout);
+	}
 	*dataoutlen = len;
 
 	return 0;
@@ -449,6 +680,28 @@ int CmdSmartInfo(const char *Cmd){
 	PrintAndLogEx(INFO, "ISO76183 ATR : %s", sprint_hex(card.atr, card.atr_len));
 	PrintAndLogEx(INFO, "look up ATR");
 	PrintAndLogEx(INFO, "http://smartcard-atr.appspot.com/parse?ATR=%s", sprint_hex_inrow(card.atr, card.atr_len) );
+
+	// print ATR
+	PrintAndLogEx(NORMAL, "");
+	PrintAndLogEx(NORMAL, "* ATR:");
+	PrintATR(card.atr, card.atr_len);
+
+	// print D/F (brom byte TA1 or defaults)
+	PrintAndLogEx(NORMAL, "");
+	PrintAndLogEx(NORMAL, "* D/F (TA1):");
+	int Di = GetATRDi(card.atr, card.atr_len);
+	int Fi = GetATRFi(card.atr, card.atr_len);
+	float F = GetATRF(card.atr, card.atr_len);
+	if (GetATRTA1(card.atr, card.atr_len) == 0x11)
+		PrintAndLogEx(INFO, "Using default values...");
+
+	PrintAndLogEx(NORMAL, "Di=%d", Di);
+	PrintAndLogEx(NORMAL, "Fi=%d", Fi);
+	PrintAndLogEx(NORMAL, "F=%.1f MHz", F);
+	PrintAndLogEx(NORMAL, "Cycles/ETU=%d", Fi/Di);
+	PrintAndLogEx(NORMAL, "%.1f bits/sec at 4MHz", (float)4000000 / (Fi/Di));
+	PrintAndLogEx(NORMAL, "%.1f bits/sec at Fmax=%.1fMHz", (F * 1000000) / (Fi/Di), F);
+
 	return 0;
 }
 
@@ -587,7 +840,7 @@ int CmdSmartBruteforceSFI(const char *Cmd) {
 			clearCommandBuffer();
 			SendCommand(&c);
 
-			smart_response(buf);
+			smart_response(data[1], buf);
 
 			// if 0x6C
 			if ( buf[0] == 0x6C ) {
@@ -596,7 +849,7 @@ int CmdSmartBruteforceSFI(const char *Cmd) {
 				memcpy(c.d.asBytes, data, sizeof(data) );
 				clearCommandBuffer();
 				SendCommand(&c);
-				uint8_t len = smart_response(buf);
+				uint8_t len = smart_response(data[1], buf);
 
 				// TLV decoder
 				if (len > 4)
