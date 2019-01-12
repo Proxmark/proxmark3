@@ -751,12 +751,9 @@ void RAMFUNC SnoopIClass(void)
 
 			//if(!LogTrace(Uart.output,Uart.byteCnt, rsamples, Uart.parityBits,true)) break;
 			//if(!LogTrace(NULL, 0, Uart.endTime*16 - DELAY_READER_AIR2ARM_AS_SNIFFER, 0, true)) break;
-			if(tracing)	{
-				uint8_t parity[MAX_PARITY_SIZE];
-				GetParity(Uart.output, Uart.byteCnt, parity);
-				LogTrace(Uart.output,Uart.byteCnt, time_start, time_stop, parity, true);
-			}
-
+			uint8_t parity[MAX_PARITY_SIZE];
+			GetParity(Uart.output, Uart.byteCnt, parity);
+			LogTrace(Uart.output,Uart.byteCnt, time_start, time_stop, parity, true);
 
 			/* And ready to receive another command. */
 		    Uart.state = STATE_UNSYNCD;
@@ -779,11 +776,9 @@ void RAMFUNC SnoopIClass(void)
 			rsamples = samples - Demod.samples;
 		    LED_B_ON();
 
-			if(tracing)	{
-				uint8_t parity[MAX_PARITY_SIZE];
-				GetParity(Demod.output, Demod.len, parity);
-				LogTrace(Demod.output, Demod.len, time_start, time_stop, parity, false);
-			}
+			uint8_t parity[MAX_PARITY_SIZE];
+			GetParity(Demod.output, Demod.len, parity);
+			LogTrace(Demod.output, Demod.len, time_start, time_stop, parity, false);
 
 		    // And ready to receive another response.
 		    memset(&Demod, 0, sizeof(Demod));
@@ -1322,20 +1317,17 @@ int doIClassSimulation( int simulationMode, uint8_t *reader_mac_buf)
 			t2r_time = GetCountSspClk();
 		}
 
-		if (tracing) {
-			uint8_t parity[MAX_PARITY_SIZE];
-			GetParity(receivedCmd, len, parity);
-			LogTrace(receivedCmd,len, (r2t_time-time_0)<< 4, (r2t_time-time_0) << 4, parity, true);
+		uint8_t parity[MAX_PARITY_SIZE];
+		GetParity(receivedCmd, len, parity);
+		LogTrace(receivedCmd,len, (r2t_time-time_0)<< 4, (r2t_time-time_0) << 4, parity, true);
 
-			if (trace_data != NULL) {
-				GetParity(trace_data, trace_data_size, parity);
-				LogTrace(trace_data, trace_data_size, (t2r_time-time_0) << 4, (t2r_time-time_0) << 4, parity, false);
-			}
-			if(!tracing) {
-				DbpString("Trace full");
-				//break;
-			}
-
+		if (trace_data != NULL) {
+			GetParity(trace_data, trace_data_size, parity);
+			LogTrace(trace_data, trace_data_size, (t2r_time-time_0) << 4, (t2r_time-time_0) << 4, parity, false);
+		}
+		if(!get_tracing()) {
+			DbpString("Trace full");
+			//break;
 		}
 	}
 
@@ -1509,11 +1501,9 @@ void ReaderTransmitIClass(uint8_t* frame, int len)
 		LED_A_ON();
 
 	// Store reader command in buffer
-	if (tracing) {
-		uint8_t par[MAX_PARITY_SIZE];
-		GetParity(frame, len, par);
-		LogTrace(frame, len, rsamples, rsamples, par, true);
-	}
+	uint8_t par[MAX_PARITY_SIZE];
+	GetParity(frame, len, par);
+	LogTrace(frame, len, rsamples, rsamples, par, true);
 }
 
 //-----------------------------------------------------------------------------
@@ -1569,11 +1559,9 @@ int ReaderReceiveIClass(uint8_t* receivedAnswer)
   int samples = 0;
   if (!GetIClassAnswer(receivedAnswer,160,&samples,0)) return false;
   rsamples += samples;
-  if (tracing) {
-	uint8_t parity[MAX_PARITY_SIZE];
-	GetParity(receivedAnswer, Demod.len, parity);
-	LogTrace(receivedAnswer,Demod.len,rsamples,rsamples,parity,false);
-  }
+  uint8_t parity[MAX_PARITY_SIZE];
+  GetParity(receivedAnswer, Demod.len, parity);
+  LogTrace(receivedAnswer,Demod.len,rsamples,rsamples,parity,false);
   if(samples == 0) return false;
   return Demod.len;
 }
@@ -1715,7 +1703,7 @@ void ReaderIClass(uint8_t arg0) {
 		// if only looking for one card try 2 times if we missed it the first time
 		if (try_once && tryCnt > 2) break; 
 		tryCnt++;
-		if(!tracing) {
+		if(!get_tracing()) {
 			DbpString("Trace full");
 			break;
 		}
@@ -1828,7 +1816,7 @@ void ReaderIClass_Replay(uint8_t arg0, uint8_t *MAC) {
 	
 		WDT_HIT();
 
-		if(!tracing) {
+		if(!get_tracing()) {
 			DbpString("Trace full");
 			break;
 		}

@@ -12,7 +12,8 @@ This project uses the changelog in accordance with [keepchangelog](http://keepac
 
 ### Fixed
 - AC-Mode decoding for HitagS
-- Wrong UID at HitagS simulation 
+- Wrong UID at HitagS simulation
+- 'hf 15 sim' now works as expected (piwi)
 
 ### Added
 - Support Standard Communication Mode in HITAG S
@@ -24,6 +25,7 @@ This project uses the changelog in accordance with [keepchangelog](http://keepac
 - Added `hf fido` `assert` and `make` commands from fido2 protocol (authenticatorMakeCredential and authenticatorGetAssertion) (Merlok)
 - Added `lf paradox clone` to clone a Paradox card
 - Added `emv` commmands working for both contactless and smart cards (Merlok)
+- Added 'hf 15 snoop' (piwi)
 
 
 ## [v3.1.0][2018-10-10]

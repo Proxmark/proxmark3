@@ -386,10 +386,7 @@ void SimulateIso14443bTag(void)
 			break;
 		}
 
-		if (tracing) {
-			uint8_t parity[MAX_PARITY_SIZE];
-			LogTrace(receivedCmd, len, 0, 0, parity, true);
-		}
+		LogTrace(receivedCmd, len, 0, 0, NULL, true);
 
 		// Good, look at the command now.
 		if ( (len == sizeof(cmd1) && memcmp(receivedCmd, cmd1, len) == 0)
@@ -463,10 +460,7 @@ void SimulateIso14443bTag(void)
 		}
 
 		// trace the response:
-		if (tracing) {
-			uint8_t parity[MAX_PARITY_SIZE];
-			LogTrace(resp, respLen, 0, 0, parity, false);
-		}
+		LogTrace(resp, respLen, 0, 0, NULL, false);
 
 	}
 }
@@ -763,9 +757,8 @@ static void GetSamplesFor14443bDemod(int n, bool quiet)
 
 	if (!quiet) Dbprintf("max behindby = %d, samples = %d, gotFrame = %d, Demod.len = %d, Demod.sumI = %d, Demod.sumQ = %d", maxBehindBy, samples, gotFrame, Demod.len, Demod.sumI, Demod.sumQ);
 	//Tracing
-	if (tracing && Demod.len > 0) {
-		uint8_t parity[MAX_PARITY_SIZE];
-		LogTrace(Demod.output, Demod.len, 0, 0, parity, false);
+	if (Demod.len > 0) {
+		LogTrace(Demod.output, Demod.len, 0, 0, NULL, false);
 	}
 }
 
@@ -858,10 +851,7 @@ static void CodeAndTransmit14443bAsReader(const uint8_t *cmd, int len)
 {
 	CodeIso14443bAsReader(cmd, len);
 	TransmitFor14443b();
-	if (tracing) {
-		uint8_t parity[MAX_PARITY_SIZE];
-		LogTrace(cmd,len, 0, 0, parity, true);
-	}
+	LogTrace(cmd,len, 0, 0, NULL, true);
 }
 
 /* Sends an APDU to the tag
@@ -1153,7 +1143,6 @@ void RAMFUNC SnoopIso14443b(void)
 	upTo = dmaBuf;
 	lastRxCounter = ISO14443B_DMA_BUFFER_SIZE;
 	FpgaSetupSscDma((uint8_t*) dmaBuf, ISO14443B_DMA_BUFFER_SIZE);
-	uint8_t parity[MAX_PARITY_SIZE];
 
 	bool TagIsActive = false;
 	bool ReaderIsActive = false;
@@ -1198,9 +1187,7 @@ void RAMFUNC SnoopIso14443b(void)
 		if (!TagIsActive) {							// no need to try decoding reader data if the tag is sending
 			if(Handle14443bUartBit(ci & 0x01)) {
 				triggered = true;
-				if(tracing) {
-					LogTrace(Uart.output, Uart.byteCnt, samples, samples, parity, true);
-				}
+				LogTrace(Uart.output, Uart.byteCnt, samples, samples, NULL, true);
 				/* And ready to receive another command. */
 				UartReset();
 				/* And also reset the demod code, which might have been */
@@ -1209,9 +1196,7 @@ void RAMFUNC SnoopIso14443b(void)
 			}
 			if(Handle14443bUartBit(cq & 0x01)) {
 				triggered = true;
-				if(tracing) {
-					LogTrace(Uart.output, Uart.byteCnt, samples, samples, parity, true);
-				}
+				LogTrace(Uart.output, Uart.byteCnt, samples, samples, NULL, true);
 				/* And ready to receive another command. */
 				UartReset();
 				/* And also reset the demod code, which might have been */
@@ -1223,13 +1208,8 @@ void RAMFUNC SnoopIso14443b(void)
 
 		if(!ReaderIsActive && triggered) {						// no need to try decoding tag data if the reader is sending or not yet triggered
 			if(Handle14443bSamplesDemod(ci/2, cq/2)) {
-
 				//Use samples as a time measurement
-				if(tracing)
-				{
-					uint8_t parity[MAX_PARITY_SIZE];
-					LogTrace(Demod.output, Demod.len, samples, samples, parity, false);
-				}
+				LogTrace(Demod.output, Demod.len, samples, samples, NULL, false);
 				// And ready to receive another response.
 				DemodReset();
 			}

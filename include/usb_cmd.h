@@ -125,7 +125,7 @@ typedef struct{
 #define CMD_ISO_14443B_COMMAND                                            0x0305
 #define CMD_READER_ISO_15693                                              0x0310
 #define CMD_SIMTAG_ISO_15693                                              0x0311
-#define CMD_RECORD_RAW_ADC_SAMPLES_ISO_15693                              0x0312
+#define CMD_SNOOP_ISO_15693                                               0x0312
 #define CMD_ISO_15693_COMMAND                                             0x0313
 #define CMD_ISO_15693_COMMAND_DONE                                        0x0314
 #define CMD_ISO_15693_FIND_AFI                                            0x0315

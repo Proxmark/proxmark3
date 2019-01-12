@@ -24,6 +24,7 @@
 #include "legicrfsim.h"
 #include "hitag2.h"
 #include "hitagS.h"
+#include "iso15693.h"
 #include "lfsampling.h"
 #include "BigBuf.h"
 #include "mifareutil.h"
@@ -1115,8 +1116,9 @@ void UsbPacketReceived(uint8_t *packet, int len)
 		case CMD_ACQUIRE_RAW_ADC_SAMPLES_ISO_15693:
 			AcquireRawAdcSamplesIso15693();
 			break;
-		case CMD_RECORD_RAW_ADC_SAMPLES_ISO_15693:
-			RecordRawAdcSamplesIso15693();
+			
+		case CMD_SNOOP_ISO_15693:
+			SnoopIso15693();
 			break;
 			
 		case CMD_ISO_15693_COMMAND:

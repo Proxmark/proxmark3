@@ -36,8 +36,8 @@ static uint16_t BigBuf_hi = BIGBUF_SIZE;
 static uint8_t *emulator_memory = NULL;
 
 // trace related variables
-static uint16_t traceLen = 0;
-int tracing = 1; //Last global one.. todo static?
+static uint32_t traceLen = 0;
+static bool tracing = true;
 
 // get the address of BigBuf
 uint8_t *BigBuf_get_addr(void)
@@ -66,7 +66,7 @@ void BigBuf_Clear(void)
 // clear ALL of BigBuf
 void BigBuf_Clear_ext(bool verbose)
 {
-	memset(BigBuf,0,BIGBUF_SIZE);
+	memset(BigBuf, 0, BIGBUF_SIZE);
 	if (verbose) 
 		Dbprintf("Buffer cleared (%i bytes)",BIGBUF_SIZE);
 }
@@ -76,7 +76,7 @@ void BigBuf_Clear_EM(void){
 
 void BigBuf_Clear_keep_EM(void)
 {
-	memset(BigBuf,0,BigBuf_hi);
+	memset(BigBuf, 0, BigBuf_hi);
 }
 
 // allocate a chunk of memory from BigBuf. We allocate high memory first. The unallocated memory
@@ -162,8 +162,8 @@ bool RAMFUNC LogTrace(const uint8_t *btBytes, uint16_t iLen, uint32_t timestamp_
 
 	uint8_t *trace = BigBuf_get_addr();
 
-	uint16_t num_paritybytes = (iLen-1)/8 + 1;	// number of valid paritybytes in *parity
-	uint16_t duration = timestamp_end - timestamp_start;
+	uint32_t num_paritybytes = (iLen-1)/8 + 1;	// number of valid paritybytes in *parity
+	uint32_t duration = timestamp_end - timestamp_start;
 
 	// Return when trace is full
 	uint16_t max_traceLen = BigBuf_max_traceLen();
@@ -200,19 +200,23 @@ bool RAMFUNC LogTrace(const uint8_t *btBytes, uint16_t iLen, uint32_t timestamp_
 
 	// data bytes
 	if (btBytes != NULL && iLen != 0) {
-		memcpy(trace + traceLen, btBytes, iLen);
+		for (int i = 0; i < iLen; i++) {
+			trace[traceLen++] = *btBytes++;
+		}
 	}
-	traceLen += iLen;
 
 	// parity bytes
 	if (num_paritybytes != 0) {
 		if (parity != NULL) {
-			memcpy(trace + traceLen, parity, num_paritybytes);
+			for (int i = 0; i < num_paritybytes; i++) {
+				trace[traceLen++] = *parity++;
+			}
 		} else {
-			memset(trace + traceLen, 0x00, num_paritybytes);
+			for (int i = 0; i < num_paritybytes; i++) {
+				trace[traceLen++] = 0x00;
+			}
 		}
 	}
-	traceLen += num_paritybytes;
 
 	return true;
 }
@@ -259,8 +263,9 @@ int LogTraceHitag(const uint8_t * btBytes, int iBits, int iSamples, uint32_t dwP
 	trace[traceLen++] = ((dwParity >> 24) & 0xff);
 	trace[traceLen++] = iBits;
 
-	memcpy(trace + traceLen, btBytes, iLen);
-	traceLen += iLen;
+	for (int i = 0; i < iLen; i++) {
+		trace[traceLen++] = *btBytes++;
+	}
 
 	return true;
 }
