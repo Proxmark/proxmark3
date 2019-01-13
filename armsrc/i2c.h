@@ -23,6 +23,8 @@
 #define I2C_DEVICE_CMD_SETBAUD        0x04
 #define I2C_DEVICE_CMD_SIM_CLC        0x05
 #define I2C_DEVICE_CMD_GETVERSION     0x06
+#define I2C_DEVICE_CMD_SEND_T0        0x07
+
 
 bool I2C_is_available(void);
 
