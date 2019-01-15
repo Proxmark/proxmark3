@@ -276,8 +276,7 @@ int CmdHF14AMfDump(const char *Cmd)
 {
 	uint8_t sectorNo, blockNo;
 
-	uint8_t keyA[40][6];
-	uint8_t keyB[40][6];
+	uint8_t keys[2][40][6];
 	uint8_t rights[40][4];
 	uint8_t carddata[256][16];
 	uint8_t numSectors = 16;
@@ -290,38 +289,39 @@ int CmdHF14AMfDump(const char *Cmd)
 	char cmdp = param_getchar(Cmd, 0);
 	numSectors = ParamCardSizeSectors(cmdp);
 
-	if (strlen(Cmd) > 1 || cmdp == 'h' || cmdp == 'H') {
-		PrintAndLog("Usage:   hf mf dump [card memory]");
+	if (strlen(Cmd) > 3 || cmdp == 'h' || cmdp == 'H') {
+		PrintAndLog("Usage:   hf mf dump [card memory] [k|m]");
 		PrintAndLog("  [card memory]: 0 = 320 bytes (Mifare Mini), 1 = 1K (default), 2 = 2K, 4 = 4K");
+		PrintAndLog("  k: Always try using both Key A and Key B for each sector, even if access bits would prohibit it");
+		PrintAndLog("  m: When missing access bits or keys, replace that block with NULL");
 		PrintAndLog("");
 		PrintAndLog("Samples: hf mf dump");
 		PrintAndLog("         hf mf dump 4");
+		PrintAndLog("         hf mf dump 4 m");
 		return 0;
 	}
+
+	char opts = param_getchar(Cmd, 1);
+	bool useBothKeysAlways = false;
+	if (opts == 'k' || opts == 'K') useBothKeysAlways = true;
+	bool nullMissingKeys = false;
+	if (opts == 'm' || opts == 'M') nullMissingKeys = true;
 
 	if ((fin = fopen("dumpkeys.bin","rb")) == NULL) {
 		PrintAndLog("Could not find file dumpkeys.bin");
 		return 1;
 	}
 
-	// Read keys A from file
-	for (sectorNo=0; sectorNo<numSectors; sectorNo++) {
-		size_t bytes_read = fread(keyA[sectorNo], 1, 6, fin);
-		if (bytes_read != 6) {
-			PrintAndLog("File reading error.");
-			fclose(fin);
-			return 2;
-		}
-	}
-
-	// Read keys B from file
-	for (sectorNo=0; sectorNo<numSectors; sectorNo++) {
-		size_t bytes_read = fread(keyB[sectorNo], 1, 6, fin);
-		if (bytes_read != 6) {
-			PrintAndLog("File reading error.");
-			fclose(fin);
-			return 2;
-		}
+	// Read keys from file
+	for (int group=0; group<=1; group++) {
+		for (sectorNo=0; sectorNo<numSectors; sectorNo++) {
+			size_t bytes_read = fread(keys[group][sectorNo], 1, 6, fin);
+			if (bytes_read != 6) {
+				PrintAndLog("File reading error.");
+				fclose(fin);
+				return 2;
+			}
+		}		
 	}
 
 	fclose(fin);
@@ -333,7 +333,8 @@ int CmdHF14AMfDump(const char *Cmd)
 	for (sectorNo = 0; sectorNo < numSectors; sectorNo++) {
 		for (tries = 0; tries < 3; tries++) {
 			UsbCommand c = {CMD_MIFARE_READBL, {FirstBlockOfSector(sectorNo) + NumBlocksPerSector(sectorNo) - 1, 0, 0}};
-			memcpy(c.d.asBytes, keyA[sectorNo], 6);
+			// At least the Access Conditions can always be read with key A.
+			memcpy(c.d.asBytes, keys[0][sectorNo], 6);
 			SendCommand(&c);
 
 			if (WaitForResponseTimeout(CMD_ACK,&resp,1500)) {
@@ -369,23 +370,41 @@ int CmdHF14AMfDump(const char *Cmd)
 			for (tries = 0; tries < 3; tries++) {
 				if (blockNo == NumBlocksPerSector(sectorNo) - 1) {		// sector trailer. At least the Access Conditions can always be read with key A.
 					UsbCommand c = {CMD_MIFARE_READBL, {FirstBlockOfSector(sectorNo) + blockNo, 0, 0}};
-					memcpy(c.d.asBytes, keyA[sectorNo], 6);
+					memcpy(c.d.asBytes, keys[0][sectorNo], 6);
 					SendCommand(&c);
 					received = WaitForResponseTimeout(CMD_ACK,&resp,1500);
+				} else if (useBothKeysAlways) {
+					// Always try both keys, even if access conditions wouldn't work.
+					for (int k=0; k<=1; k++) {
+						UsbCommand c = {CMD_MIFARE_READBL, {FirstBlockOfSector(sectorNo) + blockNo, 1, 0}};
+						memcpy(c.d.asBytes, keys[k][sectorNo], 6);
+						SendCommand(&c);
+						received = WaitForResponseTimeout(CMD_ACK,&resp,1500);
+
+						// Don't try the other one on success.
+						if (resp.arg[0] & 0xff) break;
+					}
 				} else {												// data block. Check if it can be read with key A or key B
 					uint8_t data_area = sectorNo<32?blockNo:blockNo/5;
 					if ((rights[sectorNo][data_area] == 0x03) || (rights[sectorNo][data_area] == 0x05)) {	// only key B would work
 						UsbCommand c = {CMD_MIFARE_READBL, {FirstBlockOfSector(sectorNo) + blockNo, 1, 0}};
-						memcpy(c.d.asBytes, keyB[sectorNo], 6);
+						memcpy(c.d.asBytes, keys[1][sectorNo], 6);
 						SendCommand(&c);
 						received = WaitForResponseTimeout(CMD_ACK,&resp,1500);
 					} else if (rights[sectorNo][data_area] == 0x07) {										// no key would work
-						isOK = false;
 						PrintAndLog("Access rights do not allow reading of sector %2d block %3d", sectorNo, blockNo);
-						tries = 2;
+						if (nullMissingKeys) {
+							memset(resp.d.asBytes, 0, 16);
+							resp.arg[0] = 1;
+							PrintAndLog("  ... filling the block with NULL");
+							received = true;
+						} else {
+							isOK = false;
+							tries = 2;
+						}
 					} else {																				// key A would work
 						UsbCommand c = {CMD_MIFARE_READBL, {FirstBlockOfSector(sectorNo) + blockNo, 0, 0}};
-						memcpy(c.d.asBytes, keyA[sectorNo], 6);
+						memcpy(c.d.asBytes, keys[0][sectorNo], 6);
 						SendCommand(&c);
 						received = WaitForResponseTimeout(CMD_ACK,&resp,1500);
 					}
@@ -400,18 +419,8 @@ int CmdHF14AMfDump(const char *Cmd)
 				isOK  = resp.arg[0] & 0xff;
 				uint8_t *data  = resp.d.asBytes;
 				if (blockNo == NumBlocksPerSector(sectorNo) - 1) {		// sector trailer. Fill in the keys.
-					data[0]  = (keyA[sectorNo][0]);
-					data[1]  = (keyA[sectorNo][1]);
-					data[2]  = (keyA[sectorNo][2]);
-					data[3]  = (keyA[sectorNo][3]);
-					data[4]  = (keyA[sectorNo][4]);
-					data[5]  = (keyA[sectorNo][5]);
-					data[10] = (keyB[sectorNo][0]);
-					data[11] = (keyB[sectorNo][1]);
-					data[12] = (keyB[sectorNo][2]);
-					data[13] = (keyB[sectorNo][3]);
-					data[14] = (keyB[sectorNo][4]);
-					data[15] = (keyB[sectorNo][5]);
+					memcpy(data, keys[0][sectorNo], 6);
+					memcpy(data + 10, keys[1][sectorNo], 6);
 				}
 				if (isOK) {
 					memcpy(carddata[FirstBlockOfSector(sectorNo) + blockNo], data, 16);
