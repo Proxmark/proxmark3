@@ -18,7 +18,7 @@
 #include "smartcard.h"
 #include "comms.h"
 #include "protocols.h"
-#include "cmdhf.h"              // CmdHFlist
+#include "cmdhflist.h"
 #include "emv/apduinfo.h"       // APDUcode description
 #include "emv/emvcore.h"        // decodeTVL
 #include "crypto/libpcrypto.h"			// sha512hash

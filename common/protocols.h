@@ -234,6 +234,8 @@ NXP/Philips CUSTOM COMMANDS
 #define TOPAZ         3
 #define PROTO_MIFARE  4
 #define ISO_7816_4    5
+#define ISO_15693     6
+
 
 //-- Picopass fuses
 #define FUSE_FPERS   0x80
