@@ -339,7 +339,7 @@ static void TransmitTo15693Reader(const uint8_t *cmd, size_t len, uint32_t start
 //          false if we are still waiting for some more
 //=============================================================================
 
-#define NOISE_THRESHOLD    30      // don't try to correlate noise
+#define NOISE_THRESHOLD    160      // don't try to correlate noise
 
 typedef struct DecodeTag {
 	enum {
