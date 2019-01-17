@@ -584,7 +584,7 @@ int CmdSmartUpgrade(const char *Cmd) {
 		return 1;
 	}
 
-	char sha512filename[FILE_PATH_SIZE];
+	char sha512filename[FILE_PATH_SIZE] = {'\0'};
 	char *bin_extension = filename;
 	char *dot_position = NULL;
 	while ((dot_position = strchr(bin_extension, '.')) != NULL) {
@@ -595,7 +595,7 @@ int CmdSmartUpgrade(const char *Cmd) {
 	    || !strcmp(bin_extension, "bin")
 #endif
 	    ) {
-		strncpy(sha512filename, filename, strlen(filename) - strlen("bin"));
+		memcpy(sha512filename, filename, strlen(filename) - strlen("bin"));
 		strcat(sha512filename, "sha512.txt");
 	} else {
 		PrintAndLogEx(FAILED, "Filename extension of Firmware Upgrade File must be .BIN");
