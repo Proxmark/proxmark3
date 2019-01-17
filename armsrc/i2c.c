@@ -713,7 +713,7 @@ void SmartCardRaw( uint64_t arg0, uint64_t arg1, uint8_t *data ) {
 
 		I2C_Reset_EnterMainProgram();
 
-		if (flags & SC_SELECT) {
+		if ((flags & SC_SELECT)) {
 			smart_card_atr_t card;
 			bool gotATR = GetATR( &card );
 			//cmd_send(CMD_ACK, gotATR, sizeof(smart_card_atr_t), 0, &card, sizeof(smart_card_atr_t));
@@ -722,14 +722,14 @@ void SmartCardRaw( uint64_t arg0, uint64_t arg1, uint8_t *data ) {
 		}
 	}
 
-	if ((flags & SC_RAW)) {
+	if ((flags & SC_RAW) || (flags & SC_RAW_T0)) {
 
 		LogTrace(data, arg1, 0, 0, NULL, true);
 
 		// Send raw bytes
 		// asBytes = A0 A4 00 00 02
 		// arg1 = len 5
-		bool res = I2C_BufferWrite(data, arg1, I2C_DEVICE_CMD_SEND, I2C_DEVICE_ADDRESS_MAIN);
+		bool res = I2C_BufferWrite(data, arg1, ((flags & SC_RAW_T0) ? I2C_DEVICE_CMD_SEND_T0 : I2C_DEVICE_CMD_SEND), I2C_DEVICE_ADDRESS_MAIN);
 		if ( !res && MF_DBGLEVEL > 3 ) DbpString(I2C_ERROR);
 
 		// read bytes from module

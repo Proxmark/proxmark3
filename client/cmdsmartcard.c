@@ -21,7 +21,7 @@
 #include "cmdhflist.h"
 #include "emv/apduinfo.h"       // APDUcode description
 #include "emv/emvcore.h"        // decodeTVL
-#include "crypto/libpcrypto.h"			// sha512hash
+#include "crypto/libpcrypto.h"	// sha512hash
 #include "emv/dump.h"			// dump_buffer
 
 #define SC_UPGRADE_FILES_DIRECTORY          "sc_upgrade_firmware/"
@@ -32,14 +32,15 @@ static int usage_sm_raw(void) {
 	PrintAndLogEx(NORMAL, "Usage: sc raw [h|r|c] d <0A 0B 0C ... hex>");
 	PrintAndLogEx(NORMAL, "       h          :  this help");
 	PrintAndLogEx(NORMAL, "       r          :  do not read response");
-	PrintAndLogEx(NORMAL, "       a          :  active smartcard without select");
-	PrintAndLogEx(NORMAL, "       s          :  active smartcard with select");
+	PrintAndLogEx(NORMAL, "       a          :  active smartcard without select (reset sc module)");
+	PrintAndLogEx(NORMAL, "       s          :  active smartcard with select (get ATR)");
 	PrintAndLogEx(NORMAL, "       t          :  executes TLV decoder if it possible");
+	PrintAndLogEx(NORMAL, "       0          :  use protocol T=0");
 	PrintAndLogEx(NORMAL, "       d <bytes>  :  bytes to send");
 	PrintAndLogEx(NORMAL, "");
 	PrintAndLogEx(NORMAL, "Examples:");
-	PrintAndLogEx(NORMAL, "        sc raw d 00a404000e315041592e5359532e444446303100    - `1PAY.SYS.DDF01` PPSE directory");
-	PrintAndLogEx(NORMAL, "        sc raw d 00a404000e325041592e5359532e444446303100    - `2PAY.SYS.DDF01` PPSE directory");
+	PrintAndLogEx(NORMAL, "        sc raw s 0 d 00a404000e315041592e5359532e4444463031  - `1PAY.SYS.DDF01` PPSE directory with get ATR");
+	PrintAndLogEx(NORMAL, "        sc raw 0 d 00a404000e325041592e5359532e4444463031    - `2PAY.SYS.DDF01` PPSE directory");
 	return 0;
 }
 
@@ -180,58 +181,46 @@ float GetATRF(uint8_t *atr, size_t atrlen) {
 }
 
 static int PrintATR(uint8_t *atr, size_t atrlen) {
-	uint8_t vxor = 0;
-	for (int i = 1; i < atrlen; i++)
-		vxor ^= atr[i];
-
-	if (vxor)
-		PrintAndLogEx(WARNING, "Check summ error. Must be 0 but: 0x%02x", vxor);
-	else
-		PrintAndLogEx(INFO, "Check summ OK.");
-
-	if (atr[0] != 0x3b)
-		PrintAndLogEx(WARNING, "Not a direct convention: 0x%02x", atr[0]);
 
 	uint8_t T0 = atr[1];
 	uint8_t K = T0 & 0x0F;
-	uint8_t TD1 = 0;
-
-	uint8_t T1len = 0;
-	uint8_t TD1len = 0;
-	uint8_t TDilen = 0;
+	uint8_t TD1 = 0, T1len = 0, TD1len = 0, TDilen = 0;
 
 	if (T0 & 0x10) {
-		PrintAndLog("TA1 (Maximum clock frequency, proposed bit duration): 0x%02x", atr[2 + T1len]);
+		PrintAndLog("\t- TA1 (Maximum clock frequency, proposed bit duration) [ 0x%02x ]", atr[2 + T1len]);
 		T1len++;
 	}
+	
 	if (T0 & 0x20) {
-		PrintAndLog("TB1 (Deprecated: VPP requirements): 0x%02x", atr[2 + T1len]);
+		PrintAndLog("\t- TB1 (Deprecated: VPP requirements) [ 0x%02x ]", atr[2 + T1len]);
 		T1len++;
 	}
+	
 	if (T0 & 0x40) {
-		PrintAndLog("TC1 (Extra delay between bytes required by card): 0x%02x", atr[2 + T1len]);
+		PrintAndLog("\t- TC1 (Extra delay between bytes required by card) [ 0x%02x ]", atr[2 + T1len]);
 		T1len++;
 	}
+	
 	if (T0 & 0x80) {
 		TD1 = atr[2 + T1len];
-		PrintAndLog("TD1 (First offered transmission protocol, presence of TA2..TD2): 0x%02x. Protocol T=%d", TD1, TD1 & 0x0f);
+		PrintAndLog("\t- TD1 (First offered transmission protocol, presence of TA2..TD2) [ 0x%02x ] Protocol T%d", TD1, TD1 & 0x0f);
 		T1len++;
 
 		if (TD1 & 0x10) {
-			PrintAndLog("TA2 (Specific protocol and parameters to be used after the ATR): 0x%02x", atr[2 + T1len + TD1len]);
+			PrintAndLog("\t- TA2 (Specific protocol and parameters to be used after the ATR) [ 0x%02x ]", atr[2 + T1len + TD1len]);
 			TD1len++;
 		}
 		if (TD1 & 0x20) {
-			PrintAndLog("TB2 (Deprecated: VPP precise voltage requirement): 0x%02x", atr[2 + T1len + TD1len]);
+			PrintAndLog("\t- TB2 (Deprecated: VPP precise voltage requirement) [ 0x%02x ]", atr[2 + T1len + TD1len]);
 			TD1len++;
 		}
 		if (TD1 & 0x40) {
-			PrintAndLog("TC2 (Maximum waiting time for protocol T=0): 0x%02x", atr[2 + T1len + TD1len]);
+			PrintAndLog("\t- TC2 (Maximum waiting time for protocol T=0) [ 0x%02x ]", atr[2 + T1len + TD1len]);
 			TD1len++;
 		}
 		if (TD1 & 0x80) {
 			uint8_t TDi = atr[2 + T1len + TD1len];
-			PrintAndLog("TD2 (A supported protocol or more global parameters, presence of TA3..TD3): 0x%02x. Protocol T=%d", TDi, TDi & 0x0f);
+			PrintAndLog("\t- TD2 (A supported protocol or more global parameters, presence of TA3..TD3) [ 0x%02x ] Protocol T%d", TDi, TDi & 0x0f);
 			TD1len++;
 
 			bool nextCycle = true;
@@ -239,20 +228,20 @@ static int PrintATR(uint8_t *atr, size_t atrlen) {
 			while (nextCycle) {
 				nextCycle = false;
 				if (TDi & 0x10) {
-					PrintAndLog("TA%d: 0x%02x", vi, atr[2 + T1len + TD1len + TDilen]);
+					PrintAndLog("\t- TA%d: 0x%02x", vi, atr[2 + T1len + TD1len + TDilen]);
 					TDilen++;
 				}
 				if (TDi & 0x20) {
-					PrintAndLog("TB%d: 0x%02x", vi, atr[2 + T1len + TD1len + TDilen]);
+					PrintAndLog("\t- TB%d: 0x%02x", vi, atr[2 + T1len + TD1len + TDilen]);
 					TDilen++;
 				}
 				if (TDi & 0x40) {
-					PrintAndLog("TC%d: 0x%02x", vi, atr[2 + T1len + TD1len + TDilen]);
+					PrintAndLog("\t- TC%d: 0x%02x", vi, atr[2 + T1len + TD1len + TDilen]);
 					TDilen++;
 				}
 				if (TDi & 0x80) {
 					TDi = atr[2 + T1len + TD1len + TDilen];
-					PrintAndLog("TD%d: 0x%02x. Protocol T=%d", vi, TDi, TDi & 0x0f);
+					PrintAndLog("\t- TD%d [ 0x%02x ] Protocol T%d", vi, TDi, TDi & 0x0f);
 					TDilen++;
 
 					nextCycle = true;
@@ -262,24 +251,34 @@ static int PrintATR(uint8_t *atr, size_t atrlen) {
 		}
 	}
 
+	uint8_t vxor = 0;
+	for (int i = 1; i < atrlen; i++)
+		vxor ^= atr[i];
+	
+	if (vxor)
+		PrintAndLogEx(WARNING, "Check summ error. Must be 0 got 0x%02X", vxor);
+	else
+		PrintAndLogEx(INFO, "Check summ OK.");
+
+	if (atr[0] != 0x3b)
+		PrintAndLogEx(WARNING, "Not a direct convention [ 0x%02x ]", atr[0]);
+
+	
 	uint8_t calen = 2 + T1len + TD1len + TDilen + K;
 
 	if (atrlen != calen && atrlen != calen + 1)  // may be CRC
 		PrintAndLogEx(ERR, "ATR length error. len: %d, T1len: %d, TD1len: %d, TDilen: %d, K: %d", atrlen, T1len, TD1len, TDilen, K);
-	else
-		PrintAndLogEx(INFO, "ATR length OK.");
 
-	PrintAndLog("Historical bytes len: 0x%02x", K);
 	if (K > 0)
-		PrintAndLog("The format of historical bytes: %02x", atr[2 + T1len + TD1len + TDilen]);
+		PrintAndLogEx(INFO, "\nHistorical bytes | len 0x%02d | format %02x", K, atr[2 + T1len + TD1len + TDilen]);
+	
 	if (K > 1) {
-		PrintAndLog("Historical bytes:");
+		PrintAndLogEx(INFO, "\tHistorical bytes");
 		dump_buffer(&atr[2 + T1len + TD1len + TDilen], K, NULL, 1);
 	}
 
 	return 0;
 }
-
 
 static bool smart_select(bool silent) {
 	UsbCommand c = {CMD_SMART_ATR, {0, 0, 0}};
@@ -310,7 +309,7 @@ static bool smart_select(bool silent) {
 static int smart_wait(uint8_t *data) {
 	UsbCommand resp;
 	if (!WaitForResponseTimeout(CMD_ACK, &resp, 2500)) {
-		PrintAndLogEx(WARNING, "smart card response failed");
+		PrintAndLogEx(WARNING, "smart card response timeout");
 		return -1;
 	}
 
@@ -320,26 +319,21 @@ static int smart_wait(uint8_t *data) {
 		return -2;
 	}
 	memcpy(data, resp.d.asBytes, len);
-	PrintAndLogEx(SUCCESS, " %d | %s", len, sprint_hex_inrow_ex(data,  len, 32));
-
 	if (len >= 2) {
 		PrintAndLogEx(SUCCESS, "%02X%02X | %s", data[len - 2], data[len - 1], GetAPDUCodeDescription(data[len - 2], data[len - 1]));
+	} else {
+		PrintAndLogEx(SUCCESS, " %d | %s", len, sprint_hex_inrow_ex(data,  len, 8));
 	}
+	
 	return len;
 }
 
-static int smart_response(uint8_t apduINS, uint8_t *data) {
-
+static int smart_response(uint8_t *data) {
+ 
 	int datalen = smart_wait(data);
 	bool needGetData = false;
 
 	if (datalen < 2 ) {
-		goto out;
-	}
-
-	if (datalen > 2 && data[0] != apduINS) {
-		PrintAndLogEx(ERR, "Card ACK error. len=0x%x data[0]=%02x", datalen, data[0]);
-		datalen = 0;
 		goto out;
 	}
 
@@ -349,8 +343,8 @@ static int smart_response(uint8_t apduINS, uint8_t *data) {
 
 	if (needGetData) {
 		int len = data[datalen - 1];
-		PrintAndLogEx(INFO, "Requesting response. len=0x%x", len);
-		uint8_t getstatus[] = {ISO7816_GETSTATUS, 0x00, 0x00, len};
+		PrintAndLogEx(INFO, "Requesting 0x%02X bytes response", len);	
+		uint8_t getstatus[] = {0x00, ISO7816_GETSTATUS, 0x00, 0x00, len};
 		UsbCommand cStatus = {CMD_SMART_RAW, {SC_RAW, sizeof(getstatus), 0}};
 		memcpy(cStatus.d.asBytes, getstatus, sizeof(getstatus) );
 		clearCommandBuffer();
@@ -361,21 +355,26 @@ static int smart_response(uint8_t apduINS, uint8_t *data) {
 		if (datalen < 2 ) {
 			goto out;
 		}
-		if (datalen > 2 && data[0] != ISO7816_GETSTATUS) {
-			PrintAndLogEx(ERR, "GetResponse ACK error. len=0x%x data[0]=%02x", len, data[0]);
-			datalen = 0;
-			goto out;
-		}
 
-		if (datalen != len + 2 + 1) { // 2 - response, 1 - ACK
-			PrintAndLogEx(WARNING, "GetResponse wrong length. Must be: 0x%02x but: 0x%02x", len, datalen - 3);
+		// data wo ACK
+		if (datalen != len + 2) { 
+			// data with ACK
+			if (datalen == len + 2 + 1) { // 2 - response, 1 - ACK
+				if (data[0] != ISO7816_GETSTATUS) {
+					PrintAndLogEx(ERR, "GetResponse ACK error. len 0x%x | data[0] %02X", len, data[0]);	
+					datalen = 0;
+					goto out;
+				}
+
+				datalen--;
+				memmove(data, &data[1], datalen);
+			} else {
+				// wrong length
+				PrintAndLogEx(WARNING, "GetResponse wrong length. Must be 0x%02X got 0x%02X", len, datalen - 3);	
+			}
 		}
 	}
 
-	if (datalen > 2) {
-		datalen--;
-		memmove(data, &data[1], datalen);
-	}
 	out:
 	return datalen;
 }
@@ -385,6 +384,7 @@ int CmdSmartRaw(const char *Cmd) {
 	int hexlen = 0;
 	bool active = false;
 	bool active_select = false;
+    bool useT0 = false;	
 	uint8_t cmdp = 0;
 	bool errors = false, reply = true, decodeTLV = false, breakloop = false;
 	uint8_t data[USB_CMD_DATA_SIZE] = {0x00};
@@ -408,6 +408,10 @@ int CmdSmartRaw(const char *Cmd) {
 			decodeTLV = true;
 			cmdp++;
 			break;
+		case '0':
+			useT0 = true;
+			cmdp++;
+			break;			
 		case 'd': {
 			switch (param_gethex_to_eol(Cmd, cmdp+1, data, sizeof(data), &hexlen)) {
 			case 1:
@@ -448,7 +452,10 @@ int CmdSmartRaw(const char *Cmd) {
 	}
 
 	if (hexlen > 0) {
-		c.arg[0] |= SC_RAW;
+		if (useT0)
+			c.arg[0] |= SC_RAW_T0;
+		else
+			c.arg[0] |= SC_RAW;
 	}
 
 	memcpy(c.d.asBytes, data, hexlen );
@@ -462,7 +469,7 @@ int CmdSmartRaw(const char *Cmd) {
 		if ( !buf )
 			return 1;
 
-		int len = smart_response(data[1], buf);
+		int len = smart_response(buf);
 		if ( len < 0 ) {
 			free(buf);
 			return 2;
@@ -474,13 +481,13 @@ int CmdSmartRaw(const char *Cmd) {
 			memcpy(c.d.asBytes, data, sizeof(data) );
 			clearCommandBuffer();
 			SendCommand(&c);
-			len = smart_response(data[1], buf);
+			len = smart_response(buf);
 
 			data[4] = 0;
 		}
 
 		if (decodeTLV && len > 4)
-			TLVPrintFromBuffer(buf+1, len-3);
+			TLVPrintFromBuffer(buf, len-2);
 
 		free(buf);
 	}
@@ -492,38 +499,35 @@ int ExchangeAPDUSC(uint8_t *datain, int datainlen, bool activateCard, bool leave
 
 	if (activateCard)
 		smart_select(false);
-	printf("* APDU SC\n");
 
-	UsbCommand c = {CMD_SMART_RAW, {SC_RAW | SC_CONNECT, datainlen, 0}};
+	PrintAndLogEx(DEBUG, "APDU SC");
+
+	UsbCommand c = {CMD_SMART_RAW, {SC_RAW_T0, datainlen, 0}};	
 	if (activateCard) {
-		c.arg[0] |= SC_SELECT;
+		c.arg[0] |= SC_SELECT | SC_CONNECT;
 	}
 	memcpy(c.d.asBytes, datain, datainlen);
 	clearCommandBuffer();
 	SendCommand(&c);
 
-	int len = smart_response(datain[1], dataout);
+	int len = smart_response(dataout);
 
 	if ( len < 0 ) {
 		return 2;
 	}
 
-
 	// retry
 	if (len > 1 && dataout[len - 2] == 0x6c && datainlen > 4) {
-		UsbCommand c2 = {CMD_SMART_RAW, {SC_RAW, datainlen, 0}};
-		memcpy(c2.d.asBytes, datain, datainlen);
+		UsbCommand c2 = {CMD_SMART_RAW, {SC_RAW_T0, datainlen, 0}};	
+		memcpy(c2.d.asBytes, datain, 5);
 
-		int vlen = 5 + datain[4];
-		if (datainlen == vlen)
-			datainlen++;
-
-		c2.d.asBytes[vlen] = dataout[len - 1];
+		// transfer length via T=0
+		c2.d.asBytes[4] = dataout[len - 1];
 
 		clearCommandBuffer();
 		SendCommand(&c2);
 
-		len = smart_response(datain[1], dataout);
+		len = smart_response(dataout);
 	}
 	*dataoutlen = len;
 
@@ -552,7 +556,6 @@ int CmdSmartUpgrade(const char *Cmd) {
 				errors = true;
 				break;
 			}
-
 			cmdp += 2;
 			break;
 		case 'h':
@@ -581,7 +584,7 @@ int CmdSmartUpgrade(const char *Cmd) {
 		return 1;
 	}
 
-	char sha512filename[FILE_PATH_SIZE] = {'\0'};
+	char sha512filename[FILE_PATH_SIZE];
 	char *bin_extension = filename;
 	char *dot_position = NULL;
 	while ((dot_position = strchr(bin_extension, '.')) != NULL) {
@@ -592,7 +595,7 @@ int CmdSmartUpgrade(const char *Cmd) {
 	    || !strcmp(bin_extension, "bin")
 #endif
 	    ) {
-		memcpy(sha512filename, filename, strlen(filename) - strlen("bin"));
+		strncpy(sha512filename, filename, strlen(filename) - strlen("bin"));
 		strcat(sha512filename, "sha512.txt");
 	} else {
 		PrintAndLogEx(FAILED, "Filename extension of Firmware Upgrade File must be .BIN");
@@ -772,32 +775,36 @@ int CmdSmartInfo(const char *Cmd){
 	memcpy(&card, (smart_card_atr_t *)resp.d.asBytes, sizeof(smart_card_atr_t));
 
 	// print header
-	PrintAndLogEx(INFO, "\n--- Smartcard Information ---------");
+	PrintAndLogEx(INFO, "--- Smartcard Information ---------");
 	PrintAndLogEx(INFO, "-------------------------------------------------------------");
-	PrintAndLogEx(INFO, "ISO76183 ATR : %s", sprint_hex(card.atr, card.atr_len));
-	PrintAndLogEx(INFO, "look up ATR");
-	PrintAndLogEx(INFO, "http://smartcard-atr.appspot.com/parse?ATR=%s", sprint_hex_inrow(card.atr, card.atr_len) );
+	PrintAndLogEx(INFO, "ISO7618-3 ATR : %s", sprint_hex(card.atr, card.atr_len));
+	PrintAndLogEx(INFO, "\nhttp://smartcard-atr.appspot.com/parse?ATR=%s", sprint_hex_inrow(card.atr, card.atr_len) );
 
 	// print ATR
 	PrintAndLogEx(NORMAL, "");
-	PrintAndLogEx(NORMAL, "* ATR:");
+	PrintAndLogEx(INFO, "ATR");
 	PrintATR(card.atr, card.atr_len);
 
 	// print D/F (brom byte TA1 or defaults)
 	PrintAndLogEx(NORMAL, "");
-	PrintAndLogEx(NORMAL, "* D/F (TA1):");
+	PrintAndLogEx(INFO, "D/F (TA1)");
 	int Di = GetATRDi(card.atr, card.atr_len);
 	int Fi = GetATRFi(card.atr, card.atr_len);
 	float F = GetATRF(card.atr, card.atr_len);
 	if (GetATRTA1(card.atr, card.atr_len) == 0x11)
 		PrintAndLogEx(INFO, "Using default values...");
 
-	PrintAndLogEx(NORMAL, "Di=%d", Di);
-	PrintAndLogEx(NORMAL, "Fi=%d", Fi);
-	PrintAndLogEx(NORMAL, "F=%.1f MHz", F);
-	PrintAndLogEx(NORMAL, "Cycles/ETU=%d", Fi/Di);
-	PrintAndLogEx(NORMAL, "%.1f bits/sec at 4MHz", (float)4000000 / (Fi/Di));
-	PrintAndLogEx(NORMAL, "%.1f bits/sec at Fmax=%.1fMHz", (F * 1000000) / (Fi/Di), F);
+	PrintAndLogEx(NORMAL, "\t- Di=%d", Di);
+	PrintAndLogEx(NORMAL, "\t- Fi=%d", Fi);
+	PrintAndLogEx(NORMAL, "\t- F=%.1f MHz", F);
+  
+	if (Di && Fi) {
+		PrintAndLogEx(NORMAL, "\t- Cycles/ETU=%d", Fi/Di);
+		PrintAndLogEx(NORMAL, "\t- %.1f bits/sec at 4MHz", (float)4000000 / (Fi/Di));
+		PrintAndLogEx(NORMAL, "\t- %.1f bits/sec at Fmax=%.1fMHz", (F * 1000000) / (Fi/Di), F);
+	} else {
+		PrintAndLogEx(WARNING, "\t- Di or Fi is RFU.");
+	};
 
 	return 0;
 }
@@ -917,8 +924,9 @@ int CmdSmartBruteforceSFI(const char *Cmd) {
 	}
 
 	PrintAndLogEx(INFO, "Selecting PPSE aid");
-	CmdSmartRaw("d 00a404000e325041592e5359532e444446303100");
-	CmdSmartRaw("d 00a4040007a000000004101000");
+	CmdSmartRaw("s 0 t d 00a404000e325041592e5359532e4444463031");
+	CmdSmartRaw("0 t d 00a4040007a000000004101000");  // mastercard
+//	CmdSmartRaw("0 t d 00a4040007a0000000031010"); // visa
 
 	PrintAndLogEx(INFO, "starting");
 
@@ -937,16 +945,15 @@ int CmdSmartBruteforceSFI(const char *Cmd) {
 			clearCommandBuffer();
 			SendCommand(&c);
 
-			smart_response(data[1], buf);
+			smart_response(buf);
 
-			// if 0x6C
 			if ( buf[0] == 0x6C ) {
 				data[4] = buf[1];
 
 				memcpy(c.d.asBytes, data, sizeof(data) );
 				clearCommandBuffer();
 				SendCommand(&c);
-				uint8_t len = smart_response(data[1], buf);
+				uint8_t len = smart_response(buf);
 
 				// TLV decoder
 				if (len > 4)
