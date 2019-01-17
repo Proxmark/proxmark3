@@ -123,7 +123,7 @@ static bool print_cb(void *data, const struct tlv *tlv, int level, bool is_leaf)
 	return true;
 }
 
-void TLVPrintFromBuffer(uint8_t *data, int datalen) {
+bool TLVPrintFromBuffer(uint8_t *data, int datalen) {
 	struct tlvdb *t = NULL;
 	t = tlvdb_parse_multi(data, datalen);
 	if (t) {
@@ -131,9 +131,11 @@ void TLVPrintFromBuffer(uint8_t *data, int datalen) {
 
 		tlvdb_visit(t, print_cb, NULL, 0);
 		tlvdb_free(t);
+		return true;
 	} else {
 		PrintAndLogEx(WARNING, "TLV ERROR: Can't parse response as TLV tree.");
 	}
+	return false;
 }
 
 void TLVPrintFromTLVLev(struct tlvdb *tlv, int level) {
@@ -335,14 +337,14 @@ int EMVSelectPSE(EMVCommandChannel channel, bool ActivateField, bool LeaveFieldO
 	return res;
 }
 
-int EMVSearchPSE(EMVCommandChannel channel, bool ActivateField, bool LeaveFieldON, bool decodeTLV, struct tlvdb *tlv) {
+int EMVSearchPSE(EMVCommandChannel channel, bool ActivateField, bool LeaveFieldON, uint8_t PSENum, bool decodeTLV, struct tlvdb *tlv) {
 	uint8_t data[APDU_RES_LEN] = {0};
 	size_t datalen = 0;
 	uint16_t sw = 0;
 	int res;
 
 	// select PPSE
-	res = EMVSelectPSE(channel, ActivateField, true, 2, data, sizeof(data), &datalen, &sw);
+	res = EMVSelectPSE(channel, ActivateField, true, PSENum, data, sizeof(data), &datalen, &sw);
 
 	if (!res){
 		struct tlvdb *t = NULL;
@@ -522,7 +524,7 @@ int MSCComputeCryptoChecksum(EMVCommandChannel channel, bool LeaveFieldON, uint8
 }
 
 // Authentication
-static struct emv_pk *get_ca_pk(struct tlvdb *db) {
+struct emv_pk *get_ca_pk(struct tlvdb *db) {
 	const struct tlv *df_tlv = tlvdb_get(db, 0x84, NULL);
 	const struct tlv *caidx_tlv = tlvdb_get(db, 0x8f, NULL);
 
@@ -903,7 +905,7 @@ int RecoveryCertificates(struct tlvdb *tlvRoot, json_t *root) {
 		PrintAndLog("WARNING: Issuer certificate not found. Exit.");
 		return 2;
 	}
-	PrintAndLog("Issuer PK recovered. RID %02hhx:%02hhx:%02hhx:%02hhx:%02hhx IDX %02hhx CSN %02hhx:%02hhx:%02hhx",
+	PrintAndLogEx(SUCCESS, "Issuer PK recovered. RID %02hhx:%02hhx:%02hhx:%02hhx:%02hhx IDX %02hhx CSN %02hhx:%02hhx:%02hhx",
 			issuer_pk->rid[0],
 			issuer_pk->rid[1],
 			issuer_pk->rid[2],
@@ -926,10 +928,10 @@ int RecoveryCertificates(struct tlvdb *tlvRoot, json_t *root) {
 	if (!icc_pk) {
 		emv_pk_free(pk);
 		emv_pk_free(issuer_pk);
-		PrintAndLog("WARNING: ICC certificate not found. Exit.");
+		PrintAndLogEx(WARNING, "WARNING: ICC certificate not found. Exit.");
 		return 2;
 	}
-	printf("ICC PK recovered. RID %02hhx:%02hhx:%02hhx:%02hhx:%02hhx IDX %02hhx CSN %02hhx:%02hhx:%02hhx\n",
+	PrintAndLogEx(SUCCESS, "ICC PK recovered. RID %02hhx:%02hhx:%02hhx:%02hhx:%02hhx IDX %02hhx CSN %02hhx:%02hhx:%02hhx\n",
 			icc_pk->rid[0],
 			icc_pk->rid[1],
 			icc_pk->rid[2],
