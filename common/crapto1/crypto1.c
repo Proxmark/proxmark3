@@ -47,6 +47,7 @@ struct Crypto1State * crypto1_create(uint64_t key)
 	struct Crypto1State *s = malloc(sizeof(*s));
 	int i;
 
+	memset(s, 0x0, sizeof(*s));
 	for(i = 47;s && i > 0; i -= 2) {
 		s->odd  = s->odd  << 1 | BIT(key, (i - 1) ^ 7);
 		s->even = s->even << 1 | BIT(key, i ^ 7);
