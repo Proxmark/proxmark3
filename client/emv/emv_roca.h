@@ -24,7 +24,7 @@
 #ifndef EMV_ROCA_H__
 #define EMV_ROCA_H__
 
-#include <stdint.h>
+#include <stddef.h>
 #include <stdbool.h>
 
 #define ROCA_PRINTS_LENGTH	17
