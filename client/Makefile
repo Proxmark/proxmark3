@@ -156,6 +156,7 @@ CMDSRCS = 	$(SRC_SMARTCARD) \
 			emv/test/dda_test.c\
 			emv/test/cda_test.c\
 			emv/cmdemv.c\
+			emv/emv_roca.c \
 			cmdhf.c \
 			cmdhflist.c \
 			cmdhf14a.c \
@@ -250,7 +251,7 @@ endif
 			
 BINS = proxmark3 flasher fpga_compress
 WINBINS = $(patsubst %, %.exe, $(BINS))
-CLEAN = $(BINS) $(WINBINS) $(COREOBJS) $(CMDOBJS) $(OBJCOBJS) $(ZLIBOBJS) $(QTGUIOBJS) $(MULTIARCHOBJS) $(OBJDIR)/*.o *.moc.cpp ui/ui_overlays.h
+CLEAN = $(BINS) $(WINBINS) $(COREOBJS) $(CMDOBJS) $(OBJCOBJS) $(ZLIBOBJS) $(QTGUIOBJS) $(MULTIARCHOBJS) $(OBJDIR)/*.o *.moc.cpp ui/ui_overlays.h lualibs/usb_cmd.lua
 
 # need to assign dependancies to build these first...
 all: lua_build jansson_build mbedtls_build cbor_build $(BINS)
@@ -295,7 +296,7 @@ lua_build:
 	
 jansson_build:
 	@echo Compiling jansson
-	cd ./jansson && make all
+	cd $(JANSSONLIBPATH) && make all
 	
 mbedtls_build:
 	@echo Compiling mbedtls
