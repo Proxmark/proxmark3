@@ -12,9 +12,11 @@
 #define PCSC_H__
 
 #include <stdbool.h>
+#include "smartcard.h"
 
 char *getAlternativeSmartcardReader(void);
 bool pcscCheckForCardReaders(void);
 bool pcscSelectAlternativeCardReader(const char *readername);
+bool pcscGetATR(smart_card_atr_t *card)
 
 #endif

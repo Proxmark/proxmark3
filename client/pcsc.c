@@ -15,6 +15,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "util.h"
+#include "cmdhw.h"
 
 #ifdef __APPLE__
 #include <PCSC/winscard.h>
@@ -25,7 +26,9 @@
 
 #include "ui.h"
 
-static SCARDCONTEXT hContext;
+static SCARDCONTEXT SC_Context;
+static SCARDHANDLE SC_Card;
+static DWORD SC_Protocol;
 static char* AlternativeSmartcardReader = NULL;
 
 
@@ -37,20 +40,20 @@ char *getAlternativeSmartcardReader(void)
 
 bool pcscCheckForCardReaders(void)
 {
-	int res = SCardEstablishContext(SCARD_SCOPE_SYSTEM, NULL, NULL, &hContext);
+	LONG res = SCardEstablishContext(SCARD_SCOPE_SYSTEM, NULL, NULL, &SC_Context);
 	if (res != SCARD_S_SUCCESS) {
 		return false;
 	}
 
 	DWORD pcchReaders;
-	res = SCardListReaders(hContext, NULL, NULL, &pcchReaders);
+	res = SCardListReaders(SC_Context, NULL, NULL, &pcchReaders);
 	if (res != SCARD_S_SUCCESS) {
-		SCardReleaseContext(hContext);
+		SCardReleaseContext(SC_Context);
 		return false;
 	}
 
 	if (res == SCARD_E_NO_READERS_AVAILABLE || res == SCARD_E_NO_SERVICE) {
-		SCardReleaseContext(hContext);
+		SCardReleaseContext(SC_Context);
 		return false;
 	}
 	
@@ -61,7 +64,7 @@ bool pcscCheckForCardReaders(void)
 static char *pickReader(LPTSTR readerlist)
 {
 	PrintAndLogEx(NORMAL, "Please select one of these:");
-	PrintAndLogEx(NORMAL, "  [0] PM3 RDV40 Smartcard Slot");
+	PrintAndLogEx(NORMAL, "  [0] PM3 RDV40 Smartcard Slot %s", PM3hasSmartcardSlot() ? "(default)" : "(default, not available)");
 
 	int num = 1;
 	for (LPTSTR p = readerlist; *p != '\0'; ) {
@@ -108,13 +111,13 @@ char *matchString(LPTSTR readerlist, const char *readername)
 bool pcscSelectAlternativeCardReader(const char *readername)
 {
 	DWORD readerlist_len;
-	int res = SCardListReaders(hContext, NULL, NULL, &readerlist_len);
+	LONG res = SCardListReaders(SC_Context, NULL, NULL, &readerlist_len);
 	if (res != SCARD_S_SUCCESS) {
 		return false;
 	}
 
 	LPTSTR readerlist = calloc(readerlist_len, sizeof(char));
-	res = SCardListReaders(hContext, NULL, readerlist, &readerlist_len);
+	res = SCardListReaders(SC_Context, NULL, readerlist, &readerlist_len);
 	if (res != SCARD_S_SUCCESS) {
 		free(readerlist);
 		return false;
@@ -139,14 +142,42 @@ bool pcscSelectAlternativeCardReader(const char *readername)
 	return true;
 }
 
+
+bool pcscGetATR(smart_card_atr_t *card)
+{
+	if (!card) {
+		return false;
+	}
+	
+	card->atr_len = 0;
+	memset(card->atr, 0, sizeof(card->atr));
+
+	LONG res = SCardConnect(SC_Context, AlternativeSmartcardReader, SCARD_SHARE_SHARED,
+	                        SCARD_PROTOCOL_T0 | SCARD_PROTOCOL_T1, &SC_Card, &SC_Protocol);
+	if (res != SCARD_S_SUCCESS) {
+		return false;
+	}
+
+	DWORD atr_len = sizeof(card->atr);
+	res = SCardGetAttrib(SC_Card, SCARD_ATTR_ATR_STRING, card->atr, &atr_len);
+	if (res != SCARD_S_SUCCESS) {
+		return false;
+	}
+	card->atr_len = atr_len;
+	
+	// TODO: LogTrace without device
+	
+	return true;	
+}
+
 /*
 int main(void)
 {
  LONG rv;
 
- SCARDCONTEXT hContext;
+ SCARDCONTEXT SC_Context;
  LPTSTR mszReaders;
- SCARDHANDLE hCard;
+ SCARDHANDLE SC_Card;
  DWORD dwReaders, dwActiveProtocol, dwRecvLength;
 
  SCARD_IO_REQUEST pioSendPci;
@@ -157,25 +188,25 @@ int main(void)
 
  unsigned int i;
 
- rv = SCardEstablishContext(SCARD_SCOPE_SYSTEM, NULL, NULL, &hContext);
- CHECK("SCardEstablishContext", rv)
+ rv = SCardEstablisSC_Context(SCARD_SCOPE_SYSTEM, NULL, NULL, &SC_Context);
+ CHECK("SCardEstablisSC_Context", rv)
 
 #ifdef SCARD_AUTOALLOCATE
  dwReaders = SCARD_AUTOALLOCATE;
 
- rv = SCardListReaders(hContext, NULL, (LPTSTR)&mszReaders, &dwReaders);
+ rv = SCardListReaders(SC_Context, NULL, (LPTSTR)&mszReaders, &dwReaders);
  CHECK("SCardListReaders", rv)
 #else
  CHECK("SCardListReaders", rv)
 
  mszReaders = calloc(dwReaders, sizeof(char));
- rv = SCardListReaders(hContext, NULL, mszReaders, &dwReaders);
+ rv = SCardListReaders(SC_Context, NULL, mszReaders, &dwReaders);
  CHECK("SCardListReaders", rv)
 #endif
  printf("reader name: %s\n", mszReaders);
 
- rv = SCardConnect(hContext, mszReaders, SCARD_SHARE_SHARED,
-  SCARD_PROTOCOL_T0 | SCARD_PROTOCOL_T1, &hCard, &dwActiveProtocol);
+ rv = SCardConnect(SC_Context, mszReaders, SCARD_SHARE_SHARED,
+  SCARD_PROTOCOL_T0 | SCARD_PROTOCOL_T1, &SC_Card, &dwActiveProtocol);
  CHECK("SCardConnect", rv)
 
  switch(dwActiveProtocol)
@@ -189,7 +220,7 @@ int main(void)
    break;
  }
  dwRecvLength = sizeof(pbRecvBuffer);
- rv = SCardTransmit(hCard, &pioSendPci, cmd1, sizeof(cmd1),
+ rv = SCardTransmit(SC_Card, &pioSendPci, cmd1, sizeof(cmd1),
   NULL, pbRecvBuffer, &dwRecvLength);
  CHECK("SCardTransmit", rv)
 
@@ -199,7 +230,7 @@ int main(void)
  printf("\n");
 
  dwRecvLength = sizeof(pbRecvBuffer);
- rv = SCardTransmit(hCard, &pioSendPci, cmd2, sizeof(cmd2),
+ rv = SCardTransmit(SC_Card, &pioSendPci, cmd2, sizeof(cmd2),
   NULL, pbRecvBuffer, &dwRecvLength);
  CHECK("SCardTransmit", rv)
 
@@ -208,18 +239,18 @@ int main(void)
   printf("%02X ", pbRecvBuffer[i]);
  printf("\n");
 
- rv = SCardDisconnect(hCard, SCARD_LEAVE_CARD);
+ rv = SCardDisconnect(SC_Card, SCARD_LEAVE_CARD);
  CHECK("SCardDisconnect", rv)
 
 #ifdef SCARD_AUTOALLOCATE
- rv = SCardFreeMemory(hContext, mszReaders);
+ rv = SCardFreeMemory(SC_Context, mszReaders);
  CHECK("SCardFreeMemory", rv)
 
 #else
  free(mszReaders);
 #endif
 
- rv = SCardReleaseContext(hContext);
+ rv = SCardReleaseContext(SC_Context);
 
  CHECK("SCardReleaseContext", rv)
 
