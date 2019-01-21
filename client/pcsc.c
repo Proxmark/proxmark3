@@ -14,6 +14,7 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
+#include "ui.h"
 #include "util.h"
 #include "cmdhw.h"
 
@@ -24,7 +25,9 @@
 #include <winscard.h>
 #endif
 
-#include "ui.h"
+#ifdef __linux__
+#include "reader.h"
+#endif
 
 static SCARDCONTEXT SC_Context;
 static SCARDHANDLE SC_Card;
