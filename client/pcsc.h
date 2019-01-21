@@ -17,6 +17,6 @@
 char *getAlternativeSmartcardReader(void);
 bool pcscCheckForCardReaders(void);
 bool pcscSelectAlternativeCardReader(const char *readername);
-bool pcscGetATR(smart_card_atr_t *card)
+bool pcscGetATR(smart_card_atr_t *card);
 
 #endif

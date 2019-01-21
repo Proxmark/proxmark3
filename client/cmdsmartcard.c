@@ -301,7 +301,6 @@ static int PrintATR(uint8_t *atr, size_t atrlen) {
 	if (atrlen != calen && atrlen != calen + 1)  // may be CRC
 		PrintAndLogEx(ERR, "ATR length error. len: %d, T1len: %d, TD1len: %d, TDilen: %d, K: %d", atrlen, T1len, TD1len, TDilen, K);
 
-	PrintAndLogEx(INFO, "atrlen = %d, T1len = %d, TD1len = %d, TDilen = %d, K = %d", atrlen, T1len, TD1len, TDilen, K);
 	if (K > 0)
 		PrintAndLogEx(INFO, "\nHistorical bytes | len %02d | format %02x", K, atr[2 + T1len + TD1len + TDilen]);
 	
