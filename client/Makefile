@@ -46,8 +46,13 @@ ifneq (,$(findstring MINGW,$(platform)))
 	PCSC_INCLUDES :=
 	PCSC_LIBS = -lwinscard
 else
-	PCSC_INCLUDES := $(shell pkg-config --cflags libpcsclite)
-	PCSC_LIBS := $(shell pkg-config --libs libpcsclite)
+	ifeq ($(platform),Darwin)
+		PCSC_INCLUDES = 
+		PCSC_LIBS = -framework PCSC
+	else
+		PCSC_INCLUDES := $(shell pkg-config --cflags libpcsclite)
+		PCSC_LIBS := $(shell pkg-config --libs libpcsclite)
+	endif
 endif
 
 LUAPLATFORM = generic
