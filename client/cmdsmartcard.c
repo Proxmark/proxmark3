@@ -18,13 +18,17 @@
 #include "smartcard.h"
 #include "comms.h"
 #include "protocols.h"
+#include "cmdhw.h"
 #include "cmdhflist.h"
 #include "emv/apduinfo.h"       // APDUcode description
 #include "emv/emvcore.h"        // decodeTVL
 #include "crypto/libpcrypto.h"	// sha512hash
 #include "emv/dump.h"			// dump_buffer
+#include "pcsc.h"
 
 #define SC_UPGRADE_FILES_DIRECTORY          "sc_upgrade_firmware/"
+
+static bool UseAlternativeSmartcardReader = false;	// default: use PM3 RDV40 Smartcard Slot (if available)
 
 static int CmdHelp(const char *Cmd);
 
@@ -41,6 +45,17 @@ static int usage_sm_raw(void) {
 	PrintAndLogEx(NORMAL, "Examples:");
 	PrintAndLogEx(NORMAL, "        sc raw s 0 d 00a404000e315041592e5359532e4444463031  - `1PAY.SYS.DDF01` PPSE directory with get ATR");
 	PrintAndLogEx(NORMAL, "        sc raw 0 d 00a404000e325041592e5359532e4444463031    - `2PAY.SYS.DDF01` PPSE directory");
+	return 0;
+}
+
+static int usage_sm_select(void) {
+	PrintAndLogEx(NORMAL, "Usage: sc select [h|<reader name>] ");
+	PrintAndLogEx(NORMAL, "       h             :  this help");
+	PrintAndLogEx(NORMAL, "       <reader name> :  a card reader's name, wildcards allowed, leave empty to pick from available readers");
+	PrintAndLogEx(NORMAL, "");
+	PrintAndLogEx(NORMAL, "Examples:");
+	PrintAndLogEx(NORMAL, "        sc select          : list available card readers and pick");
+	PrintAndLogEx(NORMAL, "        sc select Gemalto* : select a connected Gemalto card reader" );
 	return 0;
 }
 
@@ -185,6 +200,8 @@ static int PrintATR(uint8_t *atr, size_t atrlen) {
 	uint8_t T0 = atr[1];
 	uint8_t K = T0 & 0x0F;
 	uint8_t TD1 = 0, T1len = 0, TD1len = 0, TDilen = 0;
+	bool protocol_T0_present = true;
+	bool protocol_T15_present = false;
 
 	if (T0 & 0x10) {
 		PrintAndLog("\t- TA1 (Maximum clock frequency, proposed bit duration) [ 0x%02x ]", atr[2 + T1len]);
@@ -204,6 +221,14 @@ static int PrintATR(uint8_t *atr, size_t atrlen) {
 	if (T0 & 0x80) {
 		TD1 = atr[2 + T1len];
 		PrintAndLog("\t- TD1 (First offered transmission protocol, presence of TA2..TD2) [ 0x%02x ] Protocol T%d", TD1, TD1 & 0x0f);
+		protocol_T0_present = false;
+		if ((TD1 & 0x0f) == 0) {
+			protocol_T0_present = true;
+		}
+		if ((TD1 & 0x0f) == 15) {
+			protocol_T15_present = true;
+		}
+		
 		T1len++;
 
 		if (TD1 & 0x10) {
@@ -221,6 +246,12 @@ static int PrintATR(uint8_t *atr, size_t atrlen) {
 		if (TD1 & 0x80) {
 			uint8_t TDi = atr[2 + T1len + TD1len];
 			PrintAndLog("\t- TD2 (A supported protocol or more global parameters, presence of TA3..TD3) [ 0x%02x ] Protocol T%d", TDi, TDi & 0x0f);
+			if ((TDi & 0x0f) == 0) {
+				protocol_T0_present = true;
+			}
+			if ((TDi & 0x0f) == 15) {
+				protocol_T15_present = true;
+			}
 			TD1len++;
 
 			bool nextCycle = true;
@@ -251,26 +282,27 @@ static int PrintATR(uint8_t *atr, size_t atrlen) {
 		}
 	}
 
-	uint8_t vxor = 0;
-	for (int i = 1; i < atrlen; i++)
-		vxor ^= atr[i];
+	if (!protocol_T0_present || protocol_T15_present) { // there is CRC Check Byte TCK
+		uint8_t vxor = 0;
+		for (int i = 1; i < atrlen; i++)
+			vxor ^= atr[i];
+		
+		if (vxor)
+			PrintAndLogEx(WARNING, "Check sum error. Must be 0 got 0x%02X", vxor);
+		else
+			PrintAndLogEx(INFO, "Check sum OK.");
+	}
 	
-	if (vxor)
-		PrintAndLogEx(WARNING, "Check summ error. Must be 0 got 0x%02X", vxor);
-	else
-		PrintAndLogEx(INFO, "Check summ OK.");
-
 	if (atr[0] != 0x3b)
 		PrintAndLogEx(WARNING, "Not a direct convention [ 0x%02x ]", atr[0]);
 
-	
 	uint8_t calen = 2 + T1len + TD1len + TDilen + K;
 
 	if (atrlen != calen && atrlen != calen + 1)  // may be CRC
 		PrintAndLogEx(ERR, "ATR length error. len: %d, T1len: %d, TD1len: %d, TDilen: %d, K: %d", atrlen, T1len, TD1len, TDilen, K);
 
 	if (K > 0)
-		PrintAndLogEx(INFO, "\nHistorical bytes | len 0x%02d | format %02x", K, atr[2 + T1len + TD1len + TDilen]);
+		PrintAndLogEx(INFO, "\nHistorical bytes | len %02d | format %02x", K, atr[2 + T1len + TD1len + TDilen]);
 	
 	if (K > 1) {
 		PrintAndLogEx(INFO, "\tHistorical bytes");
@@ -280,26 +312,38 @@ static int PrintATR(uint8_t *atr, size_t atrlen) {
 	return 0;
 }
 
-static bool smart_select(bool silent) {
-	UsbCommand c = {CMD_SMART_ATR, {0, 0, 0}};
-	clearCommandBuffer();
-	SendCommand(&c);
-	UsbCommand resp;
-	if ( !WaitForResponseTimeout(CMD_ACK, &resp, 2500) ) {
-		if (!silent) PrintAndLogEx(WARNING, "smart card select failed");
-		return false;
-	}
+static bool smart_getATR(smart_card_atr_t *card)
+{
+	if (UseAlternativeSmartcardReader) {
+		return pcscGetATR(card);
+	} else {
+		UsbCommand c = {CMD_SMART_ATR, {0, 0, 0}};
+		SendCommand(&c);
 
-	uint8_t isok = resp.arg[0] & 0xFF;
-	if (!isok) {
+		UsbCommand resp;
+		if ( !WaitForResponseTimeout(CMD_ACK, &resp, 2500) ) {
+			return false;
+		}
+
+		if (resp.arg[0] & 0xff) {
+			return resp.arg[0] & 0xFF;
+		}
+
+		memcpy(card, (smart_card_atr_t *)resp.d.asBytes, sizeof(smart_card_atr_t));
+
+		return true;
+	}
+}
+
+static bool smart_select(bool silent) {
+
+	smart_card_atr_t card;
+	if (!smart_getATR(&card)) {
 		if (!silent) PrintAndLogEx(WARNING, "smart card select failed");
 		return false;
 	}
 
 	if (!silent) {
-		smart_card_atr_t card;
-		memcpy(&card, (smart_card_atr_t *)resp.d.asBytes, sizeof(smart_card_atr_t));
-
 		PrintAndLogEx(INFO, "ISO7816-3 ATR : %s", sprint_hex(card.atr, card.atr_len));
 	}
 
@@ -377,6 +421,32 @@ static int smart_response(uint8_t *data) {
 
 	out:
 	return datalen;
+}
+
+
+int CmdSmartSelect(const char *Cmd) {
+
+	const char *readername;
+	
+	if (tolower(param_getchar(Cmd, 0)) == 'h') {
+		return usage_sm_select();
+	}
+	
+	if (!PM3hasSmartcardSlot() && !pcscCheckForCardReaders()) {
+		PrintAndLogEx(WARNING, "No Smartcard Readers available");
+		UseAlternativeSmartcardReader = false;
+		return 1;
+	}
+	
+	int bg, en;
+	if (param_getptr(Cmd, &bg, &en, 0)) {
+		UseAlternativeSmartcardReader = pcscSelectAlternativeCardReader(NULL);
+	} else {
+		readername = Cmd + bg;
+		UseAlternativeSmartcardReader = pcscSelectAlternativeCardReader(readername);
+	}
+
+	return 0;
 }
 
 int CmdSmartRaw(const char *Cmd) {
@@ -756,23 +826,11 @@ int CmdSmartInfo(const char *Cmd){
 	//Validations
 	if (errors ) return usage_sm_info();
 
-	UsbCommand c = {CMD_SMART_ATR, {0, 0, 0}};
-	clearCommandBuffer();
-	SendCommand(&c);
-	UsbCommand resp;
-	if ( !WaitForResponseTimeout(CMD_ACK, &resp, 2500) ) {
-		if (!silent) PrintAndLogEx(WARNING, "smart card select failed");
-		return 1;
-	}
-
-	uint8_t isok = resp.arg[0] & 0xFF;
-	if (!isok) {
-		if (!silent) PrintAndLogEx(WARNING, "smart card select failed");
-		return 1;
-	}
-
 	smart_card_atr_t card;
-	memcpy(&card, (smart_card_atr_t *)resp.d.asBytes, sizeof(smart_card_atr_t));
+	if (!smart_getATR(&card)) {
+		if (!silent) PrintAndLogEx(WARNING, "smart card select failed");
+		return 1;
+	}
 
 	// print header
 	PrintAndLogEx(INFO, "--- Smartcard Information ---------");
@@ -830,22 +888,11 @@ int CmdSmartReader(const char *Cmd){
 	//Validations
 	if (errors ) return usage_sm_reader();
 
-	UsbCommand c = {CMD_SMART_ATR, {0, 0, 0}};
-	clearCommandBuffer();
-	SendCommand(&c);
-	UsbCommand resp;
-	if ( !WaitForResponseTimeout(CMD_ACK, &resp, 2500) ) {
-		if (!silent) PrintAndLogEx(WARNING, "smart card select failed");
-		return 1;
-	}
-
-	uint8_t isok = resp.arg[0] & 0xFF;
-	if (!isok) {
-		if (!silent) PrintAndLogEx(WARNING, "smart card select failed");
-		return 1;
-	}
 	smart_card_atr_t card;
-	memcpy(&card, (smart_card_atr_t *)resp.d.asBytes, sizeof(smart_card_atr_t));
+	if (!smart_getATR(&card)) {
+		if (!silent) PrintAndLogEx(WARNING, "smart card select failed");
+		return 1;
+	}
 
 	PrintAndLogEx(INFO, "ISO7816-3 ATR : %s", sprint_hex(card.atr, card.atr_len));
 	return 0;
@@ -970,6 +1017,7 @@ int CmdSmartBruteforceSFI(const char *Cmd) {
 
 static command_t CommandTable[] = {
 	{"help",     CmdHelp,               1, "This help"},
+	{"select",   CmdSmartSelect,        1, "Select the Smartcard Reader to use"},
 	{"list",     CmdSmartList,          0, "List ISO 7816 history"},
 	{"info",     CmdSmartInfo,          0, "Tag information"},
 	{"reader",   CmdSmartReader,        0, "Act like an IS07816 reader"},

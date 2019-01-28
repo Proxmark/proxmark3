@@ -52,7 +52,22 @@ int ukbhit(void)
   return ( error == 0 ? cnt : -1 );
 }
 
-#else
+char getch(void)
+{
+	char c;
+	int error;
+	struct termios Otty, Ntty;
+	if ( tcgetattr(STDIN_FILENO, &Otty) == -1 ) return -1;
+	Ntty = Otty;
+	Ntty.c_lflag &= ~ICANON; /* disable buffered i/o */
+	if (0 == (error = tcsetattr(STDIN_FILENO, TCSANOW, &Ntty))) {   // set new attributes
+		c = getchar();
+		error += tcsetattr(STDIN_FILENO, TCSANOW, &Otty);           // reset attributes
+	}
+	return ( error == 0 ? c : -1 );
+}
+
+#else // _WIN32
 
 #include <conio.h>
 int ukbhit(void) {

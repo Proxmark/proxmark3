@@ -35,13 +35,27 @@ APP_CFLAGS =
 include ../common/Makefile_Enabled_Options.common
 CFLAGS += $(APP_CFLAGS)
 ifneq (,$(findstring WITH_SMARTCARD,$(APP_CFLAGS)))
-	SRC_SMARTCARD = cmdsmartcard.c
+	SRC_SMARTCARD = cmdsmartcard.c pcsc.c
 else
 	SRC_SMARTCARD = 
 endif
 
-LUAPLATFORM = generic
 platform = $(shell uname)
+
+ifneq (,$(findstring MINGW,$(platform)))
+	PCSC_INCLUDES :=
+	PCSC_LIBS = -lwinscard
+else
+	ifeq ($(platform),Darwin)
+		PCSC_INCLUDES = 
+		PCSC_LIBS = -framework PCSC
+	else
+		PCSC_INCLUDES := $(shell pkg-config --cflags libpcsclite)
+		PCSC_LIBS := $(shell pkg-config --libs libpcsclite)
+	endif
+endif
+
+LUAPLATFORM = generic
 ifneq (,$(findstring MINGW,$(platform)))
 		LUAPLATFORM = mingw
 else
@@ -259,7 +273,7 @@ all: lua_build jansson_build mbedtls_build cbor_build $(BINS)
 all-static: LDLIBS:=-static $(LDLIBS)
 all-static: proxmark3 flasher fpga_compress
 
-proxmark3: LDLIBS+=$(LUALIB) $(JANSSONLIB) $(MBEDTLSLIB) $(CBORLIB) $(QTLDLIBS)
+proxmark3: LDLIBS+=$(LUALIB) $(JANSSONLIB) $(MBEDTLSLIB) $(CBORLIB) $(QTLDLIBS) $(PCSC_LIBS)
 proxmark3: $(OBJDIR)/proxmark3.o $(COREOBJS) $(CMDOBJS) $(OBJCOBJS) $(QTGUIOBJS) $(MULTIARCHOBJS) $(ZLIBOBJS) lualibs/usb_cmd.lua
 	$(LD) $(LDFLAGS) $(OBJDIR)/proxmark3.o $(COREOBJS) $(CMDOBJS) $(OBJCOBJS) $(QTGUIOBJS) $(MULTIARCHOBJS) $(ZLIBOBJS) $(LDLIBS) -o $@
 
@@ -328,7 +342,7 @@ $(OBJDIR)/%_AVX512.o : %.c $(OBJDIR)/%.d
 
 %.o: %.c
 $(OBJDIR)/%.o : %.c $(OBJDIR)/%.d
-	$(CC) $(DEPFLAGS) $(CFLAGS) $(ZLIBFLAGS) -c -o $@ $<
+	$(CC) $(DEPFLAGS) $(CFLAGS) $(ZLIBFLAGS) $(PCSC_INCLUDES) -c -o $@ $<
 	$(POSTCOMPILE)
 
 %.o: %.cpp

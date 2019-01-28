@@ -34,6 +34,7 @@
  #include "LCD.h"
 #endif
 
+static uint32_t hw_capabilities;
 
 // Craig Young - 14a stand-alone code
 #ifdef WITH_ISO14443a
@@ -312,8 +313,22 @@ extern struct version_information version_information;
 extern char *_bootphase1_version_pointer, _flash_start, _flash_end, _bootrom_start, _bootrom_end, __data_src_start__;
 
 
+void set_hw_capabilities(void)
+{
+	if (I2C_is_available()) {
+		hw_capabilities |= HAS_SMARTCARD_SLOT;
+	}
+	
+	if (false) { // TODO: implement a test
+		hw_capabilities |= HAS_EXTRA_FLASH_MEM;
+	}
+}	
+
+
 void SendVersion(void)
 {
+	set_hw_capabilities();
+	
 	char temp[USB_CMD_DATA_SIZE]; /* Limited data payload in USB packets */
 	char VersionString[USB_CMD_DATA_SIZE] = { '\0' };
 
@@ -347,7 +362,7 @@ void SendVersion(void)
 	// Send Chip ID and used flash memory
 	uint32_t text_and_rodata_section_size = (uint32_t)&__data_src_start__ - (uint32_t)&_flash_start;
 	uint32_t compressed_data_section_size = common_area.arg1;
-	cmd_send(CMD_ACK, *(AT91C_DBGU_CIDR), text_and_rodata_section_size + compressed_data_section_size, 0, VersionString, strlen(VersionString));
+	cmd_send(CMD_ACK, *(AT91C_DBGU_CIDR), text_and_rodata_section_size + compressed_data_section_size, hw_capabilities, VersionString, strlen(VersionString));
 }
 
 // measure the USB Speed by sending SpeedTestBufferSize bytes to client and measuring the elapsed time.

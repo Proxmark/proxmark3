@@ -656,28 +656,6 @@ static bool GetATR(smart_card_atr_t *card_ptr) {
 	if ( !sc_rx_bytes(card_ptr->atr, &len) )		
 		return false;
 
-	uint8_t pos_td = 1;
-	if ( (card_ptr->atr[1] & 0x10) == 0x10) pos_td++;
-	if ( (card_ptr->atr[1] & 0x20) == 0x20) pos_td++;
-	if ( (card_ptr->atr[1] & 0x40) == 0x40) pos_td++;
-	
-	// T0 indicate presence T=0 vs T=1.  T=1 has checksum TCK
-	if ( (card_ptr->atr[1] & 0x80) == 0x80) {
-		
-		pos_td++;
-	
-		// 1 == T1 ,  presence of checksum TCK
-		if ( (card_ptr->atr[pos_td] & 0x01) == 0x01) {
- 			uint8_t chksum = 0;
-			// xor property.  will be zero when xored with chksum.
-			for (uint8_t i = 1; i < len; ++i)
-				chksum ^= card_ptr->atr[i];
- 			if ( chksum ) {
-				if ( MF_DBGLEVEL > 2) DbpString("Wrong ATR checksum");
-			}
-		}
-	}
-
 	card_ptr->atr_len = len;
 	LogTrace(card_ptr->atr, card_ptr->atr_len, 0, 0, NULL, false);
 
