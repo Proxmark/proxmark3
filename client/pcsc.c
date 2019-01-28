@@ -175,3 +175,41 @@ bool pcscGetATR(smart_card_atr_t *card)
 	
 	return true;	
 }
+
+
+void pcscTransmit(uint8_t *data, uint32_t data_len, uint32_t flags, uint8_t *response, int *response_len)
+{
+	LPCSCARD_IO_REQUEST protocol;
+	if (flags & SC_RAW_T0) {
+		protocol = SCARD_PCI_T0;
+	} else {
+		protocol = SCARD_PCI_RAW;
+	}
+
+	// TODO: tracing
+	// if ((flags & SC_CONNECT))
+		// clear_trace();
+
+	// set_tracing(true);
+
+	if ((flags & SC_CONNECT || flags & SC_SELECT)) {	
+		LONG res = SCardConnect(SC_Context, AlternativeSmartcardReader, SCARD_SHARE_SHARED,
+		                        SCARD_PROTOCOL_T0 | SCARD_PROTOCOL_T1, &SC_Card, &SC_Protocol);
+		if (res != SCARD_S_SUCCESS) {
+			*response_len = -1;
+			return;
+		}
+	}
+	
+	if ((flags & SC_RAW) || (flags & SC_RAW_T0)) {
+		// TODO: tracing
+		// LogTrace(data, arg1, 0, 0, NULL, true);
+		DWORD len = *response_len;
+		LONG res = SCardTransmit(SC_Card, protocol, data, data_len, NULL, response, &len);
+		if (res != SCARD_S_SUCCESS) {
+			*response_len = -1;
+		} else {
+			*response_len = len;
+		}
+	}
+}

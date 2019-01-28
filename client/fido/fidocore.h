@@ -37,7 +37,7 @@ typedef enum  {
 } fido2PacketType;
 
 extern int FIDOSelect(bool ActivateField, bool LeaveFieldON, uint8_t *Result, size_t MaxResultLen, size_t *ResultLen, uint16_t *sw);
-extern int FIDOExchange(sAPDU apdu, uint8_t *Result, size_t MaxResultLen, size_t *ResultLen, uint16_t *sw);
+extern int FIDOExchange(uint8_t *APDU, int APDU_len, uint8_t *Result, size_t MaxResultLen, size_t *ResultLen, uint16_t *sw);
 extern int FIDORegister(uint8_t *params, uint8_t *Result, size_t MaxResultLen, size_t *ResultLen, uint16_t *sw);
 extern int FIDOAuthentication(uint8_t *params, uint8_t paramslen, uint8_t controlb, uint8_t *Result, size_t MaxResultLen, size_t *ResultLen, uint16_t *sw);
 extern int FIDO2GetInfo(uint8_t *Result, size_t MaxResultLen, size_t *ResultLen, uint16_t *sw);

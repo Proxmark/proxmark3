@@ -45,7 +45,7 @@ void ParamLoadDefaults(struct tlvdb *tlvRoot) {
 }
 
 int CmdEMVSelect(const char *cmd) {
-	uint8_t data[APDU_AID_LEN] = {0};
+	uint8_t data[APDU_DATA_LEN] = {0};
 	int datalen = 0;
 
 	CLIParserInit("emv select", 
@@ -83,7 +83,7 @@ int CmdEMVSelect(const char *cmd) {
 	SetAPDULogging(APDULogging);
 	
 	// exec
-	uint8_t buf[APDU_RES_LEN] = {0};
+	uint8_t buf[APDU_RESPONSE_LEN] = {0};
 	size_t len = 0;
 	uint16_t sw = 0;
 	int res = EMVSelect(channel, activateField, leaveSignalON, data, datalen, buf, sizeof(buf), &len, &sw, NULL);
@@ -193,7 +193,7 @@ int CmdEMVPPSE(const char *cmd) {
 	SetAPDULogging(APDULogging);
 	
 	// exec
-	uint8_t buf[APDU_RES_LEN] = {0};
+	uint8_t buf[APDU_RESPONSE_LEN] = {0};
 	size_t len = 0;
 	uint16_t sw = 0;
 	int res = EMVSelectPSE(channel, activateField, leaveSignalON, PSENum, buf, sizeof(buf), &len, &sw);
@@ -212,7 +212,7 @@ int CmdEMVPPSE(const char *cmd) {
 }
 
 int CmdEMVGPO(const char *cmd) {
-	uint8_t data[APDU_RES_LEN] = {0};
+	uint8_t data[APDU_RESPONSE_LEN] = {0};
 	int datalen = 0;
 
 	CLIParserInit("emv gpo", 
@@ -295,7 +295,7 @@ int CmdEMVGPO(const char *cmd) {
 	PrintAndLogEx(INFO, "PDOL data[%d]: %s", pdol_data_tlv_data_len, sprint_hex(pdol_data_tlv_data, pdol_data_tlv_data_len));
 	
 	// exec
-	uint8_t buf[APDU_RES_LEN] = {0};
+	uint8_t buf[APDU_RESPONSE_LEN] = {0};
 	size_t len = 0;
 	uint16_t sw = 0;
 	int res = EMVGPO(channel, leaveSignalON, pdol_data_tlv_data, pdol_data_tlv_data_len, buf, sizeof(buf), &len, &sw, tlvRoot);
@@ -317,7 +317,7 @@ int CmdEMVGPO(const char *cmd) {
 }
 
 int CmdEMVReadRecord(const char *cmd) {
-	uint8_t data[APDU_RES_LEN] = {0};
+	uint8_t data[APDU_RESPONSE_LEN] = {0};
 	int datalen = 0;
 
 	CLIParserInit("emv readrec", 
@@ -356,7 +356,7 @@ int CmdEMVReadRecord(const char *cmd) {
 	SetAPDULogging(APDULogging);
 		
 	// exec
-	uint8_t buf[APDU_RES_LEN] = {0};
+	uint8_t buf[APDU_RESPONSE_LEN] = {0};
 	size_t len = 0;
 	uint16_t sw = 0;
 	int res = EMVReadRecord(channel, leaveSignalON, data[0], data[1], buf, sizeof(buf), &len, &sw, NULL);
@@ -375,7 +375,7 @@ int CmdEMVReadRecord(const char *cmd) {
 }
 
 int CmdEMVAC(const char *cmd) {
-	uint8_t data[APDU_RES_LEN] = {0};
+	uint8_t data[APDU_RESPONSE_LEN] = {0};
 	int datalen = 0;
 
 	CLIParserInit("emv genac", 
@@ -474,7 +474,7 @@ int CmdEMVAC(const char *cmd) {
 	PrintAndLogEx(INFO, "CDOL data[%d]: %s", cdol_data_tlv->len, sprint_hex(cdol_data_tlv->value, cdol_data_tlv->len));
 
 	// exec
-	uint8_t buf[APDU_RES_LEN] = {0};
+	uint8_t buf[APDU_RESPONSE_LEN] = {0};
 	size_t len = 0;
 	uint16_t sw = 0;
 	int res = EMVAC(channel, leaveSignalON, termDecision, (uint8_t *)cdol_data_tlv->value, cdol_data_tlv->len, buf, sizeof(buf), &len, &sw, tlvRoot);
@@ -524,7 +524,7 @@ int CmdEMVGenerateChallenge(const char *cmd) {
 	SetAPDULogging(APDULogging);
 	
 	// exec
-	uint8_t buf[APDU_RES_LEN] = {0};
+	uint8_t buf[APDU_RESPONSE_LEN] = {0};
 	size_t len = 0;
 	uint16_t sw = 0;
 	int res = EMVGenerateChallenge(channel, leaveSignalON, buf, sizeof(buf), &len, &sw, NULL);
@@ -544,7 +544,7 @@ int CmdEMVGenerateChallenge(const char *cmd) {
 }
 
 int CmdEMVInternalAuthenticate(const char *cmd) {
-	uint8_t data[APDU_RES_LEN] = {0};
+	uint8_t data[APDU_RESPONSE_LEN] = {0};
 	int datalen = 0;
 
 	CLIParserInit("emv intauth", 
@@ -624,7 +624,7 @@ int CmdEMVInternalAuthenticate(const char *cmd) {
 	PrintAndLogEx(INFO, "DDOL data[%d]: %s", ddol_data_tlv->len, sprint_hex(ddol_data_tlv->value, ddol_data_tlv->len));
 	
 	// exec
-	uint8_t buf[APDU_RES_LEN] = {0};
+	uint8_t buf[APDU_RESPONSE_LEN] = {0};
 	size_t len = 0;
 	uint16_t sw = 0;
 	int res = EMVInternalAuthenticate(channel, leaveSignalON, data, datalen, buf, sizeof(buf), &len, &sw, NULL);
@@ -711,10 +711,10 @@ void ProcessGPOResponseFormat1(struct tlvdb *tlvRoot, uint8_t *buf, size_t len, 
 }
 
 int CmdEMVExec(const char *cmd) {
-	uint8_t buf[APDU_RES_LEN] = {0};
+	uint8_t buf[APDU_RESPONSE_LEN] = {0};
 	size_t len = 0;
 	uint16_t sw = 0;
-	uint8_t AID[APDU_AID_LEN] = {0};
+	uint8_t AID[APDU_DATA_LEN] = {0};
 	size_t AIDlen = 0;
 	uint8_t ODAiList[4096];
 	size_t ODAiListLen = 0;
@@ -769,6 +769,8 @@ int CmdEMVExec(const char *cmd) {
 		channel = ECC_CONTACT;
 #endif
 	uint8_t psenum = (channel == ECC_CONTACT) ? 1 : 2;
+	char *PSE_or_PPSE = psenum == 1 ? "PSE" : "PPSE";
+	
 	CLIParserFree();
 	
 	SetAPDULogging(showAPDU);
@@ -780,12 +782,12 @@ int CmdEMVExec(const char *cmd) {
 	// Application Selection
 	// https://www.openscdp.org/scripts/tutorial/emv/applicationselection.html
 	if (!forceSearch) {
-		// PPSE
-		PrintAndLogEx(NORMAL, "\n* PPSE.");
+		// PPSE / PSE
+		PrintAndLogEx(NORMAL, "\n* %s.", PSE_or_PPSE);
 		SetAPDULogging(showAPDU);
 		res = EMVSearchPSE(channel, activateField, true, psenum, decodeTLV, tlvSelect);
 
-		// check PPSE and select application id
+		// check PPSE / PSE and select application id
 		if (!res) { 
 			TLVPrintAIDlistFromSelectTLV(tlvSelect);
 			EMVSelectApplication(tlvSelect, AID, &AIDlen);
@@ -1152,7 +1154,9 @@ int CmdEMVExec(const char *cmd) {
 		}
 	}
 
-	DropField();
+	if (channel == ECC_CONTACTLESS) {
+		DropField();
+	}
 	
 	// Destroy TLV's
 	free(pdol_data_tlv);
@@ -1164,9 +1168,9 @@ int CmdEMVExec(const char *cmd) {
 }
 
 int CmdEMVScan(const char *cmd) {
-	uint8_t AID[APDU_AID_LEN] = {0};
+	uint8_t AID[APDU_DATA_LEN] = {0};
 	size_t AIDlen = 0;
-	uint8_t buf[APDU_RES_LEN] = {0};
+	uint8_t buf[APDU_RESPONSE_LEN] = {0};
 	size_t len = 0;
 	uint16_t sw = 0;
 	int res;
@@ -1260,8 +1264,10 @@ int CmdEMVScan(const char *cmd) {
 	}
 
 	// drop field at start
-	DropField();
-
+	if (channel == ECC_CONTACTLESS) {
+		DropField();
+	}
+	
 	// iso 14443 select
 	PrintAndLogEx(NORMAL, "--> GET UID, ATS.");
 	
@@ -1329,7 +1335,9 @@ int CmdEMVScan(const char *cmd) {
 
 	if (!AIDlen) {
 		PrintAndLogEx(INFO, "Can't select AID. EMV AID not found. Exit...");
-		DropField();
+		if (channel == ECC_CONTACTLESS) {
+			DropField();
+		}
 		return 4;
 	}
 
@@ -1376,7 +1384,9 @@ int CmdEMVScan(const char *cmd) {
 	if (!pdol_data_tlv){
 		PrintAndLogEx(ERR, "Can't create PDOL TLV.");
 		tlvdb_free(tlvRoot);
-		DropField();
+		if (channel == ECC_CONTACTLESS) {
+			DropField();
+		}
 		return 6;
 	}
 	
@@ -1399,7 +1409,9 @@ int CmdEMVScan(const char *cmd) {
 	if (res) {  
 		PrintAndLogEx(ERR, "GPO error(%d): %4x. Exit...", res, sw);
 		tlvdb_free(tlvRoot);
-		DropField();
+		if (channel == ECC_CONTACTLESS) {
+			DropField();
+		}
 		return 7;
 	}
 	ProcessGPOResponseFormat1(tlvRoot, buf, len, decodeTLV);
@@ -1491,8 +1503,9 @@ int CmdEMVScan(const char *cmd) {
 	// free tlv object
 	tlvdb_free(tlvRoot);
 
-	// DropField
-	DropField();
+	if (channel == ECC_CONTACTLESS) {
+		DropField();
+	}
 	
 	res = json_dump_file(root, fname, JSON_INDENT(2));
 	if (res) {
@@ -1512,9 +1525,9 @@ int CmdEMVTest(const char *cmd) {
 }
 
 int CmdEMVRoca(const char *cmd) {
-	uint8_t AID[APDU_AID_LEN] = {0};
+	uint8_t AID[APDU_DATA_LEN] = {0};
 	size_t AIDlen = 0;
-	uint8_t buf[APDU_RES_LEN] = {0};
+	uint8_t buf[APDU_RESPONSE_LEN] = {0};
 	size_t len = 0;
 	uint16_t sw = 0;
 	int res;
@@ -1573,7 +1586,9 @@ int CmdEMVRoca(const char *cmd) {
 
 	if (!AIDlen) {
 		PrintAndLogEx(INFO, "Can't select AID. EMV AID not found. Exit...");
-		DropField();
+		if (channel == ECC_CONTACTLESS) {
+			DropField();
+		}
 		return 4;
 	}
 
@@ -1588,7 +1603,9 @@ int CmdEMVRoca(const char *cmd) {
 	if (res) {	
 		PrintAndLogEx(ERR, "Can't select AID (%d). Exit...", res);
 		tlvdb_free(tlvRoot);
-		DropField();
+		if (channel == ECC_CONTACTLESS) {
+			DropField();
+		}
 		return 5;
 	}
 
@@ -1600,7 +1617,9 @@ int CmdEMVRoca(const char *cmd) {
 	if (!pdol_data_tlv){
 		PrintAndLogEx(ERR, "Can't create PDOL TLV.");
 		tlvdb_free(tlvRoot);
-		DropField();
+		if (channel == ECC_CONTACTLESS) {
+			DropField();
+		}
 		return 6;
 	}
 	
@@ -1623,7 +1642,9 @@ int CmdEMVRoca(const char *cmd) {
 	if (res) {	
 		PrintAndLogEx(ERR, "GPO error(%d): %4x. Exit...", res, sw);
 		tlvdb_free(tlvRoot);
-		DropField();
+		if (channel == ECC_CONTACTLESS) {
+			DropField();
+		}
 		return 7;
 	}
 	ProcessGPOResponseFormat1(tlvRoot, buf, len, false);
@@ -1721,9 +1742,9 @@ out:
 	// free tlv object
 	tlvdb_free(tlvRoot);
 
-	if ( channel == ECC_CONTACTLESS)
+	if (channel == ECC_CONTACTLESS) {
 		DropField();
-
+	}
 
 	return 0;
 }
@@ -1732,18 +1753,18 @@ int CmdHelp(const char *Cmd);
 
 static command_t CommandTable[] =  {
 	{"help",        CmdHelp,                    1,  "This help"},
-	{"exec",        CmdEMVExec,                 0,  "Executes EMV contactless transaction."},
-	{"pse",         CmdEMVPPSE,                 0,  "Execute PPSE. It selects 2PAY.SYS.DDF01 or 1PAY.SYS.DDF01 directory."},
-	{"search",      CmdEMVSearch,               0,  "Try to select all applets from applets list and print installed applets."},
-	{"select",      CmdEMVSelect,               0,  "Select applet."},
-	{"gpo",         CmdEMVGPO,                  0,  "Execute GetProcessingOptions."},
-	{"readrec",     CmdEMVReadRecord,           0,  "Read files from card."},
-	{"genac",       CmdEMVAC,                   0,  "Generate ApplicationCryptogram."},
-	{"challenge",   CmdEMVGenerateChallenge,    0,  "Generate challenge."},
-	{"intauth",     CmdEMVInternalAuthenticate, 0,  "Internal authentication."},
-	{"scan",        CmdEMVScan,                 0,  "Scan EMV card and save it contents to json file for emulator."},
-	{"test",        CmdEMVTest,                 0,  "Crypto logic test."},
-	{"roca",        CmdEMVRoca,                 0,  "Extract public keys and run ROCA test"}, 
+	{"exec",        CmdEMVExec,                 1,  "Executes EMV contactless transaction."},
+	{"pse",         CmdEMVPPSE,                 1,  "Execute PPSE. It selects 2PAY.SYS.DDF01 or 1PAY.SYS.DDF01 directory."},
+	{"search",      CmdEMVSearch,               1,  "Try to select all applets from applets list and print installed applets."},
+	{"select",      CmdEMVSelect,               1,  "Select applet."},
+	{"gpo",         CmdEMVGPO,                  1,  "Execute GetProcessingOptions."},
+	{"readrec",     CmdEMVReadRecord,           1,  "Read files from card."},
+	{"genac",       CmdEMVAC,                   1,  "Generate ApplicationCryptogram."},
+	{"challenge",   CmdEMVGenerateChallenge,    1,  "Generate challenge."},
+	{"intauth",     CmdEMVInternalAuthenticate, 1,  "Internal authentication."},
+	{"scan",        CmdEMVScan,                 1,  "Scan EMV card and save it contents to json file for emulator."},
+	{"test",        CmdEMVTest,                 1,  "Crypto logic test."},
+	{"roca",        CmdEMVRoca,                 1,  "Extract public keys and run ROCA test"}, 
 	{NULL,          NULL,                       0,  NULL}
 };
 

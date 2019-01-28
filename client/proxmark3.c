@@ -28,7 +28,6 @@
 #include "cmdhw.h"
 #include "whereami.h"
 #include "comms.h"
-#include "pcsc.h"
 
 
 void

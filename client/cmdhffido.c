@@ -61,7 +61,7 @@ int CmdHFFidoInfo(const char *cmd) {
 	PrintAndLog("--------------------------------------------"); 
 	SetAPDULogging(false);
 	
-	uint8_t buf[APDU_RES_LEN] = {0};
+	uint8_t buf[APDU_RESPONSE_LEN] = {0};
 	size_t len = 0;
 	uint16_t sw = 0;
 	int res = FIDOSelect(true, true, buf, sizeof(buf), &len, &sw);
