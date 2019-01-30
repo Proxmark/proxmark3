@@ -37,38 +37,39 @@ typedef struct {
 
 static const TAIDList AIDlist [] = {
 	// Visa International
-	{ CV_VISA, 	"A00000000305076010"},			// VISA ELO Credit
-	{ CV_VISA, 	"A0000000031010" },				// VISA Debit/Credit (Classic)
-	{ CV_VISA, 	"A000000003101001" },			// VISA Credit
-	{ CV_VISA, 	"A000000003101002" },			// VISA Debit
-	{ CV_VISA, 	"A0000000032010" },				// VISA Electron
-	{ CV_VISA, 	"A0000000032020" },				// VISA
-	{ CV_VISA, 	"A0000000033010" },				// VISA Interlink
-	{ CV_VISA, 	"A0000000034010" },				// VISA Specific
-	{ CV_VISA, 	"A0000000035010" },				// VISA Specific
-	{ CV_VISA, 	"A0000000036010" },				// Domestic Visa Cash Stored Value
-	{ CV_VISA, 	"A0000000036020" },				// International Visa Cash Stored Value
-	{ CV_VISA, 	"A0000000038002" },				// VISA Auth, VisaRemAuthen EMV-CAP (DPA)
-	{ CV_VISA, 	"A0000000038010" },				// VISA Plus
-	{ CV_VISA, 	"A0000000039010" },				// VISA Loyalty
-	{ CV_VISA, 	"A000000003999910" },			// VISA Proprietary ATM
+	{ CV_VISA,  "A00000000305076010"},          // VISA ELO Credit
+	{ CV_VISA,  "A0000000031010" },             // VISA Debit/Credit (Classic)
+	{ CV_VISA,  "A000000003101001" },           // VISA Credit
+	{ CV_VISA,  "A000000003101002" },           // VISA Debit
+	{ CV_VISA,  "A0000000032010" },             // VISA Electron
+	{ CV_VISA,  "A0000000032020" },             // VISA
+	{ CV_VISA,  "A0000000033010" },             // VISA Interlink
+	{ CV_VISA,  "A0000000034010" },             // VISA Specific
+	{ CV_VISA,  "A0000000035010" },             // VISA Specific
+	{ CV_VISA,  "A0000000036010" },             // Domestic Visa Cash Stored Value
+	{ CV_VISA,  "A0000000036020" },             // International Visa Cash Stored Value
+	{ CV_VISA,  "A0000000038002" },             // VISA Auth, VisaRemAuthen EMV-CAP (DPA)
+	{ CV_VISA,  "A0000000038010" },             // VISA Plus
+	{ CV_VISA,  "A0000000039010" },             // VISA Loyalty
+	{ CV_VISA,  "A000000003999910" },           // VISA Proprietary ATM
 	// Visa USA
-	{ CV_VISA, 	"A000000098" },					// Debit Card
-	{ CV_VISA, 	"A0000000980848" },				// Debit Card
+	{ CV_VISA,  "A000000098" },                 // Debit Card
+	{ CV_VISA,  "A0000000980848" },             // Debit Card
 	// Mastercard International
-	{ CV_MASTERCARD, "A00000000401" },			// MasterCard PayPass
-	{ CV_MASTERCARD, "A0000000041010" },		// MasterCard Credit
-	{ CV_MASTERCARD, "A00000000410101213" },	// MasterCard Credit
-	{ CV_MASTERCARD, "A00000000410101215" },	// MasterCard Credit
-	{ CV_MASTERCARD, "A0000000042010" },		// MasterCard Specific
-	{ CV_MASTERCARD, "A0000000043010" },		// MasterCard Specific
-	{ CV_MASTERCARD, "A0000000043060" },		// Maestro (Debit)
-	{ CV_MASTERCARD, "A000000004306001" },		// Maestro (Debit)
-	{ CV_MASTERCARD, "A0000000044010" },		// MasterCard Specific
-	{ CV_MASTERCARD, "A0000000045010" },		// MasterCard Specific
-	{ CV_MASTERCARD, "A0000000046000" },		// Cirrus
-	{ CV_MASTERCARD, "A0000000048002" },		// SecureCode Auth EMV-CAP
-	{ CV_MASTERCARD, "A0000000049999" },		// MasterCard PayPass
+	{ CV_MASTERCARD, "A00000000401" },          // MasterCard PayPass
+	{ CV_MASTERCARD, "A0000000041010" },        // MasterCard Credit
+	{ CV_MASTERCARD, "A00000000410101213" },    // MasterCard Credit
+	{ CV_MASTERCARD, "A00000000410101215" },    // MasterCard Credit
+	{ CV_MASTERCARD, "A0000000042010" },        // MasterCard Specific
+	{ CV_MASTERCARD, "A0000000043010" },        // MasterCard Specific
+	{ CV_MASTERCARD, "A0000000043060" },        // Maestro (Debit)
+	{ CV_MASTERCARD, "A000000004306001" },      // Maestro (Debit)
+	{ CV_MASTERCARD, "A0000000044010" },        // MasterCard Specific
+	{ CV_MASTERCARD, "A0000000045010" },        // MasterCard Specific
+	{ CV_MASTERCARD, "A0000000046000" },        // Cirrus
+	{ CV_MASTERCARD, "A0000000048002" },        // SecureCode Auth EMV-CAP
+	{ CV_MASTERCARD, "A0000000049999" },        // MasterCard PayPass
+	{ CV_MASTERCARD, "B012345678" },            // Maestro TEST Used for development
 	// American Express
 	{ CV_AMERICANEXPRESS, "A000000025" },
 	{ CV_AMERICANEXPRESS, "A0000000250000" },
@@ -77,19 +78,48 @@ static const TAIDList AIDlist [] = {
 	{ CV_AMERICANEXPRESS, "A000000025010701" },
 	{ CV_AMERICANEXPRESS, "A000000025010801" },
 	// Groupement des Cartes Bancaires "CB"
-	{ CV_CB, "A0000000421010" },				// Cartes Bancaire EMV Card
+	{ CV_CB, "A0000000421010" },                // Cartes Bancaire EMV Card
 	{ CV_CB, "A0000000422010" },
 	{ CV_CB, "A0000000423010" },
 	{ CV_CB, "A0000000424010" },
 	{ CV_CB, "A0000000425010" },
 	// JCB CO., LTD.
-	{ CV_JCB, "A00000006510" },					// JCB
-	{ CV_JCB, "A0000000651010" },				// JCB J Smart Credit
+	{ CV_JCB, "A00000006510" },                 // JCB
+	{ CV_JCB, "A0000000651010" },               // JCB J Smart Credit
+	// Switch Card Services Ltd.
+	{ CV_SWITCH, "A0000000050001" },            // Maestro UK
+	{ CV_SWITCH, "A0000000050002" },            // Solo
+	// Diners Club International Ltd.
+	{ CV_DINERS, "A0000001523010" },            // Discover, Pulse D Pas Discover Card
+	{ CV_DINERS, "A0000001524010" },            // Discover, Discover Debit Common Card
 	// Other
-	{ CV_OTHER, "A0000001544442" },				// Banricompras Debito - Banrisul - Banco do Estado do Rio Grande do SUL - S.A.
-	{ CV_OTHER, "F0000000030001" },				// BRADESCO
-	{ CV_OTHER, "A0000005241010" },				// RuPay - RuPay
-	{ CV_OTHER, "D5780000021010" }				// Bankaxept - Bankaxept
+	{ CV_OTHER, "A00000002401" },               // Midland Bank Plc - Self Service
+	{ CV_OTHER, "A0000000291010" },             // LINK Interchange Network Ltd - Link / American Express
+	{ CV_OTHER, "A00000006900" },               // Société Européenne de Monnaie Electronique SEME - Moneo
+	{ CV_OTHER, "A000000077010000021000000000003B" },  // Oberthur Technologies France - Visa AEPN
+	{ CV_OTHER, "A0000001211010" },             // PBS Danmark A/S - Denmark - Dankort (VISA GEM Vision) - Danish domestic debit card
+	{ CV_OTHER, "A0000001410001" },             // Associazione Bancaria Italiana - Italy - PagoBANCOMAT - CoGeBan Consorzio BANCOMAT (Italian domestic debit card)
+	{ CV_OTHER, "A0000001544442" },             // Banricompras Debito - Banrisul - Banco do Estado do Rio Grande do SUL - S.A.
+	{ CV_OTHER, "A000000172950001" },           // Financial Information Service Co. Ltd. - Taiwan - BAROC Financial Application Taiwan- The Bankers Association of the Republic of China
+	{ CV_OTHER, "A0000001850002" },             // Post Office Limited - United Kingdom - UK Post Office Account card
+	{ CV_OTHER, "A0000002281010" },             // Saudi Arabian Monetary Agency (SAMA) - Kingdom of Saudi Arabia - SPAN (M/Chip) - SPAN2 (Saudi Payments Network) - Saudi Arabia domestic credit/debit card (Saudi Arabia Monetary Agency)
+	{ CV_OTHER, "A0000002282010" },             // Saudi Arabian Monetary Agency (SAMA) - Kingdom of Saudi Arabia - SPAN (VIS) - SPAN2 (Saudi Payments Network) - Saudi Arabia domestic credit/debit card (Saudi Arabia Monetary Agency)
+	{ CV_OTHER, "A0000002771010" },             // Interac Association - Canada - INTERAC - Canadian domestic credit/debit card
+	{ CV_OTHER, "A00000031510100528" },         // Currence Holding/PIN BV - The Netherlands- Currence PuC
+	{ CV_OTHER, "A0000003156020" },             // Currence Holding/PIN BV - The Netherlands - Chipknip
+	{ CV_OTHER, "A0000003591010028001" },       // Euro Alliance of Payment Schemes s.c.r.l. (EAPS) - Belgium - Girocard EAPS - ZKA (Germany)
+	{ CV_OTHER, "A0000003710001" },             // Verve - Nigeria - InterSwitch Verve Card - Nigerian local switch company
+	{ CV_OTHER, "A0000004540010" },             // eTranzact - Nigeria - Etranzact Genesis Card - Nigerian local switch company
+	{ CV_OTHER, "A0000004540011" },             // eTranzact - Nigeria - Etranzact Genesis Card 2 - Nigerian local switch company
+	{ CV_OTHER, "A0000004766C" },               // Google - United States - GOOGLE_PAYMENT_AID
+	{ CV_OTHER, "A0000005241010" },             // RuPay - India - RuPay - RuPay (India)
+	{ CV_OTHER, "A0000006723010" },             // TROY - Turkey - TROY chip credit card - Turkey's Payment Method
+	{ CV_OTHER, "A0000006723020" },             // TROY - Turkey - TROY chip debit card - Turkey's Payment Method
+	{ CV_OTHER, "A0000007705850" },             // Indian Oil Corporation Limited - India - XTRAPOWER Fleet Card Program - Indian Oil’s Pre Paid Program
+	{ CV_OTHER, "D27600002545500100" },         // ZKA - Germany - Girocard - ZKA Girocard (Geldkarte) (Germany)
+	{ CV_OTHER, "D5280050218002" },             // The Netherlands - ? - (Netherlands)
+	{ CV_OTHER, "D5780000021010" },             // Bankaxept    Norway  Bankaxept   Norwegian domestic debit card
+	{ CV_OTHER, "F0000000030001" },             // BRADESCO - Brazilian Bank Banco Bradesco
 };
 static const size_t AIDlistLen = sizeof(AIDlist)/sizeof(TAIDList);
 
