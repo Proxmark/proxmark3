@@ -74,7 +74,7 @@ static unsigned char *emv_pki_decode_message(const struct emv_pk *enc_pk,
 		printf("Recovered data:\n");
 		dump_buffer(data, data_len, stdout, 0);
 	}*/
-	
+
 	if (data[data_len-1] != 0xbc || data[0] != 0x6a || data[1] != msgtype) {
 		printf("ERROR: Certificate format\n");
 		free(data);

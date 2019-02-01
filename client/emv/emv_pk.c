@@ -44,7 +44,7 @@ static ssize_t emv_pk_read_bin(char *buf, unsigned char *bin, size_t size, size_
 {
 	size_t left = size;
 	char *p = buf;
-	while (*p && *p == ' ')
+	while (*p && (*p == ' ' || *p == '\t'))
 		p++;
 
 	while (left > 0) {
@@ -71,7 +71,7 @@ static ssize_t emv_pk_read_bin(char *buf, unsigned char *bin, size_t size, size_
 			return -(p - buf);
 	}
 
-	while (*p && *p == ' ')
+	while (*p && (*p == ' ' || *p == '\t'))
 		p++;
 
 	p--;
@@ -87,7 +87,7 @@ static ssize_t emv_pk_read_ymv(char *buf, unsigned *ymv)
 
 	*ymv = 0;
 
-	while (*p && *p == ' ')
+	while (*p && (*p == ' ' || *p == '\t'))
 		p++;
 
 	for (i = 0; i < 3; i++) {
@@ -103,7 +103,7 @@ static ssize_t emv_pk_read_ymv(char *buf, unsigned *ymv)
 		temp[i] = (c1 * 16 + c2);
 	}
 
-	while (*p && *p == ' ')
+	while (*p && (*p == ' ' || *p == '\t'))
 		p++;
 
 	p--;
@@ -119,11 +119,11 @@ static ssize_t emv_pk_read_ymv(char *buf, unsigned *ymv)
 static ssize_t emv_pk_read_string(char *buf, char *str, size_t size)
 {
 	char *p = buf;
-	while (*p && *p == ' ')
+	while (*p && (*p == ' ' || *p == '\t'))
 		p++;
 
 	while (size > 1) {
-		if (*p == ' ')
+		if (*p == ' ' || *p == '\t')
 			break;
 		else if (*p < 0x20 || *p >= 0x7f)
 			return -(p - buf);
@@ -135,7 +135,7 @@ static ssize_t emv_pk_read_string(char *buf, char *str, size_t size)
 
 	*str = 0;
 
-	while (*p && *p == ' ')
+	while (*p && (*p == ' ' || *p == '\t'))
 		p++;
 
 	p--;
