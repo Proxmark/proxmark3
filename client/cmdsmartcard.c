@@ -570,7 +570,7 @@ int ExchangeAPDUSC(uint8_t *APDU, int APDUlen, bool activateCard, bool leaveSign
 	}
 
 	if (*responselen < 0 ) {
-		return 2;
+		return 1;
 	} else {
 		return 0;
 	}

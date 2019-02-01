@@ -257,10 +257,11 @@ static void I2C_Reset_EnterBootloader(void) {
 	WaitMS(10);
 }
 
-// Wait max 300ms or until SCL goes LOW.
+// Wait max 1800ms or until SCL goes LOW.
+// It timeout reading response from card
 // Which ever comes first
-static bool WaitSCL_L_300ms(void) {
-	volatile uint16_t delay = 310;
+bool WaitSCL_L_timeout(void){
+	volatile uint16_t delay = 1800;
 	while ( delay-- ) {
 		// exit on SCL LOW
 		if (!SCL_read)
@@ -272,8 +273,8 @@ static bool WaitSCL_L_300ms(void) {
 }
 
 static bool I2C_WaitForSim() {
-	// variable delay here.
-	if (!WaitSCL_L_300ms())
+	// wait for data from card
+	if (!WaitSCL_L_timeout())
 		return false;
 
 	// 8051 speaks with smart card.
