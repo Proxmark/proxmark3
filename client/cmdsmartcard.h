@@ -15,12 +15,6 @@
 #include <stdbool.h>
 
 extern int CmdSmartcard(const char *Cmd);
-
-extern int CmdSmartRaw(const char* cmd);
-extern int CmdSmartUpgrade(const char* cmd);
-extern int CmdSmartInfo(const char* cmd);
-extern int CmdSmartReader(const char *Cmd);
-
 extern int ExchangeAPDUSC(uint8_t *datain, int datainlen, bool activateCard, bool leaveSignalON, uint8_t *dataout, int maxdataoutlen, int *dataoutlen);
 
 #endif

@@ -29,8 +29,10 @@
 #include "emv_pk.h"
 #include "emv_pki.h"
 
-#define APDU_RES_LEN 260
-#define APDU_AID_LEN 50
+// maximum APDU lengths. Long APDUs not yet supported/needed
+#define APDU_DATA_LEN      255
+#define APDU_COMMAND_LEN   (4 + 1 + APDU_DATA_LEN + 1)
+#define APDU_RESPONSE_LEN  (256 + 2)
 
 typedef enum {
 	ECC_CONTACTLESS,
@@ -44,15 +46,6 @@ enum TransactionType {
 	TT_CDA,
 };
 extern char *TransactionTypeStr[];
-
-typedef struct {
-	uint8_t CLA;
-	uint8_t INS;
-	uint8_t P1;
-	uint8_t P2;
-	uint8_t Lc;
-	uint8_t *data;
-} sAPDU;
 
 enum CardPSVendor {
 	CV_NA,
@@ -76,7 +69,7 @@ extern struct tlvdb *GetdCVVRawFromTrack2(const struct tlv *track2);
 extern void SetAPDULogging(bool logging);
 
 // exchange
-extern int EMVExchange(EMVCommandChannel channel, bool LeaveFieldON, sAPDU apdu, uint8_t *Result, size_t MaxResultLen, size_t *ResultLen, uint16_t *sw, struct tlvdb *tlv);
+extern int EMVExchange(EMVCommandChannel channel, bool LeaveFieldON, uint8_t *APDU, int APDU_len, uint8_t *Result, size_t MaxResultLen, size_t *ResultLen, uint16_t *sw, struct tlvdb *tlv);
 
 // search application
 extern int EMVSearchPSE(EMVCommandChannel channel, bool ActivateField, bool LeaveFieldON, uint8_t PSENum, bool decodeTLV, struct tlvdb *tlv);

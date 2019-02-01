@@ -22,6 +22,8 @@
 #include "crypto/libpcrypto.h"
 #include "fido/additional_ca.h"
 #include "fido/cose.h"
+#include "protocols.h"
+
 
 typedef struct {
 	uint8_t ErrorCode;
@@ -173,14 +175,16 @@ int FIDOSelect(bool ActivateField, bool LeaveFieldON, uint8_t *Result, size_t Ma
 	return EMVSelect(ECC_CONTACTLESS, ActivateField, LeaveFieldON, data, sizeof(data), Result, MaxResultLen, ResultLen, sw, NULL);
 }
 
-int FIDOExchange(sAPDU apdu, uint8_t *Result, size_t MaxResultLen, size_t *ResultLen, uint16_t *sw) {
-	int res = EMVExchange(ECC_CONTACTLESS, true, apdu, Result, MaxResultLen, ResultLen, sw, NULL);
+int FIDOExchange(uint8_t* apdu, int apdulen, uint8_t *Result, size_t MaxResultLen, size_t *ResultLen, uint16_t *sw) {
+	int res = EMVExchange(ECC_CONTACTLESS, true, apdu, apdulen, Result, MaxResultLen, ResultLen, sw, NULL);
 	if (res == 5) // apdu result (sw) not a 0x9000
 		res = 0;
 	// software chaining
 	while (!res && (*sw >> 8) == 0x61) {
+		uint8_t La = *sw & 0xff;
+		uint8_t get_response_APDU[5] = {apdu[0], ISO7816_GET_RESPONSE, 0x00, 0x00, La};
 		size_t oldlen = *ResultLen;
-		res = EMVExchange(ECC_CONTACTLESS, true, (sAPDU){0x00, 0xC0, 0x00, 0x00, 0x00, NULL}, &Result[oldlen], MaxResultLen - oldlen, ResultLen, sw, NULL);
+		res = EMVExchange(ECC_CONTACTLESS, true, get_response_APDU, sizeof(get_response_APDU), &Result[oldlen], MaxResultLen - oldlen, ResultLen, sw, NULL);
 		if (res == 5) // apdu result (sw) not a 0x9000
 			res = 0;
 		
@@ -191,31 +195,41 @@ int FIDOExchange(sAPDU apdu, uint8_t *Result, size_t MaxResultLen, size_t *Resul
 	return res;
 }
 
-int FIDORegister(uint8_t *params, uint8_t *Result, size_t MaxResultLen, size_t *ResultLen, uint16_t *sw) {
-	return FIDOExchange((sAPDU){0x00, 0x01, 0x03, 0x00, 64, params}, Result, MaxResultLen, ResultLen, sw);
+int FIDORegister(uint8_t *params, uint8_t *Result, size_t MaxResultLen, size_t *ResultLen, uint16_t *sw) 
+{
+	uint8_t APDU[4 + 64] = {0x00, 0x01, 0x03, 0x00, 64, 0x00};
+	memcpy(APDU, params, 64);
+	return FIDOExchange(APDU, 4 + 64, Result, MaxResultLen, ResultLen, sw);
 }
 
-int FIDOAuthentication(uint8_t *params, uint8_t paramslen, uint8_t controlb, uint8_t *Result, size_t MaxResultLen, size_t *ResultLen, uint16_t *sw) {
-	return FIDOExchange((sAPDU){0x00, 0x02, controlb, 0x00, paramslen, params}, Result, MaxResultLen, ResultLen, sw);
+int FIDOAuthentication(uint8_t *params, uint8_t paramslen, uint8_t controlb, uint8_t *Result, size_t MaxResultLen, size_t *ResultLen, uint16_t *sw) 
+{
+	uint8_t APDU[APDU_COMMAND_LEN] = {0x00, 0x02, controlb, 0x00, paramslen, 0x00};
+	memcpy(APDU+5, params, paramslen);
+	int apdu_len = 5 + paramslen;
+	return FIDOExchange(APDU, apdu_len, Result, MaxResultLen, ResultLen, sw);
 }
 
-int FIDO2GetInfo(uint8_t *Result, size_t MaxResultLen, size_t *ResultLen, uint16_t *sw) {
-	uint8_t data[] = {fido2CmdGetInfo};
-	return FIDOExchange((sAPDU){0x80, 0x10, 0x00, 0x00, sizeof(data), data}, Result, MaxResultLen, ResultLen, sw);
+int FIDO2GetInfo(uint8_t *Result, size_t MaxResultLen, size_t *ResultLen, uint16_t *sw) 
+{
+	uint8_t APDU[5] = {0x80, 0x10, 0x00, 0x00, fido2CmdGetInfo};
+	return FIDOExchange(APDU, sizeof(APDU), Result, MaxResultLen, ResultLen, sw);
 }
 
-int FIDO2MakeCredential(uint8_t *params, uint8_t paramslen, uint8_t *Result, size_t MaxResultLen, size_t *ResultLen, uint16_t *sw) {
-	uint8_t data[paramslen + 1];
-	data[0] = fido2CmdMakeCredential;
-	memcpy(&data[1], params, paramslen);
-	return FIDOExchange((sAPDU){0x80, 0x10, 0x00, 0x00, sizeof(data), data}, Result, MaxResultLen, ResultLen, sw);
+int FIDO2MakeCredential(uint8_t *params, uint8_t paramslen, uint8_t *Result, size_t MaxResultLen, size_t *ResultLen, uint16_t *sw)
+{
+	uint8_t APDU[APDU_COMMAND_LEN] = {0x80, 0x10, 0x00, 0x00, paramslen + 1, fido2CmdMakeCredential, 0x00};
+	memcpy(APDU+6, params, paramslen);
+	int apdu_len = 5 + paramslen + 1;
+	return FIDOExchange(APDU, apdu_len, Result, MaxResultLen, ResultLen, sw);
 }
 
-int FIDO2GetAssertion(uint8_t *params, uint8_t paramslen, uint8_t *Result, size_t MaxResultLen, size_t *ResultLen, uint16_t *sw) {
-	uint8_t data[paramslen + 1];
-	data[0] = fido2CmdGetAssertion;
-	memcpy(&data[1], params, paramslen);
-	return FIDOExchange((sAPDU){0x80, 0x10, 0x00, 0x00, sizeof(data), data}, Result, MaxResultLen, ResultLen, sw);
+int FIDO2GetAssertion(uint8_t *params, uint8_t paramslen, uint8_t *Result, size_t MaxResultLen, size_t *ResultLen, uint16_t *sw)
+{
+	uint8_t APDU[APDU_COMMAND_LEN] = {0x80, 0x10, 0x00, 0x00, paramslen + 1, fido2CmdGetAssertion, 0x00};
+	memcpy(APDU+6, params, paramslen);
+	int apdu_len = 5 + paramslen + 1;
+	return FIDOExchange(APDU, apdu_len, Result, MaxResultLen, ResultLen, sw);
 }
 
 int FIDOCheckDERAndGetKey(uint8_t *der, size_t derLen, bool verbose, uint8_t *publicKey, size_t publicKeyMaxLen) {
