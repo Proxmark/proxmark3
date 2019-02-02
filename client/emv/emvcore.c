@@ -308,11 +308,11 @@ static int EMVExchangeEx(EMVCommandChannel channel, bool ActivateField, bool Lea
 		return 200;
 	}
 
-	if (Result[*ResultLen-2] == 0x61) {
+/*	if (Result[*ResultLen-2] == 0x61) {
 		uint8_t La = Result[*ResultLen-1];
 		uint8_t get_response[5] = {apdu[0], ISO7816_GET_RESPONSE, 0x00, 0x00, La};
 		return EMVExchangeEx(channel, false, LeaveFieldON, get_response, sizeof(get_response), Result, MaxResultLen, ResultLen, sw, tlv);
-	}
+	}*/
 
 	*ResultLen -= 2;
 	isw = Result[*ResultLen] * 0x0100 + Result[*ResultLen + 1];
@@ -346,7 +346,8 @@ int EMVExchange(EMVCommandChannel channel, bool LeaveFieldON, uint8_t *apdu, int
 		} else if (apdu_len > 5 && apdu_len == 5 + apdu[4] + 1) {
 			// there is Lc, data and Le
 		} else {
-			apdu_len++; // no Le, add Le = 0x00 because some vendors require it for contactless
+			if (apdu[1] != 0xc0)
+				apdu_len++; // no Le, add Le = 0x00 because some vendors require it for contactless
 		}
 	}
 	return EMVExchangeEx(channel, false, LeaveFieldON, APDU, apdu_len, Result, MaxResultLen, ResultLen, sw, tlv);
