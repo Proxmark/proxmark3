@@ -387,11 +387,76 @@ int EMVSelectPSE(EMVCommandChannel channel, bool ActivateField, bool LeaveFieldO
 	return res;
 }
 
+
+int EMVSelectWithRetry(EMVCommandChannel channel, bool ActivateField, bool LeaveFieldON, uint8_t *AID, size_t AIDLen, uint8_t *Result, size_t MaxResultLen, size_t *ResultLen, uint16_t *sw, struct tlvdb *tlv) {
+	int retrycnt = 0;
+	int res = 0;
+	do {
+		res = EMVSelect(channel, false, true, AID, AIDLen, Result, MaxResultLen, ResultLen, sw, tlv);
+
+		// retry if error and not returned sw error
+		if (res && res != 5) {
+			if (++retrycnt < 3){
+				continue;
+			} else {
+				// card select error, proxmark error
+				if (res == 1) {
+					PrintAndLogEx(WARNING, "Exit...");
+					return 1;
+				}
+				
+				retrycnt = 0;
+				PrintAndLogEx(NORMAL, "Retry failed [%s]. Skiped...", sprint_hex_inrow(AID, AIDLen));
+				return res;
+			}	
+		}
+	} while (res && res != 5);
+
+	return res;
+}
+
+
+int EMVCheckAID(EMVCommandChannel channel, bool decodeTLV, struct tlvdb *tlvdbelm, struct tlvdb *tlv){
+	uint8_t data[APDU_RESPONSE_LEN] = {0};
+	size_t datalen = 0;
+	int res = 0;
+	uint16_t sw = 0;
+
+	while (tlvdbelm) {
+		const struct tlv *tgAID = tlvdb_get_inchild(tlvdbelm, 0x4f, NULL);
+		if (tgAID) {
+			res = EMVSelectWithRetry(channel, false, true, (uint8_t *)tgAID->value, tgAID->len, data, sizeof(data), &datalen, &sw, tlv);
+
+			// if returned sw error
+			if (res == 5) {
+				// next element
+				tlvdbelm = tlvdb_find_next(tlvdbelm, 0x61);
+				continue;
+			}
+			
+			if (res)
+				break;
+
+			// all is ok
+			if (decodeTLV){
+				PrintAndLogEx(NORMAL, "%s:", sprint_hex_inrow(tgAID->value, tgAID->len));
+				TLVPrintFromBuffer(data, datalen);
+			}
+		}
+		tlvdbelm = tlvdb_find_next(tlvdbelm, 0x61);
+	}
+	return res;
+}
+
+
 int EMVSearchPSE(EMVCommandChannel channel, bool ActivateField, bool LeaveFieldON, uint8_t PSENum, bool decodeTLV, struct tlvdb *tlv) {
 	uint8_t data[APDU_RESPONSE_LEN] = {0};
 	size_t datalen = 0;
+	uint8_t sfidata[0x11][APDU_RESPONSE_LEN] = {0};
+	size_t sfidatalen[0x11] = {0};
 	uint16_t sw = 0;
 	int res;
+	bool fileFound = false;
 
 	char *PSE_or_PPSE = PSENum == 1 ? "PSE" : "PPSE";
 	
@@ -399,49 +464,72 @@ int EMVSearchPSE(EMVCommandChannel channel, bool ActivateField, bool LeaveFieldO
 	res = EMVSelectPSE(channel, ActivateField, true, PSENum, data, sizeof(data), &datalen, &sw);
 
 	if (!res){
+		if (sw != 0x9000) {
+			PrintAndLogEx(FAILED, "Select PSE error. APDU error: %04x.", sw);
+			return 1;
+		}
+		
 		struct tlvdb *t = NULL;
 		t = tlvdb_parse_multi(data, datalen);
 		if (t) {
-			int retrycnt = 0;
-			struct tlvdb *ttmp = tlvdb_find_path(t, (tlv_tag_t[]){0x6f, 0xa5, 0xbf0c, 0x61, 0x00});
-			if (!ttmp)
-				PrintAndLogEx(FAILED, "%s doesn't have any records.", PSE_or_PPSE);
-
-			while (ttmp) {
-				const struct tlv *tgAID = tlvdb_get_inchild(ttmp, 0x4f, NULL);
-				if (tgAID) {
-					res = EMVSelect(channel, false, true, (uint8_t *)tgAID->value, tgAID->len, data, sizeof(data), &datalen, &sw, tlv);
-
-					// retry if error and not returned sw error
-					if (res && res != 5) {
-						if (++retrycnt < 3){
-							continue;
-						} else {
-							// card select error, proxmark error
-							if (res == 1) {
-								PrintAndLogEx(WARNING, "Exit...");
-								return 1;
-							}
-
-							retrycnt = 0;
-							PrintAndLogEx(NORMAL, "Retry failed [%s]. Skiped...", sprint_hex_inrow(tgAID->value, tgAID->len));
-						}
-
-						// next element
-						ttmp = tlvdb_find_next(ttmp, 0x61);
-						continue;
+			// PSE/PPSE with SFI
+			struct tlvdb *tsfi = tlvdb_find_path(t, (tlv_tag_t[]){0x6f, 0xa5, 0x88, 0x00});
+			if (tsfi) {
+				uint8_t sfin = 0;
+				tlv_get_uint8(tlvdb_get_tlv(tsfi), &sfin);
+				PrintAndLogEx(INFO, "* PPSE get SFI: 0x%02x.", sfin);
+				
+				for (uint8_t ui = 0x01; ui <= 0x10; ui++) {
+					PrintAndLogEx(INFO, "* * Get SFI: 0x%02x. num: 0x%02x", sfin, ui);
+					res = EMVReadRecord(channel, true, sfin, ui, sfidata[ui], APDU_RESPONSE_LEN, &sfidatalen[ui], &sw, NULL);
+					
+					// end of records
+					if (sw == 0x6a83) {
+						sfidatalen[ui] = 0;
+						PrintAndLogEx(INFO, "* * PPSE get SFI. End of records.");
+						break;
 					}
-					retrycnt = 0;
+					
+					// error catch!
+					if (sw != 0x9000) {
+						sfidatalen[ui] = 0;
+						PrintAndLogEx(FAILED, "PPSE get Error. APDU error: %04x.", sw);
+						break;
+					}
 
-					// all is ok
 					if (decodeTLV){
-						PrintAndLogEx(NORMAL, "%s:", sprint_hex_inrow(tgAID->value, tgAID->len));
-						TLVPrintFromBuffer(data, datalen);
+						TLVPrintFromBuffer(sfidata[ui], sfidatalen[ui]);
 					}
 				}
 
-				ttmp = tlvdb_find_next(ttmp, 0x61);
+				for (uint8_t ui = 0x01; ui <= 0x10; ui++) {
+					if (sfidatalen[ui]) {
+						struct tlvdb *tsfi = NULL;
+						tsfi = tlvdb_parse_multi(sfidata[ui], sfidatalen[ui]);
+						if (tsfi) {
+							struct tlvdb *tsfitmp = tlvdb_find_path(tsfi, (tlv_tag_t[]){0x70, 0x61, 0x00});
+							if (!tsfitmp) {
+								PrintAndLogEx(FAILED, "SFI 0x%02d doesn't have any records.", sfidatalen[ui]);
+								continue;
+							}
+							res = EMVCheckAID(channel, decodeTLV, tsfitmp, tlv);							
+							fileFound = true;
+						}
+						tlvdb_free(tsfi);
+					}
+				}
 			}
+
+
+			// PSE/PPSE plain (wo SFI)
+			struct tlvdb *ttmp = tlvdb_find_path(t, (tlv_tag_t[]){0x6f, 0xa5, 0xbf0c, 0x61, 0x00});
+			if (ttmp) {
+				res = EMVCheckAID(channel, decodeTLV, ttmp, tlv);
+				fileFound = true;
+			}
+			
+			if (!fileFound)
+				PrintAndLogEx(FAILED, "PPSE doesn't have any records.");
 
 			tlvdb_free(t);
 		} else {
@@ -650,7 +738,7 @@ int trSDA(struct tlvdb *tlv) {
 	struct tlvdb *dac_db = emv_pki_recover_dac(issuer_pk, tlv, sda_tlv);
 	if (dac_db) {
 		const struct tlv *dac_tlv = tlvdb_get(dac_db, 0x9f45, NULL);
-		PrintAndLogEx(NORMAL, "SDA verified OK. (%02hhx:%02hhx)\n", dac_tlv->value[0], dac_tlv->value[1]);
+		PrintAndLogEx(NORMAL, "SDA verified OK. (Data Authentication Code: %02hhx:%02hhx)\n", dac_tlv->value[0], dac_tlv->value[1]);
 		tlvdb_add(tlv, dac_db);
 	} else {
 		emv_pk_free(issuer_pk);
@@ -679,12 +767,12 @@ int trDDA(EMVCommandChannel channel, bool decodeTLV, struct tlvdb *tlv) {
 	}
 
 	const struct tlv *sda_tlv = tlvdb_get(tlv, 0x21, NULL);
-	if (!sda_tlv || sda_tlv->len < 1) {
+/*	if (!sda_tlv || sda_tlv->len < 1) { it may be 0!!!!
 		emv_pk_free(pk);
 		PrintAndLogEx(WARNING, "Error: Can't find input list for Offline Data Authentication. Exit.");
 		return 3;
 	}
-
+*/
 	struct emv_pk *issuer_pk = emv_pki_recover_issuer_cert(pk, tlv);
 	if (!issuer_pk) {
 		emv_pk_free(pk);
@@ -707,7 +795,7 @@ int trDDA(EMVCommandChannel channel, bool decodeTLV, struct tlvdb *tlv) {
 	if (!icc_pk) {
 		emv_pk_free(pk);
 		emv_pk_free(issuer_pk);
-		PrintAndLogEx(WARNING, "Error: ICC setrificate not found. Exit.");
+		PrintAndLogEx(WARNING, "Error: ICC certificate not found. Exit.");
 		return 2;
 	}
 	PrintAndLogEx(SUCCESS, "ICC PK recovered. RID %02hhx:%02hhx:%02hhx:%02hhx:%02hhx IDX %02hhx CSN %02hhx:%02hhx:%02hhx\n",
@@ -722,21 +810,25 @@ int trDDA(EMVCommandChannel channel, bool decodeTLV, struct tlvdb *tlv) {
 			icc_pk->serial[2]
 			);
 
-	struct emv_pk *icc_pe_pk = emv_pki_recover_icc_pe_cert(issuer_pk, tlv);
-	if (!icc_pe_pk) {
-		PrintAndLogEx(WARNING, "WARNING: ICC PE PK recover error. ");
+	if (tlvdb_get(tlv, 0x9f2d, NULL)) {
+		struct emv_pk *icc_pe_pk = emv_pki_recover_icc_pe_cert(issuer_pk, tlv);
+		if (!icc_pe_pk) {
+			PrintAndLogEx(WARNING, "WARNING: ICC PE PK recover error. ");
+		} else {
+			PrintAndLogEx(SUCCESS, "ICC PE PK recovered. RID %02hhx:%02hhx:%02hhx:%02hhx:%02hhx IDX %02hhx CSN %02hhx:%02hhx:%02hhx\n",
+					icc_pe_pk->rid[0],
+					icc_pe_pk->rid[1],
+					icc_pe_pk->rid[2],
+					icc_pe_pk->rid[3],
+					icc_pe_pk->rid[4],
+					icc_pe_pk->index,
+					icc_pe_pk->serial[0],
+					icc_pe_pk->serial[1],
+					icc_pe_pk->serial[2]
+					);
+		}
 	} else {
-		PrintAndLogEx(SUCCESS, "ICC PE PK recovered. RID %02hhx:%02hhx:%02hhx:%02hhx:%02hhx IDX %02hhx CSN %02hhx:%02hhx:%02hhx\n",
-				icc_pe_pk->rid[0],
-				icc_pe_pk->rid[1],
-				icc_pe_pk->rid[2],
-				icc_pe_pk->rid[3],
-				icc_pe_pk->rid[4],
-				icc_pe_pk->index,
-				icc_pe_pk->serial[0],
-				icc_pe_pk->serial[1],
-				icc_pe_pk->serial[2]
-				);
+		PrintAndLogEx(INFO, "ICC PE PK (PIN Encipherment Public Key Certificate) not found.\n");
 	}
 
 	// 9F4B: Signed Dynamic Application Data
@@ -778,7 +870,7 @@ int trDDA(EMVCommandChannel channel, bool decodeTLV, struct tlvdb *tlv) {
 		struct tlvdb *dac_db = emv_pki_recover_dac(issuer_pk, tlv, sda_tlv);
 		if (dac_db) {
 			const struct tlv *dac_tlv = tlvdb_get(dac_db, 0x9f45, NULL);
-			PrintAndLogEx(NORMAL, "SDA verified OK. (%02hhx:%02hhx)\n", dac_tlv->value[0], dac_tlv->value[1]);
+			PrintAndLogEx(NORMAL, "SDAD verified OK. (Data Authentication Code: %02hhx:%02hhx)\n", dac_tlv->value[0], dac_tlv->value[1]);
 			tlvdb_add(tlv, dac_db);
 		} else {
 			PrintAndLogEx(WARNING, "Error: SSAD verify error");
@@ -822,9 +914,16 @@ int trDDA(EMVCommandChannel channel, bool decodeTLV, struct tlvdb *tlv) {
 			if (len < 3 ) {
 				PrintAndLogEx(WARNING, "Error: Internal Authenticate format1 parsing error. length=%d", len);
 			} else {
+				// parse response 0x80
+				struct tlvdb *t80 = tlvdb_parse_multi(buf, len);
+				const struct tlv * t80tlv = tlvdb_get_tlv(t80);
+				
 				// 9f4b Signed Dynamic Application Data
-				dda_db = tlvdb_fixed(0x9f4b, len - 2, buf + 2);
+				dda_db = tlvdb_fixed(0x9f4b, t80tlv->len, t80tlv->value);
 				tlvdb_add(tlv, dda_db);
+				
+				tlvdb_free(t80);
+				
 				if (decodeTLV){
 					PrintAndLogEx(NORMAL, "* * Decode response format 1:");
 					TLVPrintFromTLV(dda_db);
