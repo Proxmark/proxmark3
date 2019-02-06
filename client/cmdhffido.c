@@ -40,6 +40,7 @@
 #include "emv/emvcore.h"
 #include "emv/emvjson.h"
 #include "emv/dump.h"
+#include "emv/apduinfo.h"
 #include "cliparser/cliparser.h"
 #include "crypto/asn1utils.h"
 #include "crypto/libpcrypto.h"

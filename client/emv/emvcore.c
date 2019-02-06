@@ -9,12 +9,26 @@
 //-----------------------------------------------------------------------------
 
 #include "emvcore.h"
+
+#include <string.h>
 #include "emvjson.h"
 #include "util_posix.h"
 #include "protocols.h"
+#include "ui.h"
+#include "util.h"
+#include "emv_tags.h"
+#include "emv_pk.h"
+#include "emv_pki.h"
+#include "cmdhf14a.h"
+#include "apduinfo.h"
+#include "tlv.h"
+#include "dump.h"
+#include "dol.h"
+
 #ifdef WITH_SMARTCARD
 #include "cmdsmartcard.h"
 #endif
+
 
 // Got from here. Thanks)
 // https://eftlab.co.uk/index.php/site-map/knowledge-base/211-emv-aid-rid-pix
@@ -127,6 +141,12 @@ static const size_t AIDlistLen = sizeof(AIDlist)/sizeof(TAIDList);
 static bool APDULogging = false;
 void SetAPDULogging(bool logging) {
 	APDULogging = logging;
+}
+
+void DropFieldEx(EMVCommandChannel channel) {
+	if (channel == ECC_CONTACTLESS) {
+		DropField();
+	}
 }
 
 enum CardPSVendor GetCardPSVendor(uint8_t * AID, size_t AIDlen) {
@@ -267,15 +287,15 @@ struct tlvdb *GetdCVVRawFromTrack2(const struct tlv *track2) {
 }
 
 
-static int EMVExchangeEx(EMVCommandChannel channel, bool ActivateField, bool LeaveFieldON, uint8_t *apdu, int apdu_len, uint8_t *Result, size_t MaxResultLen, size_t *ResultLen, uint16_t *sw, struct tlvdb *tlv) 
+int EMVExchangeEx(EMVCommandChannel channel, bool ActivateField, bool LeaveFieldON, uint8_t *apdu, int apdu_len, uint8_t *Result, size_t MaxResultLen, size_t *ResultLen, uint16_t *sw, struct tlvdb *tlv) 
 {
 	*ResultLen = 0;
 	if (sw)	*sw = 0;
 	uint16_t isw = 0;
 	int res = 0;
 
-	if (ActivateField && channel == ECC_CONTACTLESS) {
-		DropField();
+	if (ActivateField) {
+		DropFieldEx( channel );
 		msleep(50);
 	}
 
@@ -308,11 +328,11 @@ static int EMVExchangeEx(EMVCommandChannel channel, bool ActivateField, bool Lea
 		return 200;
 	}
 
-/*	if (Result[*ResultLen-2] == 0x61) {
+	if (Result[*ResultLen-2] == 0x61) {
 		uint8_t La = Result[*ResultLen-1];
 		uint8_t get_response[5] = {apdu[0], ISO7816_GET_RESPONSE, 0x00, 0x00, La};
-		return EMVExchangeEx(channel, false, LeaveFieldON, get_response, sizeof(get_response), Result, MaxResultLen, ResultLen, sw, tlv);
-	}*/
+		return EMVExchangeEx(channel, false, LeaveFieldON, get_response, sizeof(get_response), &Result[*ResultLen-2], MaxResultLen-(*ResultLen-2), ResultLen, sw, tlv);
+	}
 
 	*ResultLen -= 2;
 	isw = Result[*ResultLen] * 0x0100 + Result[*ResultLen + 1];
@@ -335,19 +355,18 @@ static int EMVExchangeEx(EMVCommandChannel channel, bool ActivateField, bool Lea
 	return 0;
 }
 
-int EMVExchange(EMVCommandChannel channel, bool LeaveFieldON, uint8_t *apdu, int apdu_len, uint8_t *Result, size_t MaxResultLen, size_t *ResultLen, uint16_t *sw, struct tlvdb *tlv) 
+static int EMVExchange(EMVCommandChannel channel, bool LeaveFieldON, uint8_t *apdu, int apdu_len, uint8_t *Result, size_t MaxResultLen, size_t *ResultLen, uint16_t *sw, struct tlvdb *tlv) 
 {
 	uint8_t APDU[APDU_COMMAND_LEN];
 	memcpy(APDU, apdu, apdu_len);
 	APDU[apdu_len] = 0x00; 
 	if (channel == ECC_CONTACTLESS) {
-		if (apdu_len == 5 && apdu[4] == 0) {
-			// there is no Lc but an Le == 0 already
+		if (apdu_len == 5) {
+			// there is no Lc but an Le already
 		} else if (apdu_len > 5 && apdu_len == 5 + apdu[4] + 1) {
 			// there is Lc, data and Le
 		} else {
-			if (apdu[1] != 0xc0)
-				apdu_len++; // no Le, add Le = 0x00 because some vendors require it for contactless
+			apdu_len++; // no Le, add Le = 0x00 because some vendors require it for contactless
 		}
 	}
 	return EMVExchangeEx(channel, false, LeaveFieldON, APDU, apdu_len, Result, MaxResultLen, ResultLen, sw, tlv);
@@ -539,8 +558,8 @@ int EMVSearchPSE(EMVCommandChannel channel, bool ActivateField, bool LeaveFieldO
 		PrintAndLogEx(WARNING, "%s ERROR: Can't select PPSE AID. Error: %d", PSE_or_PPSE, res);
 	}
 
-	if(!LeaveFieldON && channel == ECC_CONTACTLESS)
-		DropField();
+	if (!LeaveFieldON)
+		DropFieldEx( channel );
 
 	return res;
 }

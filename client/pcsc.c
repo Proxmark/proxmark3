@@ -19,7 +19,7 @@
 #include <PCSC/winscard.h>
 #include <PCSC/wintypes.h>
 #define SCARD_ATTR_VALUE(Class, Tag) ((((ULONG)(Class)) << 16) | ((ULONG)(Tag)))
-#define SCARD_CLASS_ICC_STATE       9 
+#define SCARD_CLASS_ICC_STATE       9
 #define SCARD_ATTR_ATR_STRING SCARD_ATTR_VALUE(SCARD_CLASS_ICC_STATE, 0x0303)
 #elif defined (_WIN32)
 #include <winscard.h>
@@ -32,6 +32,8 @@
 #include "util.h"
 #include "cmdhw.h"
 
+#define PM3_SMARTCARD_DEFAULT_NAME "PM3 RDV40 Smartcard Slot"
+
 static SCARDCONTEXT SC_Context;
 static SCARDHANDLE SC_Card;
 static DWORD SC_Protocol;
@@ -40,7 +42,7 @@ static char* AlternativeSmartcardReader = NULL;
 
 char *getAlternativeSmartcardReader(void)
 {
-	return AlternativeSmartcardReader;
+	return AlternativeSmartcardReader ? AlternativeSmartcardReader : PM3_SMARTCARD_DEFAULT_NAME;
 }
 
 
@@ -62,7 +64,7 @@ bool pcscCheckForCardReaders(void)
 		SCardReleaseContext(SC_Context);
 		return false;
 	}
-	
+
 	return true;
 }
 
@@ -70,7 +72,7 @@ bool pcscCheckForCardReaders(void)
 static char *pickReader(LPTSTR readerlist)
 {
 	PrintAndLogEx(NORMAL, "Please select one of these:");
-	PrintAndLogEx(NORMAL, "  [0] PM3 RDV40 Smartcard Slot %s", PM3hasSmartcardSlot() ? "(default)" : "(default, not available)");
+	PrintAndLogEx(NORMAL, "  [0] %s %s", PM3_SMARTCARD_DEFAULT_NAME, PM3hasSmartcardSlot() ? "(default)" : "(default, not available)");
 
 	int num = 1;
 	for (LPTSTR p = readerlist; *p != '\0'; ) {
@@ -79,17 +81,17 @@ static char *pickReader(LPTSTR readerlist)
 	}
 
 	num--;
-	
+
 	if (num == 1) {
 		printf("Your choice (0 or 1)?");
 	} else {
 		printf("Your choice (0...%d)? ", num);
 	}
 	int selection = getch() - '0';
-	printf("\n");	
+	printf("\n");
 
 	if (selection == 0) {
-		PrintAndLogEx(INFO, "Selected RDV40 Smartcard Slot");
+		PrintAndLogEx(INFO, "Selected %s", PM3_SMARTCARD_DEFAULT_NAME);
 		return NULL;
 	}
 
@@ -102,18 +104,58 @@ static char *pickReader(LPTSTR readerlist)
 		return p;
 	}
 
-	PrintAndLogEx(INFO, "Invalid selection. Using RDV40 Smartcard Slot");
+	PrintAndLogEx(INFO, "Invalid selection. Using %s", PM3_SMARTCARD_DEFAULT_NAME);
 	return NULL;
-	
+
 }
 
 
-char *matchString(LPTSTR readerlist, const char *readername)
+static bool matchString(char *string, const char *search)
 {
-	return pickReader(readerlist);
+	if (search[0] == '*' && search[1] == '\0') {  // the wildcard only string "*" matches everything
+		return true;
+	}
+
+	if (search[0] == '\0' && string[0] != '\0') {  // string is longer than pattern. No match.
+		return false;
+	}
+
+	if (search[0] == '?' || search[0] == string[0]) { // wildcard '?' matches any character
+		return matchString(string + 1, search + 1);
+	}
+
+	if (search[0] == '*') { // wildcard '*' matches any sequence of characters
+		for (size_t i = 0; i < strlen(string); i++) {
+			if (matchString(string + i, search + 1)) {
+				return true;
+			}
+		}
+	}
+
+	return false;
 }
 
-	
+
+static char *matchReader(LPTSTR readerlist, const char *readername)
+{
+	if (matchString(PM3_SMARTCARD_DEFAULT_NAME, readername)) {
+		PrintAndLogEx(INFO, "Selected %s", PM3_SMARTCARD_DEFAULT_NAME);
+		return NULL;
+	}
+
+	for (LPTSTR p = readerlist; *p != '\0'; ) {
+		if (matchString(p, readername)) {
+			PrintAndLogEx(INFO, "Selected %s", p);
+			return p;
+		}
+		while (*p++ != '\0') ; // advance to next entry
+	}
+
+	PrintAndLogEx(INFO, "No match. Using %s", PM3_SMARTCARD_DEFAULT_NAME);
+	return NULL;
+}
+
+
 bool pcscSelectAlternativeCardReader(const char *readername)
 {
 	DWORD readerlist_len;
@@ -131,7 +173,7 @@ bool pcscSelectAlternativeCardReader(const char *readername)
 
 	char *selected_readername = NULL;
 	if (readername) {
-		selected_readername = matchString(readerlist, readername);
+		selected_readername = matchReader(readerlist, readername);
 	} else {
 		selected_readername = pickReader(readerlist);
 	}
@@ -144,7 +186,8 @@ bool pcscSelectAlternativeCardReader(const char *readername)
 	free(AlternativeSmartcardReader);
 	AlternativeSmartcardReader = malloc((strlen(selected_readername) + 1) * sizeof(char));
 	strcpy(AlternativeSmartcardReader, selected_readername);
-	
+
+	free(readerlist);
 	return true;
 }
 
@@ -154,7 +197,7 @@ bool pcscGetATR(smart_card_atr_t *card)
 	if (!card) {
 		return false;
 	}
-	
+
 	card->atr_len = 0;
 	memset(card->atr, 0, sizeof(card->atr));
 
@@ -170,10 +213,10 @@ bool pcscGetATR(smart_card_atr_t *card)
 		return false;
 	}
 	card->atr_len = atr_len;
-	
+
 	// TODO: LogTrace without device
-	
-	return true;	
+
+	return true;
 }
 
 
@@ -192,7 +235,7 @@ void pcscTransmit(uint8_t *data, uint32_t data_len, uint32_t flags, uint8_t *res
 
 	// set_tracing(true);
 
-	if ((flags & SC_CONNECT || flags & SC_SELECT)) {	
+	if ((flags & SC_CONNECT || flags & SC_SELECT)) {
 		LONG res = SCardConnect(SC_Context, AlternativeSmartcardReader, SCARD_SHARE_SHARED,
 		                        SCARD_PROTOCOL_T0 | SCARD_PROTOCOL_T1, &SC_Card, &SC_Protocol);
 		if (res != SCARD_S_SUCCESS) {
@@ -200,7 +243,7 @@ void pcscTransmit(uint8_t *data, uint32_t data_len, uint32_t flags, uint8_t *res
 			return;
 		}
 	}
-	
+
 	if ((flags & SC_RAW) || (flags & SC_RAW_T0)) {
 		// TODO: tracing
 		// LogTrace(data, arg1, 0, 0, NULL, true);
