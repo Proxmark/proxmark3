@@ -1804,7 +1804,7 @@ int CmdEMVRoca(const char *cmd) {
 
 		struct emv_pk *pk = get_ca_pk(tlvRoot);
 		if (!pk) {
-			PrintAndLogEx(ERR, "ERROR: Key not found. Exit.");
+			PrintAndLogEx(ERR, "CA Public Key not found. Exit.");
 			goto out;
 		}
 
@@ -1815,8 +1815,10 @@ int CmdEMVRoca(const char *cmd) {
 			goto out;
 		}
 	
+		char RID[15] = {0};
+		memcpy(RID, sprint_hex(issuer_pk->rid, 5), 14);
 		PrintAndLogEx(SUCCESS, "Issuer PK recovered. RID %s IDX %02hhx CSN %s",
-				sprint_hex(issuer_pk->rid, 5),
+				RID,
 				issuer_pk->index,
 				sprint_hex(issuer_pk->serial, 3)
 				);
@@ -1829,8 +1831,10 @@ int CmdEMVRoca(const char *cmd) {
 			PrintAndLogEx(WARNING, "WARNING: ICC certificate not found. Exit.");
 			goto out;
 		}
+
+		memcpy(RID, sprint_hex(icc_pk->rid, 5), 14);
 		PrintAndLogEx(SUCCESS, "ICC PK recovered. RID %s IDX %02hhx CSN %s\n",
-				sprint_hex(icc_pk->rid, 5),
+				RID,
 				icc_pk->index,
 				sprint_hex(icc_pk->serial, 3)
 				);
