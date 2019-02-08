@@ -330,8 +330,8 @@ int EMVExchangeEx(EMVCommandChannel channel, bool ActivateField, bool LeaveField
 	if (Result[*ResultLen-2] == 0x61) {
 		uint8_t La = Result[*ResultLen-1];
 		uint8_t get_response[5] = {apdu[0], ISO7816_GET_RESPONSE, 0x00, 0x00, La};
-		size_t oldlen = *ResultLen-2;
-		res = EMVExchangeEx(channel, false, LeaveFieldON, get_response, sizeof(get_response), &Result[oldlen], MaxResultLen-oldlen, ResultLen, sw, tlv);
+		size_t oldlen = *ResultLen;
+		res = EMVExchangeEx(channel, false, LeaveFieldON, get_response, sizeof(get_response), &Result[oldlen-2], MaxResultLen-oldlen+2, ResultLen, sw, tlv);
 		*ResultLen += oldlen;
 	}
 
