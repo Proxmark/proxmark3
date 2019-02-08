@@ -302,23 +302,22 @@ int EMVExchangeEx(EMVCommandChannel channel, bool ActivateField, bool LeaveField
 	if (APDULogging)
 		PrintAndLogEx(SUCCESS, ">>>> %s", sprint_hex(apdu, apdu_len));
 
+#ifdef WITH_SMARTCARD
 	switch(channel) {
 		case ECC_CONTACTLESS:
 			// 6 byes + data = INS + CLA + P1 + P2 + Lc + <data = Nc> + Le(?IncludeLe)
 			res = ExchangeAPDU14a(apdu, apdu_len, ActivateField, LeaveFieldON, Result, (int)MaxResultLen, (int *)ResultLen);
-			if (res) {
-				return res;
-			}
 			break;
 		case ECC_CONTACT:
-			//int ExchangeAPDUSC(uint8_t *datain, int datainlen, bool activateCard, bool leaveSignalON, uint8_t *dataout, int maxdataoutlen, int *dataoutlen);
-#ifdef WITH_SMARTCARD
 			res = ExchangeAPDUSC(apdu, apdu_len, ActivateField, LeaveFieldON, Result, (int)MaxResultLen, (int *)ResultLen);
-			if (res) {
-				return res;
-			}
-#endif
 			break;
+	}
+#else
+	res = ExchangeAPDU14a(apdu, apdu_len, ActivateField, LeaveFieldON, Result, (int)MaxResultLen, (int *)ResultLen);
+#endif	
+
+	if (res) {
+		return res;
 	}
 
 	if (APDULogging)
@@ -331,10 +330,15 @@ int EMVExchangeEx(EMVCommandChannel channel, bool ActivateField, bool LeaveField
 	if (Result[*ResultLen-2] == 0x61) {
 		uint8_t La = Result[*ResultLen-1];
 		uint8_t get_response[5] = {apdu[0], ISO7816_GET_RESPONSE, 0x00, 0x00, La};
-		return EMVExchangeEx(channel, false, LeaveFieldON, get_response, sizeof(get_response), &Result[*ResultLen-2], MaxResultLen-(*ResultLen-2), ResultLen, sw, tlv);
+		size_t oldlen = *ResultLen-2;
+		res = EMVExchangeEx(channel, false, LeaveFieldON, get_response, sizeof(get_response), &Result[oldlen], MaxResultLen-oldlen, ResultLen, sw, tlv);
+		*ResultLen += oldlen;
 	}
 
+	if (res) return res;
+
 	*ResultLen -= 2;
+	
 	isw = Result[*ResultLen] * 0x0100 + Result[*ResultLen + 1];
 	if (sw)
 		*sw = isw;
@@ -715,7 +719,7 @@ struct emv_pk *get_ca_pk(struct tlvdb *db) {
 	if (!df_tlv || !caidx_tlv || df_tlv->len < 6 || caidx_tlv->len != 1)
 		return NULL;
 
-	PrintAndLogEx(NORMAL, "CA public key index 0x%0x", caidx_tlv->value[0]);
+	PrintAndLogEx(NORMAL, "CA Public Key index 0x%0x", caidx_tlv->value[0]);
 	return emv_pk_get_ca_pk(df_tlv->value, caidx_tlv->value[0]);
 }
 
@@ -1035,7 +1039,7 @@ int trCDA(struct tlvdb *tlv, struct tlvdb *ac_tlv, struct tlv *pdol_data_tlv, st
 
 	struct emv_pk *icc_pk = emv_pki_recover_icc_cert(issuer_pk, tlv, sda_tlv);
 	if (!icc_pk) {
-		PrintAndLogEx(WARNING, "Error: ICC setrificate not found. Exit.");
+		PrintAndLogEx(WARNING, "Error: ICC certificate not found. Exit.");
 		emv_pk_free(pk);
 		emv_pk_free(issuer_pk);
 		return 2;
