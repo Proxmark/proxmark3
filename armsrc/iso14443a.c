@@ -1955,7 +1955,7 @@ int iso14_apdu(uint8_t *cmd, uint16_t cmd_len, void *data, uint8_t *res) {
 		return 0; //DATA LINK ERROR
 	} else{
 		// S-Block WTX 
-		while((data_bytes[0] & 0xF2) == 0xF2) {
+		while(len && ((data_bytes[0] & 0xF2) == 0xF2)) {
 			uint32_t save_iso14a_timeout = iso14a_get_timeout();
 			// temporarily increase timeout
 			iso14a_set_timeout(MAX((data_bytes[1] & 0x3f) * save_iso14a_timeout, MAX_ISO14A_TIMEOUT));
@@ -1994,12 +1994,14 @@ int iso14_apdu(uint8_t *cmd, uint16_t cmd_len, void *data, uint8_t *res) {
 		
 	}
 	
-	// cut frame byte
-	len -= 1;
-	// memmove(data_bytes, data_bytes + 1, len);
-	for (int i = 0; i < len; i++)
-		data_bytes[i] = data_bytes[i + 1];
-	
+	if (len) {
+		// cut frame byte
+		len -= 1;
+		// memmove(data_bytes, data_bytes + 1, len);
+		for (int i = 0; i < len; i++)
+			data_bytes[i] = data_bytes[i + 1];
+	}
+		
 	return len;
 }
 
