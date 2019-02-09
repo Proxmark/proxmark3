@@ -25,6 +25,7 @@
 #include "BigBuf.h"
 #include "protocols.h"
 #include "parity.h"
+#include "fpgaloader.h"
 
 typedef struct {
 	enum {
@@ -1771,7 +1772,9 @@ int iso14443a_select_card(byte_t *uid_ptr, iso14a_card_select_t *p_hi14a_card, u
 		if (anticollision) {
 			// SELECT_ALL
 			ReaderTransmit(sel_all, sizeof(sel_all), NULL);
-			if (!ReaderReceive(resp, resp_par)) return 0;
+			if (!ReaderReceive(resp, resp_par)) {
+				return 0;
+			}
 
 			if (Demod.collisionPos) {			// we had a collision and need to construct the UID bit by bit
 				memset(uid_resp, 0, 4);
@@ -1793,7 +1796,9 @@ int iso14443a_select_card(byte_t *uid_ptr, iso14a_card_select_t *p_hi14a_card, u
 					}
 					collision_answer_offset = uid_resp_bits%8;
 					ReaderTransmitBits(sel_uid, 16 + uid_resp_bits, NULL);
-					if (!ReaderReceiveOffset(resp, collision_answer_offset, resp_par)) return 0;
+					if (!ReaderReceiveOffset(resp, collision_answer_offset, resp_par)) {
+						return 0;
+					}
 				}
 				// finally, add the last bits and BCC of the UID
 				for (uint16_t i = collision_answer_offset; i < (Demod.len-1)*8; i++, uid_resp_bits++) {
@@ -1827,7 +1832,9 @@ int iso14443a_select_card(byte_t *uid_ptr, iso14a_card_select_t *p_hi14a_card, u
 		ReaderTransmit(sel_uid, sizeof(sel_uid), NULL);
 
 		// Receive the SAK
-		if (!ReaderReceive(resp, resp_par)) return 0;
+		if (!ReaderReceive(resp, resp_par)) {
+			return 0;
+		}
 		sak = resp[0];
 	
 		// Test if more parts of the uid are coming
@@ -1862,7 +1869,9 @@ int iso14443a_select_card(byte_t *uid_ptr, iso14a_card_select_t *p_hi14a_card, u
 		AppendCrc14443a(rats, 2);
 		ReaderTransmit(rats, sizeof(rats), NULL);
 
-		if (!(len = ReaderReceive(resp, resp_par))) return 0;
+		if (!(len = ReaderReceive(resp, resp_par))) {
+			return 0;
+		}
 
 		if(p_hi14a_card) {
 			memcpy(p_hi14a_card->ats, resp, len);
@@ -2044,7 +2053,7 @@ void ReaderIso14443a(UsbCommand *c)
 				// 1 - all is OK with ATS, 2 - without ATS
 				cantSELECT = true;
 			}
-			
+			FpgaDisableTracing();
 			LED_B_ON();
 			cmd_send(CMD_ACK,arg0,card->uidlen,0,buf,sizeof(iso14a_card_select_t));
 			LED_B_OFF();
@@ -2058,6 +2067,7 @@ void ReaderIso14443a(UsbCommand *c)
 	if(param & ISO14A_APDU && !cantSELECT) {
 		uint8_t res;
 		arg0 = iso14_apdu(cmd, len, buf, &res);
+		FpgaDisableTracing();
 		LED_B_ON();
 		cmd_send(CMD_ACK, arg0, res, 0, buf, sizeof(buf));
 		LED_B_OFF();
@@ -2099,6 +2109,7 @@ void ReaderIso14443a(UsbCommand *c)
 			}
 		}
 		arg0 = ReaderReceive(buf, par);
+		FpgaDisableTracing();
 
 		LED_B_ON();
 		cmd_send(CMD_ACK,arg0,0,0,buf,sizeof(buf));
@@ -2415,6 +2426,8 @@ void ReaderMifare(bool first_try)
 		}
 	}
 	
+	FpgaDisableTracing();
+
 	uint8_t buf[32];
 	memcpy(buf + 0,  uid, 4);
 	num_to_bytes(nt, 4, buf + 4);
@@ -2587,6 +2600,7 @@ void RAMFUNC SniffMifare(uint8_t param) {
 	DbpString("COMMAND FINISHED.");
 
 	FpgaDisableSscDma();
+	FpgaDisableTracing();
 	MfSniffEnd();
 	
 	Dbprintf("maxDataLen=%x, Uart.state=%x, Uart.len=%x", maxDataLen, Uart.state, Uart.len);

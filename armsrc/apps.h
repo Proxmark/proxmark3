@@ -21,7 +21,6 @@
 #include "mifare.h"
 #include "../common/crc32.h"
 #include "BigBuf.h"
-#include "fpgaloader.h"
 
 extern const uint8_t OddByteParity[256];
 extern int rsamples;   // = 0;
@@ -174,13 +173,8 @@ void SimulateHitagSTag(bool tag_mem_supplied, byte_t* data);
 void WritePageHitagS(hitag_function htf, hitag_data* htd,int page);
 void check_challenges_cmd(bool file_given, byte_t* data, uint64_t tagMode);
 
-
-
 // cmd.h
 bool cmd_receive(UsbCommand* cmd);
 bool cmd_send(uint32_t cmd, uint32_t arg0, uint32_t arg1, uint32_t arg2, void* data, size_t len);
-
-/// util.h
-void HfSnoop(int , int);
 
 #endif

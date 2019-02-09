@@ -51,6 +51,7 @@
 #include "protocols.h"
 #include "optimized_cipher.h"
 #include "usb_cdc.h" // for usb_poll_validate_length
+#include "fpgaloader.h"
 
 static int timeout = 4096;
 

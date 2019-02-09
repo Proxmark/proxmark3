@@ -15,10 +15,10 @@
 
 #include "mifarecmd.h"
 
-#include "apps.h"
 #include "util.h"
 #include "parity.h"
 #include "crc.h"
+#include "fpgaloader.h"
 
 #define HARDNESTED_AUTHENTICATION_TIMEOUT 848			// card times out 1ms after wrong authentication (according to NXP documentation)
 #define HARDNESTED_PRE_AUTHENTICATION_LEADTIME 400		// some (non standard) cards need a pause after select before they are ready for first authentication 

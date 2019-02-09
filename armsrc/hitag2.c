@@ -22,6 +22,7 @@
 #include "hitag2.h"
 #include "string.h"
 #include "BigBuf.h"
+#include "fpgaloader.h"
 
 static bool bQuiet;
 

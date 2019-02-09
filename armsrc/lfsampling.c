@@ -12,7 +12,7 @@
 #include "string.h"
 #include "lfsampling.h"
 #include "usb_cdc.h"	// for usb_poll_validate_length
-//#include "ticks.h"		// for StartTicks
+#include "fpgaloader.h"
 
 sample_config config = { 1, 8, 1, 95, 0 } ;
 

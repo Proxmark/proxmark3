@@ -10,12 +10,14 @@
 // the `fake tag' modes.
 //-----------------------------------------------------------------------------
 
+#include "iso14443b.h"
+
 #include "proxmark3.h"
 #include "apps.h"
 #include "util.h"
 #include "string.h"
-
 #include "iso14443crc.h"
+#include "fpgaloader.h"
 
 #define RECEIVE_SAMPLES_TIMEOUT 1000 // TR0 max is 256/fs = 256/(848kHz) = 302us or 64 samples from FPGA. 1000 seems to be much too high?
 #define ISO14443B_DMA_BUFFER_SIZE 128

@@ -166,7 +166,7 @@ bool FpgaSetupSscDma(uint8_t *buf, uint16_t sample_count)
 	AT91C_BASE_PDC_SSC->PDC_RPR = (uint32_t) buf;           // transfer to this memory address
 	AT91C_BASE_PDC_SSC->PDC_RCR = sample_count;             // transfer this many samples
 	AT91C_BASE_PDC_SSC->PDC_RNPR = (uint32_t) buf;          // next transfer to same memory address
-	AT91C_BASE_PDC_SSC->PDC_RNCR = sample_count;            // ... with same number of samples	AT91C_BASE_PDC_SSC->PDC_PTCR = AT91C_PDC_RXTEN;	        // go!
+	AT91C_BASE_PDC_SSC->PDC_RNCR = sample_count;            // ... with same number of samples
 	AT91C_BASE_PDC_SSC->PDC_PTCR = AT91C_PDC_RXTEN;         // go!
 	return true;
 }
@@ -417,8 +417,10 @@ void FpgaDownloadAndGo(int bitstream_version)
 	uint8_t output_buffer[OUTPUT_BUFFER_LEN] = {0x00};
 	
 	// check whether or not the bitstream is already loaded
-	if (downloaded_bitstream == bitstream_version)
+	if (downloaded_bitstream == bitstream_version) {
+		FpgaEnableTracing();
 		return;
+	}
 
 	// make sure that we have enough memory to decompress
 	BigBuf_free(); BigBuf_Clear_ext(false);	
@@ -454,14 +456,28 @@ void FpgaSendCommand(uint16_t cmd, uint16_t v)
 	while ((AT91C_BASE_SPI->SPI_SR & AT91C_SPI_TXEMPTY) == 0);		// wait for the transfer to complete
 	AT91C_BASE_SPI->SPI_TDR = AT91C_SPI_LASTXFER | cmd | v;		// send the data
 }
+
 //-----------------------------------------------------------------------------
 // Write the FPGA setup word (that determines what mode the logic is in, read
 // vs. clone vs. etc.). This is now a special case of FpgaSendCommand() to
 // avoid changing this function's occurence everywhere in the source code.
 //-----------------------------------------------------------------------------
-void FpgaWriteConfWord(uint8_t v)
+void FpgaWriteConfWord(uint16_t v)
 {
 	FpgaSendCommand(FPGA_CMD_SET_CONFREG, v);
+}
+
+//-----------------------------------------------------------------------------
+// enable/disable FPGA internal tracing
+//-----------------------------------------------------------------------------
+void FpgaEnableTracing(void)
+{
+	FpgaSendCommand(FPGA_CMD_TRACE_ENABLE, 1);
+}
+
+void FpgaDisableTracing(void)
+{
+	FpgaSendCommand(FPGA_CMD_TRACE_ENABLE, 0);
 }
 
 //-----------------------------------------------------------------------------
