@@ -305,7 +305,7 @@ bool ParamLoadFromJson(struct tlvdb *tlv) {
 	}
 
 	// current path + file name
-	const char *relfname = "emv/defparams.json"; 
+	const char *relfname = "emv\defparams.json"; 
 	char fname[strlen(get_my_executable_directory()) + strlen(relfname) + 1];
 	strcpy(fname, get_my_executable_directory());
 	strcat(fname, relfname);
