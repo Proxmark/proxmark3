@@ -22,7 +22,10 @@
 #include "crypto/libpcrypto.h"
 #include "fido/additional_ca.h"
 #include "fido/cose.h"
+#include "emv/dump.h"
 #include "protocols.h"
+#include "ui.h"
+#include "util.h"
 
 
 typedef struct {
@@ -176,22 +179,22 @@ int FIDOSelect(bool ActivateField, bool LeaveFieldON, uint8_t *Result, size_t Ma
 }
 
 int FIDOExchange(uint8_t* apdu, int apdulen, uint8_t *Result, size_t MaxResultLen, size_t *ResultLen, uint16_t *sw) {
-	int res = EMVExchange(ECC_CONTACTLESS, true, apdu, apdulen, Result, MaxResultLen, ResultLen, sw, NULL);
-	if (res == 5) // apdu result (sw) not a 0x9000
-		res = 0;
-	// software chaining
-	while (!res && (*sw >> 8) == 0x61) {
-		uint8_t La = *sw & 0xff;
-		uint8_t get_response_APDU[5] = {apdu[0], ISO7816_GET_RESPONSE, 0x00, 0x00, La};
-		size_t oldlen = *ResultLen;
-		res = EMVExchange(ECC_CONTACTLESS, true, get_response_APDU, sizeof(get_response_APDU), &Result[oldlen], MaxResultLen - oldlen, ResultLen, sw, NULL);
-		if (res == 5) // apdu result (sw) not a 0x9000
-			res = 0;
+	int res = EMVExchangeEx(ECC_CONTACTLESS, false, true, apdu, apdulen, Result, MaxResultLen, ResultLen, sw, NULL);
+	// if (res == 5) // apdu result (sw) not a 0x9000
+		// res = 0;
+	// // software chaining
+	// while (!res && (*sw >> 8) == 0x61) {
+		// uint8_t La = *sw & 0xff;
+		// uint8_t get_response_APDU[5] = {apdu[0], ISO7816_GET_RESPONSE, 0x00, 0x00, La};
+		// size_t oldlen = *ResultLen;
+		// res = EMVExchange(ECC_CONTACTLESS, true, get_response_APDU, sizeof(get_response_APDU), &Result[oldlen], MaxResultLen - oldlen, ResultLen, sw, NULL);
+		// if (res == 5) // apdu result (sw) not a 0x9000
+			// res = 0;
 		
-		*ResultLen += oldlen;
-		if (*ResultLen > MaxResultLen) 
-			return 100;
-	}
+		// *ResultLen += oldlen;
+		// if (*ResultLen > MaxResultLen) 
+			// return 100;
+	// }
 	return res;
 }
 

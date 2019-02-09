@@ -9,12 +9,26 @@
 //-----------------------------------------------------------------------------
 
 #include "emvcore.h"
+
+#include <string.h>
 #include "emvjson.h"
 #include "util_posix.h"
 #include "protocols.h"
+#include "ui.h"
+#include "util.h"
+#include "emv_tags.h"
+#include "emv_pk.h"
+#include "emv_pki.h"
+#include "cmdhf14a.h"
+#include "apduinfo.h"
+#include "tlv.h"
+#include "dump.h"
+#include "dol.h"
+
 #ifdef WITH_SMARTCARD
 #include "cmdsmartcard.h"
 #endif
+
 
 // Got from here. Thanks)
 // https://eftlab.co.uk/index.php/site-map/knowledge-base/211-emv-aid-rid-pix
@@ -127,6 +141,12 @@ static const size_t AIDlistLen = sizeof(AIDlist)/sizeof(TAIDList);
 static bool APDULogging = false;
 void SetAPDULogging(bool logging) {
 	APDULogging = logging;
+}
+
+void DropFieldEx(EMVCommandChannel channel) {
+	if (channel == ECC_CONTACTLESS) {
+		DropField();
+	}
 }
 
 enum CardPSVendor GetCardPSVendor(uint8_t * AID, size_t AIDlen) {
@@ -267,38 +287,37 @@ struct tlvdb *GetdCVVRawFromTrack2(const struct tlv *track2) {
 }
 
 
-static int EMVExchangeEx(EMVCommandChannel channel, bool ActivateField, bool LeaveFieldON, uint8_t *apdu, int apdu_len, uint8_t *Result, size_t MaxResultLen, size_t *ResultLen, uint16_t *sw, struct tlvdb *tlv) 
+int EMVExchangeEx(EMVCommandChannel channel, bool ActivateField, bool LeaveFieldON, uint8_t *apdu, int apdu_len, uint8_t *Result, size_t MaxResultLen, size_t *ResultLen, uint16_t *sw, struct tlvdb *tlv) 
 {
 	*ResultLen = 0;
 	if (sw)	*sw = 0;
 	uint16_t isw = 0;
 	int res = 0;
 
-	if (ActivateField && channel == ECC_CONTACTLESS) {
-		DropField();
+	if (ActivateField) {
+		DropFieldEx( channel );
 		msleep(50);
 	}
 
 	if (APDULogging)
 		PrintAndLogEx(SUCCESS, ">>>> %s", sprint_hex(apdu, apdu_len));
 
+#ifdef WITH_SMARTCARD
 	switch(channel) {
 		case ECC_CONTACTLESS:
 			// 6 byes + data = INS + CLA + P1 + P2 + Lc + <data = Nc> + Le(?IncludeLe)
 			res = ExchangeAPDU14a(apdu, apdu_len, ActivateField, LeaveFieldON, Result, (int)MaxResultLen, (int *)ResultLen);
-			if (res) {
-				return res;
-			}
 			break;
 		case ECC_CONTACT:
-			//int ExchangeAPDUSC(uint8_t *datain, int datainlen, bool activateCard, bool leaveSignalON, uint8_t *dataout, int maxdataoutlen, int *dataoutlen);
-#ifdef WITH_SMARTCARD
 			res = ExchangeAPDUSC(apdu, apdu_len, ActivateField, LeaveFieldON, Result, (int)MaxResultLen, (int *)ResultLen);
-			if (res) {
-				return res;
-			}
-#endif
 			break;
+	}
+#else
+	res = ExchangeAPDU14a(apdu, apdu_len, ActivateField, LeaveFieldON, Result, (int)MaxResultLen, (int *)ResultLen);
+#endif	
+
+	if (res) {
+		return res;
 	}
 
 	if (APDULogging)
@@ -308,13 +327,18 @@ static int EMVExchangeEx(EMVCommandChannel channel, bool ActivateField, bool Lea
 		return 200;
 	}
 
-/*	if (Result[*ResultLen-2] == 0x61) {
+	if (Result[*ResultLen-2] == 0x61) {
 		uint8_t La = Result[*ResultLen-1];
 		uint8_t get_response[5] = {apdu[0], ISO7816_GET_RESPONSE, 0x00, 0x00, La};
-		return EMVExchangeEx(channel, false, LeaveFieldON, get_response, sizeof(get_response), Result, MaxResultLen, ResultLen, sw, tlv);
-	}*/
+		size_t oldlen = *ResultLen;
+		res = EMVExchangeEx(channel, false, LeaveFieldON, get_response, sizeof(get_response), &Result[oldlen-2], MaxResultLen-oldlen+2, ResultLen, sw, tlv);
+		*ResultLen += oldlen;
+	}
+
+	if (res) return res;
 
 	*ResultLen -= 2;
+	
 	isw = Result[*ResultLen] * 0x0100 + Result[*ResultLen + 1];
 	if (sw)
 		*sw = isw;
@@ -335,19 +359,18 @@ static int EMVExchangeEx(EMVCommandChannel channel, bool ActivateField, bool Lea
 	return 0;
 }
 
-int EMVExchange(EMVCommandChannel channel, bool LeaveFieldON, uint8_t *apdu, int apdu_len, uint8_t *Result, size_t MaxResultLen, size_t *ResultLen, uint16_t *sw, struct tlvdb *tlv) 
+static int EMVExchange(EMVCommandChannel channel, bool LeaveFieldON, uint8_t *apdu, int apdu_len, uint8_t *Result, size_t MaxResultLen, size_t *ResultLen, uint16_t *sw, struct tlvdb *tlv) 
 {
 	uint8_t APDU[APDU_COMMAND_LEN];
 	memcpy(APDU, apdu, apdu_len);
 	APDU[apdu_len] = 0x00; 
 	if (channel == ECC_CONTACTLESS) {
-		if (apdu_len == 5 && apdu[4] == 0) {
-			// there is no Lc but an Le == 0 already
+		if (apdu_len == 5) {
+			// there is no Lc but an Le already
 		} else if (apdu_len > 5 && apdu_len == 5 + apdu[4] + 1) {
 			// there is Lc, data and Le
 		} else {
-			if (apdu[1] != 0xc0)
-				apdu_len++; // no Le, add Le = 0x00 because some vendors require it for contactless
+			apdu_len++; // no Le, add Le = 0x00 because some vendors require it for contactless
 		}
 	}
 	return EMVExchangeEx(channel, false, LeaveFieldON, APDU, apdu_len, Result, MaxResultLen, ResultLen, sw, tlv);
@@ -539,8 +562,8 @@ int EMVSearchPSE(EMVCommandChannel channel, bool ActivateField, bool LeaveFieldO
 		PrintAndLogEx(WARNING, "%s ERROR: Can't select PPSE AID. Error: %d", PSE_or_PPSE, res);
 	}
 
-	if(!LeaveFieldON && channel == ECC_CONTACTLESS)
-		DropField();
+	if (!LeaveFieldON)
+		DropFieldEx( channel );
 
 	return res;
 }
@@ -696,7 +719,7 @@ struct emv_pk *get_ca_pk(struct tlvdb *db) {
 	if (!df_tlv || !caidx_tlv || df_tlv->len < 6 || caidx_tlv->len != 1)
 		return NULL;
 
-	PrintAndLogEx(NORMAL, "CA public key index 0x%0x", caidx_tlv->value[0]);
+	PrintAndLogEx(NORMAL, "CA Public Key index 0x%0x", caidx_tlv->value[0]);
 	return emv_pk_get_ca_pk(df_tlv->value, caidx_tlv->value[0]);
 }
 
@@ -1016,7 +1039,7 @@ int trCDA(struct tlvdb *tlv, struct tlvdb *ac_tlv, struct tlv *pdol_data_tlv, st
 
 	struct emv_pk *icc_pk = emv_pki_recover_icc_cert(issuer_pk, tlv, sda_tlv);
 	if (!icc_pk) {
-		PrintAndLogEx(WARNING, "Error: ICC setrificate not found. Exit.");
+		PrintAndLogEx(WARNING, "Error: ICC certificate not found. Exit.");
 		emv_pk_free(pk);
 		emv_pk_free(issuer_pk);
 		return 2;

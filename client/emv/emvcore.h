@@ -11,23 +11,10 @@
 #ifndef EMVCORE_H__
 #define EMVCORE_H__
 
-#include <stdio.h>
 #include <stdint.h>
-#include <stdlib.h>
-#include <inttypes.h>
-#include <string.h>
-#include <jansson.h>
-#include "util.h"
-#include "common.h"
-#include "ui.h"
-#include "cmdhf14a.h"
-#include "apduinfo.h"
+#include <stdbool.h>
 #include "tlv.h"
-#include "dol.h"
-#include "dump.h"
-#include "emv_tags.h"
-#include "emv_pk.h"
-#include "emv_pki.h"
+#include "jansson.h"
 
 // maximum APDU lengths. Long APDUs not yet supported/needed
 #define APDU_DATA_LEN      255
@@ -60,6 +47,8 @@ enum CardPSVendor {
 };
 extern enum CardPSVendor GetCardPSVendor(uint8_t * AID, size_t AIDlen);
 
+extern void DropFieldEx(EMVCommandChannel channel);
+
 extern bool TLVPrintFromBuffer(uint8_t *data, int datalen);
 extern void TLVPrintFromTLV(struct tlvdb *tlv);
 extern void TLVPrintFromTLVLev(struct tlvdb *tlv, int level);
@@ -71,7 +60,7 @@ extern struct tlvdb *GetdCVVRawFromTrack2(const struct tlv *track2);
 extern void SetAPDULogging(bool logging);
 
 // exchange
-extern int EMVExchange(EMVCommandChannel channel, bool LeaveFieldON, uint8_t *APDU, int APDU_len, uint8_t *Result, size_t MaxResultLen, size_t *ResultLen, uint16_t *sw, struct tlvdb *tlv);
+extern int EMVExchangeEx(EMVCommandChannel channel, bool ActivateField, bool LeaveFieldON, uint8_t *apdu, int apdu_len, uint8_t *Result, size_t MaxResultLen, size_t *ResultLen, uint16_t *sw, struct tlvdb *tlv);
 
 // search application
 extern int EMVSearchPSE(EMVCommandChannel channel, bool ActivateField, bool LeaveFieldON, uint8_t PSENum, bool decodeTLV, struct tlvdb *tlv);

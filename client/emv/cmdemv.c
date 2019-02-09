@@ -11,8 +11,11 @@
 #include "cmdemv.h"
 
 #include <ctype.h>
+#include <string.h>
 #include "proxmark3.h"
 #include "cmdparser.h"
+#include "ui.h"
+#include "util.h"
 #include "mifare.h"
 #include "emvjson.h"
 #include "emv_pki.h"
@@ -21,7 +24,11 @@
 #include "cliparser/cliparser.h"
 #include "jansson.h"
 #include "emv_roca.h"
-
+#include "pcsc.h"
+#include "apduinfo.h"
+#include "dol.h"
+#include "emv_tags.h"
+#include "cmdhf14a.h"
 
 #define TLV_ADD(tag, value)( tlvdb_change_or_add_node(tlvRoot, tag, sizeof(value) - 1, (const unsigned char *)value) )
 void ParamLoadDefaults(struct tlvdb *tlvRoot) {
@@ -53,7 +60,7 @@ void PrintChannel(EMVCommandChannel channel) {
 		PrintAndLogEx(INFO, "Channel: CONTACTLESS");
 		break;
 	case ECC_CONTACT:
-		PrintAndLogEx(INFO, "Channel: CONTACT");
+		PrintAndLogEx(INFO, "Channel: CONTACT, using %s", getAlternativeSmartcardReader());
 		break;
 	}
 }
@@ -667,7 +674,7 @@ int CmdEMVInternalAuthenticate(const char *cmd) {
 	return 0;   
 }
 
-#define dreturn(n) {free(pdol_data_tlv);tlvdb_free(tlvSelect);tlvdb_free(tlvRoot);DropField();return n;}
+#define dreturn(n) {free(pdol_data_tlv); tlvdb_free(tlvSelect); tlvdb_free(tlvRoot); DropFieldEx( channel ); return n;}
 
 void InitTransactionParameters(struct tlvdb *tlvRoot, bool paramLoadJSON, enum TransactionType TrType, bool GenACGPO) {
 	
@@ -1255,11 +1262,10 @@ int CmdEMVExec(const char *cmd) {
 		PrintAndLogEx(NORMAL, "* * Host Response: `%s`", HostResponse);
 		tlvdb_change_or_add_node(tlvRoot, 0x8a, sizeof(HostResponse) - 1, (const unsigned char *)HostResponse);		
 		
-	}
 
-	if (channel == ECC_CONTACTLESS) {
-		DropField();
 	}
+	
+	DropFieldEx( channel );
 	
 	// Destroy TLV's
 	free(pdol_data_tlv);
@@ -1368,9 +1374,7 @@ int CmdEMVScan(const char *cmd) {
 	}
 
 	// drop field at start
-	if (channel == ECC_CONTACTLESS) {
-		DropField();
-	}
+	DropFieldEx( channel );
 	
 	// iso 14443 select
 	PrintAndLogEx(NORMAL, "--> GET UID, ATS.");
@@ -1423,7 +1427,7 @@ int CmdEMVScan(const char *cmd) {
 		if (EMVSearch(channel, false, true, decodeTLV, tlvSelect)) {
 			PrintAndLogEx(ERR, "Can't found any of EMV AID. Exit...");
 			tlvdb_free(tlvSelect);
-			DropField();
+			DropFieldEx( channel );
 			return 3;
 		}
 
@@ -1439,9 +1443,7 @@ int CmdEMVScan(const char *cmd) {
 
 	if (!AIDlen) {
 		PrintAndLogEx(INFO, "Can't select AID. EMV AID not found. Exit...");
-		if (channel == ECC_CONTACTLESS) {
-			DropField();
-		}
+		DropFieldEx( channel );
 		return 4;
 	}
 
@@ -1460,7 +1462,7 @@ int CmdEMVScan(const char *cmd) {
 	if (res) {  
 		PrintAndLogEx(ERR, "Can't select AID (%d). Exit...", res);
 		tlvdb_free(tlvRoot);
-		DropField();
+		DropFieldEx( channel );
 		return 5;
 	}
 	
@@ -1488,9 +1490,7 @@ int CmdEMVScan(const char *cmd) {
 	if (!pdol_data_tlv){
 		PrintAndLogEx(ERR, "Can't create PDOL TLV.");
 		tlvdb_free(tlvRoot);
-		if (channel == ECC_CONTACTLESS) {
-			DropField();
-		}
+		DropFieldEx( channel );
 		return 6;
 	}
 	
@@ -1499,7 +1499,7 @@ int CmdEMVScan(const char *cmd) {
 	if (!pdol_data_tlv_data) {
 		PrintAndLogEx(ERR, "Can't create PDOL data.");
 		tlvdb_free(tlvRoot);
-		DropField();
+		DropFieldEx( channel );
 		return 6;
 	}
 	PrintAndLogEx(INFO, "PDOL data[%d]: %s", pdol_data_tlv_data_len, sprint_hex(pdol_data_tlv_data, pdol_data_tlv_data_len));
@@ -1513,9 +1513,7 @@ int CmdEMVScan(const char *cmd) {
 	if (res) {  
 		PrintAndLogEx(ERR, "GPO error(%d): %4x. Exit...", res, sw);
 		tlvdb_free(tlvRoot);
-		if (channel == ECC_CONTACTLESS) {
-			DropField();
-		}
+		DropFieldEx( channel );
 		return 7;
 	}
 	ProcessGPOResponseFormat1(tlvRoot, buf, len, decodeTLV);
@@ -1607,9 +1605,7 @@ int CmdEMVScan(const char *cmd) {
 	// free tlv object
 	tlvdb_free(tlvRoot);
 
-	if (channel == ECC_CONTACTLESS) {
-		DropField();
-	}
+	DropFieldEx( channel );
 	
 	res = json_dump_file(root, fname, JSON_INDENT(2));
 	if (res) {
@@ -1683,7 +1679,7 @@ int CmdEMVRoca(const char *cmd) {
 		if (EMVSearch(channel, false, true, false, tlvSelect)) {
 			PrintAndLogEx(ERR, "Couldn't find any known EMV AID. Exit...");
 			tlvdb_free(tlvSelect);
-			DropField();
+			DropFieldEx( channel );
 			return 3;
 		}
 
@@ -1692,16 +1688,14 @@ int CmdEMVRoca(const char *cmd) {
 	}
 
 	// EMV SELECT application
-	SetAPDULogging(true);
+	SetAPDULogging(false);
 	EMVSelectApplication(tlvSelect, AID, &AIDlen);
 
 	tlvdb_free(tlvSelect);
 
 	if (!AIDlen) {
 		PrintAndLogEx(INFO, "Can't select AID. EMV AID not found. Exit...");
-		if (channel == ECC_CONTACTLESS) {
-			DropField();
-		}
+		DropFieldEx( channel );
 		return 4;
 	}
 
@@ -1716,9 +1710,7 @@ int CmdEMVRoca(const char *cmd) {
 	if (res) {	
 		PrintAndLogEx(ERR, "Can't select AID (%d). Exit...", res);
 		tlvdb_free(tlvRoot);
-		if (channel == ECC_CONTACTLESS) {
-			DropField();
-		}
+		DropFieldEx( channel );
 		return 5;
 	}
 
@@ -1730,9 +1722,7 @@ int CmdEMVRoca(const char *cmd) {
 	if (!pdol_data_tlv){
 		PrintAndLogEx(ERR, "Can't create PDOL TLV.");
 		tlvdb_free(tlvRoot);
-		if (channel == ECC_CONTACTLESS) {
-			DropField();
-		}
+		DropFieldEx( channel );
 		return 6;
 	}
 	
@@ -1741,7 +1731,7 @@ int CmdEMVRoca(const char *cmd) {
 	if (!pdol_data_tlv_data) {
 		PrintAndLogEx(ERR, "Can't create PDOL data.");
 		tlvdb_free(tlvRoot);
-		DropField();
+		DropFieldEx( channel );
 		return 6;
 	}
 	PrintAndLogEx(INFO, "PDOL data[%d]: %s", pdol_data_tlv_data_len, sprint_hex(pdol_data_tlv_data, pdol_data_tlv_data_len));
@@ -1755,9 +1745,7 @@ int CmdEMVRoca(const char *cmd) {
 	if (res) {	
 		PrintAndLogEx(ERR, "GPO error(%d): %4x. Exit...", res, sw);
 		tlvdb_free(tlvRoot);
-		if (channel == ECC_CONTACTLESS) {
-			DropField();
-		}
+		DropFieldEx( channel );
 		return 7;
 	}
 	ProcessGPOResponseFormat1(tlvRoot, buf, len, false);
@@ -1859,10 +1847,7 @@ out:
 	// free tlv object
 	tlvdb_free(tlvRoot);
 
-	if (channel == ECC_CONTACTLESS) {
-		DropField();
-	}
-
+	DropFieldEx( channel );
 	return 0;
 }
 
