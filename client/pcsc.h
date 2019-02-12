@@ -11,9 +11,12 @@
 #ifndef PCSC_H__
 #define PCSC_H__
 
+#include <stdint.h>
 #include <stdbool.h>
 #include "smartcard.h"
 
+uint8_t *pcsc_get_trace_addr(void);
+uint32_t pcsc_get_traceLen(void);
 char *getAlternativeSmartcardReader(void);
 bool pcscCheckForCardReaders(void);
 bool pcscSelectAlternativeCardReader(const char *readername);

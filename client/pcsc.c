@@ -39,6 +39,92 @@ static SCARDHANDLE SC_Card;
 static DWORD SC_Protocol;
 static char* AlternativeSmartcardReader = NULL;
 
+#define PCSC_MAX_TRACELEN 60000
+static uint8_t pcsc_trace_buf[PCSC_MAX_TRACELEN];
+static bool tracing = false;
+static uint32_t traceLen = 0;
+
+
+uint8_t *pcsc_get_trace_addr(void)
+{
+	return pcsc_trace_buf;
+}
+
+
+uint32_t pcsc_get_traceLen(void)
+{
+	return traceLen;
+}
+
+
+static void pcsc_clear_trace(void)
+{
+	traceLen = 0;
+}
+
+
+static void pcsc_set_tracing(bool enable) {
+	tracing = enable;
+}
+
+
+static bool pcsc_LogTrace(const uint8_t *btBytes, uint16_t iLen, uint32_t timestamp_start, uint32_t timestamp_end, bool readerToTag)
+{
+	if (!tracing) return false;
+
+	uint8_t *trace = pcsc_trace_buf;
+
+	uint32_t num_paritybytes = (iLen-1)/8 + 1;	// number of paritybytes
+	uint32_t duration = timestamp_end - timestamp_start;
+
+	// Return when trace is full
+	if (traceLen + sizeof(iLen) + sizeof(timestamp_start) + sizeof(duration) + num_paritybytes + iLen >= PCSC_MAX_TRACELEN) {
+		tracing = false;	// don't trace any more
+		return false;
+	}
+	// Traceformat:
+	// 32 bits timestamp (little endian)
+	// 16 bits duration (little endian)
+	// 16 bits data length (little endian, Highest Bit used as readerToTag flag)
+	// y Bytes data
+	// x Bytes parity (one byte per 8 bytes data)
+
+	// timestamp (start)
+	trace[traceLen++] = ((timestamp_start >> 0) & 0xff);
+	trace[traceLen++] = ((timestamp_start >> 8) & 0xff);
+	trace[traceLen++] = ((timestamp_start >> 16) & 0xff);
+	trace[traceLen++] = ((timestamp_start >> 24) & 0xff);
+
+	// duration
+	trace[traceLen++] = ((duration >> 0) & 0xff);
+	trace[traceLen++] = ((duration >> 8) & 0xff);
+
+	// data length
+	trace[traceLen++] = ((iLen >> 0) & 0xff);
+	trace[traceLen++] = ((iLen >> 8) & 0xff);
+
+	// readerToTag flag
+	if (!readerToTag) {
+		trace[traceLen - 1] |= 0x80;
+	}
+
+	// data bytes
+	if (btBytes != NULL && iLen != 0) {
+		for (int i = 0; i < iLen; i++) {
+			trace[traceLen++] = *btBytes++;
+		}
+	}
+
+	// dummy parity bytes
+	if (num_paritybytes != 0) {
+		for (int i = 0; i < num_paritybytes; i++) {
+			trace[traceLen++] = 0x00;
+		}
+	}
+
+	return true;
+}
+
 
 char *getAlternativeSmartcardReader(void)
 {
@@ -194,6 +280,9 @@ bool pcscSelectAlternativeCardReader(const char *readername)
 
 bool pcscGetATR(smart_card_atr_t *card)
 {
+	pcsc_clear_trace();
+	pcsc_set_tracing(true);
+	
 	if (!card) {
 		return false;
 	}
@@ -214,8 +303,10 @@ bool pcscGetATR(smart_card_atr_t *card)
 	}
 	card->atr_len = atr_len;
 
-	// TODO: LogTrace without device
-
+	pcsc_LogTrace(card->atr, card->atr_len, 0, 0, false);
+	
+	pcsc_set_tracing(false);
+	
 	return true;
 }
 
@@ -229,11 +320,10 @@ void pcscTransmit(uint8_t *data, uint32_t data_len, uint32_t flags, uint8_t *res
 		protocol = SCARD_PCI_RAW;
 	}
 
-	// TODO: tracing
-	// if ((flags & SC_CONNECT))
-		// clear_trace();
+	if ((flags & SC_CONNECT))
+		pcsc_clear_trace();
 
-	// set_tracing(true);
+	pcsc_set_tracing(true);
 
 	if ((flags & SC_CONNECT || flags & SC_SELECT)) {
 		LONG res = SCardConnect(SC_Context, AlternativeSmartcardReader, SCARD_SHARE_SHARED,
@@ -245,14 +335,15 @@ void pcscTransmit(uint8_t *data, uint32_t data_len, uint32_t flags, uint8_t *res
 	}
 
 	if ((flags & SC_RAW) || (flags & SC_RAW_T0)) {
-		// TODO: tracing
-		// LogTrace(data, arg1, 0, 0, NULL, true);
+		pcsc_LogTrace(data, data_len, 0, 0, true);
 		DWORD len = *response_len;
 		LONG res = SCardTransmit(SC_Card, protocol, data, data_len, NULL, response, &len);
 		if (res != SCARD_S_SUCCESS) {
 			*response_len = -1;
 		} else {
+			pcsc_LogTrace(response, len, 0, 0, false);
 			*response_len = len;
 		}
 	}
+	pcsc_set_tracing(false);
 }
