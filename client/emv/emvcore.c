@@ -654,7 +654,7 @@ int EMVSelectApplication(struct tlvdb *tlv, uint8_t *AID, size_t *AIDlen) {
 
 int EMVGPO(EMVCommandChannel channel, bool LeaveFieldON, uint8_t *PDOL, size_t PDOLLen, uint8_t *Result, size_t MaxResultLen, size_t *ResultLen, uint16_t *sw, struct tlvdb *tlv) 
 {
-	uint8_t GPO_APDU[APDU_COMMAND_LEN] = {0x80, 0xa8, 0x00, 0x00, PDOLLen, 0x00};
+	uint8_t GPO_APDU[APDU_COMMAND_LEN] = {0x80, ISO7816_GET_PROCESSING_OPTIONS, 0x00, 0x00, PDOLLen, 0x00};
 	memcpy(GPO_APDU + 5, PDOL, PDOLLen);
 	int apdulen = 5 + PDOLLen;
 	
@@ -695,7 +695,7 @@ int EMVGenerateChallenge(EMVCommandChannel channel, bool LeaveFieldON, uint8_t *
 
 int EMVInternalAuthenticate(EMVCommandChannel channel, bool LeaveFieldON, uint8_t *DDOL, size_t DDOLLen, uint8_t *Result, size_t MaxResultLen, size_t *ResultLen, uint16_t *sw, struct tlvdb *tlv) 
 {
-	uint8_t authenticate_APDU[APDU_COMMAND_LEN] = {0x00, ISO7816_INTERNAL_AUTHENTICATION, 0x00, 0x00, DDOLLen, 0x00};
+	uint8_t authenticate_APDU[APDU_COMMAND_LEN] = {0x00, ISO7816_INTERNAL_AUTHENTICATE, 0x00, 0x00, DDOLLen, 0x00};
 	memcpy(authenticate_APDU + 5, DDOL, DDOLLen);
 	int apdulen = 5 + DDOLLen;
 	

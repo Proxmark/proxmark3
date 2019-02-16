@@ -929,7 +929,11 @@ static int CmdSmartSetClock(const char *Cmd){
 
 
 static int CmdSmartList(const char *Cmd) {
-	CmdHFList("7816");
+	if (UseAlternativeSmartcardReader) {
+		CmdHFList("7816 p");
+	} else {
+		CmdHFList("7816");
+	}
 	return 0;
 }
 
