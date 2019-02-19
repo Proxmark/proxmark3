@@ -16,6 +16,7 @@
 #include "comms.h"
 #include "ui.h"
 #include "cmdparser.h"
+#include "cliparser/cliparser.h"
 #include "cmdhf14a.h"
 #include "cmdhf14b.h"
 #include "cmdhf15.h"
@@ -102,6 +103,16 @@ int CmdHFSnoop(const char *Cmd)
 
 static int CmdHFPlot(const char *Cmd)
 {
+	CLIParserInit("hf plot",
+		"Plots HF signal after RF signal path and A/D conversion.",
+		"This can be used after any hf command and will show the last few milliseconds of the HF signal.\n"
+		"Note: If the last hf command terminated because of a timeout you will most probably see nothing.\n");
+	void* argtable[] = {
+		arg_param_begin,
+		arg_param_end
+	};
+	CLIExecWithReturn(Cmd, argtable, true);
+
 	uint8_t buf[FPGA_TRACE_SIZE];
 
 	if (GetFromFpgaRAM(buf, FPGA_TRACE_SIZE)) {
@@ -118,32 +129,32 @@ static int CmdHFPlot(const char *Cmd)
 }
 
 
-static command_t CommandTable[] = 
+static command_t CommandTable[] =
 {
-	{"help",	CmdHelp,		0, "This help"},
-	{"14a",		CmdHF14A,		1, "{ ISO14443A RFIDs... }"},
-	{"14b",		CmdHF14B,		1, "{ ISO14443B RFIDs... }"},
-	{"15",		CmdHF15,		1, "{ ISO15693 RFIDs... }"},
-	{"epa",		CmdHFEPA,		1, "{ German Identification Card... }"},
-	{"legic",	CmdHFLegic,		1, "{ LEGIC RFIDs... }"},
-	{"iclass",	CmdHFiClass,	1, "{ ICLASS RFIDs... }"},
-	{"mf",		CmdHFMF,		1, "{ MIFARE RFIDs... }"},
-	{"mfu",		CmdHFMFUltra,	1, "{ MIFARE Ultralight RFIDs... }"},
-	{"mfp",		CmdHFMFP,		1, "{ MIFARE Plus RFIDs... }"},
-	{"topaz",	CmdHFTopaz,		1, "{ TOPAZ (NFC Type 1) RFIDs... }"},
-	{"fido",	CmdHFFido,		1, "{ FIDO and FIDO2 authenticators... }"},
-	{"tune",	CmdHFTune,		1, "Continuously measure HF antenna tuning"},
-	{"list",	CmdHFList,		1, "List protocol data in trace buffer"},
-	{"plot",    CmdHFPlot,      1, "Plot signal"},
-	{"search",	CmdHFSearch,	1, "Search for known HF tags [preliminary]"},
-	{"snoop",   CmdHFSnoop,     1, "<samples to skip (10000)> <triggers to skip (1)> Generic HF Snoop"},
-	{NULL,		NULL,			0, NULL}
+	{"help",    CmdHelp,        1, "This help"},
+	{"14a",     CmdHF14A,       0, "{ ISO14443A RFIDs... }"},
+	{"14b",     CmdHF14B,       0, "{ ISO14443B RFIDs... }"},
+	{"15",      CmdHF15,        1, "{ ISO15693 RFIDs... }"},
+	{"epa",     CmdHFEPA,       0, "{ German Identification Card... }"},
+	{"legic",   CmdHFLegic,     0, "{ LEGIC RFIDs... }"},
+	{"iclass",  CmdHFiClass,    1, "{ ICLASS RFIDs... }"},
+	{"mf",      CmdHFMF,        1, "{ MIFARE RFIDs... }"},
+	{"mfu",     CmdHFMFUltra,   1, "{ MIFARE Ultralight RFIDs... }"},
+	{"mfp",     CmdHFMFP,       0, "{ MIFARE Plus RFIDs... }"},
+	{"topaz",   CmdHFTopaz,     0, "{ TOPAZ (NFC Type 1) RFIDs... }"},
+	{"fido",    CmdHFFido,      0, "{ FIDO and FIDO2 authenticators... }"},
+	{"tune",    CmdHFTune,      0, "Continuously measure HF antenna tuning"},
+	{"list",    CmdHFList,      1, "List protocol data in trace buffer"},
+	{"plot",    CmdHFPlot,      0, "Plot signal"},
+	{"search",  CmdHFSearch,    0, "Search for known HF tags [preliminary]"},
+	{"snoop",   CmdHFSnoop,     0, "<samples to skip (10000)> <triggers to skip (1)> Generic HF Snoop"},
+	{NULL,      NULL,           0, NULL}
 };
 
 int CmdHF(const char *Cmd)
 {
   CmdsParse(CommandTable, Cmd);
-  return 0; 
+  return 0;
 }
 
 int CmdHelp(const char *Cmd)
