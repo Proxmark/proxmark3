@@ -17,7 +17,7 @@
 //-----------------------------------------------------------------------------
 typedef struct {
 	uint8_t atr_len;
-	uint8_t atr[30];
+	uint8_t atr[34];
 } __attribute__((__packed__)) smart_card_atr_t;
 
 typedef enum SMARTCARD_COMMAND {
