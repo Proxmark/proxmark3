@@ -1478,6 +1478,10 @@ int CmdEMVScan(const char *cmd) {
 		if (Hf14443_4aGetCardData(&card)) {
 			return 2;
 		}
+		if (!card.uidlen) {
+			PrintAndLogEx(ERR, "get ATS error");
+			return 2;
+		}
 
 		JsonSaveStr(root, "$.Card.Contactless.Communication", "iso14443-4a");
 		JsonSaveBufAsHex(root, "$.Card.Contactless.UID", (uint8_t *)&card.uid, card.uidlen);
@@ -1487,11 +1491,16 @@ int CmdEMVScan(const char *cmd) {
 	} else {
 		PrintAndLogEx(NORMAL, "--> GET ATR.");
 
-		smart_card_atr_t card;
-		smart_getATR(&card);
+		smart_card_atr_t ccard;
+		smart_getATR(&ccard);
+		
+		if (!ccard.atr_len) {
+			PrintAndLogEx(ERR, "get ATR error");
+			return 2;
+		}
 
 		JsonSaveStr(root, "$.Card.Contact.Communication", "iso7816");
-		JsonSaveBufAsHex(root, "$.Card.Contact.ATR", (uint8_t *)card.atr, card.atr_len);
+		JsonSaveBufAsHex(root, "$.Card.Contact.ATR", (uint8_t *)ccard.atr, ccard.atr_len);
 	}
 	
 	// init applets list tree
