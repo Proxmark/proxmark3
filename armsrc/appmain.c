@@ -30,6 +30,8 @@
 #include "mifareutil.h"
 #include "pcf7931.h"
 #include "i2c.h"
+#include "hfsnoop.h"
+#include "fpgaloader.h"
 #ifdef WITH_LCD
  #include "LCD.h"
 #endif
@@ -1323,11 +1325,16 @@ void UsbPacketReceived(uint8_t *packet, int len)
 			iClass_Clone(c->arg[0], c->arg[1], c->d.asBytes);
 			break;
 #endif
+
 #ifdef WITH_HFSNOOP
 		case CMD_HF_SNIFFER:
 			HfSnoop(c->arg[0], c->arg[1]);
 			break;
+		case CMD_HF_PLOT:
+			HfPlot();
+			break;
 #endif
+
 #ifdef WITH_SMARTCARD
 		case CMD_SMART_ATR: {
 			SmartCardAtr();
@@ -1377,7 +1384,6 @@ void UsbPacketReceived(uint8_t *packet, int len)
 			break;
 
 		case CMD_DOWNLOAD_RAW_ADC_SAMPLES_125K:
-
 			LED_B_ON();
 			uint8_t *BigBuf = BigBuf_get_addr();
 			for(size_t i=0; i<c->arg[1]; i += USB_CMD_DATA_SIZE) {

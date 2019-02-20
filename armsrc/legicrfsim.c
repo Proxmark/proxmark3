@@ -10,16 +10,17 @@
 // LEGIC RF simulation code
 //-----------------------------------------------------------------------------
 
+#include "legicrfsim.h"
+
 #include "proxmark3.h"
 #include "apps.h"
 #include "util.h"
 #include "string.h"
-
-#include "legicrfsim.h"
 #include "legic_prng.h"
 #include "legic.h"
 #include "crc.h"
 #include "usb_cdc.h"  // for usb_poll_validate_length
+#include "fpgaloader.h"
 
 static uint8_t* legic_mem;      /* card memory, used for sim */
 static legic_card_select_t card;/* metadata of currently selected card */

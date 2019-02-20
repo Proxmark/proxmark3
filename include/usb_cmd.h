@@ -220,6 +220,7 @@ typedef struct{
 #define CMD_MIFARE_DESFIRE                                                0x072e
 
 #define CMD_HF_SNIFFER                                                    0x0800
+#define CMD_HF_PLOT                                                       0x0801
 
 #define CMD_UNKNOWN                                                       0xFFFF
 

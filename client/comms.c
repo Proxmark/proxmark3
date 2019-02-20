@@ -301,6 +301,39 @@ bool GetFromBigBuf(uint8_t *dest, int bytes, int start_index, UsbCommand *respon
 }
 
 	
+bool GetFromFpgaRAM(uint8_t *dest, int bytes)
+{
+	UsbCommand c = {CMD_HF_PLOT, {0, 0, 0}};
+	SendCommand(&c);
+
+	uint64_t start_time = msclock();
+
+	UsbCommand response;
+	
+	int bytes_completed = 0;
+	bool show_warning = true;
+	while(true) {
+		if (getCommand(&response)) {
+			if (response.cmd == CMD_DOWNLOADED_RAW_ADC_SAMPLES_125K) {
+				int copy_bytes = MIN(bytes - bytes_completed, response.arg[1]);
+				memcpy(dest + response.arg[0], response.d.asBytes, copy_bytes);
+				bytes_completed += copy_bytes;
+			} else if (response.cmd == CMD_ACK) {
+				return true;
+			}
+		}
+
+		if (msclock() - start_time > 2000 && show_warning) {
+			PrintAndLog("Waiting for a response from the proxmark...");
+			PrintAndLog("You can cancel this operation by pressing the pm3 button");
+			show_warning = false;
+		}
+	}
+
+	return false;
+}
+
+
 bool OpenProxmark(void *port, bool wait_for_port, int timeout, bool flash_mode) {
 	char *portname = (char *)port;
 	if (!wait_for_port) {

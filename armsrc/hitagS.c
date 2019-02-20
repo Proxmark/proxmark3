@@ -20,6 +20,7 @@
 #include "hitag2.h"
 #include "string.h"
 #include "BigBuf.h"
+#include "fpgaloader.h"
 
 #define CRC_PRESET 0xFF
 #define CRC_POLYNOM 0x1D

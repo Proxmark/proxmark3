@@ -10,15 +10,16 @@
 // LEGIC RF simulation code
 //-----------------------------------------------------------------------------
 
+#include "legicrf.h"
+
 #include "proxmark3.h"
 #include "apps.h"
 #include "util.h"
 #include "string.h"
-
-#include "legicrf.h"
 #include "legic_prng.h"
 #include "legic.h"
 #include "crc.h"
+#include "fpgaloader.h"
 
 static legic_card_select_t card;/* metadata of currently selected card */
 static crc_t legic_crc;

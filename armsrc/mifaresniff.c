@@ -9,7 +9,7 @@
 //-----------------------------------------------------------------------------
 
 #include "mifaresniff.h"
-#include "apps.h"
+
 #include "proxmark3.h"
 #include "util.h"
 #include "string.h"
@@ -18,6 +18,9 @@
 #include "crapto1/crapto1.h"
 #include "mifareutil.h"
 #include "common.h"
+#include "cmd.h"
+#include "BigBuf.h"
+#include "fpgaloader.h"
 
 
 static int sniffState = SNF_INIT;

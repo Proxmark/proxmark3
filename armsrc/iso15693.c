@@ -60,6 +60,7 @@
 #include "protocols.h"
 #include "cmd.h"
 #include "BigBuf.h"
+#include "fpgaloader.h"
 
 #define arraylen(x) (sizeof(x)/sizeof((x)[0]))
 

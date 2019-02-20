@@ -18,6 +18,7 @@
 #include "lfsampling.h"
 #include "protocols.h"
 #include "usb_cdc.h" // for usb_poll_validate_length
+#include "fpgaloader.h"
 
 /**
  * Function to do a modulation and then get samples.
