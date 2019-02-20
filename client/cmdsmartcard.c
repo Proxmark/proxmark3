@@ -311,7 +311,7 @@ static int PrintATR(uint8_t *atr, size_t atrlen) {
 	return 0;
 }
 
-static bool smart_getATR(smart_card_atr_t *card)
+bool smart_getATR(smart_card_atr_t *card)
 {
 	if (UseAlternativeSmartcardReader) {
 		return pcscGetATR(card);
