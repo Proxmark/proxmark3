@@ -804,6 +804,11 @@ static int CmdSmartInfo(const char *Cmd){
 		if (!silent) PrintAndLogEx(WARNING, "smart card select failed");
 		return 1;
 	}
+	
+	if (!card.atr_len) {
+		if (!silent) PrintAndLogEx(ERR, "can't get ATR from a smart card");
+		return 1;
+	}
 
 	// print header
 	PrintAndLogEx(INFO, "--- Smartcard Information ---------");
