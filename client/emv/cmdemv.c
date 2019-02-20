@@ -29,6 +29,7 @@
 #include "dol.h"
 #include "emv_tags.h"
 #include "cmdhf14a.h"
+#include "cmdsmartcard.h"
 
 #define TLV_ADD(tag, value)( tlvdb_change_or_add_node(tlvRoot, tag, sizeof(value) - 1, (const unsigned char *)value) )
 void ParamLoadDefaults(struct tlvdb *tlvRoot) {
@@ -1255,16 +1256,113 @@ int CmdEMVExec(const char *cmd) {
 		// process Format1 (0x80) and print Format2 (0x77)
 		ProcessACResponseFormat1(tlvRoot, buf, len, decodeTLV);
 
-		PrintAndLogEx(NORMAL, "\n* * Processing online request\n");
+		uint8_t CID = 0;
+		tlvdb_get_uint8(tlvRoot, 0x9f27, &CID);
+
+		// AC1 print result
+		PrintAndLog("");
+		if ((CID & EMVAC_AC_MASK) == EMVAC_AAC)		PrintAndLogEx(INFO, "AC1 result: AAC (Transaction declined)");
+		if ((CID & EMVAC_AC_MASK) == EMVAC_TC)		PrintAndLogEx(INFO, "AC1 result: TC (Transaction approved)");
+		if ((CID & EMVAC_AC_MASK) == EMVAC_ARQC)	PrintAndLogEx(INFO, "AC1 result: ARQC (Online authorisation requested)");
+		if ((CID & EMVAC_AC_MASK) == EMVAC_AC_MASK)	PrintAndLogEx(INFO, "AC1 result: RFU");
+
+		// decode Issuer Application Data (IAD)
+		uint8_t CryptoVersion = 0;
+		const struct tlv *IAD = tlvdb_get(tlvRoot, 0x9f10, NULL);
+		if (IAD && (IAD->len > 1)) {
+			PrintAndLogEx(NORMAL, "\n* * Issuer Application Data (IAD):");
+			uint8_t VDDlen = IAD->value[0]; // Visa discretionary data length
+			uint8_t IDDlen = 0;             // Issuer discretionary data length
+			PrintAndLogEx(NORMAL, "IAD length: %d", IAD->len);
+			PrintAndLogEx(NORMAL, "VDDlen: %d", VDDlen);
+			if (VDDlen < IAD->len - 1) 
+				IDDlen = IAD->value[VDDlen + 1];
+			PrintAndLogEx(NORMAL, "IDDlen: %d", IDDlen);
+						
+			uint8_t DerivKeyIndex = IAD->value[1];
+			CryptoVersion = IAD->value[2];
+
+			PrintAndLogEx(NORMAL, "CryptoVersion: %d", CryptoVersion);
+			PrintAndLogEx(NORMAL, "DerivKeyIndex: %d", DerivKeyIndex);
+
+			// Card Verification Results (CVR) decode
+			if ((VDDlen - 2) > 0) {
+				uint8_t CVRlen = IAD->value[3];
+				if (CVRlen == (VDDlen - 2 - 1)) {
+					PrintAndLogEx(NORMAL, "CVR length: %d", CVRlen);
+					PrintAndLogEx(NORMAL, "CVR: %s", sprint_hex(&IAD->value[4], CVRlen));
+				} else {
+					PrintAndLogEx(NORMAL, "Wrong CVR length! CVR: %s", sprint_hex(&IAD->value[3], VDDlen - 2));
+				}
+			}
+			if (IDDlen)
+				PrintAndLogEx(NORMAL, "IDD: %s", sprint_hex(&IAD->value[VDDlen + 1], IDDlen));		
+		} else {
+			PrintAndLogEx(NORMAL, "Issuer Application Data (IAD) not found.");
+		}
+		
+		PrintAndLogEx(NORMAL, "\n* * Processing online request");
 
 		// authorization response code from acquirer
-		const char HostResponse[] = "00"; //0 x3030
-		PrintAndLogEx(NORMAL, "* * Host Response: `%s`", HostResponse);
-		tlvdb_change_or_add_node(tlvRoot, 0x8a, sizeof(HostResponse) - 1, (const unsigned char *)HostResponse);
+		const char HostResponse[] = "00"; // 0x3030
+		size_t HostResponseLen = sizeof(HostResponse) - 1;
+		PrintAndLogEx(NORMAL, "Host Response: `%s`", HostResponse);
+		tlvdb_change_or_add_node(tlvRoot, 0x8a, HostResponseLen, (const unsigned char *)HostResponse);		
+		
+		if (CryptoVersion == 10) {
+			PrintAndLogEx(NORMAL, "\n* * Generate ARPC");
+			
+			// Application Cryptogram (AC)
+			const struct tlv *AC = tlvdb_get(tlvRoot, 0x9f26, NULL);
+			if (AC && (AC->len > 0)) {
+				PrintAndLogEx(NORMAL, "AC: %s", sprint_hex(AC->value, AC->len));
 
+				size_t rawARPClen = AC->len;
+				uint8_t rawARPC[rawARPClen];
+				memcpy(rawARPC, AC->value, AC->len);
+				for (int i = 0; (i < HostResponseLen) && (i < rawARPClen); i++)
+					rawARPC[i] ^= HostResponse[i];
+				PrintAndLogEx(NORMAL, "raw ARPC: %s", sprint_hex(rawARPC, rawARPClen));
+				
+				// here must be calculation of ARPC, but we dont know a bank keys.
+				PrintAndLogEx(NORMAL, "ARPC: n/a");
+				
+			} else {
+				PrintAndLogEx(NORMAL, "Application Cryptogram (AC) not found.");
+			}
 
+			// here must be external authenticate, but we dont know ARPC
+			
 	}
+		
 
+		// needs to send AC2 command (res == ARQC)
+		if ((CID & EMVAC_AC_MASK) == EMVAC_ARQC) {
+			PrintAndLogEx(NORMAL, "\n* * Calc CDOL2");
+			struct tlv *cdol2_data_tlv = dol_process(tlvdb_get(tlvRoot, 0x8d, NULL), tlvRoot, 0x01); // 0x01 - dummy tag
+			if (!cdol2_data_tlv) {
+				PrintAndLogEx(WARNING, "Error: can't create CDOL2 TLV.");
+				dreturn(6);
+			}
+			
+			PrintAndLogEx(NORMAL, "CDOL2 data[%d]: %s", cdol2_data_tlv->len, sprint_hex(cdol2_data_tlv->value, cdol2_data_tlv->len));
+			
+			//PrintAndLogEx(NORMAL, "* * AC2");
+			
+			
+			// here must be AC2, but we dont make external authenticate (
+		
+/*			// AC2
+			PRINT_INDENT(level);
+			if ((CID & EMVAC_AC2_MASK) == EMVAC_AAC2)	fprintf(f, "\tAC2: AAC (Transaction declined)\n");
+			if ((CID & EMVAC_AC2_MASK) == EMVAC_TC2)	fprintf(f, "\tAC2: TC (Transaction approved)\n");
+			if ((CID & EMVAC_AC2_MASK) == EMVAC_ARQC2)	fprintf(f, "\tAC2: not requested (ARQC)\n");
+			if ((CID & EMVAC_AC2_MASK) == EMVAC_AC2_MASK)	fprintf(f, "\tAC2: RFU\n");
+*/
+		}
+		
+	}
+	
 	DropFieldEx( channel );
 
 	// Destroy TLV's
@@ -1342,15 +1440,9 @@ int CmdEMVScan(const char *cmd) {
 	PrintChannel(channel);
 	uint8_t psenum = (channel == ECC_CONTACT) ? 1 : 2;
 	CLIParserFree();
-
+	
 	SetAPDULogging(showAPDU);
-
-	// TODO
-	if (channel == ECC_CONTACT) {
-		PrintAndLogEx(ERR, "Do not use contact interface. Exit.");
-		return 1;
-	}
-
+	
 	// current path + file name
 	if (!strstr(crelfname, ".json"))
 		strcat(crelfname, ".json");
@@ -1376,22 +1468,32 @@ int CmdEMVScan(const char *cmd) {
 	// drop field at start
 	DropFieldEx( channel );
 
-	// iso 14443 select
-	PrintAndLogEx(NORMAL, "--> GET UID, ATS.");
-
-	iso14a_card_select_t card;
-	if (Hf14443_4aGetCardData(&card)) {
-		return 2;
-	}
-
 	JsonSaveStr(root, "$.File.Created", "proxmark3 `emv scan`");
+	
+	if (channel == ECC_CONTACTLESS) {
+		// iso 14443 select
+		PrintAndLogEx(NORMAL, "--> GET UID, ATS.");
 
-	JsonSaveStr(root, "$.Card.Communication", "iso14443-4a");
-	JsonSaveBufAsHex(root, "$.Card.UID", (uint8_t *)&card.uid, card.uidlen);
-	JsonSaveHex(root, "$.Card.ATQA", card.atqa[0] + (card.atqa[1] << 2), 2);
-	JsonSaveHex(root, "$.Card.SAK", card.sak, 0);
-	JsonSaveBufAsHex(root, "$.Card.ATS", (uint8_t *)card.ats, card.ats_len);
+		iso14a_card_select_t card;
+		if (Hf14443_4aGetCardData(&card)) {
+			return 2;
+		}
 
+		JsonSaveStr(root, "$.Card.Contactless.Communication", "iso14443-4a");
+		JsonSaveBufAsHex(root, "$.Card.Contactless.UID", (uint8_t *)&card.uid, card.uidlen);
+		JsonSaveHex(root, "$.Card.Contactless.ATQA", card.atqa[0] + (card.atqa[1] << 2), 2);
+		JsonSaveHex(root, "$.Card.Contactless.SAK", card.sak, 0);
+		JsonSaveBufAsHex(root, "$.Card.Contactless.ATS", (uint8_t *)card.ats, card.ats_len);
+	} else {
+		PrintAndLogEx(NORMAL, "--> GET ATR.");
+
+		smart_card_atr_t card;
+		smart_getATR(&card);
+
+		JsonSaveStr(root, "$.Card.Contact.Communication", "iso7816");
+		JsonSaveBufAsHex(root, "$.Card.Contact.ATR", (uint8_t *)card.atr, card.atr_len);
+	}
+	
 	// init applets list tree
 	const char *al = "Applets list";
 	struct tlvdb *tlvSelect = tlvdb_fixed(1, strlen(al), (const unsigned char *)al);
