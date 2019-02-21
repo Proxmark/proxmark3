@@ -311,7 +311,7 @@ static int PrintATR(uint8_t *atr, size_t atrlen) {
 	return 0;
 }
 
-static bool smart_getATR(smart_card_atr_t *card)
+bool smart_getATR(smart_card_atr_t *card)
 {
 	if (UseAlternativeSmartcardReader) {
 		return pcscGetATR(card);
@@ -802,6 +802,11 @@ static int CmdSmartInfo(const char *Cmd){
 	smart_card_atr_t card;
 	if (!smart_getATR(&card)) {
 		if (!silent) PrintAndLogEx(WARNING, "smart card select failed");
+		return 1;
+	}
+	
+	if (!card.atr_len) {
+		if (!silent) PrintAndLogEx(ERR, "can't get ATR from a smart card");
 		return 1;
 	}
 

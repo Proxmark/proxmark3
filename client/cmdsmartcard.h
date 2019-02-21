@@ -13,8 +13,10 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include "smartcard.h"
 
 extern int CmdSmartcard(const char *Cmd);
+extern bool smart_getATR(smart_card_atr_t *card);
 extern int ExchangeAPDUSC(uint8_t *datain, int datainlen, bool activateCard, bool leaveSignalON, uint8_t *dataout, int maxdataoutlen, int *dataoutlen);
 
 #endif

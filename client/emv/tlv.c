@@ -588,3 +588,9 @@ bool tlv_get_int(const struct tlv *etlv, int *value)
 	}
 	return false;
 }
+
+bool tlvdb_get_uint8(struct tlvdb *tlvRoot, tlv_tag_t tag, uint8_t *value)
+{
+	const struct tlv *tlvelm = tlvdb_get(tlvRoot, tag, NULL); 	
+	return tlv_get_uint8(tlvelm, value);
+}
