@@ -218,7 +218,8 @@ CMDSRCS = 	$(SRC_SMARTCARD) \
 			cmdscript.c\
 			pm3_binlib.c\
 			pm3_bitlib.c\
-			protocols.c
+			protocols.c\
+			taginfo.c
 
 cpu_arch = $(shell uname -m)
 ifneq ($(findstring 86, $(cpu_arch)), )

@@ -37,6 +37,7 @@
 #include "iso15693tools.h"
 #include "protocols.h"
 #include "cmdmain.h"
+#include "taginfo.h"
 
 #define Crc(data,datalen)     Iso15693Crc(data,datalen)
 #define AddCrc(data,datalen)  Iso15693AddCrc(data,datalen)
@@ -86,158 +87,6 @@ static const int Iso15693FrameEOF[] = {
 	-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1
 };
 
-// structure and database for uid -> tagtype lookups 
-typedef struct { 
-	uint64_t uid;
-	int mask; // how many MSB bits used
-	char* desc;
-} productName; 
-
-
-const productName uidmapping[] = {
-
-	// UID, #significant Bits, "Vendor(+Product)"
-	{ 0xE001000000000000LL, 16, "Motorola UK" },
-	
-	// E0 02 xx
-	//   02 = ST Microelectronics
-	//   XX = IC id (Chip ID Family)
-	{ 0xE002000000000000LL, 16, "ST Microelectronics SA France" },
-	{ 0xE002050000000000LL, 24, "ST Microelectronics; LRI64   [IC id = 05]"},
-	{ 0xE002080000000000LL, 24, "ST Microelectronics; LRI2K   [IC id = 08]"},
-	{ 0xE0020A0000000000LL, 24, "ST Microelectronics; LRIS2K  [IC id = 10]"},
-	{ 0xE002440000000000LL, 24, "ST Microelectronics; LRIS64K [IC id = 68]"},
-
-	{ 0xE003000000000000LL, 16, "Hitachi, Ltd Japan" }, 
-	
-	// E0 04 xx
-	//   04 = Manufacturer code (Philips/NXP)
-	//   XX = IC id (Chip ID Family)
-	//I-Code SLI SL2 ICS20 [IC id = 01]
-	//I-Code SLI-S         [IC id = 02]
-	//I-Code SLI-L         [IC id = 03]
-	//I-Code SLIX          [IC id = 01 + bit36 set to 1 (starting from bit0 - different from normal SLI)]
-	//I-Code SLIX-S        [IC id = 02 + bit36 set to 1]
-	//I-Code SLIX-L        [IC id = 03 + bit36 set to 1]
-	{ 0xE004000000000000LL, 16, "NXP Semiconductors Germany (Philips)" }, 
-	{ 0xE004010000000000LL, 24, "NXP(Philips); IC SL2 ICS20/ICS21(SLI) ICS2002/ICS2102(SLIX)" },
-	{ 0xE004020000000000LL, 24, "NXP(Philips); IC SL2 ICS53/ICS54(SLI-S) ICS5302/ICS5402(SLIX-S)" },
-	{ 0xE004030000000000LL, 24, "NXP(Philips); IC SL2 ICS50/ICS51(SLI-L) ICS5002/ICS5102(SLIX-L)" },
-
-	// E0 05 XX .. .. ..
-	//   05 = Manufacturer code (Infineon)
-	//   XX = IC id (Chip ID Family)
-	{ 0xE005000000000000LL, 16, "Infineon Technologies AG Germany" }, 
-	{ 0xE005A10000000000LL, 24, "Infineon; SRF55V01P [IC id = 161] plain mode 1kBit"},
-	{ 0xE005A80000000000LL, 24, "Infineon; SRF55V01P [IC id = 168] pilot series 1kBit"},
-	{ 0xE005400000000000LL, 24, "Infineon; SRF55V02P [IC id = 64]  plain mode 2kBit"},
-	{ 0xE005000000000000LL, 24, "Infineon; SRF55V10P [IC id = 00]  plain mode 10KBit"},
-	{ 0xE005500000000000LL, 24, "Infineon; SRF55V02S [IC id = 80]  secure mode 2kBit"},
-	{ 0xE005100000000000LL, 24, "Infineon; SRF55V10S [IC id = 16]  secure mode 10KBit"},
-	{ 0xE0051E0000000000LL, 23, "Infineon; SLE66r01P [IC id = 3x = My-d Move or My-d move NFC]"},
-	{ 0xE005200000000000LL, 21, "Infineon; SLE66r01P [IC id = 3x = My-d Move or My-d move NFC]"},
-	
-	{ 0xE006000000000000LL, 16, "Cylink USA" }, 
-	
-	
-	// E0 07 xx
-	//   07 = Texas Instruments
-	//   XX = from bit 41 to bit 43 = product configuration - from bit 44 to bit 47 IC id (Chip ID Family)
-	//Tag IT RFIDType-I Plus, 2kBit, TI Inlay
-	//Tag-it HF-I Plus Inlay             [IC id = 00] -> b'0000 000 2kBit
-	//Tag-it HF-I Plus Chip              [IC id = 64] -> b'1000 000 2kBit
-	//Tag-it HF-I Standard Chip / Inlays [IC id = 96] -> b'1100 000 256Bit
-	//Tag-it HF-I Pro Chip / Inlays      [IC id = 98] -> b'1100 010 256Bit, Password protection
-	{ 0xE007000000000000LL, 16, "Texas Instrument France" },
-	{ 0xE007000000000000LL, 20, "Texas Instrument; Tag-it HF-I Plus Inlay; 64x32bit" },
-	{ 0xE007100000000000LL, 20, "Texas Instrument; Tag-it HF-I Plus Chip; 64x32bit" },
-	{ 0xE007800000000000LL, 23, "Texas Instrument; Tag-it HF-I Plus (RF-HDT-DVBB tag or Third Party Products)" },
-	{ 0xE007C00000000000LL, 23, "Texas Instrument; Tag-it HF-I Standard; 8x32bit" },
-	{ 0xE007C40000000000LL, 23, "Texas Instrument; Tag-it HF-I Pro; 8x23bit; password" },	
-
-	{ 0xE008000000000000LL, 16, "Fujitsu Limited Japan" }, 
-	{ 0xE009000000000000LL, 16, "Matsushita Electronics Corporation, Semiconductor Company Japan" }, 
-	{ 0xE00A000000000000LL, 16, "NEC Japan" }, 
-	{ 0xE00B000000000000LL, 16, "Oki Electric Industry Co. Ltd Japan" },
-	{ 0xE00C000000000000LL, 16, "Toshiba Corp. Japan" },
-	{ 0xE00D000000000000LL, 16, "Mitsubishi Electric Corp. Japan" },
-	{ 0xE00E000000000000LL, 16, "Samsung Electronics Co. Ltd Korea" },
-	{ 0xE00F000000000000LL, 16, "Hynix / Hyundai, Korea" },
-	{ 0xE010000000000000LL, 16, "LG-Semiconductors Co. Ltd Korea" },
-	{ 0xE011000000000000LL, 16, "Emosyn-EM Microelectronics USA" },
-
-	{ 0xE012000000000000LL, 16, "HID Corporation" },
-	{ 0xE012000000000000LL, 16, "INSIDE Technology France" },
-	{ 0xE013000000000000LL, 16, "ORGA Kartensysteme GmbH Germany" },
-	{ 0xE014000000000000LL, 16, "SHARP Corporation Japan" },
-	{ 0xE015000000000000LL, 16, "ATMEL France" },
-	
-	{ 0xE016000000000000LL, 16, "EM Microelectronic-Marin SA Switzerland (Skidata)"},
-	{ 0xE016040000000000LL, 24, "EM-Marin SA (Skidata Keycard-eco); EM4034 [IC id = 01] (Read/Write - no AFI)"},
-	{ 0xE0160C0000000000LL, 24, "EM-Marin SA (Skidata); EM4035 [IC id = 03] (Read/Write - replaced by 4233)"},
-	{ 0xE016100000000000LL, 24, "EM-Marin SA (Skidata); EM4135 [IC id = 04] (Read/Write - replaced by 4233) 36x64bit start page 13"},
-	{ 0xE016140000000000LL, 24, "EM-Marin SA (Skidata); EM4036 [IC id = 05] 28pF"},
-	{ 0xE016180000000000LL, 24, "EM-Marin SA (Skidata); EM4006 [IC id = 06] (Read Only)"}, 
-	{ 0xE0161C0000000000LL, 24, "EM-Marin SA (Skidata); EM4133 [IC id = 07] 23,5pF (Read/Write)"},
-	{ 0xE016200000000000LL, 24, "EM-Marin SA (Skidata); EM4033 [IC id = 08] 23,5pF (Read Only - no AFI / no DSFID / no security blocks)"},
-	{ 0xE016240000000000LL, 24, "EM-Marin SA (Skidata); EM4233 [IC id = 09] 23,5pF CustomerID-102"},
-	{ 0xE016280000000000LL, 24, "EM-Marin SA (Skidata); EM4233 SLIC [IC id = 10] 23,5pF (1Kb flash memory - not provide High Security mode and QuietStorage feature)" },
-	{ 0xE0163C0000000000LL, 24, "EM-Marin SA (Skidata); EM4237 [IC id = 15] 23,5pF"},
-	{ 0xE0167C0000000000LL, 24, "EM-Marin SA (Skidata); EM4233 [IC id = 31] 95pF"},
-	{ 0xE016940000000000LL, 24, "EM-Marin SA (Skidata); EM4036 [IC id = 37] 95pF  51x64bit "},
-	{ 0xE0169c0000000000LL, 24, "EM-Marin SA (Skidata); EM4133 [IC id = 39] 95pF (Read/Write)" },
-	{ 0xE016A80000000000LL, 24, "EM-Marin SA (Skidata); EM4233 SLIC [IC id = 42] 97pF" },
-	{ 0xE016BC0000000000LL, 24, "EM-Marin SA (Skidata); EM4237 [IC id = 47] 97pF" },
-
-	{ 0xE017000000000000LL, 16, "KSW Microtec GmbH Germany" },
-	{ 0xE018000000000000LL, 16, "ZMD AG Germany" },
-	{ 0xE019000000000000LL, 16, "XICOR, Inc. USA" },
-	{ 0xE01A000000000000LL, 16, "Sony Corporation Japan Identifier Company Country" },
-	{ 0xE01B000000000000LL, 16, "Malaysia Microelectronic Solutions Sdn. Bhd Malaysia" },
-	{ 0xE01C000000000000LL, 16, "Emosyn USA" },
-	{ 0xE01D000000000000LL, 16, "Shanghai Fudan Microelectronics Co. Ltd. P.R. China" },
-	{ 0xE01E000000000000LL, 16, "Magellan Technology Pty Limited Australia" },
-	{ 0xE01F000000000000LL, 16, "Melexis NV BO Switzerland" },
-	{ 0xE020000000000000LL, 16, "Renesas Technology Corp. Japan" },
-	{ 0xE021000000000000LL, 16, "TAGSYS France" },
-	{ 0xE022000000000000LL, 16, "Transcore USA" },
-	{ 0xE023000000000000LL, 16, "Shanghai belling corp., ltd. China" },
-	{ 0xE024000000000000LL, 16, "Masktech Germany Gmbh Germany" },
-	{ 0xE025000000000000LL, 16, "Innovision Research and Technology Plc UK" },
-	{ 0xE026000000000000LL, 16, "Hitachi ULSI Systems Co., Ltd. Japan" },
-	{ 0xE027000000000000LL, 16, "Cypak AB Sweden" },
-	{ 0xE028000000000000LL, 16, "Ricoh Japan" },
-	{ 0xE029000000000000LL, 16, "ASK France" },
-	{ 0xE02A000000000000LL, 16, "Unicore Microsystems, LLC Russian Federation" },
-	{ 0xE02B000000000000LL, 16, "Dallas Semiconductor/Maxim USA" },
-	{ 0xE02C000000000000LL, 16, "Impinj, Inc. USA" },
-	{ 0xE02D000000000000LL, 16, "RightPlug Alliance USA" },
-	{ 0xE02E000000000000LL, 16, "Broadcom Corporation USA" },
-	{ 0xE02F000000000000LL, 16, "MStar Semiconductor, Inc Taiwan, ROC" },
-	{ 0xE030000000000000LL, 16, "BeeDar Technology Inc. USA" },
-	{ 0xE031000000000000LL, 16, " RFIDsec Denmark" },
-	{ 0xE032000000000000LL, 16, " Schweizer Electronic AG Germany" },
-	{ 0xE033000000000000LL, 16, " AMIC Technology Corp Taiwan" }, 
-	{ 0xE034000000000000LL, 16, "Mikron JSC Russia" },
-	{ 0xE035000000000000LL, 16, "Fraunhofer Institute for Photonic Microsystems Germany" },
-	{ 0xE036000000000000LL, 16, "IDS Microchip AG Switzerland" },
-	{ 0xE037000000000000LL, 16, "Kovio USA" },
-	{ 0xE038000000000000LL, 16, "HMT Microelectronic Ltd Switzerland Identifier Company Country" },
-	{ 0xE039000000000000LL, 16, "Silicon Craft Technology Thailand" },
-	{ 0xE03A000000000000LL, 16, "Advanced Film Device Inc. Japan" },
-	{ 0xE03B000000000000LL, 16, "Nitecrest Ltd UK" },
-	{ 0xE03C000000000000LL, 16, "Verayo Inc. USA" },
-	{ 0xE03D000000000000LL, 16, "HID Global USA" },
-	{ 0xE03E000000000000LL, 16, "Productivity Engineering Gmbh Germany" },
-	{ 0xE03F000000000000LL, 16, "Austriamicrosystems AG (reserved) Austria" }, 
-	{ 0xE040000000000000LL, 16, "Gemalto SA France" },
-	{ 0xE041000000000000LL, 16, "Renesas Electronics Corporation Japan" },
-	{ 0xE042000000000000LL, 16, "3Alogics Inc Korea" },
-	{ 0xE043000000000000LL, 16, "Top TroniQ Asia Limited Hong Kong" },
-	{ 0xE044000000000000LL, 16, "Gentag Inc (USA) USA" },
-	{ 0,0,"no tag-info available" } // must be the last entry
-};
-
 
 // fast method to just read the UID of a tag (collission detection not supported)
 //		*buf	should be large enough to fit the 64bit uid
@@ -269,34 +118,6 @@ int getUID(uint8_t *buf)
 		} 
 	} // retry
 	return 0;
-}
-
-
-
-// get a product description based on the UID
-//		uid[8] 	tag uid
-// returns description of the best match	
-static char* getTagInfo(uint8_t *uid) {
-	uint64_t myuid,mask;
-	int i=0, best=-1;	
-	memcpy(&myuid,uid,sizeof(uint64_t));
-	while (uidmapping[i].mask>0) {
-		mask=(~0LL) <<(64-uidmapping[i].mask);
-		if ((myuid & mask) == uidmapping[i].uid) {
-			if (best==-1) { 
-				best=i;
-			} else {
-				if (uidmapping[i].mask>uidmapping[best].mask) {
-					best=i;
-				}
-			}					
-		} 
-		i++;
-	} 
-
-	if (best>=0) return uidmapping[best].desc;
-	
-	return uidmapping[i].desc; 
 }
 
 
@@ -429,8 +250,9 @@ int HF15Reader(const char *Cmd, bool verbose)
 		return 0;
 	}
 
-	PrintAndLog("Tag UID : %s",sprintUID(NULL,uid));
-	PrintAndLog("Tag Info: %s",getTagInfo(uid));
+	PrintAndLog("UID:               %s", sprintUID(NULL,uid));
+	PrintAndLog("Manufacturer byte: %02X, %s", uid[6], getManufacturerName(uid[6]));
+	PrintAndLog("Chip ID:           %02X, %s", uid[5], getChipInfo(uid[6], uid[5]));
 	return 1;
 }
 
@@ -496,8 +318,10 @@ int CmdHF15DumpMem(const char*Cmd) {
 		return 0;
 	}
 	
-	PrintAndLog("Reading memory from tag UID=%s",sprintUID(NULL,uid));
-	PrintAndLog("Tag Info: %s",getTagInfo(uid));
+	PrintAndLog("Reading memory from tag");
+	PrintAndLog("UID:               %s", sprintUID(NULL,uid));
+	PrintAndLog("Manufacturer byte: %02X, %s", uid[6], getManufacturerName(uid[6]));
+	PrintAndLog("Chip ID:           %02X, %s", uid[5], getChipInfo(uid[6], uid[5]));
 
 	for (int retry=0; retry<5; retry++) {
 		
@@ -595,9 +419,10 @@ int CmdHF15CmdInquiry(const char *Cmd)
 	
 	if (WaitForResponseTimeout(CMD_ACK,&resp,1000)) {
 		if (resp.arg[0]>=12) {
-		   recv = resp.d.asBytes;
-		   PrintAndLog("UID=%s",sprintUID(NULL,&recv[2]));
-		   PrintAndLog("Tag Info: %s",getTagInfo(&recv[2]));	
+			recv = resp.d.asBytes;
+			PrintAndLog("UID:               %s", sprintUID(NULL,recv+2));
+			PrintAndLog("Manufacturer byte: %02X, %s", recv[8], getManufacturerName(recv[8]));
+			PrintAndLog("Chip ID:           %02X, %s", recv[7], getChipInfo(recv[8], recv[7]));
 		} else {
 			PrintAndLog("Response to short, just %i bytes. No tag?\n",resp.arg[0]);
 		}
@@ -855,15 +680,9 @@ int CmdHF15CmdSysinfo(const char *Cmd) {
 		if (ISO15693_CRC_CHECK==Crc(recv,resp.arg[0])) {
 			if (!(recv[0] & ISO15693_RES_ERROR)) {
 				*output=0; // reset outputstring
-				for ( i=1; i<resp.arg[0]-2; i++) {
-					sprintf(output+strlen(output),"%02X ",recv[i]);
-				}					
-				strcat(output,"\n\r");
-				strcat(output,"UID = ");
-				strcat(output,sprintUID(NULL,recv+2));
-				strcat(output,"\n\r");
-				strcat(output,getTagInfo(recv+2)); //ABC
-				strcat(output,"\n\r");
+				PrintAndLog("UID:               %s", sprintUID(NULL,recv+2));
+				PrintAndLog("Manufacturer byte: %02X, %s", recv[8], getManufacturerName(recv[8]));
+				PrintAndLog("Chip ID:           %02X, %s", recv[7], getChipInfo(recv[8], recv[7]));
 				i=10;
 				if (recv[1] & 0x01) 
 					sprintf(output+strlen(output),"DSFID supported, set to %02X\n\r",recv[i++]);
