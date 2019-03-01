@@ -36,10 +36,6 @@
 static int CmdHelp(const char *Cmd);
 static int waitCmd(uint8_t iLen);
 
-// iso14a apdu input frame length
-static uint16_t frameLength = 0;
-uint16_t atsFSC[] = {16, 24, 32, 40, 48, 64, 96, 128, 256};
-
 int CmdHF14AList(const char *Cmd)
 {
 	PrintAndLog("Deprecated command, use 'hf list 14a' instead");
