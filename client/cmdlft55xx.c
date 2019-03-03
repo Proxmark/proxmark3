@@ -23,8 +23,8 @@
 #include "cmdlf.h"
 #include "util.h"
 #include "lfdemod.h"
-#include "cmdhf14a.h" //for getTagInfo
 #include "protocols.h"
+#include "taginfo.h"
 
 #define T55x7_CONFIGURATION_BLOCK 0x00
 #define T55x7_PAGE0 0x00
@@ -1070,7 +1070,7 @@ void printT55x7Trace( t55x7_tracedata_t data, uint8_t repeat ){
 	PrintAndLog("-- T55x7 Trace Information ----------------------------------");
 	PrintAndLog("-------------------------------------------------------------");
 	PrintAndLog(" ACL Allocation class (ISO/IEC 15963-1)  : 0x%02X (%d)", data.acl, data.acl);
-	PrintAndLog(" MFC Manufacturer ID (ISO/IEC 7816-6)    : 0x%02X (%d) - %s", data.mfc, data.mfc, getTagInfo(data.mfc));
+	PrintAndLog(" MFC Manufacturer ID (ISO/IEC 7816-6)    : 0x%02X (%d) - %s", data.mfc, data.mfc, getManufacturerName(data.mfc));
 	PrintAndLog(" CID                                     : 0x%02X (%d) - %s", data.cid, data.cid, GetModelStrFromCID(data.cid));
 	PrintAndLog(" ICR IC Revision                         : %d", data.icr );
 	PrintAndLog(" Manufactured");

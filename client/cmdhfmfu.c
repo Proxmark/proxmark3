@@ -18,10 +18,10 @@
 #include "ui.h"
 #include "mbedtls/des.h"
 #include "cmdhfmf.h"
-#include "cmdhf14a.h"
 #include "mifare.h"
 #include "util.h"
 #include "protocols.h"
+#include "taginfo.h"
 
 #define MAX_UL_BLOCKS      0x0f
 #define MAX_ULC_BLOCKS     0x2b
@@ -316,7 +316,7 @@ static int ul_print_default( uint8_t *data){
 	uid[6] = data[7];
 
 	PrintAndLog("       UID : %s ", sprint_hex(uid, 7));
-	PrintAndLog("    UID[0] : %02X, %s",  uid[0], getTagInfo(uid[0]) );
+	PrintAndLog("    UID[0] : %02X, %s", uid[0], getManufacturerName(uid[0]));
 	if ( uid[0] == 0x05 && ((uid[1] & 0xf0) >> 4) == 2 ) { // is infineon and 66RxxP
 		uint8_t chip = (data[8] & 0xC7); // 11000111  mask, bit 3,4,5 RFU
 		switch (chip){
@@ -516,7 +516,7 @@ static int ulev1_print_signature( uint8_t *data, uint8_t len){
 static int ulev1_print_version(uint8_t *data){
 	PrintAndLog("\n--- Tag Version");
 	PrintAndLog("       Raw bytes : %s",sprint_hex(data, 8) );
-	PrintAndLog("       Vendor ID : %02X, %s", data[1], getTagInfo(data[1]));
+	PrintAndLog("       Vendor ID : %02X, %s", data[1], getManufacturerName(data[1]));
 	PrintAndLog("    Product type : %s", getProductTypeStr(data[2]));
 	PrintAndLog(" Product subtype : %02X, %s", data[3], (data[3]==1) ?"17 pF":"50pF");
 	PrintAndLog("   Major version : %02X", data[4]);
