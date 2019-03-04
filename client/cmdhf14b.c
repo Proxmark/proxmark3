@@ -22,7 +22,8 @@
 #include "ui.h"
 #include "cmdparser.h"
 #include "cmdmain.h"
-#include "cmdhf14a.h"
+#include "taginfo.h"
+
 
 static int CmdHelp(const char *Cmd);
 
@@ -305,24 +306,6 @@ static void print_atqb_resp(uint8_t *data){
 	return;
 }
 
-// get SRx chip model (from UID) // from ST Microelectronics
-char *get_ST_Chip_Model(uint8_t data){
-	static char model[20];
-	char *retStr = model;
-	memset(model,0, sizeof(model));
-
-	switch (data) {
-		case 0x0: sprintf(retStr, "SRIX4K (Special)"); break;
-		case 0x2: sprintf(retStr, "SR176"); break;
-		case 0x3: sprintf(retStr, "SRIX4K"); break;
-		case 0x4: sprintf(retStr, "SRIX512"); break;
-		case 0x6: sprintf(retStr, "SRI512"); break;
-		case 0x7: sprintf(retStr, "SRI4K"); break;
-		case 0xC: sprintf(retStr, "SRT512"); break;
-		default : sprintf(retStr, "Unknown"); break;
-	}
-	return retStr;
-}
 
 int print_ST_Lock_info(uint8_t model){
 	//assume connection open and tag selected...
@@ -393,8 +376,8 @@ int print_ST_Lock_info(uint8_t model){
 static void print_st_general_info(uint8_t *data){
 	//uid = first 8 bytes in data
 	PrintAndLog("   UID: %s", sprint_hex(SwapEndian64(data,8,8),8));
-	PrintAndLog("   MFG: %02X, %s", data[6], getTagInfo(data[6]));
-	PrintAndLog("  Chip: %02X, %s", data[5]>>2, get_ST_Chip_Model(data[5]>>2));
+	PrintAndLog("   MFG: %02X, %s", data[6], getManufacturerName(data[6]));
+	PrintAndLog("  Chip: %02X, %s", data[5], getChipInfo(data[6], data[5]));
 	return;
 }
 

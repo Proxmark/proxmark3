@@ -22,6 +22,7 @@
 #include "comms.h"
 #include "iso14443crc.h"
 #include "protocols.h"
+#include "taginfo.h"
 
 #define TOPAZ_STATIC_MEMORY	(0x0f * 8)		// 15 blocks with 8 Bytes each
 
@@ -477,7 +478,7 @@ int CmdHFTopazReader(const char *Cmd)
 			topaz_tag.uid[0]);
 	PrintAndLog("       UID[6] (Manufacturer Byte) = %02x, Manufacturer: %s", 
 			topaz_tag.uid[6], 
-			getTagInfo(topaz_tag.uid[6]));
+			getManufacturerName(topaz_tag.uid[6]));
 
 	memcpy(topaz_tag.data_blocks, rall_response+2, 0x0f*8);
 	PrintAndLog("");
