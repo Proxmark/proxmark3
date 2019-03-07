@@ -14,11 +14,6 @@ module hi_get_trace(
 	input [2:0] major_mode;
     output ssp_frame, ssp_din, ssp_clk;
 
-// constants for some major_modes:
-`define OFF        3'b111
-`define GET_TRACE  3'b101
-
-
 // clock divider
 reg [6:0] clock_cnt;
 always @(negedge ck_1356megb)
@@ -30,7 +25,7 @@ end
 reg [2:0] sample_clock;
 always @(negedge ck_1356megb)
 begin
-	if (sample_clock == 3'd3)
+	if (sample_clock == 3'd7)
 		sample_clock <= 3'd0;
 	else
 		sample_clock <= sample_clock + 1;
@@ -45,11 +40,11 @@ reg write_enable2;
 always @(negedge ck_1356megb)
 begin
 	previous_major_mode <= major_mode;
-	if (major_mode == `GET_TRACE)
+	if (major_mode == `FPGA_MAJOR_MODE_HF_GET_TRACE)
 	begin
 		write_enable1 <= 1'b0;
 		write_enable2 <= 1'b0;
-		if (previous_major_mode != `GET_TRACE) // just switched into GET_TRACE mode
+		if (previous_major_mode != `FPGA_MAJOR_MODE_HF_GET_TRACE) // just switched into GET_TRACE mode
 			addr <= start_addr;
 		if (clock_cnt == 7'd0)
 		begin
@@ -59,7 +54,7 @@ begin
 				addr <= addr + 1;
 		end
 	end
-	else if (major_mode != `OFF)
+	else if (major_mode != `FPGA_MAJOR_MODE_OFF)
 	begin
 		if (trace_enable)
 		begin
@@ -92,11 +87,11 @@ begin
 			start_addr <= addr;
 		end
 	end
-	else // major_mode == `OFF
+	else // major_mode == `FPGA_MAJOR_MODE_OFF
 	begin
 		write_enable1 <= 1'b0;
 		write_enable2 <= 1'b0;
-		if (previous_major_mode != `OFF && previous_major_mode != `GET_TRACE) // just switched off
+		if (previous_major_mode != `FPGA_MAJOR_MODE_OFF && previous_major_mode != `FPGA_MAJOR_MODE_HF_GET_TRACE) // just switched off
 			start_addr <= addr;
 	end
 end

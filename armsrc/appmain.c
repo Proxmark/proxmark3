@@ -24,6 +24,7 @@
 #include "legicrfsim.h"
 #include "hitag2.h"
 #include "hitagS.h"
+#include "iso14443b.h"
 #include "iso15693.h"
 #include "lfsampling.h"
 #include "BigBuf.h"
@@ -243,7 +244,7 @@ void MeasureAntennaTuningHfOnly(int *vHf)
 	// Let the FPGA drive the high-frequency antenna around 13.56 MHz.
 	LED_A_ON();
 	FpgaDownloadAndGo(FPGA_BITSTREAM_HF);
-	FpgaWriteConfWord(FPGA_MAJOR_MODE_HF_READER_RX_XCORR);
+	FpgaWriteConfWord(FPGA_MAJOR_MODE_HF_READER);
 	SpinDelay(20);
 	*vHf = AvgAdc_Voltage_HF();
 	LED_A_OFF();
@@ -285,7 +286,7 @@ void MeasureAntennaTuningHf(void)
 
 	// Let the FPGA drive the high-frequency antenna around 13.56 MHz.
 	FpgaDownloadAndGo(FPGA_BITSTREAM_HF);
-	FpgaWriteConfWord(FPGA_MAJOR_MODE_HF_READER_RX_XCORR);
+	FpgaWriteConfWord(FPGA_MAJOR_MODE_HF_READER);
 
 	for (;;) {
 		SpinDelay(500);

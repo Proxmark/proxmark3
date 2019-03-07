@@ -10,12 +10,18 @@
 // Routines to support ISO 14443 type B.
 //-----------------------------------------------------------------------------
 
-#ifndef __ISO14443B_H
-#define __ISO14443B_H
-#include "common.h"
+#ifndef ISO14443B_H__
+#define ISO14443B_H__
 
-int iso14443b_apdu(uint8_t const *message, size_t message_length, uint8_t *response);
-void iso14443b_setup();
-int iso14443b_select_card();
+#include <stdint.h>
+#include <stddef.h>
+
+extern int iso14443b_apdu(uint8_t const *message, size_t message_length, uint8_t *response);
+extern void iso14443b_setup();
+extern int iso14443b_select_card();
+extern void SimulateIso14443bTag(void);
+extern void ReadSTMemoryIso14443b(uint32_t);
+extern void SnoopIso14443b(void);
+extern void SendRawCommand14443B(uint32_t, uint32_t, uint8_t, uint8_t[]);
 
 #endif /* __ISO14443B_H */

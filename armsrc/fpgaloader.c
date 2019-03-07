@@ -130,21 +130,21 @@ void FpgaSetupSsc(uint8_t FPGA_mode)
 	// Now set up the SSC proper, starting from a known state.
 	AT91C_BASE_SSC->SSC_CR = AT91C_SSC_SWRST;
 
-	// RX clock comes from TX clock, RX starts when TX starts, data changes
-	// on RX clock rising edge, sampled on falling edge
+	// RX clock comes from TX clock, RX starts on Transmit Start,
+	// data and frame signal is sampled on falling edge of RK
 	AT91C_BASE_SSC->SSC_RCMR = SSC_CLOCK_MODE_SELECT(1) | SSC_CLOCK_MODE_START(1);
 
 	// 8, 16 or 32 bits per transfer, no loopback, MSB first, 1 transfer per sync
 	// pulse, no output sync
-	if ((FPGA_mode & 0xe0) == FPGA_MAJOR_MODE_HF_READER_RX_XCORR) {
+	if ((FPGA_mode & 0xe0) == FPGA_MAJOR_MODE_HF_READER) {
 		AT91C_BASE_SSC->SSC_RFMR = SSC_FRAME_MODE_BITS_IN_WORD(16) | AT91C_SSC_MSBF | SSC_FRAME_MODE_WORDS_PER_TRANSFER(0);
 	} else {
 		AT91C_BASE_SSC->SSC_RFMR = SSC_FRAME_MODE_BITS_IN_WORD(8) | AT91C_SSC_MSBF | SSC_FRAME_MODE_WORDS_PER_TRANSFER(0);
 	}		
 
 	// TX clock comes from TK pin, no clock output, outputs change on falling
-	// edge of TK, sample on rising edge of TK, start on positive-going edge of sync
-	AT91C_BASE_SSC->SSC_TCMR = SSC_CLOCK_MODE_SELECT(2) |	SSC_CLOCK_MODE_START(5);
+	// edge of TK, frame sync is sampled on rising edge of TK, start TX on rising edge of TF
+	AT91C_BASE_SSC->SSC_TCMR = SSC_CLOCK_MODE_SELECT(2) | SSC_CLOCK_MODE_START(5);
 
 	// tx framing is the same as the rx framing
 	AT91C_BASE_SSC->SSC_TFMR = AT91C_BASE_SSC->SSC_RFMR;
