@@ -1040,6 +1040,7 @@ void AcquireRawAdcSamplesIso15693(void)
 
 void SnoopIso15693(void)
 {
+	LED_A_ON();
 	FpgaDownloadAndGo(FPGA_BITSTREAM_HF);
 	BigBuf_free();
 
@@ -1073,9 +1074,6 @@ void SnoopIso15693(void)
 	}
 	Dbprintf("Snoop started. Press button to stop.");
 	
-	// Signal field is off, no reader signal, no tag signal
-	LEDsoff();
-	// And put the FPGA in the appropriate mode
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_HF_READER_RX_XCORR | FPGA_HF_READER_RX_XCORR_SNOOP | FPGA_HF_READER_RX_XCORR_AMPLITUDE);
 	SetAdcMuxFor(GPIO_MUXSEL_HIPKD);
 

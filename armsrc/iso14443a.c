@@ -319,15 +319,18 @@ static RAMFUNC bool MillerDecoding(uint8_t bit, uint32_t non_real_time)
 			Uart.startTime -= Uart.syncBit;
 			Uart.endTime = Uart.startTime;
 			Uart.state = STATE_START_OF_COMMUNICATION;
+			LED_B_ON();
 		}
 
 	} else {
 
 		if (IsMillerModulationNibble1(Uart.fourBits >> Uart.syncBit)) {			
 			if (IsMillerModulationNibble2(Uart.fourBits >> Uart.syncBit)) {		// Modulation in both halves - error
+				LED_B_OFF();
 				UartReset();
 			} else {															// Modulation in first half = Sequence Z = logic "0"
 				if (Uart.state == STATE_MILLER_X) {								// error - must not follow after X
+					LED_B_OFF();
 					UartReset();
 				} else {
 					Uart.bitCount++;
@@ -366,6 +369,7 @@ static RAMFUNC bool MillerDecoding(uint8_t bit, uint32_t non_real_time)
 				}
 			} else {															// no modulation in both halves - Sequence Y
 				if (Uart.state == STATE_MILLER_Z || Uart.state == STATE_MILLER_Y) {	// Y after logic "0" - End of Communication
+					LED_B_OFF();
 					Uart.state = STATE_UNSYNCD;
 					Uart.bitCount--;											// last "0" was part of EOC sequence
 					Uart.shiftReg <<= 1;										// drop it
@@ -387,6 +391,7 @@ static RAMFUNC bool MillerDecoding(uint8_t bit, uint32_t non_real_time)
 					}
 				}
 				if (Uart.state == STATE_START_OF_COMMUNICATION) {				// error - must not follow directly after SOC
+					LED_B_OFF();
 					UartReset();
 				} else {														// a logic "0"
 					Uart.bitCount++;
@@ -492,6 +497,7 @@ static RAMFUNC int ManchesterDecoding(uint8_t bit, uint16_t offset, uint32_t non
 				Demod.startTime -= Demod.syncBit;
 				Demod.bitCount = offset;			// number of decoded data bits
 				Demod.state = DEMOD_MANCHESTER_DATA;
+				LED_C_ON();
 			}
 		}
 
@@ -534,6 +540,7 @@ static RAMFUNC int ManchesterDecoding(uint8_t bit, uint16_t offset, uint32_t non
 				}
 				Demod.endTime = Demod.startTime + 8*(9*Demod.len + Demod.bitCount + 1);
 			} else {													// no modulation in both halves - End of communication
+				LED_C_OFF();
 				if(Demod.bitCount > 0) {								// there are some remaining data bits
 					Demod.shiftReg >>= (9 - Demod.bitCount);			// right align the decoded bits
 					Demod.output[Demod.len++] = Demod.shiftReg & 0xff;	// and add them to the output
@@ -574,6 +581,7 @@ void RAMFUNC SnoopIso14443a(uint8_t param) {
 	// bit 1 - trigger from first reader 7-bit request
 	
 	LEDsoff();
+	LED_A_ON();
 
 	iso14443a_setup(FPGA_HF_ISO14443A_SNIFFER);
 
@@ -626,7 +634,6 @@ void RAMFUNC SnoopIso14443a(uint8_t param) {
 			break;
 		}
 
-		LED_A_ON();
 		WDT_HIT();
 
 		int register readBufDataP = data - dmaBuf;
@@ -658,18 +665,15 @@ void RAMFUNC SnoopIso14443a(uint8_t param) {
 			AT91C_BASE_PDC_SSC->PDC_RNCR = DMA_BUFFER_SIZE;
 		}
 
-		LED_A_OFF();
-		
 		if (rsamples & 0x01) {				// Need two samples to feed Miller and Manchester-Decoder
 
 			if(!TagIsActive) {		// no need to try decoding reader data if the tag is sending
 				uint8_t readerdata = (previous_data & 0xF0) | (*data >> 4);
 				if (MillerDecoding(readerdata, (rsamples-1)*4)) {
-					LED_C_ON();
-
 					// check - if there is a short 7bit request from reader
-					if ((!triggered) && (param & 0x02) && (Uart.len == 1) && (Uart.bitCount == 7)) triggered = true;
-
+					if ((!triggered) && (param & 0x02) && (Uart.len == 1) && (Uart.bitCount == 7)) {
+						triggered = true;
+					}
 					if(triggered) {
 						if (!LogTrace(receivedCmd, 
 										Uart.len, 
@@ -683,31 +687,24 @@ void RAMFUNC SnoopIso14443a(uint8_t param) {
 					/* And also reset the demod code, which might have been */
 					/* false-triggered by the commands from the reader. */
 					DemodReset();
-					LED_B_OFF();
 				}
 				ReaderIsActive = (Uart.state != STATE_UNSYNCD);
 			}
 
-			if(!ReaderIsActive) {		// no need to try decoding tag data if the reader is sending - and we cannot afford the time
+			if (!ReaderIsActive) {		// no need to try decoding tag data if the reader is sending - and we cannot afford the time
 				uint8_t tagdata = (previous_data << 4) | (*data & 0x0F);
-				if(ManchesterDecoding(tagdata, 0, (rsamples-1)*4)) {
-					LED_B_ON();
-
+				if (ManchesterDecoding(tagdata, 0, (rsamples-1)*4)) {
 					if (!LogTrace(receivedResponse, 
 									Demod.len, 
 									Demod.startTime*16 - DELAY_TAG_AIR2ARM_AS_SNIFFER, 
 									Demod.endTime*16 - DELAY_TAG_AIR2ARM_AS_SNIFFER,
 									Demod.parity,
 									false)) break;
-
 					if ((!triggered) && (param & 0x01)) triggered = true;
-
 					// And ready to receive another response.
 					DemodReset();
 					// And reset the Miller decoder including itS (now outdated) input buffer
 					UartInit(receivedCmd, receivedCmdPar);
-
-					LED_C_OFF();
 				} 
 				TagIsActive = (Demod.state != DEMOD_UNSYNCD);
 			}
@@ -721,12 +718,12 @@ void RAMFUNC SnoopIso14443a(uint8_t param) {
 		}
 	} // main cycle
 
-	DbpString("COMMAND FINISHED");
-
 	FpgaDisableSscDma();
+	LEDsoff();
+
+	DbpString("COMMAND FINISHED");
 	Dbprintf("maxDataLen=%d, Uart.state=%x, Uart.len=%d", maxDataLen, Uart.state, Uart.len);
 	Dbprintf("traceLen=%d, Uart.output[0]=%08x", BigBuf_get_traceLen(), (uint32_t)Uart.output[0]);
-	LEDsoff();
 }
 
 //-----------------------------------------------------------------------------
@@ -1267,7 +1264,7 @@ static void PrepareDelayedTransfer(uint16_t delay)
 //-------------------------------------------------------------------------------------
 static void TransmitFor14443a(const uint8_t *cmd, uint16_t len, uint32_t *timing)
 {
-	
+	LED_D_ON();
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_HF_ISO14443A | FPGA_HF_ISO14443A_READER_MOD);
 
 	uint32_t ThisTransferTime = 0;
@@ -1471,6 +1468,7 @@ static int EmSendCmd14443aRaw(uint8_t *resp, uint16_t respLen)
 	bool correctionNeeded;
 
 	// Modulate Manchester
+	LED_D_OFF();
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_HF_ISO14443A | FPGA_HF_ISO14443A_TAGSIM_MOD);
 
 	// include correction bit if necessary
@@ -2459,6 +2457,8 @@ void RAMFUNC SniffMifare(uint8_t param) {
 
 	// C(red) A(yellow) B(green)
 	LEDsoff();
+	LED_A_ON();
+	
 	// init trace buffer
 	clear_trace();
 	set_tracing(true);
@@ -2494,8 +2494,6 @@ void RAMFUNC SniffMifare(uint8_t param) {
 	// Setup for the DMA.
 	FpgaSetupSscDma((uint8_t *)dmaBuf, DMA_BUFFER_SIZE); // set transfer address and number of bytes. Start transfer.
 
-	LED_D_OFF();
-	
 	// init sniffer
 	MfSniffInit();
 
@@ -2507,7 +2505,6 @@ void RAMFUNC SniffMifare(uint8_t param) {
 			break;
 		}
 
-		LED_A_ON();
 		WDT_HIT();
 		
  		if ((sniffCounter & 0x0000FFFF) == 0) {	// from time to time
@@ -2553,15 +2550,11 @@ void RAMFUNC SniffMifare(uint8_t param) {
 			AT91C_BASE_PDC_SSC->PDC_RNCR = DMA_BUFFER_SIZE;
 		}
 
-		LED_A_OFF();
-		
 		if (sniffCounter & 0x01) {
 
 			if(!TagIsActive) {		// no need to try decoding tag data if the reader is sending
 				uint8_t readerdata = (previous_data & 0xF0) | (*data >> 4);
 				if(MillerDecoding(readerdata, (sniffCounter-1)*4)) {
-					LED_B_ON();
-					LED_C_OFF();
 
 					if (MfSniffLogic(receivedCmd, Uart.len, Uart.parity, Uart.bitCount, true)) break;
 
@@ -2577,8 +2570,6 @@ void RAMFUNC SniffMifare(uint8_t param) {
 			if(!ReaderIsActive) {		// no need to try decoding tag data if the reader is sending
 				uint8_t tagdata = (previous_data << 4) | (*data & 0x0F);
 				if(ManchesterDecoding(tagdata, 0, (sniffCounter-1)*4)) {
-					LED_B_OFF();
-					LED_C_ON();
 
 					if (MfSniffLogic(receivedResponse, Demod.len, Demod.parity, Demod.bitCount, false)) break;
 
@@ -2600,12 +2591,13 @@ void RAMFUNC SniffMifare(uint8_t param) {
 
 	} // main cycle
 
+	FpgaDisableSscDma();
+	LEDsoff();
+
 	DbpString("COMMAND FINISHED.");
 
-	FpgaDisableSscDma();
 	FpgaDisableTracing();
 	MfSniffEnd();
 	
 	Dbprintf("maxDataLen=%x, Uart.state=%x, Uart.len=%x", maxDataLen, Uart.state, Uart.len);
-	LEDsoff();
 }
