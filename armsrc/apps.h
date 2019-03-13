@@ -161,18 +161,6 @@ void iClass_Dump(uint8_t blockno, uint8_t numblks);
 void iClass_Clone(uint8_t startblock, uint8_t endblock, uint8_t *data);
 void iClass_ReadCheck(uint8_t	blockNo, uint8_t keyType);
 
-// hitag2.h
-void SnoopHitag(uint32_t type);
-void SimulateHitagTag(bool tag_mem_supplied, byte_t* data);
-void ReaderHitag(hitag_function htf, hitag_data* htd);
-void WriterHitag(hitag_function htf, hitag_data* htd, int page);
-
-//hitagS.h
-void ReadHitagSCmd(hitag_function htf, hitag_data* htd, uint64_t startPage, uint64_t tagMode, bool readBlock);
-void SimulateHitagSTag(bool tag_mem_supplied, byte_t* data);
-void WritePageHitagS(hitag_function htf, hitag_data* htd,int page);
-void check_challenges_cmd(bool file_given, byte_t* data, uint64_t tagMode);
-
 // cmd.h
 bool cmd_receive(UsbCommand* cmd);
 bool cmd_send(uint32_t cmd, uint32_t arg0, uint32_t arg1, uint32_t arg2, void* data, size_t len);

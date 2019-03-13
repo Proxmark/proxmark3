@@ -19,8 +19,7 @@
 #include "common.h"
 #include "util.h"
 #include "parity.h"
-#include "hitag2.h"
-#include "hitagS.h"
+#include "hitag.h"
 #include "cmdmain.h"
 
 static int CmdHelp(const char *Cmd);
