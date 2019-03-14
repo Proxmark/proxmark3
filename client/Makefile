@@ -143,6 +143,8 @@ CMDSRCS = 	$(SRC_SMARTCARD) \
 			whereami.c\
 			mifare/mifarehost.c\
 			mifare/mifare4.c\
+			mifare/mad.c \
+			mifare/ndef.c \
 			parity.c\
 			crc.c \
 			crc16.c \
