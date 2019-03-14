@@ -9,13 +9,32 @@
 #include <stdint.h>
 #include <stddef.h>
 
+#ifndef BITMASK
+# define BITMASK(X) (1 << (X))
+#endif
+
+uint32_t reflect(uint32_t v, int b) {
+    uint32_t t = v;
+    for (int i = 0; i < b; ++i) {
+        if (t & 1)
+            v |=  BITMASK((b - 1) - i);
+        else
+            v &= ~BITMASK((b - 1) - i);
+        t >>= 1;
+    }
+    return v;
+}
+
 void crc_init(crc_t *crc, int order, uint32_t polynom, uint32_t initial_value, uint32_t final_xor)
 {
 	crc->order = order;
+    crc->topbit = BITMASK(order - 1);
 	crc->polynom = polynom;
 	crc->initial_value = initial_value;
 	crc->final_xor = final_xor;
 	crc->mask = (1L<<order)-1;
+    crc->refin = false;
+    crc->refout = false;
 	crc_clear(crc);
 }
 
@@ -32,9 +51,28 @@ void crc_update(crc_t *crc, uint32_t data, int data_width)
 	}
 }
 
+void crc_update2(crc_t *crc, uint32_t data, int data_width) {
+
+    if (crc->refin)
+        data = reflect(data, data_width);
+
+    // Bring the next byte into the remainder.
+    crc->state ^= data << (crc->order - data_width);
+
+    for (uint8_t bit = data_width; bit > 0; --bit) {
+
+        if (crc->state & crc->topbit)
+            crc->state = (crc->state << 1) ^ crc->polynom;
+        else
+            crc->state = (crc->state << 1);
+    }
+}
+
 void crc_clear(crc_t *crc)
 {
 	crc->state = crc->initial_value & crc->mask;
+    if (crc->refin)
+        crc->state = reflect(crc->state, crc->order);
 }
 
 uint32_t crc_finish(crc_t *crc)
@@ -60,6 +98,6 @@ uint32_t CRC8Mad(uint8_t *buff, size_t size) {
     crc_t crc;
     crc_init(&crc, 8, 0x1d, 0xc7, 0);
     for (int i = 0; i < size; ++i)
-        crc_update(&crc, buff[i], 8);
+        crc_update2(&crc, buff[i], 8);
     return crc_finish(&crc);
 }
