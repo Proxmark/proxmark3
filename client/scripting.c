@@ -19,7 +19,7 @@
 #include "usb_cmd.h"
 #include "cmdmain.h"
 #include "util.h"
-#include "mifarehost.h"
+#include "mifare/mifarehost.h"
 #include "../common/iso15693tools.h"
 #include "iso14443crc.h"
 #include "../common/crc16.h"

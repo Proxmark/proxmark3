@@ -23,13 +23,13 @@
 #include "util_posix.h"
 #include "usb_cmd.h"
 #include "ui.h"
-#include "mifarehost.h"
+#include "mifare/mifarehost.h"
 #include "mifare.h"
-#include "mfkey.h"
+#include "mifare/mfkey.h"
 #include "hardnested/hardnested_bf_core.h"
 #include "cliparser/cliparser.h"
 #include "cmdhf14a.h"
-#include "mifare4.h"
+#include "mifare/mifare4.h"
 
 #define NESTED_SECTOR_RETRY     10			// how often we try mfested() until we give up
 

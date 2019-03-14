@@ -27,7 +27,7 @@
 #include "cmdmain.h"
 #include "mifare.h"
 #include "cmdhfmfu.h"
-#include "mifarehost.h"
+#include "mifare/mifarehost.h"
 #include "cliparser/cliparser.h"
 #include "emv/apduinfo.h"
 #include "emv/emvcore.h"
