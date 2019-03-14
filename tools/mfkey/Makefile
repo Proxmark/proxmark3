@@ -1,4 +1,4 @@
-VPATH = ../../common ../../common/crapto1 ../../client
+VPATH = ../../common ../../common/crapto1 ../../client ../../client/mifare
 CC = gcc
 LD = gcc
 CFLAGS += -std=c99 -D_ISOC99_SOURCE -I../../include -I../../common -I../../client -Wall -O3
