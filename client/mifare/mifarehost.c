@@ -25,6 +25,7 @@
 #include "iso14443crc.h"
 
 #include "mifare.h"
+#include "mifare4.h"
 
 // mifare tracer flags used in mfTraceDecode()
 #define TRACE_IDLE		 				0x00
@@ -427,6 +428,32 @@ int mfnested(uint8_t blockNo, uint8_t keyType, uint8_t *key, uint8_t trgBlockNo,
 	free(statelists[1].head.slhead);
 
 	return 0;
+}
+
+// MIFARE
+int mfReadSector(uint8_t sectorNo, uint8_t keyType, uint8_t *key, uint8_t *data) {
+
+    UsbCommand c = {CMD_MIFARE_READSC, {sectorNo, keyType, 0}};
+    memcpy(c.d.asBytes, key, 6);
+    clearCommandBuffer();
+    SendCommand(&c);
+
+    UsbCommand resp;
+    if (WaitForResponseTimeout(CMD_ACK, &resp, 1500)) {
+        uint8_t isOK  = resp.arg[0] & 0xff;
+
+        if (isOK) {
+            memcpy(data, resp.d.asBytes, mfNumBlocksPerSector(sectorNo) * 16);
+            return 0;
+        } else {
+            return 1;
+        }
+    } else {
+        PrintAndLogEx(ERR, "Command execute timeout");
+        return 2;
+    }
+
+    return 0;
 }
 
 // EMULATOR

@@ -42,6 +42,8 @@ extern int mfnested(uint8_t blockNo, uint8_t keyType, uint8_t *key, uint8_t trgB
 extern int mfCheckKeys (uint8_t blockNo, uint8_t keyType, bool clear_trace, uint8_t keycnt, uint8_t *keyBlock, uint64_t *key);
 extern int mfCheckKeysSec(uint8_t sectorCnt, uint8_t keyType, uint8_t timeout14a, bool clear_trace, uint8_t keycnt, uint8_t * keyBlock, sector_t * e_sector);
 
+extern int mfReadSector(uint8_t sectorNo, uint8_t keyType, uint8_t *key, uint8_t *data);
+
 extern int mfEmlGetMem(uint8_t *data, int blockNum, int blocksCount);
 extern int mfEmlSetMem(uint8_t *data, int blockNum, int blocksCount);
 
