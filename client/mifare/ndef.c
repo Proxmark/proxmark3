@@ -12,6 +12,8 @@
 #include "ui.h"
 #include "emv/dump.h"
 #include "crypto/asn1utils.h"
+#include "util.h"
+#include <string.h>
 
 #define STRBOOL(p) ((p) ? "+" : "-")
 
