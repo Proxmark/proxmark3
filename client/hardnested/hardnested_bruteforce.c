@@ -86,6 +86,7 @@ static uint8_t bf_test_nonce_par[256];
 static uint32_t bucket_count = 0;
 static statelist_t* buckets[128];
 static uint32_t keys_found = 0;
+uint64_t cracked_key;
 static uint64_t num_keys_tested;
 
 
@@ -169,6 +170,7 @@ crack_states_thread(void* x){
             const uint64_t key = crack_states_bitsliced(thread_arg->cuid, thread_arg->best_first_bytes, bucket, &keys_found, &num_keys_tested, nonces_to_bruteforce, bf_test_nonce_2nd_byte, thread_arg->nonces);
             if(key != -1){
                 __sync_fetch_and_add(&keys_found, 1);
+				cracked_key = key;
 				char progress_text[80];
 				sprintf(progress_text, "Brute force phase completed. Key found: %012" PRIx64, key);
 				hardnested_print_progress(thread_arg->num_acquired_nonces, progress_text, 0.0, 0);
