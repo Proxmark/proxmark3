@@ -1490,11 +1490,8 @@ void  __attribute__((noreturn)) AppMain(void)
 	}
 	common_area.flags.osimage_present = 1;
 
-	LED_D_OFF();
-	LED_C_OFF();
-	LED_B_OFF();
-	LED_A_OFF();
-
+	LEDsoff();
+	
 	// Init USB device
 	usb_enable();
 
