@@ -810,10 +810,7 @@ done:
     AT91C_BASE_PDC_SSC->PDC_PTCR = AT91C_PDC_RXTDIS;
     Dbprintf("%x %x %x", maxBehindBy, Uart.state, Uart.byteCnt);
 	Dbprintf("%x %x %x", Uart.byteCntMax, BigBuf_get_traceLen(), (int)Uart.output[0]);
-    LED_A_OFF();
-    LED_B_OFF();
-    LED_C_OFF();
-    LED_D_OFF();
+    LEDsoff();
 }
 
 void rotateCSN(uint8_t* originalCSN, uint8_t* rotatedCSN) {
