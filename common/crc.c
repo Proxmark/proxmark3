@@ -9,9 +9,7 @@
 #include <stdint.h>
 #include <stddef.h>
 
-#ifndef BITMASK
-# define BITMASK(X) (1 << (X))
-#endif
+#define BITMASK(X) (1 << (X))
 
 uint32_t reflect(uint32_t v, int b) {
     uint32_t t = v;
