@@ -26,13 +26,10 @@ uint32_t reflect(uint32_t v, int b) {
 void crc_init(crc_t *crc, int order, uint32_t polynom, uint32_t initial_value, uint32_t final_xor)
 {
 	crc->order = order;
-    crc->topbit = BITMASK(order - 1);
 	crc->polynom = polynom;
 	crc->initial_value = initial_value;
 	crc->final_xor = final_xor;
 	crc->mask = (1L<<order)-1;
-    crc->refin = false;
-    crc->refout = false;
 	crc_clear(crc);
 }
 
@@ -49,28 +46,9 @@ void crc_update(crc_t *crc, uint32_t data, int data_width)
 	}
 }
 
-void crc_update2(crc_t *crc, uint32_t data, int data_width) {
-
-    if (crc->refin)
-        data = reflect(data, data_width);
-
-    // Bring the next byte into the remainder.
-    crc->state ^= data << (crc->order - data_width);
-
-    for (uint8_t bit = data_width; bit > 0; --bit) {
-
-        if (crc->state & crc->topbit)
-            crc->state = (crc->state << 1) ^ crc->polynom;
-        else
-            crc->state = (crc->state << 1);
-    }
-}
-
 void crc_clear(crc_t *crc)
 {
 	crc->state = crc->initial_value & crc->mask;
-    if (crc->refin)
-        crc->state = reflect(crc->state, crc->order);
 }
 
 uint32_t crc_finish(crc_t *crc)

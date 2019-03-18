@@ -20,9 +20,6 @@ typedef struct crc {
 	uint32_t initial_value;
 	uint32_t final_xor;
 	uint32_t mask;
-    int topbit;
-    bool refin;    /* Parameter: Reflect input bytes?        */
-    bool refout;   /* Parameter: Reflect output CRC?         */
 } crc_t;
 
 /* Initialize a crc structure. order is the order of the polynom, e.g. 32 for a CRC-32
