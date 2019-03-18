@@ -94,8 +94,9 @@ uint32_t CRC8Maxim(uint8_t *buff, size_t size)
 // width=8 poly=0x1d, init=0xc7 (0xe3 - WRONG! but it mentioned in MAD datasheet) refin=false  refout=false  xorout=0x00 name="CRC-8/MIFARE-MAD"
 uint32_t CRC8Mad(uint8_t *buff, size_t size) {
     crc_t crc;
-    crc_init(&crc, 8, 0x1d, 0xc7, 0);
+    crc_init(&crc, 8, reflect(0x1d, 8), reflect(0xc7, 8), 0);
     for (int i = 0; i < size; ++i)
-        crc_update2(&crc, buff[i], 8);
-    return crc_finish(&crc);
+        crc_update(&crc, reflect(buff[i], 8), 8);
+
+    return reflect(crc_finish(&crc), 8);
 }
