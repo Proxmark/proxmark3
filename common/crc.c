@@ -9,6 +9,20 @@
 #include <stdint.h>
 #include <stddef.h>
 
+#define BITMASK(X) (1 << (X))
+
+uint32_t reflect(uint32_t v, int b) {
+    uint32_t t = v;
+    for (int i = 0; i < b; ++i) {
+        if (t & 1)
+            v |=  BITMASK((b - 1) - i);
+        else
+            v &= ~BITMASK((b - 1) - i);
+        t >>= 1;
+    }
+    return v;
+}
+
 void crc_init(crc_t *crc, int order, uint32_t polynom, uint32_t initial_value, uint32_t final_xor)
 {
 	crc->order = order;
@@ -53,4 +67,14 @@ uint32_t CRC8Maxim(uint8_t *buff, size_t size)
 		crc_update(&crc, buff[i], 8);
 	}
 	return crc_finish(&crc);
+}
+
+// width=8 poly=0x1d, init=0xc7 (0xe3 - WRONG! but it mentioned in MAD datasheet) refin=false  refout=false  xorout=0x00 name="CRC-8/MIFARE-MAD"
+uint32_t CRC8Mad(uint8_t *buff, size_t size) {
+    crc_t crc;
+    crc_init(&crc, 8, reflect(0x1d, 8), reflect(0xc7, 8), 0);
+    for (int i = 0; i < size; ++i)
+        crc_update(&crc, reflect(buff[i], 8), 8);
+
+    return reflect(crc_finish(&crc), 8);
 }

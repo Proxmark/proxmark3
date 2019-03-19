@@ -134,15 +134,17 @@ CMDSRCS = 	$(SRC_SMARTCARD) \
 			fido/cose.c \
 			fido/cbortools.c \
 			fido/fidocore.c \
-			mfkey.c \
+			mifare/mfkey.c \
 			loclass/cipher.c \
 			loclass/cipherutils.c \
 			loclass/ikeys.c \
 			loclass/elite_crack.c\
 			loclass/fileutils.c\
 			whereami.c\
-			mifarehost.c\
-			mifare4.c\
+			mifare/mifarehost.c\
+			mifare/mifare4.c\
+			mifare/mad.c \
+			mifare/ndef.c \
 			parity.c\
 			crc.c \
 			crc16.c \

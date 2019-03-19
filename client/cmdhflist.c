@@ -24,8 +24,8 @@
 #include "parity.h"
 #include "protocols.h"
 #include "crapto1/crapto1.h"
-#include "mifarehost.h"
-#include "mifaredefault.h"
+#include "mifare/mifarehost.h"
+#include "mifare/mifaredefault.h"
 #include "usb_cmd.h"
 #include "pcsc.h"
 
