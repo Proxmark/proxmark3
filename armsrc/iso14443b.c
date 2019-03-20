@@ -327,6 +327,7 @@ static int GetIso14443bCommandFromReader(uint8_t *received, uint16_t *len)
 //-----------------------------------------------------------------------------
 void SimulateIso14443bTag(void)
 {
+	LED_A_ON();
 	// the only commands we understand is WUPB, AFI=0, Select All, N=1:
 	static const uint8_t cmd1[] = { 0x05, 0x00, 0x08, 0x39, 0x73 }; // WUPB
 	// ... and REQB, AFI=0, Normal Request, N=1:
@@ -465,6 +466,9 @@ void SimulateIso14443bTag(void)
 		LogTrace(resp, respLen, 0, 0, NULL, false);
 
 	}
+	
+	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
+	LED_A_OFF();
 }
 
 //=============================================================================
@@ -861,6 +865,7 @@ static void CodeAndTransmit14443bAsReader(const uint8_t *cmd, int len)
  */
 int iso14443b_apdu(uint8_t const *message, size_t message_length, uint8_t *response)
 {
+	LED_A_ON();
 	uint8_t message_frame[message_length + 4];
 	// PCB
 	message_frame[0] = 0x0A | pcb_blocknum;
@@ -875,8 +880,10 @@ int iso14443b_apdu(uint8_t const *message, size_t message_length, uint8_t *respo
 	CodeAndTransmit14443bAsReader(message_frame, message_length + 4);
 	// get response
 	GetSamplesFor14443bDemod(RECEIVE_SAMPLES_TIMEOUT, true);
+	FpgaDisableTracing();
 	if(Demod.len < 3)
 	{
+		LED_A_OFF();
 		return 0;
 	}
 	// TODO: Check CRC
@@ -885,6 +892,7 @@ int iso14443b_apdu(uint8_t const *message, size_t message_length, uint8_t *respo
 	{
 		memcpy(response, Demod.output, Demod.len);
 	}
+	LED_A_OFF();
 	return Demod.len;
 }
 
@@ -957,6 +965,7 @@ void iso14443b_setup() {
 //-----------------------------------------------------------------------------
 void ReadSTMemoryIso14443b(uint32_t dwLast)
 {
+	LED_A_ON();
 	uint8_t i = 0x00;
 
 	FpgaDownloadAndGo(FPGA_BITSTREAM_HF);
@@ -984,9 +993,9 @@ void ReadSTMemoryIso14443b(uint32_t dwLast)
 	GetSamplesFor14443bDemod(RECEIVE_SAMPLES_TIMEOUT, true);
 
 	if (Demod.len == 0) {
-		DbpString("No response from tag");
-		LED_D_OFF();
 		FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
+		DbpString("No response from tag");
+		LEDsoff();
 		return;
 	} else {
 		Dbprintf("Randomly generated Chip ID (+ 2 byte CRC): %02x %02x %02x",
@@ -1001,24 +1010,24 @@ void ReadSTMemoryIso14443b(uint32_t dwLast)
 	CodeAndTransmit14443bAsReader(cmd1, sizeof(cmd1));
 	GetSamplesFor14443bDemod(RECEIVE_SAMPLES_TIMEOUT, true);
 	if (Demod.len != 3) {
-		Dbprintf("Expected 3 bytes from tag, got %d", Demod.len);
-		LED_D_OFF();
 		FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
+		Dbprintf("Expected 3 bytes from tag, got %d", Demod.len);
+		LEDsoff();
 		return;
 	}
 	// Check the CRC of the answer:
 	ComputeCrc14443(CRC_14443_B, Demod.output, 1 , &cmd1[2], &cmd1[3]);
 	if(cmd1[2] != Demod.output[1] || cmd1[3] != Demod.output[2]) {
-		DbpString("CRC Error reading select response.");
-		LED_D_OFF();
 		FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
+		DbpString("CRC Error reading select response.");
+		LEDsoff();
 		return;
 	}
 	// Check response from the tag: should be the same UID as the command we just sent:
 	if (cmd1[1] != Demod.output[0]) {
-		Dbprintf("Bad response to SELECT from Tag, aborting: %02x %02x", cmd1[1], Demod.output[0]);
-		LED_D_OFF();
 		FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
+		Dbprintf("Bad response to SELECT from Tag, aborting: %02x %02x", cmd1[1], Demod.output[0]);
+		LEDsoff();
 		return;
 	}
 
@@ -1029,9 +1038,9 @@ void ReadSTMemoryIso14443b(uint32_t dwLast)
 	CodeAndTransmit14443bAsReader(cmd1, 3); // Only first three bytes for this one
 	GetSamplesFor14443bDemod(RECEIVE_SAMPLES_TIMEOUT, true);
 	if (Demod.len != 10) {
-		Dbprintf("Expected 10 bytes from tag, got %d", Demod.len);
-		LED_D_OFF();
 		FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
+		Dbprintf("Expected 10 bytes from tag, got %d", Demod.len);
+		LEDsoff();
 		return;
 	}
 	// The check the CRC of the answer (use cmd1 as temporary variable):
@@ -1060,9 +1069,9 @@ void ReadSTMemoryIso14443b(uint32_t dwLast)
 		CodeAndTransmit14443bAsReader(cmd1, sizeof(cmd1));
 		GetSamplesFor14443bDemod(RECEIVE_SAMPLES_TIMEOUT, true);
 		if (Demod.len != 6) { // Check if we got an answer from the tag
-			DbpString("Expected 6 bytes from tag, got less...");
-			LED_D_OFF();
 			FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
+			DbpString("Expected 6 bytes from tag, got less...");
+			LEDsoff();
 			return;
 		}
 		// The check the CRC of the answer (use cmd1 as temporary variable):
@@ -1082,8 +1091,8 @@ void ReadSTMemoryIso14443b(uint32_t dwLast)
 		i++;
 	}
 	
-	LED_D_OFF();
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
+	LEDsoff();
 }
 
 
@@ -1106,6 +1115,7 @@ void ReadSTMemoryIso14443b(uint32_t dwLast)
  */
 void RAMFUNC SnoopIso14443b(void)
 {
+	LED_A_ON();
 	FpgaDownloadAndGo(FPGA_BITSTREAM_HF);
 	BigBuf_free();
 
@@ -1221,13 +1231,13 @@ void RAMFUNC SnoopIso14443b(void)
 	}
 
 	FpgaDisableSscDma();
-	LEDsoff();
 	DbpString("Snoop statistics:");
 	Dbprintf("  Max behind by: %i", maxBehindBy);
 	Dbprintf("  Uart State: %x", Uart.state);
 	Dbprintf("  Uart ByteCnt: %i", Uart.byteCnt);
 	Dbprintf("  Uart ByteCntMax: %i", Uart.byteCntMax);
 	Dbprintf("  Trace length: %i", BigBuf_get_traceLen());
+	LEDsoff();
 }
 
 
@@ -1260,9 +1270,12 @@ void SendRawCommand14443B(uint32_t datalen, uint32_t recv, uint8_t powerfield, u
 
 		if(recv) {
 			GetSamplesFor14443bDemod(RECEIVE_SAMPLES_TIMEOUT, true);
+			FpgaDisableTracing();
 			uint16_t iLen = MIN(Demod.len, USB_CMD_DATA_SIZE);
 			cmd_send(CMD_ACK, iLen, 0, 0, Demod.output, iLen);
 		}
+
+		FpgaDisableTracing();
 	}
 
 	if(!powerfield) {

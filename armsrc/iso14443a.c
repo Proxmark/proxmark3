@@ -2591,12 +2591,12 @@ void RAMFUNC SniffMifare(uint8_t param) {
 
 	} // main cycle
 
+	FpgaDisableTracing();
 	FpgaDisableSscDma();
 	LEDsoff();
 
 	DbpString("COMMAND FINISHED.");
 
-	FpgaDisableTracing();
 	MfSniffEnd();
 	
 	Dbprintf("maxDataLen=%x, Uart.state=%x, Uart.len=%x", maxDataLen, Uart.state, Uart.len);
