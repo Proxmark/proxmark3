@@ -80,11 +80,14 @@ static int DEBUG = 0;
 #define ISO15693_MAX_RESPONSE_LENGTH     36 // allows read single block with the maximum block size of 256bits. Read multiple blocks not supported yet
 #define ISO15693_MAX_COMMAND_LENGTH      45 // allows write single block with the maximum block size of 256bits. Write multiple blocks not supported yet
 
-// timing. Delays in SSP_CLK ticks.
-#define DELAY_READER_TO_ARM            8
-#define DELAY_ARM_TO_READER            1
-#define DELAY_ISO15693_VCD_TO_VICC   132 // 132/423.75kHz = 311.5us from end of EOF to start of tag response
-#define DELAY_ISO15693_VICC_TO_VCD  1017 // 1017/3.39MHz = 300us between end of tag response and next reader command
+// timing. Delays in SSP_CLK ticks. 
+// SSP_CLK runs at 13,56MHz / 32 = 423.75kHz when simulating a tag
+#define DELAY_READER_TO_ARM_SIM           8
+#define DELAY_ARM_TO_READER_SIM           1
+#define DELAY_ISO15693_VCD_TO_VICC_SIM    132  // 132/423.75kHz = 311.5us from end of command EOF to start of tag response
+//SSP_CLK runs at 13.56MHz / 4 = 3,39MHz when acting as reader
+#define DELAY_ISO15693_VCD_TO_VICC_READER 1056 // 1056/3,39MHz = 311.5us from end of command EOF to start of tag response
+#define DELAY_ISO15693_VICC_TO_VCD_READER 1017 // 1017/3.39MHz = 300us between end of tag response and next reader command
 
 // ---------------------------
 // Signal Processing
@@ -269,21 +272,27 @@ static void CodeIso15693AsTag(uint8_t *cmd, int n)
 // Transmit the command (to the tag) that was placed in cmd[].
 static void TransmitTo15693Tag(const uint8_t *cmd, int len, uint32_t start_time)
 {
-	FpgaSetupSsc(FPGA_MAJOR_MODE_HF_READER_TX);
-	FpgaWriteConfWord(FPGA_MAJOR_MODE_HF_READER_TX);
+	FpgaWriteConfWord(FPGA_MAJOR_MODE_HF_READER | FPGA_HF_READER_MODE_SEND_FULL_MOD);
+	FpgaSetupSsc(FPGA_MAJOR_MODE_HF_READER);
 
-	while (GetCountSspClk() < start_time);
+	while (GetCountSspClk() < start_time) ;
 
 	LED_B_ON();
-    for(int c = 0; c < len; ) {
-        if(AT91C_BASE_SSC->SSC_SR & (AT91C_SSC_TXRDY)) {
-            AT91C_BASE_SSC->SSC_THR = ~cmd[c];
-            c++;
-        }
-        WDT_HIT();
-    }
+	for(int c = 0; c < len; c++) {
+		uint8_t data = cmd[c];
+		for (int i = 0; i < 8; i++) {
+			uint16_t send_word = (data & 0x80) ? 0x0000 : 0xffff;
+			while (!(AT91C_BASE_SSC->SSC_SR & (AT91C_SSC_TXRDY))) ;
+			AT91C_BASE_SSC->SSC_THR = send_word;
+			while (!(AT91C_BASE_SSC->SSC_SR & (AT91C_SSC_TXRDY))) ;
+			AT91C_BASE_SSC->SSC_THR = send_word;
+			data <<= 1;
+		}
+		WDT_HIT();
+	}
 	LED_B_OFF();
 }
+
 
 //-----------------------------------------------------------------------------
 // Transmit the tag response (to the reader) that was placed in cmd[].
@@ -562,10 +571,10 @@ static int GetIso15693AnswerFromTag(uint8_t* response, uint16_t max_len, int tim
 	while (!(AT91C_BASE_SSC->SSC_SR & AT91C_SSC_TXEMPTY));
 
 	// And put the FPGA in the appropriate mode
-	FpgaWriteConfWord(FPGA_MAJOR_MODE_HF_READER_RX_XCORR | FPGA_HF_READER_RX_XCORR_AMPLITUDE);
+	FpgaWriteConfWord(FPGA_MAJOR_MODE_HF_READER | FPGA_HF_READER_SUBCARRIER_424_KHZ | FPGA_HF_READER_MODE_RECEIVE_AMPLITUDE);
 
 	// Setup and start DMA.
-	FpgaSetupSsc(FPGA_MAJOR_MODE_HF_READER_RX_XCORR);
+	FpgaSetupSsc(FPGA_MAJOR_MODE_HF_READER);
 	FpgaSetupSscDma((uint8_t*) dmaBuf, ISO15693_DMA_BUFFER_SIZE);
 	uint16_t *upTo = dmaBuf;
 
@@ -927,7 +936,7 @@ static int GetIso15693CommandFromReader(uint8_t *received, size_t max_len, uint3
 
 		for (int i = 7; i >= 0; i--) {
 			if (Handle15693SampleFromReader((b >> i) & 0x01, &DecodeReader)) {
-				*eof_time = bit_time + samples - DELAY_READER_TO_ARM; // end of EOF
+				*eof_time = bit_time + samples - DELAY_READER_TO_ARM_SIM; // end of EOF
 				gotFrame = true;
 				break;
 			}
@@ -954,7 +963,7 @@ static int GetIso15693CommandFromReader(uint8_t *received, size_t max_len, uint3
 	                    samples, gotFrame, DecodeReader.state, DecodeReader.byteCount, DecodeReader.bitCount, DecodeReader.posCount);
 
 	if (DecodeReader.byteCount > 0) {
-		LogTrace(DecodeReader.output, DecodeReader.byteCount, 0, 0, NULL, true);
+		LogTrace(DecodeReader.output, DecodeReader.byteCount, 0, *eof_time, NULL, true);
 	}
 
 	return DecodeReader.byteCount;
@@ -997,34 +1006,23 @@ void AcquireRawAdcSamplesIso15693(void)
 	uint8_t *dest = BigBuf_get_addr();
 
 	FpgaDownloadAndGo(FPGA_BITSTREAM_HF);
-	BuildIdentifyRequest();
-
+	FpgaWriteConfWord(FPGA_MAJOR_MODE_HF_READER);
+	FpgaSetupSsc(FPGA_MAJOR_MODE_HF_READER);
 	SetAdcMuxFor(GPIO_MUXSEL_HIPKD);
+
+	BuildIdentifyRequest();
 
 	// Give the tags time to energize
 	LED_D_ON();
-	FpgaWriteConfWord(FPGA_MAJOR_MODE_HF_READER_RX_XCORR);
 	SpinDelay(100);
 
 	// Now send the command
-	FpgaSetupSsc(FPGA_MAJOR_MODE_HF_READER_TX);
-	FpgaWriteConfWord(FPGA_MAJOR_MODE_HF_READER_TX);
-
-	LED_B_ON();
-	for(int c = 0; c < ToSendMax; ) {
-		if(AT91C_BASE_SSC->SSC_SR & (AT91C_SSC_TXRDY)) {
-			AT91C_BASE_SSC->SSC_THR = ~ToSend[c];
-			c++;
-		}
-		WDT_HIT();
-	}
-	LED_B_OFF();
+	TransmitTo15693Tag(ToSend, ToSendMax, 0);
 
 	// wait for last transfer to complete
-	while (!(AT91C_BASE_SSC->SSC_SR & AT91C_SSC_TXEMPTY));
+	while (!(AT91C_BASE_SSC->SSC_SR & AT91C_SSC_TXEMPTY)) ;
 
-	FpgaSetupSsc(FPGA_MAJOR_MODE_HF_READER_RX_XCORR);
-	FpgaWriteConfWord(FPGA_MAJOR_MODE_HF_READER_RX_XCORR | FPGA_HF_READER_RX_XCORR_AMPLITUDE);
+	FpgaWriteConfWord(FPGA_MAJOR_MODE_HF_READER | FPGA_HF_READER_SUBCARRIER_424_KHZ | FPGA_HF_READER_MODE_RECEIVE_AMPLITUDE);
 
 	for(int c = 0; c < 4000; ) {
 		if(AT91C_BASE_SSC->SSC_SR & (AT91C_SSC_RXRDY)) {
@@ -1046,7 +1044,6 @@ void SnoopIso15693(void)
 
 	clear_trace();
 	set_tracing(true);
-
 
 	// The DMA buffer, used to stream samples from the FPGA
 	uint16_t* dmaBuf = (uint16_t*)BigBuf_malloc(ISO15693_DMA_BUFFER_SIZE*sizeof(uint16_t));
@@ -1072,13 +1069,13 @@ void SnoopIso15693(void)
 		Dbprintf("  tag -> Reader: %i bytes", ISO15693_MAX_RESPONSE_LENGTH);
 		Dbprintf("  DMA:           %i bytes", ISO15693_DMA_BUFFER_SIZE * sizeof(uint16_t));
 	}
-	Dbprintf("Snoop started. Press button to stop.");
+	Dbprintf("Snoop started. Press PM3 Button to stop.");
 	
-	FpgaWriteConfWord(FPGA_MAJOR_MODE_HF_READER_RX_XCORR | FPGA_HF_READER_RX_XCORR_SNOOP | FPGA_HF_READER_RX_XCORR_AMPLITUDE);
+	FpgaWriteConfWord(FPGA_MAJOR_MODE_HF_READER | FPGA_HF_READER_MODE_SNOOP_AMPLITUDE);
 	SetAdcMuxFor(GPIO_MUXSEL_HIPKD);
 
 	// Setup for the DMA.
-	FpgaSetupSsc(FPGA_MAJOR_MODE_HF_READER_RX_XCORR);
+	FpgaSetupSsc(FPGA_MAJOR_MODE_HF_READER);
 	upTo = dmaBuf;
 	FpgaSetupSscDma((uint8_t*) dmaBuf, ISO15693_DMA_BUFFER_SIZE);
 
@@ -1173,7 +1170,6 @@ void SnoopIso15693(void)
 
 
 // Initialize the proxmark as iso15k reader
-// (this might produces glitches that confuse some tags
 static void Iso15693InitReader() {
 	FpgaDownloadAndGo(FPGA_BITSTREAM_HF);
 	// Setup SSC
@@ -1185,11 +1181,11 @@ static void Iso15693InitReader() {
 	SpinDelay(10);
 
 	SetAdcMuxFor(GPIO_MUXSEL_HIPKD);
-	FpgaSetupSsc(FPGA_MAJOR_MODE_HF_READER_RX_XCORR);
+	FpgaSetupSsc(FPGA_MAJOR_MODE_HF_READER);
 
 	// Give the tags time to energize
 	LED_D_ON();
-	FpgaWriteConfWord(FPGA_MAJOR_MODE_HF_READER_RX_XCORR);
+	FpgaWriteConfWord(FPGA_MAJOR_MODE_HF_READER);
 	SpinDelay(250);
 }
 
@@ -1284,7 +1280,7 @@ int SendDataTag(uint8_t *send, int sendlen, bool init, int speed, uint8_t *recv,
 
 	// Now wait for a response
 	if (recv != NULL) {
-		answerLen = GetIso15693AnswerFromTag(recv, max_recv_len, DELAY_ISO15693_VCD_TO_VICC * 2);
+		answerLen = GetIso15693AnswerFromTag(recv, max_recv_len, DELAY_ISO15693_VCD_TO_VICC_READER * 2);
 	}
 
 	LED_A_OFF();
@@ -1368,10 +1364,10 @@ void SetDebugIso15693(uint32_t debug) {
 }
 
 
-//-----------------------------------------------------------------------------
-// Simulate an ISO15693 reader, perform anti-collision and then attempt to read a sector
+//---------------------------------------------------------------------------------------
+// Simulate an ISO15693 reader, perform anti-collision and then attempt to read a sector.
 // all demodulation performed in arm rather than host. - greg
-//-----------------------------------------------------------------------------
+//---------------------------------------------------------------------------------------
 void ReaderIso15693(uint32_t parameter)
 {
 	LEDsoff();
@@ -1388,7 +1384,7 @@ void ReaderIso15693(uint32_t parameter)
 
 	SetAdcMuxFor(GPIO_MUXSEL_HIPKD);
 	// Setup SSC
-	FpgaSetupSsc(FPGA_MAJOR_MODE_HF_READER_RX_XCORR);
+	FpgaSetupSsc(FPGA_MAJOR_MODE_HF_READER);
 
 	// Start from off (no field generated)
    	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
@@ -1396,7 +1392,7 @@ void ReaderIso15693(uint32_t parameter)
 
 	// Give the tags time to energize
 	LED_D_ON();
-	FpgaWriteConfWord(FPGA_MAJOR_MODE_HF_READER_RX_XCORR);
+	FpgaWriteConfWord(FPGA_MAJOR_MODE_HF_READER);
 	SpinDelay(200);
 	StartCountSspClk();
 
@@ -1407,10 +1403,10 @@ void ReaderIso15693(uint32_t parameter)
 	// Now send the IDENTIFY command
 	BuildIdentifyRequest();
 	TransmitTo15693Tag(ToSend, ToSendMax, 0);
-
+	
 	// Now wait for a response
-	answerLen = GetIso15693AnswerFromTag(answer, sizeof(answer), DELAY_ISO15693_VCD_TO_VICC * 2) ;
-	uint32_t start_time = GetCountSspClk() + DELAY_ISO15693_VICC_TO_VCD;
+	answerLen = GetIso15693AnswerFromTag(answer, sizeof(answer), DELAY_ISO15693_VCD_TO_VICC_READER * 2) ;
+	uint32_t start_time = GetCountSspClk() + DELAY_ISO15693_VICC_TO_VCD_READER;
 
 	if (answerLen >=12) // we should do a better check than this
 	{
@@ -1446,22 +1442,17 @@ void ReaderIso15693(uint32_t parameter)
 
 	// read all pages
 	if (answerLen >= 12 && DEBUG) {
-
-		// debugptr = BigBuf_get_addr();
-
-		int i = 0;
-		while (i < 32) {  // sanity check, assume max 32 pages
+		for (int i = 0; i < 32; i++) {  // sanity check, assume max 32 pages
 			BuildReadBlockRequest(TagUID, i);
 			TransmitTo15693Tag(ToSend, ToSendMax, start_time);
-			int answerLen = GetIso15693AnswerFromTag(answer, sizeof(answer), DELAY_ISO15693_VCD_TO_VICC * 2);
-			start_time = GetCountSspClk() + DELAY_ISO15693_VICC_TO_VCD;
+			int answerLen = GetIso15693AnswerFromTag(answer, sizeof(answer), DELAY_ISO15693_VCD_TO_VICC_READER * 2);
+			start_time = GetCountSspClk() + DELAY_ISO15693_VICC_TO_VCD_READER;
 			if (answerLen > 0) {
 				Dbprintf("READ SINGLE BLOCK %d returned %d octets:", i, answerLen);
 				DbdecodeIso15693Answer(answerLen, answer);
 				Dbhexdump(answerLen, answer, false);
 				if ( *((uint32_t*) answer) == 0x07160101 ) break; // exit on NoPageErr
 			}
-			i++;
 		}
 	}
 
@@ -1501,7 +1492,7 @@ void SimTagIso15693(uint32_t parameter, uint8_t *uid)
 
 		if ((cmd_len >= 5) && (cmd[0] & ISO15693_REQ_INVENTORY) && (cmd[1] == ISO15693_INVENTORY)) { // TODO: check more flags
 			bool slow = !(cmd[0] & ISO15693_REQ_DATARATE_HIGH);
-			start_time = eof_time + DELAY_ISO15693_VCD_TO_VICC - DELAY_ARM_TO_READER;
+			start_time = eof_time + DELAY_ISO15693_VCD_TO_VICC_SIM - DELAY_ARM_TO_READER_SIM;
 			TransmitTo15693Reader(ToSend, ToSendMax, start_time, slow);
 		}
 
@@ -1509,6 +1500,7 @@ void SimTagIso15693(uint32_t parameter, uint8_t *uid)
 		Dbhexdump(cmd_len, cmd, false);
 	}
 
+   	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
 	LEDsoff();
 }
 
@@ -1536,7 +1528,7 @@ void BruteforceIso15693Afi(uint32_t speed)
 	data[2] = 0; // mask length
 	datalen = AddCrc(data,3);
 	recvlen = SendDataTag(data, datalen, false, speed, recv, sizeof(recv), 0);
-	uint32_t start_time = GetCountSspClk() + DELAY_ISO15693_VCD_TO_VICC;
+	uint32_t start_time = GetCountSspClk() + DELAY_ISO15693_VICC_TO_VCD_READER;
 	WDT_HIT();
 	if (recvlen>=12) {
 		Dbprintf("NoAFI UID=%s", sprintUID(NULL, &recv[2]));
@@ -1553,7 +1545,7 @@ void BruteforceIso15693Afi(uint32_t speed)
 		data[2] = i & 0xFF;
 		datalen = AddCrc(data,4);
 		recvlen = SendDataTag(data, datalen, false, speed, recv, sizeof(recv), start_time);
-		start_time = GetCountSspClk() + DELAY_ISO15693_VCD_TO_VICC;
+		start_time = GetCountSspClk() + DELAY_ISO15693_VICC_TO_VCD_READER;
 		WDT_HIT();
 		if (recvlen >= 12) {
 			Dbprintf("AFI=%i UID=%s", i, sprintUID(NULL, &recv[2]));
@@ -1614,8 +1606,8 @@ static void __attribute__((unused)) BuildSysInfoRequest(uint8_t *uid)
 	uint8_t cmd[12];
 
 	uint16_t crc;
-	// If we set the Option_Flag in this request, the VICC will respond with the secuirty status of the block
-	// followed by teh block data
+	// If we set the Option_Flag in this request, the VICC will respond with the security status of the block
+	// followed by the block data
 	// one sub-carrier, inventory, 1 slot, fast rate
 	cmd[0] =  (1 << 5) | (1 << 1); // no SELECT bit
 	// System Information command code
@@ -1645,8 +1637,8 @@ static void __attribute__((unused)) BuildReadMultiBlockRequest(uint8_t *uid)
 	uint8_t cmd[14];
 
 	uint16_t crc;
-	// If we set the Option_Flag in this request, the VICC will respond with the secuirty status of the block
-	// followed by teh block data
+	// If we set the Option_Flag in this request, the VICC will respond with the security status of the block
+	// followed by the block data
 	// one sub-carrier, inventory, 1 slot, fast rate
 	cmd[0] =  (1 << 5) | (1 << 1); // no SELECT bit
 	// READ Multi BLOCK command code
@@ -1679,8 +1671,8 @@ static void __attribute__((unused)) BuildArbitraryRequest(uint8_t *uid,uint8_t C
 	uint8_t cmd[14];
 
 	uint16_t crc;
-	// If we set the Option_Flag in this request, the VICC will respond with the secuirty status of the block
-	// followed by teh block data
+	// If we set the Option_Flag in this request, the VICC will respond with the security status of the block
+	// followed by the block data
 	// one sub-carrier, inventory, 1 slot, fast rate
 	cmd[0] =   (1 << 5) | (1 << 1); // no SELECT bit
 	// READ BLOCK command code
@@ -1714,8 +1706,8 @@ static void __attribute__((unused)) BuildArbitraryCustomRequest(uint8_t uid[], u
 	uint8_t cmd[14];
 
 	uint16_t crc;
-	// If we set the Option_Flag in this request, the VICC will respond with the secuirty status of the block
-	// followed by teh block data
+	// If we set the Option_Flag in this request, the VICC will respond with the security status of the block
+	// followed by the block data
 	// one sub-carrier, inventory, 1 slot, fast rate
 	cmd[0] =   (1 << 5) | (1 << 1); // no SELECT bit
 	// READ BLOCK command code
@@ -1731,7 +1723,7 @@ static void __attribute__((unused)) BuildArbitraryCustomRequest(uint8_t uid[], u
 	cmd[8] = 0x05;
 	cmd[9]= 0xe0; // always e0 (not exactly unique)
 	// Parameter
-	cmd[10] = 0x05; // for custom codes this must be manufcturer code
+	cmd[10] = 0x05; // for custom codes this must be manufacturer code
 	cmd[11] = 0x00;
 
 //	cmd[12] = 0x00;

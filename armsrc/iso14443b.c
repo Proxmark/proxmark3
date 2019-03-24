@@ -18,8 +18,9 @@
 #include "string.h"
 #include "iso14443crc.h"
 #include "fpgaloader.h"
+#include "BigBuf.h"
 
-#define RECEIVE_SAMPLES_TIMEOUT 1000 // TR0 max is 256/fs = 256/(848kHz) = 302us or 64 samples from FPGA. 1000 seems to be much too high?
+#define RECEIVE_SAMPLES_TIMEOUT 64 // TR0 max is 256/fs = 256/(848kHz) = 302us or 64 samples from FPGA
 #define ISO14443B_DMA_BUFFER_SIZE 128
 
 // PCB Block number for APDUs
@@ -692,7 +693,7 @@ static void DemodInit(uint8_t *data)
  *  Demodulate the samples we received from the tag, also log to tracebuffer
  *  quiet: set to 'true' to disable debug output
  */
-static void GetSamplesFor14443bDemod(int n, bool quiet)
+static void GetSamplesFor14443bDemod(int timeout, bool quiet)
 {
 	int maxBehindBy = 0;
 	bool gotFrame = false;
@@ -716,7 +717,7 @@ static void GetSamplesFor14443bDemod(int n, bool quiet)
 	while (!(AT91C_BASE_SSC->SSC_SR & AT91C_SSC_TXEMPTY))
 
 	// Setup and start DMA.
-	FpgaSetupSsc(FPGA_MAJOR_MODE_HF_READER_RX_XCORR);
+	FpgaSetupSsc(FPGA_MAJOR_MODE_HF_READER);
 	FpgaSetupSscDma((uint8_t*) dmaBuf, ISO14443B_DMA_BUFFER_SIZE);
 
 	uint16_t *upTo = dmaBuf;
@@ -725,7 +726,7 @@ static void GetSamplesFor14443bDemod(int n, bool quiet)
 	// Signal field is ON with the appropriate LED:
 	LED_D_ON();
 	// And put the FPGA in the appropriate mode
-	FpgaWriteConfWord(FPGA_MAJOR_MODE_HF_READER_RX_XCORR | FPGA_HF_READER_RX_XCORR_848_KHZ);
+	FpgaWriteConfWord(FPGA_MAJOR_MODE_HF_READER | FPGA_HF_READER_SUBCARRIER_848_KHZ | FPGA_HF_READER_MODE_RECEIVE_IQ);
 
 	for(;;) {
 		int behindBy = (lastRxCounter - AT91C_BASE_PDC_SSC->PDC_RCR) & (ISO14443B_DMA_BUFFER_SIZE-1);
@@ -754,7 +755,8 @@ static void GetSamplesFor14443bDemod(int n, bool quiet)
 			break;
 		}
 
-		if(samples > n) {
+		if(samples > timeout && Demod.state < DEMOD_PHASE_REF_TRAINING) {
+			LED_C_OFF();
 			break;
 		}
 	}
@@ -774,28 +776,21 @@ static void GetSamplesFor14443bDemod(int n, bool quiet)
 //-----------------------------------------------------------------------------
 static void TransmitFor14443b(void)
 {
-	int c;
-
-	FpgaSetupSsc(FPGA_MAJOR_MODE_HF_READER_TX);
-
-	// Signal field is ON with the appropriate Red LED
-	LED_D_ON();
-	// Signal we are transmitting with the Green LED
+	FpgaWriteConfWord(FPGA_MAJOR_MODE_HF_READER | FPGA_HF_READER_MODE_SEND_SHALLOW_MOD);
 	LED_B_ON();
-	FpgaWriteConfWord(FPGA_MAJOR_MODE_HF_READER_TX | FPGA_HF_READER_TX_SHALLOW_MOD);
-
-	c = 0;
-	for(;;) {
-		if(AT91C_BASE_SSC->SSC_SR & (AT91C_SSC_TXRDY)) {
-			AT91C_BASE_SSC->SSC_THR = ~ToSend[c];
-			c++;
-			if(c >= ToSendMax) {
-				break;
-			}
+	for(int c = 0; c < ToSendMax; c++) {
+		uint8_t data = ToSend[c];
+		for (int i = 0; i < 8; i++) {
+			uint16_t send_word = (data & 0x80) ? 0x0000 : 0xffff;
+			while (!(AT91C_BASE_SSC->SSC_SR & (AT91C_SSC_TXRDY))) ;
+			AT91C_BASE_SSC->SSC_THR = send_word;
+			while (!(AT91C_BASE_SSC->SSC_SR & (AT91C_SSC_TXRDY))) ;
+			AT91C_BASE_SSC->SSC_THR = send_word;
+			data <<= 1;
 		}
 		WDT_HIT();
 	}
-	LED_B_OFF(); // Finished sending
+	LED_B_OFF();
 }
 
 
@@ -942,13 +937,13 @@ int iso14443b_select_card()
 void iso14443b_setup() {
 	FpgaDownloadAndGo(FPGA_BITSTREAM_HF);
 	// Set up the synchronous serial port
-	FpgaSetupSsc(FPGA_MAJOR_MODE_HF_READER_TX);
+	FpgaSetupSsc(FPGA_MAJOR_MODE_HF_READER);
 	// connect Demodulated Signal to ADC:
 	SetAdcMuxFor(GPIO_MUXSEL_HIPKD);
 
 	// Signal field is on with the appropriate LED
     LED_D_ON();
-	FpgaWriteConfWord(FPGA_MAJOR_MODE_HF_READER_TX | FPGA_HF_READER_TX_SHALLOW_MOD);
+	FpgaWriteConfWord(FPGA_MAJOR_MODE_HF_READER | FPGA_HF_READER_MODE_SEND_SHALLOW_MOD);
 
 	DemodReset();
 	UartReset();
@@ -976,12 +971,12 @@ void ReadSTMemoryIso14443b(uint32_t dwLast)
 	SpinDelay(200);
 
 	SetAdcMuxFor(GPIO_MUXSEL_HIPKD);
-	FpgaSetupSsc(FPGA_MAJOR_MODE_HF_READER_RX_XCORR);
+	FpgaSetupSsc(FPGA_MAJOR_MODE_HF_READER);
 
 	// Now give it time to spin up.
 	// Signal field is on with the appropriate LED
 	LED_D_ON();
-	FpgaWriteConfWord(FPGA_MAJOR_MODE_HF_READER_RX_XCORR | FPGA_HF_READER_RX_XCORR_848_KHZ);
+	FpgaWriteConfWord(FPGA_MAJOR_MODE_HF_READER | FPGA_HF_READER_MODE_SEND_SHALLOW_MOD);
 	SpinDelay(200);
 
 	clear_trace();
@@ -1143,15 +1138,15 @@ void RAMFUNC SnoopIso14443b(void)
 	Dbprintf("  tag -> Reader: %i bytes", MAX_FRAME_SIZE);
 	Dbprintf("  DMA: %i bytes", ISO14443B_DMA_BUFFER_SIZE);
 
-	// Signal field is off, no reader signal, no tag signal
-	LEDsoff();
+	// Signal field is off
+	LED_D_OFF();
 
 	// And put the FPGA in the appropriate mode
-	FpgaWriteConfWord(FPGA_MAJOR_MODE_HF_READER_RX_XCORR | FPGA_HF_READER_RX_XCORR_848_KHZ | FPGA_HF_READER_RX_XCORR_SNOOP);
+	FpgaWriteConfWord(FPGA_MAJOR_MODE_HF_READER | FPGA_HF_READER_SUBCARRIER_848_KHZ | FPGA_HF_READER_MODE_SNOOP_IQ);
 	SetAdcMuxFor(GPIO_MUXSEL_HIPKD);
 
 	// Setup for the DMA.
-	FpgaSetupSsc(FPGA_MAJOR_MODE_HF_READER_RX_XCORR);
+	FpgaSetupSsc(FPGA_MAJOR_MODE_HF_READER);
 	upTo = dmaBuf;
 	lastRxCounter = ISO14443B_DMA_BUFFER_SIZE;
 	FpgaSetupSscDma((uint8_t*) dmaBuf, ISO14443B_DMA_BUFFER_SIZE);
@@ -1255,12 +1250,14 @@ void RAMFUNC SnoopIso14443b(void)
  */
 void SendRawCommand14443B(uint32_t datalen, uint32_t recv, uint8_t powerfield, uint8_t data[])
 {
+	LED_A_ON();
 	FpgaDownloadAndGo(FPGA_BITSTREAM_HF);
 	SetAdcMuxFor(GPIO_MUXSEL_HIPKD);
 
 	// switch field on and give tag some time to power up
 	LED_D_ON();
-	FpgaSetupSsc(FPGA_MAJOR_MODE_HF_READER_TX);
+	FpgaWriteConfWord(FPGA_MAJOR_MODE_HF_READER | FPGA_HF_READER_MODE_SEND_SHALLOW_MOD);
+	FpgaSetupSsc(FPGA_MAJOR_MODE_HF_READER);
 	SpinDelay(10);
 
 	if (datalen){
@@ -1282,5 +1279,7 @@ void SendRawCommand14443B(uint32_t datalen, uint32_t recv, uint8_t powerfield, u
 		FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
 		LED_D_OFF();
 	}
+	
+	LED_A_OFF();
 }
 

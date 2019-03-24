@@ -49,12 +49,11 @@ void SetAdcMuxFor(uint32_t whichGpio);
 #define FPGA_MAJOR_MODE_LF_EDGE_DETECT              (1<<5)
 #define FPGA_MAJOR_MODE_LF_PASSTHRU                 (2<<5)
 // HF
-#define FPGA_MAJOR_MODE_HF_READER_TX                (0<<5)
-#define FPGA_MAJOR_MODE_HF_READER_RX_XCORR          (1<<5)
-#define FPGA_MAJOR_MODE_HF_SIMULATOR                (2<<5)
-#define FPGA_MAJOR_MODE_HF_ISO14443A                (3<<5)
-#define FPGA_MAJOR_MODE_HF_SNOOP                    (4<<5)
-#define FPGA_MAJOR_MODE_HF_GET_TRACE                (5<<5)
+#define FPGA_MAJOR_MODE_HF_READER                   (0<<5)
+#define FPGA_MAJOR_MODE_HF_SIMULATOR                (1<<5)
+#define FPGA_MAJOR_MODE_HF_ISO14443A                (2<<5)
+#define FPGA_MAJOR_MODE_HF_SNOOP                    (3<<5)
+#define FPGA_MAJOR_MODE_HF_GET_TRACE                (4<<5)
 // BOTH
 #define FPGA_MAJOR_MODE_OFF                         (7<<5)
 
@@ -66,14 +65,19 @@ void SetAdcMuxFor(uint32_t whichGpio);
 #define FPGA_LF_EDGE_DETECT_READER_FIELD            (1<<0)
 #define FPGA_LF_EDGE_DETECT_TOGGLE_MODE             (1<<1)
 
-// Options for the HF reader, tx to tag
-#define FPGA_HF_READER_TX_SHALLOW_MOD               (1<<0)
+// Options for the HF reader
+#define FPGA_HF_READER_MODE_RECEIVE_IQ              (0<<0)
+#define FPGA_HF_READER_MODE_RECEIVE_AMPLITUDE       (1<<0)
+#define FPGA_HF_READER_MODE_RECEIVE_PHASE           (2<<0)
+#define FPGA_HF_READER_MODE_SEND_FULL_MOD           (3<<0)
+#define FPGA_HF_READER_MODE_SEND_SHALLOW_MOD        (4<<0)
+#define FPGA_HF_READER_MODE_SNOOP_IQ                (5<<0)
+#define FPGA_HF_READER_MODE_SNOOP_AMPLITUDE         (6<<0)
+#define FPGA_HF_READER_MODE_SNOOP_PHASE             (7<<0)
 
-// Options for the HF reader, correlating against rx from tag
-#define FPGA_HF_READER_RX_XCORR_848_KHZ             (1<<0)
-#define FPGA_HF_READER_RX_XCORR_SNOOP               (1<<1)
-#define FPGA_HF_READER_RX_XCORR_QUARTER_FREQ        (1<<2)
-#define FPGA_HF_READER_RX_XCORR_AMPLITUDE           (1<<3)
+#define FPGA_HF_READER_SUBCARRIER_848_KHZ           (0<<3)
+#define FPGA_HF_READER_SUBCARRIER_424_KHZ           (1<<3)
+#define FPGA_HF_READER_SUBCARRIER_212_KHZ           (2<<3)
 
 // Options for the HF simulated tag, how to modulate
 #define FPGA_HF_SIMULATOR_NO_MODULATION             (0<<0)
