@@ -89,6 +89,22 @@ void LEDsoff()
 	LED_D_OFF();
 }
 
+void LEDson()
+{
+	LED_A_ON();
+	LED_B_ON();
+	LED_C_ON();
+	LED_D_ON();
+}
+
+void LEDsinvert()
+{
+	LED_A_INV();
+	LED_B_INV();
+	LED_C_INV();
+	LED_D_INV();
+}
+
 // LEDs: R(C) O(A) G(B) -- R(D) [1, 2, 4 and 8]
 void LED(int led, int ms)
 {

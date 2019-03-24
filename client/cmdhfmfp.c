@@ -22,108 +22,16 @@
 #include "ui.h"
 #include "cmdhf14a.h"
 #include "mifare.h"
-#include "mifare4.h"
+#include "mifare/mifare4.h"
+#include "mifare/mad.h"
+#include "mifare/ndef.h"
 #include "cliparser/cliparser.h"
 #include "crypto/libpcrypto.h"
+#include "emv/dump.h"
 
 static const uint8_t DefaultKey[16] = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
 
-typedef struct {
-	uint8_t Code;
-	const char *Description;
-} PlusErrorsElm;
-
-static const PlusErrorsElm PlusErrors[] = {
-	{0xFF, ""},
-	{0x00, "Transfer cannot be granted within the current authentication."},
-	{0x06, "Access Conditions not fulfilled. Block does not exist, block is not a value block."},
-	{0x07, "Too many read or write commands in the session or in the transaction."},
-	{0x08, "Invalid MAC in command or response"},
-	{0x09, "Block Number is not valid"},
-	{0x0a, "Invalid block number, not existing block number"},
-	{0x0b, "The current command code not available at the current card state."},
-	{0x0c, "Length error"},
-	{0x0f, "General Manipulation Error. Failure in the operation of the PICC (cannot write to the data block), etc."},
-	{0x90, "OK"},
-};
-int PlusErrorsLen = sizeof(PlusErrors) / sizeof(PlusErrorsElm);
-
-const char * GetErrorDescription(uint8_t errorCode) {
-	for(int i = 0; i < PlusErrorsLen; i++)
-		if (errorCode == PlusErrors[i].Code)
-			return PlusErrors[i].Description;
-		
-	return PlusErrors[0].Description;
-}
-
 static int CmdHelp(const char *Cmd);
-
-static bool VerboseMode = false;
-void SetVerboseMode(bool verbose) {
-	VerboseMode = verbose;
-}
-
-int intExchangeRAW14aPlus(uint8_t *datain, int datainlen, bool activateField, bool leaveSignalON, uint8_t *dataout, int maxdataoutlen, int *dataoutlen) {
-	if(VerboseMode)
-		PrintAndLog(">>> %s", sprint_hex(datain, datainlen));
-	
-	int res = ExchangeRAW14a(datain, datainlen, activateField, leaveSignalON, dataout, maxdataoutlen, dataoutlen);
-
-	if(VerboseMode)
-		PrintAndLog("<<< %s", sprint_hex(dataout, *dataoutlen));
-	
-	return res;
-}
-
-int MFPWritePerso(uint8_t *keyNum, uint8_t *key, bool activateField, bool leaveSignalON, uint8_t *dataout, int maxdataoutlen, int *dataoutlen) {
-	uint8_t rcmd[3 + 16] = {0xa8, keyNum[1], keyNum[0], 0x00};
-	memmove(&rcmd[3], key, 16);
-	
-	return intExchangeRAW14aPlus(rcmd, sizeof(rcmd), activateField, leaveSignalON, dataout, maxdataoutlen, dataoutlen);
-}
-
-int MFPCommitPerso(bool activateField, bool leaveSignalON, uint8_t *dataout, int maxdataoutlen, int *dataoutlen) {
-	uint8_t rcmd[1] = {0xaa};
-	
-	return intExchangeRAW14aPlus(rcmd, sizeof(rcmd), activateField, leaveSignalON, dataout, maxdataoutlen, dataoutlen);
-}
-
-int MFPReadBlock(mf4Session *session, bool plain, uint8_t blockNum, uint8_t blockCount, bool activateField, bool leaveSignalON, uint8_t *dataout, int maxdataoutlen, int *dataoutlen, uint8_t *mac) {
-	uint8_t rcmd[4 + 8] = {(plain?(0x37):(0x33)), blockNum, 0x00, blockCount}; 
-	if (!plain && session)
-		CalculateMAC(session, mtypReadCmd, blockNum, blockCount, rcmd, 4, &rcmd[4], VerboseMode);
-	
-	int res = intExchangeRAW14aPlus(rcmd, plain?4:sizeof(rcmd), activateField, leaveSignalON, dataout, maxdataoutlen, dataoutlen);
-	if(res)
-		return res;
-
-	if (session) 
-		session->R_Ctr++;
-	
-	if(session && mac && *dataoutlen > 11)
-		CalculateMAC(session, mtypReadResp, blockNum, blockCount, dataout, *dataoutlen - 8 - 2, mac, VerboseMode);
-	
-	return 0;
-}
-
-int MFPWriteBlock(mf4Session *session, uint8_t blockNum, uint8_t *data, bool activateField, bool leaveSignalON, uint8_t *dataout, int maxdataoutlen, int *dataoutlen, uint8_t *mac) {
-	uint8_t rcmd[1 + 2 + 16 + 8] = {0xA3, blockNum, 0x00};
-	memmove(&rcmd[3], data, 16);
-	if (session)
-		CalculateMAC(session, mtypWriteCmd, blockNum, 1, rcmd, 19, &rcmd[19], VerboseMode);
-	
-	int res = intExchangeRAW14aPlus(rcmd, sizeof(rcmd), activateField, leaveSignalON, dataout, maxdataoutlen, dataoutlen);
-	if(res)
-		return res;
-
-	if (session) 
-		session->W_Ctr++;
-
-	if(session && mac && *dataoutlen > 3)
-		CalculateMAC(session, mtypWriteResp, blockNum, 1, dataout, *dataoutlen, mac, VerboseMode);
-	
-	return 0;
-}
 
 int CmdHFMFPInfo(const char *cmd) {
 	
@@ -229,7 +137,7 @@ int CmdHFMFPWritePerso(const char *cmd) {
 	CLIGetHexWithReturn(3, key, &keyLen);
 	CLIParserFree();
 	
-	SetVerboseMode(verbose);
+	mfpSetVerboseMode(verbose);
 	
 	if (!keyLen) {
 		memmove(key, DefaultKey, 16);
@@ -260,7 +168,7 @@ int CmdHFMFPWritePerso(const char *cmd) {
 	}
 
 	if (data[0] != 0x90) {
-		PrintAndLog("Command error: %02x %s", data[0], GetErrorDescription(data[0]));
+		PrintAndLog("Command error: %02x %s", data[0], mfpGetErrorDescription(data[0]));
 		return 1;
 	}
 	PrintAndLog("Write OK.");
@@ -304,7 +212,7 @@ int CmdHFMFPInitPerso(const char *cmd) {
 	if (!keyLen)
 		memmove(key, DefaultKey, 16);
 
-	SetVerboseMode(verbose2);
+	mfpSetVerboseMode(verbose2);
 	for (uint16_t sn = 0x4000; sn < 0x4050; sn++) {
 		keyNum[0] = sn >> 8;
 		keyNum[1] = sn & 0xff;
@@ -319,7 +227,7 @@ int CmdHFMFPInitPerso(const char *cmd) {
 		}
 	}
 	
-	SetVerboseMode(verbose);
+	mfpSetVerboseMode(verbose);
 	for (int i = 0; i < sizeof(CardAddresses) / 2; i++) {
 		keyNum[0] = CardAddresses[i] >> 8;
 		keyNum[1] = CardAddresses[i] & 0xff;
@@ -360,7 +268,7 @@ int CmdHFMFPCommitPerso(const char *cmd) {
 	bool verbose = arg_get_lit(1);
 	CLIParserFree();
 	
-	SetVerboseMode(verbose);
+	mfpSetVerboseMode(verbose);
 	
 	uint8_t data[250] = {0};
 	int datalen = 0;
@@ -377,7 +285,7 @@ int CmdHFMFPCommitPerso(const char *cmd) {
 	}
 
 	if (data[0] != 0x90) {
-		PrintAndLog("Command error: %02x %s", data[0], GetErrorDescription(data[0]));
+		PrintAndLog("Command error: %02x %s", data[0], mfpGetErrorDescription(data[0]));
 		return 1;
 	}
 	PrintAndLog("Switch level OK.");
@@ -453,7 +361,7 @@ int CmdHFMFPRdbl(const char *cmd) {
 	CLIGetHexWithReturn(6, key, &keylen);
 	CLIParserFree();
 	
-	SetVerboseMode(verbose);
+	mfpSetVerboseMode(verbose);
 
 	if (!keylen) {
 		memmove(key, DefaultKey, 16);
@@ -504,7 +412,7 @@ int CmdHFMFPRdbl(const char *cmd) {
 	}
 	
 	if (datalen && data[0] != 0x90) {
-		PrintAndLog("Card read error: %02x %s", data[0], GetErrorDescription(data[0]));
+		PrintAndLog("Card read error: %02x %s", data[0], mfpGetErrorDescription(data[0]));
 		return 6;
 	}
 	
@@ -563,7 +471,7 @@ int CmdHFMFPRdsc(const char *cmd) {
 	CLIGetHexWithReturn(5, key, &keylen);
 	CLIParserFree();
 	
-	SetVerboseMode(verbose);
+	mfpSetVerboseMode(verbose);
 
 	if (!keylen) {
 		memmove(key, DefaultKey, 16);
@@ -605,7 +513,7 @@ int CmdHFMFPRdsc(const char *cmd) {
 		}
 		
 		if (datalen && data[0] != 0x90) {
-			PrintAndLog("Card read error: %02x %s", data[0], GetErrorDescription(data[0]));
+			PrintAndLog("Card read error: %02x %s", data[0], mfpGetErrorDescription(data[0]));
 			DropField();
 			return 6;
 		}
@@ -661,7 +569,7 @@ int CmdHFMFPWrbl(const char *cmd) {
 	CLIGetHexWithReturn(5, key, &keylen);
 	CLIParserFree();
 	
-	SetVerboseMode(verbose);
+	mfpSetVerboseMode(verbose);
 
 	if (!keylen) {
 		memmove(key, DefaultKey, 16);
@@ -714,7 +622,7 @@ int CmdHFMFPWrbl(const char *cmd) {
 	}
 	
 	if (datalen && data[0] != 0x90) {
-		PrintAndLog("Card write error: %02x %s", data[0], GetErrorDescription(data[0]));
+		PrintAndLog("Card write error: %02x %s", data[0], mfpGetErrorDescription(data[0]));
 		DropField();
 		return 6;
 	}
@@ -733,6 +641,204 @@ int CmdHFMFPWrbl(const char *cmd) {
 	return 0;
 }
 
+int CmdHFMFPMAD(const char *cmd) {
+
+    CLIParserInit("hf mfp mad",
+                  "Checks and prints Mifare Application Directory (MAD)",
+                  "Usage:\n\thf mfp mad -> shows MAD if exists\n"
+                  "\thf mfp mad -a 03e1 -k d3f7d3f7d3f7d3f7d3f7d3f7d3f7d3f7 -> shows NDEF data if exists\n");
+
+    void *argtable[] = {
+        arg_param_begin,
+        arg_lit0("vV",  "verbose",  "show technical data"),
+        arg_str0("aA",  "aid",      "print all sectors with aid", NULL),
+        arg_str0("kK",  "key",      "key for printing sectors", NULL),
+        arg_lit0("bB",  "keyb",     "use key B for access printing sectors (by default: key A)"),
+        arg_param_end
+    };
+    CLIExecWithReturn(cmd, argtable, true);
+
+    bool verbose = arg_get_lit(1);
+    uint8_t aid[2] = {0};
+    int aidlen;
+    CLIGetHexWithReturn(2, aid, &aidlen);
+    uint8_t key[16] = {0};
+    int keylen;
+    CLIGetHexWithReturn(3, key, &keylen);
+    bool keyB = arg_get_lit(4);
+
+    CLIParserFree();
+
+    if (aidlen != 2 && keylen > 0) {
+        PrintAndLogEx(WARNING, "do not need a key without aid.");
+    }
+
+    uint8_t sector0[16 * 4] = {0};
+    uint8_t sector10[16 * 4] = {0};
+
+    if (mfpReadSector(MF_MAD1_SECTOR, MF_KEY_A, (uint8_t *)g_mifarep_mad_key, sector0, verbose)) {
+        PrintAndLogEx(NORMAL, "");
+        PrintAndLogEx(ERR, "read sector 0 error. card don't have MAD or don't have MAD on default keys.");
+        return 2;
+    }
+
+    if (verbose) {
+        for (int i = 0; i < 4; i ++)
+            PrintAndLogEx(NORMAL, "[%d] %s", i, sprint_hex(&sector0[i * 16], 16));
+    }
+
+    bool haveMAD2 = false;
+    MAD1DecodeAndPrint(sector0, verbose, &haveMAD2);
+
+    if (haveMAD2) {
+        if (mfpReadSector(MF_MAD2_SECTOR, MF_KEY_A, (uint8_t *)g_mifarep_mad_key, sector10, verbose)) {
+            PrintAndLogEx(NORMAL, "");
+            PrintAndLogEx(ERR, "read sector 0x10 error. card don't have MAD or don't have MAD on default keys.");
+            return 2;
+        }
+
+        MAD2DecodeAndPrint(sector10, verbose);
+    }
+
+    if (aidlen == 2) {
+        uint16_t aaid = (aid[0] << 8) + aid[1];
+        PrintAndLogEx(NORMAL, "\n-------------- AID 0x%04x ---------------", aaid);
+
+        uint16_t mad[7 + 8 + 8 + 8 + 8] = {0};
+        size_t madlen = 0;
+        if (MADDecode(sector0, sector10, mad, &madlen)) {
+            PrintAndLogEx(ERR, "can't decode mad.");
+            return 10;
+        }
+
+        uint8_t akey[16] = {0};
+        memcpy(akey, g_mifarep_ndef_key, 16);
+        if (keylen == 16) {
+            memcpy(akey, key, 16);
+        }
+
+        for (int i = 0; i < madlen; i++) {
+            if (aaid == mad[i]) {
+                uint8_t vsector[16 * 4] = {0};
+                if (mfpReadSector(i + 1, keyB ? MF_KEY_B : MF_KEY_A, akey, vsector, false)) {
+                    PrintAndLogEx(NORMAL, "");
+                    PrintAndLogEx(ERR, "read sector %d error.", i + 1);
+                    return 2;
+                }
+
+                for (int j = 0; j < (verbose ? 4 : 3); j ++)
+                    PrintAndLogEx(NORMAL, " [%03d] %s", (i + 1) * 4 + j, sprint_hex(&vsector[j * 16], 16));
+            }
+        }
+    }
+
+    return 0;
+}
+
+int CmdHFMFPNDEF(const char *cmd) {
+
+    CLIParserInit("hf mfp ndef",
+                  "Prints NFC Data Exchange Format (NDEF)",
+                  "Usage:\n\thf mfp ndef -> shows NDEF data\n"
+                  "\thf mfp ndef -a 03e1 -k d3f7d3f7d3f7d3f7d3f7d3f7d3f7d3f7 -> shows NDEF data with custom AID and key\n");
+
+    void *argtable[] = {
+        arg_param_begin,
+        arg_litn("vV",  "verbose",  0, 2, "show technical data"),
+        arg_str0("aA",  "aid",      "replace default aid for NDEF", NULL),
+        arg_str0("kK",  "key",      "replace default key for NDEF", NULL),
+        arg_lit0("bB",  "keyb",     "use key B for access sectors (by default: key A)"),
+        arg_param_end
+    };
+    CLIExecWithReturn(cmd, argtable, true);
+
+    bool verbose = arg_get_lit(1);
+    bool verbose2 = arg_get_lit(1) > 1;
+    uint8_t aid[2] = {0};
+    int aidlen;
+    CLIGetHexWithReturn(2, aid, &aidlen);
+    uint8_t key[16] = {0};
+    int keylen;
+    CLIGetHexWithReturn(3, key, &keylen);
+    bool keyB = arg_get_lit(4);
+
+    CLIParserFree();
+
+    uint16_t ndefAID = 0x03e1;
+    if (aidlen == 2)
+        ndefAID = (aid[0] << 8) + aid[1];
+
+    uint8_t ndefkey[16] = {0};
+    memcpy(ndefkey, g_mifarep_ndef_key, 16);
+    if (keylen == 16) {
+        memcpy(ndefkey, key, 16);
+    }
+
+    uint8_t sector0[16 * 4] = {0};
+    uint8_t sector10[16 * 4] = {0};
+    uint8_t data[4096] = {0};
+    int datalen = 0;
+
+    PrintAndLogEx(NORMAL, "");
+
+    if (mfpReadSector(MF_MAD1_SECTOR, MF_KEY_A, (uint8_t *)g_mifarep_mad_key, sector0, verbose)) {
+        PrintAndLogEx(ERR, "read sector 0 error. card don't have MAD or don't have MAD on default keys.");
+        return 2;
+    }
+
+    bool haveMAD2 = false;
+    int res = MADCheck(sector0, NULL, verbose, &haveMAD2);
+    if (res) {
+        PrintAndLogEx(ERR, "MAD error %d.", res);
+        return res;
+    }
+
+    if (haveMAD2) {
+        if (mfpReadSector(MF_MAD2_SECTOR, MF_KEY_A, (uint8_t *)g_mifarep_mad_key, sector10, verbose)) {
+            PrintAndLogEx(ERR, "read sector 0x10 error. card don't have MAD or don't have MAD on default keys.");
+            return 2;
+        }
+    }
+
+    uint16_t mad[7 + 8 + 8 + 8 + 8] = {0};
+    size_t madlen = 0;
+    if (MADDecode(sector0, (haveMAD2 ? sector10 : NULL), mad, &madlen)) {
+        PrintAndLogEx(ERR, "can't decode mad.");
+        return 10;
+    }
+
+    printf("data reading:");
+    for (int i = 0; i < madlen; i++) {
+        if (ndefAID == mad[i]) {
+            uint8_t vsector[16 * 4] = {0};
+            if (mfpReadSector(i + 1, keyB ? MF_KEY_B : MF_KEY_A, ndefkey, vsector, false)) {
+                PrintAndLogEx(ERR, "read sector %d error.", i + 1);
+                return 2;
+            }
+
+            memcpy(&data[datalen], vsector, 16 * 3);
+            datalen += 16 * 3;
+
+            printf(".");
+        }
+    }
+    printf(" OK\n");
+
+    if (!datalen) {
+        PrintAndLogEx(ERR, "no NDEF data.");
+        return 11;
+    }
+
+    if (verbose2) {
+        PrintAndLogEx(NORMAL, "NDEF data:");
+        dump_buffer(data, datalen, stdout, 1);
+    }
+
+    NDEFDecodeAndPrint(data, datalen, verbose);
+
+    return 0;
+}
+
 static command_t CommandTable[] =
 {
   {"help",             CmdHelp,					1, "This help"},
@@ -744,6 +850,8 @@ static command_t CommandTable[] =
   {"rdbl",  	       CmdHFMFPRdbl,			0, "Read blocks"},
   {"rdsc",  	       CmdHFMFPRdsc,			0, "Read sectors"},
   {"wrbl",  	       CmdHFMFPWrbl,			0, "Write blocks"},
+  {"mad",              CmdHFMFPMAD,             0, "Checks and prints MAD"},
+  {"ndef",             CmdHFMFPNDEF,            0, "Prints NDEF records from card"},
   {NULL,               NULL,					0, NULL}
 };
 

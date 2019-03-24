@@ -3,7 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "crapto1/crapto1.h"
-#include "mfkey.h"
+#include "mifare/mfkey.h"
 #include "util_posix.h"
 
 
