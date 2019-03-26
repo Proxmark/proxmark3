@@ -29,6 +29,7 @@
 #include "lfsampling.h"
 #include "BigBuf.h"
 #include "mifareutil.h"
+#include "mifaresim.h"
 #include "pcf7931.h"
 #include "i2c.h"
 #include "hfsnoop.h"
@@ -1249,7 +1250,7 @@ void UsbPacketReceived(uint8_t *packet, int len)
 			MifareChkKeys(c->arg[0], c->arg[1], c->arg[2], c->d.asBytes);
 			break;
 		case CMD_SIMULATE_MIFARE_CARD:
-			Mifare1ksim(c->arg[0], c->arg[1], c->arg[2], c->d.asBytes);
+			MifareSim(c->arg[0], c->arg[1], c->arg[2], c->d.asBytes);
 			break;
 		
 		// emulator

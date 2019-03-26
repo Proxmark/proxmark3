@@ -1264,6 +1264,7 @@ static void PrepareDelayedTransfer(uint16_t delay)
 //-------------------------------------------------------------------------------------
 static void TransmitFor14443a(const uint8_t *cmd, uint16_t len, uint32_t *timing)
 {
+	LED_B_ON();
 	LED_D_ON();
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_HF_ISO14443A | FPGA_HF_ISO14443A_READER_MOD);
 
@@ -1299,6 +1300,7 @@ static void TransmitFor14443a(const uint8_t *cmd, uint16_t len, uint32_t *timing
 	}
 	
 	NextTransferTime = MAX(NextTransferTime, LastTimeProxToAirStart + REQUEST_GUARD_TIME);
+	LED_B_OFF();
 }
 
 
@@ -1420,8 +1422,6 @@ int EmGetCmd(uint8_t *received, uint16_t *len, uint8_t *parity)
 
 	// Set FPGA mode to "simulated ISO 14443 tag", no modulation (listen
 	// only, since we are receiving, not transmitting).
-	// Signal field is off with the appropriate LED
-	LED_D_OFF();
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_HF_ISO14443A | FPGA_HF_ISO14443A_TAGSIM_LISTEN);
 
 	for(;;) {
@@ -1463,12 +1463,13 @@ int EmGetCmd(uint8_t *received, uint16_t *len, uint8_t *parity)
 
 static int EmSendCmd14443aRaw(uint8_t *resp, uint16_t respLen)
 {
+	LED_C_ON();
+	
 	uint8_t b;
 	uint16_t i = 0;
 	bool correctionNeeded;
 
 	// Modulate Manchester
-	LED_D_OFF();
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_HF_ISO14443A | FPGA_HF_ISO14443A_TAGSIM_MOD);
 
 	// include correction bit if necessary
@@ -1516,6 +1517,7 @@ static int EmSendCmd14443aRaw(uint8_t *resp, uint16_t respLen)
 		}
 	}
 
+	LED_C_OFF();
 	return 0;
 }
 
@@ -1762,7 +1764,7 @@ int iso14443a_select_card(byte_t *uid_ptr, iso14a_card_select_t *p_hi14a_card, u
 	
 	// OK we will select at least at cascade 1, lets see if first byte of UID was 0x88 in
 	// which case we need to make a cascade 2 request and select - this is a long UID
-	// While the UID is not complete, the 3nd bit (from the right) is set in the SAK.
+	// While the UID is not complete, the 3rd bit (from the right) is set in the SAK.
 	for(; sak & 0x04; cascade_level++) {
 		// SELECT_* (L1: 0x93, L2: 0x95, L3: 0x97)
 		sel_uid[0] = sel_all[0] = 0x93 + cascade_level * 2;
