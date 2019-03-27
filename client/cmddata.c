@@ -429,7 +429,7 @@ int CmdBiphaseDecodeRaw(const char *Cmd)
 int ASKbiphaseDemod(const char *Cmd, bool verbose)
 {
 	//ask raw demod GraphBuffer first
-	int offset=0, clk=0, invert=0, maxErr=0;
+	int offset=0, clk=0, invert=0, maxErr=100;
 	sscanf(Cmd, "%i %i %i %i", &offset, &clk, &invert, &maxErr);
 
 	uint8_t BitStream[MAX_GRAPH_TRACE_LEN];	  
