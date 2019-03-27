@@ -367,18 +367,20 @@ int Cmdmandecoderaw(const char *Cmd)
 	return 1;
 }
 
-//by marshmellow
-//biphase decode
-//take 01 or 10 = 0 and 11 or 00 = 1
-//takes 2 arguments "offset" default = 0 if 1 it will shift the decode by one bit
-// and "invert" default = 0 if 1 it will invert output
-//  the argument offset allows us to manually shift if the output is incorrect - [EDIT: now auto detects]
+/** 
+ * @author marshmellow
+ * biphase decode
+ * decdoes  01 or 10 to 0 and 11 or 00 to 1
+ * param offset adjust start position
+ * param invert invert output
+ * param maxErr maximum tolerated errors 
+ */
 int CmdBiphaseDecodeRaw(const char *Cmd)
 {
 	size_t size=0;
 	int offset=0, invert=0, maxErr=20, errCnt=0;
 	char cmdp = param_getchar(Cmd, 0);
-	if (strlen(Cmd) > 3 || cmdp == 'h' || cmdp == 'H') {
+	if (strlen(Cmd) > 5 || cmdp == 'h' || cmdp == 'H') {
 		PrintAndLog("Usage:  data biphaserawdecode [offset] [invert] [maxErr]");
 		PrintAndLog("     Converts 10 or 01 to 1 and 11 or 00 to 0");
 		PrintAndLog("     --must have binary sequence in demodbuffer (run data askrawdemod first)");
