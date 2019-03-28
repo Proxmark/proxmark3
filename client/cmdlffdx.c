@@ -206,7 +206,7 @@ int CmdFdxDemod(const char *Cmd){
 }
 
 int CmdFdxRead(const char *Cmd) {
-	lf_read(true, 10000);
+	lf_read(true, 39999);
 	return CmdFdxDemod(Cmd);
 }
 

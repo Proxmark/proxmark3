@@ -380,7 +380,7 @@ int CmdBiphaseDecodeRaw(const char *Cmd)
 	size_t size=0;
 	int offset=0, invert=0, maxErr=20, errCnt=0;
 	char cmdp = param_getchar(Cmd, 0);
-	if (strlen(Cmd) > 5 || cmdp == 'h' || cmdp == 'H') {
+	if (strlen(Cmd) > 7 || cmdp == 'h' || cmdp == 'H') {
 		PrintAndLog("Usage:  data biphaserawdecode [offset] [invert] [maxErr]");
 		PrintAndLog("     Converts 10 or 01 to 1 and 11 or 00 to 0");
 		PrintAndLog("     --must have binary sequence in demodbuffer (run data askrawdemod first)");
