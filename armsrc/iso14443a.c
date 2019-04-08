@@ -884,7 +884,6 @@ static int GetIso14443aCommandFromReader(uint8_t *received, uint8_t *parity, int
 }
 
 
-static int EmSend4bitEx(uint8_t resp);
 int EmSend4bit(uint8_t resp);
 static int EmSendCmdExPar(uint8_t *resp, uint16_t respLen, uint8_t *par);
 int EmSendCmdEx(uint8_t *resp, uint16_t respLen);
@@ -1413,16 +1412,14 @@ int EmGetCmd(uint8_t *received, uint16_t *len, uint8_t *parity)
 	UartInit(received, parity);
 
 	// Ensure that the FPGA Delay Queue is empty before we switch to TAGSIM_LISTEN
-	do {
-		if(AT91C_BASE_SSC->SSC_SR & (AT91C_SSC_TXRDY)) {
-			AT91C_BASE_SSC->SSC_THR = SEC_F;
-			uint8_t b = (uint8_t)AT91C_BASE_SSC->SSC_RHR; (void) b;
-		}
-	} while (GetCountSspClk() < LastTimeProxToAirStart + LastProxToAirDuration + (FpgaSendQueueDelay>>3));
+	while (GetCountSspClk() < LastTimeProxToAirStart + LastProxToAirDuration + (FpgaSendQueueDelay>>3)) /* wait */ ;
 
 	// Set FPGA mode to "simulated ISO 14443 tag", no modulation (listen
 	// only, since we are receiving, not transmitting).
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_HF_ISO14443A | FPGA_HF_ISO14443A_TAGSIM_LISTEN);
+	
+	// Clear RXRDY
+    uint8_t b = (uint8_t)AT91C_BASE_SSC->SSC_RHR; (void)b;
 
 	for(;;) {
 		WDT_HIT();
@@ -1522,17 +1519,12 @@ static int EmSendCmd14443aRaw(uint8_t *resp, uint16_t respLen)
 }
 
 
-static int EmSend4bitEx(uint8_t resp){
+int EmSend4bit(uint8_t resp){
 	Code4bitAnswerAsTag(resp);
 	int res = EmSendCmd14443aRaw(ToSend, ToSendMax);
 	// do the tracing for the previous reader request and this tag answer:
 	EmLogTraceTag(&resp, 1, NULL, LastProxToAirDuration);
 	return res;
-}
-
-
-int EmSend4bit(uint8_t resp){
-	return EmSend4bitEx(resp);
 }
 
 
