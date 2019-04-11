@@ -66,6 +66,11 @@ int CmdHFSearch(const char *Cmd){
 		PrintAndLog("\nValid ISO14443B Tag Found - Quiting Search\n");
 		return ans;
 	}
+	ans = CmdLegicRFRead("");
+	if (ans == 0) {
+		PrintAndLog("\nValid Legic Tag Found - Quiting Search\n");
+		return ans;
+	}
 	PrintAndLog("\nno known/supported 13.56 MHz tags found\n");
 	return 0;
 }
