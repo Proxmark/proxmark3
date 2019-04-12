@@ -30,6 +30,7 @@ This project uses the changelog in accordance with [keepchangelog](http://keepac
 - Added `hf plot` (piwi)
 - Added `hf mfp mad` `hf mf mad` parsing MAD1 and MAD2 (Merlok)
 - Added `hf mfp ndef` `hf mf ndef` parsing NDEF records (Merlok)
+- Added Legic detection to `hf search` (dnet)
 
 ## [v3.1.0][2018-10-10]
 
