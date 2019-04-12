@@ -379,8 +379,9 @@ void LegicRfReader(int offset, int bytes) {
   // establish shared secret and detect card type
   DbpString("Reading card ...");
   uint8_t card_type = setup_phase(SESSION_IV);
+  uint8_t result = 0;
   if(init_card(card_type, &card) != 0) {
-    Dbprintf("No or unknown card found, aborting");
+    result = 1;
     goto OUT;
   }
 
@@ -397,17 +398,14 @@ void LegicRfReader(int offset, int bytes) {
   for(uint16_t i = 0; i < bytes; ++i) {
     int16_t byte = read_byte(offset + i, card.cmdsize);
     if(byte == -1) {
-      Dbprintf("operation failed @ 0x%03.3x", bytes);
+      result = 2;
       goto OUT;
     }
     BigBuf[i] = byte;
   }
 
-  // OK
-  Dbprintf("Card (MIM %i) read, use 'hf legic decode' or", card.cardsize);
-  Dbprintf("'data hexsamples %d' to view results", (bytes+7) & ~7);
-
 OUT:
+  cmd_send(CMD_ACK, result, bytes, 0, &card, sizeof(card));
   FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
   LED_B_OFF();
   LED_C_OFF();

@@ -18,6 +18,7 @@
 #include "cmdparser.h"
 #include "cmdmain.h"
 #include "util.h"
+#include "../include/legic.h"
 
 static int CmdHelp(const char *Cmd);
 
@@ -214,7 +215,21 @@ int CmdLegicRFRead(const char *Cmd)
   if(byte_count + offset > 1024) byte_count = 1024 - offset;
   UsbCommand c={CMD_READER_LEGIC_RF, {offset, byte_count, 0}};
   SendCommand(&c);
-  return 0;
+  UsbCommand resp;
+  WaitForResponse(CMD_ACK,&resp);
+  switch (resp.arg[0]) {
+    case 0:
+      PrintAndLog("Card (MIM %i) read, use 'hf legic decode' or", ((legic_card_select_t*)resp.d.asBytes)->cardsize);
+      PrintAndLog("'data hexsamples %d' to view results", (resp.arg[1] + 7) & ~7);
+      break;
+    case 1:
+      PrintAndLog("No or unknown card found, aborting");
+      break;
+    case 2:
+      PrintAndLog("operation failed @ 0x%03.3x", resp.arg[1]);
+      break;
+  }
+  return resp.arg[0];
 }
 
 int CmdLegicLoad(const char *Cmd)
