@@ -57,7 +57,8 @@ endif
 
 LUAPLATFORM = generic
 ifneq (,$(findstring MINGW,$(platform)))
-		LUAPLATFORM = mingw
+    LUAPLATFORM = mingw
+    LDLIBS += -lws2_32
 else
 	ifeq ($(platform),Darwin)
 		LUAPLATFORM = macosx
@@ -134,6 +135,7 @@ CMDSRCS = 	$(SRC_SMARTCARD) \
 			fido/cose.c \
 			fido/cbortools.c \
 			fido/fidocore.c \
+			ksx6924/ksx6924core.c \
 			mifare/mfkey.c \
 			loclass/cipher.c \
 			loclass/cipherutils.c \
@@ -188,6 +190,7 @@ CMDSRCS = 	$(SRC_SMARTCARD) \
 			hardnested/hardnested_bruteforce.c \
 			cmdhftopaz.c \
 			cmdhffido.c \
+			cmdhfksx6924.c \
 			cmdhw.c \
 			cmdlf.c \
 			cmdlfawid.c \

@@ -21,6 +21,7 @@
 #include "cmdhf14b.h"
 #include "cmdhf15.h"
 #include "cmdhfepa.h"
+#include "cmdhfksx6924.h"
 #include "cmdhflegic.h"
 #include "cmdhficlass.h"
 #include "cmdhfmf.h"
@@ -141,6 +142,7 @@ static command_t CommandTable[] =
 	{"14b",     CmdHF14B,       0, "{ ISO14443B RFIDs... }"},
 	{"15",      CmdHF15,        1, "{ ISO15693 RFIDs... }"},
 	{"epa",     CmdHFEPA,       0, "{ German Identification Card... }"},
+	{"ksx6924", CmdHFKSX6924,   0, "{ KS X 6924 (T-Money, Snapper+) RFIDs... }"},
 	{"legic",   CmdHFLegic,     0, "{ LEGIC RFIDs... }"},
 	{"iclass",  CmdHFiClass,    1, "{ ICLASS RFIDs... }"},
 	{"mf",      CmdHFMF,        1, "{ MIFARE RFIDs... }"},
