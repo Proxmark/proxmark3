@@ -31,6 +31,7 @@ This project uses the changelog in accordance with [keepchangelog](http://keepac
 - Added `hf mfp mad` `hf mf mad` parsing MAD1 and MAD2 (Merlok)
 - Added `hf mfp ndef` `hf mf ndef` parsing NDEF records (Merlok)
 - Added Mifare Mini, Mifare 2K and 4K support to `hf mf sim` (piwi)
+- Added Legic detection to `hf search` (dnet)
 
 ## [v3.1.0][2018-10-10]
 
