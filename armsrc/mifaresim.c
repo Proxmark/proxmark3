@@ -25,19 +25,19 @@
 #include "apps.h"
 
 //mifare emulator states
-#define MFEMUL_NOFIELD      0
-#define MFEMUL_IDLE         1
-#define MFEMUL_SELECT1      2
-#define MFEMUL_SELECT2      3
-#define MFEMUL_SELECT3      4
-#define MFEMUL_AUTH1        5
-#define MFEMUL_AUTH2        6
-#define MFEMUL_WORK         7
-#define MFEMUL_WRITEBL2     8
-#define MFEMUL_INTREG_INC   9
-#define MFEMUL_INTREG_DEC  10
-#define MFEMUL_INTREG_REST 11
-#define MFEMUL_HALTED      12
+#define MFEMUL_NOFIELD           0
+#define MFEMUL_IDLE              1
+#define MFEMUL_SELECT1           2
+#define MFEMUL_SELECT2           3
+#define MFEMUL_SELECT3           4
+#define MFEMUL_AUTH1             5
+#define MFEMUL_AUTH2             6
+#define MFEMUL_WORK              7
+#define MFEMUL_WRITEBL2          8
+#define MFEMUL_INTREG_INC        9
+#define MFEMUL_INTREG_DEC       10
+#define MFEMUL_INTREG_REST      11
+#define MFEMUL_HALTED           12
 
 #define AC_DATA_READ             0
 #define AC_DATA_WRITE            1
@@ -277,7 +277,7 @@ static void MifareSimInit(uint8_t flags, uint8_t *datain, tag_response_info_t **
 	};
 
 	// Prepare ("precompile") the responses of the anticollision phase. There will be not enough time to do this at the moment the reader sends its REQA or SELECT
-	// There are 7 predefined responses with a total of 18 bytes data to transmit. Coded responses need one byte per bit to transfer (data, parity, start, stop, correction)
+	// There are 5 predefined responses with a total of 18 bytes data to transmit. Coded responses need one byte per bit to transfer (data, parity, start, stop, correction)
 	// 18 * 8 data bits, 18 * 1 parity bits, 5 start bits, 5 stop bits, 5 correction bits  ->   need 177 bytes buffer
 	#define ALLOCATED_TAG_MODULATION_BUFFER_SIZE 177    // number of bytes required for precompiled responses
 
@@ -313,7 +313,6 @@ static bool HasValidCRC(uint8_t *receivedCmd, uint16_t receivedCmd_len) {
   * FLAG_INTERACTIVE - In interactive mode, we are expected to finish the operation with an ACK
   * FLAG_4B_UID_IN_DATA - means that there is a 4-byte UID in the data-section, we're expected to use that
   * FLAG_7B_UID_IN_DATA - means that there is a 7-byte UID in the data-section, we're expected to use that
-  * FLAG_10B_UID_IN_DATA    - use 10-byte UID in the data-section not finished
   * FLAG_NR_AR_ATTACK  - means we should collect NR_AR responses for bruteforcing later
   * FLAG_RANDOM_NONCE - means we should generate some pseudo-random nonce data (only allows moebius attack)
   *@param exitAfterNReads, exit simulation after n blocks have been read, 0 is infinite ...
@@ -335,18 +334,15 @@ void MifareSim(uint8_t flags, uint8_t exitAfterNReads, uint8_t cardsize, uint8_t
 	uint32_t cardINTREG = 0;
 	uint8_t cardINTBLOCK = 0;
 	struct Crypto1State mpcs = {0, 0};
-	struct Crypto1State *pcs;
-	pcs = &mpcs;
-	uint32_t numReads = 0;//Counts numer of times reader reads a block
+	struct Crypto1State *pcs = &mpcs;
+	uint32_t numReads = 0; //Counts numer of times reader reads a block
 	uint8_t receivedCmd[MAX_MIFARE_FRAME_SIZE];
 	uint8_t receivedCmd_dec[MAX_MIFARE_FRAME_SIZE];
 	uint8_t receivedCmd_par[MAX_MIFARE_PARITY_SIZE];
 	uint16_t receivedCmd_len;
 	uint8_t response[MAX_MIFARE_FRAME_SIZE];
 	uint8_t response_par[MAX_MIFARE_PARITY_SIZE];
-
-	uint8_t rAUTH_NT[] = {0x01, 0x02, 0x03, 0x04};
-	uint8_t rAUTH_AT[] = {0x00, 0x00, 0x00, 0x00};
+	uint8_t fixed_nonce[] = {0x01, 0x02, 0x03, 0x04};
 
 	int num_blocks = ParamCardSizeBlocks(cardsize);
 
@@ -371,7 +367,7 @@ void MifareSim(uint8_t flags, uint8_t exitAfterNReads, uint8_t cardsize, uint8_t
 	if (flags & FLAG_RANDOM_NONCE) {
 		nonce = prand();
 	} else {
-		nonce = bytes_to_num(rAUTH_NT, 4);
+		nonce = bytes_to_num(fixed_nonce, 4);
 	}
 
 	// free eventually allocated BigBuf memory but keep Emulator Memory
@@ -394,8 +390,8 @@ void MifareSim(uint8_t flags, uint8_t exitAfterNReads, uint8_t cardsize, uint8_t
 	while (!button_pushed && !finished && !usb_poll_validate_length()) {
 		WDT_HIT();
 
-		// find reader field
 		if (cardSTATE == MFEMUL_NOFIELD) {
+			// wait for reader HF field
 			int vHf = (MAX_ADC_HF_VOLTAGE_LOW * AvgAdc(ADC_CHAN_HF_LOW)) >> 10;
 			if (vHf > MF_MINFIELDV) {
 				LED_D_ON();
@@ -409,7 +405,7 @@ void MifareSim(uint8_t flags, uint8_t exitAfterNReads, uint8_t cardsize, uint8_t
 		FpgaEnableTracing();
 		int res = EmGetCmd(receivedCmd, &receivedCmd_len, receivedCmd_par);
 
-		if (res == 2) { //Field is off!
+		if (res == 2) { //  Reader has dropped the HF field. Power off.
 			FpgaDisableTracing();
 			LED_D_OFF();
 			cardSTATE = MFEMUL_NOFIELD;
@@ -522,8 +518,8 @@ void MifareSim(uint8_t flags, uint8_t exitAfterNReads, uint8_t cardsize, uint8_t
 					crypto1_create(pcs, emlGetKey(cardAUTHSC, cardAUTHKEY));
 					if (!encrypted_data) { // first authentication
 						crypto1_word(pcs, cuid ^ nonce, 0); // Update crypto state
-						num_to_bytes(nonce, 4, rAUTH_AT);   // Send unencrypted nonce
-						EmSendCmd(rAUTH_AT, sizeof(rAUTH_AT));
+						num_to_bytes(nonce, 4, response);   // Send unencrypted nonce
+						EmSendCmd(response, sizeof(nonce));
 						FpgaDisableTracing();
 						if (MF_DBGLEVEL >= MF_DBG_EXTENDED) Dbprintf("Reader authenticating for block %d (0x%02x) with key %d", receivedCmd_dec[1], receivedCmd_dec[1], cardAUTHKEY);
 					} else { // nested authentication
@@ -545,7 +541,7 @@ void MifareSim(uint8_t flags, uint8_t exitAfterNReads, uint8_t cardsize, uint8_t
 					cardSTATE = MFEMUL_HALTED;
 					break;
 				}
-				
+
 				if(receivedCmd_dec[0] == ISO14443A_CMD_READBLOCK
 					|| receivedCmd_dec[0] == ISO14443A_CMD_WRITEBLOCK
 					|| receivedCmd_dec[0] == MIFARE_CMD_INC
@@ -645,8 +641,10 @@ void MifareSim(uint8_t flags, uint8_t exitAfterNReads, uint8_t cardsize, uint8_t
 				}
 
 				// command not allowed
-				if (MF_DBGLEVEL >= MF_DBG_EXTENDED) Dbprintf("Received command not allowed, nacking");
 				EmSend4bit(mf_crypto1_encrypt4bit(pcs, CARD_NACK_NA));
+				FpgaDisableTracing();
+				if (MF_DBGLEVEL >= MF_DBG_EXTENDED) Dbprintf("Received command not allowed, nacking");
+				cardSTATE = MFEMUL_IDLE;
 				break;
 			}
 
@@ -727,6 +725,7 @@ void MifareSim(uint8_t flags, uint8_t exitAfterNReads, uint8_t cardsize, uint8_t
 
 				// test if auth OK
 				if (cardRr != prng_successor(nonce, 64)){
+					FpgaDisableTracing();
 					if (MF_DBGLEVEL >= MF_DBG_EXTENDED) Dbprintf("AUTH FAILED for sector %d with key %c. cardRr=%08x, succ=%08x",
 							cardAUTHSC, cardAUTHKEY == AUTHKEYA ? 'A' : 'B',
 							cardRr, prng_successor(nonce, 64));
@@ -787,8 +786,8 @@ void MifareSim(uint8_t flags, uint8_t exitAfterNReads, uint8_t cardsize, uint8_t
 						break;
 					}
 					cardINTREG = cardINTREG + ans;
+					cardSTATE = MFEMUL_WORK;
 				}
-				cardSTATE = MFEMUL_WORK;
 				break;
 			}
 
@@ -800,9 +799,9 @@ void MifareSim(uint8_t flags, uint8_t exitAfterNReads, uint8_t cardsize, uint8_t
 						cardSTATE = MFEMUL_IDLE;
 						break;
 					}
+					cardINTREG = cardINTREG - ans;
+					cardSTATE = MFEMUL_WORK;
 				}
-				cardINTREG = cardINTREG - ans;
-				cardSTATE = MFEMUL_WORK;
 				break;
 			}
 
@@ -818,6 +817,7 @@ void MifareSim(uint8_t flags, uint8_t exitAfterNReads, uint8_t cardsize, uint8_t
 			}
 
 		} // end of switch
+
 		FpgaDisableTracing();
 		button_pushed = BUTTON_PRESS();
 

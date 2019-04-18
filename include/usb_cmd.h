@@ -226,12 +226,11 @@ typedef struct{
 
 
 //Mifare simulation flags
-#define FLAG_INTERACTIVE      0x01
-#define FLAG_4B_UID_IN_DATA   0x02
-#define FLAG_7B_UID_IN_DATA   0x04
-#define FLAG_10B_UID_IN_DATA  0x08
-#define FLAG_NR_AR_ATTACK     0x10
-#define FLAG_RANDOM_NONCE     0x20
+#define FLAG_INTERACTIVE                (1<<0)
+#define FLAG_4B_UID_IN_DATA             (1<<1)
+#define FLAG_7B_UID_IN_DATA             (1<<2)
+#define FLAG_NR_AR_ATTACK               (1<<4)
+#define FLAG_RANDOM_NONCE               (1<<5)
 
 
 //Iclass reader flags

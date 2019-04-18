@@ -1445,7 +1445,7 @@ int usage_hf14_mfsim(void) {
 
 int CmdHF14AMfSim(const char *Cmd) {
 	UsbCommand resp;
-	uint8_t uid[10] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+	uint8_t uid[7] = {0};
 	uint8_t exitAfterNReads = 0;
 	uint8_t flags = 0;
 	int uidlen = 0;
@@ -1563,7 +1563,6 @@ int CmdHF14AMfSim(const char *Cmd) {
 
 			uidlen = strlen(buf)-1;
 			switch(uidlen) {
-				case 20: flags |= FLAG_10B_UID_IN_DATA;	break; //not complete
 				case 14: flags |= FLAG_7B_UID_IN_DATA; break;
 				case  8: flags |= FLAG_4B_UID_IN_DATA; break;
 				default:
@@ -1581,8 +1580,7 @@ int CmdHF14AMfSim(const char *Cmd) {
 					cardsize == '2' ? "2K" :
 						cardsize == '4' ? "4K" : "1K",
 				flags & FLAG_4B_UID_IN_DATA ? sprint_hex(uid,4):
-					flags & FLAG_7B_UID_IN_DATA	? sprint_hex(uid,7):
-						flags & FLAG_10B_UID_IN_DATA ? sprint_hex(uid,10): "N/A",
+					flags & FLAG_7B_UID_IN_DATA	? sprint_hex(uid,7): "N/A",
 				exitAfterNReads,
 				flags,
 				flags);
@@ -1592,7 +1590,7 @@ int CmdHF14AMfSim(const char *Cmd) {
 			clearCommandBuffer();
 			SendCommand(&c);
 
-			while(! WaitForResponseTimeout(CMD_ACK,&resp,1500)) {
+			while (! WaitForResponseTimeout(CMD_ACK,&resp,1500)) {
 				//We're waiting only 1.5 s at a time, otherwise we get the
 				// annoying message about "Waiting for a response... "
 			}
@@ -1609,6 +1607,7 @@ int CmdHF14AMfSim(const char *Cmd) {
 			count++;
 		}
 		fclose(f);
+
 	} else { //not from file
 
 		PrintAndLog("mf sim cardsize: %s, uid: %s, numreads:%d, flags:%d (0x%02x) ",
@@ -1616,8 +1615,7 @@ int CmdHF14AMfSim(const char *Cmd) {
 				cardsize == '2' ? "2K" :
 					cardsize == '4' ? "4K" : "1K",
 			flags & FLAG_4B_UID_IN_DATA ? sprint_hex(uid,4):
-				flags & FLAG_7B_UID_IN_DATA	? sprint_hex(uid,7):
-					flags & FLAG_10B_UID_IN_DATA ? sprint_hex(uid,10): "N/A",
+				flags & FLAG_7B_UID_IN_DATA	? sprint_hex(uid,7): "N/A",
 			exitAfterNReads,
 			flags,
 			flags);

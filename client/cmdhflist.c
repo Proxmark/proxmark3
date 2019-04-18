@@ -937,7 +937,6 @@ uint16_t printTraceLine(uint16_t tracepos, uint16_t traceLen, uint8_t *trace, ui
 	char line[16][110];
 
 	for (int j = 0; j < data_len && j/16 < 16; j++) {
-
 		uint8_t parityBits = parityBytes[j>>3];
 		if (protocol != ISO_14443B
 			&& protocol != ISO_15693
@@ -948,7 +947,6 @@ uint16_t printTraceLine(uint16_t tracepos, uint16_t traceLen, uint8_t *trace, ui
 		} else {
 			snprintf(line[j/16]+(( j % 16) * 4), 110, " %02x ", frame[j]);
 		}
-
 	}
 
 	if (markCRCBytes) {
@@ -961,6 +959,13 @@ uint16_t printTraceLine(uint16_t tracepos, uint16_t traceLen, uint8_t *trace, ui
 		}
 	}
 
+	// mark short bytes (less than 8 Bit + Parity)
+	if (protocol == ISO_14443A || protocol == PROTO_MIFARE) {
+		if (duration < 128 * (9 * data_len)) {
+			line[(data_len-1)/16][((data_len-1)%16) * 4 + 3] = '\'';
+		}	
+	}
+	
 	if (data_len == 0) {
 		sprintf(line[0]," <empty trace - possible error>");
 	}
@@ -990,7 +995,7 @@ uint16_t printTraceLine(uint16_t tracepos, uint16_t traceLen, uint8_t *trace, ui
 	int num_lines = MIN((data_len - 1)/16 + 1, 16);
 	for (int j = 0; j < num_lines ; j++) {
 		if (j == 0) {
-			PrintAndLog(" %10d | %10d | %s |%-64s | %s| %s",
+			PrintAndLog(" %10" PRIu32 " | %10" PRIu32 " | %s |%-64s | %s| %s",
 				(timestamp - first_timestamp),
 				(EndOfTransmissionTimestamp - first_timestamp),
 				(isResponse ? "Tag" : "Rdr"),
@@ -1004,7 +1009,7 @@ uint16_t printTraceLine(uint16_t tracepos, uint16_t traceLen, uint8_t *trace, ui
 				(j == num_lines-1) ? explanation : "");
 		}
 	}
-
+		
 	if (DecodeMifareData(frame, data_len, parityBytes, isResponse, mfData, &mfDataLen)) {
 		memset(explanation, 0x00, sizeof(explanation));
 		if (!isResponse) {
@@ -1222,7 +1227,7 @@ int CmdHFList(const char *Cmd)
 		PrintAndLog("iso14443a - All times are in carrier periods (1/13.56Mhz)");
 		PrintAndLog("iClass    - Timings are not as accurate");
 		PrintAndLog("");
-		PrintAndLog("      Start |        End | Src | Data (! denotes parity error)                                   | CRC | Annotation         |");
+		PrintAndLog("      Start |        End | Src | Data (! denotes parity error, ' denotes short bytes)            | CRC | Annotation         |");
 		PrintAndLog("------------|------------|-----|-----------------------------------------------------------------|-----|--------------------|");
 
 		ClearAuthData();
