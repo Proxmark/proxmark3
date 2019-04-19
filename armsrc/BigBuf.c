@@ -21,8 +21,8 @@
 /* BigBuf memory layout:
 Pointer to highest available memory: BigBuf_hi
 
-    high BIGBUF_SIZE
-    reserved = BigBuf_malloc()  subtracts amount from BigBuf_hi,   
+	high BIGBUF_SIZE
+	reserved = BigBuf_malloc()  subtracts amount from BigBuf_hi,
 	low  0x00
 */
 
@@ -39,6 +39,7 @@ static uint8_t *emulator_memory = NULL;
 static uint32_t traceLen = 0;
 static bool tracing = true;
 
+
 // get the address of BigBuf
 uint8_t *BigBuf_get_addr(void)
 {
@@ -53,7 +54,7 @@ uint8_t *BigBuf_get_EM_addr(void)
 	if (emulator_memory == NULL) {
 		emulator_memory = BigBuf_malloc(CARD_MEMORY_SIZE);
 	}
-	
+
 	return emulator_memory;
 }
 
@@ -63,16 +64,21 @@ void BigBuf_Clear(void)
 {
 	BigBuf_Clear_ext(true);
 }
+
+
 // clear ALL of BigBuf
 void BigBuf_Clear_ext(bool verbose)
 {
 	memset(BigBuf, 0, BIGBUF_SIZE);
-	if (verbose) 
-		Dbprintf("Buffer cleared (%i bytes)",BIGBUF_SIZE);
+	if (verbose)
+		Dbprintf("Buffer cleared (%i bytes)", BIGBUF_SIZE);
 }
+
+
 void BigBuf_Clear_EM(void){
 	memset(BigBuf_get_EM_addr(), 0, CARD_MEMORY_SIZE);
 }
+
 
 void BigBuf_Clear_keep_EM(void)
 {
@@ -83,11 +89,11 @@ void BigBuf_Clear_keep_EM(void)
 // at the beginning of BigBuf is always for traces/samples
 uint8_t *BigBuf_malloc(uint16_t chunksize)
 {
-	if (BigBuf_hi - chunksize < 0) { 
-		return NULL;							// no memory left
+	if (BigBuf_hi - chunksize < 0) {
+		return NULL;                            // no memory left
 	} else {
-		chunksize = (chunksize + 3) & 0xfffc;	// round to next multiple of 4
-		BigBuf_hi -= chunksize; 		  		// aligned to 4 Byte boundary 
+		chunksize = (chunksize + 3) & 0xfffc;   // round to next multiple of 4
+		BigBuf_hi -= chunksize;                 // aligned to 4 Byte boundary
 		return (uint8_t *)BigBuf + BigBuf_hi;
 	}
 }
@@ -128,17 +134,21 @@ uint16_t BigBuf_max_traceLen(void)
 	return BigBuf_hi;
 }
 
+
 void clear_trace() {
 	traceLen = 0;
 }
+
 
 void set_tracing(bool enable) {
 	tracing = enable;
 }
 
+
 bool get_tracing(void) {
 	return tracing;
 }
+
 
 /**
  * Get the number of bytes traced
@@ -148,6 +158,7 @@ uint16_t BigBuf_get_traceLen(void)
 {
 	return traceLen;
 }
+
 
 /**
   This is a function to store traces. All protocols can use this generic tracer-function.
@@ -162,14 +173,14 @@ bool RAMFUNC LogTrace(const uint8_t *btBytes, uint16_t iLen, uint32_t timestamp_
 
 	uint8_t *trace = BigBuf_get_addr();
 
-	uint32_t num_paritybytes = (iLen-1)/8 + 1;	// number of valid paritybytes in *parity
+	uint32_t num_paritybytes = (iLen-1)/8 + 1;  // number of valid paritybytes in *parity
 	uint32_t duration = timestamp_end - timestamp_start;
 
 	// Return when trace is full
 	uint16_t max_traceLen = BigBuf_max_traceLen();
 
 	if (traceLen + sizeof(iLen) + sizeof(timestamp_start) + sizeof(duration) + num_paritybytes + iLen >= max_traceLen) {
-		tracing = false;	// don't trace any more
+		tracing = false;    // don't trace any more
 		return false;
 	}
 	// Traceformat:
@@ -237,7 +248,7 @@ int LogTraceHitag(const uint8_t * btBytes, int iBits, int iSamples, uint32_t dwP
 	// Return when trace is full
 	if (traceLen + sizeof(rsamples) + sizeof(dwParity) + sizeof(iBits) + iLen > BigBuf_max_traceLen()) {
 		return false;
-	}	
+	}
 
 	//Hitag traces appear to use this traceformat:
 	// 32 bits timestamp (little endian,Highest Bit used as readerToTag flag)

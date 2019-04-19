@@ -254,14 +254,14 @@ uint8_t NumBlocksPerSector(uint8_t sectorNo)
 }
 
 static int ParamCardSizeSectors(const char c) {
-	int numBlocks = 16;
+	int numSectors = 16;
 	switch (c) {
-		case '0' : numBlocks = 5; break;
-		case '2' : numBlocks = 32; break;
-		case '4' : numBlocks = 40; break;
-		default:   numBlocks = 16;
+		case '0' : numSectors = 5; break;
+		case '2' : numSectors = 32; break;
+		case '4' : numSectors = 40; break;
+		default:   numSectors = 16;
 	}
-	return numBlocks;
+	return numSectors;
 }
 
 static int ParamCardSizeBlocks(const char c) {
@@ -1421,11 +1421,12 @@ void readerAttack(nonces_t ar_resp[], bool setEmulatorMem, bool doStandardAttack
 	}*/
 }
 
-int usage_hf14_mf1ksim(void) {
-	PrintAndLog("Usage:  hf mf sim h u <uid (8, 14, or 20 hex symbols)> n <numreads> i x");
+int usage_hf14_mfsim(void) {
+	PrintAndLog("Usage:  hf mf sim [h] [*<card memory>] [u <uid (8, 14, or 20 hex symbols)>] [n <numreads>] [i] [x]");
 	PrintAndLog("options:");
-	PrintAndLog("      h    this help");
-	PrintAndLog("      u    (Optional) UID 4,7 or 10 bytes. If not specified, the UID 4B from emulator memory will be used");
+	PrintAndLog("      h    (Optional) this help");
+	PrintAndLog("      card memory: 0 - MINI(320 bytes), 1 - 1K, 2 - 2K, 4 - 4K, <other, default> - 1K");
+	PrintAndLog("      u    (Optional) UID 4 or 7 bytes. If not specified, the UID 4B from emulator memory will be used");
 	PrintAndLog("      n    (Optional) Automatically exit simulation after <numreads> blocks have been read by reader. 0 = infinite");
 	PrintAndLog("      i    (Optional) Interactive, means that console will not be returned until simulation finishes or is aborted");
 	PrintAndLog("      x    (Optional) Crack, performs the 'reader attack', nr/ar attack against a legitimate reader, fishes out the key(s)");
@@ -1434,21 +1435,20 @@ int usage_hf14_mf1ksim(void) {
 	PrintAndLog("      r    (Optional) Generate random nonces instead of sequential nonces. Standard reader attack won't work with this option, only moebius attack works.");
 	PrintAndLog("samples:");
 	PrintAndLog("           hf mf sim u 0a0a0a0a");
+	PrintAndLog("           hf mf sim *4");
 	PrintAndLog("           hf mf sim u 11223344556677");
-	PrintAndLog("           hf mf sim u 112233445566778899AA");
 	PrintAndLog("           hf mf sim f uids.txt");
 	PrintAndLog("           hf mf sim u 0a0a0a0a e");
 
 	return 0;
 }
 
-int CmdHF14AMf1kSim(const char *Cmd) {
+int CmdHF14AMfSim(const char *Cmd) {
 	UsbCommand resp;
-	uint8_t uid[10] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+	uint8_t uid[7] = {0};
 	uint8_t exitAfterNReads = 0;
 	uint8_t flags = 0;
 	int uidlen = 0;
-	uint8_t pnr = 0;
 	bool setEmulatorMem = false;
 	bool attackFromFile = false;
 	FILE *f;
@@ -1459,9 +1459,21 @@ int CmdHF14AMf1kSim(const char *Cmd) {
 
 	uint8_t cmdp = 0;
 	bool errors = false;
+	uint8_t cardsize = '1';
 
 	while(param_getchar(Cmd, cmdp) != 0x00) {
 		switch(param_getchar(Cmd, cmdp)) {
+		case '*': 
+			cardsize = param_getchar(Cmd + 1, cmdp);
+			switch(cardsize) {
+				case '0':
+				case '1':
+				case '2':
+				case '4': break;
+				default: cardsize = '1';
+			}
+			cmdp++;
+			break;
 		case 'e':
 		case 'E':
 			setEmulatorMem = true;
@@ -1485,7 +1497,7 @@ int CmdHF14AMf1kSim(const char *Cmd) {
 			break;
 		case 'h':
 		case 'H':
-			return usage_hf14_mf1ksim();
+			return usage_hf14_mfsim();
 		case 'i':
 		case 'I':
 			flags |= FLAG_INTERACTIVE;
@@ -1493,7 +1505,7 @@ int CmdHF14AMf1kSim(const char *Cmd) {
 			break;
 		case 'n':
 		case 'N':
-			exitAfterNReads = param_get8(Cmd, pnr+1);
+			exitAfterNReads = param_get8(Cmd, cmdp+1);
 			cmdp += 2;
 			break;
 		case 'r':
@@ -1505,10 +1517,9 @@ int CmdHF14AMf1kSim(const char *Cmd) {
 		case 'U':
 			param_gethex_ex(Cmd, cmdp+1, uid, &uidlen);
 			switch(uidlen) {
-				case 20: flags = FLAG_10B_UID_IN_DATA;	break; //not complete
 				case 14: flags = FLAG_7B_UID_IN_DATA; break;
 				case  8: flags = FLAG_4B_UID_IN_DATA; break;
-				default: return usage_hf14_mf1ksim();
+				default: return usage_hf14_mfsim();
 			}
 			cmdp += 2;
 			break;
@@ -1525,7 +1536,7 @@ int CmdHF14AMf1kSim(const char *Cmd) {
 		if(errors) break;
 	}
 	//Validations
-	if(errors) return usage_hf14_mf1ksim();
+	if(errors) return usage_hf14_mfsim();
 
 	//get uid from file
 	if (attackFromFile) {
@@ -1552,7 +1563,6 @@ int CmdHF14AMf1kSim(const char *Cmd) {
 
 			uidlen = strlen(buf)-1;
 			switch(uidlen) {
-				case 20: flags |= FLAG_10B_UID_IN_DATA;	break; //not complete
 				case 14: flags |= FLAG_7B_UID_IN_DATA; break;
 				case  8: flags |= FLAG_4B_UID_IN_DATA; break;
 				default:
@@ -1565,18 +1575,22 @@ int CmdHF14AMf1kSim(const char *Cmd) {
 				sscanf(&buf[i], "%02x", (unsigned int *)&uid[i / 2]);
 			}
 
-			PrintAndLog("mf 1k sim uid: %s, numreads:%d, flags:%d (0x%02x) - press button to abort",
-					flags & FLAG_4B_UID_IN_DATA ? sprint_hex(uid,4):
-						flags & FLAG_7B_UID_IN_DATA	? sprint_hex(uid,7):
-							flags & FLAG_10B_UID_IN_DATA ? sprint_hex(uid,10): "N/A"
-					, exitAfterNReads, flags, flags);
+			PrintAndLog("mf sim cardsize: %s, uid: %s, numreads:%d, flags:%d (0x%02x) - press button to abort",
+				cardsize == '0' ? "Mini" :
+					cardsize == '2' ? "2K" :
+						cardsize == '4' ? "4K" : "1K",
+				flags & FLAG_4B_UID_IN_DATA ? sprint_hex(uid,4):
+					flags & FLAG_7B_UID_IN_DATA	? sprint_hex(uid,7): "N/A",
+				exitAfterNReads,
+				flags,
+				flags);
 
-			UsbCommand c = {CMD_SIMULATE_MIFARE_CARD, {flags, exitAfterNReads,0}};
+			UsbCommand c = {CMD_SIMULATE_MIFARE_CARD, {flags, exitAfterNReads, cardsize}};
 			memcpy(c.d.asBytes, uid, sizeof(uid));
 			clearCommandBuffer();
 			SendCommand(&c);
 
-			while(! WaitForResponseTimeout(CMD_ACK,&resp,1500)) {
+			while (! WaitForResponseTimeout(CMD_ACK,&resp,1500)) {
 				//We're waiting only 1.5 s at a time, otherwise we get the
 				// annoying message about "Waiting for a response... "
 			}
@@ -1593,22 +1607,27 @@ int CmdHF14AMf1kSim(const char *Cmd) {
 			count++;
 		}
 		fclose(f);
+
 	} else { //not from file
 
-		PrintAndLog("mf 1k sim uid: %s, numreads:%d, flags:%d (0x%02x) ",
-				flags & FLAG_4B_UID_IN_DATA ? sprint_hex(uid,4):
-					flags & FLAG_7B_UID_IN_DATA	? sprint_hex(uid,7):
-						flags & FLAG_10B_UID_IN_DATA ? sprint_hex(uid,10): "N/A"
-				, exitAfterNReads, flags, flags);
+		PrintAndLog("mf sim cardsize: %s, uid: %s, numreads:%d, flags:%d (0x%02x) ",
+			cardsize == '0' ? "Mini" :
+				cardsize == '2' ? "2K" :
+					cardsize == '4' ? "4K" : "1K",
+			flags & FLAG_4B_UID_IN_DATA ? sprint_hex(uid,4):
+				flags & FLAG_7B_UID_IN_DATA	? sprint_hex(uid,7): "N/A",
+			exitAfterNReads,
+			flags,
+			flags);
 
-		UsbCommand c = {CMD_SIMULATE_MIFARE_CARD, {flags, exitAfterNReads,0}};
+		UsbCommand c = {CMD_SIMULATE_MIFARE_CARD, {flags, exitAfterNReads, cardsize}};
 		memcpy(c.d.asBytes, uid, sizeof(uid));
 		clearCommandBuffer();
 		SendCommand(&c);
 
 		if(flags & FLAG_INTERACTIVE) {
 			PrintAndLog("Press pm3-button to abort simulation");
-			while(! WaitForResponseTimeout(CMD_ACK,&resp,1500)) {
+			while(! WaitForResponseTimeout(CMD_ACK, &resp, 1500)) {
 				//We're waiting only 1.5 s at a time, otherwise we get the
 				// annoying message about "Waiting for a response... "
 			}
@@ -1745,7 +1764,7 @@ int CmdHF14AMfELoad(const char *Cmd)
 		}
 	}
 
-	len = param_getstr(Cmd,nameParamNo,filename,sizeof(filename));
+	len = param_getstr(Cmd, nameParamNo, filename, sizeof(filename));
 
 	if (len > FILE_PATH_SIZE - 5) len = FILE_PATH_SIZE - 5;
 
@@ -2925,8 +2944,8 @@ static command_t CommandTable[] =
   {"hardnested",       CmdHF14AMfNestedHard,    0, "Nested attack for hardened Mifare cards"},
   {"nested",           CmdHF14AMfNested,        0, "Test nested authentication"},
   {"sniff",            CmdHF14AMfSniff,         0, "Sniff card-reader communication"},
-  {"sim",              CmdHF14AMf1kSim,         0, "Simulate MIFARE card"},
-  {"eclr",             CmdHF14AMfEClear,        0, "Clear simulator memory block"},
+  {"sim",              CmdHF14AMfSim,           0, "Simulate MIFARE card"},
+  {"eclr",             CmdHF14AMfEClear,        0, "Clear simulator memory"},
   {"eget",             CmdHF14AMfEGet,          0, "Get simulator memory block"},
   {"eset",             CmdHF14AMfESet,          0, "Set simulator memory block"},
   {"eload",            CmdHF14AMfELoad,         0, "Load from file emul dump"},

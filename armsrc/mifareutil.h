@@ -34,11 +34,11 @@
 #define MF_MINFIELDV      4000
 
 // debug
-// 0 - no debug messages 1 - error messages 2 - all messages 4 - extended debug mode
-#define MF_DBG_NONE          0
-#define MF_DBG_ERROR         1
-#define MF_DBG_ALL           2
-#define MF_DBG_EXTENDED      4
+#define MF_DBG_NONE          0  // no messages
+#define MF_DBG_ERROR         1  // errors only
+#define MF_DBG_INFO          2  // errors + info messages
+#define MF_DBG_DEBUG         3  // errors + info + debug messages
+#define MF_DBG_EXTENDED      4  // errors + info + debug + breaking debug messages
 
 extern int MF_DBGLEVEL;
 
@@ -71,6 +71,7 @@ int mifare_desfire_des_auth2(uint32_t uid, uint8_t *key, uint8_t *blockData);
 void mf_crypto1_decrypt(struct Crypto1State *pcs, uint8_t *receivedCmd, int len);
 void mf_crypto1_decryptEx(struct Crypto1State *pcs, uint8_t *data_in, int len, uint8_t *data_out);
 void mf_crypto1_encrypt(struct Crypto1State *pcs, uint8_t *data, uint16_t len, uint8_t *par);
+void mf_crypto1_encryptEx(struct Crypto1State *pcs, uint8_t *data, uint8_t *in, uint16_t len, uint8_t *par);
 uint8_t mf_crypto1_encrypt4bit(struct Crypto1State *pcs, uint8_t data);
 
 // Mifare memory structure

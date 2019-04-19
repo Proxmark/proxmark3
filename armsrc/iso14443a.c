@@ -68,7 +68,7 @@ typedef struct {
 		// DROP_FIRST_HALF,
 		} state;
 	uint16_t shiftReg;
-	int16_t	 bitCount;
+	int16_t  bitCount;
 	uint16_t len;
 	uint16_t byteCntMax;
 	uint16_t posCnt;
@@ -77,7 +77,7 @@ typedef struct {
 	uint8_t  parityLen;
 	uint32_t fourBits;
 	uint32_t startTime, endTime;
-    uint8_t *output;
+	uint8_t *output;
 	uint8_t *parity;
 } tUart;
 
@@ -94,8 +94,8 @@ static uint8_t iso14_pcb_blocknum = 0;
 //
 // minimum time between the start bits of consecutive transfers from reader to tag: 7000 carrier (13.56Mhz) cycles
 #define REQUEST_GUARD_TIME (7000/16 + 1)
-// minimum time between last modulation of tag and next start bit from reader to tag: 1172 carrier cycles 
-#define FRAME_DELAY_TIME_PICC_TO_PCD (1172/16 + 1) 
+// minimum time between last modulation of tag and next start bit from reader to tag: 1172 carrier cycles
+#define FRAME_DELAY_TIME_PICC_TO_PCD (1172/16 + 1)
 // bool LastCommandWasRequest = false;
 
 //
@@ -107,8 +107,8 @@ static uint8_t iso14_pcb_blocknum = 0;
 // 8 ticks until bit_to_arm is assigned from curbit
 // 8*16 ticks for the transfer from FPGA to ARM
 // 4*16 ticks until we measure the time
-// - 8*16 ticks because we measure the time of the previous transfer 
-#define DELAY_AIR2ARM_AS_READER (3 + 16 + 8 + 8*16 + 4*16 - 8*16) 
+// - 8*16 ticks because we measure the time of the previous transfer
+#define DELAY_AIR2ARM_AS_READER (3 + 16 + 8 + 8*16 + 4*16 - 8*16)
 
 // When the PM acts as a reader and is sending, it takes
 // 4*16 ticks until we can write data to the sending hold register
@@ -125,10 +125,10 @@ static uint8_t iso14_pcb_blocknum = 0;
 // 8 ticks until the SSC samples the first data
 // 7*16 ticks to complete the transfer from FPGA to ARM
 // 8 ticks until the next ssp_clk rising edge
-// 4*16 ticks until we measure the time 
-// - 8*16 ticks because we measure the time of the previous transfer 
+// 4*16 ticks until we measure the time
+// - 8*16 ticks because we measure the time of the previous transfer
 #define DELAY_AIR2ARM_AS_TAG (2 + 3 + 8 + 8 + 7*16 + 8 + 4*16 - 8*16)
- 
+
 // The FPGA will report its internal sending delay in
 uint16_t FpgaSendQueueDelay;
 // the 5 first bits are the number of bits buffered in mod_sig_buf
@@ -150,16 +150,16 @@ uint16_t FpgaSendQueueDelay;
 // 8 ticks (on average) until the result is stored in to_arm
 // + the delays in transferring data - which is the same for
 // sniffing reader and tag data and therefore not relevant
-#define DELAY_TAG_AIR2ARM_AS_SNIFFER (3 + 14 + 8) 
- 
+#define DELAY_TAG_AIR2ARM_AS_SNIFFER (3 + 14 + 8)
+
 // When the PM acts as sniffer and is receiving reader data, it takes
-// 2 ticks delay in analogue RF receiver (for the falling edge of the 
+// 2 ticks delay in analogue RF receiver (for the falling edge of the
 // start bit, which marks the start of the communication)
 // 3 ticks A/D conversion
 // 8 ticks on average until the data is stored in to_arm.
 // + the delays in transferring data - which is the same for
 // sniffing reader and tag data and therefore not relevant
-#define DELAY_READER_AIR2ARM_AS_SNIFFER (2 + 3 + 8) 
+#define DELAY_READER_AIR2ARM_AS_SNIFFER (2 + 3 + 8)
 
 //variables used for timing purposes:
 //these are in ssp_clk cycles:
@@ -177,12 +177,12 @@ static uint32_t LastProxToAirDuration;
 // Sequence X: 00001100 drop after half a period
 // Sequence Y: 00000000 no drop
 // Sequence Z: 11000000 drop at start
-#define	SEC_D 0xf0
-#define	SEC_E 0x0f
-#define	SEC_F 0x00
-#define	SEC_X 0x0c
-#define	SEC_Y 0x00
-#define	SEC_Z 0xc0
+#define SEC_D 0xf0
+#define SEC_E 0x0f
+#define SEC_F 0x00
+#define SEC_X 0x0c
+#define SEC_Y 0x00
+#define SEC_Z 0xc0
 
 void iso14a_set_trigger(bool enable) {
 	trigger = enable;
@@ -214,8 +214,8 @@ void GetParity(const uint8_t *pbtCmd, uint16_t iLen, uint8_t *par)
 		// Generate the parity bits
 		parityBits |= ((oddparity8(pbtCmd[i])) << (7-paritybit_cnt));
 		if (paritybit_cnt == 7) {
-			par[paritybyte_cnt] = parityBits;	// save 8 Bits parity
-			parityBits = 0;						// and advance to next Parity Byte
+			par[paritybyte_cnt] = parityBits;   // save 8 Bits parity
+			parityBits = 0;                     // and advance to next Parity Byte
 			paritybyte_cnt++;
 			paritybit_cnt = 0;
 		} else {
@@ -225,7 +225,7 @@ void GetParity(const uint8_t *pbtCmd, uint16_t iLen, uint8_t *par)
 
 	// save remaining parity bits
 	par[paritybyte_cnt] = parityBits;
-	
+
 }
 
 void AppendCrc14443a(uint8_t* data, int len)
@@ -244,14 +244,14 @@ static void AppendCrc14443b(uint8_t* data, int len)
 //=============================================================================
 // Basics:
 // This decoder is used when the PM3 acts as a tag.
-// The reader will generate "pauses" by temporarily switching of the field. 
-// At the PM3 antenna we will therefore measure a modulated antenna voltage. 
+// The reader will generate "pauses" by temporarily switching of the field.
+// At the PM3 antenna we will therefore measure a modulated antenna voltage.
 // The FPGA does a comparison with a threshold and would deliver e.g.:
 // ........  1 1 1 1 1 1 0 0 1 1 1 1 1 1 1 1 1 1 0 0 1 1 1 1 1 1 1 1 1 1  .......
 // The Miller decoder needs to identify the following sequences:
-// 2 (or 3) ticks pause followed by 6 (or 5) ticks unmodulated: 	pause at beginning - Sequence Z ("start of communication" or a "0")
-// 8 ticks without a modulation: 									no pause - Sequence Y (a "0" or "end of communication" or "no information")
-// 4 ticks unmodulated followed by 2 (or 3) ticks pause:			pause in second half - Sequence X (a "1")
+// 2 (or 3) ticks pause followed by 6 (or 5) ticks unmodulated:     pause at beginning - Sequence Z ("start of communication" or a "0")
+// 8 ticks without a modulation:                                    no pause - Sequence Y (a "0" or "end of communication" or "no information")
+// 4 ticks unmodulated followed by 2 (or 3) ticks pause:            pause in second half - Sequence X (a "1")
 // Note 1: the bitstream may start at any time. We therefore need to sync.
 // Note 2: the interpretation of Sequence Y and Z depends on the preceding sequence.
 //-----------------------------------------------------------------------------
@@ -274,19 +274,19 @@ static void UartReset()
 {
 	Uart.state = STATE_UNSYNCD;
 	Uart.bitCount = 0;
-	Uart.len = 0;						// number of decoded data bytes
-	Uart.parityLen = 0;					// number of decoded parity bytes
-	Uart.shiftReg = 0;					// shiftreg to hold decoded data bits
-	Uart.parityBits = 0;				// holds 8 parity bits
-	Uart.startTime = 0;
-	Uart.endTime = 0;
+	Uart.len = 0;                       // number of decoded data bytes
+	Uart.parityLen = 0;                 // number of decoded parity bytes
+	Uart.shiftReg = 0;                  // shiftreg to hold decoded data bits
+	Uart.parityBits = 0;                // holds 8 parity bits
 }
 
 static void UartInit(uint8_t *data, uint8_t *parity)
 {
 	Uart.output = data;
 	Uart.parity = parity;
-	Uart.fourBits = 0x00000000;			// clear the buffer for 4 Bits
+	Uart.fourBits = 0x00000000;         // clear the buffer for 4 Bits
+	Uart.startTime = 0;
+	Uart.endTime = 0;
 	UartReset();
 }
 
@@ -295,17 +295,17 @@ static RAMFUNC bool MillerDecoding(uint8_t bit, uint32_t non_real_time)
 {
 
 	Uart.fourBits = (Uart.fourBits << 8) | bit;
-	
-	if (Uart.state == STATE_UNSYNCD) {											// not yet synced
-	
-		Uart.syncBit = 9999; 													// not set
+
+	if (Uart.state == STATE_UNSYNCD) {                                          // not yet synced
+
+		Uart.syncBit = 9999;                                                    // not set
 		// The start bit is one ore more Sequence Y followed by a Sequence Z (... 11111111 00x11111). We need to distinguish from
 		// Sequence X followed by Sequence Y followed by Sequence Z (111100x1 11111111 00x11111)
-		// we therefore look for a ...xx11111111111100x11111xxxxxx... pattern 
+		// we therefore look for a ...xx11111111111100x11111xxxxxx... pattern
 		// (12 '1's followed by 2 '0's, eventually followed by another '0', followed by 5 '1's)
-		#define ISO14443A_STARTBIT_MASK		0x07FFEF80							// mask is    00000111 11111111 11101111 10000000
-		#define ISO14443A_STARTBIT_PATTERN	0x07FF8F80							// pattern is 00000111 11111111 10001111 10000000
-		if		((Uart.fourBits & (ISO14443A_STARTBIT_MASK >> 0)) == ISO14443A_STARTBIT_PATTERN >> 0) Uart.syncBit = 7;
+		#define ISO14443A_STARTBIT_MASK     0x07FFEF80                          // mask is    00000111 11111111 11101111 10000000
+		#define ISO14443A_STARTBIT_PATTERN  0x07FF8F80                          // pattern is 00000111 11111111 10001111 10000000
+		if      ((Uart.fourBits & (ISO14443A_STARTBIT_MASK >> 0)) == ISO14443A_STARTBIT_PATTERN >> 0) Uart.syncBit = 7;
 		else if ((Uart.fourBits & (ISO14443A_STARTBIT_MASK >> 1)) == ISO14443A_STARTBIT_PATTERN >> 1) Uart.syncBit = 6;
 		else if ((Uart.fourBits & (ISO14443A_STARTBIT_MASK >> 2)) == ISO14443A_STARTBIT_PATTERN >> 2) Uart.syncBit = 5;
 		else if ((Uart.fourBits & (ISO14443A_STARTBIT_MASK >> 3)) == ISO14443A_STARTBIT_PATTERN >> 3) Uart.syncBit = 4;
@@ -314,7 +314,7 @@ static RAMFUNC bool MillerDecoding(uint8_t bit, uint32_t non_real_time)
 		else if ((Uart.fourBits & (ISO14443A_STARTBIT_MASK >> 6)) == ISO14443A_STARTBIT_PATTERN >> 6) Uart.syncBit = 1;
 		else if ((Uart.fourBits & (ISO14443A_STARTBIT_MASK >> 7)) == ISO14443A_STARTBIT_PATTERN >> 7) Uart.syncBit = 0;
 
-		if (Uart.syncBit != 9999) {												// found a sync bit
+		if (Uart.syncBit != 9999) {                                             // found a sync bit
 			Uart.startTime = non_real_time?non_real_time:(GetCountSspClk() & 0xfffffff8);
 			Uart.startTime -= Uart.syncBit;
 			Uart.endTime = Uart.startTime;
@@ -324,97 +324,97 @@ static RAMFUNC bool MillerDecoding(uint8_t bit, uint32_t non_real_time)
 
 	} else {
 
-		if (IsMillerModulationNibble1(Uart.fourBits >> Uart.syncBit)) {			
-			if (IsMillerModulationNibble2(Uart.fourBits >> Uart.syncBit)) {		// Modulation in both halves - error
+		if (IsMillerModulationNibble1(Uart.fourBits >> Uart.syncBit)) {
+			if (IsMillerModulationNibble2(Uart.fourBits >> Uart.syncBit)) {     // Modulation in both halves - error
 				LED_B_OFF();
 				UartReset();
-			} else {															// Modulation in first half = Sequence Z = logic "0"
-				if (Uart.state == STATE_MILLER_X) {								// error - must not follow after X
+			} else {                                                            // Modulation in first half = Sequence Z = logic "0"
+				if (Uart.state == STATE_MILLER_X) {                             // error - must not follow after X
 					LED_B_OFF();
 					UartReset();
 				} else {
 					Uart.bitCount++;
-					Uart.shiftReg = (Uart.shiftReg >> 1);						// add a 0 to the shiftreg
+					Uart.shiftReg = (Uart.shiftReg >> 1);                       // add a 0 to the shiftreg
 					Uart.state = STATE_MILLER_Z;
 					Uart.endTime = Uart.startTime + 8*(9*Uart.len + Uart.bitCount + 1) - 6;
-					if(Uart.bitCount >= 9) {									// if we decoded a full byte (including parity)
+					if(Uart.bitCount >= 9) {                                    // if we decoded a full byte (including parity)
 						Uart.output[Uart.len++] = (Uart.shiftReg & 0xff);
-						Uart.parityBits <<= 1;									// make room for the parity bit
-						Uart.parityBits |= ((Uart.shiftReg >> 8) & 0x01);		// store parity bit
+						Uart.parityBits <<= 1;                                  // make room for the parity bit
+						Uart.parityBits |= ((Uart.shiftReg >> 8) & 0x01);       // store parity bit
 						Uart.bitCount = 0;
 						Uart.shiftReg = 0;
-						if((Uart.len&0x0007) == 0) {							// every 8 data bytes
-							Uart.parity[Uart.parityLen++] = Uart.parityBits;	// store 8 parity bits
+						if((Uart.len&0x0007) == 0) {                            // every 8 data bytes
+							Uart.parity[Uart.parityLen++] = Uart.parityBits;    // store 8 parity bits
 							Uart.parityBits = 0;
 						}
 					}
 				}
 			}
 		} else {
-			if (IsMillerModulationNibble2(Uart.fourBits >> Uart.syncBit)) {		// Modulation second half = Sequence X = logic "1"
+			if (IsMillerModulationNibble2(Uart.fourBits >> Uart.syncBit)) {     // Modulation second half = Sequence X = logic "1"
 				Uart.bitCount++;
-				Uart.shiftReg = (Uart.shiftReg >> 1) | 0x100;					// add a 1 to the shiftreg
+				Uart.shiftReg = (Uart.shiftReg >> 1) | 0x100;                   // add a 1 to the shiftreg
 				Uart.state = STATE_MILLER_X;
 				Uart.endTime = Uart.startTime + 8*(9*Uart.len + Uart.bitCount + 1) - 2;
-				if(Uart.bitCount >= 9) {										// if we decoded a full byte (including parity)
+				if(Uart.bitCount >= 9) {                                        // if we decoded a full byte (including parity)
 					Uart.output[Uart.len++] = (Uart.shiftReg & 0xff);
-					Uart.parityBits <<= 1;										// make room for the new parity bit
-					Uart.parityBits |= ((Uart.shiftReg >> 8) & 0x01); 			// store parity bit
+					Uart.parityBits <<= 1;                                      // make room for the new parity bit
+					Uart.parityBits |= ((Uart.shiftReg >> 8) & 0x01);           // store parity bit
 					Uart.bitCount = 0;
 					Uart.shiftReg = 0;
-					if ((Uart.len&0x0007) == 0) {								// every 8 data bytes
-						Uart.parity[Uart.parityLen++] = Uart.parityBits;		// store 8 parity bits
+					if ((Uart.len&0x0007) == 0) {                               // every 8 data bytes
+						Uart.parity[Uart.parityLen++] = Uart.parityBits;        // store 8 parity bits
 						Uart.parityBits = 0;
 					}
 				}
-			} else {															// no modulation in both halves - Sequence Y
-				if (Uart.state == STATE_MILLER_Z || Uart.state == STATE_MILLER_Y) {	// Y after logic "0" - End of Communication
+			} else {                                                            // no modulation in both halves - Sequence Y
+				if (Uart.state == STATE_MILLER_Z || Uart.state == STATE_MILLER_Y) { // Y after logic "0" - End of Communication
 					LED_B_OFF();
 					Uart.state = STATE_UNSYNCD;
-					Uart.bitCount--;											// last "0" was part of EOC sequence
-					Uart.shiftReg <<= 1;										// drop it
-					if(Uart.bitCount > 0) {										// if we decoded some bits
-						Uart.shiftReg >>= (9 - Uart.bitCount);					// right align them
-						Uart.output[Uart.len++] = (Uart.shiftReg & 0xff);		// add last byte to the output
-						Uart.parityBits <<= 1;									// add a (void) parity bit
-						Uart.parityBits <<= (8 - (Uart.len&0x0007));			// left align parity bits
-						Uart.parity[Uart.parityLen++] = Uart.parityBits;		// and store it
+					Uart.bitCount--;                                            // last "0" was part of EOC sequence
+					Uart.shiftReg <<= 1;                                        // drop it
+					if(Uart.bitCount > 0) {                                     // if we decoded some bits
+						Uart.shiftReg >>= (9 - Uart.bitCount);                  // right align them
+						Uart.output[Uart.len++] = (Uart.shiftReg & 0xff);       // add last byte to the output
+						Uart.parityBits <<= 1;                                  // add a (void) parity bit
+						Uart.parityBits <<= (8 - (Uart.len&0x0007));            // left align parity bits
+						Uart.parity[Uart.parityLen++] = Uart.parityBits;        // and store it
 						return true;
-					} else if (Uart.len & 0x0007) {								// there are some parity bits to store
-						Uart.parityBits <<= (8 - (Uart.len&0x0007));			// left align remaining parity bits
-						Uart.parity[Uart.parityLen++] = Uart.parityBits;		// and store them
+					} else if (Uart.len & 0x0007) {                             // there are some parity bits to store
+						Uart.parityBits <<= (8 - (Uart.len&0x0007));            // left align remaining parity bits
+						Uart.parity[Uart.parityLen++] = Uart.parityBits;        // and store them
 					}
 					if (Uart.len) {
-						return true;											// we are finished with decoding the raw data sequence
+						return true;                                            // we are finished with decoding the raw data sequence
 					} else {
-						UartReset();											// Nothing received - start over
+						UartReset();                                            // Nothing received - start over
 					}
 				}
-				if (Uart.state == STATE_START_OF_COMMUNICATION) {				// error - must not follow directly after SOC
+				if (Uart.state == STATE_START_OF_COMMUNICATION) {               // error - must not follow directly after SOC
 					LED_B_OFF();
 					UartReset();
-				} else {														// a logic "0"
+				} else {                                                        // a logic "0"
 					Uart.bitCount++;
-					Uart.shiftReg = (Uart.shiftReg >> 1);						// add a 0 to the shiftreg
+					Uart.shiftReg = (Uart.shiftReg >> 1);                       // add a 0 to the shiftreg
 					Uart.state = STATE_MILLER_Y;
-					if(Uart.bitCount >= 9) {									// if we decoded a full byte (including parity)
+					if(Uart.bitCount >= 9) {                                    // if we decoded a full byte (including parity)
 						Uart.output[Uart.len++] = (Uart.shiftReg & 0xff);
-						Uart.parityBits <<= 1;									// make room for the parity bit
-						Uart.parityBits |= ((Uart.shiftReg >> 8) & 0x01); 		// store parity bit
+						Uart.parityBits <<= 1;                                  // make room for the parity bit
+						Uart.parityBits |= ((Uart.shiftReg >> 8) & 0x01);       // store parity bit
 						Uart.bitCount = 0;
 						Uart.shiftReg = 0;
-						if ((Uart.len&0x0007) == 0) {							// every 8 data bytes
-							Uart.parity[Uart.parityLen++] = Uart.parityBits;	// store 8 parity bits
+						if ((Uart.len&0x0007) == 0) {                           // every 8 data bytes
+							Uart.parity[Uart.parityLen++] = Uart.parityBits;    // store 8 parity bits
 							Uart.parityBits = 0;
 						}
 					}
 				}
 			}
 		}
-			
-	} 
 
-    return false;	// not finished yet, need more data
+	}
+
+	return false;   // not finished yet, need more data
 }
 
 
@@ -428,10 +428,10 @@ static RAMFUNC bool MillerDecoding(uint8_t bit, uint32_t non_real_time)
 // at the reader antenna will be modulated as well. The FPGA detects the modulation for us and would deliver e.g. the following:
 // ........ 0 0 1 1 1 1 0 0 0 0 0 0 0 0 1 1 1 1 1 1 1 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 .......
 // The Manchester decoder needs to identify the following sequences:
-// 4 ticks modulated followed by 4 ticks unmodulated: 	Sequence D = 1 (also used as "start of communication")
-// 4 ticks unmodulated followed by 4 ticks modulated: 	Sequence E = 0
-// 8 ticks unmodulated:									Sequence F = end of communication
-// 8 ticks modulated:									A collision. Save the collision position and treat as Sequence D
+// 4 ticks modulated followed by 4 ticks unmodulated:   Sequence D = 1 (also used as "start of communication")
+// 4 ticks unmodulated followed by 4 ticks modulated:   Sequence E = 0
+// 8 ticks unmodulated:                                 Sequence F = end of communication
+// 8 ticks modulated:                                   A collision. Save the collision position and treat as Sequence D
 // Note 1: the bitstream may start at any time. We therefore need to sync.
 // Note 2: parameter offset is used to determine the position of the parity bits (required for the anticollision command only)
 static tDemod Demod;
@@ -450,12 +450,12 @@ const bool Mod_Manchester_LUT[] = {
 static void DemodReset()
 {
 	Demod.state = DEMOD_UNSYNCD;
-	Demod.len = 0;						// number of decoded data bytes
+	Demod.len = 0;                      // number of decoded data bytes
 	Demod.parityLen = 0;
-	Demod.shiftReg = 0;					// shiftreg to hold decoded data bits
-	Demod.parityBits = 0;				// 
-	Demod.collisionPos = 0;				// Position of collision bit
-	Demod.twoBits = 0xffff;				// buffer for 2 Bits
+	Demod.shiftReg = 0;                 // shiftreg to hold decoded data bits
+	Demod.parityBits = 0;               //
+	Demod.collisionPos = 0;             // Position of collision bit
+	Demod.twoBits = 0xffff;             // buffer for 2 Bits
 	Demod.highCnt = 0;
 	Demod.startTime = 0;
 	Demod.endTime = 0;
@@ -473,18 +473,18 @@ static RAMFUNC int ManchesterDecoding(uint8_t bit, uint16_t offset, uint32_t non
 {
 
 	Demod.twoBits = (Demod.twoBits << 8) | bit;
-	
+
 	if (Demod.state == DEMOD_UNSYNCD) {
 
-		if (Demod.highCnt < 2) {											// wait for a stable unmodulated signal
+		if (Demod.highCnt < 2) {                                            // wait for a stable unmodulated signal
 			if (Demod.twoBits == 0x0000) {
 				Demod.highCnt++;
 			} else {
 				Demod.highCnt = 0;
 			}
 		} else {
-			Demod.syncBit = 0xFFFF;			// not set
-			if 		((Demod.twoBits & 0x7700) == 0x7000) Demod.syncBit = 7; 
+			Demod.syncBit = 0xFFFF;         // not set
+			if      ((Demod.twoBits & 0x7700) == 0x7000) Demod.syncBit = 7;
 			else if ((Demod.twoBits & 0x3B80) == 0x3800) Demod.syncBit = 6;
 			else if ((Demod.twoBits & 0x1DC0) == 0x1C00) Demod.syncBit = 5;
 			else if ((Demod.twoBits & 0x0EE0) == 0x0E00) Demod.syncBit = 4;
@@ -495,7 +495,7 @@ static RAMFUNC int ManchesterDecoding(uint8_t bit, uint16_t offset, uint32_t non
 			if (Demod.syncBit != 0xFFFF) {
 				Demod.startTime = non_real_time?non_real_time:(GetCountSspClk() & 0xfffffff8);
 				Demod.startTime -= Demod.syncBit;
-				Demod.bitCount = offset;			// number of decoded data bits
+				Demod.bitCount = offset;            // number of decoded data bits
 				Demod.state = DEMOD_MANCHESTER_DATA;
 				LED_C_ON();
 			}
@@ -503,66 +503,66 @@ static RAMFUNC int ManchesterDecoding(uint8_t bit, uint16_t offset, uint32_t non
 
 	} else {
 
-		if (IsManchesterModulationNibble1(Demod.twoBits >> Demod.syncBit)) {		// modulation in first half
-			if (IsManchesterModulationNibble2(Demod.twoBits >> Demod.syncBit)) {	// ... and in second half = collision
+		if (IsManchesterModulationNibble1(Demod.twoBits >> Demod.syncBit)) {        // modulation in first half
+			if (IsManchesterModulationNibble2(Demod.twoBits >> Demod.syncBit)) {    // ... and in second half = collision
 				if (!Demod.collisionPos) {
 					Demod.collisionPos = (Demod.len << 3) + Demod.bitCount;
 				}
-			}															// modulation in first half only - Sequence D = 1
+			}                                                           // modulation in first half only - Sequence D = 1
 			Demod.bitCount++;
-			Demod.shiftReg = (Demod.shiftReg >> 1) | 0x100;				// in both cases, add a 1 to the shiftreg
-			if(Demod.bitCount == 9) {									// if we decoded a full byte (including parity)
+			Demod.shiftReg = (Demod.shiftReg >> 1) | 0x100;             // in both cases, add a 1 to the shiftreg
+			if(Demod.bitCount == 9) {                                   // if we decoded a full byte (including parity)
 				Demod.output[Demod.len++] = (Demod.shiftReg & 0xff);
-				Demod.parityBits <<= 1;									// make room for the parity bit
-				Demod.parityBits |= ((Demod.shiftReg >> 8) & 0x01); 	// store parity bit
+				Demod.parityBits <<= 1;                                 // make room for the parity bit
+				Demod.parityBits |= ((Demod.shiftReg >> 8) & 0x01);     // store parity bit
 				Demod.bitCount = 0;
 				Demod.shiftReg = 0;
-				if((Demod.len&0x0007) == 0) {							// every 8 data bytes
-					Demod.parity[Demod.parityLen++] = Demod.parityBits;	// store 8 parity bits
+				if((Demod.len&0x0007) == 0) {                           // every 8 data bytes
+					Demod.parity[Demod.parityLen++] = Demod.parityBits; // store 8 parity bits
 					Demod.parityBits = 0;
 				}
 			}
 			Demod.endTime = Demod.startTime + 8*(9*Demod.len + Demod.bitCount + 1) - 4;
-		} else {														// no modulation in first half
-			if (IsManchesterModulationNibble2(Demod.twoBits >> Demod.syncBit)) {	// and modulation in second half = Sequence E = 0
+		} else {                                                        // no modulation in first half
+			if (IsManchesterModulationNibble2(Demod.twoBits >> Demod.syncBit)) {    // and modulation in second half = Sequence E = 0
 				Demod.bitCount++;
-				Demod.shiftReg = (Demod.shiftReg >> 1);					// add a 0 to the shiftreg
-				if(Demod.bitCount >= 9) {								// if we decoded a full byte (including parity)
+				Demod.shiftReg = (Demod.shiftReg >> 1);                 // add a 0 to the shiftreg
+				if(Demod.bitCount >= 9) {                               // if we decoded a full byte (including parity)
 					Demod.output[Demod.len++] = (Demod.shiftReg & 0xff);
-					Demod.parityBits <<= 1;								// make room for the new parity bit
+					Demod.parityBits <<= 1;                             // make room for the new parity bit
 					Demod.parityBits |= ((Demod.shiftReg >> 8) & 0x01); // store parity bit
 					Demod.bitCount = 0;
 					Demod.shiftReg = 0;
-					if ((Demod.len&0x0007) == 0) {						// every 8 data bytes
-						Demod.parity[Demod.parityLen++] = Demod.parityBits;	// store 8 parity bits1
+					if ((Demod.len&0x0007) == 0) {                      // every 8 data bytes
+						Demod.parity[Demod.parityLen++] = Demod.parityBits; // store 8 parity bits1
 						Demod.parityBits = 0;
 					}
 				}
 				Demod.endTime = Demod.startTime + 8*(9*Demod.len + Demod.bitCount + 1);
-			} else {													// no modulation in both halves - End of communication
+			} else {                                                    // no modulation in both halves - End of communication
 				LED_C_OFF();
-				if(Demod.bitCount > 0) {								// there are some remaining data bits
-					Demod.shiftReg >>= (9 - Demod.bitCount);			// right align the decoded bits
-					Demod.output[Demod.len++] = Demod.shiftReg & 0xff;	// and add them to the output
-					Demod.parityBits <<= 1;								// add a (void) parity bit
-					Demod.parityBits <<= (8 - (Demod.len&0x0007));		// left align remaining parity bits
-					Demod.parity[Demod.parityLen++] = Demod.parityBits;	// and store them
+				if(Demod.bitCount > 0) {                                // there are some remaining data bits
+					Demod.shiftReg >>= (9 - Demod.bitCount);            // right align the decoded bits
+					Demod.output[Demod.len++] = Demod.shiftReg & 0xff;  // and add them to the output
+					Demod.parityBits <<= 1;                             // add a (void) parity bit
+					Demod.parityBits <<= (8 - (Demod.len&0x0007));      // left align remaining parity bits
+					Demod.parity[Demod.parityLen++] = Demod.parityBits; // and store them
 					return true;
-				} else if (Demod.len & 0x0007) {						// there are some parity bits to store
-					Demod.parityBits <<= (8 - (Demod.len&0x0007));		// left align remaining parity bits
-					Demod.parity[Demod.parityLen++] = Demod.parityBits;	// and store them
+				} else if (Demod.len & 0x0007) {                        // there are some parity bits to store
+					Demod.parityBits <<= (8 - (Demod.len&0x0007));      // left align remaining parity bits
+					Demod.parity[Demod.parityLen++] = Demod.parityBits; // and store them
 				}
 				if (Demod.len) {
-					return true;										// we are finished with decoding the raw data sequence
-				} else { 												// nothing received. Start over
+					return true;                                        // we are finished with decoding the raw data sequence
+				} else {                                                // nothing received. Start over
 					DemodReset();
 				}
 			}
 		}
-			
-	} 
 
-    return false;	// not finished yet, need more data
+	}
+
+	return false;   // not finished yet, need more data
 }
 
 //=============================================================================
@@ -579,7 +579,7 @@ void RAMFUNC SnoopIso14443a(uint8_t param) {
 	// param:
 	// bit 0 - trigger from first card answer
 	// bit 1 - trigger from first reader 7-bit request
-	
+
 	LEDsoff();
 	LED_A_ON();
 
@@ -592,11 +592,11 @@ void RAMFUNC SnoopIso14443a(uint8_t param) {
 	// The command (reader -> tag) that we're receiving.
 	uint8_t *receivedCmd = BigBuf_malloc(MAX_FRAME_SIZE);
 	uint8_t *receivedCmdPar = BigBuf_malloc(MAX_PARITY_SIZE);
-	
+
 	// The response (tag -> reader) that we're receiving.
 	uint8_t *receivedResponse = BigBuf_malloc(MAX_FRAME_SIZE);
 	uint8_t *receivedResponsePar = BigBuf_malloc(MAX_PARITY_SIZE);
-	
+
 	// The DMA buffer, used to stream samples from the FPGA
 	uint8_t *dmaBuf = BigBuf_malloc(DMA_BUFFER_SIZE);
 
@@ -610,26 +610,26 @@ void RAMFUNC SnoopIso14443a(uint8_t param) {
 	int dataLen = 0;
 	bool TagIsActive = false;
 	bool ReaderIsActive = false;
-	
+
 	// Set up the demodulator for tag -> reader responses.
 	DemodInit(receivedResponse, receivedResponsePar);
-	
+
 	// Set up the demodulator for the reader -> tag commands
 	UartInit(receivedCmd, receivedCmdPar);
-	
+
 	// Setup and start DMA.
 	FpgaSetupSscDma((uint8_t *)dmaBuf, DMA_BUFFER_SIZE);
-	
+
 	// We won't start recording the frames that we acquire until we trigger;
 	// a good trigger condition to get started is probably when we see a
 	// response from the tag.
 	// triggered == false -- to wait first for card
-	bool triggered = !(param & 0x03); 
-	
-	// And now we loop, receiving samples.
-	for(uint32_t rsamples = 0; true; ) {
+	bool triggered = !(param & 0x03);
 
-		if(BUTTON_PRESS()) {
+	// And now we loop, receiving samples.
+	for (uint32_t rsamples = 0; true; ) {
+
+		if (BUTTON_PRESS()) {
 			DbpString("cancelled by button");
 			break;
 		}
@@ -665,9 +665,9 @@ void RAMFUNC SnoopIso14443a(uint8_t param) {
 			AT91C_BASE_PDC_SSC->PDC_RNCR = DMA_BUFFER_SIZE;
 		}
 
-		if (rsamples & 0x01) {				// Need two samples to feed Miller and Manchester-Decoder
+		if (rsamples & 0x01) {              // Need two samples to feed Miller and Manchester-Decoder
 
-			if(!TagIsActive) {		// no need to try decoding reader data if the tag is sending
+			if(!TagIsActive) {      // no need to try decoding reader data if the tag is sending
 				uint8_t readerdata = (previous_data & 0xF0) | (*data >> 4);
 				if (MillerDecoding(readerdata, (rsamples-1)*4)) {
 					// check - if there is a short 7bit request from reader
@@ -675,11 +675,11 @@ void RAMFUNC SnoopIso14443a(uint8_t param) {
 						triggered = true;
 					}
 					if(triggered) {
-						if (!LogTrace(receivedCmd, 
-										Uart.len, 
+						if (!LogTrace(receivedCmd,
+										Uart.len,
 										Uart.startTime*16 - DELAY_READER_AIR2ARM_AS_SNIFFER,
 										Uart.endTime*16 - DELAY_READER_AIR2ARM_AS_SNIFFER,
-										Uart.parity, 
+										Uart.parity,
 										true)) break;
 					}
 					/* And ready to receive another command. */
@@ -691,12 +691,12 @@ void RAMFUNC SnoopIso14443a(uint8_t param) {
 				ReaderIsActive = (Uart.state != STATE_UNSYNCD);
 			}
 
-			if (!ReaderIsActive) {		// no need to try decoding tag data if the reader is sending - and we cannot afford the time
+			if (!ReaderIsActive) {      // no need to try decoding tag data if the reader is sending - and we cannot afford the time
 				uint8_t tagdata = (previous_data << 4) | (*data & 0x0F);
 				if (ManchesterDecoding(tagdata, 0, (rsamples-1)*4)) {
-					if (!LogTrace(receivedResponse, 
-									Demod.len, 
-									Demod.startTime*16 - DELAY_TAG_AIR2ARM_AS_SNIFFER, 
+					if (!LogTrace(receivedResponse,
+									Demod.len,
+									Demod.startTime*16 - DELAY_TAG_AIR2ARM_AS_SNIFFER,
 									Demod.endTime*16 - DELAY_TAG_AIR2ARM_AS_SNIFFER,
 									Demod.parity,
 									false)) break;
@@ -705,7 +705,7 @@ void RAMFUNC SnoopIso14443a(uint8_t param) {
 					DemodReset();
 					// And reset the Miller decoder including itS (now outdated) input buffer
 					UartInit(receivedCmd, receivedCmdPar);
-				} 
+				}
 				TagIsActive = (Demod.state != DEMOD_UNSYNCD);
 			}
 		}
@@ -742,16 +742,16 @@ static void CodeIso14443aAsTagPar(const uint8_t *cmd, uint16_t len, uint8_t *par
 	ToSendStuffBit(0);
 	ToSendStuffBit(0);
 	ToSendStuffBit(0);
-	
+
 	// Send startbit
 	ToSend[++ToSendMax] = SEC_D;
 	LastProxToAirDuration = 8 * ToSendMax - 4;
 
-	for(uint16_t i = 0; i < len; i++) {
+	for (uint16_t i = 0; i < len; i++) {
 		uint8_t b = cmd[i];
 
 		// Data bits
-		for(uint16_t j = 0; j < 8; j++) {
+		for (uint16_t j = 0; j < 8; j++) {
 			if(b & 1) {
 				ToSend[++ToSendMax] = SEC_D;
 			} else {
@@ -798,7 +798,7 @@ static void Code4bitAnswerAsTag(uint8_t cmd)
 	ToSend[++ToSendMax] = SEC_D;
 
 	uint8_t b = cmd;
-	for(i = 0; i < 4; i++) {
+	for (i = 0; i < 4; i++) {
 		if(b & 1) {
 			ToSend[++ToSendMax] = SEC_D;
 			LastProxToAirDuration = 8 * ToSendMax - 4;
@@ -839,7 +839,7 @@ static void FixLastReaderTraceTime(uint32_t tag_StartTime) {
 	LastReaderTraceTime[3] = (reader_StartTime >> 24) & 0xff;
 }
 
-	
+
 static void EmLogTraceTag(uint8_t *tag_data, uint16_t tag_len, uint8_t *tag_Parity, uint32_t ProxToAirDuration) {
 	uint32_t tag_StartTime = LastTimeProxToAirStart*16 + DELAY_ARM2AIR_AS_TAG;
 	uint32_t tag_EndTime = (LastTimeProxToAirStart + ProxToAirDuration)*16 + DELAY_ARM2AIR_AS_TAG;
@@ -855,39 +855,38 @@ static void EmLogTraceTag(uint8_t *tag_data, uint16_t tag_len, uint8_t *tag_Pari
 //-----------------------------------------------------------------------------
 static int GetIso14443aCommandFromReader(uint8_t *received, uint8_t *parity, int *len)
 {
-    // Set FPGA mode to "simulated ISO 14443 tag", no modulation (listen
-    // only, since we are receiving, not transmitting).
-    // Signal field is off with the appropriate LED
-    LED_D_OFF();
-    FpgaWriteConfWord(FPGA_MAJOR_MODE_HF_ISO14443A | FPGA_HF_ISO14443A_TAGSIM_LISTEN);
+	// Set FPGA mode to "simulated ISO 14443 tag", no modulation (listen
+	// only, since we are receiving, not transmitting).
+	// Signal field is off with the appropriate LED
+	LED_D_OFF();
+	FpgaWriteConfWord(FPGA_MAJOR_MODE_HF_ISO14443A | FPGA_HF_ISO14443A_TAGSIM_LISTEN);
 
-    // Now run a `software UART' on the stream of incoming samples.
+	// Now run a `software UART' on the stream of incoming samples.
 	UartInit(received, parity);
 
 	// clear RXRDY:
-    uint8_t b = (uint8_t)AT91C_BASE_SSC->SSC_RHR;
+	uint8_t b = (uint8_t)AT91C_BASE_SSC->SSC_RHR;
 
-    for(;;) {
-        WDT_HIT();
+	for (;;) {
+		WDT_HIT();
 
-        if(BUTTON_PRESS()) return false;
-		
-        if(AT91C_BASE_SSC->SSC_SR & (AT91C_SSC_RXRDY)) {
-            b = (uint8_t)AT91C_BASE_SSC->SSC_RHR;
+		if(BUTTON_PRESS()) return false;
+
+		if(AT91C_BASE_SSC->SSC_SR & (AT91C_SSC_RXRDY)) {
+			b = (uint8_t)AT91C_BASE_SSC->SSC_RHR;
 			if(MillerDecoding(b, 0)) {
 				*len = Uart.len;
 				EmLogTraceReader();
 				return true;
 			}
- 		}
-    }
+		}
+	}
 }
 
 
-static int EmSend4bitEx(uint8_t resp);
 int EmSend4bit(uint8_t resp);
 static int EmSendCmdExPar(uint8_t *resp, uint16_t respLen, uint8_t *par);
-int EmSendCmdEx(uint8_t *resp, uint16_t respLen);
+int EmSendCmd(uint8_t *resp, uint16_t respLen);
 int EmSendPrecompiledCmd(tag_response_info_t *response_info);
 
 
@@ -902,32 +901,32 @@ static bool prepare_tag_modulation(tag_response_info_t* response_info, size_t ma
 	// ----------- +
 	//    166 bytes, since every bit that needs to be send costs us a byte
 	//
- 
- 
+
+
   // Prepare the tag modulation bits from the message
   GetParity(response_info->response, response_info->response_n, &(response_info->par));
   CodeIso14443aAsTagPar(response_info->response,response_info->response_n, &(response_info->par));
-  
+
   // Make sure we do not exceed the free buffer space
   if (ToSendMax > max_buffer_size) {
-    Dbprintf("Out of memory, when modulating bits for tag answer:");
-    Dbhexdump(response_info->response_n, response_info->response, false);
-    return false;
+	Dbprintf("Out of memory, when modulating bits for tag answer:");
+	Dbhexdump(response_info->response_n, response_info->response, false);
+	return false;
   }
-  
+
   // Copy the byte array, used for this modulation to the buffer position
   memcpy(response_info->modulation, ToSend, ToSendMax);
-  
+
   // Store the number of bytes that were used for encoding/modulation and the time needed to transfer them
   response_info->modulation_n = ToSendMax;
   response_info->ProxToAirDuration = LastProxToAirDuration;
-  
+
   return true;
 }
 
 
 // "precompile" responses. There are 7 predefined responses with a total of 28 bytes data to transmit.
-// Coded responses need one byte per bit to transfer (data, parity, start, stop, correction) 
+// Coded responses need one byte per bit to transfer (data, parity, start, stop, correction)
 // 28 * 8 data bits, 28 * 1 parity bits, 7 start bits, 7 stop bits, 7 correction bits for the modulation
 // -> need 273 bytes buffer
 #define ALLOCATED_TAG_MODULATION_BUFFER_SIZE 273
@@ -936,15 +935,15 @@ bool prepare_allocated_tag_modulation(tag_response_info_t* response_info, uint8_
 
   // Retrieve and store the current buffer index
   response_info->modulation = *buffer;
-  
+
   // Forward the prepare tag modulation function to the inner function
   if (prepare_tag_modulation(response_info, *max_buffer_size)) {
-    // Update the free buffer offset and the remaining buffer size
-    *buffer += ToSendMax;
+	// Update the free buffer offset and the remaining buffer size
+	*buffer += ToSendMax;
 	*max_buffer_size -= ToSendMax;
-    return true;
+	return true;
   } else {
-    return false;
+	return false;
   }
 }
 
@@ -958,7 +957,7 @@ void SimulateIso14443aTag(int tagType, int uid_1st, int uid_2nd, byte_t* data)
 
 	// The first response contains the ATQA (note: bytes are transmitted in reverse order).
 	uint8_t response1[2];
-	
+
 	switch (tagType) {
 		case 1: { // MIFARE Classic
 			// Says: I am Mifare 1k - original line
@@ -989,19 +988,19 @@ void SimulateIso14443aTag(int tagType, int uid_1st, int uid_2nd, byte_t* data)
 			response1[0] = 0x01;
 			response1[1] = 0x0f;
 			sak = 0x01;
-		} break;		
+		} break;
 		default: {
 			Dbprintf("Error: unkown tagtype (%d)",tagType);
 			return;
 		} break;
 	}
-	
+
 	// The second response contains the (mandatory) first 24 bits of the UID
 	uint8_t response2[5] = {0x00};
 
 	// Check if the uid uses the (optional) part
 	uint8_t response2a[5] = {0x00};
-	
+
 	if (uid_2nd) {
 		response2[0] = 0x88;
 		num_to_bytes(uid_1st,3,response2+1);
@@ -1032,8 +1031,8 @@ void SimulateIso14443aTag(int tagType, int uid_1st, int uid_2nd, byte_t* data)
 	ComputeCrc14443(CRC_14443_A, response3a, 1, &response3a[1], &response3a[2]);
 
 	uint8_t response5[] = { 0x00, 0x00, 0x00, 0x00 }; // Very random tag nonce
-	uint8_t response6[] = { 0x04, 0x58, 0x80, 0x02, 0x00, 0x00 }; // dummy ATS (pseudo-ATR), answer to RATS: 
-	// Format byte = 0x58: FSCI=0x08 (FSC=256), TA(1) and TC(1) present, 
+	uint8_t response6[] = { 0x04, 0x58, 0x80, 0x02, 0x00, 0x00 }; // dummy ATS (pseudo-ATR), answer to RATS:
+	// Format byte = 0x58: FSCI=0x08 (FSC=256), TA(1) and TC(1) present,
 	// TA(1) = 0x80: different divisors not supported, DR = 1, DS = 1
 	// TB(1) = not present. Defaults: FWI = 4 (FWT = 256 * 16 * 2^4 * 1/fc = 4833us), SFGI = 0 (SFG = 256 * 16 * 2^0 * 1/fc = 302us)
 	// TC(1) = 0x02: CID supported, NAD not supported
@@ -1062,7 +1061,7 @@ void SimulateIso14443aTag(int tagType, int uid_1st, int uid_2nd, byte_t* data)
 		.modulation = dynamic_modulation_buffer,
 		.modulation_n = 0
 	};
-  
+
 	// We need to listen to the high-frequency, peak-detected path.
 	iso14443a_setup(FPGA_HF_ISO14443A_TAGSIM_LISTEN);
 
@@ -1098,7 +1097,7 @@ void SimulateIso14443aTag(int tagType, int uid_1st, int uid_2nd, byte_t* data)
 	tag_response_info_t* p_response;
 
 	LED_A_ON();
-	for(;;) {
+	for (;;) {
 		// Clean receive command buffer
 		if(!GetIso14443aCommandFromReader(receivedCmd, receivedCmdPar, &len)) {
 			DbpString("Button press");
@@ -1106,32 +1105,32 @@ void SimulateIso14443aTag(int tagType, int uid_1st, int uid_2nd, byte_t* data)
 		}
 
 		p_response = NULL;
-		
+
 		// Okay, look at the command now.
 		lastorder = order;
 		if(receivedCmd[0] == 0x26) { // Received a REQUEST
 			p_response = &responses[0]; order = 1;
 		} else if(receivedCmd[0] == 0x52) { // Received a WAKEUP
 			p_response = &responses[0]; order = 6;
-		} else if(receivedCmd[1] == 0x20 && receivedCmd[0] == 0x93) {	// Received request for UID (cascade 1)
+		} else if(receivedCmd[1] == 0x20 && receivedCmd[0] == 0x93) {   // Received request for UID (cascade 1)
 			p_response = &responses[1]; order = 2;
-		} else if(receivedCmd[1] == 0x20 && receivedCmd[0] == 0x95) { 	// Received request for UID (cascade 2)
+		} else if(receivedCmd[1] == 0x20 && receivedCmd[0] == 0x95) {   // Received request for UID (cascade 2)
 			p_response = &responses[2]; order = 20;
-		} else if(receivedCmd[1] == 0x70 && receivedCmd[0] == 0x93) {	// Received a SELECT (cascade 1)
+		} else if(receivedCmd[1] == 0x70 && receivedCmd[0] == 0x93) {   // Received a SELECT (cascade 1)
 			p_response = &responses[3]; order = 3;
-		} else if(receivedCmd[1] == 0x70 && receivedCmd[0] == 0x95) {	// Received a SELECT (cascade 2)
+		} else if(receivedCmd[1] == 0x70 && receivedCmd[0] == 0x95) {   // Received a SELECT (cascade 2)
 			p_response = &responses[4]; order = 30;
-		} else if(receivedCmd[0] == 0x30) {	// Received a (plain) READ
-			EmSendCmdEx(data+(4*receivedCmd[1]),16);
+		} else if(receivedCmd[0] == 0x30) { // Received a (plain) READ
+			EmSendCmd(data+(4*receivedCmd[1]),16);
 			// Dbprintf("Read request from reader: %x %x",receivedCmd[0],receivedCmd[1]);
 			// We already responded, do not send anything with the EmSendCmd14443aRaw() that is called below
 			p_response = NULL;
-		} else if(receivedCmd[0] == 0x50) {	// Received a HALT
+		} else if(receivedCmd[0] == 0x50) { // Received a HALT
 			p_response = NULL;
-		} else if(receivedCmd[0] == 0x60 || receivedCmd[0] == 0x61) {	// Received an authentication request
+		} else if(receivedCmd[0] == 0x60 || receivedCmd[0] == 0x61) {   // Received an authentication request
 			p_response = &responses[5]; order = 7;
-		} else if(receivedCmd[0] == 0xE0) {	// Received a RATS request
-			if (tagType == 1 || tagType == 2) {	// RATS not supported
+		} else if(receivedCmd[0] == 0xE0) { // Received a RATS request
+			if (tagType == 1 || tagType == 2) { // RATS not supported
 				EmSend4bit(CARD_NACK_NA);
 				p_response = NULL;
 			} else {
@@ -1165,7 +1164,7 @@ void SimulateIso14443aTag(int tagType, int uid_1st, int uid_2nd, byte_t* data)
 				  dynamic_response_info.response[0] = receivedCmd[0] ^ 0x11;
 				  dynamic_response_info.response_n = 2;
 				} break;
-				  
+
 				case 0xBA: { //
 				  memcpy(dynamic_response_info.response,"\xAB\x00",2);
 				  dynamic_response_info.response_n = 2;
@@ -1185,7 +1184,7 @@ void SimulateIso14443aTag(int tagType, int uid_1st, int uid_2nd, byte_t* data)
 					dynamic_response_info.response_n = 0;
 				} break;
 			}
-      
+
 			if (dynamic_response_info.response_n > 0) {
 				// Copy the CID from the reader query
 				dynamic_response_info.response[1] = receivedCmd[1];
@@ -1193,7 +1192,7 @@ void SimulateIso14443aTag(int tagType, int uid_1st, int uid_2nd, byte_t* data)
 				// Add CRC bytes, always used in ISO 14443A-4 compliant cards
 				AppendCrc14443a(dynamic_response_info.response,dynamic_response_info.response_n);
 				dynamic_response_info.response_n += 2;
-        
+
 				if (prepare_tag_modulation(&dynamic_response_info,DYNAMIC_MODULATION_BUFFER_SIZE) == false) {
 					Dbprintf("Error preparing tag response");
 					break;
@@ -1217,7 +1216,7 @@ void SimulateIso14443aTag(int tagType, int uid_1st, int uid_2nd, byte_t* data)
 		if (p_response != NULL) {
 			EmSendPrecompiledCmd(p_response);
 		}
-		
+
 		if (!get_tracing()) {
 			Dbprintf("Trace Full. Simulation stopped.");
 			break;
@@ -1237,7 +1236,7 @@ static void PrepareDelayedTransfer(uint16_t delay)
 	uint8_t bitmask = 0;
 	uint8_t bits_to_shift = 0;
 	uint8_t bits_shifted = 0;
-	
+
 	delay &= 0x07;
 	if (delay) {
 		for (uint16_t i = 0; i < delay; i++) {
@@ -1258,37 +1257,38 @@ static void PrepareDelayedTransfer(uint16_t delay)
 // Transmit the command (to the tag) that was placed in ToSend[].
 // Parameter timing:
 // if NULL: transfer at next possible time, taking into account
-// 			request guard time, startup frame guard time and frame delay time
-// if == 0:	transfer immediately and return time of transfer
+//          request guard time, startup frame guard time and frame delay time
+// if == 0: transfer immediately and return time of transfer
 // if != 0: delay transfer until time specified
 //-------------------------------------------------------------------------------------
 static void TransmitFor14443a(const uint8_t *cmd, uint16_t len, uint32_t *timing)
 {
+	LED_B_ON();
 	LED_D_ON();
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_HF_ISO14443A | FPGA_HF_ISO14443A_READER_MOD);
 
 	uint32_t ThisTransferTime = 0;
 
 	if (timing) {
-		if(*timing == 0) {										// Measure time
+		if(*timing == 0) {                                      // Measure time
 			*timing = (GetCountSspClk() + 8) & 0xfffffff8;
 		} else {
-			PrepareDelayedTransfer(*timing & 0x00000007);		// Delay transfer (fine tuning - up to 7 MF clock ticks)
+			PrepareDelayedTransfer(*timing & 0x00000007);       // Delay transfer (fine tuning - up to 7 MF clock ticks)
 		}
 		if(MF_DBGLEVEL >= 4 && GetCountSspClk() >= (*timing & 0xfffffff8)) Dbprintf("TransmitFor14443a: Missed timing");
-		while(GetCountSspClk() < (*timing & 0xfffffff8));		// Delay transfer (multiple of 8 MF clock ticks)
+		while (GetCountSspClk() < (*timing & 0xfffffff8));      // Delay transfer (multiple of 8 MF clock ticks)
 		LastTimeProxToAirStart = *timing;
 	} else {
 		ThisTransferTime = ((MAX(NextTransferTime, GetCountSspClk()) & 0xfffffff8) + 8);
-		while(GetCountSspClk() < ThisTransferTime);
+		while (GetCountSspClk() < ThisTransferTime);
 		LastTimeProxToAirStart = ThisTransferTime;
 	}
-	
+
 	// clear TXRDY
 	AT91C_BASE_SSC->SSC_THR = SEC_Y;
 
 	uint16_t c = 0;
-	for(;;) {
+	for (;;) {
 		if(AT91C_BASE_SSC->SSC_SR & (AT91C_SSC_TXRDY)) {
 			AT91C_BASE_SSC->SSC_THR = cmd[c];
 			c++;
@@ -1297,8 +1297,9 @@ static void TransmitFor14443a(const uint8_t *cmd, uint16_t len, uint32_t *timing
 			}
 		}
 	}
-	
+
 	NextTransferTime = MAX(NextTransferTime, LastTimeProxToAirStart + REQUEST_GUARD_TIME);
+	LED_B_OFF();
 }
 
 
@@ -1391,84 +1392,98 @@ static void CodeIso14443aBitsAsReaderPar(const uint8_t *cmd, uint16_t bits, cons
 //-----------------------------------------------------------------------------
 int EmGetCmd(uint8_t *received, uint16_t *len, uint8_t *parity)
 {
+	uint32_t field_off_time = -1;
+	uint32_t samples = 0;
+	int ret = 0;
+	uint8_t b = 0;;
+	uint8_t dmaBuf[DMA_BUFFER_SIZE];
+	uint8_t *upTo = dmaBuf;
+
 	*len = 0;
 
-	uint32_t timer = 0, vtime = 0;
-	int analogCnt = 0;
-	int analogAVG = 0;
-
-	// Set ADC to read field strength
-	AT91C_BASE_ADC->ADC_CR = AT91C_ADC_SWRST;
-	AT91C_BASE_ADC->ADC_MR =
-				ADC_MODE_PRESCALE(63) |
-				ADC_MODE_STARTUP_TIME(1) |
-				ADC_MODE_SAMPLE_HOLD_TIME(15);
-	AT91C_BASE_ADC->ADC_CHER = ADC_CHANNEL(ADC_CHAN_HF_LOW);
-	// start ADC
-	AT91C_BASE_ADC->ADC_CR = AT91C_ADC_START;
-	
 	// Run a 'software UART' on the stream of incoming samples.
 	UartInit(received, parity);
 
+	// start ADC
+	AT91C_BASE_ADC->ADC_CR = AT91C_ADC_START;
+
 	// Ensure that the FPGA Delay Queue is empty before we switch to TAGSIM_LISTEN
-	do {
-		if(AT91C_BASE_SSC->SSC_SR & (AT91C_SSC_TXRDY)) {
-			AT91C_BASE_SSC->SSC_THR = SEC_F;
-			uint8_t b = (uint8_t)AT91C_BASE_SSC->SSC_RHR; (void) b;
-		}
-	} while (GetCountSspClk() < LastTimeProxToAirStart + LastProxToAirDuration + (FpgaSendQueueDelay>>3));
+	while (GetCountSspClk() < LastTimeProxToAirStart + LastProxToAirDuration + (FpgaSendQueueDelay>>3) - 8 - 3) /* wait */ ;
 
 	// Set FPGA mode to "simulated ISO 14443 tag", no modulation (listen
 	// only, since we are receiving, not transmitting).
-	// Signal field is off with the appropriate LED
-	LED_D_OFF();
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_HF_ISO14443A | FPGA_HF_ISO14443A_TAGSIM_LISTEN);
 
+	// clear receive register, measure time of next transfer
+	uint32_t temp = AT91C_BASE_SSC->SSC_RHR; (void) temp;
+	while (!(AT91C_BASE_SSC->SSC_SR & AT91C_SSC_RXRDY)) ;
+	uint32_t start_time = GetCountSspClk() & 0xfffffff8;
+
+	// Setup and start DMA.
+	FpgaSetupSscDma(dmaBuf, DMA_BUFFER_SIZE);
+
 	for(;;) {
-		WDT_HIT();
+		uint16_t behindBy = ((uint8_t*)AT91C_BASE_PDC_SSC->PDC_RPR - upTo) & (DMA_BUFFER_SIZE-1);
 
-		if (BUTTON_PRESS()) return 1;
+		if (behindBy == 0) continue;
 
-		// test if the field exists
-		if (AT91C_BASE_ADC->ADC_SR & ADC_END_OF_CONVERSION(ADC_CHAN_HF_LOW)) {
-			analogCnt++;
-			analogAVG += AT91C_BASE_ADC->ADC_CDR[ADC_CHAN_HF_LOW];
-			AT91C_BASE_ADC->ADC_CR = AT91C_ADC_START;
-			if (analogCnt >= 32) {
-				if ((MAX_ADC_HF_VOLTAGE_LOW * (analogAVG / analogCnt) >> 10) < MF_MINFIELDV) {
-					vtime = GetTickCount();
-					if (!timer) timer = vtime;
-					// 50ms no field --> card to idle state
-					if (vtime - timer > 50) return 2;
-				} else
-					if (timer) timer = 0;
-				analogCnt = 0;
-				analogAVG = 0;
+		b = *upTo++;
+
+		if(upTo >= dmaBuf + DMA_BUFFER_SIZE) {                   // we have read all of the DMA buffer content.
+			upTo = dmaBuf;                                       // start reading the circular buffer from the beginning
+			if(behindBy > (9*DMA_BUFFER_SIZE/10)) {
+				Dbprintf("About to blow circular buffer - aborted! behindBy=%d", behindBy);
+				ret = 1;
+				break;
 			}
 		}
+		if (AT91C_BASE_SSC->SSC_SR & (AT91C_SSC_ENDRX)) {        // DMA Counter Register had reached 0, already rotated.
+			AT91C_BASE_PDC_SSC->PDC_RNPR = (uint32_t) dmaBuf;    // refresh the DMA Next Buffer and
+			AT91C_BASE_PDC_SSC->PDC_RNCR = DMA_BUFFER_SIZE;      // DMA Next Counter registers
+		}
 
-		// receive and test the miller decoding
-        if(AT91C_BASE_SSC->SSC_SR & (AT91C_SSC_RXRDY)) {
-            uint8_t b = (uint8_t)AT91C_BASE_SSC->SSC_RHR;
-			if(MillerDecoding(b, 0)) {
-				*len = Uart.len;
-				EmLogTraceReader();
-				return 0;
+		if (BUTTON_PRESS()) {
+			ret = 1;
+			break;
+		}
+
+		// check reader's HF field
+		if (AT91C_BASE_ADC->ADC_SR & ADC_END_OF_CONVERSION(ADC_CHAN_HF_LOW)) {
+			if ((MAX_ADC_HF_VOLTAGE_LOW * AT91C_BASE_ADC->ADC_CDR[ADC_CHAN_HF_LOW]) >> 10 < MF_MINFIELDV) {
+				if (GetTickCount() - field_off_time > 50) {
+					ret = 2; // reader has switched off HF field for more than 50ms. Timeout
+					break;
+				}
+			} else {
+				field_off_time = GetTickCount(); // HF field is still there. Reset timer
 			}
-        }
+			AT91C_BASE_ADC->ADC_CR = AT91C_ADC_START; // restart ADC
+		}
 
+		if (MillerDecoding(b, start_time + samples*8)) {
+			*len = Uart.len;
+			EmLogTraceReader();
+			ret = 0;
+			break;
+		}
+
+		samples++;
 	}
+
+	FpgaDisableSscDma();
+	return ret;
 }
 
 
 static int EmSendCmd14443aRaw(uint8_t *resp, uint16_t respLen)
 {
+	LED_C_ON();
+
 	uint8_t b;
 	uint16_t i = 0;
 	bool correctionNeeded;
 
 	// Modulate Manchester
-	LED_D_OFF();
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_HF_ISO14443A | FPGA_HF_ISO14443A_TAGSIM_MOD);
 
 	// include correction bit if necessary
@@ -1483,70 +1498,58 @@ static int EmSendCmd14443aRaw(uint8_t *resp, uint16_t respLen)
 		correctionNeeded = Uart.parity[(Uart.len-1)/8] & (0x80 >> ((Uart.len-1) & 7));
 	}
 
-	if(correctionNeeded) {
+	if (correctionNeeded) {
 		// 1236, so correction bit needed
 		i = 0;
 	} else {
 		i = 1;
 	}
 
- 	// clear receiving shift register and holding register
-	while(!(AT91C_BASE_SSC->SSC_SR & AT91C_SSC_RXRDY));
+	// clear receiving shift register and holding register
 	b = AT91C_BASE_SSC->SSC_RHR; (void) b;
-	while(!(AT91C_BASE_SSC->SSC_SR & AT91C_SSC_RXRDY));
+	while (!(AT91C_BASE_SSC->SSC_SR & AT91C_SSC_RXRDY));
 	b = AT91C_BASE_SSC->SSC_RHR; (void) b;
-	
+
 	// wait for the FPGA to signal fdt_indicator == 1 (the FPGA is ready to queue new data in its delay line)
-	for (uint16_t j = 0; j < 5; j++) {	// allow timeout - better late than never
-		while(!(AT91C_BASE_SSC->SSC_SR & AT91C_SSC_RXRDY));
+	for (uint16_t j = 0; j < 5; j++) {  // allow timeout - better late than never
+		while (!(AT91C_BASE_SSC->SSC_SR & AT91C_SSC_RXRDY));
 		if (AT91C_BASE_SSC->SSC_RHR) break;
 	}
 
 	LastTimeProxToAirStart = (GetCountSspClk() & 0xfffffff8) + (correctionNeeded?8:0);
 
 	// send cycle
-	for(; i < respLen; ) {
+	for (; i < respLen; ) {
 		if(AT91C_BASE_SSC->SSC_SR & (AT91C_SSC_TXRDY)) {
 			AT91C_BASE_SSC->SSC_THR = resp[i++];
 			FpgaSendQueueDelay = (uint8_t)AT91C_BASE_SSC->SSC_RHR;
 		}
-	
+
 		if(BUTTON_PRESS()) {
 			break;
 		}
 	}
 
+	LED_C_OFF();
 	return 0;
 }
 
 
-static int EmSend4bitEx(uint8_t resp){
+int EmSend4bit(uint8_t resp){
 	Code4bitAnswerAsTag(resp);
 	int res = EmSendCmd14443aRaw(ToSend, ToSendMax);
-	// do the tracing for the previous reader request and this tag answer:
+	// Log this tag answer and fix timing of previous reader command:
 	EmLogTraceTag(&resp, 1, NULL, LastProxToAirDuration);
 	return res;
-}
-
-
-int EmSend4bit(uint8_t resp){
-	return EmSend4bitEx(resp);
 }
 
 
 static int EmSendCmdExPar(uint8_t *resp, uint16_t respLen, uint8_t *par){
 	CodeIso14443aAsTagPar(resp, respLen, par);
 	int res = EmSendCmd14443aRaw(ToSend, ToSendMax);
-	// do the tracing for the previous reader request and this tag answer:
+	// Log this tag answer and fix timing of previous reader command:
 	EmLogTraceTag(resp, respLen, par, LastProxToAirDuration);
 	return res;
-}
-
-
-int EmSendCmdEx(uint8_t *resp, uint16_t respLen){
-	uint8_t par[MAX_PARITY_SIZE];
-	GetParity(resp, respLen, par);
-	return EmSendCmdExPar(resp, respLen, par);
 }
 
 
@@ -1564,7 +1567,7 @@ int EmSendCmdPar(uint8_t *resp, uint16_t respLen, uint8_t *par){
 
 int EmSendPrecompiledCmd(tag_response_info_t *response_info) {
 	int ret = EmSendCmd14443aRaw(response_info->modulation, response_info->modulation_n);
-	// do the tracing for the previous reader request and this tag answer:
+	// Log this tag answer and fix timing of previous reader command:
 	EmLogTraceTag(response_info->response, response_info->response_n, &(response_info->par), response_info->ProxToAirDuration);
 	return ret;
 }
@@ -1578,21 +1581,21 @@ int EmSendPrecompiledCmd(tag_response_info_t *response_info) {
 static int GetIso14443aAnswerFromTag(uint8_t *receivedResponse, uint8_t *receivedResponsePar, uint16_t offset)
 {
 	uint32_t c;
-	
+
 	// Set FPGA mode to "reader listen mode", no modulation (listen
 	// only, since we are receiving, not transmitting).
 	// Signal field is on with the appropriate LED
 	LED_D_ON();
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_HF_ISO14443A | FPGA_HF_ISO14443A_READER_LISTEN);
-	
+
 	// Now get the answer from the card
 	DemodInit(receivedResponse, receivedResponsePar);
 
 	// clear RXRDY:
-    uint8_t b = (uint8_t)AT91C_BASE_SSC->SSC_RHR;
+	uint8_t b = (uint8_t)AT91C_BASE_SSC->SSC_RHR;
 
 	c = 0;
-	for(;;) {
+	for (;;) {
 		WDT_HIT();
 
 		if(AT91C_BASE_SSC->SSC_SR & (AT91C_SSC_RXRDY)) {
@@ -1601,7 +1604,7 @@ static int GetIso14443aAnswerFromTag(uint8_t *receivedResponse, uint8_t *receive
 				NextTransferTime = MAX(NextTransferTime, Demod.endTime - (DELAY_AIR2ARM_AS_READER + DELAY_ARM2AIR_AS_READER)/16 + FRAME_DELAY_TIME_PICC_TO_PCD);
 				return true;
 			} else if (c++ > iso14a_timeout && Demod.state == DEMOD_UNSYNCD) {
-				return false; 
+				return false;
 			}
 		}
 	}
@@ -1611,12 +1614,12 @@ static int GetIso14443aAnswerFromTag(uint8_t *receivedResponse, uint8_t *receive
 void ReaderTransmitBitsPar(uint8_t* frame, uint16_t bits, uint8_t *par, uint32_t *timing)
 {
 	CodeIso14443aBitsAsReaderPar(frame, bits, par);
-  
+
 	// Send command to tag
 	TransmitFor14443a(ToSend, ToSendMax, timing);
 	if(trigger)
 		LED_A_ON();
-  
+
 	// Log reader command in trace buffer
 	LogTrace(frame, nbytes(bits), LastTimeProxToAirStart*16 + DELAY_ARM2AIR_AS_READER, (LastTimeProxToAirStart + LastProxToAirDuration)*16 + DELAY_ARM2AIR_AS_READER, par, true);
 }
@@ -1665,24 +1668,24 @@ int ReaderReceive(uint8_t *receivedAnswer, uint8_t *parity)
 static void iso14a_set_ATS_times(uint8_t *ats) {
 
 	uint8_t tb1;
-	uint8_t fwi, sfgi; 
+	uint8_t fwi, sfgi;
 	uint32_t fwt, sfgt;
-	
-	if (ats[0] > 1) {							// there is a format byte T0
-		if ((ats[1] & 0x20) == 0x20) {			// there is an interface byte TB(1)
-			if ((ats[1] & 0x10) == 0x10) {		// there is an interface byte TA(1) preceding TB(1)
+
+	if (ats[0] > 1) {                           // there is a format byte T0
+		if ((ats[1] & 0x20) == 0x20) {          // there is an interface byte TB(1)
+			if ((ats[1] & 0x10) == 0x10) {      // there is an interface byte TA(1) preceding TB(1)
 				tb1 = ats[3];
 			} else {
 				tb1 = ats[2];
 			}
-			fwi = (tb1 & 0xf0) >> 4;			// frame waiting time integer (FWI)
+			fwi = (tb1 & 0xf0) >> 4;            // frame waiting time integer (FWI)
 			if (fwi != 15) {
-				fwt = 256 * 16 * (1 << fwi);	// frame waiting time (FWT) in 1/fc
+				fwt = 256 * 16 * (1 << fwi);    // frame waiting time (FWT) in 1/fc
 				iso14a_set_timeout(fwt/(8*16));
 			}
-			sfgi = tb1 & 0x0f;					// startup frame guard time integer (SFGI)
+			sfgi = tb1 & 0x0f;                  // startup frame guard time integer (SFGI)
 			if (sfgi != 0 && sfgi != 15) {
-				sfgt = 256 * 16 * (1 << sfgi);	// startup frame guard time (SFGT) in 1/fc
+				sfgt = 256 * 16 * (1 << sfgi);  // startup frame guard time (SFGT) in 1/fc
 				NextTransferTime = MAX(NextTransferTime, Demod.endTime + (sfgt - DELAY_AIR2ARM_AS_READER - DELAY_ARM2AIR_AS_READER)/16);
 			}
 		}
@@ -1692,15 +1695,15 @@ static void iso14a_set_ATS_times(uint8_t *ats) {
 
 static int GetATQA(uint8_t *resp, uint8_t *resp_par) {
 
-#define WUPA_RETRY_TIMEOUT	10	// 10ms
+#define WUPA_RETRY_TIMEOUT  10  // 10ms
 	uint8_t wupa[]       = { 0x52 };  // 0x26 - REQA  0x52 - WAKE-UP
 
 	uint32_t save_iso14a_timeout = iso14a_get_timeout();
-	iso14a_set_timeout(1236/(16*8)+1);		// response to WUPA is expected at exactly 1236/fc. No need to wait longer.
-	
+	iso14a_set_timeout(1236/(16*8)+1);      // response to WUPA is expected at exactly 1236/fc. No need to wait longer.
+
 	uint32_t start_time = GetTickCount();
 	int len;
-	
+
 	// we may need several tries if we did send an unknown command or a wrong authentication before...
 	do {
 		// Broadcast for a card, WUPA (0x52) will force response from all cards in the field
@@ -1708,7 +1711,7 @@ static int GetATQA(uint8_t *resp, uint8_t *resp_par) {
 		// Receive the ATQA
 		len = ReaderReceive(resp, resp_par);
 	} while (len == 0 && GetTickCount() <= start_time + WUPA_RETRY_TIMEOUT);
-			
+
 	iso14a_set_timeout(save_iso14a_timeout);
 	return len;
 }
@@ -1717,7 +1720,7 @@ static int GetATQA(uint8_t *resp, uint8_t *resp_par) {
 // performs iso14443a anticollision (optional) and card select procedure
 // fills the uid and cuid pointer unless NULL
 // fills the card info record unless NULL
-// if anticollision is false, then the UID must be provided in uid_ptr[] 
+// if anticollision is false, then the UID must be provided in uid_ptr[]
 // and num_cascades must be set (1: 4 Byte UID, 2: 7 Byte UID, 3: 10 Byte UID)
 // requests ATS unless no_rats is true
 int iso14443a_select_card(byte_t *uid_ptr, iso14a_card_select_t *p_hi14a_card, uint32_t *cuid_ptr, bool anticollision, uint8_t num_cascades, bool no_rats) {
@@ -1759,11 +1762,11 @@ int iso14443a_select_card(byte_t *uid_ptr, iso14a_card_select_t *p_hi14a_card, u
 	if ((resp[0] & 0x1F) == 0) {
 		return 3;
 	}
-	
+
 	// OK we will select at least at cascade 1, lets see if first byte of UID was 0x88 in
 	// which case we need to make a cascade 2 request and select - this is a long UID
-	// While the UID is not complete, the 3nd bit (from the right) is set in the SAK.
-	for(; sak & 0x04; cascade_level++) {
+	// While the UID is not complete, the 3rd bit (from the right) is set in the SAK.
+	for (; sak & 0x04; cascade_level++) {
 		// SELECT_* (L1: 0x93, L2: 0x95, L3: 0x97)
 		sel_uid[0] = sel_all[0] = 0x93 + cascade_level * 2;
 
@@ -1774,21 +1777,21 @@ int iso14443a_select_card(byte_t *uid_ptr, iso14a_card_select_t *p_hi14a_card, u
 				return 0;
 			}
 
-			if (Demod.collisionPos) {			// we had a collision and need to construct the UID bit by bit
+			if (Demod.collisionPos) {           // we had a collision and need to construct the UID bit by bit
 				memset(uid_resp, 0, 4);
 				uint16_t uid_resp_bits = 0;
 				uint16_t collision_answer_offset = 0;
 				// anti-collision-loop:
 				while (Demod.collisionPos) {
 					Dbprintf("Multiple tags detected. Collision after Bit %d", Demod.collisionPos);
-					for (uint16_t i = collision_answer_offset; i < Demod.collisionPos; i++, uid_resp_bits++) {	// add valid UID bits before collision point
+					for (uint16_t i = collision_answer_offset; i < Demod.collisionPos; i++, uid_resp_bits++) {  // add valid UID bits before collision point
 						uint16_t UIDbit = (resp[i/8] >> (i % 8)) & 0x01;
 						uid_resp[uid_resp_bits / 8] |= UIDbit << (uid_resp_bits % 8);
 					}
-					uid_resp[uid_resp_bits/8] |= 1 << (uid_resp_bits % 8);					// next time select the card(s) with a 1 in the collision position
+					uid_resp[uid_resp_bits/8] |= 1 << (uid_resp_bits % 8);                  // next time select the card(s) with a 1 in the collision position
 					uid_resp_bits++;
 					// construct anticollosion command:
-					sel_uid[1] = ((2 + uid_resp_bits/8) << 4) | (uid_resp_bits & 0x07);  	// length of data in bytes and bits
+					sel_uid[1] = ((2 + uid_resp_bits/8) << 4) | (uid_resp_bits & 0x07);     // length of data in bytes and bits
 					for (uint16_t i = 0; i <= uid_resp_bits/8; i++) {
 						sel_uid[2+i] = uid_resp[i];
 					}
@@ -1804,7 +1807,7 @@ int iso14443a_select_card(byte_t *uid_ptr, iso14a_card_select_t *p_hi14a_card, u
 					uid_resp[uid_resp_bits/8] |= UIDbit << (uid_resp_bits % 8);
 				}
 
-			} else {		// no collision, use the response to SELECT_ALL as current uid
+			} else {        // no collision, use the response to SELECT_ALL as current uid
 				memcpy(uid_resp, resp, 4);
 			}
 		} else {
@@ -1823,10 +1826,10 @@ int iso14443a_select_card(byte_t *uid_ptr, iso14a_card_select_t *p_hi14a_card, u
 		}
 
 		// Construct SELECT UID command
-		sel_uid[1] = 0x70;													// transmitting a full UID (1 Byte cmd, 1 Byte NVB, 4 Byte UID, 1 Byte BCC, 2 Bytes CRC)
-		memcpy(sel_uid+2, uid_resp, 4);										// the UID received during anticollision, or the provided UID
-		sel_uid[6] = sel_uid[2] ^ sel_uid[3] ^ sel_uid[4] ^ sel_uid[5];  	// calculate and add BCC
-		AppendCrc14443a(sel_uid, 7);										// calculate and add CRC
+		sel_uid[1] = 0x70;                                                  // transmitting a full UID (1 Byte cmd, 1 Byte NVB, 4 Byte UID, 1 Byte BCC, 2 Bytes CRC)
+		memcpy(sel_uid+2, uid_resp, 4);                                     // the UID received during anticollision, or the provided UID
+		sel_uid[6] = sel_uid[2] ^ sel_uid[3] ^ sel_uid[4] ^ sel_uid[5];     // calculate and add BCC
+		AppendCrc14443a(sel_uid, 7);                                        // calculate and add CRC
 		ReaderTransmit(sel_uid, sizeof(sel_uid), NULL);
 
 		// Receive the SAK
@@ -1834,14 +1837,14 @@ int iso14443a_select_card(byte_t *uid_ptr, iso14a_card_select_t *p_hi14a_card, u
 			return 0;
 		}
 		sak = resp[0];
-	
+
 		// Test if more parts of the uid are coming
 		if ((sak & 0x04) /* && uid_resp[0] == 0x88 */) {
 			// Remove first byte, 0x88 is not an UID byte, it CT, see page 3 of:
 			// http://www.nxp.com/documents/application_note/AN10927.pdf
 			uid_resp[0] = uid_resp[1];
 			uid_resp[1] = uid_resp[2];
-			uid_resp[2] = uid_resp[3]; 
+			uid_resp[2] = uid_resp[3];
 			uid_resp_len = 3;
 		}
 
@@ -1860,7 +1863,7 @@ int iso14443a_select_card(byte_t *uid_ptr, iso14a_card_select_t *p_hi14a_card, u
 	}
 
 	// PICC compilant with iso14443a-4 ---> (SAK & 0x20 != 0)
-	if( (sak & 0x20) == 0) return 2; 
+	if( (sak & 0x20) == 0) return 2;
 
 	if (!no_rats) {
 		// Request for answer to select
@@ -1881,9 +1884,9 @@ int iso14443a_select_card(byte_t *uid_ptr, iso14a_card_select_t *p_hi14a_card, u
 
 		// set default timeout and delay next transfer based on ATS
 		iso14a_set_ATS_times(resp);
-		
+
 	}
-	return 1;	
+	return 1;
 }
 
 
@@ -1903,11 +1906,22 @@ void iso14443a_setup(uint8_t fpga_minor_mode) {
 	}
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_HF_ISO14443A | fpga_minor_mode);
 
+	// Set ADC to read field strength
+	AT91C_BASE_ADC->ADC_CR = AT91C_ADC_SWRST;
+	AT91C_BASE_ADC->ADC_MR =
+				ADC_MODE_PRESCALE(63) |
+				ADC_MODE_STARTUP_TIME(1) |
+				ADC_MODE_SAMPLE_HOLD_TIME(15);
+	AT91C_BASE_ADC->ADC_CHER = ADC_CHANNEL(ADC_CHAN_HF_LOW);
+
 	// Start the timer
 	StartCountSspClk();
-	
+
 	DemodReset();
 	UartReset();
+	LastTimeProxToAirStart = 0;
+	FpgaSendQueueDelay = 0;
+	LastProxToAirDuration = 20; // arbitrary small value. Avoid lock in EmGetCmd()
 	NextTransferTime = 2*DELAY_ARM2AIR_AS_READER;
 	iso14a_set_timeout(1060); // 10ms default
 }
@@ -1932,17 +1946,17 @@ b8 b7 b6 b5 b4 b3 b2 b1
 b5 = ACK/NACK
 Coding of S-block:
 b8 b7 b6 b5 b4 b3 b2 b1
-1  1  x  x  x  0  1  0 
+1  1  x  x  x  0  1  0
 b5,b6 = 00 - DESELECT
-        11 - WTX 
-*/    
+		11 - WTX
+*/
 int iso14_apdu(uint8_t *cmd, uint16_t cmd_len, bool send_chaining, void *data, uint8_t *res) {
 	uint8_t parity[MAX_PARITY_SIZE];
 	uint8_t real_cmd[cmd_len + 4];
-	
+
 	if (cmd_len) {
 		// ISO 14443 APDU frame: PCB [CID] [NAD] APDU CRC PCB=0x02
-		real_cmd[0] = 0x02; // bnr,nad,cid,chn=0; i-block(0x00)	
+		real_cmd[0] = 0x02; // bnr,nad,cid,chn=0; i-block(0x00)
 		if (send_chaining) {
 			real_cmd[0] |= 0x10;
 		}
@@ -1951,11 +1965,11 @@ int iso14_apdu(uint8_t *cmd, uint16_t cmd_len, bool send_chaining, void *data, u
 		memcpy(real_cmd + 1, cmd, cmd_len);
 	} else {
 		// R-block. ACK
-		real_cmd[0] = 0xA2; // r-block + ACK	
+		real_cmd[0] = 0xA2; // r-block + ACK
 		real_cmd[0] |= iso14_pcb_blocknum;
 	}
 	AppendCrc14443a(real_cmd, cmd_len + 1);
- 
+
 	ReaderTransmit(real_cmd, cmd_len + 3, NULL);
 
 	size_t len = ReaderReceive(data, parity);
@@ -1963,20 +1977,20 @@ int iso14_apdu(uint8_t *cmd, uint16_t cmd_len, bool send_chaining, void *data, u
 
 	if (!len) {
 		return 0; //DATA LINK ERROR
-	} else{
-		// S-Block WTX 
-		while(len && ((data_bytes[0] & 0xF2) == 0xF2)) {
+	} else {
+		// S-Block WTX
+		while (len && ((data_bytes[0] & 0xF2) == 0xF2)) {
 			uint32_t save_iso14a_timeout = iso14a_get_timeout();
 			// temporarily increase timeout
 			iso14a_set_timeout(MAX((data_bytes[1] & 0x3f) * save_iso14a_timeout, MAX_ISO14A_TIMEOUT));
-			// Transmit WTX back 
+			// Transmit WTX back
 			// byte1 - WTXM [1..59]. command FWT=FWT*WTXM
 			data_bytes[1] = data_bytes[1] & 0x3f; // 2 high bits mandatory set to 0b
 			// now need to fix CRC.
 			AppendCrc14443a(data_bytes, len - 2);
 			// transmit S-Block
 			ReaderTransmit(data_bytes, len, NULL);
-			// retrieve the result again (with increased timeout) 
+			// retrieve the result again (with increased timeout)
 			len = ReaderReceive(data, parity);
 			data_bytes = data;
 			// restore timeout
@@ -1986,13 +2000,13 @@ int iso14_apdu(uint8_t *cmd, uint16_t cmd_len, bool send_chaining, void *data, u
 		// if we received an I- or R(ACK)-Block with a block number equal to the
 		// current block number, toggle the current block number
 		if (len >= 3 // PCB+CRC = 3 bytes
-	         && ((data_bytes[0] & 0xC0) == 0 // I-Block
-	             || (data_bytes[0] & 0xD0) == 0x80) // R-Block with ACK bit set to 0
-	         && (data_bytes[0] & 0x01) == iso14_pcb_blocknum) // equal block numbers
+			 && ((data_bytes[0] & 0xC0) == 0 // I-Block
+				 || (data_bytes[0] & 0xD0) == 0x80) // R-Block with ACK bit set to 0
+			 && (data_bytes[0] & 0x01) == iso14_pcb_blocknum) // equal block numbers
 		{
 			iso14_pcb_blocknum ^= 1;
 		}
-		
+
 		// if we received I-block with chaining we need to send ACK and receive another block of data
 		if (res)
 			*res = data_bytes[0];
@@ -2001,9 +2015,9 @@ int iso14_apdu(uint8_t *cmd, uint16_t cmd_len, bool send_chaining, void *data, u
 		if (len >= 3 && !CheckCrc14443(CRC_14443_A, data_bytes, len)) {
 			return -1;
 		}
-		
+
 	}
-	
+
 	if (len) {
 		// cut frame byte
 		len -= 1;
@@ -2011,7 +2025,7 @@ int iso14_apdu(uint8_t *cmd, uint16_t cmd_len, bool send_chaining, void *data, u
 		for (int i = 0; i < len; i++)
 			data_bytes[i] = data_bytes[i + 1];
 	}
-		
+
 	return len;
 }
 
@@ -2031,9 +2045,9 @@ void ReaderIso14443a(UsbCommand *c)
 	byte_t buf[USB_CMD_DATA_SIZE] = {0};
 	uint8_t par[MAX_PARITY_SIZE];
 	bool cantSELECT = false;
-  
+
 	set_tracing(true);
-	
+
 	if(param & ISO14A_CLEAR_TRACE) {
 		clear_trace();
 	}
@@ -2084,29 +2098,29 @@ void ReaderIso14443a(UsbCommand *c)
 			len += 2;
 			if (lenbits) lenbits += 16;
 		}
-		if(lenbits>0) {				// want to send a specific number of bits (e.g. short commands)
+		if(lenbits>0) {             // want to send a specific number of bits (e.g. short commands)
 			if(param & ISO14A_TOPAZMODE) {
 				int bits_to_send = lenbits;
 				uint16_t i = 0;
-				ReaderTransmitBitsPar(&cmd[i++], MIN(bits_to_send, 7), NULL, NULL);		// first byte is always short (7bits) and no parity
+				ReaderTransmitBitsPar(&cmd[i++], MIN(bits_to_send, 7), NULL, NULL);     // first byte is always short (7bits) and no parity
 				bits_to_send -= 7;
 				while (bits_to_send > 0) {
-					ReaderTransmitBitsPar(&cmd[i++], MIN(bits_to_send, 8), NULL, NULL);	// following bytes are 8 bit and no parity
+					ReaderTransmitBitsPar(&cmd[i++], MIN(bits_to_send, 8), NULL, NULL); // following bytes are 8 bit and no parity
 					bits_to_send -= 8;
 				}
 			} else {
 				GetParity(cmd, lenbits/8, par);
-				ReaderTransmitBitsPar(cmd, lenbits, par, NULL);							// bytes are 8 bit with odd parity
+				ReaderTransmitBitsPar(cmd, lenbits, par, NULL);                         // bytes are 8 bit with odd parity
 			}
-		} else {					// want to send complete bytes only
+		} else {                    // want to send complete bytes only
 			if(param & ISO14A_TOPAZMODE) {
 				uint16_t i = 0;
-				ReaderTransmitBitsPar(&cmd[i++], 7, NULL, NULL);						// first byte: 7 bits, no paritiy
+				ReaderTransmitBitsPar(&cmd[i++], 7, NULL, NULL);                        // first byte: 7 bits, no paritiy
 				while (i < len) {
-					ReaderTransmitBitsPar(&cmd[i++], 8, NULL, NULL);					// following bytes: 8 bits, no paritiy
+					ReaderTransmitBitsPar(&cmd[i++], 8, NULL, NULL);                    // following bytes: 8 bits, no paritiy
 				}
 			} else {
-				ReaderTransmit(cmd,len, NULL);											// 8 bits, odd parity
+				ReaderTransmit(cmd,len, NULL);                                          // 8 bits, odd parity
 			}
 		}
 		arg0 = ReaderReceive(buf, par);
@@ -2142,14 +2156,14 @@ static int32_t dist_nt(uint32_t nt1, uint32_t nt2) {
 
 	nttmp1 = nt1;
 	nttmp2 = nt2;
-	
+
 	for (i = 1; i < 32768; i++) {
 		nttmp1 = prng_successor(nttmp1, 1);
 		if (nttmp1 == nt2) return i;
 		nttmp2 = prng_successor(nttmp2, 1);
 		if (nttmp2 == nt1) return -i;
 		}
-	
+
 	return(-99999); // either nt1 or nt2 are invalid nonces
 }
 
@@ -2171,15 +2185,15 @@ void ReaderMifare(bool first_try)
 	uint8_t receivedAnswerPar[MAX_MIFARE_PARITY_SIZE];
 
 	iso14443a_setup(FPGA_HF_ISO14443A_READER_MOD);
-	
+
 	// free eventually allocated BigBuf memory. We want all for tracing.
 	BigBuf_free();
-	
+
 	clear_trace();
 	set_tracing(true);
 
 	uint8_t nt_diff = 0;
-	uint8_t par[1] = {0};	// maximum 8 Bytes to be sent here, 1 byte parity is therefore enough
+	uint8_t par[1] = {0};   // maximum 8 Bytes to be sent here, 1 byte parity is therefore enough
 	static uint8_t par_low = 0;
 	bool led_on = true;
 	uint8_t uid[10]  ={0};
@@ -2200,10 +2214,10 @@ void ReaderMifare(bool first_try)
 	uint16_t consecutive_resyncs = 0;
 	int isOK = 0;
 
-	if (first_try) { 
+	if (first_try) {
 		mf_nr_ar3 = 0;
 		par[0] = par_low = 0;
-		sync_cycles = PRNG_SEQUENCE_LENGTH;							// theory: Mifare Classic's random generator repeats every 2^16 cycles (and so do the tag nonces).
+		sync_cycles = PRNG_SEQUENCE_LENGTH;                         // theory: Mifare Classic's random generator repeats every 2^16 cycles (and so do the tag nonces).
 		nt_attacked = 0;
 	}
 	else {
@@ -2216,13 +2230,13 @@ void ReaderMifare(bool first_try)
 	LED_A_ON();
 	LED_B_OFF();
 	LED_C_OFF();
-	
 
-	#define MAX_UNEXPECTED_RANDOM	4		// maximum number of unexpected (i.e. real) random numbers when trying to sync. Then give up.
-	#define MAX_SYNC_TRIES			32
-	#define SYNC_TIME_BUFFER		16		// if there is only SYNC_TIME_BUFFER left before next planned sync, wait for next PRNG cycle
-	#define NUM_DEBUG_INFOS			8		// per strategy
-	#define MAX_STRATEGY			3
+
+	#define MAX_UNEXPECTED_RANDOM   4       // maximum number of unexpected (i.e. real) random numbers when trying to sync. Then give up.
+	#define MAX_SYNC_TRIES          32
+	#define SYNC_TIME_BUFFER        16      // if there is only SYNC_TIME_BUFFER left before next planned sync, wait for next PRNG cycle
+	#define NUM_DEBUG_INFOS         8       // per strategy
+	#define MAX_STRATEGY            3
 	uint16_t unexpected_random = 0;
 	uint16_t sync_tries = 0;
 	int16_t debug_info_nr = -1;
@@ -2230,9 +2244,9 @@ void ReaderMifare(bool first_try)
 	int32_t debug_info[MAX_STRATEGY][NUM_DEBUG_INFOS];
 	uint32_t select_time;
 	uint32_t halt_time;
-	
-	for(uint16_t i = 0; true; i++) {
-		
+
+	for (uint16_t i = 0; true; i++) {
+
 		LED_C_ON();
 		WDT_HIT();
 
@@ -2241,7 +2255,7 @@ void ReaderMifare(bool first_try)
 			isOK = -1;
 			break;
 		}
-		
+
 		if (strategy == 2) {
 			// test with additional hlt command
 			halt_time = 0;
@@ -2258,9 +2272,9 @@ void ReaderMifare(bool first_try)
 			iso14443a_setup(FPGA_HF_ISO14443A_READER_MOD);
 			SpinDelay(100);
 		}
-		
+
 		if(!iso14443a_select_card(uid, NULL, &cuid, true, 0, true)) {
-			if (MF_DBGLEVEL >= 1)	Dbprintf("Mifare: Can't select card");
+			if (MF_DBGLEVEL >= 1)   Dbprintf("Mifare: Can't select card");
 			continue;
 		}
 		select_time = GetCountSspClk();
@@ -2276,11 +2290,11 @@ void ReaderMifare(bool first_try)
 				sync_time = (sync_time & 0xfffffff8) + sync_cycles;
 			}
 
-			// Transmit MIFARE_CLASSIC_AUTH at synctime. Should result in returning the same tag nonce (== nt_attacked) 
+			// Transmit MIFARE_CLASSIC_AUTH at synctime. Should result in returning the same tag nonce (== nt_attacked)
 			ReaderTransmit(mf_auth, sizeof(mf_auth), &sync_time);
 		} else {
 			// collect some information on tag nonces for debugging:
-			#define DEBUG_FIXED_SYNC_CYCLES	PRNG_SEQUENCE_LENGTH
+			#define DEBUG_FIXED_SYNC_CYCLES PRNG_SEQUENCE_LENGTH
 			if (strategy == 0) {
 				// nonce distances at fixed time after card select:
 				sync_time = select_time + DEBUG_FIXED_SYNC_CYCLES;
@@ -2295,11 +2309,11 @@ void ReaderMifare(bool first_try)
 				sync_time = DEBUG_FIXED_SYNC_CYCLES;
 			}
 			ReaderTransmit(mf_auth, sizeof(mf_auth), &sync_time);
-		}			
+		}
 
 		// Receive the (4 Byte) "random" nonce
 		if (!ReaderReceive(receivedAnswer, receivedAnswerPar)) {
-			if (MF_DBGLEVEL >= 1)	Dbprintf("Mifare: Couldn't receive tag nonce");
+			if (MF_DBGLEVEL >= 1)   Dbprintf("Mifare: Couldn't receive tag nonce");
 			continue;
 		  }
 
@@ -2317,17 +2331,17 @@ void ReaderMifare(bool first_try)
 				if (nt_distance == -99999) { // invalid nonce received
 					unexpected_random++;
 					if (unexpected_random > MAX_UNEXPECTED_RANDOM) {
-						isOK = -3;		// Card has an unpredictable PRNG. Give up	
+						isOK = -3;      // Card has an unpredictable PRNG. Give up
 						break;
 					} else {
-						continue;		// continue trying...
+						continue;       // continue trying...
 					}
 				}
 				if (++sync_tries > MAX_SYNC_TRIES) {
 					if (strategy > MAX_STRATEGY || MF_DBGLEVEL < 3) {
-						isOK = -4; 			// Card's PRNG runs at an unexpected frequency or resets unexpectedly
+						isOK = -4;          // Card's PRNG runs at an unexpected frequency or resets unexpectedly
 						break;
-					} else {				// continue for a while, just to collect some debug info
+					} else {                // continue for a while, just to collect some debug info
 						debug_info[strategy][debug_info_nr] = nt_distance;
 						debug_info_nr++;
 						if (debug_info_nr == NUM_DEBUG_INFOS) {
@@ -2348,9 +2362,9 @@ void ReaderMifare(bool first_try)
 			}
 		}
 
-		if ((nt != nt_attacked) && nt_attacked) { 	// we somehow lost sync. Try to catch up again...
+		if ((nt != nt_attacked) && nt_attacked) {   // we somehow lost sync. Try to catch up again...
 			catch_up_cycles = -dist_nt(nt_attacked, nt);
-			if (catch_up_cycles == 99999) {			// invalid nonce received. Don't resync on that one.
+			if (catch_up_cycles == 99999) {         // invalid nonce received. Don't resync on that one.
 				catch_up_cycles = 0;
 				continue;
 			}
@@ -2360,12 +2374,12 @@ void ReaderMifare(bool first_try)
 			}
 			else {
 				last_catch_up = catch_up_cycles;
-			    consecutive_resyncs = 0;
+				consecutive_resyncs = 0;
 			}
 			if (consecutive_resyncs < 3) {
 				if (MF_DBGLEVEL >= 3) Dbprintf("Lost sync in cycle %d. nt_distance=%d. Consecutive Resyncs = %d. Trying one time catch up...\n", i, -catch_up_cycles, consecutive_resyncs);
 			}
-			else {	
+			else {
 				sync_cycles = sync_cycles + catch_up_cycles;
 				if (MF_DBGLEVEL >= 3) Dbprintf("Lost sync in cycle %d for the fourth time consecutively (nt_distance = %d). Adjusting sync_cycles to %d.\n", i, -catch_up_cycles, sync_cycles);
 				last_catch_up = 0;
@@ -2374,13 +2388,13 @@ void ReaderMifare(bool first_try)
 			}
 			continue;
 		}
- 
+
 		consecutive_resyncs = 0;
-		
+
 		// Receive answer. This will be a 4 Bit NACK when the 8 parity bits are OK after decoding
 		if (ReaderReceive(receivedAnswer, receivedAnswerPar)) {
-			catch_up_cycles = 8; 	// the PRNG is delayed by 8 cycles due to the NAC (4Bits = 0x05 encrypted) transfer
-	
+			catch_up_cycles = 8;    // the PRNG is delayed by 8 cycles due to the NAC (4Bits = 0x05 encrypted) transfer
+
 			if (nt_diff == 0) {
 				par_low = par[0] & 0xE0; // there is no need to check all parities for other nt_diff. Parity Bits for mf_nr_ar[0..2] won't change
 			}
@@ -2404,7 +2418,7 @@ void ReaderMifare(bool first_try)
 			if (nt_diff == 0 && first_try)
 			{
 				par[0]++;
-				if (par[0] == 0x00) {		// tried all 256 possible parities without success. Card doesn't send NACK.
+				if (par[0] == 0x00) {       // tried all 256 possible parities without success. Card doesn't send NACK.
 					isOK = -2;
 					break;
 				}
@@ -2420,13 +2434,13 @@ void ReaderMifare(bool first_try)
 	if (isOK == -4) {
 		if (MF_DBGLEVEL >= 3) {
 			for (uint16_t i = 0; i <= MAX_STRATEGY; i++) {
-				for(uint16_t j = 0; j < NUM_DEBUG_INFOS; j++) {
+				for (uint16_t j = 0; j < NUM_DEBUG_INFOS; j++) {
 					Dbprintf("collected debug info[%d][%d] = %d", i, j, debug_info[i][j]);
 				}
 			}
 		}
 	}
-	
+
 	FpgaDisableTracing();
 
 	uint8_t buf[32];
@@ -2435,7 +2449,7 @@ void ReaderMifare(bool first_try)
 	memcpy(buf + 8,  par_list, 8);
 	memcpy(buf + 16, ks_list, 8);
 	memcpy(buf + 24, mf_nr_ar, 8);
-		
+
 	cmd_send(CMD_ACK, isOK, 0, 0, buf, 32);
 
 	// Thats it...
@@ -2447,8 +2461,8 @@ void ReaderMifare(bool first_try)
 
 
 //-----------------------------------------------------------------------------
-// MIFARE sniffer. 
-// 
+// MIFARE sniffer.
+//
 //-----------------------------------------------------------------------------
 void RAMFUNC SniffMifare(uint8_t param) {
 	// param:
@@ -2458,7 +2472,7 @@ void RAMFUNC SniffMifare(uint8_t param) {
 	// C(red) A(yellow) B(green)
 	LEDsoff();
 	LED_A_ON();
-	
+
 	// init trace buffer
 	clear_trace();
 	set_tracing(true);
@@ -2498,19 +2512,19 @@ void RAMFUNC SniffMifare(uint8_t param) {
 	MfSniffInit();
 
 	// And now we loop, receiving samples.
-	for(uint32_t sniffCounter = 0; true; ) {
-	
+	for (uint32_t sniffCounter = 0; true; ) {
+
 		if(BUTTON_PRESS()) {
 			DbpString("Canceled by button.");
 			break;
 		}
 
 		WDT_HIT();
-		
- 		if ((sniffCounter & 0x0000FFFF) == 0) {	// from time to time
+
+		if ((sniffCounter & 0x0000FFFF) == 0) { // from time to time
 			// check if a transaction is completed (timeout after 2000ms).
 			// if yes, stop the DMA transfer and send what we have so far to the client
-			if (MfSniffSend(2000)) {			
+			if (MfSniffSend(2000)) {
 				// Reset everything - we missed some sniffed data anyway while the DMA was stopped
 				sniffCounter = 0;
 				data = dmaBuf;
@@ -2520,17 +2534,17 @@ void RAMFUNC SniffMifare(uint8_t param) {
 				FpgaSetupSscDma((uint8_t *)dmaBuf, DMA_BUFFER_SIZE); // set transfer address and number of bytes. Start transfer.
 			}
 		}
-		
-		int register readBufDataP = data - dmaBuf;	// number of bytes we have processed so far
+
+		int register readBufDataP = data - dmaBuf;  // number of bytes we have processed so far
 		int register dmaBufDataP = DMA_BUFFER_SIZE - AT91C_BASE_PDC_SSC->PDC_RCR; // number of bytes already transferred
-		if (readBufDataP <= dmaBufDataP){			// we are processing the same block of data which is currently being transferred
-			dataLen = dmaBufDataP - readBufDataP;	// number of bytes still to be processed
-		} else {									
+		if (readBufDataP <= dmaBufDataP){           // we are processing the same block of data which is currently being transferred
+			dataLen = dmaBufDataP - readBufDataP;   // number of bytes still to be processed
+		} else {
 			dataLen = DMA_BUFFER_SIZE - readBufDataP + dmaBufDataP; // number of bytes still to be processed
 		}
 		// test for length of buffer
-		if(dataLen > maxDataLen) {					// we are more behind than ever...
-			maxDataLen = dataLen;					
+		if(dataLen > maxDataLen) {                  // we are more behind than ever...
+			maxDataLen = dataLen;
 			if(dataLen > (9 * DMA_BUFFER_SIZE / 10)) {
 				Dbprintf("blew circular buffer! dataLen=0x%x", dataLen);
 				break;
@@ -2552,7 +2566,7 @@ void RAMFUNC SniffMifare(uint8_t param) {
 
 		if (sniffCounter & 0x01) {
 
-			if(!TagIsActive) {		// no need to try decoding tag data if the reader is sending
+			if(!TagIsActive) {      // no need to try decoding tag data if the reader is sending
 				uint8_t readerdata = (previous_data & 0xF0) | (*data >> 4);
 				if(MillerDecoding(readerdata, (sniffCounter-1)*4)) {
 
@@ -2560,14 +2574,14 @@ void RAMFUNC SniffMifare(uint8_t param) {
 
 					/* And ready to receive another command. */
 					UartInit(receivedCmd, receivedCmdPar);
-					
+
 					/* And also reset the demod code */
 					DemodReset();
 				}
 				ReaderIsActive = (Uart.state != STATE_UNSYNCD);
 			}
-			
-			if(!ReaderIsActive) {		// no need to try decoding tag data if the reader is sending
+
+			if(!ReaderIsActive) {       // no need to try decoding tag data if the reader is sending
 				uint8_t tagdata = (previous_data << 4) | (*data & 0x0F);
 				if(ManchesterDecoding(tagdata, 0, (sniffCounter-1)*4)) {
 
@@ -2598,6 +2612,6 @@ void RAMFUNC SniffMifare(uint8_t param) {
 	DbpString("COMMAND FINISHED.");
 
 	MfSniffEnd();
-	
+
 	Dbprintf("maxDataLen=%x, Uart.state=%x, Uart.len=%x", maxDataLen, Uart.state, Uart.len);
 }
