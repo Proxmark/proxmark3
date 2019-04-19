@@ -227,7 +227,7 @@ int usage_lf_config(void)
 	PrintAndLog("       h             This help");
 	PrintAndLog("       L             Low frequency (125 KHz)");
 	PrintAndLog("       H             High frequency (134 KHz)");
-	PrintAndLog("       q <divisor>   Manually set divisor. 88-> 134KHz, 95-> 125 Hz");
+	PrintAndLog("       q <divisor>   Manually set divisor. 88-> 134 KHz, 95-> 125 KHz");
 	PrintAndLog("       b <bps>       Sets resolution of bits per sample. Default (max): 8");
 	PrintAndLog("       d <decim>     Sets decimation. A value of N saves only 1 in N samples. Default: 1");
 	PrintAndLog("       a [0|1]       Averaging - if set, will average the stored sample value when decimating. Default: 1");
