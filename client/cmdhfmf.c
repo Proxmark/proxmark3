@@ -29,6 +29,7 @@
 #include "hardnested/hardnested_bf_core.h"
 #include "cliparser/cliparser.h"
 #include "cmdhf14a.h"
+#include "mifare/mifaredefault.h"
 #include "mifare/mifare4.h"
 #include "mifare/mad.h"
 #include "mifare/ndef.h"
