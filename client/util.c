@@ -268,6 +268,10 @@ char *sprint_ascii_ex(const uint8_t *data, const size_t len, const size_t min_st
 	return buf;
 }
 
+char *sprint_ascii(const uint8_t *data, const size_t len) {
+    return sprint_ascii_ex(data, len, 0);
+}
+
 void num_to_bytes(uint64_t n, size_t len, uint8_t* dest)
 {
 	while (len--) {
@@ -329,7 +333,7 @@ uint8_t *SwapEndian64(const uint8_t *src, const size_t len, const uint8_t blockS
 }
 
 //assumes little endian
-char * printBits(size_t const size, void const * const ptr)
+char *printBits(size_t const size, void const * const ptr)
 {
     unsigned char *b = (unsigned char*) ptr;	
     unsigned char byte;
