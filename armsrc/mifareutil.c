@@ -451,7 +451,7 @@ int mifare_ultra_readblock(uint8_t blockNo, uint8_t *blockData)
 		return result;
 	}
 
-	memcpy(blockData, receivedAnswer, 14);
+	memcpy(blockData, receivedAnswer, 16);
 	return 0;
 }
 

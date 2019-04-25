@@ -1963,7 +1963,10 @@ void iClass_Dump(uint8_t blockno, uint8_t numblks) {
 	uint8_t *dataout = BigBuf_malloc(255*8);
 	if (dataout == NULL){
 		Dbprintf("out of memory");
-		OnError(1);
+		FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
+		LED_D_OFF();
+		cmd_send(CMD_ACK,0,1,0,0,0);
+		LED_A_OFF();
 		return;
 	}
 	memset(dataout,0xFF,255*8);

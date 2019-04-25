@@ -1516,8 +1516,11 @@ int CmdHF14AMfSim(const char *Cmd) {
 			break;
 		case 'u':
 		case 'U':
-			param_gethex_ex(Cmd, cmdp+1, uid, &uidlen);
-			switch(uidlen) {
+			uidlen = 14;
+			if (param_gethex_ex(Cmd, cmdp+1, uid, &uidlen)) {
+				return usage_hf14_mfsim();
+			}
+			switch (uidlen) {
 				case 14: flags = FLAG_7B_UID_IN_DATA; break;
 				case  8: flags = FLAG_4B_UID_IN_DATA; break;
 				default: return usage_hf14_mfsim();
@@ -2726,9 +2729,9 @@ int CmdHF14AMfSniff(const char *Cmd){
 //needs nt, ar, at, Data to decrypt
 int CmdDecryptTraceCmds(const char *Cmd){
 	uint8_t data[50];
-	int len = 0;
-	param_gethex_ex(Cmd,3,data,&len);
-	return tryDecryptWord(param_get32ex(Cmd,0,0,16),param_get32ex(Cmd,1,0,16),param_get32ex(Cmd,2,0,16),data,len/2);
+	int len = 100;
+	param_gethex_ex(Cmd, 3, data, &len);
+	return tryDecryptWord(param_get32ex(Cmd, 0, 0, 16), param_get32ex(Cmd, 1, 0, 16), param_get32ex(Cmd, 2, 0, 16), data, len/2);
 }
 
 int CmdHF14AMfAuth4(const char *cmd) {

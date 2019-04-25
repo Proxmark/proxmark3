@@ -142,8 +142,6 @@ void 	MifareDES_Auth1(uint8_t arg0,uint8_t arg1,uint8_t arg2, uint8_t *datain);
 void 	ReaderMifareDES(uint32_t param, uint32_t param2, uint8_t * datain);
 int 	DesfireAPDU(uint8_t *cmd, size_t cmd_len, uint8_t *dataout);
 size_t	CreateAPDU( uint8_t *datain, size_t len, uint8_t *dataout);
-void 	OnSuccess();
-void 	OnError(uint8_t reason);
 
 
 /// iclass.h
