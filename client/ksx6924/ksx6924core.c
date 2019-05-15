@@ -371,7 +371,12 @@ void KSX6924PrintPurseInfo(const struct ksx6924_purse_info *purseInfo) {
 int KSX6924Select(
       bool ActivateField, bool LeaveFieldON,
       uint8_t *Result, size_t MaxResultLen, size_t *ResultLen, uint16_t *sw) {
+   // T-Money + Snapper
    uint8_t aid[] = {0xD4, 0x10, 0x00, 0x00, 0x03, 0x00, 0x01};
+
+   // Cashbee
+   //uint8_t aid[] = {0xD4, 0x10, 0x00, 0x00, 0x14, 0x00, 0x01};
+
    
    return EMVSelect(ECC_CONTACTLESS, ActivateField, LeaveFieldON, aid,
                     sizeof(aid), Result, MaxResultLen, ResultLen, sw, NULL);
