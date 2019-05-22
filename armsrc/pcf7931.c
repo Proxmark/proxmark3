@@ -13,11 +13,11 @@ size_t DemodPCF7931(uint8_t **outBlocks) {
 	uint8_t bits[256] = {0x00};
 	uint8_t blocks[8][16];
 	uint8_t *dest = BigBuf_get_addr();
-    
+
 	int GraphTraceLen = BigBuf_max_traceLen();
 	if (GraphTraceLen > 18000)
 		GraphTraceLen = 18000;
-	
+
 	int i, j, lastval, bitidx, half_switch;
 	int clock = 64;
 	int tolerance = clock / 8;
@@ -107,7 +107,7 @@ size_t DemodPCF7931(uint8_t **outBlocks) {
 					for(j = 0; j < 16; ++j) {
 						blocks[num_blocks][j] =
 							128 * bits[j*8 + 7]+
-	                                		64 * bits[j*8 + 6] +
+											64 * bits[j*8 + 6] +
 							32 * bits[j*8 + 5] +
 							16 * bits[j*8 + 4] +
 							8 * bits[j*8 + 3] +
@@ -161,44 +161,44 @@ bool IsBlock1PCF7931(uint8_t *block) {
 
 void ReadPCF7931() {
 	int found_blocks = 0; // successfully read blocks
-	int max_blocks = 8;	// readable blocks	
+	int max_blocks = 8; // readable blocks
 	uint8_t memory_blocks[8][17]; // PCF content
-	
+
 	uint8_t single_blocks[8][17]; // PFC blocks with unknown position
 	int single_blocks_cnt = 0;
 
-	size_t n = 0; // transmitted blocks	
+	size_t n = 0; // transmitted blocks
 	uint8_t tmp_blocks[4][16]; // temporary read buffer
-	
+
 	uint8_t found_0_1 = 0; // flag: blocks 0 and 1 were found
 	int errors = 0; // error counter
 	int tries = 0; // tries counter
-	
+
 	memset(memory_blocks, 0, 8*17*sizeof(uint8_t));
 	memset(single_blocks, 0, 8*17*sizeof(uint8_t));
-	
+
 	int i = 0, j = 0;
 
 	do {
 		i = 0;
-		
+
 		memset(tmp_blocks, 0, 4*16*sizeof(uint8_t));
 		n = DemodPCF7931((uint8_t**)tmp_blocks);
 		if(!n)
 			++errors;
-		
-		// exit if no block is received 
+
+		// exit if no block is received
 		if (errors >= 10 && found_blocks == 0 && single_blocks_cnt == 0) {
 			Dbprintf("Error, no tag or bad tag");
 			return;
 		}
-		// exit if too many errors during reading 
+		// exit if too many errors during reading
 		if (tries > 50 && (2*errors > tries)) {
 			Dbprintf("Error reading the tag");
 			Dbprintf("Here is the partial content");
 			goto end;
 		}
-		
+
 		// our logic breaks if we don't get at least two blocks
 		if (n < 2) {
 			if (n == 0 || !memcmp(tmp_blocks[0], "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00", 16))
@@ -219,12 +219,12 @@ void ReadPCF7931() {
 			}
 			++tries;
 			continue;
-	 	}
-	 	
-	 	Dbprintf("(dbg) got %d blocks (%d/%d found) (%d tries, %d errors)", n, found_blocks, (max_blocks == 0 ? found_blocks : max_blocks), tries, errors);
+		}
+
+		Dbprintf("(dbg) got %d blocks (%d/%d found) (%d tries, %d errors)", n, found_blocks, (max_blocks == 0 ? found_blocks : max_blocks), tries, errors);
 
 		i = 0;
-		if(!found_0_1) {			
+		if(!found_0_1) {
 			while (i < n - 1) {
 				if (IsBlock0PCF7931(tmp_blocks[i]) && IsBlock1PCF7931(tmp_blocks[i+1])) {
 					found_0_1 = 1;
@@ -234,9 +234,9 @@ void ReadPCF7931() {
 					// block 1 tells how many blocks are going to be sent
 					max_blocks = MAX((memory_blocks[1][14] & 0x7f), memory_blocks[1][15]) + 1;
 					found_blocks = 2;
-					
+
 					Dbprintf("Found blocks 0 and 1. PCF is transmitting %d blocks.", max_blocks);
-					
+
 					// handle the following blocks
 					for (j = i + 2; j < n; ++j) {
 						memcpy(memory_blocks[found_blocks], tmp_blocks[j], 16);
@@ -297,14 +297,14 @@ void ReadPCF7931() {
 			Dbprintf("<missing block %d>", i);
 	}
 	Dbprintf("-----------------------------------------");
-	
+
 	if (found_blocks < max_blocks) {
 		Dbprintf("-----------------------------------------");
 		Dbprintf("Blocks with unknown position:");
 		Dbprintf("-----------------------------------------");
 		for (i = 0; i < single_blocks_cnt; ++i)
 			print_result("Block", single_blocks[i], 16);
-		
+
 		Dbprintf("-----------------------------------------");
 	}
 	cmd_send(CMD_ACK,0,0,0,0,0);
@@ -332,42 +332,42 @@ static void RealWritePCF7931(uint8_t *pass, uint16_t init_delay, int32_t l, int3
 	AddBytePCF7931(pass[6], tab, l, p);
 	//programming mode (0 or 1)
 	AddBitPCF7931(0, tab, l, p);
-	
+
 	//block adress on 6 bits
 	for (u = 0; u < 6; ++u) {
-		if (address & (1 << u)) {	// bit 1
+		if (address & (1 << u)) {   // bit 1
 			 ++parity;
 			 AddBitPCF7931(1, tab, l, p);
-		} else {					// bit 0
+		} else {                    // bit 0
 			 AddBitPCF7931(0, tab, l, p);
 		}
 	}
-	
+
 	//byte address on 4 bits
 	for (u = 0; u < 4; ++u)
 	{
-		if (byte & (1 << u)) { 	// bit 1
+		if (byte & (1 << u)) {  // bit 1
 			 parity++;
 			 AddBitPCF7931(1, tab, l, p);
 		}
-		else				// bit 0
+		else                // bit 0
 			 AddBitPCF7931(0, tab, l, p);
 	}
-	
+
 	//data on 8 bits
 	for (u=0; u<8; u++)
 	{
-		if (data&(1<<u)) {	// bit 1
+		if (data&(1<<u)) {  // bit 1
 			 parity++;
 			 AddBitPCF7931(1, tab, l, p);
-		} 
-		else				//bit 0
+		}
+		else                //bit 0
 			 AddBitPCF7931(0, tab, l, p);
 	}
 
 	//parity bit
 	if ((parity % 2) == 0)
-	 	AddBitPCF7931(0, tab, l, p); //even parity
+		AddBitPCF7931(0, tab, l, p); //even parity
 	else
 		AddBitPCF7931(1, tab, l, p);//odd parity
 
@@ -394,20 +394,14 @@ static void RealWritePCF7931(uint8_t *pass, uint16_t init_delay, int32_t l, int3
 void BruteForcePCF7931(uint64_t password, uint8_t tries, uint16_t init_delay, int32_t l, int32_t p) {
 	uint8_t i = 0;
 	uint8_t pass_array[7];
-	
+
 	while (password < 0x00FFFFFFFFFFFFFF) {
 		if (BUTTON_PRESS()) {
 			Dbprintf("Button pressed, stopping bruteforce ...");
 			return;
 		}
-		
-		pass_array[0] = password & 0xFF;
-		pass_array[1] = (password >> 8) & 0xFF;
-		pass_array[2] = (password >> 16) & 0xFF;
-		pass_array[3] = (password >> 24) & 0xFF;
-		pass_array[4] = (password >> 32) & 0xFF;
-		pass_array[5] = (password >> 40) & 0xFF;
-		pass_array[6] = (password >> 48) & 0xFF;
+
+		num_to_bytes(password, 7, pass_array);
 
 		Dbprintf("Trying: %02x %02x %02x %02x %02x %02x %02x ...",
 			pass_array[0],
@@ -417,7 +411,7 @@ void BruteForcePCF7931(uint64_t password, uint8_t tries, uint16_t init_delay, in
 			pass_array[4],
 			pass_array[5],
 			pass_array[6]);
-		
+
 		for (i = 0; i < tries; ++i)
 			RealWritePCF7931
 			(
@@ -429,15 +423,15 @@ void BruteForcePCF7931(uint64_t password, uint8_t tries, uint16_t init_delay, in
 				7,
 				0x01
 			);
-	
-		++password;	
+
+		++password;
 	}
 }
 
 /* Write on a byte of a PCF7931 tag
  * @param address : address of the block to write
    @param byte : address of the byte to write
-    @param data : data to write
+	@param data : data to write
  */
 void WritePCF7931(uint8_t pass1, uint8_t pass2, uint8_t pass3, uint8_t pass4, uint8_t pass5, uint8_t pass6, uint8_t pass7, uint16_t init_delay, int32_t l, int32_t p, uint8_t address, uint8_t byte, uint8_t data) {
 	Dbprintf("Initialization delay : %d us", init_delay);
@@ -446,9 +440,9 @@ void WritePCF7931(uint8_t pass1, uint8_t pass2, uint8_t pass3, uint8_t pass4, ui
 	Dbprintf("Block address : %02x", address);
 	Dbprintf("Byte address : %02x", byte);
 	Dbprintf("Data : %02x", data);
-	
+
 	uint8_t password[7] = {pass1, pass2, pass3, pass4, pass5, pass6, pass7};
-	
+
 	RealWritePCF7931 (password, init_delay, l, p, address, byte, data);
 }
 
@@ -488,7 +482,7 @@ void SendCmdPCF7931(uint32_t * tab) {
 		HIGH(GPIO_SSC_DOUT);
 		while(tempo !=  tab[u])
 			tempo = AT91C_BASE_TC0->TC_CV;
-			
+
 		// stop modulating antenna
 		LOW(GPIO_SSC_DOUT);
 		while(tempo !=  tab[u+1])
@@ -510,7 +504,7 @@ void SendCmdPCF7931(uint32_t * tab) {
 }
 
 
-/* Add a byte for building the data frame of PCF7931 tags 
+/* Add a byte for building the data frame of PCF7931 tags
  * @param b : byte to add
  * @param tab : array of the data frame
  * @param l : offset on low pulse width
@@ -519,7 +513,7 @@ void SendCmdPCF7931(uint32_t * tab) {
 bool AddBytePCF7931(uint8_t byte, uint32_t * tab, int32_t l, int32_t p) {
 	uint32_t u;
 	for (u = 0; u < 8; ++u) {
-		if (byte & (1 << u)) {	//bit is 1
+		if (byte & (1 << u)) {  //bit is 1
 			if(AddBitPCF7931(1, tab, l, p)==1)return 1;
 		} else { //bit is 0
 			if(AddBitPCF7931(0, tab, l, p)==1)return 1;
@@ -529,7 +523,7 @@ bool AddBytePCF7931(uint8_t byte, uint32_t * tab, int32_t l, int32_t p) {
 	return 0;
 }
 
-/* Add a bits for building the data frame of PCF7931 tags 
+/* Add a bits for building the data frame of PCF7931 tags
  * @param b : bit to add
  * @param tab : array of the data frame
  * @param l : offset on low pulse width
@@ -540,23 +534,23 @@ bool AddBitPCF7931(bool b, uint32_t * tab, int32_t l, int32_t p) {
 
 	for (u = 0; tab[u] != 0; u += 3){} //we put the cursor at the last value of the array
 
-	if (b == 1) {	//add a bit 1
-		if (u == 0)	tab[u] = 34 * T0_PCF + p;
-		else		tab[u] = 34 * T0_PCF + tab[u-1] + p;
+	if (b == 1) {   //add a bit 1
+		if (u == 0) tab[u] = 34 * T0_PCF + p;
+		else        tab[u] = 34 * T0_PCF + tab[u-1] + p;
 
 		tab[u+1] = 6 * T0_PCF+tab[u] + l;
 		tab[u+2] = 88 * T0_PCF+tab[u + 1] - l - p;
 		return 0;
-	} else { 		//add a bit 0
+	} else {        //add a bit 0
 
-		if (u == 0)	tab[u] = 98 * T0_PCF + p;
-		else		tab[u] = 98 * T0_PCF + tab[u-1] + p;
+		if (u == 0) tab[u] = 98 * T0_PCF + p;
+		else        tab[u] = 98 * T0_PCF + tab[u-1] + p;
 
 		tab[u + 1] = 6 * T0_PCF + tab[u] + l;
 		tab[u + 2] = 24 * T0_PCF + tab[u + 1] - l - p;
 		return 0;
 	}
-	
+
 	return 1;
 }
 
@@ -570,8 +564,8 @@ bool AddPatternPCF7931(uint32_t a, uint32_t b, uint32_t c, uint32_t * tab) {
 	uint32_t u = 0;
 	for(u = 0; tab[u] != 0; u += 3){} //we put the cursor at the last value of the array
 
-	if (u == 0)	tab[u] = a;
-	else		tab[u] = a + tab[u - 1];
+	if (u == 0) tab[u] = a;
+	else        tab[u] = a + tab[u - 1];
 
 	tab[u + 1] = b + tab[u];
 	tab[u + 2] = c + tab[u + 1];
