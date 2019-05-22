@@ -29,8 +29,8 @@ class Plot: public QWidget
 {
 private:
 	QWidget *master;
-	int GraphStart;
-	double GraphPixelsPerPoint;
+	int GraphStart; // Starting point/offset for the left side of the graph
+	double GraphPixelsPerPoint; // How many visual pixels are between each sample point (x axis)
 	int CursorAPos;
 	int CursorBPos;
 	void PlotGraph(int *buffer, int len, QRect r,QRect r2, QPainter* painter, int graphNum);
@@ -73,13 +73,13 @@ class ProxWidget : public QWidget
 		//OpsShow(void);
 
 	protected:
-	//	void paintEvent(QPaintEvent *event);
+	//  void paintEvent(QPaintEvent *event);
 		void closeEvent(QCloseEvent *event);
 		void showEvent(QShowEvent *event);
 		void hideEvent(QHideEvent *event);
-	//	void mouseMoveEvent(QMouseEvent *event);
-	//	void mousePressEvent(QMouseEvent *event) { mouseMoveEvent(event); }
-	//	void keyPressEvent(QKeyEvent *event);
+	//  void mouseMoveEvent(QMouseEvent *event);
+	//  void mousePressEvent(QMouseEvent *event) { mouseMoveEvent(event); }
+	//  void keyPressEvent(QKeyEvent *event);
 	public slots:
 		void applyOperation();
 		void stickOperation();
@@ -111,7 +111,7 @@ class ProxGuiQT : public QObject
 		int argc;
 		char **argv;
 		WorkerThread *proxmarkThread;
-	
+
 	public:
 		ProxGuiQT(int argc, char **argv, WorkerThread *wthread);
 		~ProxGuiQT(void);
