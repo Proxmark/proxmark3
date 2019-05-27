@@ -32,6 +32,7 @@ This project uses the changelog in accordance with [keepchangelog](http://keepac
 - Added `hf mfp ndef` `hf mf ndef` parsing NDEF records (Merlok)
 - Added Mifare Mini, Mifare 2K and 4K support to `hf mf sim` (piwi)
 - Added Legic detection to `hf search` (dnet)
+- Added Home (Pos1) and End key bindings to the plot GUI (based on @mcd1992)
 
 ## [v3.1.0][2018-10-10]
 
