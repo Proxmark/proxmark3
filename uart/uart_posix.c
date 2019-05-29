@@ -80,7 +80,7 @@ serial_port uart_open(const char* pcPortName)
   if (sp == 0) return INVALID_SERIAL_PORT;
   
   if (memcmp(pcPortName, "tcp:", 4) == 0) {
-    struct addrinfo *addr, *rp;
+    struct addrinfo *addr = NULL, *rp;
     char *addrstr = strdup(pcPortName + 4);
     if (addrstr == NULL) {
       printf("Error: strdup\n");
@@ -98,7 +98,13 @@ serial_port uart_open(const char* pcPortName)
     } else
       portstr = "7901";
 
-    int s = getaddrinfo(addrstr, portstr, NULL, &addr);
+    struct addrinfo info;
+
+    memset (&info, 0, sizeof(info));
+
+    info.ai_socktype = SOCK_STREAM;
+
+    int s = getaddrinfo(addrstr, portstr, &info, &addr);
     if (s != 0) {
       printf("Error: getaddrinfo: %s\n", gai_strerror(s));
       return INVALID_SERIAL_PORT;
