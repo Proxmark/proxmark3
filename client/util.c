@@ -117,9 +117,8 @@ void AddLogCurrentDT(char *fileName) {
 	AddLogLine(fileName, "\nanticollision: ", buff);
 }
 
-void FillFileNameByUID(char *fileName, uint8_t * uid, char *ext, int byteCount) {
+void FillFileNameByUID(char *fileName, uint8_t *uid, char *ext, int byteCount) {
 	char * fnameptr = fileName;
-	memset(fileName, 0x00, 200);
 	
 	for (int j = 0; j < byteCount; j++, fnameptr += 2)
 		sprintf(fnameptr, "%02x", (unsigned int) uid[j]); 
@@ -323,13 +322,12 @@ uint32_t SwapBits(uint32_t value, int nrbits) {
 uint8_t *SwapEndian64(const uint8_t *src, const size_t len, const uint8_t blockSize){
 	static uint8_t buf[64];
 	memset(buf, 0x00, 64);
-	uint8_t *tmp = buf;
 	for (uint8_t block=0; block < (uint8_t)(len/blockSize); block++){
 		for (size_t i = 0; i < blockSize; i++){
-			tmp[i+(blockSize*block)] = src[(blockSize-1-i)+(blockSize*block)];
+			buf[i+(blockSize*block)] = src[(blockSize-1-i)+(blockSize*block)];
 		}
 	}
-	return tmp;
+	return buf;
 }
 
 //assumes little endian
@@ -338,7 +336,7 @@ char *printBits(size_t const size, void const * const ptr)
     unsigned char *b = (unsigned char*) ptr;	
     unsigned char byte;
 	static char buf[1024];
-	char * tmp = buf;
+	char *tmp = buf;
     int i, j;
 
     for (i=size-1;i>=0;i--)
@@ -354,7 +352,7 @@ char *printBits(size_t const size, void const * const ptr)
 	return buf;
 }
 
-char * printBitsPar(const uint8_t *b, size_t len) {
+char *printBitsPar(const uint8_t *b, size_t len) {
 	static char buf1[512] = {0};
 	static char buf2[512] = {0};
 	static char *buf;
@@ -519,7 +517,8 @@ int param_gethex(const char *line, int paramnum, uint8_t * data, int hexcnt)
 
 	return 0;
 }
-int param_gethex_ex(const char *line, int paramnum, uint8_t * data, int *hexcnt)
+
+int param_gethex_ex(const char *line, int paramnum, uint8_t *data, int *hexcnt)
 {
 	int bg, en, temp, i;
 
@@ -528,6 +527,8 @@ int param_gethex_ex(const char *line, int paramnum, uint8_t * data, int *hexcnt)
 	
 	if (param_getptr(line, &bg, &en, paramnum)) return 1;
 
+	if (en - bg + 1 > *hexcnt) return 1;
+	
 	*hexcnt = en - bg + 1;
 	if (*hexcnt % 2) //error if not complete hex bytes
 		return 1;

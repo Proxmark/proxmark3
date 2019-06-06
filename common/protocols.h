@@ -105,44 +105,49 @@ NXP/Philips CUSTOM COMMANDS
 
 
 #define ISO14443A_CMD_REQA       0x26
-#define ISO14443A_CMD_READBLOCK  0x30
 #define ISO14443A_CMD_WUPA       0x52
 #define ISO14443A_CMD_ANTICOLL_OR_SELECT     0x93
 #define ISO14443A_CMD_ANTICOLL_OR_SELECT_2   0x95
 #define ISO14443A_CMD_ANTICOLL_OR_SELECT_3   0x97
-#define ISO14443A_CMD_WRITEBLOCK 0xA0 // or 0xA2 ?
 #define ISO14443A_CMD_HALT       0x50
 #define ISO14443A_CMD_RATS       0xE0
 
-#define MIFARE_AUTH_KEYA        0x60
-#define MIFARE_AUTH_KEYB        0x61
-#define MIFARE_MAGICWUPC1       0x40
-#define MIFARE_MAGICWUPC2       0x43
-#define MIFARE_MAGICWIPEC       0x41
-#define MIFARE_CMD_INC          0xC0
-#define MIFARE_CMD_DEC          0xC1
-#define MIFARE_CMD_RESTORE      0xC2
-#define MIFARE_CMD_TRANSFER     0xB0
+#define MIFARE_CMD_READBLOCK     0x30
+#define MIFARE_CMD_WRITEBLOCK    0xA0
+#define MIFARE_AUTH_KEYA         0x60
+#define MIFARE_AUTH_KEYB         0x61
+#define MIFARE_MAGICWUPC1        0x40
+#define MIFARE_MAGICWUPC2        0x43
+#define MIFARE_MAGICWIPEC        0x41
+#define MIFARE_CMD_INC           0xC0
+#define MIFARE_CMD_DEC           0xC1
+#define MIFARE_CMD_RESTORE       0xC2
+#define MIFARE_CMD_TRANSFER      0xB0
 
-#define MIFARE_EV1_PERSONAL_UID 0x40
-#define MIFARE_EV1_SETMODE      0x43
+#define MIFARE_EV1_PERSONAL_UID  0x40
+#define MIFARE_EV1_SETMODE       0x43
 
+#define MIFARE_ULC_WRITE         0xA2
+#define MIFARE_ULC_COMP_WRITE    MIFARE_CMD_WRITEBLOCK
+#define MIFARE_ULC_AUTH_1        0x1A
+#define MIFARE_ULC_AUTH_2        0xAF
 
-#define MIFARE_ULC_WRITE        0xA2
-//#define MIFARE_ULC__COMP_WRITE  0xA0
-#define MIFARE_ULC_AUTH_1       0x1A
-#define MIFARE_ULC_AUTH_2       0xAF
+#define MIFARE_ULEV1_AUTH        0x1B
+#define MIFARE_ULEV1_VERSION     0x60
+#define MIFARE_ULEV1_FASTREAD    0x3A
+#define MIFARE_ULEV1_WRITE       0xA2
+#define MIFARE_ULEV1_COMP_WRITE  MIFARE_CMD_WRITEBLOCK
+#define MIFARE_ULEV1_READ_CNT    0x39
+#define MIFARE_ULEV1_INCR_CNT    0xA5
+#define MIFARE_ULEV1_READSIG     0x3C
+#define MIFARE_ULEV1_CHECKTEAR   0x3E
+#define MIFARE_ULEV1_VCSL        0x4B
 
-#define MIFARE_ULEV1_AUTH       0x1B
-#define MIFARE_ULEV1_VERSION    0x60
-#define MIFARE_ULEV1_FASTREAD   0x3A
-//#define MIFARE_ULEV1_WRITE      0xA2
-//#define MIFARE_ULEV1_COMP_WRITE 0xA0
-#define MIFARE_ULEV1_READ_CNT   0x39
-#define MIFARE_ULEV1_INCR_CNT   0xA5
-#define MIFARE_ULEV1_READSIG    0x3C
-#define MIFARE_ULEV1_CHECKTEAR  0x3E
-#define MIFARE_ULEV1_VCSL       0x4B
+// mifare 4bit card answers
+#define CARD_ACK                 0x0A  // 1010 - ACK
+#define CARD_NACK_NA             0x04  // 0100 - NACK, not allowed (command not allowed)
+#define CARD_NACK_TR             0x05  // 0101 - NACK, transmission error
+
 
 /**
 06 00 = INITIATE
