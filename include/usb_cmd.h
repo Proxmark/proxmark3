@@ -41,7 +41,7 @@ typedef struct{
 	bool averaging;
 	int divisor;
 	int trigger_threshold;
-  int samples_to_skip;
+	int samples_to_skip;
 } sample_config;
 
 // For the bootloader
@@ -118,8 +118,6 @@ typedef struct{
 #define CMD_COTAG                                                         0x0225
 #define CMD_PARADOX_CLONE_TAG                                             0x0226
 #define CMD_EM4X_PROTECT                                                  0x0228
-
-/* CMD_SET_ADC_MUX: ext1 is 0 for lopkd, 1 for loraw, 2 for hipkd, 3 for hiraw */
 
 // For the 13.56 MHz tags
 #define CMD_ACQUIRE_RAW_ADC_SAMPLES_ISO_15693                             0x0300
