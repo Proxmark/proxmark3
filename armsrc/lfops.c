@@ -1203,6 +1203,8 @@ void CmdIOdemodFSK(int findone, int *high, int *low, int ledcontrol)
 #define WRITE_0   18*8 // was 144 // SPEC: 16*8 to 32*8 - typ 24*8 (or 24fc)
 #define WRITE_1   50*8 // was 400 // SPEC: 48*8 to 64*8 - typ 56*8 (or 56fc)  432 for T55x7; 448 for E5550
 #define READ_GAP  15*8 
+// Long Leading Reference
+#define Reference_llr (136+18)*8  // Needs to be WRITR_0 + 136 clocks.
 
 void TurnReadLFOn(int delay) {
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_LF_ADC | FPGA_LF_ADC_READER_FIELD);
@@ -1218,6 +1220,265 @@ void T55xxWriteBit(int bit) {
 		TurnReadLFOn(WRITE_1);
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
 	WaitUS(WRITE_GAP);
+}
+
+void T55xxWrite_LLR (void)
+{
+	TurnReadLFOn (Reference_llr);
+	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
+	WaitUS(WRITE_GAP);	
+}
+
+#define START_GAPlz 31*8 
+#define WRITE_GAPlz 20*8 
+#define WRITElz_0   18*8 
+#define WRITElz_1   40*8 
+#define READ_GAP  15*8 
+
+void T55xxWriteBit_Leading0(int bit) {
+	if (!bit)
+		TurnReadLFOn(WRITElz_0);
+	else
+		TurnReadLFOn(WRITElz_1);
+	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
+	WaitUS(WRITE_GAPlz);
+//	WaitUS(160);
+}
+
+#define START_GAP1of4 31*8 // SPEC:  1*8 to 50*8 - typ 10*8 (or 15fc)
+#define WRITE_GAP1of4 20*8 // SPEC:  1*8 to 20*8 - typ 10*8 (or 10fc)
+//  00 = reference			// 8 * 8 -  - 68 * 8
+#define WRITE1of4_00  18*8 // SPEC:  8*8 to 68*8 - typ 24*8 (or 24fc)
+#define WRITE1of4_01  34*8 // SPEC: dref+9  - dref+16 - dref+24 
+#define WRITE1of4_10  50*8 // SPEC: dref+25 - dref+32 - dref+40
+#define WRITE1of4_11  66*8 // SPEC: dref+41 - dref+48 - dref+56
+#define READ1of4_GAP  15*8 
+
+void T55xxWriteBit_1of4(int bits) {
+	
+	switch (bits)
+	{
+		case 0 :  TurnReadLFOn(WRITE1of4_00); break;
+		case 1 :  TurnReadLFOn(WRITE1of4_01); break;
+		case 2 :  TurnReadLFOn(WRITE1of4_10); break;
+		case 3 :  TurnReadLFOn(WRITE1of4_11); break;
+		default:
+			TurnReadLFOn(WRITE1of4_00);
+	}		
+
+	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
+	WaitUS(WRITE_GAP1of4);
+//	WaitUS(160);
+}
+
+void T55xxWriteBlockExt_Leading0 (uint32_t Data, uint32_t Block, uint32_t Pwd, uint8_t arg) {
+
+	LED_A_ON();
+	bool PwdMode = arg & 0x1;
+	uint8_t Page = (arg & 0x2)>>1;
+	bool testMode = arg & 0x4;
+	uint32_t i = 0;
+	
+	// Set up FPGA, 125kHz
+	LFSetupFPGAForADC(95, true);
+	StartTicks();
+	// make sure tag is fully powered up...
+	WaitMS(5);
+	// Trigger T55x7 in mode.
+	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
+
+	WaitUS(START_GAPlz);
+	
+	
+	/* 
+	   0 	: Leading Zero
+	   11   : Opcode
+	   00   : Fixed 00 if protected write (i.e. have password)
+	   <32 bit Password>
+	   0 	: Lock Bit
+	   <32 bit data> 
+	   <3 bit addr>
+
+	   	Standard Write : 0 1p L <32 data bits> <3 bit addr>
+		                 0 10 0 00000000000000000000000000000000 001
+		Protected Write: 0 1p 00 <32 pwd bits> L <32 data bits> <3 bit addr>
+					     0 10 00 00000000000000000000000000000000 0 00000000000000000000000000000000 001
+		Wake Up			 0 10 00 <32 pwd bits>
+		Protected Read   0 1p 00 <32 pwd bits> 0 <3 bit addr>
+		Standard Read    0 1p 0 <3 bit addr>
+		Page 0/1 read    0 1p
+		Reset            0 00
+		
+	*/
+		T55xxWriteBit_Leading0 (0); //T55xxWriteBit(0);
+				
+	
+		if (testMode) Dbprintf("TestMODE");
+			// Std Opcode 10
+			T55xxWriteBit_Leading0 (testMode ? 0 : 1);
+			T55xxWriteBit_Leading0 (testMode ? 1 : Page); //Page 0
+		
+	
+		if (PwdMode) {
+			// Leading zero - insert two fixed 00 between opcode and password
+			T55xxWriteBit_Leading0 (0);
+			T55xxWriteBit_Leading0 (0);
+			// Send Pwd
+			for (i = 0x80000000; i != 0; i >>= 1)
+				T55xxWriteBit_Leading0 (Pwd & i);
+		}
+	
+		// Send Lock bit
+		T55xxWriteBit_Leading0 (0);
+
+		// Send Data
+		for (i = 0x80000000; i != 0; i >>= 1)
+			T55xxWriteBit_Leading0(Data & i);
+
+		// Send Block number
+		for (i = 0x04; i != 0; i >>= 1)
+			T55xxWriteBit_Leading0 (Block & i);
+			
+		// Perform write (nominal is 5.6 ms for T55x7 and 18ms for E5550,
+		// so wait a little more)
+		// "there is a clock delay before programming" 
+		//  - programming takes ~5.6ms for t5577 ~18ms for E5550 or t5567
+		//  so we should wait 1 clock + 5.6ms then read response? 
+		//  but we need to know we are dealing with t5577 vs t5567 vs e5550 (or q5) marshmellow...
+		if (testMode) {
+			//TESTMODE TIMING TESTS: 
+			// <566us does nothing 
+			// 566-568 switches between wiping to 0s and doing nothing
+			// 5184 wipes and allows 1 block to be programmed.
+			// indefinite power on wipes and then programs all blocks with bitshifted data sent.
+			TurnReadLFOn(5184); 
+
+		} else {
+			TurnReadLFOn(20 * 1000);
+			//could attempt to do a read to confirm write took
+			// as the tag should repeat back the new block 
+			// until it is reset, but to confirm it we would 
+			// need to know the current block 0 config mode for
+			// modulation clock an other details to demod the response...
+			// response should be (for t55x7) a 0 bit then (ST if on) 
+			// block data written in on repeat until reset. 
+
+			//DoPartialAcquisition(20, true, 12000);
+		}
+
+		// turn field off
+		FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
+		LED_A_OFF();
+	
+}
+void T55xxWriteBlockExt_1of4 (uint32_t Data, uint32_t Block, uint32_t Pwd, uint8_t arg) {
+
+	LED_A_ON();
+    bool PwdMode = arg & 0x1;
+	uint8_t Page = (arg & 0x2)>>1;
+	bool testMode = arg & 0x4;
+	int bitpos;
+	uint8_t bits;
+	
+	// Set up FPGA, 125kHz
+	LFSetupFPGAForADC(95, true);
+	StartTicks();
+	// make sure tag is fully powered up...
+	WaitMS(5);
+	// Trigger T55x7 in mode.
+	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
+
+	
+	WaitUS(START_GAP1of4);
+	
+	
+	/* 
+	   00 	: 1 if 4
+	   11   : Opcode
+	   00   : Fixed 00 if protected write (i.e. have password)
+	   <32 bit Password>
+	   0 	: Lock Bit
+	   <32 bit data> 
+	   <3 bit addr>
+
+	   	Standard Write : 00 1p L <32 data bits> <3 bit addr>
+		                 00 10 0 00000000000000000000000000000000 001
+		Protected Write: 00 1p 00 <32 pwd bits> L <32 data bits> <3 bit addr>
+					     00 10 00 00000000000000000000000000000000 0 00000000000000000000000000000000 001
+		Wake Up			 00 10 00 <32 pwd bits>
+		Protected Read   00 1p 00 <32 pwd bits> 0 <3 bit addr>
+		Standard Read    00 1p 0 <3 bit addr>
+		Page 0/1 read    00 1p
+		Reset            00 00
+		
+	*/
+		T55xxWriteBit_1of4 (0); //Send Reference 00
+	
+		if (testMode) Dbprintf("TestMODE");
+		// Std Opcode 10
+		if (testMode) bits  = 0; else bits   = 2;			// 0x or 1x
+		if (testMode) bits |= 1; else bits  += (Page);  //  x0 or x1
+		T55xxWriteBit_1of4 (bits);
+		
+		if (PwdMode) {
+			// 1 of 4 00 - insert two fixed 00 between opcode and password
+			T55xxWriteBit_1of4 (0); // 00
+			
+			// Send Pwd
+			for (bitpos = 31; bitpos >= 1; bitpos -= 2) { // 2 bits at a time
+				bits = (((Pwd >> bitpos) & 1) << 1) + ((Pwd >> (bitpos-1)) & 1);	
+				T55xxWriteBit_1of4 (bits);
+			}
+		}
+		
+		// Send Lock bit
+		bits = 0; // Add lock bit (Not Set) to the next 2 bits
+	
+		// Send Data - offset by 1 bit due to lock bit
+		// 2 bits at a time - Initilised with lock bit above
+		for (bitpos = 31; bitpos >= 1; bitpos -= 2) { 
+				bits  |= ((Data >> bitpos) & 1);  // Add Low bit
+				T55xxWriteBit_1of4 (bits);
+				bits = ((Data >> (bitpos-1)) & 1) << 1; // Set next high bit 	
+		}
+
+		// Send Block number
+		bits  |= ((Block >> 2) & 1); 
+		T55xxWriteBit_1of4 (bits);
+		bits = (Block & 3);// 1) & 2) + (Block & 1);
+		T55xxWriteBit_1of4 (bits);			
+			
+		// Perform write (nominal is 5.6 ms for T55x7 and 18ms for E5550,
+		// so wait a little more)
+		// "there is a clock delay before programming" 
+		//  - programming takes ~5.6ms for t5577 ~18ms for E5550 or t5567
+		//  so we should wait 1 clock + 5.6ms then read response? 
+		//  but we need to know we are dealing with t5577 vs t5567 vs e5550 (or q5) marshmellow...
+		if (testMode) {
+			//TESTMODE TIMING TESTS: 
+			// <566us does nothing 
+			// 566-568 switches between wiping to 0s and doing nothing
+			// 5184 wipes and allows 1 block to be programmed.
+			// indefinite power on wipes and then programs all blocks with bitshifted data sent.
+			TurnReadLFOn(5184); 
+
+		} else {
+			TurnReadLFOn(20 * 1000);
+			//could attempt to do a read to confirm write took
+			// as the tag should repeat back the new block 
+			// until it is reset, but to confirm it we would 
+			// need to know the current block 0 config mode for
+			// modulation clock an other details to demod the response...
+			// response should be (for t55x7) a 0 bit then (ST if on) 
+			// block data written in on repeat until reset. 
+
+			//DoPartialAcquisition(20, true, 12000);
+		}
+
+		// turn field off
+		FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
+		LED_A_OFF();
+	
 }
 
 // Send T5577 reset command then read stream (see if we can identify the start of the stream)
@@ -1324,12 +1585,34 @@ void T55xxWriteBlockExt(uint32_t Data, uint32_t Block, uint32_t Pwd, uint8_t arg
 
 // Write one card block in page 0, no lock
 void T55xxWriteBlock(uint32_t Data, uint32_t Block, uint32_t Pwd, uint8_t arg) {
-	T55xxWriteBlockExt(Data, Block, Pwd, arg);
+//	arg 8 bit 00000000 
+//            0000000x	Password
+//            000000x0  Page
+//            00000x00  Test Mode
+//            000xx000  (0x18) where xx : 00 - Normal Write, 01 - Long Leading Reference
+//										  10 - Leading 0,    11 - 1 of 4
+	uint8_t downlink_mode;
+	
+	downlink_mode = (arg >> 3) & 0x03;
+	
+	switch (downlink_mode)
+	{
+		case 0 :	T55xxWriteBlockExt          (Data, Block, Pwd, arg);	break;
+		case 1 :    T55xxWrite_LLR ();
+					T55xxWriteBlockExt          (Data, Block, Pwd, arg);
+					break;
+		case 2 :	T55xxWriteBlockExt_Leading0 (Data, Block, Pwd, arg); 	break;
+		case 3 :	T55xxWriteBlockExt_1of4     (Data, Block, Pwd, arg); 	break;
+		
+		default:
+				T55xxWriteBlockExt    (Data, Block, Pwd, arg);
+	}					
+
 	cmd_send(CMD_ACK,0,0,0,0,0);
 }
 
 // Read one card block in page [page]
-void T55xxReadBlock(uint16_t arg0, uint8_t Block, uint32_t Pwd) {
+void T55xxReadBlockExt (uint16_t arg0, uint8_t Block, uint32_t Pwd) {
 	LED_A_ON();
 	bool PwdMode = arg0 & 0x1;
 	uint8_t Page = (arg0 & 0x2) >> 1;
@@ -1379,8 +1662,161 @@ void T55xxReadBlock(uint16_t arg0, uint8_t Block, uint32_t Pwd) {
 
 	// Turn the field off
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF); // field off
-	cmd_send(CMD_ACK,0,0,0,0,0);    
+//	cmd_send(CMD_ACK,0,0,0,0,0);    
 	LED_A_OFF();
+}
+
+void T55xxReadBlockExt_Leading0 (uint16_t arg0, uint8_t Block, uint32_t Pwd) {
+	LED_A_ON();
+	bool     PwdMode = arg0 & 0x1;
+	uint8_t  Page    = (arg0 & 0x2) >> 1;
+	uint32_t i       = 0;
+	bool RegReadMode = (Block == 0xFF);//regular read mode
+	 
+	//clear buffer now so it does not interfere with timing later
+	BigBuf_Clear_ext(false);
+
+	//make sure block is at max 7
+	Block &= 0x7;
+
+	// Set up FPGA, 125kHz to power up the tag
+	LFSetupFPGAForADC(95, true);
+	StartTicks();
+	// make sure tag is fully powered up...
+	WaitMS(5);
+	// Trigger T55x7 Direct Access Mode with start gap
+	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
+	WaitUS(START_GAPlz);
+
+	T55xxWriteBit_Leading0 (0); 
+
+	// Opcode 1[page]
+	T55xxWriteBit_Leading0 (1);
+	T55xxWriteBit_Leading0 (Page); //Page 0
+
+	if (PwdMode){
+		// Send Pwd
+		T55xxWriteBit_Leading0 (0);
+		T55xxWriteBit_Leading0 (0);		
+		
+		for (i = 0x80000000; i != 0; i >>= 1)
+			T55xxWriteBit_Leading0 (Pwd & i);
+	}
+	// Send a zero bit separation
+	T55xxWriteBit_Leading0(0);
+
+	// Send Block number (if direct access mode)
+	if (!RegReadMode)
+		for (i = 0x04; i != 0; i >>= 1)
+			T55xxWriteBit_Leading0(Block & i);		
+
+	// Turn field on to read the response
+	// 137*8 seems to get to the start of data pretty well... 
+	//  but we want to go past the start and let the repeating data settle in...
+	TurnReadLFOn(210*8); 
+
+	// Acquisition
+	// Now do the acquisition
+	DoPartialAcquisition(0, true, 12000, 0);
+
+	// Turn the field off
+	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF); // field off
+//	cmd_send(CMD_ACK,0,0,0,0,0);    
+	LED_A_OFF();
+}
+
+void T55xxReadBlockExt_1of4 (uint16_t arg0, uint8_t Block, uint32_t Pwd) {
+	LED_A_ON();
+	bool     PwdMode = arg0 & 0x1;
+	uint8_t  Page    = (arg0 & 0x2) >> 1;
+	//uint32_t i       = 0;
+	bool RegReadMode = (Block == 0xFF);//regular read mode
+	uint8_t bits;
+	int bitpos;
+	 
+	//clear buffer now so it does not interfere with timing later
+	BigBuf_Clear_ext(false);
+
+	//make sure block is at max 7
+	Block &= 0x7;
+
+	// Set up FPGA, 125kHz to power up the tag
+	LFSetupFPGAForADC(95, true);
+	StartTicks();
+	// make sure tag is fully powered up...
+	WaitMS(5);
+	// Trigger T55x7 Direct Access Mode with start gap
+	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
+	WaitUS(START_GAP1of4);
+
+	T55xxWriteBit_1of4 (0); // 2 Bit 00 leading reference 
+
+	// Opcode 1[page]
+	bits = 2 + Page;
+	T55xxWriteBit_1of4 (bits);
+	
+	if (PwdMode) {
+		// 1 of 4 00 - insert two fixed 00 between opcode and password
+		T55xxWriteBit_1of4 (0); // 00
+		
+		// Send Pwd
+		for (bitpos = 31; bitpos >= 1; bitpos -= 2) { // 2 bits at a time
+			bits = (((Pwd >> bitpos) & 1) << 1) + ((Pwd >> (bitpos-1)) & 1);	
+			T55xxWriteBit_1of4 (bits);
+		}
+	}
+	
+	// Send Lock bit
+	bits = 0; // Add lock bit (Not Set) to the next 2 bits
+
+	// Send Block number (if direct access mode)
+	if (!RegReadMode){
+		// Send Block number
+		bits  += ((Block >> 2) & 1); 
+		T55xxWriteBit_1of4 (bits);
+		bits = (Block & 3); //  + (Block & 1);
+		T55xxWriteBit_1of4 (bits);				
+	}	
+
+	// Turn field on to read the response
+	// 137*8 seems to get to the start of data pretty well... 
+	//  but we want to go past the start and let the repeating data settle in...
+	TurnReadLFOn(210*8); 
+
+	// Acquisition
+	// Now do the acquisition
+	DoPartialAcquisition(0, true, 12000, 0);
+	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF); // field off
+//	cmd_send(CMD_ACK,0,0,0,0,0);    
+	LED_A_OFF();
+}
+
+void T55xxReadBlock (uint16_t arg0, uint8_t Block, uint32_t Pwd) {
+//	arg0 16 bit 00000000 
+//              0000000x  Password
+//              000000x0  Page
+//              00000x00  
+//              000xx000  (0x18) where xx : 00 - Normal Write, 01 - Long Leading Reference
+//										    10 - Leading 0,    11 - 1 of 4
+	uint8_t downlink_mode;
+	
+	downlink_mode = (arg0 >> 3) & 0x03;
+
+	//  downlink mode id set to match the 2 bit as per Tech Sheet
+	switch (downlink_mode)
+	{
+		case 0 :	T55xxReadBlockExt 			(arg0, Block, Pwd); 	break;
+		case 1 :  	T55xxWrite_LLR ();
+					T55xxReadBlockExt 			(arg0, Block, Pwd);
+				    break;
+		case 2 :	T55xxReadBlockExt_Leading0 	(arg0, Block, Pwd); 	break;
+		case 3 :	T55xxReadBlockExt_1of4		(arg0, Block, Pwd);		break;
+		default:
+					T55xxReadBlockExt           (arg0, Block, Pwd) ;
+	}					
+
+//	T55xxReadBlockExt           (arg0, Block, Pwd) ;
+	cmd_send(CMD_ACK,0,0,0,0,0);
 }
 
 void T55xxWakeUp(uint32_t Pwd){

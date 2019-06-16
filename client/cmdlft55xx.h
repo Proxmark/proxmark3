@@ -74,6 +74,7 @@ void Set_t55xx_Config(t55xx_conf_block_t conf);
 
 extern int CmdLFT55XX(const char *Cmd);
 extern int CmdT55xxBruteForce(const char *Cmd);
+extern int CmdT55xxBruteForce_downlink(const char *Cmd);
 extern int CmdT55xxSetConfig(const char *Cmd);
 extern int CmdT55xxReadBlock(const char *Cmd);
 extern int CmdT55xxWriteBlock(const char *Cmd);
@@ -98,7 +99,7 @@ bool tryDetectModulation(void);
 extern bool tryDetectP1(bool getData);
 bool test(uint8_t mode, uint8_t *offset, int *fndBitRate, uint8_t clk, bool *Q5);
 int special(const char *Cmd);
-int AquireData( uint8_t page, uint8_t block, bool pwdmode, uint32_t password );
+int AquireData( uint8_t page, uint8_t block, bool pwdmode, uint32_t password,uint8_t downlink_mode );
 
 void printT55x7Trace( t55x7_tracedata_t data, uint8_t repeat );
 void printT5555Trace( t5555_tracedata_t data, uint8_t repeat );
