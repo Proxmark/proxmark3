@@ -67,8 +67,8 @@ int usage_t55xx_read(){
 	PrintAndLog("     p <password> - OPTIONAL password (8 hex characters)");
 	PrintAndLog("     o            - OPTIONAL override safety check");
 	PrintAndLog("     1            - OPTIONAL read Page 1 instead of Page 0");
-	PrintAndLog("     e <mode>     - OPTIONAL downlink encoding '0' fixed-bit-length (default), '1' Long Zero Reference"); 
-	PrintAndLog("                                               '2' Leading Zero,               '3' 1 of 4 "); 
+	PrintAndLog("     e <mode>     - OPTIONAL downlink encoding '0' fixed bit length (default), '1' long leading reference");
+	PrintAndLog("                                               '2' leading zero,               '3' 1 of 4 coding reference"); 
 	PrintAndLog("     ****WARNING****");
 	PrintAndLog("     Use of read with password on a tag not configured for a pwd");
 	PrintAndLog("     can damage the tag");
@@ -88,8 +88,8 @@ int usage_t55xx_write(){
 	PrintAndLog("     p <password> - OPTIONAL password 4bytes (8 hex characters)");
 	PrintAndLog("     1            - OPTIONAL write Page 1 instead of Page 0");
 	PrintAndLog("     t            - OPTIONAL test mode write - ****DANGER****");	
-	PrintAndLog("     e <mode>     - OPTIONAL downlink encoding '0' fixed-bit-length (default), '1' Long Zero Reference"); 
-	PrintAndLog("                                               '2' Leading Zero,               '3' 1 of 4 "); 
+	PrintAndLog("     e <mode>     - OPTIONAL downlink encoding '0' fixed bit length (default), '1' long leading reference");
+	PrintAndLog("                                               '2' leading zero,               '3' 1 of 4 coding reference"); 
 	PrintAndLog("");
 	PrintAndLog("Examples:");
 	PrintAndLog("      lf t55xx write b 3 d 11223344            - write 11223344 to block 3");
@@ -136,8 +136,8 @@ int usage_t55xx_detect(){
 	PrintAndLog("Options:");
 	PrintAndLog("     1             - if set, use Graphbuffer otherwise read data from tag.");
 	PrintAndLog("     p <password>  - OPTIONAL password (8 hex characters)");
-	PrintAndLog("     e <mode>     - OPTIONAL downlink encoding '0' fixed-bit-length (default), '1' Long Zero Reference");
-	PrintAndLog("                                               '2' Leading Zero,               '3' 1 of 4 "); 
+	PrintAndLog("     e <mode>      - OPTIONAL downlink encoding '0' fixed bit length (default), '1' long leading reference");
+	PrintAndLog("                                                '2' leading zero,               '3' 1 of 4 coding reference"); 
 	PrintAndLog("");
 	PrintAndLog("Examples:");
 	PrintAndLog("      lf t55xx detect");
@@ -196,9 +196,10 @@ int usage_t55xx_bruteforce_downlink(){
 	PrintAndLog("Options:");
 	PrintAndLog("     h                         - this help");
 	PrintAndLog("     r <start_pwd> <end_pwd>   - 4 byte hex value to start and end pwd search at");
-	PrintAndLog("     i <*.dic>   				- loads a default keys dictionary file <*.dic>");
-	PrintAndLog("     e <mode>     				- OPTIONAL downlink encoding '0' fixed-bit-length (default), '1' Long Zero Reference"); 
-	PrintAndLog("                                                            '2' Leading Zero,               '3' 1 of 4 "); 
+	PrintAndLog("     i <*.dic>                 - loads a default keys dictionary file <*.dic>");
+	PrintAndLog("     e <mode>                  - OPTIONAL downlink encoding '0' fixed bit length (default)"); 
+	PrintAndLog("                                  '1' long leading reference,  '2' leading zero ");
+	PrintAndLog("                                  '3' 1 of 4 coding reference, '4' special - try all downlink modes");
 	PrintAndLog("");
 	PrintAndLog("Examples:");
 	PrintAndLog("       lf t55xx bruteforce aaaaaaaa bbbbbbbb");
