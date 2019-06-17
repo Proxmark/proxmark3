@@ -1635,8 +1635,6 @@ int CmdT55xxBruteForce_downlink(const char *Cmd) {
 	keyBlock = calloc(stKeyBlock, 6);
 	if (keyBlock == NULL) return 1;
 
-	PrintAndLog("New Downlink Supprt");
-
 	while(param_getchar(Cmd, cmdp) != 0x00 && !errors) {
 		switch(param_getchar(Cmd, cmdp)) {
 		case 'h':
@@ -1649,7 +1647,6 @@ int CmdT55xxBruteForce_downlink(const char *Cmd) {
 					if (downlink_mode > 3) downlink_mode = 0;
 					cmdp +=2;
 					cmd_offset += 4;
-					PrintAndLog ("DL Mode : %d",downlink_mode);
 					break;
 		case 'i':
 		case 'I':
@@ -1661,8 +1658,11 @@ int CmdT55xxBruteForce_downlink(const char *Cmd) {
 					len = strlen(Cmd+2);
 					if (len > FILE_PATH_SIZE) len = FILE_PATH_SIZE;
 					memcpy(filename, Cmd+cmd_offset+2, len);
+					// Drop any characters after space
+					char *p = strstr(filename," ");
+					if (p) *p = 0;
 					cmdp += 2;
-		//			PrintAndLog (" File : [%s]",filename);
+					// PrintAndLog (" File : [%s]",filename);
 					break;
 		case 'r':
 		case 'R':
@@ -1670,12 +1670,11 @@ int CmdT55xxBruteForce_downlink(const char *Cmd) {
 						PrintAndLog ("use Range or File");
 						return 0;
 					}
-					use_range       = true; // = param_get32ex(Cmd, cmdp+1, 0, 16);
+					use_range       = true; 
 					start_password  = param_get32ex(Cmd, cmdp+1, 0, 16);
 					end_password    = param_get32ex(Cmd, cmdp+2, 0, 16);
 					cmdp += 3;
-					cmd_offset += 20; // 8 + 8 + 1 + 1 + 1
-		//			PrintAndLog (" Range : [%0X] - [%0X]",start_password,end_password);
+					cmd_offset += 20; 
 					break;
 		default:
 			PrintAndLog("Unknown parameter '%c'", param_getchar(Cmd, cmdp));
@@ -1683,9 +1682,6 @@ int CmdT55xxBruteForce_downlink(const char *Cmd) {
 			break;
 		}
 	}
-
-
-//	if (cmdp == 'i' || cmdp == 'I') {
 
 	if (use_file)
 	{
@@ -1753,7 +1749,7 @@ int CmdT55xxBruteForce_downlink(const char *Cmd) {
 
 			PrintAndLog("Testing %08X", testpwd);
             
-			// Try each downlink_mode of asked to 
+			// Try each downlink_mode if asked to 
 			// donwlink_mode will = 0 if > 3 or set to 0, so loop from 0 - 3
 			for (dl_mode = downlink_mode; dl_mode <= 3; dl_mode++)
 			{
@@ -1768,7 +1764,7 @@ int CmdT55xxBruteForce_downlink(const char *Cmd) {
 				if ( found ) {
 					PrintAndLog("Found valid password: [%08X]", testpwd);
 					free(keyBlock);
-							// Add downlink mode to reference.
+					// Add downlink mode for reference.
 					switch (dl_mode) {
 						case  0 :	PrintAndLog ("Downlink   : e 0 - Default/Fixed Bit Length"); break;
 						case  1 :   PrintAndLog ("Downlink   : e 1 - Long Leading Reference"); break;
@@ -1788,9 +1784,6 @@ int CmdT55xxBruteForce_downlink(const char *Cmd) {
 
 	if (use_range)
 	{
-		// incremental pwd range search
-	//	start_password = param_get32ex(Cmd, 0, 0, 16);
-	//	end_password = param_get32ex(Cmd, 1, 0, 16);
 
 		if ( start_password >= end_password ) {
 			free(keyBlock);
@@ -1827,7 +1820,7 @@ int CmdT55xxBruteForce_downlink(const char *Cmd) {
 	
 		if (found) {
 			PrintAndLog("Found valid password: [%08x]", i);
-					// Add downlink mode to reference.
+			// Add downlink mode for reference.
 			switch (downlink_mode) {
 				case  0 :	PrintAndLog ("Downlink   : e 0 - Default/Fixed Bit Length"); break;
 				case  1 :   PrintAndLog ("Downlink   : e 1 - Long Leading Reference"); break;
