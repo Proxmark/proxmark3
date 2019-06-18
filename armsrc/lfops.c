@@ -1519,6 +1519,10 @@ void T55xxWriteBlockExt(uint32_t Data, uint32_t Block, uint32_t Pwd, uint8_t arg
 	uint8_t Page = (arg & 0x2)>>1;
 	bool testMode = arg & 0x4;
 	uint32_t i = 0;
+	uint8_t downlink_mode;
+	
+	downlink_mode = (arg >> 3) & 0x03;
+	
 
 	// Set up FPGA, 125kHz
 	LFSetupFPGAForADC(95, true);
@@ -1528,6 +1532,9 @@ void T55xxWriteBlockExt(uint32_t Data, uint32_t Block, uint32_t Pwd, uint8_t arg
 	// Trigger T55x7 in mode.
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
 	WaitUS(START_GAP);
+
+	// Long Leading Reference, same as fixed/default just with leading reference
+	if (downlink_mode == 1)  T55xxWrite_LLR (); 
 
 	if (testMode) Dbprintf("TestMODE");
 	// Std Opcode 10
@@ -1597,8 +1604,8 @@ void T55xxWriteBlock(uint32_t Data, uint32_t Block, uint32_t Pwd, uint8_t arg) {
 	
 	switch (downlink_mode)
 	{
-		case 0 :	T55xxWriteBlockExt          (Data, Block, Pwd, arg);	break;
-		case 1 :    T55xxWrite_LLR ();
+		case 0 ://	T55xxWriteBlockExt          (Data, Block, Pwd, arg);	break;
+		case 1 :  //  T55xxWrite_LLR ();
 					T55xxWriteBlockExt          (Data, Block, Pwd, arg);
 					break;
 		case 2 :	T55xxWriteBlockExt_Leading0 (Data, Block, Pwd, arg); 	break;
@@ -1618,7 +1625,10 @@ void T55xxReadBlockExt (uint16_t arg0, uint8_t Block, uint32_t Pwd) {
 	uint8_t Page = (arg0 & 0x2) >> 1;
 	uint32_t i = 0;
 	bool RegReadMode = (Block == 0xFF);//regular read mode
-
+	uint8_t downlink_mode;
+	
+	downlink_mode = (arg0 >> 3) & 0x03;
+	
 	//clear buffer now so it does not interfere with timing later
 	BigBuf_Clear_ext(false);
 
@@ -1634,6 +1644,9 @@ void T55xxReadBlockExt (uint16_t arg0, uint8_t Block, uint32_t Pwd) {
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
 	WaitUS(START_GAP);
 
+	// Long Leading Reference, same as fixed/default just with leading reference
+	if (downlink_mode == 1)  T55xxWrite_LLR (); 
+		
 	// Opcode 1[page]
 	T55xxWriteBit(1);
 	T55xxWriteBit(Page); //Page 0
@@ -1805,8 +1818,8 @@ void T55xxReadBlock (uint16_t arg0, uint8_t Block, uint32_t Pwd) {
 	//  downlink mode id set to match the 2 bit as per Tech Sheet
 	switch (downlink_mode)
 	{
-		case 0 :	T55xxReadBlockExt 			(arg0, Block, Pwd); 	break;
-		case 1 :  	T55xxWrite_LLR ();
+		case 0 ://	T55xxReadBlockExt 			(arg0, Block, Pwd); 	break;
+		case 1 : // 	T55xxWrite_LLR ();
 					T55xxReadBlockExt 			(arg0, Block, Pwd);
 				    break;
 		case 2 :	T55xxReadBlockExt_Leading0 	(arg0, Block, Pwd); 	break;

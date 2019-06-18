@@ -74,7 +74,6 @@ void Set_t55xx_Config(t55xx_conf_block_t conf);
 
 extern int CmdLFT55XX(const char *Cmd);
 extern int CmdT55xxBruteForce(const char *Cmd);
-extern int CmdT55xxBruteForce_downlink(const char *Cmd);
 extern int CmdT55xxSetConfig(const char *Cmd);
 extern int CmdT55xxReadBlock(const char *Cmd);
 extern int CmdT55xxWriteBlock(const char *Cmd);
