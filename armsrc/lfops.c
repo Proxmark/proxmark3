@@ -1819,7 +1819,7 @@ void EM4xReadWord(uint8_t Address, uint32_t Pwd, uint8_t PwdMode) {
 
 void EM4xWriteWord(uint32_t flag, uint32_t Data, uint32_t Pwd) {
 	
-	bool PwdMode = (flag & 0xF);
+	bool PwdMode = (flag & 0x1);
 	uint8_t Address = (flag >> 8) & 0xFF;
 	uint8_t fwd_bit_count;
 
@@ -1852,7 +1852,7 @@ void EM4xWriteWord(uint32_t flag, uint32_t Data, uint32_t Pwd) {
 
 void EM4xProtect(uint32_t flag, uint32_t Data, uint32_t Pwd) {
 	
-	bool PwdMode = (flag & 0xF);
+	bool PwdMode = (flag & 0x1);
 	uint8_t fwd_bit_count;
 
 	//clear buffer now so it does not interfere with timing later
