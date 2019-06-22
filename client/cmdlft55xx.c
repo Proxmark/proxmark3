@@ -311,13 +311,13 @@ int CmdT55xxSetConfig(const char *Cmd) {
 	}
 
 	// No args
-	if (cmdp == 0) return printConfiguration( config );
+	if (cmdp == 0) return printConfiguration( config);
 
 	//Validations
 	if (errors) return usage_t55xx_config();
 
 	config.block0 = 0;
-	return printConfiguration ( config );
+	return printConfiguration ( config);
 }
 
 int T55xxReadBlock(uint8_t block, bool page1, bool usepwd, bool override, uint32_t password, uint8_t downlink_mode){
@@ -476,6 +476,25 @@ bool DecodeT5555TraceBlock() {
 	return (bool) ASKDemod("64 0 1", false, false, 1);
 }
 
+void T55xx_Print_DownlinkMode (uint8_t downlink_mode)
+{
+	char Msg[80];
+	sprintf (Msg,"Downlink Mode used : ");
+	
+		switch (downlink_mode) {
+			case  0 :	strcat (Msg,"default/fixed bit length"); break;
+			case  1 :   strcat (Msg,"long leading reference (r 1)");   break;
+			case  2 :   strcat (Msg,"leading zero reference (r 2)");   break;
+			case  3 :   strcat (Msg,"1 of 4 coding reference (r 3)");  break;
+			default :
+					strcat (Msg,"default/fixed bit length"); break;
+
+		}
+	
+	PrintAndLog (Msg);
+	
+}
+
 int CmdT55xxDetect(const char *Cmd){
 	bool errors = false;
 	bool useGB = false;
@@ -522,13 +541,8 @@ int CmdT55xxDetect(const char *Cmd){
 	if ( !tryDetectModulation() )
 		PrintAndLog("Could not detect modulation automatically. Try setting it manually with \'lf t55xx config\'");
 	else {
-		// Add downlink mode to reference.
-		switch (downlink_mode) {
-			case  0 :	PrintAndLog ("Downlink   : r 0 - default/fixed bit length"); break;
-			case  1 :   PrintAndLog ("Downlink   : r 1 - long leading reference"); break;
-			case  2 :   PrintAndLog ("Downlink   : r 2 - leading zero reference"); break;
-			case  3 :   PrintAndLog ("Downlink   : r 3 - 1 of 4 coding reference"); break;
-		}
+		// Add downlink mode for reference.
+		T55xx_Print_DownlinkMode (downlink_mode);
 	}
 	return 1;
 }
@@ -681,7 +695,8 @@ bool tryDetectModulation(){
 		config.block0 = tests[0].block0;
 		config.Q5 = tests[0].Q5;
 		config.ST = tests[0].ST;
-		printConfiguration( config );
+		
+		printConfiguration( config);
 		return true;
 	}
 	
@@ -689,7 +704,7 @@ bool tryDetectModulation(){
 		PrintAndLog("Found [%d] possible matches for modulation.",hits);
 		for(int i=0; i<hits; ++i){
 			PrintAndLog("--[%d]---------------", i+1);
-			printConfiguration( tests[i] );
+			printConfiguration( tests[i]);
 		}
 	}
 	return false;
@@ -1541,7 +1556,7 @@ int CmdT55xxBruteForce(const char *Cmd) {
 			// donwlink_mode will = 0 if > 3 or set to 0, so loop from 0 - 3
 			for (dl_mode = downlink_mode; dl_mode <= 3; dl_mode++){
 				if ( !AquireData(T55x7_PAGE0, T55x7_CONFIGURATION_BLOCK, true, testpwd, dl_mode)) {
-					PrintAndLog("Aquireing data from device failed. Quitting");
+					PrintAndLog("Acquiring data from device failed. Quitting");
 					free(keyBlock);
 					return 0;
 				}
@@ -1551,12 +1566,9 @@ int CmdT55xxBruteForce(const char *Cmd) {
 				if ( found ) {
 					PrintAndLog("Found valid password: [%08X]", testpwd);
 					free(keyBlock);
-					switch (dl_mode) {
-						case  0 :	PrintAndLog ("Downlink   : r 0 - default/fixed bit length"); break;
-						case  1 :   PrintAndLog ("Downlink   : r 1 - long leading reference"); break;
-						case  2 :   PrintAndLog ("Downlink   : r 2 - leading zero reference"); break;
-						case  3 :   PrintAndLog ("Downlink   : r 3 - 1 of 4 coding reference"); break;
-					}					
+					
+					T55xx_Print_DownlinkMode (dl_mode);
+
 					return 0;
 				}
 				if (!try_all_dl_modes) // Exit loop if not trying all downlink modes
@@ -1597,7 +1609,7 @@ int CmdT55xxBruteForce(const char *Cmd) {
 		// donwlink_mode will = 0 if > 3 or set to 0, so loop from 0 - 3
 		for (dl_mode = downlink_mode; dl_mode <= 3; dl_mode++){
 			if (!AquireData(T55x7_PAGE0, T55x7_CONFIGURATION_BLOCK, true, i,dl_mode)) {
-				PrintAndLog("Aquireing data from device failed. Quitting");
+				PrintAndLog("Acquiring data from device failed. Quitting");
 				free(keyBlock);
 				return 0;
 			}
@@ -1613,12 +1625,7 @@ int CmdT55xxBruteForce(const char *Cmd) {
 
 	if (found){
 		PrintAndLog("Found valid password: [%08x]", i);
-		switch (dl_mode) {
-			case  0 :	PrintAndLog ("Downlink   : r 0 - default/fixed bit length"); break;
-			case  1 :   PrintAndLog ("Downlink   : r 1 - long leading reference"); break;
-			case  2 :   PrintAndLog ("Downlink   : r 2 - leading Zero reference"); break;
-			case  3 :   PrintAndLog ("Downlink   : r 3 - 1 of 4 coding reference"); break;
-		}
+		T55xx_Print_DownlinkMode (downlink_mode);
 	}
 	else{
 		PrintAndLog("");

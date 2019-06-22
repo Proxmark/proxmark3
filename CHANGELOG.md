@@ -4,6 +4,34 @@ This project uses the changelog in accordance with [keepchangelog](http://keepac
 
 ## [unreleased][unreleased]
 
+## T55xx Downlink Protocol - 22 Jun 2019
+
+# armsrc/lfops
+
+### Added
+- Added typedef T55xx_Timing to hold downlink timings.
+- Added Timing Records for long leading reference (llr), Leading 0 and 1 of 4
+- Added some constant defines for code readability
+- Added function T55xx_SetBits to build a bit stream for writing to T55xx
+- Added function T55xx_SendCMD to build the bit stream and send to T55xx
+
+### Changed
+- Converted Timing for default/fixed bit to T55xx_Timing
+- Updated T55xxWriteBit (and calls) to support all downlink protocols
+- Updated T55xxWriteBlock to call T55xx_SendCMD (removed local bit writes)
+- Updated T55xxReadBlock to call T55xx_SendCMD (removed local bit writes)
+
+# client/cmdlft55xx
+
+### Added
+- Added function T55xx_Print_DownlinkMode to print downlink mode information when uesd
+
+### Changes
+- Added downlink mode options r <mode> [ 0 (or missing) default/fixed bit, 1 long leading, leading 0 and 1 of 4 ]
+- Added r 4 option to bruteforce to try all downlink modes (0,1,2 and 3)
+- Updated help messages for each support functions t55xx_read, t55xx_write, t55_detect, t55xx_bruteforce
+
+
 ### Changed
 - Changed hf mfp security. Now it works in all the modes. (drHatson)
 - `hf fido` - show/check DER certificate and signatures (Merlok)
