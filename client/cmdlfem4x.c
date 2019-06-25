@@ -1161,6 +1161,119 @@ int CmdEM4x05WriteWord(const char *Cmd) {
 	return EM4x05WriteWord(addr, data, pwd, usePwd, swap, invert);
 }
 
+int usage_lf_em_protect(void) {
+	PrintAndLog("Protect EM4x05.  Tag must be on antenna. ");
+	PrintAndLog("");
+	PrintAndLog("Usage:  lf em 4x05protect [h] d <data> p <pwd> [s] [i]");
+	PrintAndLog("Options:");
+	PrintAndLog("       h           - this help");
+	PrintAndLog("       d <data>    - data to write (hex)");
+	PrintAndLog("       p <pwd>     - password (hex) (optional)");
+	PrintAndLog("       s           - swap the data bit order before write");
+	PrintAndLog("       i           - invert the data bits before write");
+	PrintAndLog("samples:");
+	PrintAndLog("      lf em 4x05protect d 11223344");
+	PrintAndLog("      lf em 4x05protect p deadc0de d 11223344 s i");
+	return 0;
+}
+
+int EM4x05Protect(uint32_t data, uint32_t pwd, bool usePwd, bool swap, bool invert) {
+	if (swap) data = SwapBits(data, 32);
+
+	if (invert) data ^= 0xFFFFFFFF;
+
+	if ( !usePwd ) {
+		PrintAndLog("Writing Protect data %08X", data);
+	} else {
+		PrintAndLog("Writing Protect data %08X using password %08X", data, pwd);
+	}
+
+	uint16_t flag = usePwd;
+
+	UsbCommand c = {CMD_EM4X_PROTECT, {flag, data, pwd}};
+	clearCommandBuffer();
+	SendCommand(&c);
+	UsbCommand resp;
+	if (!WaitForResponseTimeout(CMD_ACK, &resp, 2000)){
+		PrintAndLog("Error occurred, device did not respond during protect operation.");
+		return -1;
+	}
+	if ( !downloadSamplesEM() ) {
+		return -1;
+	}
+	//check response for 00001010 for write confirmation!
+	//attempt demod:
+	uint32_t dummy = 0;
+	int result = demodEM4x05resp(&dummy,false);
+	if (result == 1) {
+		PrintAndLog("Protect Verified");
+	} else {
+		PrintAndLog("Protect could not be verified");
+	}
+	return result;
+}
+
+int CmdEM4x05ProtectWrite(const char *Cmd) {
+	bool errors = false;
+	bool usePwd = false;
+	uint32_t data = 0xFFFFFFFF;
+	uint32_t pwd = 0xFFFFFFFF;
+	bool swap = false;
+	bool invert = false;
+	bool gotData = false;
+	char cmdp = 0;
+	while(param_getchar(Cmd, cmdp) != 0x00)
+	{
+		switch(param_getchar(Cmd, cmdp))
+		{
+		case 'h':
+		case 'H':
+			return usage_lf_em_write();
+		case 'd':
+		case 'D':
+			data = param_get32ex(Cmd, cmdp+1, 0, 16);
+			gotData = true;
+			cmdp += 2;
+			break;
+		case 'i':
+		case 'I':
+			invert = true;
+			cmdp++;
+			break;
+		case 'p':
+		case 'P':
+			pwd = param_get32ex(Cmd, cmdp+1, 1, 16);
+			if (pwd == 1) {
+				PrintAndLog("invalid pwd");
+				errors = true;
+			}
+			usePwd = true;
+			cmdp += 2;
+			break;
+		case 's':
+		case 'S':
+			swap = true;
+			cmdp++;
+			break;
+		default:
+			PrintAndLog("Unknown parameter '%c'", param_getchar(Cmd, cmdp));
+			errors = true;
+			break;
+		}
+		if(errors) break;
+	}
+	//Validations
+	if(errors) return usage_lf_em_protect();
+
+	if ( strlen(Cmd) == 0 ) return usage_lf_em_protect();
+
+	if (!gotData) {
+		PrintAndLog("You must enter the data you want to write");
+		return usage_lf_em_protect();
+	}
+	return EM4x05Protect(data, pwd, usePwd, swap, invert);
+}
+
 void printEM4x05config(uint32_t wordData) {
 	uint16_t datarate = EM4x05_GET_BITRATE(wordData);
 	uint8_t encoder = ((wordData >> 6) & 0xF);
@@ -1345,6 +1458,7 @@ static command_t CommandTable[] =
 	{"4x05info",  CmdEM4x05info, 0, "(pwd) -- Get info from EM4x05/EM4x69 tag"},
 	{"4x05readword",  CmdEM4x05ReadWord, 0, "<Word> (pwd) -- Read EM4x05/EM4x69 word data"},
 	{"4x05writeword", CmdEM4x05WriteWord, 0, "<Word> <data> (pwd) -- Write EM4x05/EM4x69 word data"},
+	{"4x05protect",   CmdEM4x05ProtectWrite, 0, "<data> (pwd) -- Write Protection to EM4x05"},
 	{"4x50read",  CmdEM4x50Read, 1, "demod data from EM4x50 tag from the graph buffer"},
 	{NULL, NULL, 0, NULL}
 };

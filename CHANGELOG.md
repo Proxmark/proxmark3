@@ -16,6 +16,8 @@ This project uses the changelog in accordance with [keepchangelog](http://keepac
 - `hf 15 sim` now works as expected (piwi)
 
 ### Added
+- Added `lf config s xxxx` option to allow skipping x samples before capture (marshmellow)
+- Added `lf em 4x05protect` to support changing protection blocks on em4x05 chips (marshmellow)
 - Support Standard Communication Mode in HITAG S
 - Added `hf emv scan` - commands for scan EMV card and dump data to json file (Merlok)
 - `hf mfp` group of commands (Merlok)

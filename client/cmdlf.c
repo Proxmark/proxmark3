@@ -224,24 +224,25 @@ int usage_lf_config(void)
 {
 	PrintAndLog("Usage: lf config [H|<divisor>] [b <bps>] [d <decim>] [a 0|1]");
 	PrintAndLog("Options:        ");
-	PrintAndLog("       h             This help");
-	PrintAndLog("       L             Low frequency (125 KHz)");
-	PrintAndLog("       H             High frequency (134 KHz)");
-	PrintAndLog("       q <divisor>   Manually set divisor. 88-> 134 KHz, 95-> 125 KHz");
-	PrintAndLog("       b <bps>       Sets resolution of bits per sample. Default (max): 8");
-	PrintAndLog("       d <decim>     Sets decimation. A value of N saves only 1 in N samples. Default: 1");
-	PrintAndLog("       a [0|1]       Averaging - if set, will average the stored sample value when decimating. Default: 1");
-	PrintAndLog("       t <threshold> Sets trigger threshold. 0 means no threshold (range: 0-128)");
+	PrintAndLog("       h               This help");
+	PrintAndLog("       L               Low frequency (125 KHz)");
+	PrintAndLog("       H               High frequency (134 KHz)");
+	PrintAndLog("       q <divisor>     Manually set divisor. 88-> 134 KHz, 95-> 125 KHz");
+	PrintAndLog("       b <bps>         Sets resolution of bits per sample. Default (max): 8");
+	PrintAndLog("       d <decim>       Sets decimation. A value of N saves only 1 in N samples. Default: 1");
+	PrintAndLog("       a [0|1]         Averaging - if set, will average the stored sample value when decimating. Default: 1");
+	PrintAndLog("       t <threshold>   Sets trigger threshold. 0 means no threshold (range: 0-128)");
+	PrintAndLog("       s <smplstoskip> Sets a number of samples to skip before capture. Default: 0");
 	PrintAndLog("Examples:");
 	PrintAndLog("      lf config b 8 L");
-	PrintAndLog("                    Samples at 125KHz, 8bps.");
+	PrintAndLog("                       Samples at 125KHz, 8bps.");
 	PrintAndLog("      lf config H b 4 d 3");
-	PrintAndLog("                    Samples at 134KHz, averages three samples into one, stored with ");
-	PrintAndLog("                    a resolution of 4 bits per sample.");
+	PrintAndLog("                       Samples at 134KHz, averages three samples into one, stored with ");
+	PrintAndLog("                       a resolution of 4 bits per sample.");
 	PrintAndLog("      lf read");
-	PrintAndLog("                    Performs a read (active field)");
+	PrintAndLog("                       Performs a read (active field)");
 	PrintAndLog("      lf snoop");
-	PrintAndLog("                    Performs a snoop (no active field)");
+	PrintAndLog("                       Performs a snoop (no active field)");
 	return 0;
 }
 
@@ -255,6 +256,7 @@ int CmdLFSetConfig(const char *Cmd)
 	bool errors = false;
 	int trigger_threshold =-1;//Means no change
 	uint8_t unsigned_trigg = 0;
+	int samples_to_skip = -1;
 
 	uint8_t cmdp =0;
 	while(param_getchar(Cmd, cmdp) != 0x00)
@@ -295,6 +297,10 @@ int CmdLFSetConfig(const char *Cmd)
 			averaging = param_getchar(Cmd,cmdp+1) == '1';
 			cmdp+=2;
 			break;
+		case 's':
+			samples_to_skip = param_get32ex(Cmd,cmdp+1,0,10);
+			cmdp+=2;
+			break;
 		default:
 			PrintAndLog("Unknown parameter '%c'", param_getchar(Cmd, cmdp));
 			errors = 1;
@@ -316,7 +322,7 @@ int CmdLFSetConfig(const char *Cmd)
 	if(bps >> 4) bps = 8;
 
 	sample_config config = {
-		decimation,bps,averaging,divisor,trigger_threshold
+		decimation,bps,averaging,divisor,trigger_threshold,samples_to_skip
 	};
 	//Averaging is a flag on high-bit of arg[1]
 	UsbCommand c = {CMD_SET_LF_SAMPLING_CONFIG};

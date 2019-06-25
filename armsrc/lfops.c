@@ -1198,6 +1198,7 @@ void CmdIOdemodFSK(int findone, int *high, int *low, int ledcontrol)
  * and enlarge the gap ones.
  * Q5 tags seems to have issues when these values changes. 
  */
+
  /*
  // Original Timings for reference
  
@@ -1205,6 +1206,47 @@ void CmdIOdemodFSK(int findone, int *high, int *low, int ledcontrol)
 #define WRITE_GAP 20*8 // was 160 // SPEC:  1*8 to 20*8 - typ 10*8 (or 10fc)
 #define WRITE_0   18*8 // was 144 // SPEC: 16*8 to 32*8 - typ 24*8 (or 24fc)
 #define WRITE_1   50*8 // was 400 // SPEC: 48*8 to 64*8 - typ 56*8 (or 56fc)  432 for T55x7; 448 for E5550
+=======
+
+/* Q5 timing datasheet:
+ * Type                  |  MIN   | Typical |  Max   |
+ * Start_Gap             |  10*8  |    ?    |  50*8  |
+ * Write_Gap Normal mode |   8*8  |   14*8  |  20*8  | 
+ * Write_Gap Fast Mode   |   8*8  |    ?    |  20*8  |
+ * Write_0   Normal mode |  16*8  |   24*8  |  32*8  |
+ * Write_1   Normal mode |  48*8  |   56*8  |  64*8  |
+ * Write_0   Fast Mode   |   8*8  |   12*8  |  16*8  |
+ * Write_1   Fast Mode   |  24*8  |   28*8  |  32*8  |
+*/
+
+/* T5557 timing datasheet:
+ * Type                  |  MIN   | Typical |  Max   |
+ * Start_Gap             |  10*8  |    ?    |  50*8  |
+ * Write_Gap Normal mode |   8*8  |50-150us |  30*8  | 
+ * Write_Gap Fast Mode   |   8*8  |    ?    |  20*8  |
+ * Write_0   Normal mode |  16*8  |   24*8  |  31*8  | 
+ * Write_1   Normal mode |  48*8  |   54*8  |  63*8  | 
+ * Write_0   Fast Mode   |   8*8  |   12*8  |  15*8  |
+ * Write_1   Fast Mode   |  24*8  |   28*8  |  31*8  |
+*/
+
+/* T5577C timing datasheet for Fixed-Bit-Length protocol (defualt):
+ * Type                  |  MIN   | Typical |  Max   |
+ * Start_Gap             |   8*8  |   15*8  |  50*8  |
+ * Write_Gap Normal mode |   8*8  |   10*8  |  20*8  | 
+ * Write_Gap Fast Mode   |   8*8  |   10*8  |  20*8  |
+ * Write_0   Normal mode |  16*8  |   24*8  |  32*8  | 
+ * Write_1   Normal mode |  48*8  |   56*8  |  64*8  | 
+ * Write_0   Fast Mode   |   8*8  |   12*8  |  16*8  |
+ * Write_1   Fast Mode   |  24*8  |   28*8  |  32*8  |
+*/
+
+//note startgap must be sent after tag has been powered up for more than 3ms (per T5557 ds)
+#define START_GAP 31*8 //31*8 // was 250 // SPEC:  1*8 to 50*8 - typ 15*8 (or 15fc) - T5557: 10*8 to 50*8 
+#define WRITE_GAP 20*8 //20*8 // was 160 // SPEC:  1*8 to 20*8 - typ 10*8 (or 10fc) - T5557:  8*8 to 30*8 typ 50-150us
+#define WRITE_0   18*8 //18*8 // was 144 // SPEC: 16*8 to 32*8 - typ 24*8 (or 24fc) - T5557: 16*8 to 31*8 typ 24*8
+#define WRITE_1   50*8 //50*8 // was 400 // SPEC: 48*8 to 64*8 - typ 56*8 (or 56fc) - T5557: 48*8 to 63*8 typ 54*8       432 for T55x7; 448 for E5550
+
 #define READ_GAP  15*8 
 */
 
@@ -1523,12 +1565,44 @@ void T55xxReadBlock (uint16_t arg0, uint8_t Block, uint32_t Pwd) {//, struct T55
 	
 	//make sure block is at max 7
 	Block &= 0x7;
+
 	//clear buffer now so it does not interfere with timing later
 	BigBuf_Clear_ext(false);
 	
 	T55xx_SendCMD (0, Block, Pwd, arg0); //, true);
 	
-		
+/*	
+// the send has been moved to the above SendCMD Call
+=======
+
+	// Set up FPGA, 125kHz to power up the tag
+	LFSetupFPGAForADC(95, true);
+	StartTicks();
+	// make sure tag is fully powered up...
+	WaitMS(5);
+	// Trigger T55x7 Direct Access Mode with start gap
+	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
+	WaitUS(START_GAP);
+
+	// Opcode 1[page]
+	T55xxWriteBit(1);
+	T55xxWriteBit(Page); //Page 0
+
+	if (PwdMode) {
+		// Send Pwd
+		for (i = 0x80000000; i != 0; i >>= 1)
+			T55xxWriteBit(Pwd & i);
+	}
+	// Send a zero bit separation
+	T55xxWriteBit(0);
+
+	// Send Block number (if direct access mode)
+	if (!RegReadMode)
+		for (i = 0x04; i != 0; i >>= 1)
+			T55xxWriteBit(Block & i);		
+
+
+*/
 	// Turn field on to read the response
 	// 137*8 seems to get to the start of data pretty well... 
 	//  but we want to go past the start and let the repeating data settle in...
@@ -1778,6 +1852,7 @@ void WriteEM410x(uint32_t card, uint32_t id_hi, uint32_t id_lo) {
 #define FWD_CMD_WRITE 0xA
 #define FWD_CMD_READ 0x9
 #define FWD_CMD_DISABLE 0x5
+#define FWD_CMD_PROTECT 0x3
 
 uint8_t forwardLink_data[64]; //array of forwarded bits
 uint8_t * forward_ptr; //ptr for forward message preparation
@@ -1947,7 +2022,7 @@ void EM4xReadWord(uint8_t Address, uint32_t Pwd, uint8_t PwdMode) {
 
 void EM4xWriteWord(uint32_t flag, uint32_t Data, uint32_t Pwd) {
 	
-	bool PwdMode = (flag & 0xF);
+	bool PwdMode = (flag & 0x1);
 	uint8_t Address = (flag >> 8) & 0xFF;
 	uint8_t fwd_bit_count;
 
@@ -1962,6 +2037,39 @@ void EM4xWriteWord(uint32_t flag, uint32_t Data, uint32_t Pwd) {
 	forward_ptr = forwardLink_data;
 	fwd_bit_count = Prepare_Cmd( FWD_CMD_WRITE );
 	fwd_bit_count += Prepare_Addr( Address );
+	fwd_bit_count += Prepare_Data( Data&0xFFFF, Data>>16 );
+
+	SendForward(fwd_bit_count);
+
+	//Wait for write to complete
+	//SpinDelay(10);
+
+	WaitUS(6500);
+	//Capture response if one exists
+	DoPartialAcquisition(20, true, 6000, 1000);
+
+	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF); // field off
+	LED_A_OFF();
+	cmd_send(CMD_ACK,0,0,0,0,0);
+}
+
+void EM4xProtect(uint32_t flag, uint32_t Data, uint32_t Pwd) {
+	
+	bool PwdMode = (flag & 0x1);
+	uint8_t fwd_bit_count;
+
+	//clear buffer now so it does not interfere with timing later
+	BigBuf_Clear_ext(false);
+
+	LED_A_ON();
+	StartTicks();
+	//If password mode do login
+	if (PwdMode) EM4xLogin(Pwd);
+
+	forward_ptr = forwardLink_data;
+	fwd_bit_count = Prepare_Cmd( FWD_CMD_PROTECT );
+
+	//unsure if this needs the full packet config...
 	fwd_bit_count += Prepare_Data( Data&0xFFFF, Data>>16 );
 
 	SendForward(fwd_bit_count);
