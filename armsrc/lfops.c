@@ -1219,55 +1219,7 @@ typedef struct  {
 	uint16_t  READ_GAP;
 } T55xx_Timing;
 
-/*
-	T5577 Timeing from datasheet for reference
-	
-	Fixed bit length
-	----------------
-					Normal Down Link 						Fast Downlink			
-					Min			Typ			Max				Min			Typ			Max
-	Start gap		8			15			50				8			15			50
-	Write gap		8			10			20				8			10			20
-	0 data			16			24			32				8			12			16
-	1 data			48			56			64				24			28			32
-	
-	
-	Long Leading Reference
-	----------------------
-					Normal Down Link 						Fast Downlink			
-					Min			Typ			Max				Min			Typ			Max
-	Start gap		8			10			50				8			10			50
-	Write gap		8			10			20				8			10			20
-	Reference(r)	152			160			168				140			144			148			
-				   			136 + 0 data							132 + 0 data
-	0 data			r - 143		r - 136		r - 128			r - 135		r - 132		r - 124		
-	1 data			r - 111		r - 104		r - 96			r - 119		r - 116		r - 112
-	
-	
-	Leading Zero Reference
-	----------------------
-					Normal Down Link 						Fast Downlink			
-					Min			Typ			Max				Min			Typ			Max
-	Start gap		8			10			50				8			10			50
-	Write gap		8			10			20				8			10			20
-	Reference(r)	12			-			72				8			-			68			
-	0 data			r - 7		r 	 		r + 8			r - 3		r			r + 4		
-	1 data			r + 9		r + 16		r + 24			r + 5		r + 8		r + 12
-	
-	
-	1 of 4 Coding
-	-------------
-					Normal Down Link 						Fast Downlink			
-					Min			Typ			Max				Min			Typ			Max
-	Start gap		8			10			50				8			10			50
-	Write gap		8			10			20				8			10			20
-	Reference(r)	8			-			68				12			-			72			
-	00 data			r - 7		r 	 		r + 8			r - 3		r			r + 4		
-	01 data			r + 9		r + 16		r + 24			r + 5		r + 8		r + 12
-	10 data			r + 25		r + 32 		r + 40			r + 13		r + 16		r + 20		
-	11 data			r + 41		r + 48		r + 56			r + 21		r + 24		r + 28
-	
-*/
+
 
 // Set Initial/Default Values.  Note: *8 can occure when used.  This should keep things simplier here.
 T55xx_Timing T55xx_Timing_FixedBit = { 31 * 8   , 20 * 8   , 18 * 8 , 50 * 8 , 0      , 0      , 15 * 8   };
