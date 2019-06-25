@@ -1307,32 +1307,17 @@ void T55xxWriteBit(int bit, T55xx_Timing *Timings) {
 // num_bits     - how many bits (low x bits of data)  Max 32 bits at a time
 // max_len         - how many bytes can the bit_array hold (ensure no buffer overflow)
 // returns "Next" bit offset / bits stored (for next store)
-int T55xx_SetBits (uint8_t *bit_array, int start_offset, uint32_t data      , int num_bits, int max_len)
+//int T55xx_SetBits (uint8_t *bit_array, int start_offset, uint32_t data      , int num_bits, int max_len)
+int T55xx_SetBits (bool *bit_array, int start_offset, uint32_t data      , int num_bits, int max_len)
 {
-	int bit,byte_idx, bit_idx;
     int offset;
     int NextOffset = start_offset;      
 
     // Check if data will fit.
-    if ((start_offset + num_bits) <= (max_len*8))       {
-                           
+    if ((start_offset + num_bits) <= (max_len*8)) {
     	// Loop through the data and store                          
-        for (offset = (num_bits-1); offset >= 0; offset--) {
-                                                
-        	bit      = (data >> offset) & 1;                          // Get data bit value (0/1)
-            byte_idx = (NextOffset / 8);                              // Get Array Byte Index to Store
-            bit_idx  = NextOffset - (byte_idx * 8);                   // Get Bit Index to set/clr
-
-            // If set (1) we OR, if clear (0) we AND with inverse
-            // Dbprintf ("Add Bit : %d at byte %d bit %d",bit,byte_idx,bit_idx);
-            if (bit == 1)
-            	bit_array[byte_idx] |= (1 << bit_idx);                // Set the bit to 1
-            	
-            else  
-                bit_array[byte_idx] &= (0xff ^ (1 << bit_idx));       // Set the bit to 0 (clr)
-
-            NextOffset++;
-     	}
+        for (offset = (num_bits-1); offset >= 0; offset--) 
+            bit_array[NextOffset++] = (data >> offset) & 1;                                    
   	}
   	else
   		Dbprintf ("Too Many Bits to fit into bit buffer");
@@ -1390,11 +1375,11 @@ void T55xx_SendCMD (uint32_t Data, uint32_t Block, uint32_t Pwd, uint8_t arg) { 
 	bool	reg_readmode	= ((arg & 0x20) == 0x20);
 	bool	read_cmd		= ((arg & 0x40) == 0x40);
 	
-	int i = 0;
-	uint8_t BitStream[10]; // Max Downlink Command size ~75 bits, so 10 bytes (80 bits)              
+	int i = 0;             
+	bool BitStream[100];  // Max Downlink Command size ~75 bits, so 10 bytes (80 bits)
 	uint8_t BitStreamLen;
-	int byte_idx, bit_idx;
 	T55xx_Timing *Timing;
+	uint8_t SendBits;
 	
 
 	// Assigning Downlink Timeing for write
@@ -1463,26 +1448,16 @@ void T55xx_SendCMD (uint32_t Data, uint32_t Block, uint32_t Pwd, uint8_t arg) { 
 	if (downlink_mode ==  T55xx_DLMode_LLR) 
 		T55xxWriteBit (T55xx_LongLeadingReference,Timing); // Send Long Leading Start Reference
 
-	uint8_t SendBits;
 	
 	if (downlink_mode ==  T55xx_DLMode_1of4) { // 1 of 4 need to send 2 bits at a time
 		for (i = 0; i < BitStreamLen; i+=2) {
-			byte_idx = i / 8;
-			bit_idx  = i - (byte_idx * 8);
-			SendBits = ((BitStream[byte_idx] >> bit_idx) & 1) << 1;
-			
-			byte_idx = (i+1) / 8;
-			bit_idx  = (i+1) - (byte_idx * 8);
-			SendBits += (BitStream[byte_idx] >> bit_idx) & 1;
-			
+			SendBits = (BitStream[i] << 1) + BitStream[i+1]; 
 			T55xxWriteBit (SendBits,Timing);
 		}
 	}
 	else {
 		for (i = 0; i < BitStreamLen; i++) {
-			byte_idx = i / 8;
-			bit_idx  = i - (byte_idx * 8);
-			SendBits = (BitStream[byte_idx] >> bit_idx) & 1;
+			SendBits = (BitStream[i]); 
 			T55xxWriteBit (SendBits,Timing);
     	}		
 	}
