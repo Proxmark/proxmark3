@@ -1206,8 +1206,8 @@ void CmdIOdemodFSK(int findone, int *high, int *low, int ledcontrol)
 #define WRITE_GAP 20*8 // was 160 // SPEC:  1*8 to 20*8 - typ 10*8 (or 10fc)
 #define WRITE_0   18*8 // was 144 // SPEC: 16*8 to 32*8 - typ 24*8 (or 24fc)
 #define WRITE_1   50*8 // was 400 // SPEC: 48*8 to 64*8 - typ 56*8 (or 56fc)  432 for T55x7; 448 for E5550
-=======
 
+*/
 /* Q5 timing datasheet:
  * Type                  |  MIN   | Typical |  Max   |
  * Start_Gap             |  10*8  |    ?    |  50*8  |
@@ -1240,7 +1240,7 @@ void CmdIOdemodFSK(int findone, int *high, int *low, int ledcontrol)
  * Write_0   Fast Mode   |   8*8  |   12*8  |  16*8  |
  * Write_1   Fast Mode   |  24*8  |   28*8  |  32*8  |
 */
-
+/*
 //note startgap must be sent after tag has been powered up for more than 3ms (per T5557 ds)
 #define START_GAP 31*8 //31*8 // was 250 // SPEC:  1*8 to 50*8 - typ 15*8 (or 15fc) - T5557: 10*8 to 50*8 
 #define WRITE_GAP 20*8 //20*8 // was 160 // SPEC:  1*8 to 20*8 - typ 10*8 (or 10fc) - T5557:  8*8 to 30*8 typ 50-150us
@@ -1271,11 +1271,11 @@ T55xx_Timing T55xx_Timing_1of4     = { 31 * 8   , 20 * 8   , 18 * 8 , 34 * 8 , 5
 
 
 // Some defines for readability
-#define T55xx_LongLeadingReference 4 // Value to tell Write Bit to send long reference
 #define T55xx_DLMode_Fixed         0 // Default Mode
 #define T55xx_DLMode_LLR           1 // Long Leading Reference
 #define T55xx_DLMode_Leading0      2 // Leading Zero
 #define T55xx_DLMode_1of4 		   3 // 1 of 4
+#define T55xx_LongLeadingReference 4 // Value to tell Write Bit to send long reference
 
 void TurnReadLFOn(int delay) {
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_LF_ADC | FPGA_LF_ADC_READER_FIELD);
@@ -1324,7 +1324,7 @@ int T55xx_SetBits (uint8_t *bit_array, int start_offset, uint32_t data      , in
             bit_idx  = NextOffset - (byte_idx * 8);                   // Get Bit Index to set/clr
 
             // If set (1) we OR, if clear (0) we AND with inverse
-           // Dbprintf ("Add Bit : %d at byte %d bit %d",bit,byte_idx,bit_idx);
+            // Dbprintf ("Add Bit : %d at byte %d bit %d",bit,byte_idx,bit_idx);
             if (bit == 1)
             	bit_array[byte_idx] |= (1 << bit_idx);                // Set the bit to 1
             	
