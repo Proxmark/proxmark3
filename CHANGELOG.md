@@ -4,12 +4,6 @@ This project uses the changelog in accordance with [keepchangelog](http://keepac
 
 ## [unreleased][unreleased]
 
-## T55xx Downlink Protocol
-### Added
-- Added downlink reference mode option r <mode> [ 0 - (default) fixed bit, 1 - long leading, 2 - leading 0 and 3 - 1 of 4 ]
-Supported commands lf t55xx detect, read, write, bruteforce (with special r 4 to try all downlink modes) (mwalker33)
-
-
 ### Changed
 - Changed hf mfp security. Now it works in all the modes. (drHatson)
 - `hf fido` - show/check DER certificate and signatures (Merlok)
