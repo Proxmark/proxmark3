@@ -1274,8 +1274,8 @@ T55xx_Timing T55xx_Timing_1of4     = { 31 * 8   , 20 * 8   , 18 * 8 , 34 * 8 , 5
 #define T55xx_DLMode_1of4 		   3 // 1 of 4
 #define T55xx_LongLeadingReference 4 // Value to tell Write Bit to send long reference
 // Macro for code readability
-#define BitStream_Byte(X) ((X) / 8)
-#define BitStream_Bit(X) ((X) - ((X) / 8) * 8)
+#define BitStream_Byte(X) ((X) >> 3)
+#define BitStream_Bit(X)  ((X) &  7)  
 
 
 void TurnReadLFOn(int delay) {
@@ -1288,7 +1288,7 @@ void TurnReadLFOn(int delay) {
 void T55xxWriteBit(int bit, T55xx_Timing *Timings) {
 
 	// If bit = 4 Send Long Leading Reference which is 138 + WRITE_0	
-
+   // Dbprintf ("Bits : %d",bit);
 	switch (bit){
 		case 0 : TurnReadLFOn(Timings->WRITE_0);             break; // Send bit  0/00
 		case 1 : TurnReadLFOn(Timings->WRITE_1);             break; // Send bit  1/01
@@ -1324,14 +1324,16 @@ int T55xx_SetBits (uint8_t *BitStream, uint8_t start_offset, uint32_t data , uin
             NextOffset++;                                
         }
   	}
-  	else
-  		Dbprintf ("Too Many Bits to fit into bit buffer");
- 
+  	else{
+        // Note: This should never happen unless some code changes cause it.  
+        // So short message for coders when testing.
+        Dbprintf ("T55 too many bits"); 
+    }
     return NextOffset;          
 }
 
 // Send one downlink command to the card 
-void T55xx_SendCMD (uint32_t Data, uint32_t Block, uint32_t Pwd, uint8_t arg) { //, bool read_cmd) {//, struct T55xx_Timing *Timing) {
+void T55xx_SendCMD (uint32_t Data, uint32_t Block, uint32_t Pwd, uint8_t arg) { 
 	
 	/*
 		arg bits
@@ -1339,16 +1341,19 @@ void T55xx_SendCMD (uint32_t Data, uint32_t Block, uint32_t Pwd, uint8_t arg) { 
 		xxxxxx1x 0x02 Page
 		xxxxx1xx 0x04 testMode
 		xxx11xxx 0x18 downlink mode
-		xx1xxxxx 0x20 reg_readmode
+		xx1xxxxx 0x20 !reg_readmode
 		x1xxxxxx 0x40 called for a read, so no data packet
-		
+		1xxxxxxx 0x80 reset
+        
 	*/
 	bool 	PwdMode 		= ((arg & 0x01) == 0x01);
-	uint8_t Page 			=  (arg & 0x02) >> 1;
+	bool    Page 			=  (arg & 0x02);
 	bool 	testMode		= ((arg & 0x04) == 0x04);
 	uint8_t downlink_mode   =  (arg >> 3) & 0x03;
 	bool	reg_readmode	= ((arg & 0x20) == 0x20);
 	bool	read_cmd		= ((arg & 0x40) == 0x40);
+    bool    reset           =  (arg & 0x80);
+    
     uint8_t i = 0;             
 	uint8_t BitStream[10];  // Max Downlink Command size ~74 bits, so 10 bytes (80 bits)
 	uint8_t BitStreamLen;
@@ -1379,29 +1384,35 @@ void T55xx_SendCMD (uint32_t Data, uint32_t Block, uint32_t Pwd, uint8_t arg) { 
 	if (downlink_mode == T55xx_DLMode_1of4)                            
 		BitStreamLen = T55xx_SetBits (BitStream, BitStreamLen, 0, 1,sizeof(BitStream)); 
 
-	// Add Opcode
-	if (testMode) Dbprintf("TestMODE");
-	BitStreamLen = T55xx_SetBits (BitStream, BitStreamLen,testMode ? 0 : 1    , 1,sizeof(BitStream)); 	
-	BitStreamLen = T55xx_SetBits (BitStream, BitStreamLen,testMode ? 1 : Page , 1,sizeof(BitStream)); 	
+	// Add Opcode 
+    if (reset) {
+        //  Reset : r*) 00
+            BitStreamLen = T55xx_SetBits (BitStream, BitStreamLen, 0, 2,sizeof(BitStream)); 
+    }
+    else
+    {
+        if (testMode) Dbprintf("TestMODE");
+        BitStreamLen = T55xx_SetBits (BitStream, BitStreamLen,testMode ? 0 : 1    , 1,sizeof(BitStream)); 	
+        BitStreamLen = T55xx_SetBits (BitStream, BitStreamLen,testMode ? 1 : Page , 1,sizeof(BitStream)); 	
 	
-	if (PwdMode) {
-		// Leading 0 and 1 of 4 00 fixed bits if passsword used		
-		if ((downlink_mode == T55xx_DLMode_Leading0) || (downlink_mode == T55xx_DLMode_1of4)) {
-			BitStreamLen = T55xx_SetBits (BitStream, BitStreamLen, 0, 1,sizeof(BitStream)); 
-			BitStreamLen = T55xx_SetBits (BitStream, BitStreamLen, 0, 1,sizeof(BitStream)); 
-		}
-		BitStreamLen = T55xx_SetBits (BitStream, BitStreamLen, Pwd, 32,sizeof(BitStream)); 
-	}
+        if (PwdMode) {
+            // Leading 0 and 1 of 4 00 fixed bits if passsword used		
+            if ((downlink_mode == T55xx_DLMode_Leading0) || (downlink_mode == T55xx_DLMode_1of4)) {
+                BitStreamLen = T55xx_SetBits (BitStream, BitStreamLen, 0, 2,sizeof(BitStream)); 
+            }
+            BitStreamLen = T55xx_SetBits (BitStream, BitStreamLen, Pwd, 32,sizeof(BitStream)); 
+        }
 
-	// Add Lock bit 0
-	BitStreamLen = T55xx_SetBits (BitStream, BitStreamLen, 0, 1,sizeof(BitStream)); 
+        // Add Lock bit 0
+        if (!reg_readmode) BitStreamLen = T55xx_SetBits (BitStream, BitStreamLen, 0, 1,sizeof(BitStream)); 
 
-	// Add Data if a write command
-	if (!read_cmd)	BitStreamLen = T55xx_SetBits (BitStream, BitStreamLen, Data, 32,sizeof(BitStream)); 
+        // Add Data if a write command
+        if (!read_cmd)	BitStreamLen = T55xx_SetBits (BitStream, BitStreamLen, Data, 32,sizeof(BitStream)); 
 
-	// Add Address
-	if (!reg_readmode) BitStreamLen = T55xx_SetBits (BitStream, BitStreamLen, Block, 3,sizeof(BitStream)); 
-
+        // Add Address
+        if (!reg_readmode) BitStreamLen = T55xx_SetBits (BitStream, BitStreamLen, Block, 3,sizeof(BitStream)); 
+    }
+    
 	// Send Bits to T55xx
 	// Set up FPGA, 125kHz
 	LFSetupFPGAForADC(95, true);
@@ -1434,6 +1445,7 @@ void T55xx_SendCMD (uint32_t Data, uint32_t Block, uint32_t Pwd, uint8_t arg) { 
 // Send T5577 reset command then read stream (see if we can identify the start of the stream)
 void T55xxResetRead(void) {
 	LED_A_ON();
+/*
 	//clear buffer now so it does not interfere with timing later
 	BigBuf_Clear_keep_EM();
 
@@ -1452,6 +1464,15 @@ void T55xxResetRead(void) {
 	T55xxWriteBit(0,&T55xx_Timing_FixedBit);
 
 	TurnReadLFOn(T55xx_Timing_FixedBit.READ_GAP);
+*/
+
+    //  send  r* 00 
+    uint8_t arg = 0x80;  // SendCMD will add correct reference mode based on flags (when added).
+
+    // Add in downlink_mode when ready
+    //    arg |= 0x00;  // dlmode << 3  (00 default - 08 leading 0 - 10 Fixed - 18 1 of 4 )
+
+	T55xx_SendCMD (0, 0, 0, arg); //, true);
 
 	// Acquisition
 	DoPartialAcquisition(0, true, BigBuf_max_traceLen(), 0);
@@ -1470,8 +1491,9 @@ void T55xxWriteBlock(uint32_t Data, uint32_t Block, uint32_t Pwd, uint8_t arg) {
 		xxxxxx1x 0x02 Page
 		xxxxx1xx 0x04 testMode
 		xxx11xxx 0x18 downlink mode
-		xx1xxxxx 0x20 reg_readmode
+		xx1xxxxx 0x20 !reg_readmode
 		x1xxxxxx 0x40 called for a read, so no data packet
+		1xxxxxxx 0x80 reset
 	*/
 	
 	bool 	testMode		= ((arg & 0x04) == 0x04);
@@ -1516,7 +1538,6 @@ void T55xxWriteBlock(uint32_t Data, uint32_t Block, uint32_t Pwd, uint8_t arg) {
 }
 
 // Read one card block in page [page]
-//void T55xxReadBlock (uint16_t arg0, uint8_t Block, uint32_t Pwd) {//, struct T55xx_Timing *Timing) {
 void T55xxReadBlock (uint16_t arg0, uint8_t Block, uint32_t Pwd) {//, struct T55xx_Timing *Timing) {
 	
 	LED_A_ON();
@@ -1527,14 +1548,15 @@ void T55xxReadBlock (uint16_t arg0, uint8_t Block, uint32_t Pwd) {//, struct T55
 		xxxxxx1x 0x02 Page
 		xxxxx1xx 0x04 testMode
 		xxx11xxx 0x18 downlink mode
-		xx1xxxxx 0x20 reg_readmode
+		xx1xxxxx 0x20 !reg_readmode
 		x1xxxxxx 0x40 called for a read, so no data packet
+		1xxxxxxx 0x80 reset
 	*/
 	
 	// Set Read Flag to ensure SendCMD does not add "data" to the packet
 	arg0 |= 0x40;
 
-		
+	// RegRead Mode true of block 0xff	
 	if (Block == 0xff) arg0 |= 0x20;
 	
 	//make sure block is at max 7
@@ -1595,8 +1617,8 @@ void T55xxReadBlock (uint16_t arg0, uint8_t Block, uint32_t Pwd) {//, struct T55
 
 void T55xxWakeUp(uint32_t Pwd){
 	LED_B_ON();
+	/*
 	uint32_t i = 0;
-	
 	// Set up FPGA, 125kHz
 	LFSetupFPGAForADC(95, true);
 	StartTicks();
@@ -1614,6 +1636,26 @@ void T55xxWakeUp(uint32_t Pwd){
 	// Send Pwd
 	for (i = 0x80000000; i != 0; i >>= 1)
 		T55xxWriteBit(Pwd & i,&T55xx_Timing_FixedBit);
+*/
+	/*
+		arg bits
+		xxxxxxx1 0x01 PwdMode
+		xxxxxx1x 0x02 Page
+		xxxxx1xx 0x04 testMode
+		xxx11xxx 0x18 downlink mode
+		xx1xxxxx 0x20 !reg_readmode 
+		x1xxxxxx 0x40 called for a read, so no data packet
+		1xxxxxxx 0x80 reset
+	*/
+	
+    // r* 10 (00) <pwd>   r* for llr , L0 and 1/4 - (00) for L0 and 1/4 - All handled in SendCMD
+    // So, default Opcode 10 and pwd.
+    uint8_t arg = 0x01 | 0x40 | 0x20; //Password Read Call no data | reg_read no block
+    
+    // Add in downlink_mode when ready
+    //    arg |= 0x00;  // dlmode << 3  (00 default - 08 leading 0 - 10 Fixed - 18 1 of 4 )
+
+	T55xx_SendCMD (0, 0, Pwd, arg); //, true);
 
 	// Turn and leave field on to let the begin repeating transmission
 	TurnReadLFOn(20*1000);
