@@ -1445,26 +1445,6 @@ void T55xx_SendCMD (uint32_t Data, uint32_t Block, uint32_t Pwd, uint8_t arg) {
 // Send T5577 reset command then read stream (see if we can identify the start of the stream)
 void T55xxResetRead(void) {
 	LED_A_ON();
-/*
-	//clear buffer now so it does not interfere with timing later
-	BigBuf_Clear_keep_EM();
-
-	// Set up FPGA, 125kHz
-	LFSetupFPGAForADC(95, true);
-	StartTicks();
-	// make sure tag is fully powered up...
-	WaitMS(5);
-	
-	// Trigger T55x7 in mode.
-	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
-	WaitUS(T55xx_Timing_FixedBit.START_GAP);
-
-	// reset tag - op code 00
-	T55xxWriteBit(0,&T55xx_Timing_FixedBit);
-	T55xxWriteBit(0,&T55xx_Timing_FixedBit);
-
-	TurnReadLFOn(T55xx_Timing_FixedBit.READ_GAP);
-*/
 
     //  send  r* 00 
     uint8_t arg = 0x80;  // SendCMD will add correct reference mode based on flags (when added).
@@ -1566,39 +1546,7 @@ void T55xxReadBlock (uint16_t arg0, uint8_t Block, uint32_t Pwd) {//, struct T55
 	BigBuf_Clear_ext(false);
 	
 	T55xx_SendCMD (0, Block, Pwd, arg0); //, true);
-	
-/*	
-// the send has been moved to the above SendCMD Call
-=======
 
-	// Set up FPGA, 125kHz to power up the tag
-	LFSetupFPGAForADC(95, true);
-	StartTicks();
-	// make sure tag is fully powered up...
-	WaitMS(5);
-	// Trigger T55x7 Direct Access Mode with start gap
-	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
-	WaitUS(START_GAP);
-
-	// Opcode 1[page]
-	T55xxWriteBit(1);
-	T55xxWriteBit(Page); //Page 0
-
-	if (PwdMode) {
-		// Send Pwd
-		for (i = 0x80000000; i != 0; i >>= 1)
-			T55xxWriteBit(Pwd & i);
-	}
-	// Send a zero bit separation
-	T55xxWriteBit(0);
-
-	// Send Block number (if direct access mode)
-	if (!RegReadMode)
-		for (i = 0x04; i != 0; i >>= 1)
-			T55xxWriteBit(Block & i);		
-
-
-*/
 	// Turn field on to read the response
 	// 137*8 seems to get to the start of data pretty well... 
 	//  but we want to go past the start and let the repeating data settle in...
@@ -1617,26 +1565,6 @@ void T55xxReadBlock (uint16_t arg0, uint8_t Block, uint32_t Pwd) {//, struct T55
 
 void T55xxWakeUp(uint32_t Pwd){
 	LED_B_ON();
-	/*
-	uint32_t i = 0;
-	// Set up FPGA, 125kHz
-	LFSetupFPGAForADC(95, true);
-	StartTicks();
-	// make sure tag is fully powered up...
-	WaitMS(5);
-	
-	// Trigger T55x7 Direct Access Mode
-	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
-	WaitUS(T55xx_Timing_FixedBit.START_GAP);
-	
-	// Opcode 10
-	T55xxWriteBit(1,&T55xx_Timing_FixedBit);
-	T55xxWriteBit(0,&T55xx_Timing_FixedBit); //Page 0
-
-	// Send Pwd
-	for (i = 0x80000000; i != 0; i >>= 1)
-		T55xxWriteBit(Pwd & i,&T55xx_Timing_FixedBit);
-*/
 	/*
 		arg bits
 		xxxxxxx1 0x01 PwdMode
