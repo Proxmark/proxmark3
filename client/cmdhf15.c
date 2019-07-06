@@ -382,6 +382,7 @@ static command_t CommandTable15[] =
 	{"cmd",     CmdHF15Cmd,     0, "Send direct commands to ISO15693 tag"},
 	{"findafi", CmdHF15Afi,     0, "Brute force AFI of an ISO15693 tag"},
 	{"dumpmemory", CmdHF15DumpMem,     0, "Read all memory pages of an ISO15693 tag"},
+	{"csetuid",	CmdHF15CSetUID,	0,	"Set UID for magic Chinese card"},
 	{NULL, NULL, 0, NULL}
 };
 
@@ -954,6 +955,102 @@ int CmdHF15CmdWrite(const char *Cmd) {
 	return 0;
 }
 
+int CmdHF15CSetUID(const char *Cmd)
+{
+  uint8_t uid[16] = {0x00};
+  uint8_t oldUidReversed[8], oldUid[8] = {0x00};
+  uint8_t newUidReversed[8], newUid[8] = {0x00};
+  int res;
+
+  uint8_t needHelp = 0;
+  char cmdp = 1;
+
+  if (param_getchar(Cmd, 0) && param_gethex(Cmd, 0, uid, 16)) {	
+    PrintAndLog("UID must include 16 HEX symbols");
+    return 1;
+  }
+
+  if (strcmp(sprint_hex_inrow_ex(uid, 1, 2), "e0") != 0) {
+    PrintAndLog("UID must begin with the byte 'E0'");
+    return 1;
+  }
+
+  while(param_getchar(Cmd, cmdp) != 0x00)
+  {
+    switch(param_getchar(Cmd, cmdp))
+    {
+    case 'h':
+    case 'H':
+      needHelp = 1;
+      break;
+    default:
+      PrintAndLog("ERROR: Unknown parameter '%c'", param_getchar(Cmd, cmdp));
+      needHelp = 1;
+      break;
+    }
+    cmdp++;
+  }
+
+  if (strlen(Cmd) < 1 || needHelp) {
+    PrintAndLog("");
+    PrintAndLog("Usage:  hf 15 csetuid <UID 16 hex symbols>");
+    PrintAndLog("sample:  hf 15 csetuid E004013344556677");
+    PrintAndLog("Set UID for magic Chinese card (only works with such cards)");
+    return 0;
+  }
+
+  PrintAndLog("");
+  PrintAndLog("new UID | %s", sprint_hex(uid, 8));
+  PrintAndLog("Using backdoor Magic tag function");
+
+  if (getUID(oldUidReversed)) {
+    for (int i=0; i<sizeof(oldUidReversed); i++) {
+      oldUid[i] = oldUidReversed[sizeof(oldUidReversed)-1-i];
+    }
+  } else {
+    PrintAndLog("Can't get old UID.");
+    return 1;
+  }
+
+  UsbCommand resp;
+  uint8_t *recv;
+  char *hexout;
+  UsbCommand c = {CMD_CSETUID_ISO_15693, {0, 0, 0}};
+  memcpy(c.d.asBytes, uid, 8);
+	
+  SendCommand(&c);
+
+  for (int i=0; i<4; i++) {
+    if (WaitForResponseTimeout(CMD_ACK,&resp,1000)) {
+      recv = resp.d.asBytes;
+      PrintAndLog("received %i octets",resp.arg[0]);
+      hexout = (char *)malloc(resp.arg[0] * 3 + 1);
+      if (hexout != NULL) {
+        for (int i = 0; i < resp.arg[0]; i++) { // data in hex
+          sprintf(&hexout[i * 3], "%02X ", recv[i]);
+        }
+        PrintAndLog("%s", hexout);
+        free(hexout);
+      }
+    } else {
+      PrintAndLog("timeout while waiting for reply.");
+    }
+  }
+
+  if (getUID(newUidReversed)) {
+    for (int i=0; i<sizeof(newUidReversed); i++) {
+      newUid[i] = newUidReversed[sizeof(newUidReversed)-1-i];
+    }
+  } else {
+    PrintAndLog("Can't get new UID.");
+    return 1;
+  }
+
+  PrintAndLog("");
+  PrintAndLog("old UID : %s", sprint_hex(oldUid, 8));
+  PrintAndLog("new UID : %s", sprint_hex(newUid, 8));
+  return 0;
+}
 
 
 static command_t CommandTable15Cmd[] =
@@ -967,7 +1064,8 @@ static command_t CommandTable15Cmd[] =
 	{"write",   CmdHF15CmdWrite,    0, "Write a block"},	
 	{"readmulti",CmdHF15CmdReadmulti,    0, "Reads multiple Blocks"},
 	{"sysinfo",CmdHF15CmdSysinfo,    0, "Get Card Information"},
-	{"raw",		 CmdHF15CmdRaw,		0,	"Send raw hex data to tag"}, 
+	{"raw",		 CmdHF15CmdRaw,		0,	"Send raw hex data to tag"},
+	{"csetuid",	CmdHF15CSetUID,	0,	"Set UID for magic Chinese card"},
 	{"debug",    CmdHF15CmdDebug,    0, "Turn debugging on/off"},
 	{NULL, NULL, 0, NULL}
 };

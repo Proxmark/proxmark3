@@ -132,6 +132,7 @@ typedef struct{
 #define CMD_ISO_15693_FIND_AFI                                            0x0315
 #define CMD_ISO_15693_DEBUG                                               0x0316
 #define CMD_LF_SNOOP_RAW_ADC_SAMPLES                                      0x0317
+#define CMD_CSETUID_ISO_15693                                             0x0318
 
 // For Hitag2 transponders
 #define CMD_SNOOP_HITAG                                                   0x0370

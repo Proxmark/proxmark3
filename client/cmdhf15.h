@@ -22,6 +22,7 @@ int CmdHF15Reader(const char *Cmd);
 int CmdHF15Sim(const char *Cmd);
 int CmdHF15Record(const char *Cmd);
 int CmdHF15Cmd(const char*Cmd);
+int CmdHF15CSetUID(const char *Cmd);
 int CmdHF15CmdHelp(const char*Cmd);
 int CmdHF15Help(const char*Cmd);
 
