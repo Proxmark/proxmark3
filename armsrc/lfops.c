@@ -1201,11 +1201,13 @@ void CmdIOdemodFSK(int findone, int *high, int *low, int ledcontrol)
 
  /*
  // Original Timings for reference
+//note startgap must be sent after tag has been powered up for more than 3ms (per T5557 ds)
  
 #define START_GAP 31*8 // was 250 // SPEC:  1*8 to 50*8 - typ 15*8 (or 15fc)
 #define WRITE_GAP 20*8 // was 160 // SPEC:  1*8 to 20*8 - typ 10*8 (or 10fc)
 #define WRITE_0   18*8 // was 144 // SPEC: 16*8 to 32*8 - typ 24*8 (or 24fc)
 #define WRITE_1   50*8 // was 400 // SPEC: 48*8 to 64*8 - typ 56*8 (or 56fc)  432 for T55x7; 448 for E5550
+#define READ_GAP  15*8 
 
 */
 /* Q5 timing datasheet:
@@ -1239,15 +1241,6 @@ void CmdIOdemodFSK(int findone, int *high, int *low, int ledcontrol)
  * Write_1   Normal mode |  48*8  |   56*8  |  64*8  | 
  * Write_0   Fast Mode   |   8*8  |   12*8  |  16*8  |
  * Write_1   Fast Mode   |  24*8  |   28*8  |  32*8  |
-*/
-/*
-//note startgap must be sent after tag has been powered up for more than 3ms (per T5557 ds)
-#define START_GAP 31*8 //31*8 // was 250 // SPEC:  1*8 to 50*8 - typ 15*8 (or 15fc) - T5557: 10*8 to 50*8 
-#define WRITE_GAP 20*8 //20*8 // was 160 // SPEC:  1*8 to 20*8 - typ 10*8 (or 10fc) - T5557:  8*8 to 30*8 typ 50-150us
-#define WRITE_0   18*8 //18*8 // was 144 // SPEC: 16*8 to 32*8 - typ 24*8 (or 24fc) - T5557: 16*8 to 31*8 typ 24*8
-#define WRITE_1   50*8 //50*8 // was 400 // SPEC: 48*8 to 64*8 - typ 56*8 (or 56fc) - T5557: 48*8 to 63*8 typ 54*8       432 for T55x7; 448 for E5550
-
-#define READ_GAP  15*8 
 */
 
 // Structure to hold Timing values.  In future will be simplier to add user changable timings.
@@ -1374,7 +1367,7 @@ void T55xx_SendCMD (uint32_t Data, uint32_t Block, uint32_t Pwd, uint8_t arg) {
 	// Build Bit Stream to send.
 	memset (BitStream,0x00,sizeof(BitStream));
 	
-	BitStreamLen = 0;
+	BitStreamLen = 0; // Ensure 0 bit index to start.
 	
 	// Add Leading 0 and 1 of 4 reference bit
 	if ((downlink_mode == T55xx_DLMode_Leading0) || (downlink_mode == T55xx_DLMode_1of4))  
@@ -1427,8 +1420,8 @@ void T55xx_SendCMD (uint32_t Data, uint32_t Block, uint32_t Pwd, uint8_t arg) {
 	if (downlink_mode ==  T55xx_DLMode_LLR) 
 		T55xxWriteBit (T55xx_LongLeadingReference,Timing); // Send Long Leading Start Reference
 
-	if (downlink_mode ==  T55xx_DLMode_1of4) { // 1 of 4 need to send 2 bits at a time
-		for ( i = 0; i < BitStreamLen; i+=2 ) {
+   if (downlink_mode ==  T55xx_DLMode_1of4) { // 1 of 4 need to send 2 bits at a time
+		for ( i = 0; i < BitStreamLen-1; i+=2 ) {
 			SendBits  = (BitStream[BitStream_Byte(i  )] >> (BitStream_Bit(i  )) & 1) << 1;   // Bit i
             SendBits += (BitStream[BitStream_Byte(i+1)] >> (BitStream_Bit(i+1)) & 1);        // Bit i+1; 
 			T55xxWriteBit (SendBits & 3,Timing);
@@ -1452,7 +1445,12 @@ void T55xxResetRead(void) {
     // Add in downlink_mode when ready
     //    arg |= 0x00;  // dlmode << 3  (00 default - 08 leading 0 - 10 Fixed - 18 1 of 4 )
 
+	//clear buffer now so it does not interfere with timing later
+	BigBuf_Clear_keep_EM();
+
 	T55xx_SendCMD (0, 0, 0, arg); //, true);
+
+	TurnReadLFOn(T55xx_Timing_FixedBit.READ_GAP);
 
 	// Acquisition
 	DoPartialAcquisition(0, true, BigBuf_max_traceLen(), 0);
