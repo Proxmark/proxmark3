@@ -1420,7 +1420,7 @@ void T55xx_SendCMD (uint32_t Data, uint32_t Block, uint32_t Pwd, uint8_t arg) {
 	if (downlink_mode ==  T55xx_DLMode_LLR) 
 		T55xxWriteBit (T55xx_LongLeadingReference,Timing); // Send Long Leading Start Reference
 
-   if (downlink_mode ==  T55xx_DLMode_1of4) { // 1 of 4 need to send 2 bits at a time
+   if ((downlink_mode ==  T55xx_DLMode_1of4) && (BitStreamLen > 0)) { // 1 of 4 need to send 2 bits at a time
 		for ( i = 0; i < BitStreamLen-1; i+=2 ) {
 			SendBits  = (BitStream[BitStream_Byte(i  )] >> (BitStream_Bit(i  )) & 1) << 1;   // Bit i
             SendBits += (BitStream[BitStream_Byte(i+1)] >> (BitStream_Bit(i+1)) & 1);        // Bit i+1; 
