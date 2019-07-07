@@ -957,10 +957,8 @@ int CmdHF15CmdWrite(const char *Cmd) {
 
 int CmdHF15CSetUID(const char *Cmd)
 {
-  uint8_t uid[16] = {0x00};
-  uint8_t oldUidReversed[8], oldUid[8] = {0x00};
-  uint8_t newUidReversed[8], newUid[8] = {0x00};
-  int res;
+  uint8_t uid[8] = {0x00};
+  uint8_t oldUid[8], newUid[8] = {0x00};
 
   uint8_t needHelp = 0;
   char cmdp = 1;
@@ -970,7 +968,7 @@ int CmdHF15CSetUID(const char *Cmd)
     return 1;
   }
 
-  if (strcmp(sprint_hex_inrow_ex(uid, 1, 2), "e0") != 0) {
+  if (uid[0] != 0xe0) {
     PrintAndLog("UID must begin with the byte 'E0'");
     return 1;
   }
@@ -1003,11 +1001,7 @@ int CmdHF15CSetUID(const char *Cmd)
   PrintAndLog("new UID | %s", sprint_hex(uid, 8));
   PrintAndLog("Using backdoor Magic tag function");
 
-  if (getUID(oldUidReversed)) {
-    for (int i=0; i<sizeof(oldUidReversed); i++) {
-      oldUid[i] = oldUidReversed[sizeof(oldUidReversed)-1-i];
-    }
-  } else {
+  if (!getUID(oldUid)) {
     PrintAndLog("Can't get old UID.");
     return 1;
   }
@@ -1037,18 +1031,14 @@ int CmdHF15CSetUID(const char *Cmd)
     }
   }
 
-  if (getUID(newUidReversed)) {
-    for (int i=0; i<sizeof(newUidReversed); i++) {
-      newUid[i] = newUidReversed[sizeof(newUidReversed)-1-i];
-    }
-  } else {
+  if (!getUID(newUid)) {
     PrintAndLog("Can't get new UID.");
     return 1;
   }
 
   PrintAndLog("");
-  PrintAndLog("old UID : %s", sprint_hex(oldUid, 8));
-  PrintAndLog("new UID : %s", sprint_hex(newUid, 8));
+  PrintAndLog("old UID : %02X %02X %02X %02X %02X %02X %02X %02X", oldUid[7], oldUid[6], oldUid[5], oldUid[4], oldUid[3], oldUid[2], oldUid[1], oldUid[0]);
+  PrintAndLog("new UID : %02X %02X %02X %02X %02X %02X %02X %02X", newUid[7], newUid[6], newUid[5], newUid[4], newUid[3], newUid[2], newUid[1], newUid[0]);
   return 0;
 }
 

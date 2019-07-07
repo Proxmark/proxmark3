@@ -1604,7 +1604,7 @@ void SetTag15693Uid(uint8_t *uid)
     uint16_t crc;
 
     int recvlen = 0;
-	uint8_t recvbuf[ISO15693_MAX_RESPONSE_LENGTH];
+    uint8_t recvbuf[ISO15693_MAX_RESPONSE_LENGTH];
 
     LED_A_ON();
 
