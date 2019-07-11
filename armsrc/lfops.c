@@ -1907,7 +1907,7 @@ void SendForward(uint8_t fwd_bit_count) {
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_LF_ADC | FPGA_LF_ADC_READER_FIELD);//field on
 	WaitUS(18*8); //18 cycles on (8us each)
 
-	// now start writting
+	// now start writting - each bit should be 32*8 total length
 	while(fwd_bit_sz-- > 0) { //prepare next bit modulation
 		if(((*fwd_write_ptr++) & 1) == 1)
 			WaitUS(32*8); //32 cycles at 125Khz (8us each)
@@ -1916,7 +1916,7 @@ void SendForward(uint8_t fwd_bit_count) {
 			FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF); // field off
 			WaitUS(23*8); //23 cycles off (8us each)
 			FpgaWriteConfWord(FPGA_MAJOR_MODE_LF_ADC | FPGA_LF_ADC_READER_FIELD);//field on
-			WaitUS(18*8); //18 cycles on (8us each)
+			WaitUS((32-23)*8); //remaining cycles on (8us each)
 		}
 	}
 }
