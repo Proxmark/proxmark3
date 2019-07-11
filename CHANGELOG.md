@@ -35,6 +35,9 @@ This project uses the changelog in accordance with [keepchangelog](http://keepac
 - Added Mifare Mini, Mifare 2K and 4K support to `hf mf sim` (piwi)
 - Added Legic detection to `hf search` (dnet)
 - Added Home (Pos1) and End key bindings to the plot GUI (based on @mcd1992)
+- Added downlink reference mode option r <mode> [ 0 - (or missing) default/fixed bit, 1 - long leading, 2 - leading 0 and 3 - 1 of 4 ] to `lf t55xx detect`, `lf t55xx read`, `lf t55xx write`, and `lf t55xx bruteforce`
+- Added special option `r 4` to bruteforce, to try all downlink modes (0,1,2 and 3) for each password
+
 
 ## [v3.1.0][2018-10-10]
 
