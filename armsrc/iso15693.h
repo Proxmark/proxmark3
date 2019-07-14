@@ -19,6 +19,7 @@ void ReaderIso15693(uint32_t parameter);
 void SimTagIso15693(uint32_t parameter, uint8_t *uid);
 void BruteforceIso15693Afi(uint32_t speed);
 void DirectTag15693Command(uint32_t datalen,uint32_t speed, uint32_t recv, uint8_t data[]); 
+void SetTag15693Uid(uint8_t *uid);
 void SetDebugIso15693(uint32_t flag);
 
 #endif

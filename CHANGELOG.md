@@ -16,6 +16,7 @@ This project uses the changelog in accordance with [keepchangelog](http://keepac
 - `hf 15 sim` now works as expected (piwi)
 
 ### Added
+- Added `hf 15 csetuid` - set UID on ISO-15693 Magic tags (t0m4)
 - Added `lf config s xxxx` option to allow skipping x samples before capture (marshmellow)
 - Added `lf em 4x05protect` to support changing protection blocks on em4x05 chips (marshmellow)
 - Support Standard Communication Mode in HITAG S
