@@ -23,10 +23,28 @@
 #define HARDNESTED_AUTHENTICATION_TIMEOUT 848			// card times out 1ms after wrong authentication (according to NXP documentation)
 #define HARDNESTED_PRE_AUTHENTICATION_LEADTIME 400		// some (non standard) cards need a pause after select before they are ready for first authentication 
 
+/*
 // the block number for the ISO14443-4 PCB
 static uint8_t pcb_blocknum = 0;
 // Deselect card by sending a s-block. the crc is precalced for speed
 static  uint8_t deselect_cmd[] = {0xc2,0xe0,0xb4};
+
+static void OnSuccess(){
+	pcb_blocknum = 0;
+	ReaderTransmit(deselect_cmd, 3 , NULL);
+	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
+	LEDsoff();
+}
+*/
+
+static void OnError(uint8_t reason){
+	// pcb_blocknum = 0;
+	// ReaderTransmit(deselect_cmd, 3 , NULL);
+	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
+	LED_D_OFF();
+	cmd_send(CMD_ACK,0,reason,0,0,0);
+	LED_A_OFF();
+}
 
 //-----------------------------------------------------------------------------
 // Select, Authenticate, Read a MIFARE tag.
@@ -34,13 +52,13 @@ static  uint8_t deselect_cmd[] = {0xc2,0xe0,0xb4};
 //-----------------------------------------------------------------------------
 void MifareReadBlock(uint8_t arg0, uint8_t arg1, uint8_t arg2, uint8_t *datain)
 {
-  // params
+	LED_A_ON();
+
 	uint8_t blockNo = arg0;
 	uint8_t keyType = arg1;
 	uint64_t ui64Key = 0;
 	ui64Key = bytes_to_num(datain, 6);
 
-	// variables
 	byte_t isOK = 0;
 	byte_t dataoutbuf[16];
 	uint8_t uid[10];
@@ -52,10 +70,6 @@ void MifareReadBlock(uint8_t arg0, uint8_t arg1, uint8_t arg2, uint8_t *datain)
 	iso14443a_setup(FPGA_HF_ISO14443A_READER_LISTEN);
 
 	clear_trace();
-
-	LED_A_ON();
-	LED_B_OFF();
-	LED_C_OFF();
 
 	while (true) {
 		if(!iso14443a_select_card(uid, NULL, &cuid, true, 0, true)) {
@@ -97,21 +111,18 @@ void MifareReadBlock(uint8_t arg0, uint8_t arg1, uint8_t arg2, uint8_t *datain)
 
 void MifareUC_Auth(uint8_t arg0, uint8_t *keybytes){
 
+	LED_A_ON();
 	bool turnOffField = (arg0 == 1);
-
-	LED_A_ON(); LED_B_OFF(); LED_C_OFF();
 
 	iso14443a_setup(FPGA_HF_ISO14443A_READER_LISTEN);
 
-	clear_trace();
-
-	if(!iso14443a_select_card(NULL, NULL, NULL, true, 0, true)) {
+	if (!iso14443a_select_card(NULL, NULL, NULL, true, 0, true)) {
 		if (MF_DBGLEVEL >= MF_DBG_ERROR) Dbprintf("Can't select card");
 		OnError(0);
 		return;
 	};
 
-	if(!mifare_ultra_auth(keybytes)){
+	if (!mifare_ultra_auth(keybytes)){
 		if (MF_DBGLEVEL >= MF_DBG_ERROR) Dbprintf("Authentication failed");
 		OnError(1);
 		return;
@@ -119,9 +130,11 @@ void MifareUC_Auth(uint8_t arg0, uint8_t *keybytes){
 
 	if (turnOffField) {
 		FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
-		LEDsoff();
+		LED_D_OFF();
 	}
+
 	cmd_send(CMD_ACK,1,0,0,0,0);
+	LED_A_OFF();
 }
 
 // Arg0 = BlockNo,
@@ -129,16 +142,14 @@ void MifareUC_Auth(uint8_t arg0, uint8_t *keybytes){
 // datain = PWD bytes,
 void MifareUReadBlock(uint8_t arg0, uint8_t arg1, uint8_t *datain)
 {
+	LED_A_ON();
+
 	uint8_t blockNo = arg0;
 	byte_t dataout[16] = {0x00};
 	bool useKey = (arg1 == 1); //UL_C
 	bool usePwd = (arg1 == 2); //UL_EV1/NTAG
 
-	LEDsoff();
-	LED_A_ON();
 	iso14443a_setup(FPGA_HF_ISO14443A_READER_LISTEN);
-
-	clear_trace();
 
 	int len = iso14443a_select_card(NULL, NULL, NULL, true, 0, true);
 	if(!len) {
@@ -148,7 +159,7 @@ void MifareUReadBlock(uint8_t arg0, uint8_t arg1, uint8_t *datain)
 	}
 
 	// UL-C authentication
-	if ( useKey ) {
+	if (useKey) {
 		uint8_t key[16] = {0x00};
 		memcpy(key, datain, sizeof(key) );
 
@@ -159,7 +170,7 @@ void MifareUReadBlock(uint8_t arg0, uint8_t arg1, uint8_t *datain)
 	}
 
 	// UL-EV1 / NTAG authentication
-	if ( usePwd ) {
+	if (usePwd) {
 		uint8_t pwd[4] = {0x00};
 		memcpy(pwd, datain, 4);
 		uint8_t pack[4] = {0,0,0,0};
@@ -169,13 +180,13 @@ void MifareUReadBlock(uint8_t arg0, uint8_t arg1, uint8_t *datain)
 		}
 	}
 
-	if( mifare_ultra_readblock(blockNo, dataout) ) {
+	if (mifare_ultra_readblock(blockNo, dataout)) {
 		if (MF_DBGLEVEL >= MF_DBG_ERROR) Dbprintf("Read block error");
 		OnError(2);
 		return;
 	}
 
-	if( mifare_ultra_halt() ) {
+	if (mifare_ultra_halt()) {
 		if (MF_DBGLEVEL >= MF_DBG_ERROR) Dbprintf("Halt error");
 		OnError(3);
 		return;
@@ -183,7 +194,8 @@ void MifareUReadBlock(uint8_t arg0, uint8_t arg1, uint8_t *datain)
 
 	cmd_send(CMD_ACK,1,0,0,dataout,16);
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
-	LEDsoff();
+	LED_D_OFF();
+	LED_A_OFF();
 }
 
 //-----------------------------------------------------------------------------
@@ -259,13 +271,11 @@ void MifareReadSector(uint8_t arg0, uint8_t arg1, uint8_t arg2, uint8_t *datain)
 // datain = KEY bytes
 void MifareUReadCard(uint8_t arg0, uint16_t arg1, uint8_t arg2, uint8_t *datain)
 {
-	LEDsoff();
 	LED_A_ON();
 	iso14443a_setup(FPGA_HF_ISO14443A_READER_LISTEN);
 
 	// free eventually allocated BigBuf memory
 	BigBuf_free();
-	clear_trace();
 
 	// params
 	uint8_t blockNo = arg0;
@@ -288,7 +298,7 @@ void MifareUReadCard(uint8_t arg0, uint16_t arg1, uint8_t arg2, uint8_t *datain)
 	}
 
 	// UL-C authentication
-	if ( useKey ) {
+	if (useKey) {
 		uint8_t key[16] = {0x00};
 		memcpy(key, datain, sizeof(key) );
 
@@ -340,14 +350,14 @@ void MifareUReadCard(uint8_t arg0, uint16_t arg1, uint8_t arg2, uint8_t *datain)
 		return;
 	}
 
-	if (MF_DBGLEVEL >= MF_DBG_EXTENDED) Dbprintf("Blocks read %d", countblocks);
+	if (MF_DBGLEVEL >= MF_DBG_DEBUG) Dbprintf("Blocks read %d", countblocks);
 
-	countblocks *= 4;
+	cmd_send(CMD_ACK, 1, countblocks*4, BigBuf_max_traceLen(), 0, 0);
 
-	cmd_send(CMD_ACK, 1, countblocks, BigBuf_max_traceLen(), 0, 0);
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
-	LEDsoff();
+	LED_D_OFF();
 	BigBuf_free();
+	LED_A_OFF();
 }
 
 //-----------------------------------------------------------------------------
@@ -1598,17 +1608,3 @@ void Mifare_DES_Auth2(uint32_t arg0, uint8_t *datain){
 	LEDsoff();
 }
 
-void OnSuccess(){
-	pcb_blocknum = 0;
-	ReaderTransmit(deselect_cmd, 3 , NULL);
-	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
-	LEDsoff();
-}
-
-void OnError(uint8_t reason){
-	pcb_blocknum = 0;
-	ReaderTransmit(deselect_cmd, 3 , NULL);
-	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
-	cmd_send(CMD_ACK,0,reason,0,0,0);
-	LEDsoff();
-}

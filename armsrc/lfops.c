@@ -1198,11 +1198,78 @@ void CmdIOdemodFSK(int findone, int *high, int *low, int ledcontrol)
  * and enlarge the gap ones.
  * Q5 tags seems to have issues when these values changes. 
  */
+
+ /*
+ // Original Timings for reference
+//note startgap must be sent after tag has been powered up for more than 3ms (per T5557 ds)
+ 
 #define START_GAP 31*8 // was 250 // SPEC:  1*8 to 50*8 - typ 15*8 (or 15fc)
 #define WRITE_GAP 20*8 // was 160 // SPEC:  1*8 to 20*8 - typ 10*8 (or 10fc)
 #define WRITE_0   18*8 // was 144 // SPEC: 16*8 to 32*8 - typ 24*8 (or 24fc)
 #define WRITE_1   50*8 // was 400 // SPEC: 48*8 to 64*8 - typ 56*8 (or 56fc)  432 for T55x7; 448 for E5550
 #define READ_GAP  15*8 
+
+*/
+/* Q5 timing datasheet:
+ * Type                  |  MIN   | Typical |  Max   |
+ * Start_Gap             |  10*8  |    ?    |  50*8  |
+ * Write_Gap Normal mode |   8*8  |   14*8  |  20*8  | 
+ * Write_Gap Fast Mode   |   8*8  |    ?    |  20*8  |
+ * Write_0   Normal mode |  16*8  |   24*8  |  32*8  |
+ * Write_1   Normal mode |  48*8  |   56*8  |  64*8  |
+ * Write_0   Fast Mode   |   8*8  |   12*8  |  16*8  |
+ * Write_1   Fast Mode   |  24*8  |   28*8  |  32*8  |
+*/
+
+/* T5557 timing datasheet:
+ * Type                  |  MIN   | Typical |  Max   |
+ * Start_Gap             |  10*8  |    ?    |  50*8  |
+ * Write_Gap Normal mode |   8*8  |50-150us |  30*8  | 
+ * Write_Gap Fast Mode   |   8*8  |    ?    |  20*8  |
+ * Write_0   Normal mode |  16*8  |   24*8  |  31*8  | 
+ * Write_1   Normal mode |  48*8  |   54*8  |  63*8  | 
+ * Write_0   Fast Mode   |   8*8  |   12*8  |  15*8  |
+ * Write_1   Fast Mode   |  24*8  |   28*8  |  31*8  |
+*/
+
+/* T5577C timing datasheet for Fixed-Bit-Length protocol (defualt):
+ * Type                  |  MIN   | Typical |  Max   |
+ * Start_Gap             |   8*8  |   15*8  |  50*8  |
+ * Write_Gap Normal mode |   8*8  |   10*8  |  20*8  | 
+ * Write_Gap Fast Mode   |   8*8  |   10*8  |  20*8  |
+ * Write_0   Normal mode |  16*8  |   24*8  |  32*8  | 
+ * Write_1   Normal mode |  48*8  |   56*8  |  64*8  | 
+ * Write_0   Fast Mode   |   8*8  |   12*8  |  16*8  |
+ * Write_1   Fast Mode   |  24*8  |   28*8  |  32*8  |
+*/
+
+// Structure to hold Timing values.  In future will be simplier to add user changable timings.
+typedef struct  {
+	uint16_t  START_GAP;
+	uint16_t  WRITE_GAP;
+	uint16_t  WRITE_0;
+	uint16_t  WRITE_1;
+	uint16_t  WRITE_2;
+	uint16_t  WRITE_3;
+	uint16_t  READ_GAP;
+} T55xx_Timing;
+
+// Set Initial/Default Values.  Note: *8 can occure when used.  This should keep things simplier here.
+T55xx_Timing T55xx_Timing_FixedBit = { 31 * 8   , 20 * 8   , 18 * 8 , 50 * 8 , 0      , 0      , 15 * 8   };
+T55xx_Timing T55xx_Timing_LLR      = { 31 * 8   , 20 * 8   , 18 * 8 , 50 * 8 , 0      , 0      , 15 * 8   };
+T55xx_Timing T55xx_Timing_Leading0 = { 31 * 8   , 20 * 8   , 18 * 8 , 40 * 8 , 0      , 0      , 15 * 8   };
+T55xx_Timing T55xx_Timing_1of4     = { 31 * 8   , 20 * 8   , 18 * 8 , 34 * 8 , 50 * 8 , 66 * 8 , 15 * 8   };
+
+// Some defines for readability
+#define T55xx_DLMode_Fixed         0 // Default Mode
+#define T55xx_DLMode_LLR           1 // Long Leading Reference
+#define T55xx_DLMode_Leading0      2 // Leading Zero
+#define T55xx_DLMode_1of4          3 // 1 of 4
+#define T55xx_LongLeadingReference 4 // Value to tell Write Bit to send long reference
+// Macro for code readability
+#define BitStream_Byte(X) ((X) >> 3)
+#define BitStream_Bit(X)  ((X) &  7)  
+
 
 void TurnReadLFOn(int delay) {
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_LF_ADC | FPGA_LF_ADC_READER_FIELD);
@@ -1211,36 +1278,179 @@ void TurnReadLFOn(int delay) {
 }
 
 // Write one bit to card
-void T55xxWriteBit(int bit) {
-	if (!bit)
-		TurnReadLFOn(WRITE_0);
-	else
-		TurnReadLFOn(WRITE_1);
+void T55xxWriteBit(int bit, T55xx_Timing *Timings) {
+
+	// If bit = 4 Send Long Leading Reference which is 138 + WRITE_0	
+	// Dbprintf ("Bits : %d",bit);
+	switch (bit){
+		case 0 : TurnReadLFOn(Timings->WRITE_0);             break; // Send bit  0/00
+		case 1 : TurnReadLFOn(Timings->WRITE_1);             break; // Send bit  1/01
+		case 2 : TurnReadLFOn(Timings->WRITE_2);             break; // Send bits   10
+		case 3 : TurnReadLFOn(Timings->WRITE_3);             break; // Send bits   11
+		case 4 : TurnReadLFOn(Timings->WRITE_0 + (136 * 8)); break; // Send Long Leading Reference
+	}
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
-	WaitUS(WRITE_GAP);
+	WaitUS(Timings->WRITE_GAP);
 }
 
-// Send T5577 reset command then read stream (see if we can identify the start of the stream)
-void T55xxResetRead(void) {
-	LED_A_ON();
-	//clear buffer now so it does not interfere with timing later
-	BigBuf_Clear_keep_EM();
+// Function to abstract an Arbitrary length byte array to store bit pattern.
+// bit_array    - Array to hold data/bit pattern
+// start_offset - bit location to start storing new bits.
+// data         - upto 32 bits of data to store
+// num_bits     - how many bits (low x bits of data)  Max 32 bits at a time
+// max_len         - how many bytes can the bit_array hold (ensure no buffer overflow)
+// returns "Next" bit offset / bits stored (for next store)
+//int T55xx_SetBits (uint8_t *bit_array, int start_offset, uint32_t data      , int num_bits, int max_len)
+int T55xx_SetBits (uint8_t *BitStream, uint8_t start_offset, uint32_t data , uint8_t num_bits, uint8_t max_len)
+{
+	int8_t offset;
+	int8_t NextOffset = start_offset;
 
+	// Check if data will fit.
+	if ((start_offset + num_bits) <= (max_len*8)) {
+		// Loop through the data and store
+		for (offset = (num_bits-1); offset >= 0; offset--) {
+
+			if ((data >> offset) & 1)  BitStream[BitStream_Byte(NextOffset)] |= (1         << BitStream_Bit(NextOffset));     // Set the bit to 1
+			else                       BitStream[BitStream_Byte(NextOffset)] &= (0xff ^ (1 << BitStream_Bit(NextOffset)));    // Set the bit to 0
+
+			NextOffset++;
+		}
+	}
+	else {
+		// Note: This should never happen unless some code changes cause it.  
+		// So short message for coders when testing.
+		Dbprintf ("T55 too many bits"); 
+	}
+	return NextOffset;
+}
+
+// Send one downlink command to the card 
+void T55xx_SendCMD (uint32_t Data, uint32_t Block, uint32_t Pwd, uint8_t arg) { 
+
+	/*
+		arg bits
+		xxxxxxx1 0x01 PwdMode
+		xxxxxx1x 0x02 Page
+		xxxxx1xx 0x04 testMode
+		xxx11xxx 0x18 downlink mode
+		xx1xxxxx 0x20 !reg_readmode
+		x1xxxxxx 0x40 called for a read, so no data packet
+		1xxxxxxx 0x80 reset
+
+	*/
+	bool PwdMode      = ((arg & 0x01) == 0x01);
+	bool Page         =  (arg & 0x02);
+	bool testMode     = ((arg & 0x04) == 0x04);
+	uint8_t downlink_mode = (arg >> 3) & 0x03;
+	bool reg_readmode = ((arg & 0x20) == 0x20);
+	bool read_cmd     = ((arg & 0x40) == 0x40);
+	bool reset        =  (arg & 0x80);
+
+	uint8_t i = 0;
+	uint8_t BitStream[10];  // Max Downlink Command size ~74 bits, so 10 bytes (80 bits)
+	uint8_t BitStreamLen;
+	T55xx_Timing *Timing;
+	uint8_t SendBits;
+
+	// Assigning Downlink Timeing for write
+	switch (downlink_mode)
+	{
+		case T55xx_DLMode_Fixed    : Timing = &T55xx_Timing_FixedBit;  break; 
+		case T55xx_DLMode_LLR      : Timing = &T55xx_Timing_LLR;       break;
+		case T55xx_DLMode_Leading0 : Timing = &T55xx_Timing_Leading0;  break;
+		case T55xx_DLMode_1of4     : Timing = &T55xx_Timing_1of4;      break;
+		default:
+				Timing = &T55xx_Timing_FixedBit;
+	}
+
+	// Build Bit Stream to send.
+	memset (BitStream,0x00,sizeof(BitStream));
+	
+	BitStreamLen = 0; // Ensure 0 bit index to start.
+	
+	// Add Leading 0 and 1 of 4 reference bit
+	if ((downlink_mode == T55xx_DLMode_Leading0) || (downlink_mode == T55xx_DLMode_1of4))
+		BitStreamLen = T55xx_SetBits (BitStream, BitStreamLen, 0, 1,sizeof(BitStream)); 
+
+	// Add extra reference 0 for 1 of 4
+	if (downlink_mode == T55xx_DLMode_1of4)
+		BitStreamLen = T55xx_SetBits (BitStream, BitStreamLen, 0, 1,sizeof(BitStream)); 
+
+	// Add Opcode 
+	if (reset) {
+		//  Reset : r*) 00
+		BitStreamLen = T55xx_SetBits (BitStream, BitStreamLen, 0, 2,sizeof(BitStream)); 
+	}
+	else
+	{
+		if (testMode) Dbprintf("TestMODE");
+		BitStreamLen = T55xx_SetBits (BitStream, BitStreamLen,testMode ? 0 : 1    , 1,sizeof(BitStream));
+		BitStreamLen = T55xx_SetBits (BitStream, BitStreamLen,testMode ? 1 : Page , 1,sizeof(BitStream));
+
+		if (PwdMode) {
+			// Leading 0 and 1 of 4 00 fixed bits if passsword used		
+			if ((downlink_mode == T55xx_DLMode_Leading0) || (downlink_mode == T55xx_DLMode_1of4)) {
+				BitStreamLen = T55xx_SetBits (BitStream, BitStreamLen, 0, 2,sizeof(BitStream));
+			}
+			BitStreamLen = T55xx_SetBits (BitStream, BitStreamLen, Pwd, 32,sizeof(BitStream));
+		}
+
+		// Add Lock bit 0
+		if (!reg_readmode) BitStreamLen = T55xx_SetBits (BitStream, BitStreamLen, 0, 1,sizeof(BitStream));
+
+		// Add Data if a write command
+		if (!read_cmd)	BitStreamLen = T55xx_SetBits (BitStream, BitStreamLen, Data, 32,sizeof(BitStream));
+
+		// Add Address
+		if (!reg_readmode) BitStreamLen = T55xx_SetBits (BitStream, BitStreamLen, Block, 3,sizeof(BitStream));
+	}
+
+	// Send Bits to T55xx
 	// Set up FPGA, 125kHz
 	LFSetupFPGAForADC(95, true);
 	StartTicks();
 	// make sure tag is fully powered up...
 	WaitMS(5);
-	
 	// Trigger T55x7 in mode.
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
-	WaitUS(START_GAP);
+	WaitUS(Timing->START_GAP);
 
-	// reset tag - op code 00
-	T55xxWriteBit(0);
-	T55xxWriteBit(0);
+	// If long leading 0 send long reference pulse
+	if (downlink_mode ==  T55xx_DLMode_LLR) 
+		T55xxWriteBit (T55xx_LongLeadingReference,Timing); // Send Long Leading Start Reference
 
-	TurnReadLFOn(READ_GAP);
+	if ((downlink_mode ==  T55xx_DLMode_1of4) && (BitStreamLen > 0)) { // 1 of 4 need to send 2 bits at a time
+		for ( i = 0; i < BitStreamLen-1; i+=2 ) {
+			SendBits  = (BitStream[BitStream_Byte(i  )] >> (BitStream_Bit(i  )) & 1) << 1;   // Bit i
+			SendBits += (BitStream[BitStream_Byte(i+1)] >> (BitStream_Bit(i+1)) & 1);        // Bit i+1;
+			T55xxWriteBit (SendBits & 3,Timing);
+		}
+	}
+	else {
+		for (i = 0; i < BitStreamLen; i++) {
+			SendBits = (BitStream[BitStream_Byte(i)] >> BitStream_Bit(i));
+			T55xxWriteBit (SendBits & 1,Timing);
+		}
+	}
+}
+
+// Send T5577 reset command then read stream (see if we can identify the start of the stream)
+void T55xxResetRead(void) {
+	LED_A_ON();
+
+	//  send  r* 00 
+	uint8_t arg = 0x80;  // SendCMD will add correct reference mode based on flags (when added).
+
+	// Add in downlink_mode when ready
+	//    arg |= 0x00;  // dlmode << 3  (00 default - 08 leading 0 - 10 Fixed - 18 1 of 4 )
+
+	//clear buffer now so it does not interfere with timing later
+	BigBuf_Clear_keep_EM();
+
+	T55xx_SendCMD (0, 0, 0, arg); //, true);
+
+	TurnReadLFOn(T55xx_Timing_FixedBit.READ_GAP);
 
 	// Acquisition
 	DoPartialAcquisition(0, true, BigBuf_max_traceLen(), 0);
@@ -1252,42 +1462,23 @@ void T55xxResetRead(void) {
 }
 
 // Write one card block in page 0, no lock
-void T55xxWriteBlockExt(uint32_t Data, uint32_t Block, uint32_t Pwd, uint8_t arg) {
-	LED_A_ON();
-	bool PwdMode = arg & 0x1;
-	uint8_t Page = (arg & 0x2)>>1;
-	bool testMode = arg & 0x4;
-	uint32_t i = 0;
-
-	// Set up FPGA, 125kHz
-	LFSetupFPGAForADC(95, true);
-	StartTicks();
-	// make sure tag is fully powered up...
-	WaitMS(5);
-	// Trigger T55x7 in mode.
-	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
-	WaitUS(START_GAP);
-
-	if (testMode) Dbprintf("TestMODE");
-	// Std Opcode 10
-	T55xxWriteBit(testMode ? 0 : 1);
-	T55xxWriteBit(testMode ? 1 : Page); //Page 0
-
-	if (PwdMode) {
-		// Send Pwd
-		for (i = 0x80000000; i != 0; i >>= 1)
-			T55xxWriteBit(Pwd & i);
-	}
-	// Send Lock bit
-	T55xxWriteBit(0);
-
-	// Send Data
-	for (i = 0x80000000; i != 0; i >>= 1)
-		T55xxWriteBit(Data & i);
-
-	// Send Block number
-	for (i = 0x04; i != 0; i >>= 1)
-		T55xxWriteBit(Block & i);
+void T55xxWriteBlock(uint32_t Data, uint32_t Block, uint32_t Pwd, uint8_t arg) {
+	/*
+		arg bits
+		xxxxxxx1 0x01 PwdMode
+		xxxxxx1x 0x02 Page
+		xxxxx1xx 0x04 testMode
+		xxx11xxx 0x18 downlink mode
+		xx1xxxxx 0x20 !reg_readmode
+		x1xxxxxx 0x40 called for a read, so no data packet
+		1xxxxxxx 0x80 reset
+	*/
+	
+	bool testMode = ((arg & 0x04) == 0x04);
+	arg &= (0xff ^ 0x40); // Called for a write, so ensure it is clear/0
+	
+	LED_A_ON ();
+	T55xx_SendCMD (Data, Block, Pwd, arg) ;//, false); 
 
 	// Perform write (nominal is 5.6 ms for T55x7 and 18ms for E5550,
 	// so wait a little more)
@@ -1316,57 +1507,43 @@ void T55xxWriteBlockExt(uint32_t Data, uint32_t Block, uint32_t Pwd, uint8_t arg
 
 		//DoPartialAcquisition(20, true, 12000);
 	}
-
 	// turn field off
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
-	LED_A_OFF();
-}
 
-// Write one card block in page 0, no lock
-void T55xxWriteBlock(uint32_t Data, uint32_t Block, uint32_t Pwd, uint8_t arg) {
-	T55xxWriteBlockExt(Data, Block, Pwd, arg);
 	cmd_send(CMD_ACK,0,0,0,0,0);
+
+	LED_A_OFF ();
 }
 
 // Read one card block in page [page]
-void T55xxReadBlock(uint16_t arg0, uint8_t Block, uint32_t Pwd) {
+void T55xxReadBlock (uint16_t arg0, uint8_t Block, uint32_t Pwd) {//, struct T55xx_Timing *Timing) {
+
 	LED_A_ON();
-	bool PwdMode = arg0 & 0x1;
-	uint8_t Page = (arg0 & 0x2) >> 1;
-	uint32_t i = 0;
-	bool RegReadMode = (Block == 0xFF);//regular read mode
+
+	/*
+		arg bits
+		xxxxxxx1 0x01 PwdMode
+		xxxxxx1x 0x02 Page
+		xxxxx1xx 0x04 testMode
+		xxx11xxx 0x18 downlink mode
+		xx1xxxxx 0x20 !reg_readmode
+		x1xxxxxx 0x40 called for a read, so no data packet
+		1xxxxxxx 0x80 reset
+	*/
+
+	// Set Read Flag to ensure SendCMD does not add "data" to the packet
+	arg0 |= 0x40;
+
+	// RegRead Mode true of block 0xff
+	if (Block == 0xff) arg0 |= 0x20;
+	
+	//make sure block is at max 7
+	Block &= 0x7;
 
 	//clear buffer now so it does not interfere with timing later
 	BigBuf_Clear_ext(false);
 
-	//make sure block is at max 7
-	Block &= 0x7;
-
-	// Set up FPGA, 125kHz to power up the tag
-	LFSetupFPGAForADC(95, true);
-	StartTicks();
-	// make sure tag is fully powered up...
-	WaitMS(5);
-	// Trigger T55x7 Direct Access Mode with start gap
-	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
-	WaitUS(START_GAP);
-
-	// Opcode 1[page]
-	T55xxWriteBit(1);
-	T55xxWriteBit(Page); //Page 0
-
-	if (PwdMode){
-		// Send Pwd
-		for (i = 0x80000000; i != 0; i >>= 1)
-			T55xxWriteBit(Pwd & i);
-	}
-	// Send a zero bit separation
-	T55xxWriteBit(0);
-
-	// Send Block number (if direct access mode)
-	if (!RegReadMode)
-		for (i = 0x04; i != 0; i >>= 1)
-			T55xxWriteBit(Block & i);		
+	T55xx_SendCMD (0, Block, Pwd, arg0); //, true);
 
 	// Turn field on to read the response
 	// 137*8 seems to get to the start of data pretty well... 
@@ -1380,30 +1557,31 @@ void T55xxReadBlock(uint16_t arg0, uint8_t Block, uint32_t Pwd) {
 	// Turn the field off
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF); // field off
 	cmd_send(CMD_ACK,0,0,0,0,0);    
+
 	LED_A_OFF();
 }
 
 void T55xxWakeUp(uint32_t Pwd){
 	LED_B_ON();
-	uint32_t i = 0;
-	
-	// Set up FPGA, 125kHz
-	LFSetupFPGAForADC(95, true);
-	StartTicks();
-	// make sure tag is fully powered up...
-	WaitMS(5);
-	
-	// Trigger T55x7 Direct Access Mode
-	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
-	WaitUS(START_GAP);
-	
-	// Opcode 10
-	T55xxWriteBit(1);
-	T55xxWriteBit(0); //Page 0
+	/*
+		arg bits
+		xxxxxxx1 0x01 PwdMode
+		xxxxxx1x 0x02 Page
+		xxxxx1xx 0x04 testMode
+		xxx11xxx 0x18 downlink mode
+		xx1xxxxx 0x20 !reg_readmode 
+		x1xxxxxx 0x40 called for a read, so no data packet
+		1xxxxxxx 0x80 reset
+	*/
 
-	// Send Pwd
-	for (i = 0x80000000; i != 0; i >>= 1)
-		T55xxWriteBit(Pwd & i);
+	// r* 10 (00) <pwd>   r* for llr , L0 and 1/4 - (00) for L0 and 1/4 - All handled in SendCMD
+	// So, default Opcode 10 and pwd.
+	uint8_t arg = 0x01 | 0x40 | 0x20; //Password Read Call no data | reg_read no block
+
+	// Add in downlink_mode when ready
+	//    arg |= 0x00;  // dlmode << 3  (00 default - 08 leading 0 - 10 Fixed - 18 1 of 4 )
+
+	T55xx_SendCMD (0, 0, Pwd, arg); //, true);
 
 	// Turn and leave field on to let the begin repeating transmission
 	TurnReadLFOn(20*1000);
@@ -1414,7 +1592,8 @@ void T55xxWakeUp(uint32_t Pwd){
 void WriteT55xx(uint32_t *blockdata, uint8_t startblock, uint8_t numblocks) {
 	// write last block first and config block last (if included)
 	for (uint8_t i = numblocks+startblock; i > startblock; i--) {
-		T55xxWriteBlockExt(blockdata[i-1],i-1,0,0);
+		T55xxWriteBlock(blockdata[i-1],i-1,0,0);//,false); //,&T55xx_Timing_FixedBit);
+		//T55xx_SendCMD (blockdata[i-1],i-1,0,0);//,false); //,&T55xx_Timing_FixedBit);
 	}
 }
 
@@ -1614,6 +1793,7 @@ void WriteEM410x(uint32_t card, uint32_t id_hi, uint32_t id_lo) {
 #define FWD_CMD_WRITE 0xA
 #define FWD_CMD_READ 0x9
 #define FWD_CMD_DISABLE 0x5
+#define FWD_CMD_PROTECT 0x3
 
 uint8_t forwardLink_data[64]; //array of forwarded bits
 uint8_t * forward_ptr; //ptr for forward message preparation
@@ -1727,7 +1907,7 @@ void SendForward(uint8_t fwd_bit_count) {
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_LF_ADC | FPGA_LF_ADC_READER_FIELD);//field on
 	WaitUS(18*8); //18 cycles on (8us each)
 
-	// now start writting
+	// now start writting - each bit should be 32*8 total length
 	while(fwd_bit_sz-- > 0) { //prepare next bit modulation
 		if(((*fwd_write_ptr++) & 1) == 1)
 			WaitUS(32*8); //32 cycles at 125Khz (8us each)
@@ -1736,7 +1916,7 @@ void SendForward(uint8_t fwd_bit_count) {
 			FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF); // field off
 			WaitUS(23*8); //23 cycles off (8us each)
 			FpgaWriteConfWord(FPGA_MAJOR_MODE_LF_ADC | FPGA_LF_ADC_READER_FIELD);//field on
-			WaitUS(18*8); //18 cycles on (8us each)
+			WaitUS((32-23)*8); //remaining cycles on (8us each)
 		}
 	}
 }
@@ -1783,7 +1963,7 @@ void EM4xReadWord(uint8_t Address, uint32_t Pwd, uint8_t PwdMode) {
 
 void EM4xWriteWord(uint32_t flag, uint32_t Data, uint32_t Pwd) {
 	
-	bool PwdMode = (flag & 0xF);
+	bool PwdMode = (flag & 0x1);
 	uint8_t Address = (flag >> 8) & 0xFF;
 	uint8_t fwd_bit_count;
 
@@ -1798,6 +1978,39 @@ void EM4xWriteWord(uint32_t flag, uint32_t Data, uint32_t Pwd) {
 	forward_ptr = forwardLink_data;
 	fwd_bit_count = Prepare_Cmd( FWD_CMD_WRITE );
 	fwd_bit_count += Prepare_Addr( Address );
+	fwd_bit_count += Prepare_Data( Data&0xFFFF, Data>>16 );
+
+	SendForward(fwd_bit_count);
+
+	//Wait for write to complete
+	//SpinDelay(10);
+
+	WaitUS(6500);
+	//Capture response if one exists
+	DoPartialAcquisition(20, true, 6000, 1000);
+
+	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF); // field off
+	LED_A_OFF();
+	cmd_send(CMD_ACK,0,0,0,0,0);
+}
+
+void EM4xProtect(uint32_t flag, uint32_t Data, uint32_t Pwd) {
+	
+	bool PwdMode = (flag & 0x1);
+	uint8_t fwd_bit_count;
+
+	//clear buffer now so it does not interfere with timing later
+	BigBuf_Clear_ext(false);
+
+	LED_A_ON();
+	StartTicks();
+	//If password mode do login
+	if (PwdMode) EM4xLogin(Pwd);
+
+	forward_ptr = forwardLink_data;
+	fwd_bit_count = Prepare_Cmd( FWD_CMD_PROTECT );
+
+	//unsure if this needs the full packet config...
 	fwd_bit_count += Prepare_Data( Data&0xFFFF, Data>>16 );
 
 	SendForward(fwd_bit_count);

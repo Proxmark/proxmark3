@@ -41,6 +41,7 @@ typedef struct{
 	bool averaging;
 	int divisor;
 	int trigger_threshold;
+	int samples_to_skip;
 } sample_config;
 
 // For the bootloader
@@ -116,6 +117,7 @@ typedef struct{
 #define CMD_T55XX_WAKEUP                                                  0x0224
 #define CMD_COTAG                                                         0x0225
 #define CMD_PARADOX_CLONE_TAG                                             0x0226
+#define CMD_EM4X_PROTECT                                                  0x0228
 
 // For the 13.56 MHz tags
 #define CMD_ACQUIRE_RAW_ADC_SAMPLES_ISO_15693                             0x0300
@@ -130,6 +132,7 @@ typedef struct{
 #define CMD_ISO_15693_FIND_AFI                                            0x0315
 #define CMD_ISO_15693_DEBUG                                               0x0316
 #define CMD_LF_SNOOP_RAW_ADC_SAMPLES                                      0x0317
+#define CMD_CSETUID_ISO_15693                                             0x0318
 
 // For Hitag2 transponders
 #define CMD_SNOOP_HITAG                                                   0x0370

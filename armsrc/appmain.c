@@ -1088,6 +1088,9 @@ void UsbPacketReceived(uint8_t *packet, int len)
 		case CMD_EM4X_WRITE_WORD:
 			EM4xWriteWord(c->arg[0], c->arg[1], c->arg[2]);
 			break;
+		case CMD_EM4X_PROTECT:
+			EM4xProtect(c->arg[0], c->arg[1], c->arg[2]);
+			break;
 		case CMD_AWID_DEMOD_FSK: // Set realtime AWID demodulation
 			CmdAWIDdemodFSK(c->arg[0], 0, 0, 1);
 			break;
@@ -1155,8 +1158,13 @@ void UsbPacketReceived(uint8_t *packet, int len)
 		case CMD_READER_ISO_15693:
 			ReaderIso15693(c->arg[0]);
 			break;
+
 		case CMD_SIMTAG_ISO_15693:
 			SimTagIso15693(c->arg[0], c->d.asBytes);
+			break;
+
+		case CMD_CSETUID_ISO_15693:
+			SetTag15693Uid(c->d.asBytes);
 			break;
 #endif
 

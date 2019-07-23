@@ -1591,6 +1591,85 @@ void DirectTag15693Command(uint32_t datalen, uint32_t speed, uint32_t recv, uint
 	LED_A_OFF();
 }
 
+//-----------------------------------------------------------------------------
+// Work with "magic Chinese" card.
+//
+//-----------------------------------------------------------------------------
+
+// Set the UID to the tag (based on Iceman work).
+void SetTag15693Uid(uint8_t *uid)
+{
+    uint8_t cmd[4][9] = {0x00};
+
+    uint16_t crc;
+
+    int recvlen = 0;
+    uint8_t recvbuf[ISO15693_MAX_RESPONSE_LENGTH];
+
+    LED_A_ON();
+
+    // Command 1 : 02213E00000000
+    cmd[0][0] = 0x02;
+    cmd[0][1] = 0x21;
+    cmd[0][2] = 0x3e;
+    cmd[0][3] = 0x00;
+    cmd[0][4] = 0x00;
+    cmd[0][5] = 0x00;
+    cmd[0][6] = 0x00;
+
+    // Command 2 : 02213F69960000
+    cmd[1][0] = 0x02;
+    cmd[1][1] = 0x21;
+    cmd[1][2] = 0x3f;
+    cmd[1][3] = 0x69;
+    cmd[1][4] = 0x96;
+    cmd[1][5] = 0x00;
+    cmd[1][6] = 0x00;
+
+    // Command 3 : 022138u8u7u6u5 (where uX = uid byte X)
+    cmd[2][0] = 0x02;
+    cmd[2][1] = 0x21;
+    cmd[2][2] = 0x38;
+    cmd[2][3] = uid[7];
+    cmd[2][4] = uid[6];
+    cmd[2][5] = uid[5];
+    cmd[2][6] = uid[4];
+
+    // Command 4 : 022139u4u3u2u1 (where uX = uid byte X)
+    cmd[3][0] = 0x02;
+    cmd[3][1] = 0x21;
+    cmd[3][2] = 0x39;
+    cmd[3][3] = uid[3];
+    cmd[3][4] = uid[2];
+    cmd[3][5] = uid[1];
+    cmd[3][6] = uid[0];
+
+    for (int i=0; i<4; i++) {
+        // Add the CRC
+        crc = Crc(cmd[i], 7);
+        cmd[i][7] = crc & 0xff;
+        cmd[i][8] = crc >> 8;
+
+        if (DEBUG) {
+            Dbprintf("SEND:");
+            Dbhexdump(sizeof(cmd[i]), cmd[i], false);
+        }
+
+        recvlen = SendDataTag(cmd[i], sizeof(cmd[i]), true, 1, recvbuf, sizeof(recvbuf), 0);
+
+        if (DEBUG) {
+            Dbprintf("RECV:");
+            Dbhexdump(recvlen, recvbuf, false);
+            DbdecodeIso15693Answer(recvlen, recvbuf);
+        }
+
+        cmd_send(CMD_ACK, recvlen>ISO15693_MAX_RESPONSE_LENGTH?ISO15693_MAX_RESPONSE_LENGTH:recvlen, 0, 0, recvbuf, ISO15693_MAX_RESPONSE_LENGTH);
+    }
+    
+    LED_D_OFF();
+
+    LED_A_OFF();
+}
 
 
 

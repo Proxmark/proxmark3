@@ -415,8 +415,8 @@ void annotateIso14443a(char *exp, size_t size, uint8_t* cmd, uint8_t cmdsize)
 	case ISO14443A_CMD_REQA:
 		snprintf(exp,size,"REQA");
 		break;
-	case ISO14443A_CMD_READBLOCK:   snprintf(exp,size,"READBLOCK(%d)",cmd[1]); break;
-	case ISO14443A_CMD_WRITEBLOCK:  snprintf(exp,size,"WRITEBLOCK(%d)",cmd[1]); break;
+	case MIFARE_CMD_READBLOCK:   snprintf(exp,size,"READBLOCK(%d)",cmd[1]); break;
+	case MIFARE_CMD_WRITEBLOCK:  snprintf(exp,size,"WRITEBLOCK(%d)",cmd[1]); break;
 	case ISO14443A_CMD_HALT:
 		snprintf(exp,size,"HALT");
 		MifareAuthState = masNone;

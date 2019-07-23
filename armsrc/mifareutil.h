@@ -25,11 +25,6 @@
 #define AUTH_FIRST    0	
 #define AUTH_NESTED   2
 
-// mifare 4bit card answers
-#define CARD_ACK      0x0A  // 1010 - ACK
-#define CARD_NACK_NA  0x04  // 0100 - NACK, not allowed (command not allowed)
-#define CARD_NACK_TR  0x05  // 0101 - NACK, transmission error
-
 // reader voltage field detector
 #define MF_MINFIELDV      4000
 

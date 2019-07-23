@@ -16,13 +16,14 @@
 #include <stdbool.h>
 #include "mifare.h"
 
-int CmdHF14A(const char *Cmd);
-int CmdHF14AList(const char *Cmd);
-int CmdHF14AMifare(const char *Cmd);
-int CmdHF14AReader(const char *Cmd);
+extern int CmdHF14A(const char *Cmd);
+extern int CmdHF14AMfDbg(const char* cmd);
+extern int CmdHF14AList(const char *Cmd);
+extern int CmdHF14AMifare(const char *Cmd);
+extern int CmdHF14AReader(const char *Cmd);
 extern int CmdHF14AInfo(const char *Cmd);
-int CmdHF14ASim(const char *Cmd);
-int CmdHF14ASnoop(const char *Cmd);
+extern int CmdHF14ASim(const char *Cmd);
+extern int CmdHF14ASnoop(const char *Cmd);
 
 extern void DropField();
 

@@ -30,9 +30,10 @@ following locations:
 * [RyscCorp](https://proxmark3.com/) (US)
 * [Hackerwarehouse](https://hackerwarehouse.com/) (US)
 * [Elechouse](http://www.elechouse.com/) (HK)
-* [Lab401](https://lab401.com/) (FR)
+* [Lab401](https://lab401.com/) (HK)
 * [RFxSecure](http://www.rfxsecure.com/) (SG)
-* [IceSQL](http://proxmark3.tictail.com/) (SE)
+* [Sneaktechnology](https://www.sneaktechnology.com/) (ASIA/OCEANIA)
+
    
 Most of the ultra-low-volume contract assemblers could put
 something like this together with a reasonable yield. A run of around

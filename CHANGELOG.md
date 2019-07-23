@@ -16,6 +16,9 @@ This project uses the changelog in accordance with [keepchangelog](http://keepac
 - `hf 15 sim` now works as expected (piwi)
 
 ### Added
+- Added `hf 15 csetuid` - set UID on ISO-15693 Magic tags (t0m4)
+- Added `lf config s xxxx` option to allow skipping x samples before capture (marshmellow)
+- Added `lf em 4x05protect` to support changing protection blocks on em4x05 chips (marshmellow)
 - Support Standard Communication Mode in HITAG S
 - Added `hf emv scan` - commands for scan EMV card and dump data to json file (Merlok)
 - `hf mfp` group of commands (Merlok)
@@ -32,6 +35,10 @@ This project uses the changelog in accordance with [keepchangelog](http://keepac
 - Added `hf mfp ndef` `hf mf ndef` parsing NDEF records (Merlok)
 - Added Mifare Mini, Mifare 2K and 4K support to `hf mf sim` (piwi)
 - Added Legic detection to `hf search` (dnet)
+- Added Home (Pos1) and End key bindings to the plot GUI (based on @mcd1992)
+- Added downlink reference mode option r <mode> [ 0 - (or missing) default/fixed bit, 1 - long leading, 2 - leading 0 and 3 - 1 of 4 ] to `lf t55xx detect`, `lf t55xx read`, `lf t55xx write`, and `lf t55xx bruteforce`
+- Added special option `r 4` to bruteforce, to try all downlink modes (0,1,2 and 3) for each password
+
 
 ## [v3.1.0][2018-10-10]
 

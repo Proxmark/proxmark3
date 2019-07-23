@@ -33,6 +33,7 @@
 #include "usb_cmd.h"
 #include "cmdhfmfu.h"
 #include "util_posix.h"
+#include "cmdhf14a.h" // DropField()
 
 static int CmdHelp(const char *Cmd);
 

@@ -1,7 +1,7 @@
 //-----------------------------------------------------------------------------
 // Copyright (C) 2012 Chalk <chalk.secu at gmail.com>
 //               2015 Dake <thomas.cayrou at gmail.com>
-//				 2018 sguerrini97 <sguerrini97 at gmail.com>
+//               2018 sguerrini97 <sguerrini97 at gmail.com>
 
 // This code is licensed to you under the terms of the GNU GPL, version 2 or,
 // at your option, any later version. See the LICENSE.txt file for the text of
@@ -33,7 +33,7 @@ static int CmdHelp(const char *Cmd);
 struct pcf7931_config configPcf = {
 	{0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF},
 	PCF7931_DEFAULT_INITDELAY,
-	PCF7931_DEFAULT_OFFSET_WIDTH, 
+	PCF7931_DEFAULT_OFFSET_WIDTH,
 	PCF7931_DEFAULT_OFFSET_POSITION
 	};
 
@@ -41,8 +41,8 @@ struct pcf7931_config configPcf = {
 int pcf7931_resetConfig(){
 	memset(configPcf.Pwd, 0xFF, sizeof(configPcf.Pwd) );
 	configPcf.InitDelay = PCF7931_DEFAULT_INITDELAY;
-	configPcf.OffsetWidth = PCF7931_DEFAULT_OFFSET_WIDTH; 
-	configPcf.OffsetPosition = PCF7931_DEFAULT_OFFSET_POSITION; 
+	configPcf.OffsetWidth = PCF7931_DEFAULT_OFFSET_WIDTH;
+	configPcf.OffsetPosition = PCF7931_DEFAULT_OFFSET_POSITION;
 	return 0;
 }
 
@@ -103,7 +103,7 @@ int usage_pcf7931_config(){
 	PrintAndLog("       pwd     Password, hex, 7bytes, LSB-order");
 	PrintAndLog("       delay   Tag initialization delay (in us) decimal");
 	PrintAndLog("       offset  Low pulses width (in us) decimal");
-	PrintAndLog("       offset  Low pulses position (in us) decimal");  
+	PrintAndLog("       offset  Low pulses position (in us) decimal");
 	PrintAndLog("Examples:");
 	PrintAndLog("      lf pcf7931 config");
 	PrintAndLog("      lf pcf7931 config r");
@@ -112,7 +112,7 @@ int usage_pcf7931_config(){
 	return 0;
 }
 
-int CmdLFPCF7931Read(const char *Cmd){  
+int CmdLFPCF7931Read(const char *Cmd){
 
 	uint8_t ctmp = param_getchar(Cmd, 0);
 	if ( ctmp == 'H' || ctmp == 'h' ) return usage_pcf7931_read();
@@ -128,12 +128,12 @@ int CmdLFPCF7931Read(const char *Cmd){
 	return 0;
 }
 
-int CmdLFPCF7931Config(const char *Cmd){ 
+int CmdLFPCF7931Config(const char *Cmd){
 
 	uint8_t ctmp = param_getchar(Cmd, 0);
 	if ( ctmp == 0) return pcf7931_printConfig();
 	if ( ctmp == 'H' || ctmp == 'h' ) return usage_pcf7931_config();
-	if ( ctmp == 'R' || ctmp == 'r' ) return pcf7931_resetConfig(); 
+	if ( ctmp == 'R' || ctmp == 'r' ) return pcf7931_resetConfig();
 
 	if ( param_gethex(Cmd, 0, configPcf.Pwd, 14) ) return usage_pcf7931_config();
 
@@ -148,17 +148,17 @@ int CmdLFPCF7931Config(const char *Cmd){
 int CmdLFPCF7931Write(const char *Cmd){
 
 	uint8_t ctmp = param_getchar(Cmd, 0);
-	if (strlen(Cmd) < 1 || ctmp == 'h' || ctmp == 'H') return usage_pcf7931_write();  
+	if (strlen(Cmd) < 1 || ctmp == 'h' || ctmp == 'H') return usage_pcf7931_write();
 
 	uint8_t block = 0, bytepos = 0, data = 0;
-	
+
 	if ( param_getdec(Cmd, 0, &block) ) return usage_pcf7931_write();
 	if ( param_getdec(Cmd, 1, &bytepos) ) return usage_pcf7931_write();
-	
+
 	if ( (block > 7) || (bytepos > 15) ) return usage_pcf7931_write();
 
 	data  = param_get8ex(Cmd, 2, 0, 16);
-	
+
 	PrintAndLog("Writing block: %d", block);
 	PrintAndLog("          pos: %d", bytepos);
 	PrintAndLog("         data: 0x%02X", data);
@@ -178,27 +178,27 @@ int CmdLFPCF7931Write(const char *Cmd){
 int CmdLFPCF7931BruteForce(const char *Cmd){
 
 	uint8_t ctmp = param_getchar(Cmd, 0);
-	if (strlen(Cmd) < 1 || ctmp == 'h' || ctmp == 'H') return usage_pcf7931_bruteforce();  
+	if (strlen(Cmd) < 1 || ctmp == 'h' || ctmp == 'H') return usage_pcf7931_bruteforce();
 
-	uint64_t start_password = 0;
+	uint8_t start_password[7] = {0};
 	uint8_t tries = 3;
-	
-	if (param_gethex(Cmd, 0, (uint8_t*)(&start_password), 14)) return usage_pcf7931_bruteforce();
+
+	if (param_gethex(Cmd, 0, start_password, 14)) return usage_pcf7931_bruteforce();
 	if (param_getdec(Cmd, 1, &tries)) return usage_pcf7931_bruteforce();
-	
+
 	PrintAndLog("Bruteforcing from password: %02x %02x %02x %02x %02x %02x %02x",
-			start_password & 0xFF,
-			(start_password >> 8) & 0xFF,
-			(start_password >> 16) & 0xFF,
-			(start_password >> 24) & 0xFF,
-			(start_password >> 32) & 0xFF,
-			(start_password >> 48) & 0xFF,
-			(start_password >> 56) & 0xFF);
-			
+			start_password[0],
+			start_password[1],
+			start_password[2],
+			start_password[3],
+			start_password[4],
+			start_password[5],
+			start_password[6]);
+
 	PrintAndLog("Trying each password %d times", tries);
 
-	UsbCommand c = {CMD_PCF7931_BRUTEFORCE, {start_password, tries} };
-	
+	UsbCommand c = {CMD_PCF7931_BRUTEFORCE, {bytes_to_num(start_password, 7), tries} };
+
 	c.d.asDwords[7] = (configPcf.OffsetWidth + 128);
 	c.d.asDwords[8] = (configPcf.OffsetPosition + 128);
 	c.d.asDwords[9] = configPcf.InitDelay;
@@ -209,7 +209,7 @@ int CmdLFPCF7931BruteForce(const char *Cmd){
 	return 0;
 }
 
-static command_t CommandTable[] = 
+static command_t CommandTable[] =
 {
 	{"help",   CmdHelp,            1, "This help"},
 	{"read",   CmdLFPCF7931Read,   0, "Read content of a PCF7931 transponder"},
