@@ -14,6 +14,7 @@ This project uses the changelog in accordance with [keepchangelog](http://keepac
 - AC-Mode decoding for HitagS
 - Wrong UID at HitagS simulation
 - `hf 15 sim` now works as expected (piwi)
+- 'hf mf chk t` save to emulator memory now works as expeted (mwalker)
 
 ### Added
 - Added `hf 15 csetuid` - set UID on ISO-15693 Magic tags (t0m4)

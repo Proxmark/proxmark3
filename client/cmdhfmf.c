@@ -1054,7 +1054,7 @@ int CmdHF14AMfChk(const char *Cmd)
 		PrintAndLog("Usage:  hf mf chk <block number>|<*card memory> <key type (A/B/?)> [t|d|s|ss] [<key (12 hex symbols)>] [<dic (*.dic)>]");
 		PrintAndLog("          * - all sectors");
 		PrintAndLog("card memory - 0 - MINI(320 bytes), 1 - 1K, 2 - 2K, 4 - 4K, <other> - 1K");
-		PrintAndLog("d  - write keys to binary file\n");
+		PrintAndLog("d  - write keys to binary file (not used when <block number> supplied)");
 		PrintAndLog("t  - write keys to emulator memory");
 		PrintAndLog("s  - slow execute. timeout 1ms");
 		PrintAndLog("ss - very slow execute. timeout 5ms");
@@ -1066,27 +1066,27 @@ int CmdHF14AMfChk(const char *Cmd)
 		return 0;
 	}
 
-	FILE * f;
-	char filename[FILE_PATH_SIZE]={0};
-	char buf[13];
-	uint8_t *keyBlock = NULL, *p;
-	uint16_t stKeyBlock = 20;
-
-	int i, res;
-	int keycnt = 0;
-	char ctmp   = 0x00;
-	int clen = 0;
-	uint8_t blockNo = 0;
-	uint8_t SectorsCnt = 0;
-	uint8_t keyType = 0;
-	uint64_t key64 = 0;
+	FILE     * f;
+	char     filename[FILE_PATH_SIZE]={0};
+	char     buf[13];
+	uint8_t  *keyBlock      = NULL, *p;
+	uint16_t stKeyBlock     = 20;
+	int      i, res;
+	int      keycnt         = 0;
+	char     ctmp           = 0x00;
+	int      clen           = 0;
+	uint8_t  blockNo        = 0;
+	uint8_t  SectorsCnt     = 0;
+	uint8_t  keyType        = 0;
+	uint64_t key64          = 0;
 	// timeout in units. (ms * 106)/10 or us*0.0106
-	uint8_t btimeout14a = MF_CHKKEYS_DEFTIMEOUT; // fast by default
-	bool param3InUse = false;
-
-	bool transferToEml = 0;
-	bool createDumpFile = 0;
-
+	uint8_t  btimeout14a    = MF_CHKKEYS_DEFTIMEOUT; // fast by default
+	bool     param3InUse    = false;
+	bool     transferToEml  = 0;
+	bool     createDumpFile = 0;
+	bool     singleBlock    = false;     // Flag to ID if a single or multi key check
+	uint8_t  keyFoundCount  = 0;         // Counter to display the number of keys found/transfered to emulator
+    
 	sector_t *e_sector = NULL;
 
 	keyBlock = calloc(stKeyBlock, 6);
@@ -1100,8 +1100,17 @@ int CmdHF14AMfChk(const char *Cmd)
 	if (param_getchar(Cmd, 0)=='*') {
 		SectorsCnt = ParamCardSizeSectors(param_getchar(Cmd + 1, 0));
 	}
-	else
+	else {   
 		blockNo = param_get8(Cmd, 0);
+		// Singe Key check, so Set Sector count to cover sectors (1 to sector that contains the block)
+		// 1 and 2 Cards : Sector = blockNo/4 + 1
+		// Sectors  0 - 31  :  4 blocks per sector : Blocks 0 - 127
+		// Sectors 32 - 39  : 16 blocks per sector : Blocks 128 - 255 (4K)
+		if (blockNo < 128) SectorsCnt =       (blockNo     / 4) + 1;
+		else 					 SectorsCnt = 32 + ((blockNo-128)/16) + 1;
+
+		singleBlock  = true;              // Set flag for single key check
+	}
 
 	ctmp = param_getchar(Cmd, 1);
 	clen = param_getlength(Cmd, 1);
@@ -1122,8 +1131,14 @@ int CmdHF14AMfChk(const char *Cmd)
 			return 1;
 		};
 	}
-
+	
 	parseParamTDS(Cmd, 2, &transferToEml, &createDumpFile, &btimeout14a);
+
+	if (singleBlock & createDumpFile) {
+		PrintAndLog (" block key check (<block no>) and write to dump file (d) combination is not supported ");
+		PrintAndLog (" please remove option d and try again");
+		return 1;
+	}
 
 	param3InUse = transferToEml | createDumpFile | (btimeout14a != MF_CHKKEYS_DEFTIMEOUT);
 
@@ -1142,7 +1157,7 @@ int CmdHF14AMfChk(const char *Cmd)
 				keyBlock = p;
 			}
 			PrintAndLog("chk key[%2d] %02x%02x%02x%02x%02x%02x", keycnt,
-			(keyBlock + 6*keycnt)[0],(keyBlock + 6*keycnt)[1], (keyBlock + 6*keycnt)[2],
+			(keyBlock + 6*keycnt)[0], (keyBlock + 6*keycnt)[1], (keyBlock + 6*keycnt)[2],
 			(keyBlock + 6*keycnt)[3], (keyBlock + 6*keycnt)[4], (keyBlock + 6*keycnt)[5], 6);
 			keycnt++;
 		} else {
@@ -1190,7 +1205,6 @@ int CmdHF14AMfChk(const char *Cmd)
 				PrintAndLog("File: %s: not found or locked.", filename);
 				free(keyBlock);
 				return 1;
-
 			}
 		}
 	}
@@ -1200,7 +1214,7 @@ int CmdHF14AMfChk(const char *Cmd)
 		PrintAndLog("No key specified, trying default keys");
 		for (;keycnt < defaultKeysSize; keycnt++)
 			PrintAndLog("chk default key[%2d] %02x%02x%02x%02x%02x%02x", keycnt,
-				(keyBlock + 6*keycnt)[0],(keyBlock + 6*keycnt)[1], (keyBlock + 6*keycnt)[2],
+				(keyBlock + 6*keycnt)[0], (keyBlock + 6*keycnt)[1], (keyBlock + 6*keycnt)[2],
 				(keyBlock + 6*keycnt)[3], (keyBlock + 6*keycnt)[4], (keyBlock + 6*keycnt)[5], 6);
 	}
 
@@ -1218,9 +1232,11 @@ int CmdHF14AMfChk(const char *Cmd)
 	}
 	printf("\n");
 
-	bool foundAKey = false;
-	uint32_t max_keys = keycnt > USB_CMD_DATA_SIZE / 6 ? USB_CMD_DATA_SIZE / 6 : keycnt;
-	if (SectorsCnt) {
+	bool		foundAKey = false;
+	uint32_t	max_keys  = keycnt > USB_CMD_DATA_SIZE / 6 ? USB_CMD_DATA_SIZE / 6 : keycnt;
+
+	// !SingleKey, so all key check (if SectorsCnt > 0)
+	if (!singleBlock) { 
 		PrintAndLog("To cancel this operation press the button on the proxmark...");
 		printf("--");
 		for (uint32_t c = 0; c < keycnt; c += max_keys) {
@@ -1240,7 +1256,7 @@ int CmdHF14AMfChk(const char *Cmd)
 				PrintAndLog("Command execute timeout");
 			}
 		}
-	} else {
+	} else { 
 		int keyAB = keyType;
 		do {
 			for (uint32_t c = 0; c < keycnt; c+=max_keys) {
@@ -1249,9 +1265,16 @@ int CmdHF14AMfChk(const char *Cmd)
 				res = mfCheckKeys(blockNo, keyAB & 0x01, true, size, &keyBlock[6 * c], &key64);
 
 				if (res != 1) {
-					if (!res) {
-						PrintAndLog("Found valid key:[%d:%c]%012" PRIx64, blockNo, (keyAB & 0x01)?'B':'A', key64);
+					if (!res) {      
+						// Use the common format below
+						// PrintAndLog("Found valid key:[%d:%c]%012" PRIx64, blockNo, (keyAB & 0x01)?'B':'A', key64);
 						foundAKey = true;
+                       
+						// Store the Single Key for display list
+						// For a single block check, SectorsCnt = Sector that contains the block
+						e_sector[SectorsCnt-1].foundKey[(keyAB & 0x01)] = true;  // flag key found 
+						e_sector[SectorsCnt-1].Key[(keyAB & 0x01)]      = key64; // Save key data  
+						
 					}
 				} else {
 					PrintAndLog("Command execute timeout");
@@ -1268,8 +1291,11 @@ int CmdHF14AMfChk(const char *Cmd)
 			PrintAndLog("|sec|key A           |res|key B           |res|");
 			PrintAndLog("|---|----------------|---|----------------|---|");
 			for (i = 0; i < SectorsCnt; i++) {
-				PrintAndLog("|%03d|  %012" PRIx64 "  | %d |  %012" PRIx64 "  | %d |", i,
-					e_sector[i].Key[0], e_sector[i].foundKey[0], e_sector[i].Key[1], e_sector[i].foundKey[1]);
+		        // If a block key check, only print a line if a key was found.
+                if (!singleBlock || (e_sector[i].foundKey[0]) || (e_sector[i].foundKey[1]) ){ 
+                    PrintAndLog("|%03d|  %012" PRIx64 "  | %d |  %012" PRIx64 "  | %d |", i,
+                        e_sector[i].Key[0], e_sector[i].foundKey[0], e_sector[i].Key[1], e_sector[i].foundKey[1]);
+                }
 			}
 			PrintAndLog("|---|----------------|---|----------------|---|");
 		}
@@ -1286,15 +1312,17 @@ int CmdHF14AMfChk(const char *Cmd)
 				for (uint16_t t = 0; t < 2; t++) {
 					if (e_sector[sectorNo].foundKey[t]) {
 						num_to_bytes(e_sector[sectorNo].Key[t], 6, block + t * 10);
+                        keyFoundCount++; // Key found count for information
 					}
 				}
 				mfEmlSetMem(block, FirstBlockOfSector(sectorNo) + NumBlocksPerSector(sectorNo) - 1, 1);
 			}
 		}
-		PrintAndLog("Found keys have been transferred to the emulator memory");
+		// Updated to show the actual number of keys found/transfered.
+		PrintAndLog("%d keys(s) found have been transferred to the emulator memory",keyFoundCount);
 	}
 
-	if (createDumpFile) {
+	if (createDumpFile && !singleBlock) {
 		FILE *fkeys = fopen("dumpkeys.bin","wb");
 		if (fkeys == NULL) {
 			PrintAndLog("Could not create file dumpkeys.bin");
@@ -1312,7 +1340,7 @@ int CmdHF14AMfChk(const char *Cmd)
 		fclose(fkeys);
 		PrintAndLog("Found keys have been dumped to file dumpkeys.bin. 0xffffffffffff has been inserted for unknown keys.");
 	}
-
+    
 	free(e_sector);
 	free(keyBlock);
 	PrintAndLog("");
