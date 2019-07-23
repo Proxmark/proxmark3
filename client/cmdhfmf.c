@@ -1054,7 +1054,7 @@ int CmdHF14AMfChk(const char *Cmd)
 		PrintAndLog("Usage:  hf mf chk <block number>|<*card memory> <key type (A/B/?)> [t|d|s|ss] [<key (12 hex symbols)>] [<dic (*.dic)>]");
 		PrintAndLog("          * - all sectors");
 		PrintAndLog("card memory - 0 - MINI(320 bytes), 1 - 1K, 2 - 2K, 4 - 4K, <other> - 1K");
-		PrintAndLog("d  - write keys to binary file (not used when <block number> supplied)\n");
+		PrintAndLog("d  - write keys to binary file (not used when <block number> supplied)");
 		PrintAndLog("t  - write keys to emulator memory");
 		PrintAndLog("s  - slow execute. timeout 1ms");
 		PrintAndLog("ss - very slow execute. timeout 5ms");
@@ -1131,8 +1131,14 @@ int CmdHF14AMfChk(const char *Cmd)
 			return 1;
 		};
 	}
-
+	
 	parseParamTDS(Cmd, 2, &transferToEml, &createDumpFile, &btimeout14a);
+
+	if (singleBlock & createDumpFile) {
+		PrintAndLog (" block key check (<block no>) and write to dump file (d) combination is not supported ");
+		PrintAndLog (" please remove option d and try again");
+		return 1;
+	}
 
 	param3InUse = transferToEml | createDumpFile | (btimeout14a != MF_CHKKEYS_DEFTIMEOUT);
 
@@ -1230,7 +1236,7 @@ int CmdHF14AMfChk(const char *Cmd)
 	uint32_t	max_keys  = keycnt > USB_CMD_DATA_SIZE / 6 ? USB_CMD_DATA_SIZE / 6 : keycnt;
 
 	// !SingleKey, so all key check (if SectorsCnt > 0)
-	if (SectorsCnt && !singleBlock) { 
+	if (!singleBlock) { 
 		PrintAndLog("To cancel this operation press the button on the proxmark...");
 		printf("--");
 		for (uint32_t c = 0; c < keycnt; c += max_keys) {
@@ -1250,7 +1256,7 @@ int CmdHF14AMfChk(const char *Cmd)
 				PrintAndLog("Command execute timeout");
 			}
 		}
-	} else if (singleBlock) { // Ensure single block mode in case SectorsCnt == 0
+	} else { 
 		int keyAB = keyType;
 		do {
 			for (uint32_t c = 0; c < keycnt; c+=max_keys) {
