@@ -15,6 +15,12 @@
 #include <stdbool.h>
 #include <stddef.h>
 
+#ifdef _MSC_VER
+#define PACKED
+#else
+#define PACKED __attribute__((packed))
+#endif
+
 #ifndef ROTR
 # define ROTR(x,n) (((uintmax_t)(x) >> (n)) | ((uintmax_t)(x) << ((sizeof(x) * 8) - (n))))
 #endif

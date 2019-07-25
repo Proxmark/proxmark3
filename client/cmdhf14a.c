@@ -921,20 +921,34 @@ int ExchangeAPDU14a(uint8_t *datain, int datainlen, bool activateField, bool lea
 int CmdHF14AAPDU(const char *cmd) {
 	uint8_t data[USB_CMD_DATA_SIZE];
 	int datalen = 0;
+	uint8_t header[5];
+	int headerlen = 0;
 	bool activateField = false;
 	bool leaveSignalON = false;
 	bool decodeTLV = false;
+	bool decodeAPDU = false;
+	bool makeAPDU = false;
+	bool extendedAPDU = false;
+	int le = 0;
+	int res = 0;
 
 	CLIParserInit("hf 14a apdu",
-		"Sends an ISO 7816-4 APDU via ISO 14443-4 block transmission protocol (T=CL)",
-		"Sample:\n\thf 14a apdu -st 00A404000E325041592E5359532E444446303100\n");
+				  "Sends an ISO 7816-4 APDU via ISO 14443-4 block transmission protocol (T=CL). Works with all APDU types from ISO 7816-4:2013",
+				  "Examples:\n\thf 14a apdu -st 00A404000E325041592E5359532E444446303100\n"
+				  "\thf 14a apdu -sd 00A404000E325041592E5359532E444446303100 - decode APDU\n"
+				  "\thf 14a apdu -sm 00A40400 325041592E5359532E4444463031 -l 256 - encode standard APDU\n"
+				  "\thf 14a apdu -sm 00A40400 325041592E5359532E4444463031 -el 65536 - encode extended APDU\n");
 
 	void* argtable[] = {
 		arg_param_begin,
-		arg_lit0("sS",  "select",  "activate field and select card"),
-		arg_lit0("kK",  "keep",    "leave the signal field ON after receive response"),
-		arg_lit0("tT",  "tlv",     "executes TLV decoder if it possible"),
-		arg_strx1(NULL, NULL,      "<APDU (hex)>", NULL),
+		arg_lit0("sS",  "select",   "activate field and select card"),
+		arg_lit0("kK",  "keep",     "leave the signal field ON after receive response"),
+		arg_lit0("tT",  "tlv",      "executes TLV decoder if it possible"),
+		arg_lit0("dD",  "decapdu",  "decode APDU request if it possible"),
+		arg_str0("mM",  "make",     "<head (CLA INS P1 P2) hex>", "make APDU with head from this field and data from data field. Must be 4 bytes length: <CLA INS P1 P2>"),
+		arg_lit0("eE",  "extended", "make extended length APDU (requires `-m`)"),
+		arg_int0("lL",  "le",       "<Le (int)>", "Le APDU parameter (requires `-m`)"),
+		arg_strx1(NULL, NULL,       "<APDU (hex) | data (hex)>", "APDU (without `-m`), or data (with `-m`)"),
 		arg_param_end
 	};
 	CLIExecWithReturn(cmd, argtable, false);
@@ -942,15 +956,71 @@ int CmdHF14AAPDU(const char *cmd) {
 	activateField = arg_get_lit(1);
 	leaveSignalON = arg_get_lit(2);
 	decodeTLV = arg_get_lit(3);
-	// len = data + PCB(1b) + CRC(2b)
-	CLIGetHexBLessWithReturn(4, data, &datalen, 1 + 2);
+	decodeAPDU = arg_get_lit(4);
 
+	res = CLIParamHexToBuf(arg_get_str(5), header, sizeof(header), &headerlen);
+	makeAPDU = headerlen > 0;
+	if (res || (makeAPDU && headerlen != 4)) {
+		PrintAndLogEx(ERR, "header length must be exactly 4 bytes");
+		CLIParserFree();
+		return 1;
+	}
+	extendedAPDU = arg_get_lit(6);
+	le = arg_get_int_def(7, 0);
+
+	if (makeAPDU) {
+		uint8_t apdudata[USB_CMD_DATA_SIZE] = {0};
+		int apdudatalen = 0;
+
+		CLIGetHexBLessWithReturn(8, apdudata, &apdudatalen, 1 + 2);
+
+		APDUStruct apdu;
+		apdu.cla = header[0];
+		apdu.ins = header[1];
+		apdu.p1 = header[2];
+		apdu.p2 = header[3];
+
+		apdu.lc = apdudatalen;
+		apdu.data = apdudata;
+
+		apdu.extended_apdu = extendedAPDU;
+		apdu.le = le;
+
+		if (APDUEncode(&apdu, data, &datalen)) {
+			PrintAndLogEx(ERR, "can't make apdu with provided parameters.");
+			CLIParserFree();
+			return 2;
+		}
+	} else {
+		if (extendedAPDU) {
+			PrintAndLogEx(ERR, "`-e` without `-m`.");
+			CLIParserFree();
+			return 3;
+		}
+		if (le > 0) {
+			PrintAndLogEx(ERR, "`-l` without `-m`.");
+			CLIParserFree();
+			return 3;
+		}
+
+		// len = data + PCB(1b) + CRC(2b)
+		CLIGetHexBLessWithReturn(8, data, &datalen, 1 + 2);
+	}
 
 	CLIParserFree();
 //  PrintAndLog("---str [%d] %s", arg_get_str(4)->count, arg_get_str(4)->sval[0]);
-	PrintAndLog(">>>>[%s%s%s] %s", activateField ? "sel ": "", leaveSignalON ? "keep ": "", decodeTLV ? "TLV": "", sprint_hex(data, datalen));
+	PrintAndLogEx(NORMAL, ">>>>[%s%s%s] %s", activateField ? "sel ": "", leaveSignalON ? "keep ": "", decodeTLV ? "TLV": "", sprint_hex(data, datalen));
 
-	int res = ExchangeAPDU14a(data, datalen, activateField, leaveSignalON, data, USB_CMD_DATA_SIZE, &datalen);
+	if (decodeAPDU) {
+		APDUStruct apdu;
+
+		if (APDUDecode(data, datalen, &apdu) == 0)
+			APDUPrint(apdu);
+		else
+			PrintAndLogEx(WARNING, "can't decode APDU.");
+	}
+
+	res = ExchangeAPDU14a(data, datalen, activateField, leaveSignalON, data, USB_CMD_DATA_SIZE, &datalen);
 
 	if (res)
 		return res;
