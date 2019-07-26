@@ -980,16 +980,17 @@ void MifareChkKeys(uint16_t arg0, uint16_t arg1, uint8_t arg2, uint8_t *datain)
 	uint8_t set14aTimeout = (arg1 >> 8) & 0xff;
 	uint8_t keyCount = arg2;
 
+	LED_A_ON();
+
 	// clear debug level
 	int OLD_MF_DBGLEVEL = MF_DBGLEVEL;
 	MF_DBGLEVEL = MF_DBG_NONE;
 
-	LED_A_ON();
-	LED_B_OFF();
-	LED_C_OFF();
 	iso14443a_setup(FPGA_HF_ISO14443A_READER_LISTEN);
 
-	if (clearTrace) clear_trace();
+	if (clearTrace) {
+		clear_trace();
+	}
 	set_tracing(true);
 
 	if (set14aTimeout){
@@ -1001,30 +1002,28 @@ void MifareChkKeys(uint16_t arg0, uint16_t arg1, uint8_t arg2, uint8_t *datain)
 		uint8_t sectorCnt = blockNo;
 		int res = MifareMultisectorChk(datain, keyCount, sectorCnt, keyType, OLD_MF_DBGLEVEL, &keyIndex);
 
-		LED_B_ON();
 		if (res >= 0) {
 			cmd_send(CMD_ACK, 1, 0, 0, keyIndex, 80);
 		} else {
 			cmd_send(CMD_ACK, 0, 0, 0, NULL, 0);
 		}
-		LED_B_OFF();
 	} else {	
 		int res = MifareChkBlockKeys(datain, keyCount, blockNo, keyType, OLD_MF_DBGLEVEL);
 		
-		LED_B_ON();
 		if (res > 0) {
 			cmd_send(CMD_ACK, 1, 0, 0, datain + (res - 1) * 6, 6);
 		} else {
 			cmd_send(CMD_ACK, 0, 0, 0, NULL, 0);
 		}
-		LED_B_OFF();
 	}
 
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
-	LEDsoff();
+	LED_D_OFF();
 
 	// restore debug level
 	MF_DBGLEVEL = OLD_MF_DBGLEVEL;
+	
+	LED_A_OFF();
 }
 
 //-----------------------------------------------------------------------------
