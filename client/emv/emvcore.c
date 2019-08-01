@@ -287,10 +287,10 @@ struct tlvdb *GetdCVVRawFromTrack2(const struct tlv *track2) {
 }
 
 
-int EMVExchangeEx(EMVCommandChannel channel, bool ActivateField, bool LeaveFieldON, uint8_t *apdu, int apdu_len, uint8_t *Result, size_t MaxResultLen, size_t *ResultLen, uint16_t *sw, struct tlvdb *tlv) 
+int EMVExchangeEx(EMVCommandChannel channel, bool ActivateField, bool LeaveFieldON, uint8_t *apdu, int apdu_len, uint8_t *Result, size_t MaxResultLen, size_t *ResultLen, uint16_t *sw, struct tlvdb *tlv)
 {
 	*ResultLen = 0;
-	if (sw)	*sw = 0;
+	if (sw) *sw = 0;
 	uint16_t isw = 0;
 	int res = 0;
 
@@ -314,7 +314,7 @@ int EMVExchangeEx(EMVCommandChannel channel, bool ActivateField, bool LeaveField
 	}
 #else
 	res = ExchangeAPDU14a(apdu, apdu_len, ActivateField, LeaveFieldON, Result, (int)MaxResultLen, (int *)ResultLen);
-#endif	
+#endif
 
 	if (res) {
 		return res;
@@ -338,7 +338,7 @@ int EMVExchangeEx(EMVCommandChannel channel, bool ActivateField, bool LeaveField
 	if (res) return res;
 
 	*ResultLen -= 2;
-	
+
 	isw = Result[*ResultLen] * 0x0100 + Result[*ResultLen + 1];
 	if (sw)
 		*sw = isw;
@@ -359,11 +359,11 @@ int EMVExchangeEx(EMVCommandChannel channel, bool ActivateField, bool LeaveField
 	return 0;
 }
 
-static int EMVExchange(EMVCommandChannel channel, bool LeaveFieldON, uint8_t *apdu, int apdu_len, uint8_t *Result, size_t MaxResultLen, size_t *ResultLen, uint16_t *sw, struct tlvdb *tlv) 
+static int EMVExchange(EMVCommandChannel channel, bool LeaveFieldON, uint8_t *apdu, int apdu_len, uint8_t *Result, size_t MaxResultLen, size_t *ResultLen, uint16_t *sw, struct tlvdb *tlv)
 {
 	uint8_t APDU[APDU_COMMAND_LEN];
 	memcpy(APDU, apdu, apdu_len);
-	APDU[apdu_len] = 0x00; 
+	APDU[apdu_len] = 0x00;
 	if (channel == ECC_CONTACTLESS) {
 		if (apdu_len == 5) {
 			// there is no Lc but an Le already
@@ -376,7 +376,7 @@ static int EMVExchange(EMVCommandChannel channel, bool LeaveFieldON, uint8_t *ap
 	return EMVExchangeEx(channel, false, LeaveFieldON, APDU, apdu_len, Result, MaxResultLen, ResultLen, sw, tlv);
 }
 
-int EMVSelect(EMVCommandChannel channel, bool ActivateField, bool LeaveFieldON, uint8_t *AID, size_t AIDLen, uint8_t *Result, size_t MaxResultLen, size_t *ResultLen, uint16_t *sw, struct tlvdb *tlv) 
+int EMVSelect(EMVCommandChannel channel, bool ActivateField, bool LeaveFieldON, uint8_t *AID, size_t AIDLen, uint8_t *Result, size_t MaxResultLen, size_t *ResultLen, uint16_t *sw, struct tlvdb *tlv)
 {
 	uint8_t Select_APDU[APDU_COMMAND_LEN] = {0x00, ISO7816_SELECT_FILE, 0x04, 0x00, AIDLen, 0x00};
 	memcpy(Select_APDU + 5, AID, AIDLen);
@@ -397,7 +397,7 @@ int EMVSelectPSE(EMVCommandChannel channel, bool ActivateField, bool LeaveFieldO
 			param_gethex_to_eol(PSElist[1], 0, buf, sizeof(buf), &len);
 			break;
 		case 2:
-		
+
 			param_gethex_to_eol(PSElist[0], 0, buf, sizeof(buf), &len);
 			break;
 		default:
@@ -427,11 +427,11 @@ int EMVSelectWithRetry(EMVCommandChannel channel, bool ActivateField, bool Leave
 					PrintAndLogEx(WARNING, "Exit...");
 					return 1;
 				}
-				
+
 				retrycnt = 0;
 				PrintAndLogEx(NORMAL, "Retry failed [%s]. Skiped...", sprint_hex_inrow(AID, AIDLen));
 				return res;
-			}	
+			}
 		}
 	} while (res && res != 5);
 
@@ -456,7 +456,7 @@ int EMVCheckAID(EMVCommandChannel channel, bool decodeTLV, struct tlvdb *tlvdbel
 				tlvdbelm = tlvdb_find_next(tlvdbelm, 0x61);
 				continue;
 			}
-			
+
 			if (res)
 				break;
 
@@ -482,7 +482,7 @@ int EMVSearchPSE(EMVCommandChannel channel, bool ActivateField, bool LeaveFieldO
 	bool fileFound = false;
 
 	char *PSE_or_PPSE = PSENum == 1 ? "PSE" : "PPSE";
-	
+
 	// select PPSE
 	res = EMVSelectPSE(channel, ActivateField, true, PSENum, data, sizeof(data), &datalen, &sw);
 
@@ -491,7 +491,7 @@ int EMVSearchPSE(EMVCommandChannel channel, bool ActivateField, bool LeaveFieldO
 			PrintAndLogEx(FAILED, "Select PSE error. APDU error: %04x.", sw);
 			return 1;
 		}
-		
+
 		struct tlvdb *t = NULL;
 		t = tlvdb_parse_multi(data, datalen);
 		if (t) {
@@ -501,18 +501,18 @@ int EMVSearchPSE(EMVCommandChannel channel, bool ActivateField, bool LeaveFieldO
 				uint8_t sfin = 0;
 				tlv_get_uint8(tlvdb_get_tlv(tsfi), &sfin);
 				PrintAndLogEx(INFO, "* PPSE get SFI: 0x%02x.", sfin);
-				
+
 				for (uint8_t ui = 0x01; ui <= 0x10; ui++) {
 					PrintAndLogEx(INFO, "* * Get SFI: 0x%02x. num: 0x%02x", sfin, ui);
 					res = EMVReadRecord(channel, true, sfin, ui, sfidata[ui], APDU_RESPONSE_LEN, &sfidatalen[ui], &sw, NULL);
-					
+
 					// end of records
 					if (sw == 0x6a83) {
 						sfidatalen[ui] = 0;
 						PrintAndLogEx(INFO, "* * PPSE get SFI. End of records.");
 						break;
 					}
-					
+
 					// error catch!
 					if (sw != 0x9000) {
 						sfidatalen[ui] = 0;
@@ -535,7 +535,7 @@ int EMVSearchPSE(EMVCommandChannel channel, bool ActivateField, bool LeaveFieldO
 								PrintAndLogEx(FAILED, "SFI 0x%02d doesn't have any records.", sfidatalen[ui]);
 								continue;
 							}
-							res = EMVCheckAID(channel, decodeTLV, tsfitmp, tlv);							
+							res = EMVCheckAID(channel, decodeTLV, tsfitmp, tlv);
 							fileFound = true;
 						}
 						tlvdb_free(tsfi);
@@ -550,7 +550,7 @@ int EMVSearchPSE(EMVCommandChannel channel, bool ActivateField, bool LeaveFieldO
 				res = EMVCheckAID(channel, decodeTLV, ttmp, tlv);
 				fileFound = true;
 			}
-			
+
 			if (!fileFound)
 				PrintAndLogEx(FAILED, "PPSE doesn't have any records.");
 
@@ -579,14 +579,16 @@ int EMVSearch(EMVCommandChannel channel, bool ActivateField, bool LeaveFieldON, 
 	int retrycnt = 0;
 	for(int i = 0; i < AIDlistLen; i ++) {
 		param_gethex_to_eol(AIDlist[i].aid, 0, aidbuf, sizeof(aidbuf), &aidlen);
-		res = EMVSelect(channel, (i == 0) ? ActivateField : false, (i == AIDlistLen - 1) ? LeaveFieldON : true, aidbuf, aidlen, data, sizeof(data), &datalen, &sw, tlv);
+		res = EMVSelect(channel, (i == 0) ? ActivateField : false, true, aidbuf, aidlen, data, sizeof(data), &datalen, &sw, tlv);
 		// retry if error and not returned sw error
 		if (res && res != 5) {
 			if (++retrycnt < 3){
 				i--;
 			} else {
-				// (1) - card select error, proxmark error OR (200) - result length = 0
-				if (res == 1 || res == 200) {
+				// (1) - card select error, (4) reply timeout, (200) - result length = 0
+				if (res == 1 || res == 4 || res == 200) {
+					if (!LeaveFieldON)
+						DropFieldEx(channel);
 					PrintAndLogEx(WARNING, "Exit...");
 					return 1;
 				}
@@ -609,6 +611,9 @@ int EMVSearch(EMVCommandChannel channel, bool ActivateField, bool LeaveFieldON, 
 			TLVPrintFromBuffer(data, datalen);
 		}
 	}
+
+	if (!LeaveFieldON)
+		DropFieldEx(channel);
 
 	return 0;
 }
@@ -652,12 +657,12 @@ int EMVSelectApplication(struct tlvdb *tlv, uint8_t *AID, size_t *AIDlen) {
 	return 0;
 }
 
-int EMVGPO(EMVCommandChannel channel, bool LeaveFieldON, uint8_t *PDOL, size_t PDOLLen, uint8_t *Result, size_t MaxResultLen, size_t *ResultLen, uint16_t *sw, struct tlvdb *tlv) 
+int EMVGPO(EMVCommandChannel channel, bool LeaveFieldON, uint8_t *PDOL, size_t PDOLLen, uint8_t *Result, size_t MaxResultLen, size_t *ResultLen, uint16_t *sw, struct tlvdb *tlv)
 {
 	uint8_t GPO_APDU[APDU_COMMAND_LEN] = {0x80, ISO7816_GET_PROCESSING_OPTIONS, 0x00, 0x00, PDOLLen, 0x00};
 	memcpy(GPO_APDU + 5, PDOL, PDOLLen);
 	int apdulen = 5 + PDOLLen;
-	
+
 	return EMVExchange(channel, LeaveFieldON, GPO_APDU, apdulen, Result, MaxResultLen, ResultLen, sw, tlv);
 }
 
@@ -677,14 +682,14 @@ int EMVAC(EMVCommandChannel channel, bool LeaveFieldON, uint8_t RefControl, uint
 	uint8_t CDOL_APDU[APDU_COMMAND_LEN] = {0x80, 0xae, RefControl, 0x00, CDOLLen, 0x00};
 	memcpy(CDOL_APDU + 5, CDOL, CDOLLen);
 	int apdulen = 5 + CDOLLen;
-	
+
 	return EMVExchange(channel, LeaveFieldON, CDOL_APDU, apdulen, Result, MaxResultLen, ResultLen, sw, tlv);
 }
 
-int EMVGenerateChallenge(EMVCommandChannel channel, bool LeaveFieldON, uint8_t *Result, size_t MaxResultLen, size_t *ResultLen, uint16_t *sw, struct tlvdb *tlv) 
+int EMVGenerateChallenge(EMVCommandChannel channel, bool LeaveFieldON, uint8_t *Result, size_t MaxResultLen, size_t *ResultLen, uint16_t *sw, struct tlvdb *tlv)
 {
 	uint8_t get_challenge_APDU[APDU_COMMAND_LEN] = {0x00, ISO7816_GET_CHALLENGE, 0x00, 0x00};
-	
+
 	int res = EMVExchange(channel, LeaveFieldON, get_challenge_APDU, 4, Result, MaxResultLen, ResultLen, sw, tlv);
 	if (*sw == 0x6700) {
 		PrintAndLogEx(INFO, ">>> trying to reissue command withouth Le...");
@@ -693,12 +698,12 @@ int EMVGenerateChallenge(EMVCommandChannel channel, bool LeaveFieldON, uint8_t *
 	return res;
 }
 
-int EMVInternalAuthenticate(EMVCommandChannel channel, bool LeaveFieldON, uint8_t *DDOL, size_t DDOLLen, uint8_t *Result, size_t MaxResultLen, size_t *ResultLen, uint16_t *sw, struct tlvdb *tlv) 
+int EMVInternalAuthenticate(EMVCommandChannel channel, bool LeaveFieldON, uint8_t *DDOL, size_t DDOLLen, uint8_t *Result, size_t MaxResultLen, size_t *ResultLen, uint16_t *sw, struct tlvdb *tlv)
 {
 	uint8_t authenticate_APDU[APDU_COMMAND_LEN] = {0x00, ISO7816_INTERNAL_AUTHENTICATE, 0x00, 0x00, DDOLLen, 0x00};
 	memcpy(authenticate_APDU + 5, DDOL, DDOLLen);
 	int apdulen = 5 + DDOLLen;
-	
+
 	return EMVExchange(channel, LeaveFieldON, authenticate_APDU, apdulen, Result, MaxResultLen, ResultLen, sw, tlv);
 }
 
@@ -707,7 +712,7 @@ int MSCComputeCryptoChecksum(EMVCommandChannel channel, bool LeaveFieldON, uint8
 	uint8_t checksum_APDU[APDU_COMMAND_LEN] = {0x80, 0x2a, 0x8e, 0x80, UDOLlen, 0x00};
 	memcpy(checksum_APDU + 5, UDOL, UDOLlen);
 	int apdulen = 5 + UDOLlen;
-	
+
 	return EMVExchange(channel, LeaveFieldON, checksum_APDU, apdulen, Result, MaxResultLen, ResultLen, sw, tlv);
 }
 
@@ -790,7 +795,7 @@ int trDDA(EMVCommandChannel channel, bool decodeTLV, struct tlvdb *tlv) {
 	}
 
 	const struct tlv *sda_tlv = tlvdb_get(tlv, 0x21, NULL);
-/*	if (!sda_tlv || sda_tlv->len < 1) { it may be 0!!!!
+/*  if (!sda_tlv || sda_tlv->len < 1) { it may be 0!!!!
 		emv_pk_free(pk);
 		PrintAndLogEx(WARNING, "Error: Can't find input list for Offline Data Authentication. Exit.");
 		return 3;
@@ -940,13 +945,13 @@ int trDDA(EMVCommandChannel channel, bool decodeTLV, struct tlvdb *tlv) {
 				// parse response 0x80
 				struct tlvdb *t80 = tlvdb_parse_multi(buf, len);
 				const struct tlv * t80tlv = tlvdb_get_tlv(t80);
-				
+
 				// 9f4b Signed Dynamic Application Data
 				dda_db = tlvdb_fixed(0x9f4b, t80tlv->len, t80tlv->value);
 				tlvdb_add(tlv, dda_db);
-				
+
 				tlvdb_free(t80);
-				
+
 				if (decodeTLV){
 					PrintAndLogEx(NORMAL, "* * Decode response format 1:");
 					TLVPrintFromTLV(dda_db);
