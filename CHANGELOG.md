@@ -18,6 +18,7 @@ This project uses the changelog in accordance with [keepchangelog](http://keepac
  - Fix `hf mf sim` - wrong access rights to write key B in trailer (@McEloff)
  
 ### Added
+- Added to `hf 14a apdu` print apdu and compose apdu (@merlokk)
 - Added `hf 15 csetuid` - set UID on ISO-15693 Magic tags (t0m4)
 - Added `lf config s xxxx` option to allow skipping x samples before capture (marshmellow)
 - Added `lf em 4x05protect` to support changing protection blocks on em4x05 chips (marshmellow)
