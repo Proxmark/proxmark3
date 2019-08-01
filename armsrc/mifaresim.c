@@ -95,7 +95,7 @@ static bool IsTrailerAccessAllowed(uint8_t blockNo, uint8_t keytype, uint8_t act
 			break;
 		}
 		case AC_KEYB_WRITE: {
-			return ((keytype == AUTHKEYA && (AC == 0x00 || AC == 0x04))
+			return ((keytype == AUTHKEYA && (AC == 0x00 || AC == 0x01))
 				 || (keytype == AUTHKEYB && (AC == 0x04 || AC == 0x03)));
 			break;
 		}
