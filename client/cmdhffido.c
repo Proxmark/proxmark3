@@ -353,9 +353,9 @@ int CmdHFFidoRegister(const char *cmd) {
 			&buf[1], 65,             // user public key
 			NULL, 0);
 		//PrintAndLog("--xbuf(%d)[%d]: %s", res, xbuflen, sprint_hex(xbuf, xbuflen));
-		res = ecdsa_signature_verify(public_key, xbuf, xbuflen, &buf[hashp], len - hashp);
+		res = ecdsa_signature_verify(MBEDTLS_ECP_DP_SECP256R1, public_key, xbuf, xbuflen, &buf[hashp], len - hashp, true);
 		if (res) {
-			if (res == -0x4e00) {
+			if (res == MBEDTLS_ERR_ECP_VERIFY_FAILED) {
 				PrintAndLog("Signature is NOT VALID.");
 			} else {
 				PrintAndLog("Other signature check error: %x %s", (res<0)?-res:res, ecdsa_get_error(res));
@@ -579,9 +579,9 @@ int CmdHFFidoAuthenticate(const char *cmd) {
 				data, 32,      // challenge parameter
 				NULL, 0);
 			//PrintAndLog("--xbuf(%d)[%d]: %s", res, xbuflen, sprint_hex(xbuf, xbuflen));
-			res = ecdsa_signature_verify(public_key, xbuf, xbuflen, &buf[5], len - 5);
+			res = ecdsa_signature_verify(MBEDTLS_ECP_DP_SECP256R1, public_key, xbuf, xbuflen, &buf[5], len - 5, true);
 			if (res) {
-				if (res == -0x4e00) {
+				if (res == MBEDTLS_ERR_ECP_VERIFY_FAILED) {
 					PrintAndLog("Signature is NOT VALID.");
 				} else {
 					PrintAndLog("Other signature check error: %x %s", (res<0)?-res:res, ecdsa_get_error(res));

@@ -24,6 +24,7 @@
 #include "util_posix.h"
 #include "protocols.h"
 #include "taginfo.h"
+#include "crypto/libpcrypto.h"
 
 typedef enum TAGTYPE_UL {
 	UNKNOWN       = 0x000000,
@@ -65,15 +66,6 @@ typedef enum TAGTYPE_UL {
 #define MAX_MY_D_MOVE      0x25
 #define MAX_MY_D_MOVE_LEAN 0x0f
 
-#define PUBLIC_ECDA_KEYLEN 33
-static uint8_t public_ecda_key[PUBLIC_ECDA_KEYLEN] = {
-	0x04, 0x49, 0x4e, 0x1a, 0x38, 0x6d, 0x3d, 0x3c,
-	0xfe, 0x3d, 0xc1, 0x0e, 0x5d, 0xe6, 0x8a, 0x49,
-	0x9b, 0x1c, 0x20, 0x2d, 0xb5, 0xb1, 0x32, 0x39,
-	0x3e, 0x89, 0xed, 0x19, 0xfe, 0x5b, 0xe8, 0xbc,
-	0x61
-};
-
 #define KEYS_3DES_COUNT 7
 static uint8_t default_3des_keys[KEYS_3DES_COUNT][16] = {
 	{ 0x42,0x52,0x45,0x41,0x4b,0x4d,0x45,0x49,0x46,0x59,0x4f,0x55,0x43,0x41,0x4e,0x21 },// 3des std key
@@ -93,6 +85,13 @@ static uint8_t default_pwd_pack[KEYS_PWD_COUNT][4] = {
 	{0xFF,0x90,0x6C,0xB2}, // PACK 0x12,0x9e -- italian bus (sniffed)
 	{0x46,0x1c,0xA3,0x19}, // PACK 0xE9,0x5A -- italian bus (sniffed)
 	{0x35,0x1C,0xD0,0x19}, // PACK 0x9A,0x5a -- italian bus (sniffed)
+};
+
+// known public keys for the originality check (source: https://github.com/alexbatalov/node-nxp-originality-verifier)
+uint8_t public_keys[2][33] = {{0x04,0x49,0x4e,0x1a,0x38,0x6d,0x3d,0x3c,0xfe,0x3d,0xc1,0x0e,0x5d,0xe6,0x8a,0x49,0x9b,  // UL and NDEF
+									0x1c,0x20,0x2d,0xb5,0xb1,0x32,0x39,0x3e,0x89,0xed,0x19,0xfe,0x5b,0xe8,0xbc,0x61},
+							  {0x04,0x90,0x93,0x3b,0xdc,0xd6,0xe9,0x9b,0x4e,0x25,0x5e,0x3d,0xa5,0x53,0x89,0xa8,0x27,  // UL EV1
+									0x56,0x4e,0x11,0x71,0x8e,0x01,0x72,0x92,0xfa,0xf2,0x32,0x26,0xa9,0x66,0x14,0xb8}
 };
 
 #define MAX_UL_TYPES 17
@@ -552,14 +551,20 @@ static int ulev1_print_counters(void) {
 }
 
 
-static int ulev1_print_signature( uint8_t *data, uint8_t len){
-	PrintAndLogEx(NORMAL, "\n--- Tag Signature");
-	PrintAndLogEx(NORMAL, "IC signature public key name  : NXP NTAG21x (2013)");
-	PrintAndLogEx(NORMAL, "IC signature public key value : %s", sprint_hex(public_ecda_key, PUBLIC_ECDA_KEYLEN));
+static int ulev1_print_signature(TagTypeUL_t tagtype, uint8_t *uid, uint8_t *signature, size_t signature_len){
+	uint8_t public_key = 0;
+	if (tagtype == UL_EV1_48 || tagtype == UL_EV1_128) {
+		public_key = 1;
+	}
+	int res = ecdsa_signature_r_s_verify(MBEDTLS_ECP_DP_SECP128R1, public_keys[public_key], uid, 7, signature, signature_len, false);
+	bool signature_valid = (res == 0);
+	
+	PrintAndLogEx(NORMAL, "\n--- Tag Originality Signature");
+	//PrintAndLogEx(NORMAL, "IC signature public key name  : NXP NTAG21x 2013"); // don't know if there is other NXP public keys.. :(
+	PrintAndLogEx(NORMAL, "         Signature public key : %s", sprint_hex(public_keys[public_key]+1, sizeof(public_keys[public_key])-1));
 	PrintAndLogEx(NORMAL, "    Elliptic curve parameters : secp128r1");
-	PrintAndLogEx(NORMAL, "            Tag ECC Signature : %s", sprint_hex(data, len));
-	//to do:  verify if signature is valid
-	//PrintAndLogEx(NORMAL, "IC signature status: %s valid", (iseccvalid() )?"":"not");
+	PrintAndLogEx(NORMAL, "            Tag ECC Signature : %s", sprint_hex(signature, signature_len));
+	PrintAndLogEx(NORMAL, "  Originality signature check : signature is %svalid", signature_valid?"":"NOT ");
 	return 0;
 }
 
@@ -725,6 +730,7 @@ static int CmdHF14AMfUInfo(const char *Cmd) {
 
 	uint8_t authlim = 0xff;
 	iso14a_card_select_t card;
+	uint8_t uid[7];
 	bool errors = false;
 	uint8_t keybytes[16] = {0x00};
 	uint8_t *authenticationkey = keybytes;
@@ -798,6 +804,8 @@ static int CmdHF14AMfUInfo(const char *Cmd) {
 		PrintAndLogEx(WARNING, "Error: tag didn't answer to READ");
 		return -1;
 	} else if (len == 16) {
+		memcpy(uid, data, 3);
+		memcpy(uid+3, data+4, 4);
 		ul_print_default(data);
 		ndef_print_CC(data+12);
 	} else {
@@ -878,7 +886,7 @@ static int CmdHF14AMfUInfo(const char *Cmd) {
 			return -1;
 		}
 		if (len == 32) {
-			ulev1_print_signature( ulev1_signature, sizeof(ulev1_signature));
+			ulev1_print_signature(tagtype, uid, ulev1_signature, sizeof(ulev1_signature));
 		} else {
 			// re-select
 			if (!ul_auth_select( &card, tagtype, hasAuthKey, authenticationkey, pack, sizeof(pack))) {
