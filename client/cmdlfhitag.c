@@ -30,7 +30,7 @@ size_t nbytes(size_t nbits) {
 
 int CmdLFHitagList(const char *Cmd)
 {
- 	uint8_t *got = malloc(USB_CMD_DATA_SIZE);
+	uint8_t *got = malloc(USB_CMD_DATA_SIZE);
 	// Query for the actual size of the trace
 	UsbCommand response;
 	GetFromBigBuf(got, USB_CMD_DATA_SIZE, 0, &response, -1, false);
@@ -45,7 +45,7 @@ int CmdLFHitagList(const char *Cmd)
 		got = p;
 		GetFromBigBuf(got, traceLen, 0, NULL, -1, false);
 	}
-	
+
 	PrintAndLog("recorded activity (TraceLen = %d bytes):");
 	PrintAndLog(" ETU     :nbits: who bytes");
 	PrintAndLog("---------+-----+----+-----------");
@@ -57,11 +57,11 @@ int CmdLFHitagList(const char *Cmd)
 
 	char filename[FILE_PATH_SIZE]  = { 0x00 };
 	FILE* pf = NULL;
-  	
-	if (len > FILE_PATH_SIZE) 
+
+	if (len > FILE_PATH_SIZE)
 		len = FILE_PATH_SIZE;
 	memcpy(filename, Cmd, len);
-   
+
 	if (strlen(filename) > 0) {
 		if ((pf = fopen(filename,"wb")) == NULL) {
 			PrintAndLog("Error: Could not open file [%s]",filename);
@@ -71,7 +71,7 @@ int CmdLFHitagList(const char *Cmd)
 	}
 
 	for (;;) {
-  
+
 		if(i > traceLen) { break; }
 
 		bool isResponse;
@@ -104,7 +104,7 @@ int CmdLFHitagList(const char *Cmd)
 		int fillupBits = 8 - (bits % 8);
 		byte_t framefilled[bits+fillupBits];
 		byte_t* ff = framefilled;
-		
+
 		int response_bit[200] = {0};
 		int z = 0;
 		for (int y = 0; y < len; y++) {
@@ -154,11 +154,11 @@ int CmdLFHitagList(const char *Cmd)
 				(isResponse ? "TAG" : "   "),
 				line);
 		}
-		
+
 		prev = timestamp;
 		i += (len + 9);
 	}
-  
+
 	if (pf) {
 		fclose(pf);
 		PrintAndLog("Recorded activity succesfully written to file: %s", filename);
@@ -175,7 +175,7 @@ int CmdLFHitagSnoop(const char *Cmd) {
 }
 
 int CmdLFHitagSim(const char *Cmd) {
-    
+
   UsbCommand c = {CMD_SIMULATE_HITAG};
 	char filename[FILE_PATH_SIZE] = { 0x00 };
 	FILE* pf;
@@ -183,7 +183,7 @@ int CmdLFHitagSim(const char *Cmd) {
 	int len = strlen(Cmd);
 	if (len > FILE_PATH_SIZE) len = FILE_PATH_SIZE;
 	memcpy(filename, Cmd, len);
-	
+
 	if (strlen(filename) > 0) {
 		if ((pf = fopen(filename,"rb+")) == NULL) {
 			PrintAndLog("Error: Could not open file [%s]",filename);
@@ -199,7 +199,7 @@ int CmdLFHitagSim(const char *Cmd) {
 	} else {
 		tag_mem_supplied = false;
 	}
-	
+
 	// Does the tag comes with memory
 	c.arg[0] = (uint32_t)tag_mem_supplied;
 
@@ -211,7 +211,7 @@ int CmdLFHitagReader(const char *Cmd) {
 	UsbCommand c = {CMD_READER_HITAG};//, {param_get32ex(Cmd,0,0,10),param_get32ex(Cmd,1,0,16),param_get32ex(Cmd,2,0,16),param_get32ex(Cmd,3,0,16)}};
 	hitag_data* htd = (hitag_data*)c.d.asBytes;
 	hitag_function htf = param_get32ex(Cmd,0,0,10);
-	
+
 	switch (htf) {
 		case 01: { //RHTSF_CHALLENGE
 			c = (UsbCommand){ CMD_READ_HITAG_S };
@@ -248,7 +248,7 @@ int CmdLFHitagReader(const char *Cmd) {
 		} break;
 		case RHT2F_CRYPTO: {
 			num_to_bytes(param_get64ex(Cmd,1,0,16),6,htd->crypto.key);
-			//			num_to_bytes(param_get32ex(Cmd,2,0,16),4,htd->auth.NrAr+4);
+			//          num_to_bytes(param_get32ex(Cmd,2,0,16),4,htd->auth.NrAr+4);
 		} break;
 		case RHT2F_TEST_AUTH_ATTEMPTS: {
 			// No additional parameters needed
@@ -261,19 +261,20 @@ int CmdLFHitagReader(const char *Cmd) {
 			PrintAndLog("");
 			PrintAndLog("Usage: hitag reader <Reader Function #>");
 			PrintAndLog("Reader Functions:");
-			PrintAndLog(" HitagS (0*)");
-			PrintAndLog("  01 <nr> <ar> (Challenge) <firstPage> <tagmode> read all pages from a Hitag S tag");
-			PrintAndLog("  02 <key> (set to 0 if no authentication is needed) <firstPage> <tagmode> read all pages from a Hitag S tag");
-			PrintAndLog("  03 <nr> <ar> (Challenge) <firstPage> <tagmode> read all blocks from a Hitag S tag");
-			PrintAndLog("  04 <key> (set to 0 if no authentication is needed) <firstPage> <tagmode> read all blocks from a Hitag S tag");
-			PrintAndLog("  Valid tagmodes are 0=STANDARD, 1=ADVANCED, 2=FAST_ADVANCED (default is ADVANCED)");
-			PrintAndLog(" Hitag1 (1*)");
-			PrintAndLog(" Hitag2 (2*)");
-			PrintAndLog("  21 <password> (password mode)");
-			PrintAndLog("  22 <nr> <ar> (authentication)");
-			PrintAndLog("  23 <key> (authentication) key is in format: ISK high + ISK low");
-			PrintAndLog("  25 (test recorded authentications)");
-			PrintAndLog("  26 just read UID");
+			PrintAndLog("  HitagS (0*):");
+			PrintAndLog("    01 <nr> <ar> (Challenge) <firstPage> <tagmode> read all pages from a Hitag S tag");
+			PrintAndLog("    02 <key> (set to 0 if no authentication is needed) <firstPage> <tagmode> read all pages from a Hitag S tag");
+			PrintAndLog("    03 <nr> <ar> (Challenge) <firstPage> <tagmode> read all blocks from a Hitag S tag");
+			PrintAndLog("    04 <key> (set to 0 if no authentication is needed) <firstPage> <tagmode> read all blocks from a Hitag S tag");
+			PrintAndLog("    Valid tagmodes are 0=STANDARD, 1=ADVANCED, 2=FAST_ADVANCED (default is ADVANCED)");
+			PrintAndLog("  Hitag1 (1*):");
+			PrintAndLog("    (not yet implemented)");
+			PrintAndLog("  Hitag2 (2*):");
+			PrintAndLog("    21 <password> (password mode)");
+			PrintAndLog("    22 <nr> <ar> (authentication)");
+			PrintAndLog("    23 <key> (authentication) key is in format: ISK high + ISK low");
+			PrintAndLog("    25 (test recorded authentications)");
+			PrintAndLog("    26 just read UID");
 			return 1;
 		} break;
 	}
@@ -290,9 +291,9 @@ int CmdLFHitagReader(const char *Cmd) {
 
 	// Check the return status, stored in the first argument
 	if (resp.arg[0] == false) return 1;
-	
+
 	uint32_t id = bytes_to_num(resp.d.asBytes,4);
-		
+
 	if (htf == RHT2F_UID_ONLY){
 		PrintAndLog("Valid Hitag2 tag found - UID: %08x",id);
 	} else {
@@ -358,7 +359,7 @@ int CmdLFHitagCheckChallenges(const char *Cmd) {
 	int len = strlen(Cmd);
 	if (len > FILE_PATH_SIZE) len = FILE_PATH_SIZE;
 	memcpy(filename, Cmd, len);
-	
+
 	if (strlen(filename) > 0) {
 		if ((pf = fopen(filename,"rb+")) == NULL) {
 			PrintAndLog("Error: Could not open file [%s]",filename);
@@ -369,12 +370,12 @@ int CmdLFHitagCheckChallenges(const char *Cmd) {
 			PrintAndLog("Error: File reading error");
 			fclose(pf);
 			return 1;
-        }
+		}
 		fclose(pf);
 	} else {
 		file_given = false;
 	}
-	
+
 	//file with all the challenges to try
 	c.arg[0] = (uint32_t)file_given;
 	c.arg[1] = param_get64ex(Cmd,2,0,0); //get mode
@@ -389,28 +390,33 @@ int CmdLFHitagWP(const char *Cmd) {
 	hitag_data* htd = (hitag_data*)c.d.asBytes;
 	hitag_function htf = param_get32ex(Cmd,0,0,10);
 	switch (htf) {
-		case 03: { //WHTSF_CHALLENGE
+		case WHTSF_CHALLENGE: {
 			num_to_bytes(param_get64ex(Cmd,1,0,16),8,htd->auth.NrAr);
 			c.arg[2]= param_get32ex(Cmd, 2, 0, 10);
 			num_to_bytes(param_get32ex(Cmd,3,0,16),4,htd->auth.data);
 		} break;
-		case 04:
-		case 24:
-		{ //WHTSF_KEY
+		case WHTSF_KEY:
+		case WHT2F_CRYPTO: {
 			num_to_bytes(param_get64ex(Cmd,1,0,16),6,htd->crypto.key);
 			c.arg[2]= param_get32ex(Cmd, 2, 0, 10);
 			num_to_bytes(param_get32ex(Cmd,3,0,16),4,htd->crypto.data);
-
+		} break;
+		case WHT2F_PASSWORD: {
+			num_to_bytes(param_get64ex(Cmd, 1, 0, 16), 4, htd->pwd.password);
+			c.arg[2] = param_get32ex(Cmd, 2, 0, 10);
+			num_to_bytes(param_get32ex(Cmd, 3, 0, 16), 4, htd->crypto.data);
 		} break;
 		default: {
 			PrintAndLog("Error: unkown writer function %d",htf);
 			PrintAndLog("Hitag writer functions");
-			PrintAndLog(" HitagS (0*)");
-			PrintAndLog("  03 <nr,ar> (Challenge) <page> <byte0...byte3> write page on a Hitag S tag");
-			PrintAndLog("  04 <key> (set to 0 if no authentication is needed) <page> <byte0...byte3> write page on a Hitag S tag");
-			PrintAndLog(" Hitag1 (1*)");
-			PrintAndLog(" Hitag2 (2*)");
-			PrintAndLog("  24 <key> (set to 0 if no authentication is needed) <page> <byte0...byte3> write page on a Hitag S tag");
+			PrintAndLog("  HitagS (0*):");
+			PrintAndLog("    03 <nr,ar> (Challenge) <page> <byte0...byte3> write page on a Hitag S tag");
+			PrintAndLog("    04 <key> (set to 0 if no authentication is needed) <page> <byte0...byte3> write page on a Hitag S tag");
+			PrintAndLog("  Hitag1 (1*)");
+			PrintAndLog("    (not yet implemented)");
+			PrintAndLog("  Hitag2 (2*):");
+			PrintAndLog("    24 <key> (set to 0 if no authentication is needed) <page> <byte0...byte3> write page on a Hitag S tag");
+			PrintAndLog("    27 <password> <page> <byte0...byte3> write page on a Hitag2 tag");
 			return 1;
 		} break;
 	}
@@ -419,26 +425,26 @@ int CmdLFHitagWP(const char *Cmd) {
 
   // Send the command to the proxmark
   SendCommand(&c);
-  
+
   UsbCommand resp;
   WaitForResponse(CMD_ACK,&resp);
-  
+
   // Check the return status, stored in the first argument
   if (resp.arg[0] == false) return 1;
   return 0;
 }
 
 
-static command_t CommandTable[] = 
+static command_t CommandTable[] =
 {
-  {"help",    		CmdHelp,           1, "This help"},
-  {"list",    		CmdLFHitagList,    1, "<outfile> List Hitag trace history"},
-  {"reader",  		CmdLFHitagReader,  1, "Act like a Hitag Reader"},
-  {"sim",     		CmdLFHitagSim,     1, "<infile> Simulate Hitag transponder"},
-  {"snoop",   		CmdLFHitagSnoop,   1, "Eavesdrop Hitag communication"},
-  {"writer",   		CmdLFHitagWP,      1, "Act like a Hitag Writer" },
-  {"simS",   		CmdLFHitagSimS,    1, "<hitagS.hts> Simulate HitagS transponder" }, 
-  {"checkChallenges",	CmdLFHitagCheckChallenges,   1, "<challenges.cc> <tagmode> test all challenges" }, {
+  {"help",          CmdHelp,           1, "This help"},
+  {"list",          CmdLFHitagList,    1, "<outfile> List Hitag trace history"},
+  {"reader",        CmdLFHitagReader,  1, "Act like a Hitag Reader"},
+  {"sim",           CmdLFHitagSim,     1, "<infile> Simulate Hitag transponder"},
+  {"snoop",         CmdLFHitagSnoop,   1, "Eavesdrop Hitag communication"},
+  {"writer",        CmdLFHitagWP,      1, "Act like a Hitag Writer" },
+  {"simS",          CmdLFHitagSimS,    1, "<hitagS.hts> Simulate HitagS transponder" },
+  {"checkChallenges",   CmdLFHitagCheckChallenges,   1, "<challenges.cc> <tagmode> test all challenges" }, {
 				NULL,NULL, 0, NULL }
 };
 
