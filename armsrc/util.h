@@ -17,15 +17,21 @@
 
 #define BYTEx(x, n) (((x) >> (n * 8)) & 0xff )
 
-#define LED_RED 1
+#define LED_RED    1
 #define LED_ORANGE 2
-#define LED_GREEN 4
-#define LED_RED2 8
-#define BUTTON_HOLD 1
-#define BUTTON_NO_CLICK 0
-#define BUTTON_SINGLE_CLICK -1
-#define BUTTON_DOUBLE_CLICK -2
-#define BUTTON_ERROR -99
+#define LED_GREEN  4
+#define LED_RED2   8
+
+#define BUTTON_HOLD           1
+#define BUTTON_NO_CLICK       0
+#define BUTTON_SINGLE_CLICK  -1
+#define BUTTON_DOUBLE_CLICK  -2
+#define BUTTON_ERROR        -99
+
+#define REV8(x)  ((((x)>>7)&1)|((((x)>>6)&1)<<1)|((((x)>>5)&1)<<2)|((((x)>>4)&1)<<3)|((((x)>>3)&1)<<4)|((((x)>>2)&1)<<5)|((((x)>>1)&1)<<6)|(((x)&1)<<7))
+#define REV16(x) (REV8(x)  | (REV8 (x >> 8) << 8))
+#define REV32(x) (REV16(x) | (REV16(x >> 16) << 16))
+#define REV64(x) (REV32(x) | (REV32(x >> 32) << 32))
 
 void print_result(char *name, uint8_t *buf, size_t len);
 size_t nbytes(size_t nbits);
