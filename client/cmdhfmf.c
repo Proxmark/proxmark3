@@ -1100,16 +1100,17 @@ int CmdHF14AMfChk(const char *Cmd)
 
 	if (param_getchar(Cmd, 0)=='*') {
 		SectorsCnt = ParamCardSizeSectors(param_getchar(Cmd + 1, 0));
-	}
-	else {
+	} else {   
 		blockNo = param_get8(Cmd, 0);
 		// Singe Key check, so Set Sector count to cover sectors (1 to sector that contains the block)
 		// 1 and 2 Cards : Sector = blockNo/4 + 1
 		// Sectors  0 - 31  :  4 blocks per sector : Blocks 0 - 127
 		// Sectors 32 - 39  : 16 blocks per sector : Blocks 128 - 255 (4K)
-		if (blockNo < 128) SectorsCnt =       (blockNo     / 4) + 1;
-		else                     SectorsCnt = 32 + ((blockNo-128)/16) + 1;
-
+		if (blockNo < 128) {
+			SectorsCnt = (blockNo / 4) + 1;
+		} else {
+			SectorsCnt = 32 + ((blockNo-128)/16) + 1;
+		}
 		singleBlock  = true;              // Set flag for single key check
 	}
 
@@ -1144,7 +1145,7 @@ int CmdHF14AMfChk(const char *Cmd)
 	param3InUse = transferToEml | createDumpFile | (btimeout14a != MF_CHKKEYS_DEFTIMEOUT);
 
 	PrintAndLog("--chk keys. sectors:%2d, block no:%3d, key type:%c, eml:%c, dmp=%c checktimeout=%d us",
-			SectorsCnt, blockNo, keyType?'B':'A', transferToEml?'y':'n', createDumpFile?'y':'n', ((int)btimeout14a * 10000) / 106);
+			SectorsCnt, blockNo, keyType==0?'A':keyType==1?'B':'?', transferToEml?'y':'n', createDumpFile?'y':'n', ((int)btimeout14a * 10000) / 106);
 
 	for (i = param3InUse; param_getchar(Cmd, 2 + i); i++) {
 		if (!param_gethex(Cmd, 2 + i, keyBlock + 6 * keycnt, 12)) {
@@ -1169,8 +1170,8 @@ int CmdHF14AMfChk(const char *Cmd)
 				return 2;
 			}
 
-			if ( (f = fopen( filename , "r")) ) {
-				while( fgets(buf, sizeof(buf), f) ){
+			if ((f = fopen( filename , "r"))) {
+				while (fgets(buf, sizeof(buf), f)) {
 					if (strlen(buf) < 12 || buf[11] == '\n')
 						continue;
 
@@ -1178,14 +1179,20 @@ int CmdHF14AMfChk(const char *Cmd)
 
 					if( buf[0]=='#' ) continue; //The line start with # is comment, skip
 
-					if (!isxdigit((unsigned char)buf[0])){
-						PrintAndLog("File content error. '%s' must include 12 HEX symbols",buf);
+					bool content_error = false;
+					for (int i = 0; i < 12; i++) {
+						if (!isxdigit((unsigned char)buf[i])) {
+							content_error = true;
+						}
+					}
+					if (content_error) {
+						PrintAndLog("File content error. '%s' must include 12 HEX symbols", buf);
 						continue;
 					}
 
 					buf[12] = 0;
 
-					if ( stKeyBlock - keycnt < 2) {
+					if (stKeyBlock - keycnt < 2) {
 						p = realloc(keyBlock, 6*(stKeyBlock+=10));
 						if (!p) {
 							PrintAndLog("Cannot allocate memory for defKeys");
@@ -1233,8 +1240,9 @@ int CmdHF14AMfChk(const char *Cmd)
 	}
 	printf("\n");
 
-	bool        foundAKey = false;
-	uint32_t    max_keys  = keycnt > USB_CMD_DATA_SIZE / 6 ? USB_CMD_DATA_SIZE / 6 : keycnt;
+	bool foundAKey = false;
+	bool clearTraceLog = true;
+	uint32_t max_keys  = keycnt > USB_CMD_DATA_SIZE / 6 ? USB_CMD_DATA_SIZE / 6 : keycnt;
 
 	// !SingleKey, so all key check (if SectorsCnt > 0)
 	if (!singleBlock) {
@@ -1243,7 +1251,8 @@ int CmdHF14AMfChk(const char *Cmd)
 		for (uint32_t c = 0; c < keycnt; c += max_keys) {
 
 			uint32_t size = keycnt-c > max_keys ? max_keys : keycnt-c;
-			res = mfCheckKeysSec(SectorsCnt, keyType, btimeout14a, true, size, &keyBlock[6 * c], e_sector); // timeout is (ms * 106)/10 or us*0.0106
+			res = mfCheckKeysSec(SectorsCnt, keyType, btimeout14a, clearTraceLog, size, &keyBlock[6 * c], e_sector); // timeout is (ms * 106)/10 or us*0.0106
+			clearTraceLog = false;
 
 			if (res != 1) {
 				if (!res) {
@@ -1260,10 +1269,11 @@ int CmdHF14AMfChk(const char *Cmd)
 	} else {
 		int keyAB = keyType;
 		do {
-			for (uint32_t c = 0; c < keycnt; c+=max_keys) {
+			for (uint32_t c = 0; c < keycnt; c += max_keys) {
 
 				uint32_t size = keycnt-c > max_keys ? max_keys : keycnt-c;
 				res = mfCheckKeys(blockNo, keyAB & 0x01, true, size, &keyBlock[6 * c], &key64);
+				clearTraceLog = false;
 
 				if (res != 1) {
 					if (!res) {
@@ -1286,20 +1296,25 @@ int CmdHF14AMfChk(const char *Cmd)
 
 	// print result
 	if (foundAKey) {
-		if (SectorsCnt) {
-			PrintAndLog("");
-			PrintAndLog("|---|----------------|---|----------------|---|");
-			PrintAndLog("|sec|key A           |res|key B           |res|");
-			PrintAndLog("|---|----------------|---|----------------|---|");
-			for (i = 0; i < SectorsCnt; i++) {
-				// If a block key check, only print a line if a key was found.
-				if (!singleBlock || (e_sector[i].foundKey[0]) || (e_sector[i].foundKey[1]) ){
-					PrintAndLog("|%03d|  %012" PRIx64 "  | %d |  %012" PRIx64 "  | %d |", i,
-						e_sector[i].Key[0], e_sector[i].foundKey[0], e_sector[i].Key[1], e_sector[i].foundKey[1]);
+		PrintAndLog("");
+		PrintAndLog("|---|----------------|----------------|");
+		PrintAndLog("|sec|key A           |key B           |");
+		PrintAndLog("|---|----------------|----------------|");
+		for (i = 0; i < SectorsCnt; i++) {
+			// If a block key check, only print a line if a key was found.
+			if (!singleBlock || e_sector[i].foundKey[0] || e_sector[i].foundKey[1]) {
+				char keyAString[13] = "      ?     ";
+				char keyBString[13] = "      ?     ";
+				if (e_sector[i].foundKey[0]) {
+					sprintf(keyAString, "%012" PRIx64, e_sector[i].Key[0]);
 				}
+				if (e_sector[i].foundKey[1]) {
+					sprintf(keyBString, "%012" PRIx64, e_sector[i].Key[1]);
+				}
+				PrintAndLog("|%03d|  %s  |  %s  |", i, keyAString, keyBString);
 			}
-			PrintAndLog("|---|----------------|---|----------------|---|");
 		}
+		PrintAndLog("|---|----------------|----------------|");
 	} else {
 		PrintAndLog("");
 		PrintAndLog("No valid keys found.");
@@ -1347,6 +1362,7 @@ int CmdHF14AMfChk(const char *Cmd)
 	PrintAndLog("");
 	return 0;
 }
+
 
 void readerAttack(nonces_t ar_resp[], bool setEmulatorMem, bool doStandardAttack) {
 	#define ATTACK_KEY_COUNT 7 // keep same as define in iso14443a.c -> Mifare1ksim()
