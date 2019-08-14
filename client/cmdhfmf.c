@@ -3022,9 +3022,9 @@ int CmdHFMFPersonalize(const char *cmd) {
 
 	void *argtable[] = {
 		arg_param_begin,
-		arg_str0("tT",  "key type", "<A|B>",                     "key type (A or B) to authenticate sector 0 (default: A)"),
-		arg_str0("kK",  "key",      "<key (hex 6 Bytes)>",       "key to authenticate sector 0 (default: FFFFFFFFFFFF)"),
-		arg_str1(NULL,  NULL,       "<UIDF0|UIDF1|UIDF2|UIDF3>", "Personalization Option"),
+		arg_str0("tT",  "keytype", "<A|B>",                     "key type (A or B) to authenticate sector 0 (default: A)"),
+		arg_str0("kK",  "key",     "<key (hex 6 Bytes)>",       "key to authenticate sector 0 (default: FFFFFFFFFFFF)"),
+		arg_str1(NULL,  NULL,      "<UIDF0|UIDF1|UIDF2|UIDF3>", "Personalization Option"),
 		arg_param_end
 	};
 	CLIExecWithReturn(cmd, argtable, true);
