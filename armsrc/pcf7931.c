@@ -153,7 +153,7 @@ bool IsBlock0PCF7931(uint8_t *block) {
 bool IsBlock1PCF7931(uint8_t *block) {
 	// assuming all RFU bits are set to 0
 
-	uint8_t rb1 = block[14] & 0x01;
+	uint8_t rb1 = block[14] & 0x80;
 	uint8_t rfb = block[14] & 0x7f;
 	uint8_t rlb = block[15];
 
