@@ -24,6 +24,7 @@
 #include "legicrfsim.h"
 #include "hitag2.h"
 #include "hitagS.h"
+#include "iclass.h"
 #include "iso14443b.h"
 #include "iso15693.h"
 #include "lfsampling.h"
