@@ -125,6 +125,10 @@ NXP/Philips CUSTOM COMMANDS
 #define MIFARE_CMD_TRANSFER      0xB0
 
 #define MIFARE_EV1_PERSONAL_UID  0x40
+#define MIFARE_EV1_UIDF0         0x00
+#define MIFARE_EV1_UIDF1         0x40
+#define MIFARE_EV1_UIDF2         0x20
+#define MIFARE_EV1_UIDF3         0x60
 #define MIFARE_EV1_SETMODE       0x43
 
 #define MIFARE_ULC_WRITE         0xA2

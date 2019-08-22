@@ -28,6 +28,7 @@
 #include "iso15693.h"
 #include "lfsampling.h"
 #include "BigBuf.h"
+#include "mifarecmd.h"
 #include "mifareutil.h"
 #include "mifaresim.h"
 #include "pcf7931.h"
@@ -1241,6 +1242,9 @@ void UsbPacketReceived(uint8_t *packet, int len)
 			break;
 		case CMD_MIFARE_WRITEBL:
 			MifareWriteBlock(c->arg[0], c->arg[1], c->arg[2], c->d.asBytes);
+			break;
+		case CMD_MIFARE_PERSONALIZE_UID:
+			MifarePersonalizeUID(c->arg[0], c->arg[1], c->d.asBytes);
 			break;
 		//case CMD_MIFAREU_WRITEBL_COMPAT:
 			//MifareUWriteBlockCompat(c->arg[0], c->d.asBytes);
