@@ -11,11 +11,7 @@
 #ifndef CMDLFHITAG_H__
 #define CMDLFHITAG_H__
 
-int CmdLFHitag(const char *Cmd);
-
-int CmdLFHitagList(const char *Cmd);
-int CmdLFHitagSnoop(const char *Cmd);
-int CmdLFHitagSim(const char *Cmd);
-int CmdLFHitagReader(const char *Cmd);
+extern int CmdLFHitag(const char *Cmd);
+extern int CmdLFHitagReader(const char *Cmd);
 
 #endif

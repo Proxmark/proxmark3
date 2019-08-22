@@ -26,18 +26,6 @@
 #define CRC_PRESET 0xFF
 #define CRC_POLYNOM 0x1D
 
-#define u8              uint8_t
-#define u32             uint32_t
-#define u64             uint64_t
-#define rev8(x)         ((((x)>>7)&1)+((((x)>>6)&1)<<1)+((((x)>>5)&1)<<2)+((((x)>>4)&1)<<3)+((((x)>>3)&1)<<4)+((((x)>>2)&1)<<5)+((((x)>>1)&1)<<6)+(((x)&1)<<7))
-#define rev16(x)        (rev8 (x)+(rev8 (x>> 8)<< 8))
-#define rev32(x)        (rev16(x)+(rev16(x>>16)<<16))
-#define rev64(x)        (rev32(x)+(rev32(x>>32)<<32))
-#define bit(x,n)        (((x)>>(n))&1)
-#define bit32(x,n)      ((((x)[(n)>>5])>>((n)))&1)
-#define inv32(x,i,n)    ((x)[(i)>>5]^=((u32)(n))<<((i)&31))
-#define rotl64(x, n)    ((((u64)(x))<<((n)&63))+(((u64)(x))>>((0-(n))&63)))
-
 static bool bQuiet;
 static bool bSuccessful;
 static struct hitagS_tag tag;
@@ -57,17 +45,17 @@ size_t blocknr;
 bool end=false;
 
 // Single bit Hitag2 functions:
-#define i4(x,a,b,c,d)   ((u32)((((x)>>(a))&1)+(((x)>>(b))&1)*2+(((x)>>(c))&1)*4+(((x)>>(d))&1)*8))
-static const u32 ht2_f4a = 0x2C79;          // 0010 1100 0111 1001
-static const u32 ht2_f4b = 0x6671;          // 0110 0110 0111 0001
-static const u32 ht2_f5c = 0x7907287B;          // 0111 1001 0000 0111 0010 1000 0111 1011
+#define i4(x,a,b,c,d)   ((uint32_t)((((x)>>(a))&1)+(((x)>>(b))&1)*2+(((x)>>(c))&1)*4+(((x)>>(d))&1)*8))
+static const uint32_t ht2_f4a = 0x2C79;          // 0010 1100 0111 1001
+static const uint32_t ht2_f4b = 0x6671;          // 0110 0110 0111 0001
+static const uint32_t ht2_f5c = 0x7907287B;          // 0111 1001 0000 0111 0010 1000 0111 1011
 #define ht2bs_4a(a,b,c,d)   (~(((a|b)&c)^(a|d)^b))
 #define ht2bs_4b(a,b,c,d)   (~(((d|c)&(a^b))^(d|a|b)))
 #define ht2bs_5c(a,b,c,d,e) (~((((((c^e)|d)&a)^b)&(c^b))^(((d^e)|a)&((d^b)|c))))
-#define uf20bs              u32
+#define uf20bs              uint32_t
 
-static u32 f20(const u64 x) {
-	u32 i5;
+static uint32_t f20(const uint64_t x) {
+	uint32_t i5;
 
 	i5 = ((ht2_f4a >> i4(x, 1, 2, 4, 5)) & 1) * 1
 			+ ((ht2_f4b >> i4(x, 7, 11, 13, 14)) & 1) * 2
@@ -77,8 +65,19 @@ static u32 f20(const u64 x) {
 
 	return (ht2_f5c >> i5) & 1;
 }
-static u64 hitag2_round(u64 *state) {
-	u64 x = *state;
+
+static uint64_t hitag2_init(const uint64_t key, const uint32_t serial, const uint32_t IV) {
+	uint32_t i;
+	uint64_t x = ((key & 0xFFFF) << 32) + serial;
+	for (i = 0; i < 32; i++) {
+		x >>= 1;
+		x += (uint64_t) (f20(x) ^ (((IV >> i) ^ (key >> (i + 16))) & 1)) << 47;
+	}
+	return x;
+}
+
+static uint64_t hitag2_round(uint64_t *state) {
+	uint64_t x = *state;
 
 	x = (x >> 1)
 			+ ((((x >> 0) ^ (x >> 2) ^ (x >> 3) ^ (x >> 6) ^ (x >> 7) ^ (x >> 8)
@@ -89,20 +88,12 @@ static u64 hitag2_round(u64 *state) {
 	*state = x;
 	return f20(x);
 }
-static u64 hitag2_init(const u64 key, const u32 serial, const u32 IV) {
-	u32 i;
-	u64 x = ((key & 0xFFFF) << 32) + serial;
-	for (i = 0; i < 32; i++) {
-		x >>= 1;
-		x += (u64) (f20(x) ^ (((IV >> i) ^ (key >> (i + 16))) & 1)) << 47;
-	}
-	return x;
-}
-static u32 hitag2_byte(u64 *x) {
-	u32 i, c;
+
+static uint32_t hitag2_byte(uint64_t *x) {
+	uint32_t i, c;
 
 	for (i = 0, c = 0; i < 8; i++)
-		c += (u32) hitag2_round(x) << (i ^ 7);
+		c += (uint32_t) hitag2_round(x) << (i ^ 7);
 	return c;
 }
 
@@ -858,7 +849,7 @@ static void hitagS_handle_reader_command(byte_t* rx, const size_t rxlen,
 	byte_t rx_air[HITAG_FRAME_LEN];
 	byte_t page;
 	int i;
-	u64 state;
+	uint64_t state;
 	unsigned char crc;
 
 	// Copy the (original) received frame how it is send over the air
@@ -956,8 +947,8 @@ static void hitagS_handle_reader_command(byte_t* rx, const size_t rxlen,
 		//challenge message received
 		Dbprintf("Challenge for UID: %X", temp_uid);
 		temp2++;
-		state = hitag2_init(rev64(tag.key), rev32(tag.pages[0][0]),
-				rev32(((rx[3] << 24) + (rx[2] << 16) + (rx[1] << 8) + rx[0])));
+		state = hitag2_init(REV64(tag.key), REV32(tag.pages[0][0]),
+				REV32(((rx[3] << 24) + (rx[2] << 16) + (rx[1] << 8) + rx[0])));
 		Dbprintf(
 				",{0x%02X, 0x%02X, 0x%02X, 0x%02X, 0x%02X, 0x%02X, 0x%02X, 0x%02X}",
 				rx[0], rx[1], rx[2], rx[3], rx[4], rx[5], rx[6], rx[7]);
@@ -1216,7 +1207,7 @@ static int hitagS_handle_tag_auth(hitag_function htf,uint64_t key, uint64_t NrAr
 	unsigned char uid[32];
 	byte_t uid1 = 0x00, uid2 = 0x00, uid3 = 0x00, uid4 = 0x00;
 	unsigned char crc;
-	u64 state;
+	uint64_t state;
 	byte_t auth_ks[4];
 	byte_t conf_pages[3];
 	memcpy(rx_air, rx, nbytes(rxlen));
@@ -1356,11 +1347,11 @@ static int hitagS_handle_tag_auth(hitag_function htf,uint64_t key, uint64_t NrAr
 			*txlen = 64;
 			if(end!=true){
 				if(htf==02||htf==04){ //RHTS_KEY //WHTS_KEY
-					state = hitag2_init(rev64(key), rev32(tag.uid), rev32(rnd));
+					state = hitag2_init(REV64(key), REV32(tag.uid), REV32(rnd));
 					/*
-					Dbprintf("key: %02X %02X\n\n", key, rev64(key));
-					Dbprintf("tag.uid: %02X %02X\n\n", tag.uid, rev32(tag.uid));
-					Dbprintf("rnd: %02X %02X\n\n", rnd, rev32(rnd));
+					Dbprintf("key: %02X %02X\n\n", key, REV64(key));
+					Dbprintf("tag.uid: %02X %02X\n\n", tag.uid, REV32(tag.uid));
+					Dbprintf("rnd: %02X %02X\n\n", rnd, REV32(rnd));
 					*/
 					for (i = 0; i < 4; i++) {
 						auth_ks[i] = hitag2_byte(&state) ^ 0xff;
@@ -1404,7 +1395,7 @@ static int hitagS_handle_tag_auth(hitag_function htf,uint64_t key, uint64_t NrAr
 		pwdl0=0;
 		pwdl1=0;
 		if(htf==02 || htf==04) { //RHTS_KEY //WHTS_KEY
-			state = hitag2_init(rev64(key), rev32(tag.uid), rev32(rnd));
+			state = hitag2_init(REV64(key), REV32(tag.uid), REV32(rnd));
 			for (i = 0; i < 5; i++)  {
 				hitag2_byte(&state);
 			}

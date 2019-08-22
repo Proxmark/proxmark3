@@ -16,7 +16,6 @@
 #include <stddef.h>
 #include "common.h"
 #include "usb_cmd.h"
-#include "hitag2.h"
 #include "hitagS.h"
 #include "mifare.h"
 #include "../common/crc32.h"
