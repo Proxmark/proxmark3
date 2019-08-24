@@ -16,7 +16,6 @@
 #include <stddef.h>
 #include "common.h"
 #include "usb_cmd.h"
-#include "hitag2.h"
 #include "hitagS.h"
 #include "mifare.h"
 #include "../common/crc32.h"
@@ -104,41 +103,14 @@ void RAMFUNC SniffMifare(uint8_t param);
 void EPA_PACE_Collect_Nonce(UsbCommand * c);
 void EPA_PACE_Replay(UsbCommand *c);
 
-// mifarecmd.h
-void MifareReadBlock(uint8_t arg0, uint8_t arg1, uint8_t arg2, uint8_t *data);
-void MifareUReadBlock(uint8_t arg0, uint8_t arg1, uint8_t *datain);
-void MifareUC_Auth(uint8_t arg0, uint8_t *datain);
-void MifareUReadCard(uint8_t arg0, uint16_t arg1, uint8_t arg2, uint8_t *datain);
-void MifareReadSector(uint8_t arg0, uint8_t arg1, uint8_t arg2, uint8_t *datain);
-void MifareWriteBlock(uint8_t arg0, uint8_t arg1, uint8_t arg2, uint8_t *datain);
-//void MifareUWriteBlockCompat(uint8_t arg0,uint8_t *datain);
-void MifareUWriteBlock(uint8_t arg0, uint8_t arg1, uint8_t *datain);
-void MifareNested(uint32_t arg0, uint32_t arg1, uint32_t arg2, uint8_t *datain);
-void MifareAcquireEncryptedNonces(uint32_t arg0, uint32_t arg1, uint32_t flags, uint8_t *datain);
-void MifareChkKeys(uint16_t arg0, uint16_t arg1, uint8_t arg2, uint8_t *datain);
-void MifareSetDbgLvl(uint32_t arg0, uint32_t arg1, uint32_t arg2, uint8_t *datain);
-void MifareEMemClr(uint32_t arg0, uint32_t arg1, uint32_t arg2, uint8_t *datain);
-void MifareEMemSet(uint32_t arg0, uint32_t arg1, uint32_t arg2, uint8_t *datain);
-void MifareEMemGet(uint32_t arg0, uint32_t arg1, uint32_t arg2, uint8_t *datain);
-void MifareECardLoad(uint32_t arg0, uint32_t arg1, uint32_t arg2, uint8_t *datain);
-void MifareCWipe(uint32_t arg0, uint32_t arg1, uint32_t arg2, uint8_t *datain);       // Work with "magic Chinese" card
-void MifareCSetBlock(uint32_t arg0, uint32_t arg1, uint32_t arg2, uint8_t *datain);  
-void MifareCGetBlock(uint32_t arg0, uint32_t arg1, uint32_t arg2, uint8_t *datain);
-void MifareCIdent();  // is "magic chinese" card?
-void MifareUSetPwd(uint8_t arg0, uint8_t *datain);
-
-//desfire
-void Mifare_DES_Auth1(uint8_t arg0,uint8_t *datain);
-void Mifare_DES_Auth2(uint32_t arg0, uint8_t *datain);					   
-
 // mifaredesfire.h
-bool 	InitDesfireCard();
-void	MifareSendCommand(uint8_t arg0,uint8_t arg1, uint8_t *datain);
-void 	MifareDesfireGetInformation();
-void 	MifareDES_Auth1(uint8_t arg0,uint8_t arg1,uint8_t arg2, uint8_t *datain);
-void 	ReaderMifareDES(uint32_t param, uint32_t param2, uint8_t * datain);
-int 	DesfireAPDU(uint8_t *cmd, size_t cmd_len, uint8_t *dataout);
-size_t	CreateAPDU( uint8_t *datain, size_t len, uint8_t *dataout);
+bool    InitDesfireCard();
+void    MifareSendCommand(uint8_t arg0,uint8_t arg1, uint8_t *datain);
+void    MifareDesfireGetInformation();
+void    MifareDES_Auth1(uint8_t arg0,uint8_t arg1,uint8_t arg2, uint8_t *datain);
+void    ReaderMifareDES(uint32_t param, uint32_t param2, uint8_t * datain);
+int     DesfireAPDU(uint8_t *cmd, size_t cmd_len, uint8_t *dataout);
+size_t  CreateAPDU( uint8_t *datain, size_t len, uint8_t *dataout);
 
 // cmd.h
 bool cmd_receive(UsbCommand* cmd);
