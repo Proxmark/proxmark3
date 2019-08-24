@@ -1146,7 +1146,7 @@ int doIClassSimulation(int simulationMode, uint8_t *reader_mac_buf) {
 				memcpy(data_response, ToSend, ToSendMax);
 				modulated_response = data_response;
 				modulated_response_size = ToSendMax;
-				response_delay = 0;//We need to hurry here...
+				response_delay = 0; //We need to hurry here... (but maybe not too much... ??)
 				//exitLoop = true;
 			} else {    //Not fullsim, we don't respond
 				// We do not know what to answer, so lets keep quiet
