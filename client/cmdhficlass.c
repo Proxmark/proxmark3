@@ -110,28 +110,20 @@ int CmdHFiClassSim(const char *Cmd) {
 	}
 	simType = param_get8ex(Cmd, 0, 0, 10);
 
-	if(simType == 0)
-	{
+	if (simType == ICLASS_SIM_MODE_CSN) {
 		if (param_gethex(Cmd, 1, CSN, 16)) {
 			PrintAndLog("A CSN should consist of 16 HEX symbols");
 			return usage_hf_iclass_sim();
 		}
-
 		PrintAndLog("--simtype:%02x csn:%s", simType, sprint_hex(CSN, 8));
 	}
-	if(simType > 3)
-	{
-		PrintAndLog("Undefined simptype %d", simType);
-		return usage_hf_iclass_sim();
-	}
 
-	uint8_t numberOfCSNs=0;
-	if(simType == 2)
-	{
-		UsbCommand c = {CMD_SIMULATE_TAG_ICLASS, {simType,NUM_CSNS}};
+	uint8_t numberOfCSNs = 0;
+	if (simType == ICLASS_SIM_MODE_READER_ATTACK) {
+		UsbCommand c = {CMD_SIMULATE_TAG_ICLASS, {simType, NUM_CSNS}};
 		UsbCommand resp = {0};
 
-		uint8_t csns[8*NUM_CSNS] = {
+		uint8_t csns[8 * NUM_CSNS] = {
 			0x00, 0x0B, 0x0F, 0xFF, 0xF7, 0xFF, 0x12, 0xE0,
 			0x00, 0x04, 0x0E, 0x08, 0xF7, 0xFF, 0x12, 0xE0,
 			0x00, 0x09, 0x0D, 0x05, 0xF7, 0xFF, 0x12, 0xE0,
@@ -148,7 +140,7 @@ int CmdHFiClassSim(const char *Cmd) {
 			0x00, 0x00, 0x02, 0x24, 0xF7, 0xFF, 0x12, 0xE0,
 			0x00, 0x05, 0x01, 0x21, 0xF7, 0xFF, 0x12, 0xE0 };
 
-		memcpy(c.d.asBytes, csns, 8*NUM_CSNS);
+		memcpy(c.d.asBytes, csns, 8 * NUM_CSNS);
 
 		SendCommand(&c);
 		if (!WaitForResponseTimeout(CMD_ACK, &resp, -1)) {
@@ -157,9 +149,9 @@ int CmdHFiClassSim(const char *Cmd) {
 		}
 
 		uint8_t num_mac_responses  = resp.arg[1];
-		PrintAndLog("Mac responses: %d MACs obtained (should be %d)", num_mac_responses,NUM_CSNS);
+		PrintAndLog("Mac responses: %d MACs obtained (should be %d)", num_mac_responses, NUM_CSNS);
 
-		size_t datalen = NUM_CSNS*24;
+		size_t datalen = NUM_CSNS * 24;
 		/*
 		 * Now, time to dump to file. We'll use this format:
 		 * <8-byte CSN><8-byte CC><4 byte NR><4 byte MAC>....
@@ -167,28 +159,29 @@ int CmdHFiClassSim(const char *Cmd) {
 		 * 8 * 24 bytes.
 		 *
 		 * The returndata from the pm3 is on the following format
-		 * <4 byte NR><4 byte MAC>
-		 * CC are all zeroes, CSN is the same as was sent in
+		 * <8 byte CC><4 byte NR><4 byte MAC>
+		 * CSN is the same as was sent in
 		 **/
 		void* dump = malloc(datalen);
-		memset(dump,0,datalen);//<-- Need zeroes for the CC-field
-		uint8_t i = 0;
-		for(i = 0 ; i < NUM_CSNS ; i++)
-		{
-			memcpy(dump+i*24, csns+i*8,8); //CSN
-			//8 zero bytes here...
+		for(int i = 0; i < NUM_CSNS; i++) {
+			memcpy(dump + i*24, csns+i*8, 8); //CSN
+            //copy CC from response
+            memcpy(dump + i*24 + 8, resp.d.asBytes + i*16, 8);
 			//Then comes NR_MAC (eight bytes from the response)
-			memcpy(dump+i*24+16,resp.d.asBytes+i*8,8);
-
+			memcpy(dump + i*24 + 16, resp.d.asBytes + i*16 + 8, 8);
 		}
 		/** Now, save to dumpfile **/
 		saveFile("iclass_mac_attack", "bin", dump,datalen);
 		free(dump);
-	}else
-	{
-		UsbCommand c = {CMD_SIMULATE_TAG_ICLASS, {simType,numberOfCSNs}};
+
+	} else if (simType == ICLASS_SIM_MODE_CSN || simType == ICLASS_SIM_MODE_CSN_DEFAULT) {
+		UsbCommand c = {CMD_SIMULATE_TAG_ICLASS, {simType, numberOfCSNs}};
 		memcpy(c.d.asBytes, CSN, 8);
 		SendCommand(&c);
+
+	} else {
+		PrintAndLog("Undefined simtype %d", simType);
+		return usage_hf_iclass_sim();
 	}
 
 	return 0;
@@ -1265,24 +1258,18 @@ int CmdHFiClass_loclass(const char *Cmd) {
 		return 0;
 	}
 	char fileName[255] = {0};
-	if(opt == 'f')
-	{
-		if(param_getstr(Cmd, 1, fileName, sizeof(fileName)) > 0)
-		{
+	if(opt == 'f') {
+		if(param_getstr(Cmd, 1, fileName, sizeof(fileName)) > 0) {
 			return bruteforceFileNoKeys(fileName);
-		}else
-		{
+		} else {
 			PrintAndLog("You must specify a filename");
 		}
-	}
-	else if(opt == 't')
-	{
+	} else if(opt == 't') {
 		int errors = testCipherUtils();
 		errors += testMAC();
 		errors += doKeyTests(0);
 		errors += testElite();
-		if(errors)
-		{
+		if(errors) {
 			prnlog("OBS! There were errors!!!");
 		}
 		return errors;

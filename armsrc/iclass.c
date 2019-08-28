@@ -391,8 +391,7 @@ static RAMFUNC int ManchesterDecoding(int v) {
 			Demod.shiftReg = 0;
 			Demod.samples = 0;
 			if (Demod.posCount) {
-				//if (trigger) LED_A_OFF();  // Not useful in this case...
-				switch(Demod.syncBit) {
+				switch (Demod.syncBit) {
 					case 0x08: Demod.samples = 3; break;
 					case 0x04: Demod.samples = 2; break;
 					case 0x02: Demod.samples = 1; break;
@@ -414,12 +413,13 @@ static RAMFUNC int ManchesterDecoding(int v) {
 
 		}
 	} else {
+		// state is DEMOD is in SYNC from here on.
 		modulation = bit & Demod.syncBit;
 		modulation |= ((bit << 1) ^ ((Demod.buffer & 0x08) >> 3)) & Demod.syncBit;
 
 		Demod.samples += 4;
 
-		if (Demod.posCount==0) {
+		if (Demod.posCount == 0) {
 			Demod.posCount = 1;
 			if (modulation) {
 				Demod.sub = SUB_FIRST_HALF;
@@ -428,14 +428,6 @@ static RAMFUNC int ManchesterDecoding(int v) {
 			}
 		} else {
 			Demod.posCount = 0;
-			/*(modulation && (Demod.sub == SUB_FIRST_HALF)) {
-				if (Demod.state!=DEMOD_ERROR_WAIT) {
-					Demod.state = DEMOD_ERROR_WAIT;
-					Demod.output[Demod.len] = 0xaa;
-					error = 0x01;
-				}
-			}*/
-			//else if (modulation) {
 			if (modulation) {
 				if (Demod.sub == SUB_FIRST_HALF) {
 					Demod.sub = SUB_BOTH;
@@ -447,23 +439,16 @@ static RAMFUNC int ManchesterDecoding(int v) {
 					Demod.output[Demod.len] = 0x0f;
 					Demod.len++;
 					Demod.state = DEMOD_UNSYNCD;
-//                  error = 0x0f;
 					return true;
 				} else {
 					Demod.state = DEMOD_ERROR_WAIT;
 					error = 0x33;
 				}
-				/*if (Demod.state!=DEMOD_ERROR_WAIT) {
-					Demod.state = DEMOD_ERROR_WAIT;
-					Demod.output[Demod.len] = 0xaa;
-					error = 0x01;
-				}*/
 			}
 
 			switch(Demod.state) {
 				case DEMOD_START_OF_COMMUNICATION:
 					if (Demod.sub == SUB_BOTH) {
-						//Demod.state = DEMOD_MANCHESTER_D;
 						Demod.state = DEMOD_START_OF_COMMUNICATION2;
 						Demod.posCount = 1;
 						Demod.sub = SUB_NONE;
@@ -484,10 +469,7 @@ static RAMFUNC int ManchesterDecoding(int v) {
 					break;
 				case DEMOD_START_OF_COMMUNICATION3:
 					if (Demod.sub == SUB_SECOND_HALF) {
-//                      Demod.state = DEMOD_MANCHESTER_D;
 						Demod.state = DEMOD_SOF_COMPLETE;
-						//Demod.output[Demod.len] = Demod.syncBit & 0xFF;
-						//Demod.len++;
 					} else {
 						Demod.output[Demod.len] = 0xab;
 						Demod.state = DEMOD_ERROR_WAIT;
@@ -543,16 +525,6 @@ static RAMFUNC int ManchesterDecoding(int v) {
 					break;
 			}
 
-			/*if (Demod.bitCount>=9) {
-				Demod.output[Demod.len] = Demod.shiftReg & 0xff;
-				Demod.len++;
-
-				Demod.parityBits <<= 1;
-				Demod.parityBits ^= ((Demod.shiftReg >> 8) & 0x01);
-
-				Demod.bitCount = 0;
-				Demod.shiftReg = 0;
-			}*/
 			if (Demod.bitCount >= 8) {
 				Demod.shiftReg >>= 1;
 				Demod.output[Demod.len] = (Demod.shiftReg & 0xff);
@@ -787,8 +759,7 @@ void rotateCSN(uint8_t* originalCSN, uint8_t* rotatedCSN) {
 // Stop when button is pressed
 // Or return true when command is captured
 //-----------------------------------------------------------------------------
-static int GetIClassCommandFromReader(uint8_t *received, int *len, int maxLen)
-{
+static int GetIClassCommandFromReader(uint8_t *received, int *len, int maxLen) {
 	// Set FPGA mode to "simulated ISO 14443 tag", no modulation (listen
 	// only, since we are receiving, not transmitting).
 	// Signal field is off with the appropriate LED
@@ -825,7 +796,7 @@ static uint8_t encode4Bits(const uint8_t b) {
 	//         The columns are
 	//               1 - Bit value to send
 	//               2 - Reversed (big-endian)
-	//               3 - Encoded
+	//               3 - Manchester Encoded
 	//               4 - Hex values
 
 	switch(c){
@@ -935,20 +906,19 @@ static int SendIClassAnswer(uint8_t *resp, int respLen, int delay) {
 
 	AT91C_BASE_SSC->SSC_THR = 0x00;
 	FpgaSetupSsc(FPGA_MAJOR_MODE_HF_SIMULATOR);
-	while (!BUTTON_PRESS()) {
+	while (true) {
 		if ((AT91C_BASE_SSC->SSC_SR & AT91C_SSC_RXRDY)){
-			b = AT91C_BASE_SSC->SSC_RHR; (void) b;
+			b = AT91C_BASE_SSC->SSC_RHR;
+			(void) b;
 		}
 		if (AT91C_BASE_SSC->SSC_SR & (AT91C_SSC_TXRDY)){
 			b = 0x00;
 			if (d < delay) {
+				// send 0x00 byte (causing a 2048/13,56MHz = 151us delay)
 				d++;
-			}
-			else {
+			} else {
 				if (i < respLen) {
 					b = resp[i];
-					//Hack
-					//b = 0xAC;
 				}
 				i++;
 			}
@@ -957,15 +927,13 @@ static int SendIClassAnswer(uint8_t *resp, int respLen, int delay) {
 
 //      if (i > respLen +4) break;
 		if (i > respLen + 1) break;
+		// send 2 more 0x00 bytes (causing a 302us delay)
 	}
 
 	return 0;
 }
 
 
-#define MODE_SIM_CSN        0
-#define MODE_EXIT_AFTER_MAC 1
-#define MODE_FULLSIM        2
 
 /**
  * @brief Does the actual simulation
@@ -973,14 +941,16 @@ static int SendIClassAnswer(uint8_t *resp, int respLen, int delay) {
  * @param breakAfterMacReceived if true, returns after reader MAC has been received.
  */
 int doIClassSimulation(int simulationMode, uint8_t *reader_mac_buf) {
+
 	// free eventually allocated BigBuf memory
 	BigBuf_free_keep_EM();
 
 	State cipher_state;
-//  State cipher_state_reserve;
-	uint8_t *csn = BigBuf_get_EM_addr();
-	uint8_t *emulator = csn;
-	uint8_t sof_data[] = { 0x0F} ;
+
+	uint8_t *emulator = BigBuf_get_EM_addr();
+	uint8_t *csn = emulator;
+	uint8_t sof_data[] = { 0x0F } ;
+
 	// CSN followed by two CRC bytes
 	uint8_t anticoll_data[10] = { 0 };
 	uint8_t csn_data[10] = { 0 };
@@ -991,20 +961,25 @@ int doIClassSimulation(int simulationMode, uint8_t *reader_mac_buf) {
 	rotateCSN(csn_data, anticoll_data);
 
 	// Compute CRC on both CSNs
-	ComputeCrc14443(CRC_ICLASS, anticoll_data, 8, &anticoll_data[8], &anticoll_data[9]);
-	ComputeCrc14443(CRC_ICLASS, csn_data, 8, &csn_data[8], &csn_data[9]);
+	AppendCrc(anticoll_data, 8);
+	AppendCrc(csn_data, 8);
 
 	uint8_t diversified_key[8] = { 0 };
 	// e-Purse
-	uint8_t card_challenge_data[8] = { 0x00 };
-	if (simulationMode == MODE_FULLSIM) {
-		//The diversified key should be stored on block 3
-		//Get the diversified key from emulator memory
-		memcpy(diversified_key, emulator + (8*3), 8);
-		//Card challenge, a.k.a e-purse is on block 2
+	uint8_t card_challenge_data[8] = { 0xfe, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
+	//uint8_t card_challenge_data[8] = { 0 };
+	if (simulationMode == ICLASS_SIM_MODE_FULL) {
+		// The diversified key should be stored on block 3
+		// Get the diversified key from emulator memory
+		memcpy(diversified_key, emulator + (8 * 3), 8);
+		// Card challenge, a.k.a e-purse is on block 2
 		memcpy(card_challenge_data, emulator + (8 * 2), 8);
-		//Precalculate the cipher state, feeding it the CC
+		// Precalculate the cipher state, feeding it the CC
 		cipher_state = opt_doTagMAC_1(card_challenge_data, diversified_key);
+	}
+	// save card challenge for sim2,4 attack
+	if (reader_mac_buf != NULL) {
+		memcpy(reader_mac_buf, card_challenge_data, 8);
 	}
 
 	int exitLoop = 0;
@@ -1026,18 +1001,30 @@ int doIClassSimulation(int simulationMode, uint8_t *reader_mac_buf) {
 
 	// Anticollision CSN (rotated CSN)
 	// 22: Takes 2 bytes for SOF/EOF and 10 * 2 = 20 bytes (2 bytes/byte)
-	uint8_t *resp_anticoll = BigBuf_malloc(28);
+	uint8_t *resp_anticoll = BigBuf_malloc(22);
 	int resp_anticoll_len;
 
-	// CSN
+	// CSN (block 0)
 	// 22: Takes 2 bytes for SOF/EOF and 10 * 2 = 20 bytes (2 bytes/byte)
-	uint8_t *resp_csn = BigBuf_malloc(30);
+	uint8_t *resp_csn = BigBuf_malloc(22);
 	int resp_csn_len;
 
-	// e-Purse
+	// configuration (block 1) picopass 2ks
+	uint8_t *resp_conf = BigBuf_malloc(22);
+	int resp_conf_len;
+	uint8_t conf_data[10] = {0x12, 0xFF, 0xFF, 0xFF, 0x7F, 0x1F, 0xFF, 0x3C, 0x00, 0x00};
+	AppendCrc(conf_data, 8);
+
+	// e-Purse (block 2)
 	// 18: Takes 2 bytes for SOF/EOF and 8 * 2 = 16 bytes (2 bytes/bit)
-	uint8_t *resp_cc = BigBuf_malloc(20);
+	uint8_t *resp_cc = BigBuf_malloc(18);
 	int resp_cc_len;
+
+	// Application Issuer Area (block 5)
+	uint8_t *resp_aia = BigBuf_malloc(22);
+	int resp_aia_len;
+	uint8_t aia_data[10] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0x00};
+	AppendCrc(aia_data, 8);
 
 	uint8_t *receivedCmd = BigBuf_malloc(MAX_FRAME_SIZE);
 	int len;
@@ -1055,25 +1042,30 @@ int doIClassSimulation(int simulationMode, uint8_t *reader_mac_buf) {
 	memcpy(resp_anticoll, ToSend, ToSendMax);
 	resp_anticoll_len = ToSendMax;
 
-	// CSN
+	// CSN (block 0)
 	CodeIClassTagAnswer(csn_data, sizeof(csn_data));
 	memcpy(resp_csn, ToSend, ToSendMax);
 	resp_csn_len = ToSendMax;
 
-	// e-Purse
+	// Configuration (block 1)
+	CodeIClassTagAnswer(conf_data, sizeof(conf_data));
+	memcpy(resp_conf, ToSend, ToSendMax);
+	resp_conf_len = ToSendMax;
+
+	// e-Purse (block 2)
 	CodeIClassTagAnswer(card_challenge_data, sizeof(card_challenge_data));
-	memcpy(resp_cc, ToSend, ToSendMax); resp_cc_len = ToSendMax;
+	memcpy(resp_cc, ToSend, ToSendMax);
+	resp_cc_len = ToSendMax;
+
+	// Application Issuer Area (block 5)
+	CodeIClassTagAnswer(aia_data, sizeof(aia_data));
+	memcpy(resp_aia, ToSend, ToSendMax);
+	resp_aia_len = ToSendMax;
 
 	//This is used for responding to READ-block commands or other data which is dynamically generated
-	//First the 'trace'-data, not encoded for FPGA
-	uint8_t *data_generic_trace = BigBuf_malloc(8 + 2);//8 bytes data + 2byte CRC is max tag answer
-	//Then storage for the modulated data
-	//Each bit is doubled when modulated for FPGA, and we also have SOF and EOF (2 bytes)
-	uint8_t *data_response = BigBuf_malloc( (8+2) * 2 + 2);
+	uint8_t *data_generic_trace = BigBuf_malloc(8 + 2); // 8 bytes data + 2byte CRC is max tag answer
+	uint8_t *data_response = BigBuf_malloc( (8 + 2) * 2 + 2);
 
-	// Start from off (no field generated)
-	//FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
-	//SpinDelay(200);
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_HF_ISO14443A | FPGA_HF_ISO14443A_TAGSIM_LISTEN);
 	SpinDelay(100);
 	StartCountSspClk();
@@ -1081,8 +1073,6 @@ int doIClassSimulation(int simulationMode, uint8_t *reader_mac_buf) {
 	SetAdcMuxFor(GPIO_MUXSEL_HIPKD);
 	FpgaSetupSsc(FPGA_MAJOR_MODE_HF_ISO14443A);
 
-	// To control where we are in the protocol
-	int cmdsRecvd = 0;
 	uint32_t time_0 = GetCountSspClk();
 	uint32_t t2r_time =0;
 	uint32_t r2t_time =0;
@@ -1091,6 +1081,7 @@ int doIClassSimulation(int simulationMode, uint8_t *reader_mac_buf) {
 	bool buttonPressed = false;
 	uint8_t response_delay = 1;
 	while (!exitLoop) {
+		WDT_HIT();
 		response_delay = 1;
 		LED_B_OFF();
 		//Signal tracer
@@ -1105,41 +1096,95 @@ int doIClassSimulation(int simulationMode, uint8_t *reader_mac_buf) {
 		//Signal tracer
 		LED_C_ON();
 
-		// Okay, look at the command now.
+		// Now look at the reader command and provide appropriate responses
+		// default is no response:
+		modulated_response = NULL;
+		modulated_response_size = 0;
+		trace_data = NULL;
+		trace_data_size = 0;
 		if (receivedCmd[0] == ICLASS_CMD_ACTALL) {
 			// Reader in anticollission phase
 			modulated_response = resp_sof;
-			modulated_response_size = resp_sof_Len; //order = 1;
+			modulated_response_size = resp_sof_Len;
 			trace_data = sof_data;
 			trace_data_size = sizeof(sof_data);
-		} else if (receivedCmd[0] == ICLASS_CMD_READ_OR_IDENTIFY && len == 1) {
+
+		} else if (receivedCmd[0] == ICLASS_CMD_READ_OR_IDENTIFY && len == 1) { // identify
 			// Reader asks for anticollission CSN
 			modulated_response = resp_anticoll;
-			modulated_response_size = resp_anticoll_len; //order = 2;
+			modulated_response_size = resp_anticoll_len;
 			trace_data = anticoll_data;
 			trace_data_size = sizeof(anticoll_data);
 			//DbpString("Reader requests anticollission CSN:");
+
+		} else if (receivedCmd[0] == ICLASS_CMD_READ_OR_IDENTIFY && len == 4) { // read block
+			uint16_t blockNo = receivedCmd[1];
+			if (simulationMode != ICLASS_SIM_MODE_FULL) {
+				// provide defaults for blocks 0, 1, 2, 5
+				switch (blockNo) {
+					case 0: // csn (block 00)
+						modulated_response = resp_csn;
+						modulated_response_size = resp_csn_len;
+						trace_data = csn_data;
+						trace_data_size = sizeof(csn_data);
+						break;
+					case 1: // configuration (block 01)
+						modulated_response = resp_conf;
+						modulated_response_size = resp_conf_len;
+						trace_data = conf_data;
+						trace_data_size = sizeof(conf_data);
+						break;
+					case 2: // e-purse (block 02)
+						modulated_response = resp_cc;
+						modulated_response_size = resp_cc_len;
+						trace_data = card_challenge_data;
+						trace_data_size = sizeof(card_challenge_data);
+						// set epurse of sim2,4 attack
+						if (reader_mac_buf != NULL) {
+							memcpy(reader_mac_buf, card_challenge_data, 8);
+						}
+						break;
+					case 5: // Application Issuer Area (block 05)
+						modulated_response = resp_aia;
+						modulated_response_size = resp_aia_len;
+						trace_data = aia_data;
+						trace_data_size = sizeof(aia_data);
+						break;
+					// default: don't respond
+				}
+			} else { // use data from emulator memory
+				memcpy(data_generic_trace, emulator + (receivedCmd[1] << 3), 8);
+				AppendCrc(data_generic_trace, 8);
+				trace_data = data_generic_trace;
+				trace_data_size = 10;
+				CodeIClassTagAnswer(trace_data, trace_data_size);
+				memcpy(data_response, ToSend, ToSendMax);
+				modulated_response = data_response;
+				modulated_response_size = ToSendMax;
+			}
+
 		} else if (receivedCmd[0] == ICLASS_CMD_SELECT) {
 			// Reader selects anticollission CSN.
 			// Tag sends the corresponding real CSN
 			modulated_response = resp_csn;
-			modulated_response_size = resp_csn_len; //order = 3;
+			modulated_response_size = resp_csn_len;
 			trace_data = csn_data;
 			trace_data_size = sizeof(csn_data);
-			//DbpString("Reader selects anticollission CSN:");
-		} else if (receivedCmd[0] == ICLASS_CMD_READCHECK_KD) {
-			// Read e-purse (88 02)
+
+		} else if (receivedCmd[0] == ICLASS_CMD_READCHECK_KD
+					|| receivedCmd[0] == ICLASS_CMD_READCHECK_KC) {
+			// Read e-purse (88 02 || 18 02)
 			modulated_response = resp_cc;
-			modulated_response_size = resp_cc_len; //order = 4;
+			modulated_response_size = resp_cc_len;
 			trace_data = card_challenge_data;
 			trace_data_size = sizeof(card_challenge_data);
 			LED_B_ON();
+
 		} else if (receivedCmd[0] == ICLASS_CMD_CHECK) {
 			// Reader random and reader MAC!!!
-			if (simulationMode == MODE_FULLSIM) {
+			if (simulationMode == ICLASS_SIM_MODE_FULL) {
 				//NR, from reader, is in receivedCmd +1
 				opt_doTagMAC_2(cipher_state, receivedCmd+1, data_generic_trace, diversified_key);
-
 				trace_data = data_generic_trace;
 				trace_data_size = 4;
 				CodeIClassTagAnswer(trace_data, trace_data_size);
@@ -1148,13 +1193,9 @@ int doIClassSimulation(int simulationMode, uint8_t *reader_mac_buf) {
 				modulated_response_size = ToSendMax;
 				response_delay = 0; //We need to hurry here... (but maybe not too much... ??)
 				//exitLoop = true;
-			} else {    //Not fullsim, we don't respond
+			} else { // Not fullsim, we don't respond
 				// We do not know what to answer, so lets keep quiet
-				modulated_response = resp_sof;
-				modulated_response_size = 0;
-				trace_data = NULL;
-				trace_data_size = 0;
-				if (simulationMode == MODE_EXIT_AFTER_MAC) {
+				if (simulationMode == ICLASS_SIM_MODE_EXIT_AFTER_MAC) {
 					// dbprintf:ing ...
 					Dbprintf("CSN: %02x %02x %02x %02x %02x %02x %02x %02x"
 							   ,csn[0],csn[1],csn[2],csn[3],csn[4],csn[5],csn[6],csn[7]);
@@ -1163,7 +1204,8 @@ int doIClassSimulation(int simulationMode, uint8_t *reader_mac_buf) {
 							receivedCmd[3], receivedCmd[4], receivedCmd[5],
 							receivedCmd[6], receivedCmd[7], receivedCmd[8]);
 					if (reader_mac_buf != NULL) {
-						memcpy(reader_mac_buf, receivedCmd+1, 8);
+						// save NR and MAC for sim 2,4
+						memcpy(reader_mac_buf + 8, receivedCmd + 1, 8);
 					}
 					exitLoop = true;
 				}
@@ -1172,30 +1214,18 @@ int doIClassSimulation(int simulationMode, uint8_t *reader_mac_buf) {
 		} else if (receivedCmd[0] == ICLASS_CMD_HALT && len == 1) {
 			// Reader ends the session
 			modulated_response = resp_sof;
-			modulated_response_size = 0; //order = 0;
+			modulated_response_size = 0;
 			trace_data = NULL;
 			trace_data_size = 0;
-		} else if (simulationMode == MODE_FULLSIM && receivedCmd[0] == ICLASS_CMD_READ_OR_IDENTIFY && len == 4) {
-			//Read block
-			uint16_t blk = receivedCmd[1];
-			//Take the data...
-			memcpy(data_generic_trace, emulator + (blk << 3), 8);
-			//Add crc
-			AppendCrc(data_generic_trace, 8);
-			trace_data = data_generic_trace;
-			trace_data_size = 10;
-			CodeIClassTagAnswer(trace_data, trace_data_size);
-			memcpy(data_response, ToSend, ToSendMax);
-			modulated_response = data_response;
-			modulated_response_size = ToSendMax;
-		} else if (receivedCmd[0] == ICLASS_CMD_UPDATE && simulationMode == MODE_FULLSIM) {
-			//Probably the reader wants to update the nonce. Let's just ignore that for now.
+
+		} else if (receivedCmd[0] == ICLASS_CMD_UPDATE && simulationMode == ICLASS_SIM_MODE_FULL) {
+			// Probably the reader wants to update the nonce. Let's just ignore that for now.
 			// OBS! If this is implemented, don't forget to regenerate the cipher_state
-			//We're expected to respond with the data+crc, exactly what's already in the receivedcmd
-			//receivedcmd is now UPDATE 1b | ADDRESS 1b| DATA 8b| Signature 4b or CRC 2b|
+			// We're expected to respond with the data+crc, exactly what's already in the receivedCmd
+			// receivedCmd is now UPDATE 1b | ADDRESS 1b | DATA 8b | Signature 4b or CRC 2b
 
 			//Take the data...
-			memcpy(data_generic_trace, receivedCmd+2, 8);
+			memcpy(data_generic_trace, receivedCmd + 2, 8);
 			//Add crc
 			AppendCrc(data_generic_trace, 8);
 			trace_data = data_generic_trace;
@@ -1204,35 +1234,23 @@ int doIClassSimulation(int simulationMode, uint8_t *reader_mac_buf) {
 			memcpy(data_response, ToSend, ToSendMax);
 			modulated_response = data_response;
 			modulated_response_size = ToSendMax;
+
 		} else if (receivedCmd[0] == ICLASS_CMD_PAGESEL) {
-			//Pagesel
-			//Pagesel enables to select a page in the selected chip memory and return its configuration block
-			//Chips with a single page will not answer to this command
+			// Pagesel
+			// Pagesel enables to select a page in the selected chip memory and return its configuration block
+			// Chips with a single page will not answer to this command
 			// It appears we're fine ignoring this.
-			//Otherwise, we should answer 8bytes (block) + 2bytes CRC
+			// Otherwise, we should answer 8bytes (block) + 2bytes CRC
+
 		} else {
 			//#db# Unknown command received from reader (len=5): 26 1 0 f6 a 44 44 44 44
 			// Never seen this command before
-			Dbprintf("Unknown command received from reader (len=%d): %x %x %x %x %x %x %x %x %x",
-			len,
-			receivedCmd[0], receivedCmd[1], receivedCmd[2],
-			receivedCmd[3], receivedCmd[4], receivedCmd[5],
-			receivedCmd[6], receivedCmd[7], receivedCmd[8]);
+			print_result("Unhandled command received from reader ", receivedCmd, len);
 			// Do not respond
-			modulated_response = resp_sof;
-			modulated_response_size = 0; //order = 0;
-			trace_data = NULL;
-			trace_data_size = 0;
 		}
 
-		if (cmdsRecvd >  100) {
-			//DbpString("100 commands later...");
-			//break;
-		} else {
-			cmdsRecvd++;
-		}
 		/**
-		A legit tag has about 380us delay between reader EOT and tag SOF.
+		A legit tag has about 330us delay between reader EOT and tag SOF.
 		**/
 		if (modulated_response_size > 0) {
 			SendIClassAnswer(modulated_response, modulated_response_size, response_delay);
@@ -1253,7 +1271,6 @@ int doIClassSimulation(int simulationMode, uint8_t *reader_mac_buf) {
 		}
 	}
 
-	//Dbprintf("%x", cmdsRecvd);
 	LED_A_OFF();
 	LED_B_OFF();
 	LED_C_OFF();
@@ -1280,6 +1297,7 @@ int doIClassSimulation(int simulationMode, uint8_t *reader_mac_buf) {
 void SimulateIClass(uint32_t arg0, uint32_t arg1, uint32_t arg2, uint8_t *datain) {
 	uint32_t simType = arg0;
 	uint32_t numberOfCSNS = arg1;
+
 	FpgaDownloadAndGo(FPGA_BITSTREAM_HF);
 
 	// Enable and clear the trace
@@ -1288,35 +1306,35 @@ void SimulateIClass(uint32_t arg0, uint32_t arg1, uint32_t arg2, uint8_t *datain
 	//Use the emulator memory for SIM
 	uint8_t *emulator = BigBuf_get_EM_addr();
 
-	if (simType == 0) {
+	if (simType == ICLASS_SIM_MODE_CSN) {
 		// Use the CSN from commandline
 		memcpy(emulator, datain, 8);
-		doIClassSimulation(MODE_SIM_CSN,NULL);
-	} else if (simType == 1) {
+		doIClassSimulation(ICLASS_SIM_MODE_CSN, NULL);
+	} else if (simType == ICLASS_SIM_MODE_CSN_DEFAULT) {
 		//Default CSN
 		uint8_t csn_crc[] = { 0x03, 0x1f, 0xec, 0x8a, 0xf7, 0xff, 0x12, 0xe0, 0x00, 0x00 };
 		// Use the CSN from commandline
 		memcpy(emulator, csn_crc, 8);
-		doIClassSimulation(MODE_SIM_CSN,NULL);
-	} else if (simType == 2) {
+		doIClassSimulation(ICLASS_SIM_MODE_CSN, NULL);
+	} else if (simType == ICLASS_SIM_MODE_READER_ATTACK) {
 		uint8_t mac_responses[USB_CMD_DATA_SIZE] = { 0 };
 		Dbprintf("Going into attack mode, %d CSNS sent", numberOfCSNS);
 		// In this mode, a number of csns are within datain. We'll simulate each one, one at a time
-		// in order to collect MAC's from the reader. This can later be used in an offlne-attack
+		// in order to collect MAC's from the reader. This can later be used in an offline-attack
 		// in order to obtain the keys, as in the "dismantling iclass"-paper.
-		int i = 0;
-		for ( ; i < numberOfCSNS && i*8+8 < USB_CMD_DATA_SIZE; i++) {
-			// The usb data is 512 bytes, fitting 65 8-byte CSNs in there.
+		int i;
+		for (i = 0; i < numberOfCSNS && i*16+16 <= USB_CMD_DATA_SIZE; i++) {
+			// The usb data is 512 bytes, fitting 32 responses (8 byte CC + 4 Byte NR + 4 Byte MAC = 16 Byte response).
 			memcpy(emulator, datain+(i*8), 8);
-			if (doIClassSimulation(MODE_EXIT_AFTER_MAC,mac_responses+i*8)) {
-				cmd_send(CMD_ACK, CMD_SIMULATE_TAG_ICLASS, i, 0, mac_responses, i*8);
-				return; // Button pressed
+			if (doIClassSimulation(ICLASS_SIM_MODE_EXIT_AFTER_MAC, mac_responses+i*16)) {
+				 // Button pressed
+				 break;
 			}
 		}
-		cmd_send(CMD_ACK, CMD_SIMULATE_TAG_ICLASS, i, 0, mac_responses, i*8);
-	} else if (simType == 3) {
+		cmd_send(CMD_ACK, CMD_SIMULATE_TAG_ICLASS, i, 0, mac_responses, i*16);
+	} else if (simType == ICLASS_SIM_MODE_FULL) {
 		//This is 'full sim' mode, where we use the emulator storage for data.
-		doIClassSimulation(MODE_FULLSIM, NULL);
+		doIClassSimulation(ICLASS_SIM_MODE_FULL, NULL);
 	} else {
 		// We may want a mode here where we hardcode the csns to use (from proxclone).
 		// That will speed things up a little, but not required just yet.
@@ -1683,10 +1701,10 @@ void ReaderIClass(uint8_t arg0) {
 		// 0 : CSN
 		// 1 : Configuration
 		// 2 : e-purse
-		// (3,4 write-only, kc and kd)
-		// 5 Application issuer area
-		//
-		//Then we can 'ship' back the 8 * 6 bytes of data,
+		// 3 : kd / debit / aa2 (write-only)
+		// 4 : kc / credit / aa1 (write-only)
+		// 5 : AIA, Application issuer area
+		//Then we can 'ship' back the 6 * 8 bytes of data,
 		// with 0xFF:s in block 3 and 4.
 
 		LED_B_ON();

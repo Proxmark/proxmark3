@@ -333,16 +333,14 @@ int bruteforceItem(dumpdata item, uint16_t keytable[])
 	 * Only the lower eight bits correspond to the (hopefully cracked) key-value.
 	 **/
 	uint8_t bytes_to_recover[3] = {0};
-	uint8_t numbytes_to_recover = 0 ;
-	int i;
-	for(i =0 ; i < 8 ; i++)
-	{
-		if(keytable[key_index[i]] & (CRACKED | BEING_CRACKED)) continue;
+	uint8_t numbytes_to_recover = 0;
+
+	for(int i = 0; i < 8; i++) {
+		if (keytable[key_index[i]] & (CRACKED | BEING_CRACKED)) continue;
 		bytes_to_recover[numbytes_to_recover++] = key_index[i];
 		keytable[key_index[i]] |= BEING_CRACKED;
 
-		if(numbytes_to_recover > 3)
-		{
+		if(numbytes_to_recover > 3) {
 			prnlog("The CSN requires > 3 byte bruteforce, not supported");
 			printvar("CSN", item.csn,8);
 			printvar("HASH1", key_index,8);
@@ -370,15 +368,14 @@ int bruteforceItem(dumpdata item, uint16_t keytable[])
 
 	uint32_t endmask =  1 << 8*numbytes_to_recover;
 
-	for(i =0 ; i < numbytes_to_recover && numbytes_to_recover > 1; i++)
+	for (int i = 0; i < numbytes_to_recover && numbytes_to_recover > 1; i++) {
 		prnlog("Bruteforcing byte %d", bytes_to_recover[i]);
+	}
 
-	while(!found && !(brute & endmask))
-	{
+	while(!found && !(brute & endmask)) {
 
 		//Update the keytable with the brute-values
-		for(i =0 ; i < numbytes_to_recover; i++)
-		{
+		for (int i = 0; i < numbytes_to_recover; i++) {
 			keytable[bytes_to_recover[i]] &= 0xFF00;
 			keytable[bytes_to_recover[i]] |= (brute >> (i*8) & 0xFF);
 		}
@@ -394,42 +391,34 @@ int bruteforceItem(dumpdata item, uint16_t keytable[])
 		//Diversify
 		diversifyKey(item.csn, key_sel_p, div_key);
 		//Calc mac
-		doMAC(item.cc_nr, div_key,calculated_MAC);
+		doMAC(item.cc_nr, div_key, calculated_MAC);
 
-		if(memcmp(calculated_MAC, item.mac, 4) == 0)
-		{
-			for(i =0 ; i < numbytes_to_recover; i++)
-				prnlog("=> %d: 0x%02x", bytes_to_recover[i],0xFF & keytable[bytes_to_recover[i]]);
+		if (memcmp(calculated_MAC, item.mac, 4) == 0) {
+			for (int i =0 ; i < numbytes_to_recover; i++)
+				prnlog("=> %d: 0x%02x", bytes_to_recover[i], 0xFF & keytable[bytes_to_recover[i]]);
 			found = true;
 			break;
 		}
 		brute++;
-		if((brute & 0xFFFF) == 0)
-		{
+		if ((brute & 0xFFFF) == 0) {
 			printf("%d",(brute >> 16) & 0xFF);
 			fflush(stdout);
 		}
 	}
-	if(! found)
-	{
+	if (! found) {
 		prnlog("Failed to recover %d bytes using the following CSN",numbytes_to_recover);
 		printvar("CSN",item.csn,8);
 		errors++;
 		//Before we exit, reset the 'BEING_CRACKED' to zero
-		for(i =0 ; i < numbytes_to_recover; i++)
-		{
+		for (int i = 0; i < numbytes_to_recover; i++) {
 			keytable[bytes_to_recover[i]]  &= 0xFF;
 			keytable[bytes_to_recover[i]]  |= CRACK_FAILED;
 		}
-
-	}else
-	{
-		for(i =0 ; i < numbytes_to_recover; i++)
-		{
+	} else {
+		for (int i = 0 ;i < numbytes_to_recover; i++) {
 			keytable[bytes_to_recover[i]]  &= 0xFF;
 			keytable[bytes_to_recover[i]]  |= CRACKED;
 		}
-
 	}
 	return errors;
 }
@@ -516,7 +505,7 @@ int bruteforceDump(uint8_t dump[], size_t dumpsize, uint16_t keytable[])
 
 	dumpdata* attack = (dumpdata* ) malloc(itemsize);
 
-	for(i = 0 ; i * itemsize < dumpsize ; i++ )
+	for (i = 0 ; i * itemsize < dumpsize ; i++ )
 	{
 		memcpy(attack,dump+i*itemsize, itemsize);
 		errors += bruteforceItem(*attack, keytable);

@@ -228,7 +228,7 @@ typedef struct{
 #define CMD_UNKNOWN                                                       0xFFFF
 
 
-//Mifare simulation flags
+// Mifare simulation flags
 #define FLAG_INTERACTIVE                (1<<0)
 #define FLAG_4B_UID_IN_DATA             (1<<1)
 #define FLAG_7B_UID_IN_DATA             (1<<2)
@@ -236,7 +236,7 @@ typedef struct{
 #define FLAG_RANDOM_NONCE               (1<<5)
 
 
-//Iclass reader flags
+// iCLASS reader flags
 #define FLAG_ICLASS_READER_ONLY_ONCE    0x01
 #define FLAG_ICLASS_READER_CC           0x02
 #define FLAG_ICLASS_READER_CSN          0x04
@@ -245,8 +245,16 @@ typedef struct{
 #define FLAG_ICLASS_READER_ONE_TRY      0x20
 #define FLAG_ICLASS_READER_CEDITKEY     0x40
 
+// iCLASS simulation modes
+#define ICLASS_SIM_MODE_CSN                   0
+#define ICLASS_SIM_MODE_CSN_DEFAULT           1
+#define ICLASS_SIM_MODE_READER_ATTACK         2
+#define ICLASS_SIM_MODE_FULL                  3
+#define ICLASS_SIM_MODE_READER_ATTACK_KEYROLL 4
+#define ICLASS_SIM_MODE_EXIT_AFTER_MAC        5  // note: device internal only
 
-//hw tune args
+
+// hw tune args
 #define FLAG_TUNE_LF   1
 #define FLAG_TUNE_HF   2
 #define FLAG_TUNE_ALL  3
