@@ -25,10 +25,6 @@ extern const uint8_t OddByteParity[256];
 extern int rsamples;   // = 0;
 extern uint8_t trigger;
 
-// This may be used (sparingly) to declare a function to be copied to
-// and executed from RAM
-#define RAMFUNC __attribute((long_call, section(".ramfunc")))
-
 /// appmain.h
 void ReadMem(int addr);
 void __attribute__((noreturn)) AppMain(void);
@@ -115,21 +111,6 @@ void    MifareDES_Auth1(uint8_t arg0,uint8_t arg1,uint8_t arg2, uint8_t *datain)
 void    ReaderMifareDES(uint32_t param, uint32_t param2, uint8_t * datain);
 int     DesfireAPDU(uint8_t *cmd, size_t cmd_len, uint8_t *dataout);
 size_t  CreateAPDU( uint8_t *datain, size_t len, uint8_t *dataout);
-
-
-/// iclass.h
-void RAMFUNC SnoopIClass(void);
-void SimulateIClass(uint32_t arg0, uint32_t arg1, uint32_t arg2, uint8_t *datain);
-void ReaderIClass(uint8_t arg0);
-void ReaderIClass_Replay(uint8_t arg0,uint8_t *MAC);
-void IClass_iso14443A_GetPublic(uint8_t arg0);
-void iClass_Authentication(uint8_t *MAC);
-void iClass_WriteBlock(uint8_t blockNo, uint8_t *data);
-void iClass_ReadBlk(uint8_t blockNo);
-bool iClass_ReadBlock(uint8_t blockNo, uint8_t *readdata);
-void iClass_Dump(uint8_t blockno, uint8_t numblks);
-void iClass_Clone(uint8_t startblock, uint8_t endblock, uint8_t *data);
-void iClass_ReadCheck(uint8_t   blockNo, uint8_t keyType);
 
 // cmd.h
 bool cmd_receive(UsbCommand* cmd);
