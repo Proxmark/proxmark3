@@ -42,9 +42,11 @@
 #include "apps.h"
 #include "util.h"
 #include "string.h"
+#include "printf.h"
 #include "common.h"
 #include "cmd.h"
 #include "iso14443a.h"
+#include "iso15693.h"
 // Needed for CRC in emulation mode;
 // same construction as in ISO 14443;
 // different initial value (CRC_ICLASS)
@@ -754,132 +756,7 @@ void rotateCSN(uint8_t* originalCSN, uint8_t* rotatedCSN) {
 	}
 }
 
-//-----------------------------------------------------------------------------
-// Wait for commands from reader
-// Stop when button is pressed
-// Or return true when command is captured
-//-----------------------------------------------------------------------------
-static int GetIClassCommandFromReader(uint8_t *received, int *len, int maxLen) {
-	// Set FPGA mode to "simulated ISO 14443 tag", no modulation (listen
-	// only, since we are receiving, not transmitting).
-	// Signal field is off with the appropriate LED
-	LED_D_OFF();
-	FpgaWriteConfWord(FPGA_MAJOR_MODE_HF_ISO14443A | FPGA_HF_ISO14443A_TAGSIM_LISTEN);
-
-	// Now run a `software UART' on the stream of incoming samples.
-	Uart.output = received;
-	Uart.byteCntMax = maxLen;
-	Uart.state = STATE_UNSYNCD;
-
-	for (;;) {
-		WDT_HIT();
-
-		if (BUTTON_PRESS()) return false;
-
-		if (AT91C_BASE_SSC->SSC_SR & (AT91C_SSC_TXRDY)) {
-			AT91C_BASE_SSC->SSC_THR = 0x00;
-		}
-		if (AT91C_BASE_SSC->SSC_SR & (AT91C_SSC_RXRDY)) {
-			uint8_t b = (uint8_t)AT91C_BASE_SSC->SSC_RHR;
-
-			if (OutOfNDecoding(b & 0x0f)) {
-				*len = Uart.byteCnt;
-				return true;
-			}
-		}
-	}
-}
-
-static uint8_t encode4Bits(const uint8_t b) {
-	uint8_t c = b & 0xF;
-	// OTA, the least significant bits first
-	//         The columns are
-	//               1 - Bit value to send
-	//               2 - Reversed (big-endian)
-	//               3 - Manchester Encoded
-	//               4 - Hex values
-
-	switch(c){
-	//                          1       2         3         4
-	  case 15: return 0x55; // 1111 -> 1111 -> 01010101 -> 0x55
-	  case 14: return 0x95; // 1110 -> 0111 -> 10010101 -> 0x95
-	  case 13: return 0x65; // 1101 -> 1011 -> 01100101 -> 0x65
-	  case 12: return 0xa5; // 1100 -> 0011 -> 10100101 -> 0xa5
-	  case 11: return 0x59; // 1011 -> 1101 -> 01011001 -> 0x59
-	  case 10: return 0x99; // 1010 -> 0101 -> 10011001 -> 0x99
-	  case 9:  return 0x69; // 1001 -> 1001 -> 01101001 -> 0x69
-	  case 8:  return 0xa9; // 1000 -> 0001 -> 10101001 -> 0xa9
-	  case 7:  return 0x56; // 0111 -> 1110 -> 01010110 -> 0x56
-	  case 6:  return 0x96; // 0110 -> 0110 -> 10010110 -> 0x96
-	  case 5:  return 0x66; // 0101 -> 1010 -> 01100110 -> 0x66
-	  case 4:  return 0xa6; // 0100 -> 0010 -> 10100110 -> 0xa6
-	  case 3:  return 0x5a; // 0011 -> 1100 -> 01011010 -> 0x5a
-	  case 2:  return 0x9a; // 0010 -> 0100 -> 10011010 -> 0x9a
-	  case 1:  return 0x6a; // 0001 -> 1000 -> 01101010 -> 0x6a
-	  default: return 0xaa; // 0000 -> 0000 -> 10101010 -> 0xaa
-
-	}
-}
-
-//-----------------------------------------------------------------------------
-// Prepare tag messages
-//-----------------------------------------------------------------------------
-static void CodeIClassTagAnswer(const uint8_t *cmd, int len) {
-
-	/*
-	 * SOF comprises 3 parts;
-	 * * An unmodulated time of 56.64 us
-	 * * 24 pulses of 423.75 kHz (fc/32)
-	 * * A logic 1, which starts with an unmodulated time of 18.88us
-	 *   followed by 8 pulses of 423.75kHz (fc/32)
-	 *
-	 *
-	 * EOF comprises 3 parts:
-	 * - A logic 0 (which starts with 8 pulses of fc/32 followed by an unmodulated
-	 *   time of 18.88us.
-	 * - 24 pulses of fc/32
-	 * - An unmodulated time of 56.64 us
-	 *
-	 *
-	 * A logic 0 starts with 8 pulses of fc/32
-	 * followed by an unmodulated time of 256/fc (~18,88us).
-	 *
-	 * A logic 0 starts with unmodulated time of 256/fc (~18,88us) followed by
-	 * 8 pulses of fc/32 (also 18.88us)
-	 *
-	 * The mode FPGA_HF_SIMULATOR_MODULATE_424K_8BIT which we use to simulate tag,
-	 * works like this.
-	 * - A 1-bit input to the FPGA becomes 8 pulses on 423.5kHz (fc/32) (18.88us).
-	 * - A 0-bit input to the FPGA becomes an unmodulated time of 18.88us
-	 *
-	 * In this mode the SOF can be written as 00011101 = 0x1D
-	 * The EOF can be written as 10111000 = 0xb8
-	 * A logic 1 is 01
-	 * A logic 0 is 10
-	 *
-	 * */
-
-	int i;
-
-	ToSendReset();
-
-	// Send SOF
-	ToSend[++ToSendMax] = 0x1D;
-
-	for (i = 0; i < len; i++) {
-		uint8_t b = cmd[i];
-		ToSend[++ToSendMax] = encode4Bits(b & 0xF);       // Least significant half
-		ToSend[++ToSendMax] = encode4Bits((b >>4) & 0xF); // Most significant half
-	}
-
-	// Send EOF
-	ToSend[++ToSendMax] = 0xB8;
-	//lastProxToAirDuration  = 8*ToSendMax - 3*8 - 3*8;//Not counting zeroes in the beginning or end
-	// Convert from last byte pos to length
-	ToSendMax++;
-}
-
-// Only SOF
+// Encode SOF only
 static void CodeIClassTagSOF() {
 	//So far a dummy implementation, not used
 	//int lastProxToAirDuration =0;
@@ -896,43 +773,6 @@ static void CodeIClassTagSOF() {
 static void AppendCrc(uint8_t *data, int len) {
 	ComputeCrc14443(CRC_ICLASS, data, len, data+len, data+len+1);
 }
-
-static int SendIClassAnswer(uint8_t *resp, int respLen, int delay) {
-	int i = 0, d = 0;//, u = 0, d = 0;
-	uint8_t b = 0;
-
-	//FpgaWriteConfWord(FPGA_MAJOR_MODE_HF_SIMULATOR|FPGA_HF_SIMULATOR_MODULATE_424K);
-	FpgaWriteConfWord(FPGA_MAJOR_MODE_HF_SIMULATOR | FPGA_HF_SIMULATOR_MODULATE_424K_8BIT);
-
-	AT91C_BASE_SSC->SSC_THR = 0x00;
-	FpgaSetupSsc(FPGA_MAJOR_MODE_HF_SIMULATOR);
-	while (true) {
-		if ((AT91C_BASE_SSC->SSC_SR & AT91C_SSC_RXRDY)){
-			b = AT91C_BASE_SSC->SSC_RHR;
-			(void) b;
-		}
-		if (AT91C_BASE_SSC->SSC_SR & (AT91C_SSC_TXRDY)){
-			b = 0x00;
-			if (d < delay) {
-				// send 0x00 byte (causing a 2048/13,56MHz = 151us delay)
-				d++;
-			} else {
-				if (i < respLen) {
-					b = resp[i];
-				}
-				i++;
-			}
-			AT91C_BASE_SSC->SSC_THR = b;
-		}
-
-//      if (i > respLen +4) break;
-		if (i > respLen + 1) break;
-		// send 2 more 0x00 bytes (causing a 302us delay)
-	}
-
-	return 0;
-}
-
 
 
 /**
@@ -1032,33 +872,33 @@ int doIClassSimulation(int simulationMode, uint8_t *reader_mac_buf) {
 	// Prepare card messages
 	ToSendMax = 0;
 
-	// First card answer: SOF
+	// First card answer: SOF only
 	CodeIClassTagSOF();
 	memcpy(resp_sof, ToSend, ToSendMax);
 	resp_sof_Len = ToSendMax;
 
 	// Anticollision CSN
-	CodeIClassTagAnswer(anticoll_data, sizeof(anticoll_data));
+	CodeIso15693AsTag(anticoll_data, sizeof(anticoll_data));
 	memcpy(resp_anticoll, ToSend, ToSendMax);
 	resp_anticoll_len = ToSendMax;
 
 	// CSN (block 0)
-	CodeIClassTagAnswer(csn_data, sizeof(csn_data));
+	CodeIso15693AsTag(csn_data, sizeof(csn_data));
 	memcpy(resp_csn, ToSend, ToSendMax);
 	resp_csn_len = ToSendMax;
 
 	// Configuration (block 1)
-	CodeIClassTagAnswer(conf_data, sizeof(conf_data));
+	CodeIso15693AsTag(conf_data, sizeof(conf_data));
 	memcpy(resp_conf, ToSend, ToSendMax);
 	resp_conf_len = ToSendMax;
 
 	// e-Purse (block 2)
-	CodeIClassTagAnswer(card_challenge_data, sizeof(card_challenge_data));
+	CodeIso15693AsTag(card_challenge_data, sizeof(card_challenge_data));
 	memcpy(resp_cc, ToSend, ToSendMax);
 	resp_cc_len = ToSendMax;
 
 	// Application Issuer Area (block 5)
-	CodeIClassTagAnswer(aia_data, sizeof(aia_data));
+	CodeIso15693AsTag(aia_data, sizeof(aia_data));
 	memcpy(resp_aia, ToSend, ToSendMax);
 	resp_aia_len = ToSendMax;
 
@@ -1066,33 +906,22 @@ int doIClassSimulation(int simulationMode, uint8_t *reader_mac_buf) {
 	uint8_t *data_generic_trace = BigBuf_malloc(8 + 2); // 8 bytes data + 2byte CRC is max tag answer
 	uint8_t *data_response = BigBuf_malloc( (8 + 2) * 2 + 2);
 
-	FpgaWriteConfWord(FPGA_MAJOR_MODE_HF_ISO14443A | FPGA_HF_ISO14443A_TAGSIM_LISTEN);
-	SpinDelay(100);
-	StartCountSspClk();
-	// We need to listen to the high-frequency, peak-detected path.
-	SetAdcMuxFor(GPIO_MUXSEL_HIPKD);
-	FpgaSetupSsc(FPGA_MAJOR_MODE_HF_ISO14443A);
-
-	uint32_t time_0 = GetCountSspClk();
-	uint32_t t2r_time =0;
-	uint32_t r2t_time =0;
-
 	LED_A_ON();
 	bool buttonPressed = false;
-	uint8_t response_delay = 1;
 	while (!exitLoop) {
 		WDT_HIT();
-		response_delay = 1;
 		LED_B_OFF();
 		//Signal tracer
 		// Can be used to get a trigger for an oscilloscope..
 		LED_C_OFF();
 
-		if (!GetIClassCommandFromReader(receivedCmd, &len, 100)) {
+		uint32_t reader_eof_time = 0;
+		len = GetIso15693CommandFromReader(receivedCmd, MAX_FRAME_SIZE, &reader_eof_time);
+		if (len < 0) {
 			buttonPressed = true;
 			break;
 		}
-		r2t_time = GetCountSspClk();
+		
 		//Signal tracer
 		LED_C_ON();
 
@@ -1116,7 +945,7 @@ int doIClassSimulation(int simulationMode, uint8_t *reader_mac_buf) {
 			trace_data = anticoll_data;
 			trace_data_size = sizeof(anticoll_data);
 			//DbpString("Reader requests anticollission CSN:");
-
+			
 		} else if (receivedCmd[0] == ICLASS_CMD_READ_OR_IDENTIFY && len == 4) { // read block
 			uint16_t blockNo = receivedCmd[1];
 			if (simulationMode != ICLASS_SIM_MODE_FULL) {
@@ -1157,7 +986,7 @@ int doIClassSimulation(int simulationMode, uint8_t *reader_mac_buf) {
 				AppendCrc(data_generic_trace, 8);
 				trace_data = data_generic_trace;
 				trace_data_size = 10;
-				CodeIClassTagAnswer(trace_data, trace_data_size);
+				CodeIso15693AsTag(trace_data, trace_data_size);
 				memcpy(data_response, ToSend, ToSendMax);
 				modulated_response = data_response;
 				modulated_response_size = ToSendMax;
@@ -1183,26 +1012,18 @@ int doIClassSimulation(int simulationMode, uint8_t *reader_mac_buf) {
 		} else if (receivedCmd[0] == ICLASS_CMD_CHECK) {
 			// Reader random and reader MAC!!!
 			if (simulationMode == ICLASS_SIM_MODE_FULL) {
-				//NR, from reader, is in receivedCmd +1
+				//NR, from reader, is in receivedCmd+1
 				opt_doTagMAC_2(cipher_state, receivedCmd+1, data_generic_trace, diversified_key);
 				trace_data = data_generic_trace;
 				trace_data_size = 4;
-				CodeIClassTagAnswer(trace_data, trace_data_size);
+				CodeIso15693AsTag(trace_data, trace_data_size);
 				memcpy(data_response, ToSend, ToSendMax);
 				modulated_response = data_response;
 				modulated_response_size = ToSendMax;
-				response_delay = 0; //We need to hurry here... (but maybe not too much... ??)
 				//exitLoop = true;
 			} else { // Not fullsim, we don't respond
 				// We do not know what to answer, so lets keep quiet
 				if (simulationMode == ICLASS_SIM_MODE_EXIT_AFTER_MAC) {
-					// dbprintf:ing ...
-					Dbprintf("CSN: %02x %02x %02x %02x %02x %02x %02x %02x"
-							   ,csn[0],csn[1],csn[2],csn[3],csn[4],csn[5],csn[6],csn[7]);
-					Dbprintf("RDR:  (len=%02d): %02x %02x %02x %02x %02x %02x %02x %02x %02x",len,
-							receivedCmd[0], receivedCmd[1], receivedCmd[2],
-							receivedCmd[3], receivedCmd[4], receivedCmd[5],
-							receivedCmd[6], receivedCmd[7], receivedCmd[8]);
 					if (reader_mac_buf != NULL) {
 						// save NR and MAC for sim 2,4
 						memcpy(reader_mac_buf + 8, receivedCmd + 1, 8);
@@ -1223,14 +1044,11 @@ int doIClassSimulation(int simulationMode, uint8_t *reader_mac_buf) {
 			// OBS! If this is implemented, don't forget to regenerate the cipher_state
 			// We're expected to respond with the data+crc, exactly what's already in the receivedCmd
 			// receivedCmd is now UPDATE 1b | ADDRESS 1b | DATA 8b | Signature 4b or CRC 2b
-
-			//Take the data...
 			memcpy(data_generic_trace, receivedCmd + 2, 8);
-			//Add crc
 			AppendCrc(data_generic_trace, 8);
 			trace_data = data_generic_trace;
 			trace_data_size = 10;
-			CodeIClassTagAnswer(trace_data, trace_data_size);
+			CodeIso15693AsTag(trace_data, trace_data_size);
 			memcpy(data_response, ToSend, ToSendMax);
 			modulated_response = data_response;
 			modulated_response_size = ToSendMax;
@@ -1243,9 +1061,13 @@ int doIClassSimulation(int simulationMode, uint8_t *reader_mac_buf) {
 			// Otherwise, we should answer 8bytes (block) + 2bytes CRC
 
 		} else {
-			//#db# Unknown command received from reader (len=5): 26 1 0 f6 a 44 44 44 44
 			// Never seen this command before
-			print_result("Unhandled command received from reader ", receivedCmd, len);
+			char debug_message[250]; // should be enough
+			sprintf(debug_message, "Unhandled command (len = %d) received from reader:", len);
+			for (int i = 0; i < len && strlen(debug_message) < sizeof(debug_message) - 3 - 1; i++) {
+				sprintf(debug_message + strlen(debug_message), " %02x", receivedCmd[i]);
+			}
+			Dbprintf("%s", debug_message);
 			// Do not respond
 		}
 
@@ -1253,22 +1075,11 @@ int doIClassSimulation(int simulationMode, uint8_t *reader_mac_buf) {
 		A legit tag has about 330us delay between reader EOT and tag SOF.
 		**/
 		if (modulated_response_size > 0) {
-			SendIClassAnswer(modulated_response, modulated_response_size, response_delay);
-			t2r_time = GetCountSspClk();
+			uint32_t response_time = reader_eof_time + DELAY_ISO15693_VCD_TO_VICC_SIM - DELAY_ARM_TO_READER_SIM;
+			TransmitTo15693Reader(modulated_response, modulated_response_size, response_time, false);
+			LogTrace(trace_data, trace_data_size, response_time + DELAY_ARM_TO_READER_SIM, response_time + (modulated_response_size << 6) + DELAY_ARM_TO_READER_SIM, NULL, false);
 		}
 
-		uint8_t parity[MAX_PARITY_SIZE];
-		GetParity(receivedCmd, len, parity);
-		LogTrace(receivedCmd, len, (r2t_time-time_0) << 4, (r2t_time-time_0) << 4, parity, true);
-
-		if (trace_data != NULL) {
-			GetParity(trace_data, trace_data_size, parity);
-			LogTrace(trace_data, trace_data_size, (t2r_time-time_0) << 4, (t2r_time-time_0) << 4, parity, false);
-		}
-		if (!get_tracing()) {
-			DbpString("Trace full");
-			//break;
-		}
 	}
 
 	LED_A_OFF();
@@ -1298,7 +1109,12 @@ void SimulateIClass(uint32_t arg0, uint32_t arg1, uint32_t arg2, uint8_t *datain
 	uint32_t simType = arg0;
 	uint32_t numberOfCSNS = arg1;
 
+	// setup hardware for simulation:
 	FpgaDownloadAndGo(FPGA_BITSTREAM_HF);
+	SetAdcMuxFor(GPIO_MUXSEL_HIPKD);
+   	FpgaWriteConfWord(FPGA_MAJOR_MODE_HF_SIMULATOR | FPGA_HF_SIMULATOR_NO_MODULATION);
+	FpgaSetupSsc(FPGA_MAJOR_MODE_HF_SIMULATOR);
+	StartCountSspClk();
 
 	// Enable and clear the trace
 	set_tracing(true);
@@ -1330,6 +1146,12 @@ void SimulateIClass(uint32_t arg0, uint32_t arg1, uint32_t arg2, uint8_t *datain
 				 // Button pressed
 				 break;
 			}
+			Dbprintf("CSN: %02x %02x %02x %02x %02x %02x %02x %02x",
+					datain[i*8+0], datain[i*8+1], datain[i*8+2], datain[i*8+3],
+					datain[i*8+4], datain[i*8+5], datain[i*8+6], datain[i*8+7]);
+			Dbprintf("NR,MAC: %02x %02x %02x %02x %02x %02x %02x %02x",
+					datain[i*8+ 8], datain[i*8+ 9], datain[i*8+10],	datain[i*8+11],
+					datain[i*8+12], datain[i*8+13],	datain[i*8+14], datain[i*8+15]);
 		}
 		cmd_send(CMD_ACK, CMD_SIMULATE_TAG_ICLASS, i, 0, mac_responses, i*16);
 	} else if (simType == ICLASS_SIM_MODE_FULL) {
