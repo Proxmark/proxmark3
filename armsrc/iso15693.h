@@ -18,7 +18,7 @@
 // Delays in SSP_CLK ticks.
 // SSP_CLK runs at 13,56MHz / 32 = 423.75kHz when simulating a tag
 #define DELAY_READER_TO_ARM_SIM           8
-#define DELAY_ARM_TO_READER_SIM           1
+#define DELAY_ARM_TO_READER_SIM           0
 #define DELAY_ISO15693_VCD_TO_VICC_SIM    132  // 132/423.75kHz = 311.5us from end of command EOF to start of tag response
 //SSP_CLK runs at 13.56MHz / 4 = 3,39MHz when acting as reader
 #define DELAY_ISO15693_VCD_TO_VICC_READER 1056 // 1056/3,39MHz = 311.5us from end of command EOF to start of tag response

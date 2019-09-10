@@ -860,6 +860,12 @@ int doIClassSimulation(int simulationMode, uint8_t *reader_mac_buf) {
 	uint8_t *resp_cc = BigBuf_malloc(18);
 	int resp_cc_len;
 
+	// Kd, Kc (blocks 3 and 4). Cannot be read. Always respond with 0xff bytes only
+	uint8_t *resp_ff = BigBuf_malloc(22);
+	int resp_ff_len;
+	uint8_t ff_data[10] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0x00};
+	AppendCrc(ff_data, 8);
+
 	// Application Issuer Area (block 5)
 	uint8_t *resp_aia = BigBuf_malloc(22);
 	int resp_aia_len;
@@ -897,14 +903,19 @@ int doIClassSimulation(int simulationMode, uint8_t *reader_mac_buf) {
 	memcpy(resp_cc, ToSend, ToSendMax);
 	resp_cc_len = ToSendMax;
 
+	// Kd, Kc (blocks 3 and 4)
+	CodeIso15693AsTag(ff_data, sizeof(ff_data));
+	memcpy(resp_ff, ToSend, ToSendMax);
+	resp_ff_len = ToSendMax;
+
 	// Application Issuer Area (block 5)
 	CodeIso15693AsTag(aia_data, sizeof(aia_data));
 	memcpy(resp_aia, ToSend, ToSendMax);
 	resp_aia_len = ToSendMax;
 
 	//This is used for responding to READ-block commands or other data which is dynamically generated
-	uint8_t *data_generic_trace = BigBuf_malloc(8 + 2); // 8 bytes data + 2byte CRC is max tag answer
-	uint8_t *data_response = BigBuf_malloc( (8 + 2) * 2 + 2);
+	uint8_t *data_generic_trace = BigBuf_malloc(32 + 2); // 32 bytes data + 2byte CRC is max tag answer
+	uint8_t *data_response = BigBuf_malloc( (32 + 2) * 2 + 2);
 
 	LED_A_ON();
 	bool buttonPressed = false;
@@ -921,7 +932,7 @@ int doIClassSimulation(int simulationMode, uint8_t *reader_mac_buf) {
 			buttonPressed = true;
 			break;
 		}
-		
+
 		//Signal tracer
 		LED_C_ON();
 
@@ -931,6 +942,7 @@ int doIClassSimulation(int simulationMode, uint8_t *reader_mac_buf) {
 		modulated_response_size = 0;
 		trace_data = NULL;
 		trace_data_size = 0;
+
 		if (receivedCmd[0] == ICLASS_CMD_ACTALL) {
 			// Reader in anticollission phase
 			modulated_response = resp_sof;
@@ -944,12 +956,11 @@ int doIClassSimulation(int simulationMode, uint8_t *reader_mac_buf) {
 			modulated_response_size = resp_anticoll_len;
 			trace_data = anticoll_data;
 			trace_data_size = sizeof(anticoll_data);
-			//DbpString("Reader requests anticollission CSN:");
-			
+
 		} else if (receivedCmd[0] == ICLASS_CMD_READ_OR_IDENTIFY && len == 4) { // read block
 			uint16_t blockNo = receivedCmd[1];
-			if (simulationMode != ICLASS_SIM_MODE_FULL) {
-				// provide defaults for blocks 0, 1, 2, 5
+			if (simulationMode == ICLASS_SIM_MODE_EXIT_AFTER_MAC) {
+				// provide defaults for blocks 0 ... 5
 				switch (blockNo) {
 					case 0: // csn (block 00)
 						modulated_response = resp_csn;
@@ -973,6 +984,13 @@ int doIClassSimulation(int simulationMode, uint8_t *reader_mac_buf) {
 							memcpy(reader_mac_buf, card_challenge_data, 8);
 						}
 						break;
+					case 3:
+					case 4: // Kd, Kd, always respond with 0xff bytes
+						modulated_response = resp_ff;
+						modulated_response_size = resp_ff_len;
+						trace_data = ff_data;
+						trace_data_size = sizeof(ff_data);
+						break;
 					case 5: // Application Issuer Area (block 05)
 						modulated_response = resp_aia;
 						modulated_response_size = resp_aia_len;
@@ -981,15 +999,22 @@ int doIClassSimulation(int simulationMode, uint8_t *reader_mac_buf) {
 						break;
 					// default: don't respond
 				}
-			} else { // use data from emulator memory
-				memcpy(data_generic_trace, emulator + (receivedCmd[1] << 3), 8);
-				AppendCrc(data_generic_trace, 8);
-				trace_data = data_generic_trace;
-				trace_data_size = 10;
-				CodeIso15693AsTag(trace_data, trace_data_size);
-				memcpy(data_response, ToSend, ToSendMax);
-				modulated_response = data_response;
-				modulated_response_size = ToSendMax;
+			} else if (simulationMode == ICLASS_SIM_MODE_FULL) {
+				if (blockNo == 3 || blockNo == 4) { // Kd, Kc, always respond with 0xff bytes
+					modulated_response = resp_ff;
+					modulated_response_size = resp_ff_len;
+					trace_data = ff_data;
+					trace_data_size = sizeof(ff_data);
+				} else { // use data from emulator memory
+					memcpy(data_generic_trace, emulator + (receivedCmd[1] << 3), 8);
+					AppendCrc(data_generic_trace, 8);
+					trace_data = data_generic_trace;
+					trace_data_size = 10;
+					CodeIso15693AsTag(trace_data, trace_data_size);
+					memcpy(data_response, ToSend, ToSendMax);
+					modulated_response = data_response;
+					modulated_response_size = ToSendMax;
+				}
 			}
 
 		} else if (receivedCmd[0] == ICLASS_CMD_SELECT) {
@@ -1039,6 +1064,18 @@ int doIClassSimulation(int simulationMode, uint8_t *reader_mac_buf) {
 			trace_data = NULL;
 			trace_data_size = 0;
 
+		} else if (simulationMode == ICLASS_SIM_MODE_FULL && receivedCmd[0] == ICLASS_CMD_READ4 && len == 4) {  // 0x06
+			//Read block
+			//Take the data...
+			memcpy(data_generic_trace, emulator + (receivedCmd[1] << 3), 8 * 4);
+			AppendCrc(data_generic_trace, 8 * 4);
+			trace_data = data_generic_trace;
+			trace_data_size = 8 * 4 + 2;
+			CodeIso15693AsTag(trace_data, trace_data_size);
+			memcpy(data_response, ToSend, ToSendMax);
+			modulated_response = data_response;
+			modulated_response_size = ToSendMax;
+
 		} else if (receivedCmd[0] == ICLASS_CMD_UPDATE && simulationMode == ICLASS_SIM_MODE_FULL) {
 			// Probably the reader wants to update the nonce. Let's just ignore that for now.
 			// OBS! If this is implemented, don't forget to regenerate the cipher_state
@@ -1072,7 +1109,7 @@ int doIClassSimulation(int simulationMode, uint8_t *reader_mac_buf) {
 		}
 
 		/**
-		A legit tag has about 330us delay between reader EOT and tag SOF.
+		A legit tag has about 311,5us delay between reader EOT and tag SOF.
 		**/
 		if (modulated_response_size > 0) {
 			uint32_t response_time = reader_eof_time + DELAY_ISO15693_VCD_TO_VICC_SIM - DELAY_ARM_TO_READER_SIM;
@@ -1112,7 +1149,7 @@ void SimulateIClass(uint32_t arg0, uint32_t arg1, uint32_t arg2, uint8_t *datain
 	// setup hardware for simulation:
 	FpgaDownloadAndGo(FPGA_BITSTREAM_HF);
 	SetAdcMuxFor(GPIO_MUXSEL_HIPKD);
-   	FpgaWriteConfWord(FPGA_MAJOR_MODE_HF_SIMULATOR | FPGA_HF_SIMULATOR_NO_MODULATION);
+	FpgaWriteConfWord(FPGA_MAJOR_MODE_HF_SIMULATOR | FPGA_HF_SIMULATOR_NO_MODULATION);
 	FpgaSetupSsc(FPGA_MAJOR_MODE_HF_SIMULATOR);
 	StartCountSspClk();
 
@@ -1150,8 +1187,8 @@ void SimulateIClass(uint32_t arg0, uint32_t arg1, uint32_t arg2, uint8_t *datain
 					datain[i*8+0], datain[i*8+1], datain[i*8+2], datain[i*8+3],
 					datain[i*8+4], datain[i*8+5], datain[i*8+6], datain[i*8+7]);
 			Dbprintf("NR,MAC: %02x %02x %02x %02x %02x %02x %02x %02x",
-					datain[i*8+ 8], datain[i*8+ 9], datain[i*8+10],	datain[i*8+11],
-					datain[i*8+12], datain[i*8+13],	datain[i*8+14], datain[i*8+15]);
+					datain[i*8+ 8], datain[i*8+ 9], datain[i*8+10], datain[i*8+11],
+					datain[i*8+12], datain[i*8+13], datain[i*8+14], datain[i*8+15]);
 		}
 		cmd_send(CMD_ACK, CMD_SIMULATE_TAG_ICLASS, i, 0, mac_responses, i*16);
 	} else if (simType == ICLASS_SIM_MODE_FULL) {
@@ -1319,10 +1356,10 @@ static int GetIClassAnswer(uint8_t *receivedResponse, int maxLen, int *samples, 
 			if (elapsed) (*elapsed)++;
 		}
 		if (AT91C_BASE_SSC->SSC_SR & (AT91C_SSC_RXRDY)) {
-			if (c < timeout) { 
-				c++; 
-			} else { 
-				return false; 
+			if (c < timeout) {
+				c++;
+			} else {
+				return false;
 			}
 			b = (uint8_t)AT91C_BASE_SSC->SSC_RHR;
 			skip = !skip;

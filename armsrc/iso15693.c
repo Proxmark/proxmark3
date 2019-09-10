@@ -2,7 +2,7 @@
 // Jonathan Westhues, split Nov 2006
 // Modified by Greg Jones, Jan 2009
 // Modified by Adrian Dabrowski "atrox", Mar-Sept 2010,Oct 2011
-// Modified by piwi, Oct 2018 
+// Modified by piwi, Oct 2018
 //
 // This code is licensed to you under the terms of the GNU GPL, version 2 or,
 // at your option, any later version. See the LICENSE.txt file for the text of
@@ -16,26 +16,26 @@
 // transmission modes from tag to reader. As of Oct 2018 this code supports
 // both reader modes and the high speed variant with one subcarrier from card to reader.
 // As long as the card fully support ISO 15693 this is no problem, since the
-// reader chooses both data rates, but some non-standard tags do not. 
+// reader chooses both data rates, but some non-standard tags do not.
 // For card simulation, the code supports both high and low speed modes with one subcarrier.
 //
 // VCD (reader) -> VICC (tag)
 // 1 out of 256:
-// 	data rate: 1,66 kbit/s (fc/8192)
-// 	used for long range
+//  data rate: 1,66 kbit/s (fc/8192)
+//  used for long range
 // 1 out of 4:
-// 	data rate: 26,48 kbit/s (fc/512)
-//	used for short range, high speed
+//  data rate: 26,48 kbit/s (fc/512)
+//  used for short range, high speed
 //
 // VICC (tag) -> VCD (reader)
 // Modulation:
-//		ASK / one subcarrier (423,75 khz)
-//		FSK / two subcarriers (423,75 khz && 484,28 khz)
+//      ASK / one subcarrier (423,75 khz)
+//      FSK / two subcarriers (423,75 khz && 484,28 khz)
 // Data Rates / Modes:
-// 	low ASK: 6,62 kbit/s
-// 	low FSK: 6.67 kbit/s
-// 	high ASK: 26,48 kbit/s
-// 	high FSK: 26,69 kbit/s
+//  low ASK: 6,62 kbit/s
+//  low FSK: 6.67 kbit/s
+//  high ASK: 26,48 kbit/s
+//  high FSK: 26,69 kbit/s
 //-----------------------------------------------------------------------------
 
 
@@ -161,7 +161,7 @@ static void CodeIso15693AsReader(uint8_t *cmd, int n)
 	for(i = 0; i < 4; i++) {
 		ToSendStuffBit(1);
 	}
-	
+
 	ToSendMax++;
 }
 
@@ -338,20 +338,20 @@ void TransmitTo15693Reader(const uint8_t *cmd, size_t len, uint32_t start_time, 
 	LED_C_ON();
 	uint8_t bits_to_shift = 0x00;
 	uint8_t bits_to_send = 0x00;
-    for(size_t c = 0; c < len; c++) {
+	for(size_t c = 0; c < len; c++) {
 		for (int i = 7; i >= 0; i--) {
 			uint8_t cmd_bits = ((cmd[c] >> i) & 0x01) ? 0xff : 0x00;
 			for (int j = 0; j < (slow?4:1); ) {
-				bits_to_send = bits_to_shift << (8 - shift_delay) | cmd_bits >> shift_delay;
-				bits_to_shift = cmd_bits;
 				if (AT91C_BASE_SSC->SSC_SR & AT91C_SSC_TXRDY) {
+					bits_to_send = bits_to_shift << (8 - shift_delay) | cmd_bits >> shift_delay;
 					AT91C_BASE_SSC->SSC_THR = bits_to_send;
+					bits_to_shift = cmd_bits;
 					j++;
 				}
 			}
-        }
+		}
 		WDT_HIT();
-    }
+	}
 	// send the remaining bits, padded with 0:
 	bits_to_send = bits_to_shift << (8 - shift_delay);
 	for ( ; ; ) {
@@ -408,7 +408,7 @@ typedef struct DecodeTag {
 static int inline __attribute__((always_inline)) Handle15693SamplesFromTag(uint16_t amplitude, DecodeTag_t *DecodeTag)
 {
 	switch(DecodeTag->state) {
-		case STATE_TAG_SOF_LOW: 
+		case STATE_TAG_SOF_LOW:
 			// waiting for 12 times low (11 times low is accepted as well)
 			if (amplitude < NOISE_THRESHOLD) {
 				DecodeTag->posCount++;
@@ -422,7 +422,7 @@ static int inline __attribute__((always_inline)) Handle15693SamplesFromTag(uint1
 				}
 			}
 			break;
-			
+
 		case STATE_TAG_SOF_HIGH:
 			// waiting for 10 times high. Take average over the last 8
 			if (amplitude > NOISE_THRESHOLD) {
@@ -592,7 +592,7 @@ static int GetIso15693AnswerFromTag(uint8_t* response, uint16_t max_len, int tim
 	bool gotFrame = false;
 
 	uint16_t *dmaBuf = (uint16_t*)BigBuf_malloc(ISO15693_DMA_BUFFER_SIZE*sizeof(uint16_t));
-	
+
 	// the Decoder data structure
 	DecodeTag_t DecodeTag = { 0 };
 	DecodeTagInit(&DecodeTag, response, max_len);
@@ -643,9 +643,9 @@ static int GetIso15693AnswerFromTag(uint8_t* response, uint16_t max_len, int tim
 
 	FpgaDisableSscDma();
 	BigBuf_free();
-	
+
 	if (DEBUG) Dbprintf("samples = %d, gotFrame = %d, Decoder: state = %d, len = %d, bitCount = %d, posCount = %d",
-	                    samples, gotFrame, DecodeTag.state, DecodeTag.len, DecodeTag.bitCount, DecodeTag.posCount);
+						samples, gotFrame, DecodeTag.state, DecodeTag.len, DecodeTag.bitCount, DecodeTag.posCount);
 
 	if (DecodeTag.len > 0) {
 		LogTrace(DecodeTag.output, DecodeTag.len, 0, 0, NULL, false);
@@ -687,7 +687,7 @@ typedef struct DecodeReader {
 	int         byteCount;
 	int         byteCountMax;
 	int         posCount;
-	int			sum1, sum2;
+	int         sum1, sum2;
 	uint8_t     *output;
 } DecodeReader_t;
 
@@ -985,12 +985,12 @@ int GetIso15693CommandFromReader(uint8_t *received, size_t max_len, uint32_t *eo
 	}
 
 	FpgaDisableSscDma();
-	
+
 	if (DEBUG) Dbprintf("samples = %d, gotFrame = %d, Decoder: state = %d, len = %d, bitCount = %d, posCount = %d",
-	                    samples, gotFrame, DecodeReader.state, DecodeReader.byteCount, DecodeReader.bitCount, DecodeReader.posCount);
+						samples, gotFrame, DecodeReader.state, DecodeReader.byteCount, DecodeReader.bitCount, DecodeReader.posCount);
 
 	if (DecodeReader.byteCount > 0) {
-		uint32_t sof_time = *eof_time 
+		uint32_t sof_time = *eof_time
 						- DecodeReader.byteCount * (DecodeReader.Coding==CODING_1_OUT_OF_4?128:2048) // time for byte transfers
 						- 32  // time for SOF transfer
 						- 16; // time for EOF transfer
@@ -1101,7 +1101,7 @@ void SnoopIso15693(void)
 		Dbprintf("  DMA:           %i bytes", ISO15693_DMA_BUFFER_SIZE * sizeof(uint16_t));
 	}
 	Dbprintf("Snoop started. Press PM3 Button to stop.");
-	
+
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_HF_READER | FPGA_HF_READER_MODE_SNOOP_AMPLITUDE);
 	SetAdcMuxFor(GPIO_MUXSEL_HIPKD);
 
@@ -1139,7 +1139,7 @@ void SnoopIso15693(void)
 			}
 		}
 		samples++;
-		
+
 		if (!TagIsActive) {                                            // no need to try decoding reader data if the tag is sending
 			if (Handle15693SampleFromReader(snoopdata & 0x02, &DecodeReader)) {
 				FpgaDisableSscDma();
@@ -1168,7 +1168,7 @@ void SnoopIso15693(void)
 			ReaderIsActive = (DecodeReader.state >= STATE_READER_AWAIT_2ND_RISING_EDGE_OF_SOF);
 		}
 
-		if (!ReaderIsActive && ExpectTagAnswer) {						// no need to try decoding tag data if the reader is currently sending or no answer expected yet
+		if (!ReaderIsActive && ExpectTagAnswer) {                       // no need to try decoding tag data if the reader is currently sending or no answer expected yet
 			if (Handle15693SamplesFromTag(snoopdata >> 2, &DecodeTag)) {
 				FpgaDisableSscDma();
 				//Use samples as a time measurement
@@ -1187,7 +1187,7 @@ void SnoopIso15693(void)
 
 	FpgaDisableSscDma();
 	BigBuf_free();
-	
+
 	LEDsoff();
 
 	DbpString("Snoop statistics:");
@@ -1234,7 +1234,7 @@ static void BuildReadBlockRequest(uint8_t *uid, uint8_t blockNumber )
 	uint16_t crc;
 	// If we set the Option_Flag in this request, the VICC will respond with the security status of the block
 	// followed by the block data
-	cmd[0] = ISO15693_REQ_OPTION | ISO15693_REQ_ADDRESS | ISO15693_REQ_DATARATE_HIGH; 
+	cmd[0] = ISO15693_REQ_OPTION | ISO15693_REQ_ADDRESS | ISO15693_REQ_DATARATE_HIGH;
 	// READ BLOCK command code
 	cmd[1] = ISO15693_READBLOCK;
 	// UID may be optionally specified here
@@ -1285,10 +1285,10 @@ static void BuildInventoryResponse(uint8_t *uid)
 }
 
 // Universal Method for sending to and recv bytes from a tag
-// 	init ... should we initialize the reader?
-// 	speed ... 0 low speed, 1 hi speed
-// 	*recv will contain the tag's answer
-//	return: lenght of received data
+//  init ... should we initialize the reader?
+//  speed ... 0 low speed, 1 hi speed
+//  *recv will contain the tag's answer
+//  return: lenght of received data
 int SendDataTag(uint8_t *send, int sendlen, bool init, int speed, uint8_t *recv, uint16_t max_recv_len, uint32_t start_time) {
 
 	LED_A_ON();
@@ -1405,7 +1405,7 @@ void ReaderIso15693(uint32_t parameter)
 	LED_A_ON();
 
 	set_tracing(true);
-	
+
 	int answerLen = 0;
 	uint8_t TagUID[8] = {0x00};
 
@@ -1418,8 +1418,8 @@ void ReaderIso15693(uint32_t parameter)
 	FpgaSetupSsc(FPGA_MAJOR_MODE_HF_READER);
 
 	// Start from off (no field generated)
-   	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
-   	SpinDelay(200);
+	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
+	SpinDelay(200);
 
 	// Give the tags time to energize
 	LED_D_ON();
@@ -1434,7 +1434,7 @@ void ReaderIso15693(uint32_t parameter)
 	// Now send the IDENTIFY command
 	BuildIdentifyRequest();
 	TransmitTo15693Tag(ToSend, ToSendMax, 0);
-	
+
 	// Now wait for a response
 	answerLen = GetIso15693AnswerFromTag(answer, sizeof(answer), DELAY_ISO15693_VCD_TO_VICC_READER * 2) ;
 	uint32_t start_time = GetCountSspClk() + DELAY_ISO15693_VICC_TO_VCD_READER;
@@ -1489,7 +1489,7 @@ void ReaderIso15693(uint32_t parameter)
 
 	// for the time being, switch field off to protect rdv4.0
 	// note: this prevents using hf 15 cmd with s option - which isn't implemented yet anyway
-   	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
+	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
 	LED_D_OFF();
 
 	LED_A_OFF();
@@ -1506,7 +1506,7 @@ void SimTagIso15693(uint32_t parameter, uint8_t *uid)
 
 	FpgaDownloadAndGo(FPGA_BITSTREAM_HF);
 	SetAdcMuxFor(GPIO_MUXSEL_HIPKD);
-   	FpgaWriteConfWord(FPGA_MAJOR_MODE_HF_SIMULATOR | FPGA_HF_SIMULATOR_NO_MODULATION);
+	FpgaWriteConfWord(FPGA_MAJOR_MODE_HF_SIMULATOR | FPGA_HF_SIMULATOR_NO_MODULATION);
 	FpgaSetupSsc(FPGA_MAJOR_MODE_HF_SIMULATOR);
 
 	StartCountSspClk();
@@ -1531,7 +1531,7 @@ void SimTagIso15693(uint32_t parameter, uint8_t *uid)
 		Dbhexdump(cmd_len, cmd, false);
 	}
 
-   	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
+	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
 	LEDsoff();
 }
 
@@ -1545,12 +1545,12 @@ void BruteforceIso15693Afi(uint32_t speed)
 
 	uint8_t data[6];
 	uint8_t recv[ISO15693_MAX_RESPONSE_LENGTH];
-	
+
 	int datalen=0, recvlen=0;
 
 	Iso15693InitReader();
 	StartCountSspClk();
-	
+
 	// first without AFI
 	// Tags should respond without AFI and with AFI=0 even when AFI is active
 
@@ -1584,7 +1584,7 @@ void BruteforceIso15693Afi(uint32_t speed)
 	}
 	Dbprintf("AFI Bruteforcing done.");
 
-   	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
+	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
 	LEDsoff();
 }
 
@@ -1616,7 +1616,7 @@ void DirectTag15693Command(uint32_t datalen, uint32_t speed, uint32_t recv, uint
 
 	// for the time being, switch field off to protect rdv4.0
 	// note: this prevents using hf 15 cmd with s option - which isn't implemented yet anyway
-   	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
+	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
 	LED_D_OFF();
 
 	LED_A_OFF();
@@ -1630,76 +1630,76 @@ void DirectTag15693Command(uint32_t datalen, uint32_t speed, uint32_t recv, uint
 // Set the UID to the tag (based on Iceman work).
 void SetTag15693Uid(uint8_t *uid)
 {
-    uint8_t cmd[4][9] = {0x00};
+	uint8_t cmd[4][9] = {0x00};
 
-    uint16_t crc;
+	uint16_t crc;
 
-    int recvlen = 0;
-    uint8_t recvbuf[ISO15693_MAX_RESPONSE_LENGTH];
+	int recvlen = 0;
+	uint8_t recvbuf[ISO15693_MAX_RESPONSE_LENGTH];
 
-    LED_A_ON();
+	LED_A_ON();
 
-    // Command 1 : 02213E00000000
-    cmd[0][0] = 0x02;
-    cmd[0][1] = 0x21;
-    cmd[0][2] = 0x3e;
-    cmd[0][3] = 0x00;
-    cmd[0][4] = 0x00;
-    cmd[0][5] = 0x00;
-    cmd[0][6] = 0x00;
+	// Command 1 : 02213E00000000
+	cmd[0][0] = 0x02;
+	cmd[0][1] = 0x21;
+	cmd[0][2] = 0x3e;
+	cmd[0][3] = 0x00;
+	cmd[0][4] = 0x00;
+	cmd[0][5] = 0x00;
+	cmd[0][6] = 0x00;
 
-    // Command 2 : 02213F69960000
-    cmd[1][0] = 0x02;
-    cmd[1][1] = 0x21;
-    cmd[1][2] = 0x3f;
-    cmd[1][3] = 0x69;
-    cmd[1][4] = 0x96;
-    cmd[1][5] = 0x00;
-    cmd[1][6] = 0x00;
+	// Command 2 : 02213F69960000
+	cmd[1][0] = 0x02;
+	cmd[1][1] = 0x21;
+	cmd[1][2] = 0x3f;
+	cmd[1][3] = 0x69;
+	cmd[1][4] = 0x96;
+	cmd[1][5] = 0x00;
+	cmd[1][6] = 0x00;
 
-    // Command 3 : 022138u8u7u6u5 (where uX = uid byte X)
-    cmd[2][0] = 0x02;
-    cmd[2][1] = 0x21;
-    cmd[2][2] = 0x38;
-    cmd[2][3] = uid[7];
-    cmd[2][4] = uid[6];
-    cmd[2][5] = uid[5];
-    cmd[2][6] = uid[4];
+	// Command 3 : 022138u8u7u6u5 (where uX = uid byte X)
+	cmd[2][0] = 0x02;
+	cmd[2][1] = 0x21;
+	cmd[2][2] = 0x38;
+	cmd[2][3] = uid[7];
+	cmd[2][4] = uid[6];
+	cmd[2][5] = uid[5];
+	cmd[2][6] = uid[4];
 
-    // Command 4 : 022139u4u3u2u1 (where uX = uid byte X)
-    cmd[3][0] = 0x02;
-    cmd[3][1] = 0x21;
-    cmd[3][2] = 0x39;
-    cmd[3][3] = uid[3];
-    cmd[3][4] = uid[2];
-    cmd[3][5] = uid[1];
-    cmd[3][6] = uid[0];
+	// Command 4 : 022139u4u3u2u1 (where uX = uid byte X)
+	cmd[3][0] = 0x02;
+	cmd[3][1] = 0x21;
+	cmd[3][2] = 0x39;
+	cmd[3][3] = uid[3];
+	cmd[3][4] = uid[2];
+	cmd[3][5] = uid[1];
+	cmd[3][6] = uid[0];
 
-    for (int i=0; i<4; i++) {
-        // Add the CRC
-        crc = Iso15693Crc(cmd[i], 7);
-        cmd[i][7] = crc & 0xff;
-        cmd[i][8] = crc >> 8;
+	for (int i=0; i<4; i++) {
+		// Add the CRC
+		crc = Iso15693Crc(cmd[i], 7);
+		cmd[i][7] = crc & 0xff;
+		cmd[i][8] = crc >> 8;
 
-        if (DEBUG) {
-            Dbprintf("SEND:");
-            Dbhexdump(sizeof(cmd[i]), cmd[i], false);
-        }
+		if (DEBUG) {
+			Dbprintf("SEND:");
+			Dbhexdump(sizeof(cmd[i]), cmd[i], false);
+		}
 
-        recvlen = SendDataTag(cmd[i], sizeof(cmd[i]), true, 1, recvbuf, sizeof(recvbuf), 0);
+		recvlen = SendDataTag(cmd[i], sizeof(cmd[i]), true, 1, recvbuf, sizeof(recvbuf), 0);
 
-        if (DEBUG) {
-            Dbprintf("RECV:");
-            Dbhexdump(recvlen, recvbuf, false);
-            DbdecodeIso15693Answer(recvlen, recvbuf);
-        }
+		if (DEBUG) {
+			Dbprintf("RECV:");
+			Dbhexdump(recvlen, recvbuf, false);
+			DbdecodeIso15693Answer(recvlen, recvbuf);
+		}
 
-        cmd_send(CMD_ACK, recvlen>ISO15693_MAX_RESPONSE_LENGTH?ISO15693_MAX_RESPONSE_LENGTH:recvlen, 0, 0, recvbuf, ISO15693_MAX_RESPONSE_LENGTH);
-    }
-    
-    LED_D_OFF();
+		cmd_send(CMD_ACK, recvlen>ISO15693_MAX_RESPONSE_LENGTH?ISO15693_MAX_RESPONSE_LENGTH:recvlen, 0, 0, recvbuf, ISO15693_MAX_RESPONSE_LENGTH);
+	}
 
-    LED_A_OFF();
+	LED_D_OFF();
+
+	LED_A_OFF();
 }
 
 
@@ -1801,8 +1801,8 @@ static void __attribute__((unused)) BuildArbitraryRequest(uint8_t *uid,uint8_t C
 	cmd[10] = 0x00;
 	cmd[11] = 0x0a;
 
-//	cmd[12] = 0x00;
-//	cmd[13] = 0x00;	//Now the CRC
+//  cmd[12] = 0x00;
+//  cmd[13] = 0x00; //Now the CRC
 	crc = Iso15693Crc(cmd, 12); // the crc needs to be calculated over 2 bytes
 	cmd[12] = crc & 0xff;
 	cmd[13] = crc >> 8;
@@ -1836,8 +1836,8 @@ static void __attribute__((unused)) BuildArbitraryCustomRequest(uint8_t uid[], u
 	cmd[10] = 0x05; // for custom codes this must be manufacturer code
 	cmd[11] = 0x00;
 
-//	cmd[12] = 0x00;
-//	cmd[13] = 0x00;	//Now the CRC
+//  cmd[12] = 0x00;
+//  cmd[13] = 0x00; //Now the CRC
 	crc = Iso15693Crc(cmd, 12); // the crc needs to be calculated over 2 bytes
 	cmd[12] = crc & 0xff;
 	cmd[13] = crc >> 8;
