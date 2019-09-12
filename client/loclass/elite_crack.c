@@ -1,13 +1,13 @@
 /*****************************************************************************
  * WARNING
  *
- * THIS CODE IS CREATED FOR EXPERIMENTATION AND EDUCATIONAL USE ONLY. 
- * 
- * USAGE OF THIS CODE IN OTHER WAYS MAY INFRINGE UPON THE INTELLECTUAL 
- * PROPERTY OF OTHER PARTIES, SUCH AS INSIDE SECURE AND HID GLOBAL, 
- * AND MAY EXPOSE YOU TO AN INFRINGEMENT ACTION FROM THOSE PARTIES. 
- * 
- * THIS CODE SHOULD NEVER BE USED TO INFRINGE PATENTS OR INTELLECTUAL PROPERTY RIGHTS. 
+ * THIS CODE IS CREATED FOR EXPERIMENTATION AND EDUCATIONAL USE ONLY.
+ *
+ * USAGE OF THIS CODE IN OTHER WAYS MAY INFRINGE UPON THE INTELLECTUAL
+ * PROPERTY OF OTHER PARTIES, SUCH AS INSIDE SECURE AND HID GLOBAL,
+ * AND MAY EXPOSE YOU TO AN INFRINGEMENT ACTION FROM THOSE PARTIES.
+ *
+ * THIS CODE SHOULD NEVER BE USED TO INFRINGE PATENTS OR INTELLECTUAL PROPERTY RIGHTS.
  *
  *****************************************************************************
  *
@@ -22,7 +22,7 @@
  *
  * This is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as published
- * by the Free Software Foundation, or, at your option, any later version. 
+ * by the Free Software Foundation, or, at your option, any later version.
  *
  * This file is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -31,8 +31,8 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with loclass.  If not, see <http://www.gnu.org/licenses/>.
- * 
- * 
+ *
+ *
  ****************************************************************************/
 
 #include <stdint.h>
@@ -50,21 +50,21 @@
 
 /**
  * @brief Permutes a key from standard NIST format to Iclass specific format
- *	from http://www.proxmark.org/forum/viewtopic.php?pid=11220#p11220
+ *  from http://www.proxmark.org/forum/viewtopic.php?pid=11220#p11220
  *
- *	If you permute [6c 8d 44 f9 2a 2d 01 bf]  you get  [8a 0d b9 88 bb a7 90 ea]  as shown below.
+ *  If you permute [6c 8d 44 f9 2a 2d 01 bf]  you get  [8a 0d b9 88 bb a7 90 ea]  as shown below.
  *
- * 	1 0 1 1 1 1 1 1  bf
- *	0 0 0 0 0 0 0 1  01
- *	0 0 1 0 1 1 0 1  2d
- *	0 0 1 0 1 0 1 0  2a
- *	1 1 1 1 1 0 0 1  f9
- *	0 1 0 0 0 1 0 0  44
- *	1 0 0 0 1 1 0 1  8d
- *	0 1 1 0 1 1 0 0  6c
+ *  1 0 1 1 1 1 1 1  bf
+ *  0 0 0 0 0 0 0 1  01
+ *  0 0 1 0 1 1 0 1  2d
+ *  0 0 1 0 1 0 1 0  2a
+ *  1 1 1 1 1 0 0 1  f9
+ *  0 1 0 0 0 1 0 0  44
+ *  1 0 0 0 1 1 0 1  8d
+ *  0 1 1 0 1 1 0 0  6c
  *
- *	8 0 b 8 b a 9 e
- *	a d 9 8 b 7 0 a
+ *  8 0 b 8 b a 9 e
+ *  a d 9 8 b 7 0 a
  *
  * @param key
  * @param dest
@@ -75,7 +75,7 @@ void permutekey(uint8_t key[8], uint8_t dest[8])
 	int i;
 	for(i = 0 ; i < 8 ; i++)
 	{
-		dest[i] =	(((key[7] & (0x80 >> i)) >> (7-i)) << 7) |
+		dest[i] =   (((key[7] & (0x80 >> i)) >> (7-i)) << 7) |
 					(((key[6] & (0x80 >> i)) >> (7-i)) << 6) |
 					(((key[5] & (0x80 >> i)) >> (7-i)) << 5) |
 					(((key[4] & (0x80 >> i)) >> (7-i)) << 4) |
@@ -98,7 +98,7 @@ void permutekey_rev(uint8_t key[8], uint8_t dest[8])
 	int i;
 	for(i = 0 ; i < 8 ; i++)
 	{
-		dest[7-i] =	(((key[0] & (0x80 >> i)) >> (7-i)) << 7) |
+		dest[7-i] = (((key[0] & (0x80 >> i)) >> (7-i)) << 7) |
 					(((key[1] & (0x80 >> i)) >> (7-i)) << 6) |
 					(((key[2] & (0x80 >> i)) >> (7-i)) << 5) |
 					(((key[3] & (0x80 >> i)) >> (7-i)) << 4) |
@@ -168,15 +168,15 @@ rk(x [0] . . . x [7] , n + 1) = rk(rl(x [0] ) . . . rl(x [7] ), n)
 void rk(uint8_t *key, uint8_t n, uint8_t *outp_key)
 {
 
-    memcpy(outp_key, key, 8);
+	memcpy(outp_key, key, 8);
 
-    uint8_t j;
+	uint8_t j;
 
-    while(n-- > 0)
-        for(j=0; j < 8 ; j++)
-            outp_key[j] = rl(outp_key[j]);
+	while(n-- > 0)
+		for(j=0; j < 8 ; j++)
+			outp_key[j] = rl(outp_key[j]);
 
-    return;
+	return;
 }
 
 static mbedtls_des_context ctx_enc = { {0} };
@@ -184,17 +184,17 @@ static mbedtls_des_context ctx_dec = { {0} };
 
 void desdecrypt_iclass(uint8_t *iclass_key, uint8_t *input, uint8_t *output)
 {
-    uint8_t key_std_format[8] = {0};
-    permutekey_rev(iclass_key, key_std_format);
-    mbedtls_des_setkey_dec( &ctx_dec, key_std_format);
-    mbedtls_des_crypt_ecb(&ctx_dec,input,output);
+	uint8_t key_std_format[8] = {0};
+	permutekey_rev(iclass_key, key_std_format);
+	mbedtls_des_setkey_dec( &ctx_dec, key_std_format);
+	mbedtls_des_crypt_ecb(&ctx_dec,input,output);
 }
 void desencrypt_iclass(uint8_t *iclass_key, uint8_t *input, uint8_t *output)
 {
-    uint8_t key_std_format[8] = {0};
-    permutekey_rev(iclass_key, key_std_format);
-    mbedtls_des_setkey_enc( &ctx_enc, key_std_format);
-    mbedtls_des_crypt_ecb(&ctx_enc,input,output);
+	uint8_t key_std_format[8] = {0};
+	permutekey_rev(iclass_key, key_std_format);
+	mbedtls_des_setkey_enc( &ctx_enc, key_std_format);
+	mbedtls_des_crypt_ecb(&ctx_enc,input,output);
 }
 
 /**
@@ -205,9 +205,9 @@ void desencrypt_iclass(uint8_t *iclass_key, uint8_t *input, uint8_t *output)
  */
 void hash2(uint8_t *key64, uint8_t *outp_keytable)
 {
-    /**
-     *Expected:
-     * High Security Key Table
+	/**
+	 *Expected:
+	 * High Security Key Table
 
 00  F1 35 59 A1 0D 5A 26 7F 18 60 0B 96 8A C0 25 C1
 10  BF A1 3B B0 FF 85 28 75 F2 1F C6 8F 0E 74 8F 21
@@ -219,60 +219,60 @@ void hash2(uint8_t *key64, uint8_t *outp_keytable)
 70  43 08 A0 2F FE B3 26 D7 98 0B 34 7B 47 70 A0 AB
 
 **** The 64-bit HS Custom Key Value = 5B7C62C491C11B39 ******/
-    uint8_t key64_negated[8] = {0};
-    uint8_t z[8][8]={{0},{0}};
-    uint8_t temp_output[8]={0};
-    //calculate complement of key
-    int i;
-    for(i=0;i<8;i++)
-        key64_negated[i]= ~key64[i];
+	uint8_t key64_negated[8] = {0};
+	uint8_t z[8][8]={{0},{0}};
+	uint8_t temp_output[8]={0};
+	//calculate complement of key
+	int i;
+	for(i=0;i<8;i++)
+		key64_negated[i]= ~key64[i];
 
-    // Once again, key is on iclass-format
-    desencrypt_iclass(key64, key64_negated, z[0]);
+	// Once again, key is on iclass-format
+	desencrypt_iclass(key64, key64_negated, z[0]);
 
-    prnlog("\nHigh security custom key (Kcus):");
-    printvar("z0  ",  z[0],8);
+	prnlog("\nHigh security custom key (Kcus):");
+	printvar("z0  ",  z[0],8);
 
-    uint8_t y[8][8]={{0},{0}};
+	uint8_t y[8][8]={{0},{0}};
 
-    // y[0]=DES_dec(z[0],~key)
-    // Once again, key is on iclass-format
-    desdecrypt_iclass(z[0], key64_negated, y[0]);
-    printvar("y0  ",  y[0],8);
+	// y[0]=DES_dec(z[0],~key)
+	// Once again, key is on iclass-format
+	desdecrypt_iclass(z[0], key64_negated, y[0]);
+	printvar("y0  ",  y[0],8);
 
-    for(i=1; i<8; i++)
-    {
+	for(i=1; i<8; i++)
+	{
 
-        // z [i] = DES dec (rk(K cus , i), z [i−1] )
-        rk(key64, i, temp_output);
-        //y [i] = DES enc (rk(K cus , i), y [i−1] )
+		// z [i] = DES dec (rk(K cus , i), z [i−1] )
+		rk(key64, i, temp_output);
+		//y [i] = DES enc (rk(K cus , i), y [i−1] )
 
-        desdecrypt_iclass(temp_output,z[i-1], z[i]);
-        desencrypt_iclass(temp_output,y[i-1], y[i]);
+		desdecrypt_iclass(temp_output,z[i-1], z[i]);
+		desencrypt_iclass(temp_output,y[i-1], y[i]);
 
-    }
-    if(outp_keytable != NULL)
-    {
-        for(i = 0 ; i < 8 ; i++)
-        {
-            memcpy(outp_keytable+i*16,y[i],8);
-            memcpy(outp_keytable+8+i*16,z[i],8);
-        }
-    }else
-    {
-        printarr_human_readable("hash2", outp_keytable,128);
-    }
+	}
+	if(outp_keytable != NULL)
+	{
+		for(i = 0 ; i < 8 ; i++)
+		{
+			memcpy(outp_keytable+i*16,y[i],8);
+			memcpy(outp_keytable+8+i*16,z[i],8);
+		}
+	}else
+	{
+		printarr_human_readable("hash2", outp_keytable,128);
+	}
 }
 
 /**
  * @brief Reads data from the iclass-reader-attack dump file.
  * @param dump, data from a iclass reader attack dump.  The format of the dumpdata is expected to be as follows:
- *		<8 byte CSN><8 byte CC><4 byte NR><4 byte MAC><8 byte HASH1><1 byte NUM_BYTES_TO_RECOVER><3 bytes BYTES_TO_RECOVER>
- *		.. N times...
+ *      <8 byte CSN><8 byte CC><4 byte NR><4 byte MAC><8 byte HASH1><1 byte NUM_BYTES_TO_RECOVER><3 bytes BYTES_TO_RECOVER>
+ *      .. N times...
  *
- *	So the first attack, with 3 bytes to recover would be : ... 03000145
- *	And a later attack, with 1 byte to recover (byte 0x5)would be : ...01050000
- *	And an attack, with 2 bytes to recover (byte 0x5 and byte 0x07 )would be : ...02050700
+ *  So the first attack, with 3 bytes to recover would be : ... 03000145
+ *  And a later attack, with 1 byte to recover (byte 0x5)would be : ...01050000
+ *  And an attack, with 2 bytes to recover (byte 0x5 and byte 0x07 )would be : ...02050700
  *
  * @param cc_nr an array to store cc_nr into (12 bytes)
  * @param csn an arracy ot store CSN into (8 bytes)
@@ -306,8 +306,7 @@ static uint32_t startvalue = 0;
  * @param keytable where to write found values.
  * @return
  */
-int bruteforceItem(dumpdata item, uint16_t keytable[])
-{
+int bruteforceItem(dumpdata item, uint16_t keytable[]) {
 	int errors = 0;
 	uint8_t key_sel_p[8] = { 0 };
 	uint8_t div_key[8] = {0};
@@ -319,6 +318,8 @@ int bruteforceItem(dumpdata item, uint16_t keytable[])
 	uint8_t key_index[8] = {0};
 	hash1(item.csn, key_index);
 
+	printvar("CSN  ", item.csn, 8);
+	printvar("HASH1", key_index, 8);
 
 	/*
 	 * Determine which bytes to retrieve. A hash is typically
@@ -333,26 +334,20 @@ int bruteforceItem(dumpdata item, uint16_t keytable[])
 	 * Only the lower eight bits correspond to the (hopefully cracked) key-value.
 	 **/
 	uint8_t bytes_to_recover[3] = {0};
-	uint8_t numbytes_to_recover = 0 ;
-	int i;
-	for(i =0 ; i < 8 ; i++)
-	{
-		if(keytable[key_index[i]] & (CRACKED | BEING_CRACKED)) continue;
-		bytes_to_recover[numbytes_to_recover++] = key_index[i];
-		keytable[key_index[i]] |= BEING_CRACKED;
+	uint8_t numbytes_to_recover = 0;
 
-		if(numbytes_to_recover > 3)
-		{
+	for (int i = 0; i < 8; i++) {
+		if (keytable[key_index[i]] & (CRACKED | BEING_CRACKED)) continue;
+		if (numbytes_to_recover == 3) {
 			prnlog("The CSN requires > 3 byte bruteforce, not supported");
-			printvar("CSN", item.csn,8);
-			printvar("HASH1", key_index,8);
-
 			//Before we exit, reset the 'BEING_CRACKED' to zero
-			keytable[bytes_to_recover[0]]  &= ~BEING_CRACKED;
-			keytable[bytes_to_recover[1]]  &= ~BEING_CRACKED;
-			keytable[bytes_to_recover[2]]  &= ~BEING_CRACKED;
-
+			keytable[bytes_to_recover[0]] &= ~BEING_CRACKED;
+			keytable[bytes_to_recover[1]] &= ~BEING_CRACKED;
+			keytable[bytes_to_recover[2]] &= ~BEING_CRACKED;
 			return 1;
+		} else {
+			bytes_to_recover[numbytes_to_recover++] = key_index[i];
+			keytable[key_index[i]] |= BEING_CRACKED;
 		}
 	}
 
@@ -370,24 +365,27 @@ int bruteforceItem(dumpdata item, uint16_t keytable[])
 
 	uint32_t endmask =  1 << 8*numbytes_to_recover;
 
-	for(i =0 ; i < numbytes_to_recover && numbytes_to_recover > 1; i++)
+	for (int i = 0; i < numbytes_to_recover; i++) {
 		prnlog("Bruteforcing byte %d", bytes_to_recover[i]);
+	}
 
-	while(!found && !(brute & endmask))
-	{
+	while (!found && !(brute & endmask)) {
 
 		//Update the keytable with the brute-values
-		for(i =0 ; i < numbytes_to_recover; i++)
-		{
+		for(int i = 0 ; i < numbytes_to_recover; i++) {
 			keytable[bytes_to_recover[i]] &= 0xFF00;
-			keytable[bytes_to_recover[i]] |= (brute >> (i*8) & 0xFF);
+			keytable[bytes_to_recover[i]] |= ((brute >> (i*8)) & 0xFF);
 		}
 
 		// Piece together the key
-		key_sel[0] = keytable[key_index[0]] & 0xFF;key_sel[1] = keytable[key_index[1]] & 0xFF;
-		key_sel[2] = keytable[key_index[2]] & 0xFF;key_sel[3] = keytable[key_index[3]] & 0xFF;
-		key_sel[4] = keytable[key_index[4]] & 0xFF;key_sel[5] = keytable[key_index[5]] & 0xFF;
-		key_sel[6] = keytable[key_index[6]] & 0xFF;key_sel[7] = keytable[key_index[7]] & 0xFF;
+		key_sel[0] = keytable[key_index[0]] & 0xFF;
+		key_sel[1] = keytable[key_index[1]] & 0xFF;
+		key_sel[2] = keytable[key_index[2]] & 0xFF;
+		key_sel[3] = keytable[key_index[3]] & 0xFF;
+		key_sel[4] = keytable[key_index[4]] & 0xFF;
+		key_sel[5] = keytable[key_index[5]] & 0xFF;
+		key_sel[6] = keytable[key_index[6]] & 0xFF;
+		key_sel[7] = keytable[key_index[7]] & 0xFF;
 
 		//Permute from iclass format to standard format
 		permutekey_rev(key_sel,key_sel_p);
@@ -396,10 +394,9 @@ int bruteforceItem(dumpdata item, uint16_t keytable[])
 		//Calc mac
 		doMAC(item.cc_nr, div_key,calculated_MAC);
 
-		if(memcmp(calculated_MAC, item.mac, 4) == 0)
-		{
-			for(i =0 ; i < numbytes_to_recover; i++)
-				prnlog("=> %d: 0x%02x", bytes_to_recover[i],0xFF & keytable[bytes_to_recover[i]]);
+		if (memcmp(calculated_MAC, item.mac, 4) == 0) {
+			for (int i = 0; i < numbytes_to_recover; i++)
+				prnlog("=> %d: 0x%02x", bytes_to_recover[i], 0xFF & keytable[bytes_to_recover[i]]);
 			found = true;
 			break;
 		}
@@ -410,39 +407,34 @@ int bruteforceItem(dumpdata item, uint16_t keytable[])
 			fflush(stdout);
 		}
 	}
-	if(! found)
-	{
-		prnlog("Failed to recover %d bytes using the following CSN",numbytes_to_recover);
-		printvar("CSN",item.csn,8);
+
+	if (!found) {
+		prnlog("\nFailed to recover %d bytes", numbytes_to_recover);
 		errors++;
 		//Before we exit, reset the 'BEING_CRACKED' to zero
-		for(i =0 ; i < numbytes_to_recover; i++)
-		{
-			keytable[bytes_to_recover[i]]  &= 0xFF;
-			keytable[bytes_to_recover[i]]  |= CRACK_FAILED;
+		for (int i = 0; i < numbytes_to_recover; i++) {
+			keytable[bytes_to_recover[i]] &= ~BEING_CRACKED;
 		}
-
-	}else
-	{
-		for(i =0 ; i < numbytes_to_recover; i++)
-		{
-			keytable[bytes_to_recover[i]]  &= 0xFF;
-			keytable[bytes_to_recover[i]]  |= CRACKED;
+	} else {
+		for (int i = 0; i < numbytes_to_recover; i++) {
+			keytable[bytes_to_recover[i]] &= ~BEING_CRACKED;
+			keytable[bytes_to_recover[i]] |= CRACKED;
 		}
 
 	}
+
 	return errors;
 }
 
 
 /**
  * From dismantling iclass-paper:
- *	Assume that an adversary somehow learns the first 16 bytes of hash2(K_cus ), i.e., y [0] and z [0] .
- *	Then he can simply recover the master custom key K_cus by computing
- *	K_cus = ~DES(z[0] , y[0] ) .
+ *  Assume that an adversary somehow learns the first 16 bytes of hash2(K_cus ), i.e., y [0] and z [0] .
+ *  Then he can simply recover the master custom key K_cus by computing
+ *  K_cus = ~DES(z[0] , y[0] ) .
  *
- *	Furthermore, the adversary is able to verify that he has the correct K cus by
- *	checking whether z [0] = DES enc (K_cus , ~K_cus ).
+ *  Furthermore, the adversary is able to verify that he has the correct K cus by
+ *  checking whether z [0] = DES enc (K_cus , ~K_cus ).
  * @param keytable an array (128 bytes) of hash2(kcus)
  * @param master_key where to put the master key
  * @return 0 for ok, 1 for failz
@@ -532,12 +524,11 @@ int bruteforceDump(uint8_t dump[], size_t dumpsize, uint16_t keytable[])
 	// master key calculation
 	uint8_t first16bytes[16] = {0};
 
-	for(i = 0 ; i < 16 ; i++)
-	{
+	for (int i = 0; i < 16; i++) {
 		first16bytes[i] = keytable[i] & 0xFF;
-		if(!(keytable[i] & CRACKED))
-		{
-			prnlog("Error, we are missing byte %d, custom key calculation will fail...", i);
+		if (!(keytable[i] & CRACKED)) {
+			prnlog("Error, we are missing byte %d, cannot calculate custom key.", i);
+			return 1;
 		}
 	}
 	errors += calculateMasterKey(first16bytes, NULL);
@@ -670,29 +661,29 @@ int _test_iclass_key_permutation()
 }
 int _testHash1()
 {
-    uint8_t csn[8]= {0x01,0x02,0x03,0x04,0xF7,0xFF,0x12,0xE0};
-    uint8_t k[8] = {0};
-    hash1(csn, k);
-    uint8_t expected[8] = {0x7E,0x72,0x2F,0x40,0x2D,0x02,0x51,0x42};
-    if(memcmp(k,expected,8) != 0)
-    {
-        prnlog("Error with hash1!");
-        printarr("calculated", k, 8);
-        printarr("expected", expected, 8);
-        return 1;
-    }
-    return 0;
+	uint8_t csn[8]= {0x01,0x02,0x03,0x04,0xF7,0xFF,0x12,0xE0};
+	uint8_t k[8] = {0};
+	hash1(csn, k);
+	uint8_t expected[8] = {0x7E,0x72,0x2F,0x40,0x2D,0x02,0x51,0x42};
+	if(memcmp(k,expected,8) != 0)
+	{
+		prnlog("Error with hash1!");
+		printarr("calculated", k, 8);
+		printarr("expected", expected, 8);
+		return 1;
+	}
+	return 0;
 }
 
 int testElite()
 {
 	prnlog("[+] Testing iClass Elite functinality...");
-    prnlog("[+] Testing hash2");
-    uint8_t k_cus[8] = {0x5B,0x7C,0x62,0xC4,0x91,0xC1,0x1B,0x39};
+	prnlog("[+] Testing hash2");
+	uint8_t k_cus[8] = {0x5B,0x7C,0x62,0xC4,0x91,0xC1,0x1B,0x39};
 
-    /**
-     *Expected:
-     * High Security Key Table
+	/**
+	 *Expected:
+	 * High Security Key Table
 
 00  F1 35 59 A1 0D 5A 26 7F 18 60 0B 96 8A C0 25 C1
 10  BF A1 3B B0 FF 85 28 75 F2 1F C6 8F 0E 74 8F 21
@@ -706,20 +697,20 @@ int testElite()
 
 
 **** The 64-bit HS Custom Key Value = 5B7C62C491C11B39 ****
-     */
-    uint8_t keytable[128] = {0};
-    hash2(k_cus, keytable);
-    printarr_human_readable("Hash2", keytable, 128);
-    if(keytable[3] == 0xA1 && keytable[0x30] == 0xA3 && keytable[0x6F] == 0x95)
-    {
-        prnlog("[+] Hash2 looks fine...");
-    }
+	 */
+	uint8_t keytable[128] = {0};
+	hash2(k_cus, keytable);
+	printarr_human_readable("Hash2", keytable, 128);
+	if(keytable[3] == 0xA1 && keytable[0x30] == 0xA3 && keytable[0x6F] == 0x95)
+	{
+		prnlog("[+] Hash2 looks fine...");
+	}
 
 	int errors = 0 ;
-    prnlog("[+] Testing hash1...");
-    errors += _testHash1();
-    prnlog("[+] Testing key diversification ...");
-    errors +=_test_iclass_key_permutation();
+	prnlog("[+] Testing hash1...");
+	errors += _testHash1();
+	prnlog("[+] Testing key diversification ...");
+	errors +=_test_iclass_key_permutation();
 	errors += _testBruteforce();
 
 	return errors;
