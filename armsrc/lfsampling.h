@@ -1,5 +1,5 @@
-#ifndef LFSAMPLING_H
-#define LFSAMPLING_H
+#ifndef LFSAMPLING_H__
+#define LFSAMPLING_H__
 
 /**
 * acquisition of Cotag LF signal. Similar to other LF,  since the Cotag has such long datarate RF/384
@@ -45,7 +45,7 @@ uint32_t DoAcquisition_config(bool silent, int sample_size);
 * Setup the FPGA to listen for samples. This method downloads the FPGA bitstream
 * if not already loaded, sets divisor and starts up the antenna.
 * @param divisor : 1, 88> 255 or negative ==> 134.8 KHz
-* 				   0 or 95 ==> 125 KHz
+*                  0 or 95 ==> 125 KHz
 *
 **/
 void LFSetupFPGAForADC(int divisor, bool lf_field);
@@ -61,9 +61,9 @@ void LFSetupFPGAForADC(int divisor, bool lf_field);
  * @brief setSamplingConfig
  * @param sc
  */
-void setSamplingConfig(sample_config *sc);
+void setSamplingConfig(uint8_t *config_data);
 
-sample_config * getSamplingConfig();
+sample_config *getSamplingConfig();
 
 void printConfig();
 

@@ -998,7 +998,7 @@ void UsbPacketReceived(uint8_t *packet, int len)
 	switch(c->cmd) {
 #ifdef WITH_LF
 		case CMD_SET_LF_SAMPLING_CONFIG:
-			setSamplingConfig((sample_config *) c->d.asBytes);
+			setSamplingConfig(c->d.asBytes);
 			break;
 		case CMD_ACQUIRE_RAW_ADC_SAMPLES_125K:
 			cmd_send(CMD_ACK,SampleLF(c->arg[0], c->arg[1]),0,0,0,0);
