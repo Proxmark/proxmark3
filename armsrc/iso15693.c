@@ -671,6 +671,7 @@ static int GetIso15693AnswerFromTag(uint8_t* response, uint16_t max_len, int tim
 typedef struct DecodeReader {
 	enum {
 		STATE_READER_UNSYNCD,
+		STATE_READER_AWAIT_1ST_FALLING_EDGE_OF_SOF,
 		STATE_READER_AWAIT_1ST_RISING_EDGE_OF_SOF,
 		STATE_READER_AWAIT_2ND_FALLING_EDGE_OF_SOF,
 		STATE_READER_AWAIT_2ND_RISING_EDGE_OF_SOF,
@@ -714,6 +715,13 @@ static int inline __attribute__((always_inline)) Handle15693SampleFromReader(uin
 {
 	switch (DecodeReader->state) {
 		case STATE_READER_UNSYNCD:
+			// wait for unmodulated carrier
+			if (bit) {
+				DecodeReader->state = STATE_READER_AWAIT_1ST_FALLING_EDGE_OF_SOF;
+			}
+			break;
+
+		case STATE_READER_AWAIT_1ST_FALLING_EDGE_OF_SOF:
 			if (!bit) {
 				// we went low, so this could be the beginning of a SOF
 				DecodeReader->posCount = 1;
@@ -725,7 +733,7 @@ static int inline __attribute__((always_inline)) Handle15693SampleFromReader(uin
 			DecodeReader->posCount++;
 			if (bit) { // detected rising edge
 				if (DecodeReader->posCount < 4) { // rising edge too early (nominally expected at 5)
-					DecodeReaderReset(DecodeReader);
+					DecodeReader->state = STATE_READER_AWAIT_1ST_FALLING_EDGE_OF_SOF;
 				} else { // SOF
 					DecodeReader->state = STATE_READER_AWAIT_2ND_FALLING_EDGE_OF_SOF;
 				}
@@ -748,13 +756,13 @@ static int inline __attribute__((always_inline)) Handle15693SampleFromReader(uin
 					DecodeReader->state = STATE_READER_AWAIT_2ND_RISING_EDGE_OF_SOF;
 				} else if (DecodeReader->posCount < 28) {  // falling edge too early (nominally expected at 29 latest)
 					DecodeReaderReset(DecodeReader);
-				} else {                                 // SOF for 1 out of 4 coding
+				} else {                                   // SOF for 1 out of 256 coding
 					DecodeReader->Coding = CODING_1_OUT_OF_256;
 					DecodeReader->state = STATE_READER_AWAIT_2ND_RISING_EDGE_OF_SOF;
 				}
 			} else {
 				if (DecodeReader->posCount > 29) { // stayed high for too long
-					DecodeReaderReset(DecodeReader);
+					DecodeReader->state = STATE_READER_AWAIT_1ST_FALLING_EDGE_OF_SOF;
 				} else {
 					// do nothing, keep waiting
 				}
@@ -766,7 +774,7 @@ static int inline __attribute__((always_inline)) Handle15693SampleFromReader(uin
 			if (bit) { // detected rising edge
 				if (DecodeReader->Coding == CODING_1_OUT_OF_256) {
 					if (DecodeReader->posCount < 32) { // rising edge too early (nominally expected at 33)
-					DecodeReaderReset(DecodeReader);
+						DecodeReader->state = STATE_READER_AWAIT_1ST_FALLING_EDGE_OF_SOF;
 					} else {
 						DecodeReader->posCount = 1;
 						DecodeReader->bitCount = 0;
@@ -777,21 +785,22 @@ static int inline __attribute__((always_inline)) Handle15693SampleFromReader(uin
 					}
 				} else { // CODING_1_OUT_OF_4
 					if (DecodeReader->posCount < 24) { // rising edge too early (nominally expected at 25)
-					DecodeReaderReset(DecodeReader);
+						DecodeReader->state = STATE_READER_AWAIT_1ST_FALLING_EDGE_OF_SOF;
 					} else {
+						DecodeReader->posCount = 1;
 						DecodeReader->state = STATE_READER_AWAIT_END_OF_SOF_1_OUT_OF_4;
 					}
 				}
 			} else {
 				if (DecodeReader->Coding == CODING_1_OUT_OF_256) {
 					if (DecodeReader->posCount > 34) { // signal stayed low for too long
-					DecodeReaderReset(DecodeReader);
+						DecodeReaderReset(DecodeReader);
 					} else {
 						// do nothing, keep waiting
 					}
 				} else { // CODING_1_OUT_OF_4
 					if (DecodeReader->posCount > 26) { // signal stayed low for too long
-					DecodeReaderReset(DecodeReader);
+						DecodeReaderReset(DecodeReader);
 					} else {
 						// do nothing, keep waiting
 					}
@@ -802,7 +811,7 @@ static int inline __attribute__((always_inline)) Handle15693SampleFromReader(uin
 		case STATE_READER_AWAIT_END_OF_SOF_1_OUT_OF_4:
 			DecodeReader->posCount++;
 			if (bit) {
-				if (DecodeReader->posCount == 33) {
+				if (DecodeReader->posCount == 9) {
 					DecodeReader->posCount = 1;
 					DecodeReader->bitCount = 0;
 					DecodeReader->byteCount = 0;

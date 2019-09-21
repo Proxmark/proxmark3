@@ -33,15 +33,33 @@ module hi_simulate(
     output dbg;
     input [2:0] mod_type;
 
+assign adc_clk = ck_1356meg;
 
 // The comparator with hysteresis on the output from the peak detector.
 reg after_hysteresis;
-assign adc_clk = ck_1356meg;
+reg [11:0] has_been_low_for;
 
 always @(negedge adc_clk)
 begin
-    if(& adc_d[7:5]) after_hysteresis = 1'b1;           // if (adc_d >= 224)
-    else if(~(| adc_d[7:5])) after_hysteresis = 1'b0;   // if (adc_d <= 31)
+    if (& adc_d[7:5]) after_hysteresis <= 1'b1;           // if (adc_d >= 224)
+    else if (~(| adc_d[7:5])) after_hysteresis <= 1'b0;   // if (adc_d <= 31)
+
+	if (adc_d >= 224)
+    begin
+        has_been_low_for <= 12'd0;
+    end
+    else
+    begin
+        if (has_been_low_for == 12'd4095)
+        begin
+            has_been_low_for <= 12'd0;
+            after_hysteresis <= 1'b1;
+        end
+        else
+		begin
+            has_been_low_for <= has_been_low_for + 1;
+		end	
+    end
 end
 
 

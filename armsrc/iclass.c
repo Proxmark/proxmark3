@@ -777,8 +777,6 @@ static void AppendCrc(uint8_t *data, int len) {
 
 /**
  * @brief Does the actual simulation
- * @param csn - csn to use
- * @param breakAfterMacReceived if true, returns after reader MAC has been received.
  */
 int doIClassSimulation(int simulationMode, uint8_t *reader_mac_buf) {
 
@@ -919,6 +917,8 @@ int doIClassSimulation(int simulationMode, uint8_t *reader_mac_buf) {
 
 	LED_A_ON();
 	bool buttonPressed = false;
+	enum { IDLE, ACTIVATED, SELECTED, HALTED } chip_state = IDLE;
+
 	while (!exitLoop) {
 		WDT_HIT();
 		LED_B_OFF();
@@ -943,162 +943,193 @@ int doIClassSimulation(int simulationMode, uint8_t *reader_mac_buf) {
 		trace_data = NULL;
 		trace_data_size = 0;
 
-		if (receivedCmd[0] == ICLASS_CMD_ACTALL) {
-			// Reader in anticollission phase
-			modulated_response = resp_sof;
-			modulated_response_size = resp_sof_Len;
-			trace_data = sof_data;
-			trace_data_size = sizeof(sof_data);
+		if (receivedCmd[0] == ICLASS_CMD_ACTALL && len == 1) {
+			// Reader in anticollision phase
+			if (chip_state != HALTED) {
+				modulated_response = resp_sof;
+				modulated_response_size = resp_sof_Len;
+				trace_data = sof_data;
+				trace_data_size = sizeof(sof_data);
+				chip_state = ACTIVATED;
+			}
 
 		} else if (receivedCmd[0] == ICLASS_CMD_READ_OR_IDENTIFY && len == 1) { // identify
-			// Reader asks for anticollission CSN
-			modulated_response = resp_anticoll;
-			modulated_response_size = resp_anticoll_len;
-			trace_data = anticoll_data;
-			trace_data_size = sizeof(anticoll_data);
+			// Reader asks for anticollision CSN
+			if (chip_state == SELECTED || chip_state == ACTIVATED) {
+				modulated_response = resp_anticoll;
+				modulated_response_size = resp_anticoll_len;
+				trace_data = anticoll_data;
+				trace_data_size = sizeof(anticoll_data);
+			}
+
+		} else if (receivedCmd[0] == ICLASS_CMD_SELECT && len == 9) {
+			// Reader selects anticollision CSN.
+			// Tag sends the corresponding real CSN
+			if (chip_state == ACTIVATED || chip_state == SELECTED) {
+				if (!memcmp(receivedCmd+1, anticoll_data, 8)) {
+					modulated_response = resp_csn;
+					modulated_response_size = resp_csn_len;
+					trace_data = csn_data;
+					trace_data_size = sizeof(csn_data);
+					chip_state = SELECTED;
+				} else {
+					chip_state = IDLE;
+				}
+			} else if (chip_state == HALTED) {
+				// RESELECT with CSN
+				if (!memcmp(receivedCmd+1, csn_data, 8)) {
+					modulated_response = resp_csn;
+					modulated_response_size = resp_csn_len;
+					trace_data = csn_data;
+					trace_data_size = sizeof(csn_data);
+					chip_state = SELECTED;
+				}
+			}
 
 		} else if (receivedCmd[0] == ICLASS_CMD_READ_OR_IDENTIFY && len == 4) { // read block
 			uint16_t blockNo = receivedCmd[1];
-			if (simulationMode == ICLASS_SIM_MODE_EXIT_AFTER_MAC) {
-				// provide defaults for blocks 0 ... 5
-				switch (blockNo) {
-					case 0: // csn (block 00)
-						modulated_response = resp_csn;
-						modulated_response_size = resp_csn_len;
-						trace_data = csn_data;
-						trace_data_size = sizeof(csn_data);
-						break;
-					case 1: // configuration (block 01)
-						modulated_response = resp_conf;
-						modulated_response_size = resp_conf_len;
-						trace_data = conf_data;
-						trace_data_size = sizeof(conf_data);
-						break;
-					case 2: // e-purse (block 02)
-						modulated_response = resp_cc;
-						modulated_response_size = resp_cc_len;
-						trace_data = card_challenge_data;
-						trace_data_size = sizeof(card_challenge_data);
-						// set epurse of sim2,4 attack
-						if (reader_mac_buf != NULL) {
-							memcpy(reader_mac_buf, card_challenge_data, 8);
-						}
-						break;
-					case 3:
-					case 4: // Kd, Kd, always respond with 0xff bytes
+			if (chip_state == SELECTED) {
+				if (simulationMode == ICLASS_SIM_MODE_EXIT_AFTER_MAC) {
+					// provide defaults for blocks 0 ... 5
+					switch (blockNo) {
+						case 0: // csn (block 00)
+							modulated_response = resp_csn;
+							modulated_response_size = resp_csn_len;
+							trace_data = csn_data;
+							trace_data_size = sizeof(csn_data);
+							break;
+						case 1: // configuration (block 01)
+							modulated_response = resp_conf;
+							modulated_response_size = resp_conf_len;
+							trace_data = conf_data;
+							trace_data_size = sizeof(conf_data);
+							break;
+						case 2: // e-purse (block 02)
+							modulated_response = resp_cc;
+							modulated_response_size = resp_cc_len;
+							trace_data = card_challenge_data;
+							trace_data_size = sizeof(card_challenge_data);
+							// set epurse of sim2,4 attack
+							if (reader_mac_buf != NULL) {
+								memcpy(reader_mac_buf, card_challenge_data, 8);
+							}
+							break;
+						case 3:
+						case 4: // Kd, Kc, always respond with 0xff bytes
+							modulated_response = resp_ff;
+							modulated_response_size = resp_ff_len;
+							trace_data = ff_data;
+							trace_data_size = sizeof(ff_data);
+							break;
+						case 5: // Application Issuer Area (block 05)
+							modulated_response = resp_aia;
+							modulated_response_size = resp_aia_len;
+							trace_data = aia_data;
+							trace_data_size = sizeof(aia_data);
+							break;
+						// default: don't respond
+					}
+				} else if (simulationMode == ICLASS_SIM_MODE_FULL) {
+					if (blockNo == 3 || blockNo == 4) { // Kd, Kc, always respond with 0xff bytes
 						modulated_response = resp_ff;
 						modulated_response_size = resp_ff_len;
 						trace_data = ff_data;
 						trace_data_size = sizeof(ff_data);
-						break;
-					case 5: // Application Issuer Area (block 05)
-						modulated_response = resp_aia;
-						modulated_response_size = resp_aia_len;
-						trace_data = aia_data;
-						trace_data_size = sizeof(aia_data);
-						break;
-					// default: don't respond
+					} else { // use data from emulator memory
+						memcpy(data_generic_trace, emulator + 8*blockNo, 8);
+						AppendCrc(data_generic_trace, 8);
+						trace_data = data_generic_trace;
+						trace_data_size = 10;
+						CodeIso15693AsTag(trace_data, trace_data_size);
+						memcpy(data_response, ToSend, ToSendMax);
+						modulated_response = data_response;
+						modulated_response_size = ToSendMax;
+					}
 				}
-			} else if (simulationMode == ICLASS_SIM_MODE_FULL) {
-				if (blockNo == 3 || blockNo == 4) { // Kd, Kc, always respond with 0xff bytes
-					modulated_response = resp_ff;
-					modulated_response_size = resp_ff_len;
-					trace_data = ff_data;
-					trace_data_size = sizeof(ff_data);
-				} else { // use data from emulator memory
-					memcpy(data_generic_trace, emulator + (receivedCmd[1] << 3), 8);
-					AppendCrc(data_generic_trace, 8);
+			}
+
+		} else if ((receivedCmd[0] == ICLASS_CMD_READCHECK_KD
+					|| receivedCmd[0] == ICLASS_CMD_READCHECK_KC) && len == 2) {
+			// Read e-purse (88 02 || 18 02)
+			if (chip_state == SELECTED) {
+				modulated_response = resp_cc;
+				modulated_response_size = resp_cc_len;
+				trace_data = card_challenge_data;
+				trace_data_size = sizeof(card_challenge_data);
+				LED_B_ON();
+			}
+
+		} else if (receivedCmd[0] == ICLASS_CMD_CHECK && len == 9) {
+			// Reader random and reader MAC!!!
+			if (chip_state == SELECTED) {
+				if (simulationMode == ICLASS_SIM_MODE_FULL) {
+					//NR, from reader, is in receivedCmd+1
+					opt_doTagMAC_2(cipher_state, receivedCmd+1, data_generic_trace, diversified_key);
 					trace_data = data_generic_trace;
-					trace_data_size = 10;
+					trace_data_size = 4;
 					CodeIso15693AsTag(trace_data, trace_data_size);
 					memcpy(data_response, ToSend, ToSendMax);
 					modulated_response = data_response;
 					modulated_response_size = ToSendMax;
-				}
-			}
-
-		} else if (receivedCmd[0] == ICLASS_CMD_SELECT) {
-			// Reader selects anticollission CSN.
-			// Tag sends the corresponding real CSN
-			modulated_response = resp_csn;
-			modulated_response_size = resp_csn_len;
-			trace_data = csn_data;
-			trace_data_size = sizeof(csn_data);
-
-		} else if (receivedCmd[0] == ICLASS_CMD_READCHECK_KD
-					|| receivedCmd[0] == ICLASS_CMD_READCHECK_KC) {
-			// Read e-purse (88 02 || 18 02)
-			modulated_response = resp_cc;
-			modulated_response_size = resp_cc_len;
-			trace_data = card_challenge_data;
-			trace_data_size = sizeof(card_challenge_data);
-			LED_B_ON();
-
-		} else if (receivedCmd[0] == ICLASS_CMD_CHECK) {
-			// Reader random and reader MAC!!!
-			if (simulationMode == ICLASS_SIM_MODE_FULL) {
-				//NR, from reader, is in receivedCmd+1
-				opt_doTagMAC_2(cipher_state, receivedCmd+1, data_generic_trace, diversified_key);
-				trace_data = data_generic_trace;
-				trace_data_size = 4;
-				CodeIso15693AsTag(trace_data, trace_data_size);
-				memcpy(data_response, ToSend, ToSendMax);
-				modulated_response = data_response;
-				modulated_response_size = ToSendMax;
-				//exitLoop = true;
-			} else { // Not fullsim, we don't respond
-				// We do not know what to answer, so lets keep quiet
-				if (simulationMode == ICLASS_SIM_MODE_EXIT_AFTER_MAC) {
-					if (reader_mac_buf != NULL) {
-						// save NR and MAC for sim 2,4
-						memcpy(reader_mac_buf + 8, receivedCmd + 1, 8);
+					//exitLoop = true;
+				} else { // Not fullsim, we don't respond
+					// We do not know what to answer, so lets keep quiet
+					if (simulationMode == ICLASS_SIM_MODE_EXIT_AFTER_MAC) {
+						if (reader_mac_buf != NULL) {
+							// save NR and MAC for sim 2,4
+							memcpy(reader_mac_buf + 8, receivedCmd + 1, 8);
+						}
+						exitLoop = true;
 					}
-					exitLoop = true;
 				}
 			}
 
 		} else if (receivedCmd[0] == ICLASS_CMD_HALT && len == 1) {
-			// Reader ends the session
-			modulated_response = resp_sof;
-			modulated_response_size = 0;
-			trace_data = NULL;
-			trace_data_size = 0;
+			if (chip_state == SELECTED) {
+				// Reader ends the session
+				chip_state = HALTED;
+			}
 
 		} else if (simulationMode == ICLASS_SIM_MODE_FULL && receivedCmd[0] == ICLASS_CMD_READ4 && len == 4) {  // 0x06
-			//Read block
-			//Take the data...
-			memcpy(data_generic_trace, emulator + (receivedCmd[1] << 3), 8 * 4);
-			AppendCrc(data_generic_trace, 8 * 4);
-			trace_data = data_generic_trace;
-			trace_data_size = 8 * 4 + 2;
-			CodeIso15693AsTag(trace_data, trace_data_size);
-			memcpy(data_response, ToSend, ToSendMax);
-			modulated_response = data_response;
-			modulated_response_size = ToSendMax;
+			//Read 4 blocks
+			if (chip_state == SELECTED) {
+				memcpy(data_generic_trace, emulator + (receivedCmd[1] << 3), 8 * 4);
+				AppendCrc(data_generic_trace, 8 * 4);
+				trace_data = data_generic_trace;
+				trace_data_size = 8 * 4 + 2;
+				CodeIso15693AsTag(trace_data, trace_data_size);
+				memcpy(data_response, ToSend, ToSendMax);
+				modulated_response = data_response;
+				modulated_response_size = ToSendMax;
+			}
 
-		} else if (receivedCmd[0] == ICLASS_CMD_UPDATE && simulationMode == ICLASS_SIM_MODE_FULL) {
+		} else if (receivedCmd[0] == ICLASS_CMD_UPDATE && (len == 12 || len == 14)) {
 			// Probably the reader wants to update the nonce. Let's just ignore that for now.
 			// OBS! If this is implemented, don't forget to regenerate the cipher_state
 			// We're expected to respond with the data+crc, exactly what's already in the receivedCmd
 			// receivedCmd is now UPDATE 1b | ADDRESS 1b | DATA 8b | Signature 4b or CRC 2b
-			memcpy(data_generic_trace, receivedCmd + 2, 8);
-			AppendCrc(data_generic_trace, 8);
-			trace_data = data_generic_trace;
-			trace_data_size = 10;
-			CodeIso15693AsTag(trace_data, trace_data_size);
-			memcpy(data_response, ToSend, ToSendMax);
-			modulated_response = data_response;
-			modulated_response_size = ToSendMax;
+			if (chip_state == SELECTED) {
+				memcpy(data_generic_trace, receivedCmd + 2, 8);
+				AppendCrc(data_generic_trace, 8);
+				trace_data = data_generic_trace;
+				trace_data_size = 10;
+				CodeIso15693AsTag(trace_data, trace_data_size);
+				memcpy(data_response, ToSend, ToSendMax);
+				modulated_response = data_response;
+				modulated_response_size = ToSendMax;
+			}
 
-		} else if (receivedCmd[0] == ICLASS_CMD_PAGESEL) {
+		} else if (receivedCmd[0] == ICLASS_CMD_PAGESEL && len == 4) {
 			// Pagesel
-			// Pagesel enables to select a page in the selected chip memory and return its configuration block
-			// Chips with a single page will not answer to this command
-			// It appears we're fine ignoring this.
-			// Otherwise, we should answer 8bytes (block) + 2bytes CRC
+			if (chip_state == SELECTED) {
+				// Pagesel enables to select a page in the selected chip memory and return its configuration block
+				// Chips with a single page will not answer to this command
+				// It appears we're fine ignoring this.
+				// Otherwise, we should answer 8bytes (block) + 2bytes CRC
+			}
 
 		} else {
-			// Never seen this command before
+			// don't know how to handle this command
 			char debug_message[250]; // should be enough
 			sprintf(debug_message, "Unhandled command (len = %d) received from reader:", len);
 			for (int i = 0; i < len && strlen(debug_message) < sizeof(debug_message) - 3 - 1; i++) {
@@ -1187,8 +1218,9 @@ void SimulateIClass(uint32_t arg0, uint32_t arg1, uint32_t arg2, uint8_t *datain
 					datain[i*8+0], datain[i*8+1], datain[i*8+2], datain[i*8+3],
 					datain[i*8+4], datain[i*8+5], datain[i*8+6], datain[i*8+7]);
 			Dbprintf("NR,MAC: %02x %02x %02x %02x %02x %02x %02x %02x",
-					datain[i*8+ 8], datain[i*8+ 9], datain[i*8+10], datain[i*8+11],
-					datain[i*8+12], datain[i*8+13], datain[i*8+14], datain[i*8+15]);
+					mac_responses[i*16+ 8], mac_responses[i*16+ 9], mac_responses[i*16+10], mac_responses[i*16+11],
+					mac_responses[i*16+12], mac_responses[i*16+13], mac_responses[i*16+14], mac_responses[i*16+15]);
+			SpinDelay(100); // give the reader some time to prepare for next CSN
 		}
 		cmd_send(CMD_ACK, CMD_SIMULATE_TAG_ICLASS, i, 0, mac_responses, i*16);
 	} else if (simType == ICLASS_SIM_MODE_FULL) {
