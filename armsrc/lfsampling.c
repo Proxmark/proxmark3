@@ -39,17 +39,17 @@ void printConfig()
  * @brief setSamplingConfig
  * @param sc
  */
-void setSamplingConfig(sample_config *sc)
-{
-	if(sc->divisor != 0) config.divisor = sc->divisor;
-	if(sc->bits_per_sample!= 0) config.bits_per_sample= sc->bits_per_sample;
-	if(sc->decimation!= 0) config.decimation= sc->decimation;
-	if(sc->trigger_threshold != -1) config.trigger_threshold= sc->trigger_threshold;
-	if(sc->samples_to_skip != -1) config.samples_to_skip = sc->samples_to_skip;
+void setSamplingConfig(uint8_t *config_data) {
+	sample_config *sc = (sample_config *)config_data;
+	if (sc->divisor != 0) config.divisor = sc->divisor;
+	if (sc->bits_per_sample != 0) config.bits_per_sample = sc->bits_per_sample;
+	if (sc->decimation != 0) config.decimation = sc->decimation;
+	if (sc->trigger_threshold != -1) config.trigger_threshold = sc->trigger_threshold;
+	if (sc->samples_to_skip != -1) config.samples_to_skip = sc->samples_to_skip;
 
 	config.averaging= sc->averaging;
-	if(config.bits_per_sample > 8)	config.bits_per_sample = 8;
-	if(config.decimation < 1)	config.decimation = 1;
+	if (config.bits_per_sample > 8)	config.bits_per_sample = 8;
+	if (config.decimation < 1)	config.decimation = 1;
 
 	printConfig();
 }
