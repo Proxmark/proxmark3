@@ -96,7 +96,8 @@ NXP/Philips CUSTOM COMMANDS
 #define ICLASS_CMD_PAGESEL          0x84
 #define ICLASS_CMD_READCHECK_KD     0x88
 #define ICLASS_CMD_READCHECK_KC     0x18
-#define ICLASS_CMD_CHECK            0x05
+#define ICLASS_CMD_CHECK_KC         0x95
+#define ICLASS_CMD_CHECK_KD         0x05
 #define ICLASS_CMD_DETECT           0x0F
 #define ICLASS_CMD_HALT             0x00
 #define ICLASS_CMD_UPDATE           0x87

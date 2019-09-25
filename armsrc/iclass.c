@@ -783,7 +783,8 @@ int doIClassSimulation(int simulationMode, uint8_t *reader_mac_buf) {
 	// free eventually allocated BigBuf memory
 	BigBuf_free_keep_EM();
 
-	State cipher_state;
+	State cipher_state_KC;
+	State cipher_state_KD;
 
 	uint8_t *emulator = BigBuf_get_EM_addr();
 	uint8_t *csn = emulator;
@@ -802,18 +803,20 @@ int doIClassSimulation(int simulationMode, uint8_t *reader_mac_buf) {
 	AppendCrc(anticoll_data, 8);
 	AppendCrc(csn_data, 8);
 
-	uint8_t diversified_key[8] = { 0 };
+	uint8_t diversified_key_d[8] = { 0 };
+	uint8_t diversified_key_c[8] = { 0 };
 	// e-Purse
 	uint8_t card_challenge_data[8] = { 0xfe, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
 	//uint8_t card_challenge_data[8] = { 0 };
 	if (simulationMode == ICLASS_SIM_MODE_FULL) {
-		// The diversified key should be stored on block 3
-		// Get the diversified key from emulator memory
-		memcpy(diversified_key, emulator + (8 * 3), 8);
+		// Get the diversified keys from emulator memory
+		memcpy(diversified_key_d, emulator + (8 * 3), 8);
+		memcpy(diversified_key_c, emulator + (8 * 4), 8);
 		// Card challenge, a.k.a e-purse is on block 2
 		memcpy(card_challenge_data, emulator + (8 * 2), 8);
-		// Precalculate the cipher state, feeding it the CC
-		cipher_state = opt_doTagMAC_1(card_challenge_data, diversified_key);
+		// Precalculate the cipher states, feeding it the CC
+		cipher_state_KD = opt_doTagMAC_1(card_challenge_data, diversified_key_d);
+		cipher_state_KC = opt_doTagMAC_1(card_challenge_data, diversified_key_c);
 	}
 	// save card challenge for sim2,4 attack
 	if (reader_mac_buf != NULL) {
@@ -1049,7 +1052,7 @@ int doIClassSimulation(int simulationMode, uint8_t *reader_mac_buf) {
 			}
 
 		} else if ((receivedCmd[0] == ICLASS_CMD_READCHECK_KD
-					|| receivedCmd[0] == ICLASS_CMD_READCHECK_KC) && len == 2) {
+					|| receivedCmd[0] == ICLASS_CMD_READCHECK_KC) && receivedCmd[1] == 0x02 && len == 2) {
 			// Read e-purse (88 02 || 18 02)
 			if (chip_state == SELECTED) {
 				modulated_response = resp_cc;
@@ -1059,12 +1062,17 @@ int doIClassSimulation(int simulationMode, uint8_t *reader_mac_buf) {
 				LED_B_ON();
 			}
 
-		} else if (receivedCmd[0] == ICLASS_CMD_CHECK && len == 9) {
+		} else if ((receivedCmd[0] == ICLASS_CMD_CHECK_KC 
+					|| receivedCmd[0] == ICLASS_CMD_CHECK_KD) && len == 9) {
 			// Reader random and reader MAC!!!
 			if (chip_state == SELECTED) {
 				if (simulationMode == ICLASS_SIM_MODE_FULL) {
 					//NR, from reader, is in receivedCmd+1
-					opt_doTagMAC_2(cipher_state, receivedCmd+1, data_generic_trace, diversified_key);
+					if (receivedCmd[0] == ICLASS_CMD_CHECK_KC) {
+						opt_doTagMAC_2(cipher_state_KC, receivedCmd+1, data_generic_trace, diversified_key_c);
+					} else {
+						opt_doTagMAC_2(cipher_state_KD, receivedCmd+1, data_generic_trace, diversified_key_d);
+					}
 					trace_data = data_generic_trace;
 					trace_data_size = 4;
 					CodeIso15693AsTag(trace_data, trace_data_size);
@@ -1093,7 +1101,7 @@ int doIClassSimulation(int simulationMode, uint8_t *reader_mac_buf) {
 		} else if (simulationMode == ICLASS_SIM_MODE_FULL && receivedCmd[0] == ICLASS_CMD_READ4 && len == 4) {  // 0x06
 			//Read 4 blocks
 			if (chip_state == SELECTED) {
-				memcpy(data_generic_trace, emulator + (receivedCmd[1] << 3), 8 * 4);
+				memcpy(data_generic_trace, emulator + receivedCmd[1]*8, 8 * 4);
 				AppendCrc(data_generic_trace, 8 * 4);
 				trace_data = data_generic_trace;
 				trace_data_size = 8 * 4 + 2;
@@ -1104,11 +1112,39 @@ int doIClassSimulation(int simulationMode, uint8_t *reader_mac_buf) {
 			}
 
 		} else if (receivedCmd[0] == ICLASS_CMD_UPDATE && (len == 12 || len == 14)) {
-			// Probably the reader wants to update the nonce. Let's just ignore that for now.
-			// OBS! If this is implemented, don't forget to regenerate the cipher_state
 			// We're expected to respond with the data+crc, exactly what's already in the receivedCmd
 			// receivedCmd is now UPDATE 1b | ADDRESS 1b | DATA 8b | Signature 4b or CRC 2b
 			if (chip_state == SELECTED) {
+				uint8_t blockNo = receivedCmd[1];
+				if (blockNo == 2) { // update e-purse
+					memcpy(card_challenge_data, receivedCmd+2, 8);
+					CodeIso15693AsTag(card_challenge_data, sizeof(card_challenge_data));
+					memcpy(resp_cc, ToSend, ToSendMax);
+					resp_cc_len = ToSendMax;
+					cipher_state_KD = opt_doTagMAC_1(card_challenge_data, diversified_key_d);
+					cipher_state_KC = opt_doTagMAC_1(card_challenge_data, diversified_key_c);
+					if (simulationMode == ICLASS_SIM_MODE_FULL) {
+						memcpy(emulator + 8*2, card_challenge_data, 8);
+					}
+				} else if (blockNo == 3) { // update Kd
+					for (int i = 0; i < 8; i++){
+						diversified_key_d[i] = diversified_key_d[i] ^ receivedCmd[2 + i];							
+					}
+					cipher_state_KD = opt_doTagMAC_1(card_challenge_data, diversified_key_d);				
+					if (simulationMode == ICLASS_SIM_MODE_FULL) {
+						memcpy(emulator + 8*3, diversified_key_d, 8);
+					}
+				} else if (blockNo == 4) { // update Kc					
+					for(int i = 0; i < 8; i++){
+						diversified_key_c[i] = diversified_key_c[i] ^ receivedCmd[2 + i];					
+					}
+					cipher_state_KC = opt_doTagMAC_1(card_challenge_data, diversified_key_c);
+					if (simulationMode == ICLASS_SIM_MODE_FULL) {
+						memcpy(emulator + 8*4, diversified_key_c, 8);
+					}
+				} else if (simulationMode == ICLASS_SIM_MODE_FULL) { // update any other data block
+						memcpy(emulator + 8*blockNo, receivedCmd+2, 8);
+				}					
 				memcpy(data_generic_trace, receivedCmd + 2, 8);
 				AppendCrc(data_generic_trace, 8);
 				trace_data = data_generic_trace;
@@ -1772,7 +1808,7 @@ void iClass_ReadCheck(uint8_t blockNo, uint8_t keyType) {
 }
 
 void iClass_Authentication(uint8_t *MAC) {
-	uint8_t check[] = { ICLASS_CMD_CHECK, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
+	uint8_t check[] = { ICLASS_CMD_CHECK_KD, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
 	uint8_t resp[ICLASS_BUFFER_SIZE];
 	memcpy(check+5, MAC, 4);
 	bool isOK;
