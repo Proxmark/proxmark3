@@ -827,6 +827,7 @@ static int inline __attribute__((always_inline)) Handle15693SampleFromReader(uin
 			break;
 
 		case STATE_READER_RECEIVE_DATA_1_OUT_OF_4:
+			bit = !!bit;
 			DecodeReader->posCount++;
 			if (DecodeReader->posCount == 1) {
 				DecodeReader->sum1 = bit;
@@ -839,17 +840,14 @@ static int inline __attribute__((always_inline)) Handle15693SampleFromReader(uin
 			}
 			if (DecodeReader->posCount == 8) {
 				DecodeReader->posCount = 0;
-				int corr10 = DecodeReader->sum1 - DecodeReader->sum2;
-				int corr01 = DecodeReader->sum2 - DecodeReader->sum1;
-				int corr11 = (DecodeReader->sum1 + DecodeReader->sum2) / 2;
-				if (corr01 > corr11 && corr01 > corr10) { // EOF
+				if (DecodeReader->sum1 <= 1 && DecodeReader->sum2 >= 3) { // EOF
 					LED_B_OFF(); // Finished receiving
 					DecodeReaderReset(DecodeReader);
 					if (DecodeReader->byteCount != 0) {
 						return true;
 					}
 				}
-				if (corr10 > corr11) { // detected a 2bit position
+				if (DecodeReader->sum1 >= 3 && DecodeReader->sum2 <= 1) { // detected a 2bit position
 					DecodeReader->shiftReg >>= 2;
 					DecodeReader->shiftReg |= (DecodeReader->bitCount << 6);
 				}
@@ -869,6 +867,7 @@ static int inline __attribute__((always_inline)) Handle15693SampleFromReader(uin
 			break;
 
 		case STATE_READER_RECEIVE_DATA_1_OUT_OF_256:
+			bit = !!bit;
 			DecodeReader->posCount++;
 			if (DecodeReader->posCount == 1) {
 				DecodeReader->sum1 = bit;
@@ -881,17 +880,14 @@ static int inline __attribute__((always_inline)) Handle15693SampleFromReader(uin
 			}
 			if (DecodeReader->posCount == 8) {
 				DecodeReader->posCount = 0;
-				int corr10 = DecodeReader->sum1 - DecodeReader->sum2;
-				int corr01 = DecodeReader->sum2 - DecodeReader->sum1;
-				int corr11 = (DecodeReader->sum1 + DecodeReader->sum2) / 2;
-				if (corr01 > corr11 && corr01 > corr10) { // EOF
+				if (DecodeReader->sum1 <= 1 && DecodeReader->sum2 >= 3) { // EOF
 					LED_B_OFF(); // Finished receiving
 					DecodeReaderReset(DecodeReader);
 					if (DecodeReader->byteCount != 0) {
 						return true;
 					}
 				}
-				if (corr10 > corr11) { // detected the bit position
+				if (DecodeReader->sum1 >= 3 && DecodeReader->sum2 <= 1) { // detected the bit position
 					DecodeReader->shiftReg = DecodeReader->bitCount;
 				}
 				if (DecodeReader->bitCount == 255) { // we have a full byte

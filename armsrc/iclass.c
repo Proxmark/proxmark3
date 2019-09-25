@@ -1128,6 +1128,9 @@ int doIClassSimulation(int simulationMode, uint8_t *reader_mac_buf) {
 				// Otherwise, we should answer 8bytes (block) + 2bytes CRC
 			}
 
+		} else if (receivedCmd[0] == 0x26 && len == 5) {
+			// standard ISO15693 INVENTORY command. Ignore.
+
 		} else {
 			// don't know how to handle this command
 			char debug_message[250]; // should be enough

@@ -144,7 +144,7 @@ int CmdHFiClassSim(const char *Cmd) {
 	uint8_t simType = 0;
 	uint8_t CSN[8] = {0, 0, 0, 0, 0, 0, 0, 0};
 
-	if (strlen(Cmd)<1) {
+	if (strlen(Cmd) < 1) {
 		return usage_hf_iclass_sim();
 	}
 	simType = param_get8ex(Cmd, 0, 0, 10);
@@ -157,7 +157,6 @@ int CmdHFiClassSim(const char *Cmd) {
 		PrintAndLog("--simtype:%02x csn:%s", simType, sprint_hex(CSN, 8));
 	}
 
-	uint8_t numberOfCSNs = 0;
 	if (simType == ICLASS_SIM_MODE_READER_ATTACK) {
 		UsbCommand c = {CMD_SIMULATE_TAG_ICLASS, {simType, NUM_CSNS}};
 		UsbCommand resp = {0};
@@ -196,8 +195,8 @@ int CmdHFiClassSim(const char *Cmd) {
 		saveFile("iclass_mac_attack", "bin", dump,datalen);
 		free(dump);
 
-	} else if (simType == ICLASS_SIM_MODE_CSN || simType == ICLASS_SIM_MODE_CSN_DEFAULT) {
-		UsbCommand c = {CMD_SIMULATE_TAG_ICLASS, {simType, numberOfCSNs}};
+	} else if (simType == ICLASS_SIM_MODE_CSN || simType == ICLASS_SIM_MODE_CSN_DEFAULT || simType == ICLASS_SIM_MODE_FULL) {
+		UsbCommand c = {CMD_SIMULATE_TAG_ICLASS, {simType, 0}};
 		memcpy(c.d.asBytes, CSN, 8);
 		SendCommand(&c);
 
