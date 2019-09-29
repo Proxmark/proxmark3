@@ -294,14 +294,13 @@ int CmdHFiClassELoad(const char *Cmd) {
 	//File handling and reading
 	FILE *f;
 	char filename[FILE_PATH_SIZE];
-	if(opt == 'f' && param_getstr(Cmd, 1, filename, sizeof(filename)) > 0)
-	{
+	if (opt == 'f' && param_getstr(Cmd, 1, filename, sizeof(filename)) > 0) {
 		f = fopen(filename, "rb");
-	}else{
+	} else {
 		return hf_iclass_eload_usage();
 	}
 
-	if(!f) {
+	if (!f) {
 		PrintAndLog("Failed to read from file '%s'", filename);
 		return 1;
 	}
@@ -324,8 +323,7 @@ int CmdHFiClassELoad(const char *Cmd) {
 	printIclassDumpInfo(dump);
 	//Validate
 
-	if (bytes_read < fsize)
-	{
+	if (bytes_read < fsize)	{
 		prnlog("Error, could only read %d bytes (should be %d)",bytes_read, fsize );
 		free(dump);
 		return 1;
@@ -334,10 +332,10 @@ int CmdHFiClassELoad(const char *Cmd) {
 	uint32_t bytes_sent = 0;
 	uint32_t bytes_remaining  = bytes_read;
 
-	while(bytes_remaining > 0){
+	while (bytes_remaining > 0) {
 		uint32_t bytes_in_packet = MIN(USB_CMD_DATA_SIZE, bytes_remaining);
 		UsbCommand c = {CMD_ICLASS_EML_MEMSET, {bytes_sent,bytes_in_packet,0}};
-		memcpy(c.d.asBytes, dump, bytes_in_packet);
+		memcpy(c.d.asBytes, dump+bytes_sent, bytes_in_packet);
 		SendCommand(&c);
 		bytes_remaining -= bytes_in_packet;
 		bytes_sent += bytes_in_packet;
