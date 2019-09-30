@@ -15,7 +15,8 @@ This project uses the changelog in accordance with [keepchangelog](http://keepac
 - Wrong UID at HitagS simulation
 - `hf 15 sim` now works as expected (piwi)
 - `hf mf chk t` save to emulator memory now works as expected (mwalker)
- - Fix `hf mf sim` - wrong access rights to write key B in trailer (@McEloff)
+- Fix `hf mf sim` - wrong access rights to write key B in trailer (@McEloff)
+- allow files > 512Bytes in 'hf iclass eload' (@Sherhannn79)
  
 ### Added
 - Added to `hf 14a apdu` print apdu and compose apdu (@merlokk)
