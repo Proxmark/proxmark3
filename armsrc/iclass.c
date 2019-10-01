@@ -758,15 +758,8 @@ void rotateCSN(uint8_t* originalCSN, uint8_t* rotatedCSN) {
 
 // Encode SOF only
 static void CodeIClassTagSOF() {
-	//So far a dummy implementation, not used
-	//int lastProxToAirDuration =0;
-
 	ToSendReset();
-	// Send SOF
 	ToSend[++ToSendMax] = 0x1D;
-//  lastProxToAirDuration  = 8*ToSendMax - 3*8;//Not counting zeroes in the beginning
-
-	// Convert from last byte pos to length
 	ToSendMax++;
 }
 
@@ -783,16 +776,20 @@ int doIClassSimulation(int simulationMode, uint8_t *reader_mac_buf) {
 	// free eventually allocated BigBuf memory
 	BigBuf_free_keep_EM();
 
-	State cipher_state_KC;
-	State cipher_state_KD;
+	uint16_t page_size = 32 * 8;
+	uint8_t current_page = 0;
 
+	// maintain cipher states for both credit and debit key for each page
+	State cipher_state_KC[8];
+	State cipher_state_KD[8];
+	State *cipher_state = &cipher_state_KD[0];
+	
 	uint8_t *emulator = BigBuf_get_EM_addr();
 	uint8_t *csn = emulator;
-	uint8_t sof_data[] = { 0x0F } ;
 
 	// CSN followed by two CRC bytes
-	uint8_t anticoll_data[10] = { 0 };
-	uint8_t csn_data[10] = { 0 };
+	uint8_t anticoll_data[10];
+	uint8_t csn_data[10];
 	memcpy(csn_data, csn, sizeof(csn_data));
 	Dbprintf("Simulating CSN %02x%02x%02x%02x%02x%02x%02x%02x", csn[0], csn[1], csn[2], csn[3], csn[4], csn[5], csn[6], csn[7]);
 
@@ -803,26 +800,56 @@ int doIClassSimulation(int simulationMode, uint8_t *reader_mac_buf) {
 	AppendCrc(anticoll_data, 8);
 	AppendCrc(csn_data, 8);
 
-	uint8_t diversified_key_d[8] = { 0 };
-	uint8_t diversified_key_c[8] = { 0 };
+	uint8_t diversified_key_d[8];
+	uint8_t diversified_key_c[8];
+	uint8_t *diversified_key = diversified_key_d;
+	
+	// configuration block
+	uint8_t conf_block[10] = {0x12, 0xFF, 0xFF, 0xFF, 0x7F, 0x1F, 0xFF, 0x3C, 0x00, 0x00};
+	AppendCrc(conf_block, 8);
+
 	// e-Purse
 	uint8_t card_challenge_data[8] = { 0xfe, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
-	//uint8_t card_challenge_data[8] = { 0 };
+
 	if (simulationMode == ICLASS_SIM_MODE_FULL) {
-		// Get the diversified keys from emulator memory
-		memcpy(diversified_key_d, emulator + (8 * 3), 8);
-		memcpy(diversified_key_c, emulator + (8 * 4), 8);
-		// Card challenge, a.k.a e-purse is on block 2
-		memcpy(card_challenge_data, emulator + (8 * 2), 8);
-		// Precalculate the cipher states, feeding it the CC
-		cipher_state_KD = opt_doTagMAC_1(card_challenge_data, diversified_key_d);
-		cipher_state_KC = opt_doTagMAC_1(card_challenge_data, diversified_key_c);
+		// initialize from page 0
+		memcpy(conf_block, emulator + 8 * 1, 8);
+		memcpy(card_challenge_data, emulator + 8 * 2, 8); // e-purse
+		memcpy(diversified_key_d, emulator + 8 * 3, 8);   // Kd
+		memcpy(diversified_key_c, emulator + 8 * 4, 8);   // Kc
 	}
+
 	// save card challenge for sim2,4 attack
 	if (reader_mac_buf != NULL) {
 		memcpy(reader_mac_buf, card_challenge_data, 8);
 	}
 
+	if (conf_block[5] & 0x80) {
+		page_size = 256 * 8;
+	}
+
+	// From PicoPass DS:
+	// When the page is in personalization mode this bit is equal to 1.
+	// Once the application issuer has personalized and coded its dedicated areas, this bit must be set to 0:
+	// the page is then "in application mode".
+	bool personalization_mode = conf_block[7] & 0x80;
+
+	// chip memory may be divided in 8 pages
+	uint8_t max_page = conf_block[4] & 0x10 ? 0 : 7;
+	
+	// Precalculate the cipher states, feeding it the CC
+	cipher_state_KD[0] = opt_doTagMAC_1(card_challenge_data, diversified_key_d);
+	cipher_state_KC[0] = opt_doTagMAC_1(card_challenge_data, diversified_key_c);
+	if (simulationMode == ICLASS_SIM_MODE_FULL) {
+		for (int i = 1; i < max_page; i++) {
+			uint8_t *epurse = emulator + i*page_size + 8*2;
+			uint8_t *Kd = emulator + i*page_size + 8*3;
+			uint8_t *Kc = emulator + i*page_size + 8*4;
+			cipher_state_KD[i] = opt_doTagMAC_1(epurse, Kd);
+			cipher_state_KC[i] = opt_doTagMAC_1(epurse, Kc);
+		}
+	}
+			
 	int exitLoop = 0;
 	// Reader 0a
 	// Tag    0f
@@ -837,7 +864,7 @@ int doIClassSimulation(int simulationMode, uint8_t *reader_mac_buf) {
 	int trace_data_size = 0;
 
 	// Respond SOF -- takes 1 bytes
-	uint8_t *resp_sof = BigBuf_malloc(2);
+	uint8_t *resp_sof = BigBuf_malloc(1);
 	int resp_sof_Len;
 
 	// Anticollision CSN (rotated CSN)
@@ -853,8 +880,6 @@ int doIClassSimulation(int simulationMode, uint8_t *reader_mac_buf) {
 	// configuration (block 1) picopass 2ks
 	uint8_t *resp_conf = BigBuf_malloc(22);
 	int resp_conf_len;
-	uint8_t conf_data[10] = {0x12, 0xFF, 0xFF, 0xFF, 0x7F, 0x1F, 0xFF, 0x3C, 0x00, 0x00};
-	AppendCrc(conf_data, 8);
 
 	// e-Purse (block 2)
 	// 18: Takes 2 bytes for SOF/EOF and 8 * 2 = 16 bytes (2 bytes/bit)
@@ -877,7 +902,6 @@ int doIClassSimulation(int simulationMode, uint8_t *reader_mac_buf) {
 	int len;
 
 	// Prepare card messages
-	ToSendMax = 0;
 
 	// First card answer: SOF only
 	CodeIClassTagSOF();
@@ -895,7 +919,7 @@ int doIClassSimulation(int simulationMode, uint8_t *reader_mac_buf) {
 	resp_csn_len = ToSendMax;
 
 	// Configuration (block 1)
-	CodeIso15693AsTag(conf_data, sizeof(conf_data));
+	CodeIso15693AsTag(conf_block, sizeof(conf_block));
 	memcpy(resp_conf, ToSend, ToSendMax);
 	resp_conf_len = ToSendMax;
 
@@ -918,16 +942,11 @@ int doIClassSimulation(int simulationMode, uint8_t *reader_mac_buf) {
 	uint8_t *data_generic_trace = BigBuf_malloc(32 + 2); // 32 bytes data + 2byte CRC is max tag answer
 	uint8_t *data_response = BigBuf_malloc( (32 + 2) * 2 + 2);
 
-	LED_A_ON();
 	bool buttonPressed = false;
 	enum { IDLE, ACTIVATED, SELECTED, HALTED } chip_state = IDLE;
 
 	while (!exitLoop) {
 		WDT_HIT();
-		LED_B_OFF();
-		//Signal tracer
-		// Can be used to get a trigger for an oscilloscope..
-		LED_C_OFF();
 
 		uint32_t reader_eof_time = 0;
 		len = GetIso15693CommandFromReader(receivedCmd, MAX_FRAME_SIZE, &reader_eof_time);
@@ -935,9 +954,6 @@ int doIClassSimulation(int simulationMode, uint8_t *reader_mac_buf) {
 			buttonPressed = true;
 			break;
 		}
-
-		//Signal tracer
-		LED_C_ON();
 
 		// Now look at the reader command and provide appropriate responses
 		// default is no response:
@@ -951,8 +967,6 @@ int doIClassSimulation(int simulationMode, uint8_t *reader_mac_buf) {
 			if (chip_state != HALTED) {
 				modulated_response = resp_sof;
 				modulated_response_size = resp_sof_Len;
-				trace_data = sof_data;
-				trace_data_size = sizeof(sof_data);
 				chip_state = ACTIVATED;
 			}
 
@@ -1004,8 +1018,8 @@ int doIClassSimulation(int simulationMode, uint8_t *reader_mac_buf) {
 						case 1: // configuration (block 01)
 							modulated_response = resp_conf;
 							modulated_response_size = resp_conf_len;
-							trace_data = conf_data;
-							trace_data_size = sizeof(conf_data);
+							trace_data = conf_block;
+							trace_data_size = sizeof(conf_block);
 							break;
 						case 2: // e-purse (block 02)
 							modulated_response = resp_cc;
@@ -1039,7 +1053,7 @@ int doIClassSimulation(int simulationMode, uint8_t *reader_mac_buf) {
 						trace_data = ff_data;
 						trace_data_size = sizeof(ff_data);
 					} else { // use data from emulator memory
-						memcpy(data_generic_trace, emulator + 8*blockNo, 8);
+						memcpy(data_generic_trace, emulator + current_page*page_size + 8*blockNo, 8);
 						AppendCrc(data_generic_trace, 8);
 						trace_data = data_generic_trace;
 						trace_data_size = 10;
@@ -1055,11 +1069,17 @@ int doIClassSimulation(int simulationMode, uint8_t *reader_mac_buf) {
 					|| receivedCmd[0] == ICLASS_CMD_READCHECK_KC) && receivedCmd[1] == 0x02 && len == 2) {
 			// Read e-purse (88 02 || 18 02)
 			if (chip_state == SELECTED) {
+				if(receivedCmd[0] == ICLASS_CMD_READCHECK_KD){
+					cipher_state = &cipher_state_KD[current_page];
+					diversified_key = diversified_key_d;
+				} else {
+					cipher_state = &cipher_state_KC[current_page];			
+					diversified_key = diversified_key_c;
+				}
 				modulated_response = resp_cc;
 				modulated_response_size = resp_cc_len;
 				trace_data = card_challenge_data;
 				trace_data_size = sizeof(card_challenge_data);
-				LED_B_ON();
 			}
 
 		} else if ((receivedCmd[0] == ICLASS_CMD_CHECK_KC 
@@ -1068,11 +1088,7 @@ int doIClassSimulation(int simulationMode, uint8_t *reader_mac_buf) {
 			if (chip_state == SELECTED) {
 				if (simulationMode == ICLASS_SIM_MODE_FULL) {
 					//NR, from reader, is in receivedCmd+1
-					if (receivedCmd[0] == ICLASS_CMD_CHECK_KC) {
-						opt_doTagMAC_2(cipher_state_KC, receivedCmd+1, data_generic_trace, diversified_key_c);
-					} else {
-						opt_doTagMAC_2(cipher_state_KD, receivedCmd+1, data_generic_trace, diversified_key_d);
-					}
+					opt_doTagMAC_2(*cipher_state, receivedCmd+1, data_generic_trace, diversified_key);
 					trace_data = data_generic_trace;
 					trace_data_size = 4;
 					CodeIso15693AsTag(trace_data, trace_data_size);
@@ -1095,13 +1111,16 @@ int doIClassSimulation(int simulationMode, uint8_t *reader_mac_buf) {
 		} else if (receivedCmd[0] == ICLASS_CMD_HALT && len == 1) {
 			if (chip_state == SELECTED) {
 				// Reader ends the session
+				modulated_response = resp_sof;
+				modulated_response_size = resp_sof_Len;
 				chip_state = HALTED;
 			}
 
 		} else if (simulationMode == ICLASS_SIM_MODE_FULL && receivedCmd[0] == ICLASS_CMD_READ4 && len == 4) {  // 0x06
 			//Read 4 blocks
 			if (chip_state == SELECTED) {
-				memcpy(data_generic_trace, emulator + receivedCmd[1]*8, 8 * 4);
+				uint8_t blockNo = receivedCmd[1];
+				memcpy(data_generic_trace, emulator + current_page*page_size + blockNo*8, 8 * 4);
 				AppendCrc(data_generic_trace, 8 * 4);
 				trace_data = data_generic_trace;
 				trace_data_size = 8 * 4 + 2;
@@ -1121,29 +1140,37 @@ int doIClassSimulation(int simulationMode, uint8_t *reader_mac_buf) {
 					CodeIso15693AsTag(card_challenge_data, sizeof(card_challenge_data));
 					memcpy(resp_cc, ToSend, ToSendMax);
 					resp_cc_len = ToSendMax;
-					cipher_state_KD = opt_doTagMAC_1(card_challenge_data, diversified_key_d);
-					cipher_state_KC = opt_doTagMAC_1(card_challenge_data, diversified_key_c);
+					cipher_state_KD[current_page] = opt_doTagMAC_1(card_challenge_data, diversified_key_d);
+					cipher_state_KC[current_page] = opt_doTagMAC_1(card_challenge_data, diversified_key_c);
 					if (simulationMode == ICLASS_SIM_MODE_FULL) {
-						memcpy(emulator + 8*2, card_challenge_data, 8);
+						memcpy(emulator + current_page*page_size + 8*2, card_challenge_data, 8);
 					}
 				} else if (blockNo == 3) { // update Kd
-					for (int i = 0; i < 8; i++){
-						diversified_key_d[i] = diversified_key_d[i] ^ receivedCmd[2 + i];							
+					for (int i = 0; i < 8; i++) {
+						if (personalization_mode) {
+							diversified_key_d[i] = receivedCmd[2 + i];	
+						} else {
+							diversified_key_d[i] ^= receivedCmd[2 + i];
+						}						
 					}
-					cipher_state_KD = opt_doTagMAC_1(card_challenge_data, diversified_key_d);				
+					cipher_state_KD[current_page] = opt_doTagMAC_1(card_challenge_data, diversified_key_d);				
 					if (simulationMode == ICLASS_SIM_MODE_FULL) {
-						memcpy(emulator + 8*3, diversified_key_d, 8);
+						memcpy(emulator + current_page*page_size + 8*3, diversified_key_d, 8);
 					}
 				} else if (blockNo == 4) { // update Kc					
-					for(int i = 0; i < 8; i++){
-						diversified_key_c[i] = diversified_key_c[i] ^ receivedCmd[2 + i];					
+					for (int i = 0; i < 8; i++) {
+						if (personalization_mode) {
+							diversified_key_c[i] = receivedCmd[2 + i];	
+						} else {
+							diversified_key_c[i] ^= receivedCmd[2 + i];
+						}						
 					}
-					cipher_state_KC = opt_doTagMAC_1(card_challenge_data, diversified_key_c);
+					cipher_state_KC[current_page] = opt_doTagMAC_1(card_challenge_data, diversified_key_c);
 					if (simulationMode == ICLASS_SIM_MODE_FULL) {
-						memcpy(emulator + 8*4, diversified_key_c, 8);
+						memcpy(emulator + current_page*page_size + 8*4, diversified_key_c, 8);
 					}
 				} else if (simulationMode == ICLASS_SIM_MODE_FULL) { // update any other data block
-						memcpy(emulator + 8*blockNo, receivedCmd+2, 8);
+						memcpy(emulator + current_page*page_size + 8*blockNo, receivedCmd+2, 8);
 				}					
 				memcpy(data_generic_trace, receivedCmd + 2, 8);
 				AppendCrc(data_generic_trace, 8);
@@ -1157,11 +1184,24 @@ int doIClassSimulation(int simulationMode, uint8_t *reader_mac_buf) {
 
 		} else if (receivedCmd[0] == ICLASS_CMD_PAGESEL && len == 4) {
 			// Pagesel
+			// Chips with a single page will not answer to this command
+			// Otherwise, we should answer 8bytes (block) + 2bytes CRC
 			if (chip_state == SELECTED) {
-				// Pagesel enables to select a page in the selected chip memory and return its configuration block
-				// Chips with a single page will not answer to this command
-				// It appears we're fine ignoring this.
-				// Otherwise, we should answer 8bytes (block) + 2bytes CRC
+				if (simulationMode == ICLASS_SIM_MODE_FULL && max_page > 0) {
+					current_page = receivedCmd[1];
+					memcpy(data_generic_trace, emulator + current_page*page_size + 8*1, 8);
+					memcpy(diversified_key_d, emulator + current_page*page_size + 8*3, 8);
+					memcpy(diversified_key_c, emulator + current_page*page_size + 8*4, 8);												
+					cipher_state = &cipher_state_KD[current_page];
+					personalization_mode = data_generic_trace[7] & 0x80;
+					AppendCrc(data_generic_trace, 8);
+					trace_data = data_generic_trace;
+					trace_data_size = 10;
+					CodeIso15693AsTag(trace_data, trace_data_size);
+					memcpy(data_response, ToSend, ToSendMax);		
+					modulated_response = data_response;
+					modulated_response_size = ToSendMax;
+				}
 			}
 
 		} else if (receivedCmd[0] == 0x26 && len == 5) {
@@ -1189,10 +1229,6 @@ int doIClassSimulation(int simulationMode, uint8_t *reader_mac_buf) {
 
 	}
 
-	LED_A_OFF();
-	LED_B_OFF();
-	LED_C_OFF();
-
 	if (buttonPressed)
 	{
 		DbpString("Button pressed");
@@ -1213,6 +1249,9 @@ int doIClassSimulation(int simulationMode, uint8_t *reader_mac_buf) {
  * @param datain
  */
 void SimulateIClass(uint32_t arg0, uint32_t arg1, uint32_t arg2, uint8_t *datain) {
+	
+	LED_A_ON();
+	
 	uint32_t simType = arg0;
 	uint32_t numberOfCSNS = arg1;
 
@@ -1220,6 +1259,7 @@ void SimulateIClass(uint32_t arg0, uint32_t arg1, uint32_t arg2, uint8_t *datain
 	FpgaDownloadAndGo(FPGA_BITSTREAM_HF);
 	SetAdcMuxFor(GPIO_MUXSEL_HIPKD);
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_HF_SIMULATOR | FPGA_HF_SIMULATOR_NO_MODULATION);
+	LED_D_OFF();
 	FpgaSetupSsc(FPGA_MAJOR_MODE_HF_SIMULATOR);
 	StartCountSspClk();
 
@@ -1270,8 +1310,10 @@ void SimulateIClass(uint32_t arg0, uint32_t arg1, uint32_t arg2, uint8_t *datain
 		// That will speed things up a little, but not required just yet.
 		Dbprintf("The mode is not implemented, reserved for future use");
 	}
+
 	Dbprintf("Done...");
 
+	LED_A_OFF();
 }
 
 
