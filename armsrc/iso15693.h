@@ -26,7 +26,7 @@
 
 void CodeIso15693AsTag(uint8_t *cmd, size_t len);
 int GetIso15693CommandFromReader(uint8_t *received, size_t max_len, uint32_t *eof_time);
-void TransmitTo15693Reader(const uint8_t *cmd, size_t len, uint32_t start_time, bool slow);
+void TransmitTo15693Reader(const uint8_t *cmd, size_t len, uint32_t *start_time, uint32_t slot_time, bool slow);
 void SnoopIso15693(void);
 void AcquireRawAdcSamplesIso15693(void);
 void ReaderIso15693(uint32_t parameter);

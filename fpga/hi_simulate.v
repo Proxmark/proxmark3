@@ -132,7 +132,7 @@ always @(*)
 // modulation than a real tag would.
 assign pwr_hi = 1'b0;                   // HF antenna connected to GND
 assign pwr_oe3 = 1'b0;                  // 10k Load
-assign pwr_oe1 = modulating_carrier;    // 33 Ohms Load
+assign pwr_oe1 = 1'b0;                  // 33 Ohms Load
 assign pwr_oe4 = modulating_carrier;    // 33 Ohms Load
 
 // This is all LF and doesn't matter

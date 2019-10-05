@@ -246,6 +246,8 @@ static void CodeIso15693AsReader256(uint8_t *cmd, int n)
 	// }
 // }
 
+static const uint8_t encode_4bits[16] = { 0xaa, 0x6a, 0x9a, 0x5a, 0xa6, 0x66, 0x96, 0x56, 0xa9, 0x69, 0x99, 0x59, 0xa5, 0x65, 0x95, 0x55 };
+
 void CodeIso15693AsTag(uint8_t *cmd, size_t len) {
 	/*
 	 * SOF comprises 3 parts;
@@ -280,16 +282,9 @@ void CodeIso15693AsTag(uint8_t *cmd, size_t len) {
 	ToSend[++ToSendMax] = 0x1D;  // 00011101
 
 	// data
-	for(int i = 0; i < len; i++) {
-		for(int j = 0; j < 8; j++) {
-			if ((cmd[i] >> j) & 0x01) {
-					ToSendStuffBit(0);
-					ToSendStuffBit(1);
-			} else {
-					ToSendStuffBit(1);
-					ToSendStuffBit(0);
-			}
-		}
+	for (int i = 0; i < len; i++) {
+		ToSend[++ToSendMax] = encode_4bits[cmd[i] & 0xF];
+		ToSend[++ToSendMax] = encode_4bits[cmd[i] >> 4];
 	}
 
 	// EOF
@@ -327,19 +322,32 @@ static void TransmitTo15693Tag(const uint8_t *cmd, int len, uint32_t start_time)
 //-----------------------------------------------------------------------------
 // Transmit the tag response (to the reader) that was placed in cmd[].
 //-----------------------------------------------------------------------------
-void TransmitTo15693Reader(const uint8_t *cmd, size_t len, uint32_t start_time, bool slow) {
+void TransmitTo15693Reader(const uint8_t *cmd, size_t len, uint32_t *start_time, uint32_t slot_time, bool slow) {
 	// don't use the FPGA_HF_SIMULATOR_MODULATE_424K_8BIT minor mode. It would spoil GetCountSspClk()
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_HF_SIMULATOR | FPGA_HF_SIMULATOR_MODULATE_424K);
 
-	uint8_t shift_delay = start_time & 0x00000007;
+	uint32_t modulation_start_time = *start_time + 3 * 8;  // no need to transfer the unmodulated start of SOF
+	
+	while (GetCountSspClk() > (modulation_start_time & 0xfffffff8) + 3) { // we will miss the intended time
+		if (slot_time) {
+			modulation_start_time += slot_time; // use next available slot
+		} else {
+			modulation_start_time = (modulation_start_time & 0xfffffff8) + 8; // next possible time
+		}
+	}
 
-	while (GetCountSspClk() < (start_time & 0xfffffff8)) ;
+	while (GetCountSspClk() < (modulation_start_time & 0xfffffff8)) 
+		/* wait */ ;
+
+	uint8_t shift_delay = modulation_start_time & 0x00000007;
+
+	*start_time = modulation_start_time - 3 * 8;
 
 	LED_C_ON();
 	uint8_t bits_to_shift = 0x00;
 	uint8_t bits_to_send = 0x00;
-	for(size_t c = 0; c < len; c++) {
-		for (int i = 7; i >= 0; i--) {
+	for (size_t c = 0; c < len; c++) {
+		for (int i = (c==0?4:7); i >= 0; i--) {
 			uint8_t cmd_bits = ((cmd[c] >> i) & 0x01) ? 0xff : 0x00;
 			for (int j = 0; j < (slow?4:1); ) {
 				if (AT91C_BASE_SSC->SSC_SR & AT91C_SSC_TXRDY) {
@@ -361,7 +369,6 @@ void TransmitTo15693Reader(const uint8_t *cmd, size_t len, uint32_t start_time, 
 		}
 	}
 	LED_C_OFF();
-
 }
 
 
@@ -1529,7 +1536,7 @@ void SimTagIso15693(uint32_t parameter, uint8_t *uid)
 		if ((cmd_len >= 5) && (cmd[0] & ISO15693_REQ_INVENTORY) && (cmd[1] == ISO15693_INVENTORY)) { // TODO: check more flags
 			bool slow = !(cmd[0] & ISO15693_REQ_DATARATE_HIGH);
 			start_time = eof_time + DELAY_ISO15693_VCD_TO_VICC_SIM - DELAY_ARM_TO_READER_SIM;
-			TransmitTo15693Reader(ToSend, ToSendMax, start_time, slow);
+			TransmitTo15693Reader(ToSend, ToSendMax, &start_time, 0, slow);
 		}
 
 		Dbprintf("%d bytes read from reader:", cmd_len);
