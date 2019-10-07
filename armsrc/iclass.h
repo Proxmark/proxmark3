@@ -25,9 +25,7 @@ extern void IClass_iso14443A_GetPublic(uint8_t arg0);
 extern void iClass_Authentication(uint8_t *MAC);
 extern void iClass_WriteBlock(uint8_t blockNo, uint8_t *data);
 extern void iClass_ReadBlk(uint8_t blockNo);
-extern bool iClass_ReadBlock(uint8_t blockNo, uint8_t *readdata);
 extern void iClass_Dump(uint8_t blockno, uint8_t numblks);
 extern void iClass_Clone(uint8_t startblock, uint8_t endblock, uint8_t *data);
-extern void iClass_ReadCheck(uint8_t blockNo, uint8_t keyType);
 
 #endif

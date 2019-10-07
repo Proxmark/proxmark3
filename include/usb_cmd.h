@@ -156,7 +156,6 @@ typedef struct{
 #define CMD_EPA_PACE_COLLECT_NONCE                                        0x038A
 #define CMD_EPA_PACE_REPLAY                                               0x038B
 
-#define CMD_ICLASS_READCHECK                                              0x038F
 #define CMD_ICLASS_CLONE                                                  0x0390
 #define CMD_ICLASS_DUMP                                                   0x0391
 #define CMD_SNOOP_ICLASS                                                  0x0392

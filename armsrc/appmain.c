@@ -1324,9 +1324,6 @@ void UsbPacketReceived(uint8_t *packet, int len)
 		case CMD_ICLASS_WRITEBLOCK:
 			iClass_WriteBlock(c->arg[0], c->d.asBytes);
 			break;
-		case CMD_ICLASS_READCHECK:  // auth step 1
-			iClass_ReadCheck(c->arg[0], c->arg[1]);
-			break;
 		case CMD_ICLASS_READBLOCK:
 			iClass_ReadBlk(c->arg[0]);
 			break;
