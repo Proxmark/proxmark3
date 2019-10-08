@@ -29,8 +29,8 @@ following locations:
 
 * [RyscCorp](https://proxmark3.com/) (US)
 * [Hackerwarehouse](https://hackerwarehouse.com/) (US)
+* [Lab401](https://lab401.com/) (Europe)
 * [Elechouse](http://www.elechouse.com/) (HK)
-* [Lab401](https://lab401.com/) (HK)
 * [RFxSecure](http://www.rfxsecure.com/) (SG)
 * [Sneaktechnology](https://www.sneaktechnology.com/) (ASIA/OCEANIA)
 
