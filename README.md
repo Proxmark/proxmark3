@@ -27,12 +27,14 @@ your operating system. Please refer to [the wiki](https://github.com/Proxmark/pr
 The Proxmark3 is available for purchase (assembled and tested) from the
 following locations:
 
-* [RyscCorp](https://proxmark3.com/) (US)
-* [Hackerwarehouse](https://hackerwarehouse.com/) (US)
-* [Elechouse](http://www.elechouse.com/) (HK)
-* [Lab401](https://lab401.com/) (HK)
-* [RFxSecure](http://www.rfxsecure.com/) (SG)
-* [Sneaktechnology](https://www.sneaktechnology.com/) (ASIA/OCEANIA)
+| Distributor Name | Warehouse Location | Entity Location |
+|------------------|--------------------|-----------------|
+| [RyscCorp](https://proxmark3.com/)         | USA                | USA             |
+| [Hackerwarehouse](https://hackerwarehouse.com/)  | USA                | USA             |
+| [Elechouse](http://www.elechouse.com/)        | HK                 | HK              |
+| [Lab401](https://lab401.com/)           | EU                 | HK              |
+| [RFxSecure](http://www.rfxsecure.com/)       | CN                 | SG              |
+| [Sneaktechnology](https://www.sneaktechnology.com/)  | CN                 | CN              |
 
    
 Most of the ultra-low-volume contract assemblers could put
