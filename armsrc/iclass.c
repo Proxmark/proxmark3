@@ -1405,7 +1405,7 @@ void CodeIClassCommand(const uint8_t *cmd, int len) {
 		for (j = 0; j < 4; j++) {
 			for (k = 0; k < 4; k++) {
 				if (k == (b & 3)) {
-					ToSend[++ToSendMax] = 0xf0;
+					ToSend[++ToSendMax] = 0x0f;
 				} else {
 					ToSend[++ToSendMax] = 0x00;
 				}
@@ -1696,6 +1696,7 @@ void ReaderIClass(uint8_t arg0) {
 			if ( (result_status ^ FLAG_ICLASS_READER_CSN ^ flagReadConfig ^ flagReadCC ^ flagReadAA) == 0) {
 				cmd_send(CMD_ACK, result_status, 0, 0, card_data, sizeof(card_data));
 				if (abort_after_read) {
+					FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
 					LED_A_OFF();
 					LED_B_OFF();
 					return;
@@ -1847,15 +1848,8 @@ void ReaderIClass_Replay(uint8_t arg0, uint8_t *MAC) {
 			 card_data,
 			 0);
 
+	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
 	LED_A_OFF();
-}
-
-void iClass_ReadCheck(uint8_t blockNo, uint8_t keyType) {
-	uint8_t readcheck[] = { keyType, blockNo };
-	uint8_t resp[] = {0,0,0,0,0,0,0,0};
-	size_t isOK = 0;
-	isOK = sendCmdGetResponseWithRetries(readcheck, sizeof(readcheck), resp, sizeof(resp), 6);
-	cmd_send(CMD_ACK,isOK, 0, 0, 0, 0);
 }
 
 void iClass_Authentication(uint8_t *MAC) {
@@ -1867,7 +1861,7 @@ void iClass_Authentication(uint8_t *MAC) {
 	cmd_send(CMD_ACK,isOK, 0, 0, 0, 0);
 }
 
-bool iClass_ReadBlock(uint8_t blockNo, uint8_t *readdata) {
+static bool iClass_ReadBlock(uint8_t blockNo, uint8_t *readdata) {
 	uint8_t readcmd[] = {ICLASS_CMD_READ_OR_IDENTIFY, blockNo, 0x00, 0x00}; //0x88, 0x00 // can i use 0C?
 	char bl = blockNo;
 	uint16_t rdCrc = iclass_crc16(&bl, 1);
@@ -1888,6 +1882,7 @@ void iClass_ReadBlk(uint8_t blockno) {
 	bool isOK = false;
 	isOK = iClass_ReadBlock(blockno, readblockdata);
 	cmd_send(CMD_ACK, isOK, 0, 0, readblockdata, 8);
+	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
 }
 
 void iClass_Dump(uint8_t blockno, uint8_t numblks) {
@@ -1958,6 +1953,7 @@ void iClass_WriteBlock(uint8_t blockNo, uint8_t *data) {
 		Dbprintf("Write block [%02x] failed", blockNo);
 	}
 	cmd_send(CMD_ACK, isOK, 0, 0, 0, 0);
+	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
 }
 
 void iClass_Clone(uint8_t startblock, uint8_t endblock, uint8_t *data) {
