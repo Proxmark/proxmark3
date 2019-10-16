@@ -247,9 +247,9 @@ begin
 
 	// set ssp_frame signal for corr_i_cnt = 1..3
 	// (send one frame with 16 Bits)
-    if (corr_i_cnt == 6'd2)
+    if (corr_i_cnt == 6'd1)
         ssp_frame <= 1'b1;
-    if (corr_i_cnt == 6'd14)
+    if (corr_i_cnt == 6'd5)
         ssp_frame <= 1'b0;
 end
 

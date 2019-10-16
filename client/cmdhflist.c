@@ -903,8 +903,6 @@ uint16_t printTraceLine(uint16_t tracepos, uint16_t traceLen, uint8_t *trace, ui
 
 	// adjust for different time scales
 	if (protocol == ICLASS || protocol == ISO_15693) {
-		first_timestamp *= 32;
-		timestamp *= 32;
 		duration *= 32;
 	}
 
@@ -1037,10 +1035,6 @@ uint16_t printTraceLine(uint16_t tracepos, uint16_t traceLen, uint8_t *trace, ui
 
 	if (showWaitCycles && !isResponse && next_record_is_response(tracepos, trace)) {
 		uint32_t next_timestamp = *((uint32_t *)(trace + tracepos));
-		// adjust for different time scales
-		if (protocol == ICLASS || protocol == ISO_15693) {
-			next_timestamp *= 32;
-		}
 
 		PrintAndLog(" %10d | %10d | %s | fdt (Frame Delay Time): %d",
 			(EndOfTransmissionTimestamp - first_timestamp),

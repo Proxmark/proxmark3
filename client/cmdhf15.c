@@ -464,7 +464,7 @@ int CmdHF15CmdRaw (const char *cmd) {
 	char *hexout;
 
 	
-	if (strlen(cmd)<3) {
+	if (strlen(cmd)<2) {
 		PrintAndLog("Usage: hf 15 cmd raw  [-r] [-2] [-c] <0A 0B 0C ... hex>");
 		PrintAndLog("       -r    do not read response");
 		PrintAndLog("       -2    use slower '1 out of 256' mode");
@@ -526,22 +526,31 @@ int CmdHF15CmdRaw (const char *cmd) {
 	SendCommand(&c);
 	
 	if (reply) {
-		if (WaitForResponseTimeout(CMD_ACK,&resp,1000)) {
+		if (WaitForResponseTimeout(CMD_ACK, &resp, 1000)) {
 			recv = resp.d.asBytes;
-			PrintAndLog("received %i octets",resp.arg[0]);
-			hexout = (char *)malloc(resp.arg[0] * 3 + 1);
-			if (hexout != NULL) {
-				for (int i = 0; i < resp.arg[0]; i++) { // data in hex
-					sprintf(&hexout[i * 3], "%02X ", recv[i]);
+			int recv_len = resp.arg[0];
+			if (recv_len == 0) {
+				PrintAndLog("received SOF only. Maybe Picopass/iCLASS?");
+			} else if (recv_len > 0) {
+				PrintAndLog("received %i octets", recv_len);
+				hexout = (char *)malloc(resp.arg[0] * 3 + 1);
+				if (hexout != NULL) {
+					for (int i = 0; i < resp.arg[0]; i++) { // data in hex
+						sprintf(&hexout[i * 3], "%02X ", recv[i]);
+					}
+					PrintAndLog("%s", hexout);
+					free(hexout);
 				}
-				PrintAndLog("%s", hexout);
-				free(hexout);
+			} else if (recv_len == -1) {
+				PrintAndLog("card didn't respond");
+			} else if (recv_len == -2) {
+				PrintAndLog("receive buffer overflow");
 			}
 		} else {
 			PrintAndLog("timeout while waiting for reply.");
 		}
-		
-	} // if reply
+	}
+
 	return 0;
 }
 
