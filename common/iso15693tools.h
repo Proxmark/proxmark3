@@ -1,8 +1,8 @@
 // ISO15693 commons
 // Adrian Dabrowski 2010 and others, GPLv2
 
-#ifndef ISO15693_H__
-#define ISO15693_H__
+#ifndef ISO15693TOOLS_H__
+#define ISO15693TOOLS_H__
 
 // ISO15693 CRC
 #define ISO15693_CRC_PRESET  (uint16_t)0xFFFF
@@ -11,7 +11,7 @@
 
 uint16_t Iso15693Crc(uint8_t *v, int n);
 int Iso15693AddCrc(uint8_t *req, int n);
-char* Iso15693sprintUID(char *target,uint8_t *uid);
+char* Iso15693sprintUID(char *target, uint8_t *uid);
 unsigned short iclass_crc16(char *data_p, unsigned short length);
 
 #endif

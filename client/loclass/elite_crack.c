@@ -392,7 +392,7 @@ int bruteforceItem(dumpdata item, uint16_t keytable[]) {
 		//Diversify
 		diversifyKey(item.csn, key_sel_p, div_key);
 		//Calc mac
-		doMAC(item.cc_nr, div_key,calculated_MAC);
+		doMAC(item.cc_nr, div_key, calculated_MAC);
 
 		if (memcmp(calculated_MAC, item.mac, 4) == 0) {
 			for (int i = 0; i < numbytes_to_recover; i++)
@@ -401,8 +401,7 @@ int bruteforceItem(dumpdata item, uint16_t keytable[]) {
 			break;
 		}
 		brute++;
-		if((brute & 0xFFFF) == 0)
-		{
+		if ((brute & 0xFFFF) == 0) {
 			printf("%d",(brute >> 16) & 0xFF);
 			fflush(stdout);
 		}
@@ -420,7 +419,6 @@ int bruteforceItem(dumpdata item, uint16_t keytable[]) {
 			keytable[bytes_to_recover[i]] &= ~BEING_CRACKED;
 			keytable[bytes_to_recover[i]] |= CRACKED;
 		}
-
 	}
 
 	return errors;
@@ -508,7 +506,7 @@ int bruteforceDump(uint8_t dump[], size_t dumpsize, uint16_t keytable[])
 
 	dumpdata* attack = (dumpdata* ) malloc(itemsize);
 
-	for(i = 0 ; i * itemsize < dumpsize ; i++ )
+	for (i = 0 ; i * itemsize < dumpsize ; i++ )
 	{
 		memcpy(attack,dump+i*itemsize, itemsize);
 		errors += bruteforceItem(*attack, keytable);

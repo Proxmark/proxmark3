@@ -213,30 +213,30 @@ uint8_t iclass_CRC_check(bool isResponse, uint8_t* data, uint8_t len)
 }
 
 
-void annotateIclass(char *exp, size_t size, uint8_t* cmd, uint8_t cmdsize)
-{
+void annotateIclass(char *exp, size_t size, uint8_t* cmd, uint8_t cmdsize) {
 	switch(cmd[0])
 	{
-	case ICLASS_CMD_ACTALL:      snprintf(exp,size,"ACTALL"); break;
-	case ICLASS_CMD_READ_OR_IDENTIFY:{
-		if(cmdsize > 1){
+	case ICLASS_CMD_ACTALL:      snprintf(exp, size, "ACTALL"); break;
+	case ICLASS_CMD_READ_OR_IDENTIFY: {
+		if (cmdsize > 1){
 			snprintf(exp,size,"READ(%d)",cmd[1]);
-		}else{
+		} else {
 			snprintf(exp,size,"IDENTIFY");
 		}
 		break;
 	}
-	case ICLASS_CMD_SELECT:      snprintf(exp,size,"SELECT"); break;
-	case ICLASS_CMD_PAGESEL:     snprintf(exp,size,"PAGESEL(%d)", cmd[1]); break;
-	case ICLASS_CMD_READCHECK_KC:snprintf(exp,size,"READCHECK[Kc](%d)", cmd[1]); break;
-	case ICLASS_CMD_READCHECK_KD:snprintf(exp,size,"READCHECK[Kd](%d)", cmd[1]); break;
-	case ICLASS_CMD_CHECK:       snprintf(exp,size,"CHECK"); break;
-	case ICLASS_CMD_DETECT:      snprintf(exp,size,"DETECT"); break;
-	case ICLASS_CMD_HALT:        snprintf(exp,size,"HALT"); break;
-	case ICLASS_CMD_UPDATE:      snprintf(exp,size,"UPDATE(%d)",cmd[1]); break;
-	case ICLASS_CMD_ACT:         snprintf(exp,size,"ACT"); break;
-	case ICLASS_CMD_READ4:       snprintf(exp,size,"READ4(%d)",cmd[1]); break;
-	default:                     snprintf(exp,size,"?"); break;
+	case ICLASS_CMD_SELECT:       snprintf(exp,size, "SELECT"); break;
+	case ICLASS_CMD_PAGESEL:      snprintf(exp,size, "PAGESEL(%d)", cmd[1]); break;
+	case ICLASS_CMD_READCHECK_KC: snprintf(exp,size, "READCHECK[Kc](%d)", cmd[1]); break;
+	case ICLASS_CMD_READCHECK_KD: snprintf(exp,size, "READCHECK[Kd](%d)", cmd[1]); break;
+	case ICLASS_CMD_CHECK_KC:
+	case ICLASS_CMD_CHECK_KD:     snprintf(exp,size, "CHECK"); break;
+	case ICLASS_CMD_DETECT:       snprintf(exp,size, "DETECT"); break;
+	case ICLASS_CMD_HALT:         snprintf(exp,size, "HALT"); break;
+	case ICLASS_CMD_UPDATE:       snprintf(exp,size, "UPDATE(%d)",cmd[1]); break;
+	case ICLASS_CMD_ACT:          snprintf(exp,size, "ACT"); break;
+	case ICLASS_CMD_READ4:        snprintf(exp,size, "READ4(%d)",cmd[1]); break;
+	default:                      snprintf(exp,size, "?"); break;
 	}
 	return;
 }
@@ -337,7 +337,7 @@ void annotateIso14443_4(char *exp, size_t size, uint8_t* cmd, uint8_t cmdsize){
 	else {
 		int pos = 1;
 		switch (cmd[0] & 0x0c) {
-			case 0x08: // CID following 
+			case 0x08: // CID following
 			case 0x04: // NAD following
 				pos = 2;
 				break;
@@ -901,6 +901,13 @@ uint16_t printTraceLine(uint16_t tracepos, uint16_t traceLen, uint8_t *trace, ui
 		}
 	}
 
+	// adjust for different time scales
+	if (protocol == ICLASS || protocol == ISO_15693) {
+		first_timestamp *= 32;
+		timestamp *= 32;
+		duration *= 32;
+	}
+
 	//Check the CRC status
 	uint8_t crcStatus = 2;
 
@@ -940,6 +947,7 @@ uint16_t printTraceLine(uint16_t tracepos, uint16_t traceLen, uint8_t *trace, ui
 		uint8_t parityBits = parityBytes[j>>3];
 		if (protocol != ISO_14443B
 			&& protocol != ISO_15693
+			&& protocol != ICLASS
 			&& protocol != ISO_7816_4
 			&& (isResponse || protocol == ISO_14443A)
 			&& (oddparity8(frame[j]) != ((parityBits >> (7-(j&0x0007))) & 0x01))) {
@@ -950,8 +958,7 @@ uint16_t printTraceLine(uint16_t tracepos, uint16_t traceLen, uint8_t *trace, ui
 	}
 
 	if (markCRCBytes) {
-		if(crcStatus == 0 || crcStatus == 1)
-		{//CRC-command
+		if (crcStatus == 0 || crcStatus == 1) { //CRC-command
 			char *pos1 = line[(data_len-2)/16]+(((data_len-2) % 16) * 4);
 			(*pos1) = '[';
 			char *pos2 = line[(data_len)/16]+(((data_len) % 16) * 4);
@@ -963,11 +970,15 @@ uint16_t printTraceLine(uint16_t tracepos, uint16_t traceLen, uint8_t *trace, ui
 	if (protocol == ISO_14443A || protocol == PROTO_MIFARE) {
 		if (duration < 128 * (9 * data_len)) {
 			line[(data_len-1)/16][((data_len-1)%16) * 4 + 3] = '\'';
-		}	
+		}
 	}
-	
+
 	if (data_len == 0) {
-		sprintf(line[0]," <empty trace - possible error>");
+		if (protocol == ICLASS && duration == 2048) {
+			sprintf(line[0], " <SOF>");
+		} else {
+			sprintf(line[0], " <empty trace - possible error>");
+		}
 	}
 
 	//--- Draw the CRC column
@@ -978,8 +989,7 @@ uint16_t printTraceLine(uint16_t tracepos, uint16_t traceLen, uint8_t *trace, ui
 	if (protocol == PROTO_MIFARE)
 		annotateMifare(explanation, sizeof(explanation), frame, data_len, parityBytes, parity_len, isResponse);
 
-	if(!isResponse)
-	{
+	if (!isResponse) {
 		switch(protocol) {
 			case ICLASS:      annotateIclass(explanation,sizeof(explanation),frame,data_len); break;
 			case ISO_14443A:  annotateIso14443a(explanation,sizeof(explanation),frame,data_len); break;
@@ -1009,7 +1019,7 @@ uint16_t printTraceLine(uint16_t tracepos, uint16_t traceLen, uint8_t *trace, ui
 				(j == num_lines-1) ? explanation : "");
 		}
 	}
-		
+
 	if (DecodeMifareData(frame, data_len, parityBytes, isResponse, mfData, &mfDataLen)) {
 		memset(explanation, 0x00, sizeof(explanation));
 		if (!isResponse) {
@@ -1027,6 +1037,11 @@ uint16_t printTraceLine(uint16_t tracepos, uint16_t traceLen, uint8_t *trace, ui
 
 	if (showWaitCycles && !isResponse && next_record_is_response(tracepos, trace)) {
 		uint32_t next_timestamp = *((uint32_t *)(trace + tracepos));
+		// adjust for different time scales
+		if (protocol == ICLASS || protocol == ISO_15693) {
+			next_timestamp *= 32;
+		}
+
 		PrintAndLog(" %10d | %10d | %s | fdt (Frame Delay Time): %d",
 			(EndOfTransmissionTimestamp - first_timestamp),
 			(next_timestamp - first_timestamp),
