@@ -61,7 +61,7 @@ int CmdHFSearch(const char *Cmd){
 		return ans;
 	}
 	//14b is longest test currently (and rarest chip type) ... put last
-	ans = HF14BInfo(false);
+	ans = infoHF14B(false);
 	if (ans) {
 		PrintAndLog("\nValid ISO14443B Tag Found - Quiting Search\n");
 		return ans;
