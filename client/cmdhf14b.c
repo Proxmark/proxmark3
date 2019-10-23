@@ -108,9 +108,21 @@ int HF14BCmdRaw(bool reply, bool *crc, bool power, uint8_t *data, uint8_t *datal
 		if (verbose) PrintAndLog("timeout while waiting for reply.");
 		return 0;
 	}
-	*datalen = resp.arg[0];
-	if (verbose) PrintAndLog("received %u octets", *datalen);
-	if (*datalen < 2) return 0;
+
+	int ret = resp.arg[0];
+	if (verbose) {
+		if (ret < 0) {
+			PrintAndLog("tag didn't respond");
+		} else if (ret == 0) {
+			PrintAndLog("received SOF only (maybe iCLASS/Picopass)");
+		} else {
+			PrintAndLog("received %u octets", ret);
+		}
+	}
+
+	*datalen = ret;
+	
+	if (ret < 2) return 0;
 
 	memcpy(data, resp.d.asBytes, *datalen);
 	if (verbose) PrintAndLog("%s", sprint_hex(data, *datalen));
@@ -139,7 +151,7 @@ static int CmdHF14BCmdRaw (const char *Cmd) {
 	uint8_t datalen = 0;
 	unsigned int temp;
 	int i = 0;
-	if (strlen(Cmd) < 3) {
+	if (strlen(Cmd) < 2) {
 			PrintAndLog("Usage: hf 14b raw [-r] [-c] [-p] [-s || -ss] <0A 0B 0C ... hex>");
 			PrintAndLog("       -r    do not read response");
 			PrintAndLog("       -c    calculate and append CRC");
