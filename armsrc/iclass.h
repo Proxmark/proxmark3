@@ -15,6 +15,7 @@
 #define ICLASS_H__
 
 #include <stdint.h>
+#include <stdbool.h>
 #include "common.h" // for RAMFUNC
 
 extern void RAMFUNC SnoopIClass(void);
@@ -22,7 +23,8 @@ extern void SimulateIClass(uint32_t arg0, uint32_t arg1, uint32_t arg2, uint8_t 
 extern void ReaderIClass(uint8_t arg0);
 extern void ReaderIClass_Replay(uint8_t arg0, uint8_t *MAC);
 extern void IClass_iso14443A_GetPublic(uint8_t arg0);
-extern void iClass_Authentication(uint8_t *MAC);
+extern void iClass_Readcheck(uint8_t block, bool use_credit_key);
+extern void iClass_Check(uint8_t *MAC);
 extern void iClass_WriteBlock(uint8_t blockNo, uint8_t *data);
 extern void iClass_ReadBlk(uint8_t blockNo);
 extern void iClass_Dump(uint8_t blockno, uint8_t numblks);

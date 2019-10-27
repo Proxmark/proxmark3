@@ -165,7 +165,8 @@ typedef struct{
 #define CMD_ICLASS_READBLOCK                                              0x0396
 #define CMD_ICLASS_WRITEBLOCK                                             0x0397
 #define CMD_ICLASS_EML_MEMSET                                             0x0398
-#define CMD_ICLASS_AUTHENTICATION                                         0x0399
+#define CMD_ICLASS_CHECK                                                  0x0399
+#define CMD_ICLASS_READCHECK                                              0x039A                                         
 
 // For measurements of the antenna tuning
 #define CMD_MEASURE_ANTENNA_TUNING                                        0x0400
@@ -236,13 +237,11 @@ typedef struct{
 
 
 // iCLASS reader flags
-#define FLAG_ICLASS_READER_ONLY_ONCE    0x01
 #define FLAG_ICLASS_READER_CC           0x02
 #define FLAG_ICLASS_READER_CSN          0x04
 #define FLAG_ICLASS_READER_CONF         0x08
 #define FLAG_ICLASS_READER_AA           0x10
-#define FLAG_ICLASS_READER_ONE_TRY      0x20
-#define FLAG_ICLASS_READER_CEDITKEY     0x40
+#define FLAG_ICLASS_READER_CREDITKEY    0x40
 
 // iCLASS simulation modes
 #define ICLASS_SIM_MODE_CSN                   0

@@ -132,7 +132,7 @@ void CodeIso15693AsReader(uint8_t *cmd, int n) {
 
 	// EOF
 	ToSend[++ToSendMax] = 0x20; //0010 + 0000 padding
-	
+
 	ToSendMax++;
 }
 
@@ -249,14 +249,18 @@ void CodeIso15693AsTag(uint8_t *cmd, size_t len) {
 void TransmitTo15693Tag(const uint8_t *cmd, int len, uint32_t *start_time) {
 
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_HF_READER | FPGA_HF_READER_MODE_SEND_FULL_MOD);
-	
+
+	if (*start_time < DELAY_ARM_TO_TAG) {
+		*start_time = DELAY_ARM_TO_TAG;
+	}
+
 	*start_time = (*start_time - DELAY_ARM_TO_TAG) & 0xfffffff0;
 
 	while (GetCountSspClk() > *start_time) { // we may miss the intended time
 		*start_time += 16; // next possible time
 	}
 
-	
+
 	while (GetCountSspClk() < *start_time)
 		/* wait */ ;
 
@@ -275,7 +279,7 @@ void TransmitTo15693Tag(const uint8_t *cmd, int len, uint32_t *start_time) {
 		WDT_HIT();
 	}
 	LED_B_OFF();
-	
+
 	*start_time = *start_time + DELAY_ARM_TO_TAG;
 
 }
@@ -289,7 +293,7 @@ void TransmitTo15693Reader(const uint8_t *cmd, size_t len, uint32_t *start_time,
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_HF_SIMULATOR | FPGA_HF_SIMULATOR_MODULATE_424K);
 
 	uint32_t modulation_start_time = *start_time - DELAY_ARM_TO_READER + 3 * 8;  // no need to transfer the unmodulated start of SOF
-	
+
 	while (GetCountSspClk() > (modulation_start_time & 0xfffffff8) + 3) { // we will miss the intended time
 		if (slot_time) {
 			modulation_start_time += slot_time; // use next available slot
@@ -298,7 +302,7 @@ void TransmitTo15693Reader(const uint8_t *cmd, size_t len, uint32_t *start_time,
 		}
 	}
 
-	while (GetCountSspClk() < (modulation_start_time & 0xfffffff8)) 
+	while (GetCountSspClk() < (modulation_start_time & 0xfffffff8))
 		/* wait */ ;
 
 	uint8_t shift_delay = modulation_start_time & 0x00000007;
@@ -414,7 +418,7 @@ static int inline __attribute__((always_inline)) Handle15693SamplesFromTag(uint1
 			// DecodeTag->posCount = 2;
 			DecodeTag->state = STATE_TAG_SOF_HIGH;
 			break;
-				
+
 		case STATE_TAG_SOF_HIGH:
 			// waiting for 10 times high. Take average over the last 8
 			if (amplitude > DecodeTag->threshold_sof) {
@@ -428,7 +432,7 @@ static int inline __attribute__((always_inline)) Handle15693SamplesFromTag(uint1
 				}
 			} else { // high phase was too short
 				DecodeTag->posCount = 1;
-				DecodeTag->previous_amplitude = MAX_PREVIOUS_AMPLITUDE;
+				DecodeTag->previous_amplitude = amplitude;
 				DecodeTag->state = STATE_TAG_SOF_LOW;
 			}
 			break;
@@ -444,18 +448,18 @@ static int inline __attribute__((always_inline)) Handle15693SamplesFromTag(uint1
 				DecodeTag->sum2 = 0;
 				DecodeTag->posCount = 2;
 				DecodeTag->state = STATE_TAG_RECEIVING_DATA;
-				// FpgaDisableTracing(); // DEBUGGING
-				// Dbprintf("amplitude = %d, threshold_sof = %d, threshold_half/4 = %d, previous_amplitude = %d", 
-					// amplitude, 
-					// DecodeTag->threshold_sof, 
-					// DecodeTag->threshold_half/4,
-					// DecodeTag->previous_amplitude); // DEBUGGING
+				FpgaDisableTracing(); // DEBUGGING
+				Dbprintf("amplitude = %d, threshold_sof = %d, threshold_half/4 = %d, previous_amplitude = %d",
+					amplitude,
+					DecodeTag->threshold_sof,
+					DecodeTag->threshold_half/4,
+					DecodeTag->previous_amplitude); // DEBUGGING
 				LED_C_ON();
 			} else {
 				DecodeTag->posCount++;
 				if (DecodeTag->posCount > 13) { // high phase too long
 					DecodeTag->posCount = 0;
-					DecodeTag->previous_amplitude = MAX_PREVIOUS_AMPLITUDE;
+					DecodeTag->previous_amplitude = amplitude;
 					DecodeTag->state = STATE_TAG_SOF_LOW;
 					LED_C_OFF();
 				}
@@ -478,7 +482,7 @@ static int inline __attribute__((always_inline)) Handle15693SamplesFromTag(uint1
 						DecodeTag->state = STATE_TAG_EOF;
 					} else {
 						DecodeTag->posCount = 0;
-						DecodeTag->previous_amplitude = MAX_PREVIOUS_AMPLITUDE;
+						DecodeTag->previous_amplitude = amplitude;
 						DecodeTag->state = STATE_TAG_SOF_LOW;
 						LED_C_OFF();
 					}
@@ -508,7 +512,7 @@ static int inline __attribute__((always_inline)) Handle15693SamplesFromTag(uint1
 					// logic 0
 					if (DecodeTag->lastBit == SOF_PART1) { // incomplete SOF
 						DecodeTag->posCount = 0;
-						DecodeTag->previous_amplitude = MAX_PREVIOUS_AMPLITUDE;
+						DecodeTag->previous_amplitude = amplitude;
 						DecodeTag->state = STATE_TAG_SOF_LOW;
 						LED_C_OFF();
 					} else {
@@ -522,7 +526,7 @@ static int inline __attribute__((always_inline)) Handle15693SamplesFromTag(uint1
 							if (DecodeTag->len > DecodeTag->max_len) {
 								// buffer overflow, give up
 								DecodeTag->posCount = 0;
-								DecodeTag->previous_amplitude = MAX_PREVIOUS_AMPLITUDE;
+								DecodeTag->previous_amplitude = amplitude;
 								DecodeTag->state = STATE_TAG_SOF_LOW;
 								LED_C_OFF();
 							}
@@ -561,7 +565,7 @@ static int inline __attribute__((always_inline)) Handle15693SamplesFromTag(uint1
 					DecodeTag->state = STATE_TAG_EOF_TAIL;
 				} else {
 					DecodeTag->posCount = 0;
-					DecodeTag->previous_amplitude = MAX_PREVIOUS_AMPLITUDE;
+					DecodeTag->previous_amplitude = amplitude;
 					DecodeTag->state = STATE_TAG_SOF_LOW;
 					LED_C_OFF();
 				}
@@ -585,7 +589,7 @@ static int inline __attribute__((always_inline)) Handle15693SamplesFromTag(uint1
 					return true;
 				} else {
 					DecodeTag->posCount = 0;
-					DecodeTag->previous_amplitude = MAX_PREVIOUS_AMPLITUDE;
+					DecodeTag->previous_amplitude = amplitude;
 					DecodeTag->state = STATE_TAG_SOF_LOW;
 					LED_C_OFF();
 				}
@@ -598,8 +602,7 @@ static int inline __attribute__((always_inline)) Handle15693SamplesFromTag(uint1
 }
 
 
-static void DecodeTagInit(DecodeTag_t *DecodeTag, uint8_t *data, uint16_t max_len)
-{
+static void DecodeTagInit(DecodeTag_t *DecodeTag, uint8_t *data, uint16_t max_len) {
 	DecodeTag->previous_amplitude = MAX_PREVIOUS_AMPLITUDE;
 	DecodeTag->posCount = 0;
 	DecodeTag->state = STATE_TAG_SOF_LOW;
@@ -608,8 +611,7 @@ static void DecodeTagInit(DecodeTag_t *DecodeTag, uint8_t *data, uint16_t max_le
 }
 
 
-static void DecodeTagReset(DecodeTag_t *DecodeTag)
-{
+static void DecodeTagReset(DecodeTag_t *DecodeTag) {
 	DecodeTag->posCount = 0;
 	DecodeTag->state = STATE_TAG_SOF_LOW;
 	DecodeTag->previous_amplitude = MAX_PREVIOUS_AMPLITUDE;
@@ -649,10 +651,10 @@ int GetIso15693AnswerFromTag(uint8_t* response, uint16_t max_len, uint16_t timeo
 
 		samples++;
 		if (samples == 1) {
-		    // DMA has transferred the very first data
+			// DMA has transferred the very first data
 			dma_start_time = GetCountSspClk() & 0xfffffff0;
 		}
-		
+
 		uint16_t tagdata = *upTo++;
 
 		if(upTo >= dmaBuf + ISO15693_DMA_BUFFER_SIZE) {                // we have read all of the DMA buffer content.
@@ -680,7 +682,7 @@ int GetIso15693AnswerFromTag(uint8_t* response, uint16_t max_len, uint16_t timeo
 		}
 
 		if (samples > timeout && DecodeTag.state < STATE_TAG_RECEIVING_DATA) {
-			ret = -1;	// timeout
+			ret = -1;   // timeout
 			break;
 		}
 
@@ -699,9 +701,9 @@ int GetIso15693AnswerFromTag(uint8_t* response, uint16_t max_len, uint16_t timeo
 						- DecodeTag.len * 8 * 8 * 16 // time for byte transfers
 						- 32 * 16  // time for SOF transfer
 						- (DecodeTag.lastBit != SOF_PART2?32*16:0); // time for EOF transfer
-						
+
 	if (DEBUG) Dbprintf("timing: sof_time = %d, eof_time = %d", sof_time, *eof_time);
-	
+
 	LogTrace_ISO15693(DecodeTag.output, DecodeTag.len, sof_time*4, *eof_time*4, NULL, false);
 
 	return DecodeTag.len;
@@ -1089,20 +1091,19 @@ static void BuildIdentifyRequest(void)
 //-----------------------------------------------------------------------------
 void AcquireRawAdcSamplesIso15693(void)
 {
-	LEDsoff();
 	LED_A_ON();
 
 	uint8_t *dest = BigBuf_get_addr();
 
 	FpgaDownloadAndGo(FPGA_BITSTREAM_HF);
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_HF_READER);
+	LED_D_ON();
 	FpgaSetupSsc(FPGA_MAJOR_MODE_HF_READER);
 	SetAdcMuxFor(GPIO_MUXSEL_HIPKD);
 
 	BuildIdentifyRequest();
 
 	// Give the tags time to energize
-	LED_D_ON();
 	SpinDelay(100);
 
 	// Now send the command
@@ -1129,6 +1130,7 @@ void AcquireRawAdcSamplesIso15693(void)
 void SnoopIso15693(void)
 {
 	LED_A_ON();
+	
 	FpgaDownloadAndGo(FPGA_BITSTREAM_HF);
 	BigBuf_free();
 
@@ -1348,17 +1350,13 @@ static void BuildInventoryResponse(uint8_t *uid)
 //  return: length of received data, or -1 for timeout
 int SendDataTag(uint8_t *send, int sendlen, bool init, int speed, uint8_t *recv, uint16_t max_recv_len, uint32_t start_time, uint32_t *eof_time) {
 
-	LED_A_ON();
-	LED_B_OFF();
-	LED_C_OFF();
-
 	if (init) {
 		Iso15693InitReader();
 		StartCountSspClk();
 	}
-	
+
 	int answerLen = 0;
-	
+
 	if (!speed) {
 		// low speed (1 out of 256)
 		CodeIso15693AsReader256(send, sendlen);
@@ -1367,17 +1365,12 @@ int SendDataTag(uint8_t *send, int sendlen, bool init, int speed, uint8_t *recv,
 		CodeIso15693AsReader(send, sendlen);
 	}
 
-	if (start_time == 0) {
-		start_time = GetCountSspClk();
-	}
 	TransmitTo15693Tag(ToSend, ToSendMax, &start_time);
 
 	// Now wait for a response
 	if (recv != NULL) {
-		answerLen = GetIso15693AnswerFromTag(recv, max_recv_len, DELAY_ISO15693_VCD_TO_VICC_READER * 2, eof_time);
+		answerLen = GetIso15693AnswerFromTag(recv, max_recv_len, ISO15693_READER_TIMEOUT, eof_time);
 	}
-
-	LED_A_OFF();
 
 	return answerLen;
 }
@@ -1462,9 +1455,8 @@ void SetDebugIso15693(uint32_t debug) {
 // Simulate an ISO15693 reader, perform anti-collision and then attempt to read a sector.
 // all demodulation performed in arm rather than host. - greg
 //---------------------------------------------------------------------------------------
-void ReaderIso15693(uint32_t parameter)
-{
-	LEDsoff();
+void ReaderIso15693(uint32_t parameter) {
+
 	LED_A_ON();
 
 	set_tracing(true);
@@ -1564,9 +1556,8 @@ void ReaderIso15693(uint32_t parameter)
 // Simulate an ISO15693 TAG.
 // For Inventory command: print command and send Inventory Response with given UID
 // TODO: interpret other reader commands and send appropriate response
-void SimTagIso15693(uint32_t parameter, uint8_t *uid)
-{
-	LEDsoff();
+void SimTagIso15693(uint32_t parameter, uint8_t *uid) {
+
 	LED_A_ON();
 
 	FpgaDownloadAndGo(FPGA_BITSTREAM_HF);
@@ -1597,7 +1588,8 @@ void SimTagIso15693(uint32_t parameter, uint8_t *uid)
 	}
 
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
-	LEDsoff();
+	LED_D_OFF();
+	LED_A_OFF();
 }
 
 
@@ -1605,7 +1597,6 @@ void SimTagIso15693(uint32_t parameter, uint8_t *uid)
 // (some manufactures offer a way to read the AFI, though)
 void BruteforceIso15693Afi(uint32_t speed)
 {
-	LEDsoff();
 	LED_A_ON();
 
 	uint8_t data[6];
@@ -1648,17 +1639,19 @@ void BruteforceIso15693Afi(uint32_t speed)
 	Dbprintf("AFI Bruteforcing done.");
 
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
-	LEDsoff();
+	LED_D_OFF();
+	LED_A_OFF();
+
 }
 
 // Allows to directly send commands to the tag via the client
 void DirectTag15693Command(uint32_t datalen, uint32_t speed, uint32_t recv, uint8_t data[]) {
 
+	LED_A_ON();
+
 	int recvlen = 0;
 	uint8_t recvbuf[ISO15693_MAX_RESPONSE_LENGTH];
 	uint32_t eof_time;
-	
-	LED_A_ON();
 
 	if (DEBUG) {
 		Dbprintf("SEND:");
@@ -1695,17 +1688,16 @@ void DirectTag15693Command(uint32_t datalen, uint32_t speed, uint32_t recv, uint
 //-----------------------------------------------------------------------------
 
 // Set the UID to the tag (based on Iceman work).
-void SetTag15693Uid(uint8_t *uid)
-{
-	uint8_t cmd[4][9] = {0x00};
+void SetTag15693Uid(uint8_t *uid) {
 
+	LED_A_ON();
+
+	uint8_t cmd[4][9] = {0x00};
 	uint16_t crc;
 
 	int recvlen = 0;
 	uint8_t recvbuf[ISO15693_MAX_RESPONSE_LENGTH];
 	uint32_t eof_time;
-	
-	LED_A_ON();
 
 	// Command 1 : 02213E00000000
 	cmd[0][0] = 0x02;
@@ -1766,8 +1758,6 @@ void SetTag15693Uid(uint8_t *uid)
 
 		cmd_send(CMD_ACK, recvlen>ISO15693_MAX_RESPONSE_LENGTH?ISO15693_MAX_RESPONSE_LENGTH:recvlen, 0, 0, recvbuf, ISO15693_MAX_RESPONSE_LENGTH);
 	}
-
-	LED_D_OFF();
 
 	LED_A_OFF();
 }

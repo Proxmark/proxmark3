@@ -1327,8 +1327,11 @@ void UsbPacketReceived(uint8_t *packet, int len)
 		case CMD_ICLASS_READBLOCK:
 			iClass_ReadBlk(c->arg[0]);
 			break;
-		case CMD_ICLASS_AUTHENTICATION: //check
-			iClass_Authentication(c->d.asBytes);
+		case CMD_ICLASS_CHECK:
+			iClass_Check(c->d.asBytes);
+			break;
+		case CMD_ICLASS_READCHECK:
+			iClass_Readcheck(c->arg[0], c->arg[1]);
 			break;
 		case CMD_ICLASS_DUMP:
 			iClass_Dump(c->arg[0], c->arg[1]);
