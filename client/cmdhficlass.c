@@ -35,7 +35,6 @@
 #include "util_posix.h"
 #include "cmdhf14a.h" // DropField()
 
-static int CmdHelp(const char *Cmd);
 
 #define ICLASS_KEYS_MAX 8
 static uint8_t iClass_Key_Table[ICLASS_KEYS_MAX][8] = {
@@ -49,12 +48,14 @@ static uint8_t iClass_Key_Table[ICLASS_KEYS_MAX][8] = {
 		{ 0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00 }
 };
 
+
 typedef struct iclass_block {
-    uint8_t d[8];
+	uint8_t d[8];
 } iclass_block_t;
 
-int usage_hf_iclass_chk(void) {
-	PrintAndLog("Checkkeys loads a dictionary text file with 8byte hex keys to test authenticating against a iClass tag");	
+
+static void usage_hf_iclass_chk(void) {
+	PrintAndLog("Checkkeys loads a dictionary text file with 8byte hex keys to test authenticating against a iClass tag");
 	PrintAndLog("Usage: hf iclass chk [h|e|r] <f  (*.dic)>");
 	PrintAndLog("Options:");
 	PrintAndLog("h             Show this help");
@@ -62,31 +63,25 @@ int usage_hf_iclass_chk(void) {
 	PrintAndLog("      e             target Elite / High security key scheme");
 	PrintAndLog("      r             interpret dictionary file as raw (diversified keys)");
 	PrintAndLog("Samples:");
-	PrintAndLog("		 hf iclass chk f default_iclass_keys.dic");	
-	PrintAndLog("		 hf iclass chk f default_iclass_keys.dic e");	
-	return 0;
+	PrintAndLog("        hf iclass chk f default_iclass_keys.dic");
+	PrintAndLog("        hf iclass chk f default_iclass_keys.dic e");
 }
 
-int xorbits_8(uint8_t val) {
-	uint8_t res = val ^ (val >> 1); //1st pass
-	res = res ^ (res >> 1); 		// 2nd pass
-	res = res ^ (res >> 2); 		// 3rd pass
-	res = res ^ (res >> 4); 			// 4th pass
-	return res & 1;
-}
 
-int CmdHFiClassList(const char *Cmd) {
+static int CmdHFiClassList(const char *Cmd) {
 	PrintAndLog("Deprecated command, use 'hf list iclass' instead");
 	return 0;
 }
 
-int CmdHFiClassSnoop(const char *Cmd) {
+
+static int CmdHFiClassSnoop(const char *Cmd) {
 	UsbCommand c = {CMD_SNOOP_ICLASS};
 	SendCommand(&c);
 	return 0;
 }
 
-int usage_hf_iclass_sim(void) {
+
+static void usage_hf_iclass_sim(void) {
 	PrintAndLog("Usage:  hf iclass sim <option> [CSN]");
 	PrintAndLog("        options");
 	PrintAndLog("                0 <CSN> simulate the given CSN");
@@ -97,8 +92,8 @@ int usage_hf_iclass_sim(void) {
 	PrintAndLog("        example: hf iclass sim 2");
 	PrintAndLog("        example: hf iclass eload 'tagdump.bin'");
 	PrintAndLog("                 hf iclass sim 3");
-	return 0;
 }
+
 
 // the original malicious IDs from Flavio D. Garcia, Gerhard de Koning Gans, Roel Verdult,
 // and Milosch Meriac. Dismantling iClass and iClass Elite.
@@ -127,32 +122,34 @@ static uint8_t csns[8 * NUM_CSNS] = {
 
 // #define NUM_CSNS 9
 // static uint8_t csns[8 * NUM_CSNS] = {
-    // 0x01, 0x0A, 0x0F, 0xFF, 0xF7, 0xFF, 0x12, 0xE0,
-    // 0x0C, 0x06, 0x0C, 0xFE, 0xF7, 0xFF, 0x12, 0xE0,
-    // 0x10, 0x97, 0x83, 0x7B, 0xF7, 0xFF, 0x12, 0xE0,
-    // 0x13, 0x97, 0x82, 0x7A, 0xF7, 0xFF, 0x12, 0xE0,
-    // 0x07, 0x0E, 0x0D, 0xF9, 0xF7, 0xFF, 0x12, 0xE0,
-    // 0x14, 0x96, 0x84, 0x76, 0xF7, 0xFF, 0x12, 0xE0,
-    // 0x17, 0x96, 0x85, 0x71, 0xF7, 0xFF, 0x12, 0xE0,
-    // 0xCE, 0xC5, 0x0F, 0x77, 0xF7, 0xFF, 0x12, 0xE0,
-    // 0xD2, 0x5A, 0x82, 0xF8, 0xF7, 0xFF, 0x12, 0xE0
-    // //0x04, 0x08, 0x9F, 0x78, 0x6E, 0xFF, 0x12, 0xE0
+	// 0x01, 0x0A, 0x0F, 0xFF, 0xF7, 0xFF, 0x12, 0xE0,
+	// 0x0C, 0x06, 0x0C, 0xFE, 0xF7, 0xFF, 0x12, 0xE0,
+	// 0x10, 0x97, 0x83, 0x7B, 0xF7, 0xFF, 0x12, 0xE0,
+	// 0x13, 0x97, 0x82, 0x7A, 0xF7, 0xFF, 0x12, 0xE0,
+	// 0x07, 0x0E, 0x0D, 0xF9, 0xF7, 0xFF, 0x12, 0xE0,
+	// 0x14, 0x96, 0x84, 0x76, 0xF7, 0xFF, 0x12, 0xE0,
+	// 0x17, 0x96, 0x85, 0x71, 0xF7, 0xFF, 0x12, 0xE0,
+	// 0xCE, 0xC5, 0x0F, 0x77, 0xF7, 0xFF, 0x12, 0xE0,
+	// 0xD2, 0x5A, 0x82, 0xF8, 0xF7, 0xFF, 0x12, 0xE0
+	// //0x04, 0x08, 0x9F, 0x78, 0x6E, 0xFF, 0x12, 0xE0
 // };
 
 
-int CmdHFiClassSim(const char *Cmd) {
+static int CmdHFiClassSim(const char *Cmd) {
 	uint8_t simType = 0;
 	uint8_t CSN[8] = {0, 0, 0, 0, 0, 0, 0, 0};
 
 	if (strlen(Cmd) < 1) {
-		return usage_hf_iclass_sim();
+		usage_hf_iclass_sim();
+		return 0;
 	}
 	simType = param_get8ex(Cmd, 0, 0, 10);
 
 	if (simType == ICLASS_SIM_MODE_CSN) {
 		if (param_gethex(Cmd, 1, CSN, 16)) {
 			PrintAndLog("A CSN should consist of 16 HEX symbols");
-			return usage_hf_iclass_sim();
+			usage_hf_iclass_sim();
+			return 0;
 		}
 		PrintAndLog("--simtype:%02x csn:%s", simType, sprint_hex(CSN, 8));
 	}
@@ -186,8 +183,8 @@ int CmdHFiClassSim(const char *Cmd) {
 		void* dump = malloc(datalen);
 		for(int i = 0; i < NUM_CSNS; i++) {
 			memcpy(dump + i*24, csns+i*8, 8); //CSN
-            //copy CC from response
-            memcpy(dump + i*24 + 8, resp.d.asBytes + i*16, 8);
+			//copy CC from response
+			memcpy(dump + i*24 + 8, resp.d.asBytes + i*16, 8);
 			//Then comes NR_MAC (eight bytes from the response)
 			memcpy(dump + i*24 + 16, resp.d.asBytes + i*16 + 8, 8);
 		}
@@ -202,17 +199,18 @@ int CmdHFiClassSim(const char *Cmd) {
 
 	} else {
 		PrintAndLog("Undefined simtype %d", simType);
-		return usage_hf_iclass_sim();
+		usage_hf_iclass_sim();
+		return 0;
 	}
 
 	return 0;
 }
 
+
 int HFiClassReader(const char *Cmd, bool loop, bool verbose) {
 	bool tagFound = false;
 	UsbCommand c = {CMD_READER_ICLASS, {FLAG_ICLASS_READER_CSN |
-		    FLAG_ICLASS_READER_CC | FLAG_ICLASS_READER_CONF | FLAG_ICLASS_READER_AA |
-		    FLAG_ICLASS_READER_ONLY_ONCE | FLAG_ICLASS_READER_ONE_TRY } };
+			FLAG_ICLASS_READER_CC | FLAG_ICLASS_READER_CONF | FLAG_ICLASS_READER_AA} };
 	// loop in client not device - else on windows have a communication error
 	UsbCommand resp;
 	while(!ukbhit()){
@@ -232,7 +230,7 @@ int HFiClassReader(const char *Cmd, bool loop, bool verbose) {
 				PrintAndLog("   CSN: %s",sprint_hex(data,8));
 				tagFound = true;
 			}
-			if( readStatus & FLAG_ICLASS_READER_CC) { 
+			if( readStatus & FLAG_ICLASS_READER_CC) {
 				PrintAndLog("    CC: %s",sprint_hex(data+16,8));
 			}
 			if( readStatus & FLAG_ICLASS_READER_CONF) {
@@ -244,7 +242,7 @@ int HFiClassReader(const char *Cmd, bool loop, bool verbose) {
 				for (int i = 0; i<8; i++) {
 					if (data[8*5+i] != 0xFF) {
 						legacy = false;
-					} 
+					}
 				}
 				PrintAndLog("      : Possible iClass %s",(legacy) ? "(legacy tag)" : "(NOT legacy tag)");
 			}
@@ -258,11 +256,13 @@ int HFiClassReader(const char *Cmd, bool loop, bool verbose) {
 	return 0;
 }
 
-int CmdHFiClassReader(const char *Cmd) {
+
+static int CmdHFiClassReader(const char *Cmd) {
 	return HFiClassReader(Cmd, true, true);
 }
 
-int CmdHFiClassReader_Replay(const char *Cmd) {
+
+static int CmdHFiClassReader_Replay(const char *Cmd) {
 	uint8_t readerType = 0;
 	uint8_t MAC[4]={0x00, 0x00, 0x00, 0x00};
 
@@ -284,26 +284,22 @@ int CmdHFiClassReader_Replay(const char *Cmd) {
 	return 0;
 }
 
-int iclassEmlSetMem(uint8_t *data, int blockNum, int blocksCount) {
-	UsbCommand c = {CMD_MIFARE_EML_MEMSET, {blockNum, blocksCount, 0}};
-	memcpy(c.d.asBytes, data, blocksCount * 16);
-	SendCommand(&c);
-	return 0;
-}
 
-int hf_iclass_eload_usage(void) {
+static void usage_hf_iclass_eload(void) {
 	PrintAndLog("Loads iclass tag-dump into emulator memory on device");
 	PrintAndLog("Usage:  hf iclass eload f <filename>");
 	PrintAndLog("");
 	PrintAndLog("Example: hf iclass eload f iclass_tagdump-aa162d30f8ff12f1.bin");
-	return 0;
 }
 
-int CmdHFiClassELoad(const char *Cmd) {
+
+static int CmdHFiClassELoad(const char *Cmd) {
 
 	char opt = param_getchar(Cmd, 0);
-	if (strlen(Cmd)<1 || opt == 'h')
-		return hf_iclass_eload_usage();
+	if (strlen(Cmd)<1 || opt == 'h') {
+		usage_hf_iclass_eload();
+		return 0;
+	}
 
 	//File handling and reading
 	FILE *f;
@@ -311,7 +307,8 @@ int CmdHFiClassELoad(const char *Cmd) {
 	if (opt == 'f' && param_getstr(Cmd, 1, filename, sizeof(filename)) > 0) {
 		f = fopen(filename, "rb");
 	} else {
-		return hf_iclass_eload_usage();
+		usage_hf_iclass_eload();
+		return 0;
 	}
 
 	if (!f) {
@@ -337,7 +334,7 @@ int CmdHFiClassELoad(const char *Cmd) {
 	printIclassDumpInfo(dump);
 	//Validate
 
-	if (bytes_read < fsize)	{
+	if (bytes_read < fsize) {
 		prnlog("Error, could only read %d bytes (should be %d)",bytes_read, fsize );
 		free(dump);
 		return 1;
@@ -358,6 +355,7 @@ int CmdHFiClassELoad(const char *Cmd) {
 	PrintAndLog("Sent %d bytes of data to device emulator memory", bytes_sent);
 	return 0;
 }
+
 
 static int readKeyfile(const char *filename, size_t len, uint8_t* buffer) {
 	FILE *f = fopen(filename, "rb");
@@ -383,7 +381,8 @@ static int readKeyfile(const char *filename, size_t len, uint8_t* buffer) {
 	return 0;
 }
 
-int usage_hf_iclass_decrypt(void) {
+
+static void usage_hf_iclass_decrypt(void) {
 	PrintAndLog("Usage: hf iclass decrypt f <tagdump>");
 	PrintAndLog("");
 	PrintAndLog("OBS! In order to use this function, the file 'iclass_decryptionkey.bin' must reside");
@@ -394,10 +393,10 @@ int usage_hf_iclass_decrypt(void) {
 	PrintAndLog("OBS! This is pretty stupid implementation, it tries to decrypt every block after block 6. ");
 	PrintAndLog("Correct behaviour would be to decrypt only the application areas where the key is valid,");
 	PrintAndLog("which is defined by the configuration block.");
-	return 1;
 }
 
-int CmdHFiClassDecrypt(const char *Cmd) {
+
+static int CmdHFiClassDecrypt(const char *Cmd) {
 	uint8_t key[16] = { 0 };
 	if(readKeyfile("iclass_decryptionkey.bin", 16, key))
 	{
@@ -406,8 +405,10 @@ int CmdHFiClassDecrypt(const char *Cmd) {
 	}
 	PrintAndLog("Decryption file found... ");
 	char opt = param_getchar(Cmd, 0);
-	if (strlen(Cmd)<1 || opt == 'h')
-		return usage_hf_iclass_decrypt();
+	if (strlen(Cmd)<1 || opt == 'h') {
+		usage_hf_iclass_decrypt();
+		return 0;
+	}
 
 	//Open the tagdump-file
 	FILE *f;
@@ -419,7 +420,8 @@ int CmdHFiClassDecrypt(const char *Cmd) {
 			return 1;
 		}
 	} else {
-		return usage_hf_iclass_decrypt();
+		usage_hf_iclass_decrypt();
+		return 0;
 	}
 
 	fseek(f, 0, SEEK_END);
@@ -457,7 +459,8 @@ int CmdHFiClassDecrypt(const char *Cmd) {
 	return 0;
 }
 
-int usage_hf_iclass_encrypt(void) {
+
+static void usage_hf_iclass_encrypt(void) {
 	PrintAndLog("Usage: hf iclass encrypt <BlockData>");
 	PrintAndLog("");
 	PrintAndLog("OBS! In order to use this function, the file 'iclass_decryptionkey.bin' must reside");
@@ -465,8 +468,8 @@ int usage_hf_iclass_encrypt(void) {
 	PrintAndLog("");
 	PrintAndLog("example: hf iclass encrypt 0102030405060708");
 	PrintAndLog("");
-	return 0;
 }
+
 
 static int iClassEncryptBlkData(uint8_t *blkData) {
 	uint8_t key[16] = { 0 };
@@ -481,7 +484,7 @@ static int iClassEncryptBlkData(uint8_t *blkData) {
 	uint8_t *encrypted = encryptedData;
 	mbedtls_des3_context ctx = { {0} };
 	mbedtls_des3_set2key_enc( &ctx, key);
-	
+
 	mbedtls_des3_crypt_ecb(&ctx, blkData,encrypted);
 	//printvar("decrypted block", decrypted, 8);
 	memcpy(blkData,encrypted,8);
@@ -489,25 +492,26 @@ static int iClassEncryptBlkData(uint8_t *blkData) {
 	return 1;
 }
 
-int CmdHFiClassEncryptBlk(const char *Cmd) {
+
+static int CmdHFiClassEncryptBlk(const char *Cmd) {
 	uint8_t blkData[8] = {0};
 	char opt = param_getchar(Cmd, 0);
-	if (strlen(Cmd)<1 || opt == 'h')
-		return usage_hf_iclass_encrypt();
-
+	if (strlen(Cmd)<1 || opt == 'h') {
+		usage_hf_iclass_encrypt();
+		return 0;
+	}
 	//get the bytes to encrypt
-	if (param_gethex(Cmd, 0, blkData, 16))
-	{
+	if (param_gethex(Cmd, 0, blkData, 16)) {
 		PrintAndLog("BlockData must include 16 HEX symbols");
 		return 0;
 	}
 	if (!iClassEncryptBlkData(blkData)) return 0;
-
 	printvar("encrypted block", blkData, 8);
 	return 1;
 }
 
-void Calc_wb_mac(uint8_t blockno, uint8_t *data, uint8_t *div_key, uint8_t MAC[4]) {
+
+static void Calc_wb_mac(uint8_t blockno, uint8_t *data, uint8_t *div_key, uint8_t MAC[4]) {
 	uint8_t WB[9];
 	WB[0] = blockno;
 	memcpy(WB + 1,data,8);
@@ -515,18 +519,15 @@ void Calc_wb_mac(uint8_t blockno, uint8_t *data, uint8_t *div_key, uint8_t MAC[4
 	//printf("Cal wb mac block [%02x][%02x%02x%02x%02x%02x%02x%02x%02x] : MAC [%02x%02x%02x%02x]",WB[0],WB[1],WB[2],WB[3],WB[4],WB[5],WB[6],WB[7],WB[8],MAC[0],MAC[1],MAC[2],MAC[3]);
 }
 
-static bool select_only(uint8_t *CSN, uint8_t *CCNR, bool use_credit_key, bool verbose) {
+
+static bool select_only(uint8_t *CSN, bool verbose) {
 	UsbCommand resp;
 
 	UsbCommand c = {CMD_READER_ICLASS, {0}};
-	c.arg[0] = FLAG_ICLASS_READER_ONLY_ONCE | FLAG_ICLASS_READER_CC | FLAG_ICLASS_READER_ONE_TRY;
-	if (use_credit_key)
-		c.arg[0] |= FLAG_ICLASS_READER_CEDITKEY;
 
 	clearCommandBuffer();
 	SendCommand(&c);
-	if (!WaitForResponseTimeout(CMD_ACK,&resp,4500))
-	{
+	if (!WaitForResponseTimeout(CMD_ACK, &resp, 4500)) {
 		PrintAndLog("Command execute timeout");
 		return false;
 	}
@@ -534,45 +535,81 @@ static bool select_only(uint8_t *CSN, uint8_t *CCNR, bool use_credit_key, bool v
 	uint8_t isOK = resp.arg[0] & 0xff;
 	uint8_t *data = resp.d.asBytes;
 
-	memcpy(CSN,data,8);
-	if (CCNR!=NULL)memcpy(CCNR,data+16,8);
-	if(isOK > 0)
-	{
-		if (verbose) PrintAndLog("CSN: %s",sprint_hex(CSN,8));
-	}
-	if(isOK <= 1){
-		PrintAndLog("Failed to obtain CC! Aborting");
+	memcpy(CSN, data, 8);
+
+	if (isOK > 0) {
+		if (verbose) PrintAndLog("CSN: %s", sprint_hex(CSN, 8));
+	} else {
+		PrintAndLog("Failed to select card! Aborting");
 		return false;
 	}
-	return true;	
+	return true;
 }
 
-static bool select_and_auth(uint8_t *KEY, uint8_t *MAC, uint8_t *div_key, bool use_credit_key, bool elite, bool rawkey, bool verbose) {
-	uint8_t CSN[8]={0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00};
-	uint8_t CCNR[12]={0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00};
 
-	if (!select_only(CSN, CCNR, use_credit_key, verbose))
+static void HFiClassCalcDivKey(uint8_t *CSN, uint8_t *KEY, uint8_t *div_key, bool elite){
+	uint8_t keytable[128] = {0};
+	uint8_t key_index[8] = {0};
+	if (elite) {
+		uint8_t key_sel[8] = { 0 };
+		uint8_t key_sel_p[8] = { 0 };
+		hash2(KEY, keytable);
+		hash1(CSN, key_index);
+		for(uint8_t i = 0; i < 8 ; i++)
+			key_sel[i] = keytable[key_index[i]] & 0xFF;
+
+		//Permute from iclass format to standard format
+		permutekey_rev(key_sel, key_sel_p);
+		diversifyKey(CSN, key_sel_p, div_key);
+	} else {
+		diversifyKey(CSN, KEY, div_key);
+	}
+}
+
+
+static bool select_and_auth(uint8_t *KEY, uint8_t *MAC, uint8_t *div_key, bool use_credit_key, bool elite, bool rawkey, bool verbose) {
+	uint8_t CSN[8] = {0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00};
+	uint8_t CCNR[12] = {0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00};
+
+	if (!select_only(CSN, verbose))
 		return false;
 
 	//get div_key
-	if(rawkey)
+	if (rawkey)
 		memcpy(div_key, KEY, 8);
 	else
 		HFiClassCalcDivKey(CSN, KEY, div_key, elite);
-	 if (verbose) PrintAndLog("Authing with %s: %02x%02x%02x%02x%02x%02x%02x%02x", rawkey ? "raw key" : "diversified key", div_key[0],div_key[1],div_key[2],div_key[3],div_key[4],div_key[5],div_key[6],div_key[7]);
+
+	if (verbose) PrintAndLog("Authenticating with %s: %s", rawkey ? "raw key" : "diversified key", sprint_hex(div_key, 8));
+
+	UsbCommand resp;
+	UsbCommand d = {CMD_ICLASS_READCHECK, {2, use_credit_key, 0}};
+
+	clearCommandBuffer();
+	SendCommand(&d);
+
+	if (!WaitForResponseTimeout(CMD_ACK, &resp, 4500)) {
+		if (verbose) PrintAndLog("Auth Command (READCHECK[2]) execute timeout");
+		return false;
+	}
+	bool isOK = resp.arg[0];
+	if (!isOK) {
+		if (verbose) PrintAndLog("Couldn't get Card Challenge");
+		return false;
+	}
+	memcpy(CCNR, resp.d.asBytes, 8);
 
 	doMAC(CCNR, div_key, MAC);
-	UsbCommand resp;
-	UsbCommand d = {CMD_ICLASS_AUTHENTICATION, {0}};
+
+	d.cmd = CMD_ICLASS_CHECK;
 	memcpy(d.d.asBytes, MAC, 4);
 	clearCommandBuffer();
 	SendCommand(&d);
-	if (!WaitForResponseTimeout(CMD_ACK,&resp,4500))
-	{
-		if (verbose) PrintAndLog("Auth Command execute timeout");
+	if (!WaitForResponseTimeout(CMD_ACK, &resp, 4500)) {
+		if (verbose) PrintAndLog("Auth Command (CHECK) execute timeout");
 		return false;
 	}
-	uint8_t isOK = resp.arg[0] & 0xff;
+	isOK = resp.arg[0];
 	if (!isOK) {
 		if (verbose) PrintAndLog("Authentication error");
 		return false;
@@ -580,7 +617,8 @@ static bool select_and_auth(uint8_t *KEY, uint8_t *MAC, uint8_t *div_key, bool u
 	return true;
 }
 
-int usage_hf_iclass_dump(void) {
+
+static void usage_hf_iclass_dump(void) {
 	PrintAndLog("Usage:  hf iclass dump f <fileName> k <Key> c <CreditKey> e|r\n");
 	PrintAndLog("Options:");
 	PrintAndLog("  f <filename> : specify a filename to save dump to");
@@ -591,14 +629,45 @@ int usage_hf_iclass_dump(void) {
 	PrintAndLog("                 See 'hf iclass sim 2'. This key should be on iclass-format");
 	PrintAndLog("  r            : If 'r' is specified, the key is interpreted as raw block 3/4");
 	PrintAndLog("  NOTE: * = required");
-  PrintAndLog("Samples:");
+	PrintAndLog("Samples:");
 	PrintAndLog("  hf iclass dump k 001122334455667B");
 	PrintAndLog("  hf iclass dump k AAAAAAAAAAAAAAAA c 001122334455667B");
 	PrintAndLog("  hf iclass dump k AAAAAAAAAAAAAAAA e");
-	return 0;
 }
 
-int CmdHFiClassReader_Dump(const char *Cmd) {
+
+static void printIclassDumpContents(uint8_t *iclass_dump, uint8_t startblock, uint8_t endblock, size_t filesize) {
+	uint8_t mem_config;
+	memcpy(&mem_config, iclass_dump + 13,1);
+	uint8_t maxmemcount;
+	uint8_t filemaxblock = filesize / 8;
+	if (mem_config & 0x80)
+		maxmemcount = 255;
+	else
+		maxmemcount = 31;
+	//PrintAndLog   ("endblock: %d, filesize: %d, maxmemcount: %d, filemaxblock: %d", endblock,filesize, maxmemcount, filemaxblock);
+
+	if (startblock == 0)
+		startblock = 6;
+	if ((endblock > maxmemcount) || (endblock == 0))
+		endblock = maxmemcount;
+
+	// remember endblock need to relate to zero-index arrays.
+	if (endblock > filemaxblock-1)
+		endblock = filemaxblock;
+
+	int i = startblock;
+	printf("------+--+-------------------------+\n");
+	while (i <= endblock) {
+		uint8_t *blk = iclass_dump + (i * 8);
+		printf("Block |%02X| %s|\n", i, sprint_hex(blk, 8) );
+		i++;
+	}
+	printf("------+--+-------------------------+\n");
+}
+
+
+static int CmdHFiClassReader_Dump(const char *Cmd) {
 
 	uint8_t MAC[4] = {0x00,0x00,0x00,0x00};
 	uint8_t div_key[8] = {0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00};
@@ -629,7 +698,8 @@ int CmdHFiClassReader_Dump(const char *Cmd) {
 		{
 		case 'h':
 		case 'H':
-			return usage_hf_iclass_dump();
+			usage_hf_iclass_dump();
+			return 0;
 		case 'c':
 		case 'C':
 			have_credit_key = true;
@@ -657,7 +727,7 @@ int CmdHFiClassReader_Dump(const char *Cmd) {
 			break;
 		case 'f':
 		case 'F':
-			fileNameLen = param_getstr(Cmd, cmdp+1, filename, sizeof(filename)); 
+			fileNameLen = param_getstr(Cmd, cmdp+1, filename, sizeof(filename));
 			if (fileNameLen < 1) {
 				PrintAndLog("No filename found after f");
 				errors = true;
@@ -668,7 +738,7 @@ int CmdHFiClassReader_Dump(const char *Cmd) {
 		case 'K':
 			have_debit_key = true;
 			dataLen = param_getstr(Cmd, cmdp+1, tempStr, sizeof(tempStr));
-			if (dataLen == 16) { 
+			if (dataLen == 16) {
 				errors = param_gethex(tempStr, 0, KEY, dataLen);
 			} else if (dataLen == 1) {
 				keyNbr = param_get8(Cmd, cmdp+1);
@@ -694,16 +764,21 @@ int CmdHFiClassReader_Dump(const char *Cmd) {
 			errors = true;
 			break;
 		}
-		if(errors) return usage_hf_iclass_dump();
+		if (errors) {
+			usage_hf_iclass_dump();
+			return 0;
+		}
 	}
 
-	if (cmdp < 2) return usage_hf_iclass_dump();
+	if (cmdp < 2) {
+		usage_hf_iclass_dump();
+		return 0;
+	}
 	// if no debit key given try credit key on AA1 (not for iclass but for some picopass this will work)
 	if (!have_debit_key && have_credit_key) use_credit_key = true;
 
 	//get config and first 3 blocks
-	UsbCommand c = {CMD_READER_ICLASS, {FLAG_ICLASS_READER_CSN |
-					FLAG_ICLASS_READER_CONF | FLAG_ICLASS_READER_ONLY_ONCE | FLAG_ICLASS_READER_ONE_TRY}};
+	UsbCommand c = {CMD_READER_ICLASS, {FLAG_ICLASS_READER_CSN | FLAG_ICLASS_READER_CONF}};
 	UsbCommand resp;
 	uint8_t tag_data[255*8];
 
@@ -739,7 +814,7 @@ int CmdHFiClassReader_Dump(const char *Cmd) {
 			return 0;
 		}
 	}
-	
+
 	// begin dump
 	UsbCommand w = {CMD_ICLASS_DUMP, {blockno, numblks-blockno+1}};
 	clearCommandBuffer();
@@ -796,7 +871,7 @@ int CmdHFiClassReader_Dump(const char *Cmd) {
 				PrintAndLog("Read Block Failed 2");
 				DropField();
 				return 0;
-			}		
+			}
 
 			startindex = resp.arg[2];
 			if (blocksRead*8 > sizeof(tag_data)-gotBytes) {
@@ -806,7 +881,7 @@ int CmdHFiClassReader_Dump(const char *Cmd) {
 			// get dumped data from bigbuf
 			GetFromBigBuf(tag_data+gotBytes, blocksRead*8, startindex, NULL, -1, false);
 
-			gotBytes += blocksRead*8;			
+			gotBytes += blocksRead*8;
 		} else { //field is still on - turn it off...
 			DropField();
 		}
@@ -819,11 +894,11 @@ int CmdHFiClassReader_Dump(const char *Cmd) {
 	printf("------+--+-------------------------+\n");
 	printf("CSN   |00| %s|\n",sprint_hex(tag_data, 8));
 	printIclassDumpContents(tag_data, 1, (gotBytes/8), gotBytes);
-	
+
 	if (filename[0] == 0){
 		snprintf(filename, FILE_PATH_SIZE,"iclass_tagdump-%02x%02x%02x%02x%02x%02x%02x%02x",
-		    tag_data[0],tag_data[1],tag_data[2],tag_data[3],
-		    tag_data[4],tag_data[5],tag_data[6],tag_data[7]);
+			tag_data[0],tag_data[1],tag_data[2],tag_data[3],
+			tag_data[4],tag_data[5],tag_data[6],tag_data[7]);
 	}
 
 	// save the dump to .bin file
@@ -831,6 +906,7 @@ int CmdHFiClassReader_Dump(const char *Cmd) {
 	saveFile(filename, "bin", tag_data, gotBytes);
 	return 1;
 }
+
 
 static int WriteBlock(uint8_t blockno, uint8_t *bldata, uint8_t *KEY, bool use_credit_key, bool elite, bool rawkey, bool verbose) {
 	uint8_t MAC[4]={0x00,0x00,0x00,0x00};
@@ -844,7 +920,7 @@ static int WriteBlock(uint8_t blockno, uint8_t *bldata, uint8_t *KEY, bool use_c
 	UsbCommand w = {CMD_ICLASS_WRITEBLOCK, {blockno}};
 	memcpy(w.d.asBytes, bldata, 8);
 	memcpy(w.d.asBytes + 8, MAC, 4);
-	
+
 	clearCommandBuffer();
 	SendCommand(&w);
 	if (!WaitForResponseTimeout(CMD_ACK,&resp,4500))
@@ -861,22 +937,23 @@ static int WriteBlock(uint8_t blockno, uint8_t *bldata, uint8_t *KEY, bool use_c
 	return 1;
 }
 
-int usage_hf_iclass_writeblock(void) {
+
+static void usage_hf_iclass_writeblock(void) {
 	PrintAndLog("Options:");
-  PrintAndLog("  b <Block> : The block number as 2 hex symbols");
-  PrintAndLog("  d <data>  : Set the Data to write as 16 hex symbols");
+	PrintAndLog("  b <Block> : The block number as 2 hex symbols");
+	PrintAndLog("  d <data>  : Set the Data to write as 16 hex symbols");
 	PrintAndLog("  k <Key>   : Access Key as 16 hex symbols or 1 hex to select key from memory");
-  PrintAndLog("  c         : If 'c' is specified, the key set is assumed to be the credit key\n");
-  PrintAndLog("  e         : If 'e' is specified, elite computations applied to key");
-  PrintAndLog("  r         : If 'r' is specified, no computations applied to key");
-  PrintAndLog("Samples:");
+	PrintAndLog("  c         : If 'c' is specified, the key set is assumed to be the credit key\n");
+	PrintAndLog("  e         : If 'e' is specified, elite computations applied to key");
+	PrintAndLog("  r         : If 'r' is specified, no computations applied to key");
+	PrintAndLog("Samples:");
 	PrintAndLog("  hf iclass writeblk b 0A d AAAAAAAAAAAAAAAA k 001122334455667B");
 	PrintAndLog("  hf iclass writeblk b 1B d AAAAAAAAAAAAAAAA k 001122334455667B c");
 	PrintAndLog("  hf iclass writeblk b 0A d AAAAAAAAAAAAAAAA n 0");
-	return 0;
 }
 
-int CmdHFiClass_WriteBlock(const char *Cmd) {
+
+static int CmdHFiClass_WriteBlock(const char *Cmd) {
 	uint8_t blockno=0;
 	uint8_t bldata[8]={0,0,0,0,0,0,0,0};
 	uint8_t KEY[8]={0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00};
@@ -894,7 +971,8 @@ int CmdHFiClass_WriteBlock(const char *Cmd) {
 		{
 		case 'h':
 		case 'H':
-			return usage_hf_iclass_writeblock();
+			usage_hf_iclass_writeblock();
+			return 0;
 		case 'b':
 		case 'B':
 			if (param_gethex(Cmd, cmdp+1, &blockno, 2)) {
@@ -925,7 +1003,7 @@ int CmdHFiClass_WriteBlock(const char *Cmd) {
 		case 'k':
 		case 'K':
 			dataLen = param_getstr(Cmd, cmdp+1, tempStr, sizeof(tempStr));
-			if (dataLen == 16) { 
+			if (dataLen == 16) {
 				errors = param_gethex(tempStr, 0, KEY, dataLen);
 			} else if (dataLen == 1) {
 				keyNbr = param_get8(Cmd, cmdp+1);
@@ -951,16 +1029,23 @@ int CmdHFiClass_WriteBlock(const char *Cmd) {
 			errors = true;
 			break;
 		}
-		if(errors) return usage_hf_iclass_writeblock();
+		if(errors) {
+			usage_hf_iclass_writeblock();
+			return 0;
+		}
 	}
 
-	if (cmdp < 6) return usage_hf_iclass_writeblock();
+	if (cmdp < 6) {
+		usage_hf_iclass_writeblock();
+		return 0;
+	}
 	int ans = WriteBlock(blockno, bldata, KEY, use_credit_key, elite, rawkey, true);
 	DropField();
 	return ans;
 }
 
-int usage_hf_iclass_clone(void) {
+
+static void usage_hf_iclass_clone(void) {
 	PrintAndLog("Usage:  hf iclass clone f <tagfile.bin> b <first block> l <last block> k <KEY> c e|r");
 	PrintAndLog("Options:");
 	PrintAndLog("  f <filename>: specify a filename to clone from");
@@ -974,10 +1059,10 @@ int usage_hf_iclass_clone(void) {
 	PrintAndLog("  hf iclass clone f iclass_tagdump-121345.bin b 06 l 1A k 1122334455667788 e");
 	PrintAndLog("  hf iclass clone f iclass_tagdump-121345.bin b 05 l 19 k 0");
 	PrintAndLog("  hf iclass clone f iclass_tagdump-121345.bin b 06 l 19 k 0 e");
-	return -1;
 }
 
-int CmdHFiClassCloneTag(const char *Cmd) {
+
+static int CmdHFiClassCloneTag(const char *Cmd) {
 	char filename[FILE_PATH_SIZE] = {0};
 	char tempStr[50]={0};
 	uint8_t KEY[8]={0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00};
@@ -997,7 +1082,8 @@ int CmdHFiClassCloneTag(const char *Cmd) {
 		{
 		case 'h':
 		case 'H':
-			return usage_hf_iclass_clone();
+			usage_hf_iclass_clone();
+			return 0;
 		case 'b':
 		case 'B':
 			if (param_gethex(Cmd, cmdp+1, &startblock, 2)) {
@@ -1018,7 +1104,7 @@ int CmdHFiClassCloneTag(const char *Cmd) {
 			break;
 		case 'f':
 		case 'F':
-			fileNameLen = param_getstr(Cmd, cmdp+1, filename, sizeof(filename)); 
+			fileNameLen = param_getstr(Cmd, cmdp+1, filename, sizeof(filename));
 			if (fileNameLen < 1) {
 				PrintAndLog("No filename found after f");
 				errors = true;
@@ -1028,7 +1114,7 @@ int CmdHFiClassCloneTag(const char *Cmd) {
 		case 'k':
 		case 'K':
 			dataLen = param_getstr(Cmd, cmdp+1, tempStr, sizeof(tempStr));
-			if (dataLen == 16) { 
+			if (dataLen == 16) {
 				errors = param_gethex(tempStr, 0, KEY, dataLen);
 			} else if (dataLen == 1) {
 				keyNbr = param_get8(Cmd, cmdp+1);
@@ -1062,10 +1148,16 @@ int CmdHFiClassCloneTag(const char *Cmd) {
 			errors = true;
 			break;
 		}
-		if(errors) return usage_hf_iclass_clone();
+		if (errors) {
+			usage_hf_iclass_clone();
+			return 0;
+		}
 	}
 
-	if (cmdp < 8) return usage_hf_iclass_clone();
+	if (cmdp < 8) {
+		usage_hf_iclass_clone();
+		return 0;
+	}
 
 	FILE *f;
 
@@ -1108,21 +1200,21 @@ int CmdHFiClassCloneTag(const char *Cmd) {
 	uint8_t *ptr;
 	// calculate all mac for every the block we will write
 	for (i = startblock; i <= endblock; i++){
-	    Calc_wb_mac(i,tag_data[i - startblock].d,div_key,MAC);
-	    // usb command d start pointer = d + (i - 6) * 12
-	    // memcpy(pointer,tag_data[i - 6],8) 8 bytes
-	    // memcpy(pointer + 8,mac,sizoof(mac) 4 bytes;
-	    // next one
-	    ptr = w.d.asBytes + (i - startblock) * 12;
-	    memcpy(ptr, &(tag_data[i - startblock].d[0]), 8);
-	    memcpy(ptr + 8,MAC, 4);
+		Calc_wb_mac(i,tag_data[i - startblock].d,div_key,MAC);
+		// usb command d start pointer = d + (i - 6) * 12
+		// memcpy(pointer,tag_data[i - 6],8) 8 bytes
+		// memcpy(pointer + 8,mac,sizoof(mac) 4 bytes;
+		// next one
+		ptr = w.d.asBytes + (i - startblock) * 12;
+		memcpy(ptr, &(tag_data[i - startblock].d[0]), 8);
+		memcpy(ptr + 8,MAC, 4);
 	}
 	uint8_t p[12];
 	for (i = 0; i <= endblock - startblock;i++){
-	    memcpy(p,w.d.asBytes + (i * 12),12);
-	    printf("Block |%02x|",i + startblock);
-	    printf(" %02x%02x%02x%02x%02x%02x%02x%02x |",p[0],p[1],p[2],p[3],p[4],p[5],p[6],p[7]);
-	    printf(" MAC |%02x%02x%02x%02x|\n",p[8],p[9],p[10],p[11]);
+		memcpy(p,w.d.asBytes + (i * 12),12);
+		printf("Block |%02x|",i + startblock);
+		printf(" %02x%02x%02x%02x%02x%02x%02x%02x |",p[0],p[1],p[2],p[3],p[4],p[5],p[6],p[7]);
+		printf(" MAC |%02x%02x%02x%02x|\n",p[8],p[9],p[10],p[11]);
 	}
 	UsbCommand resp;
 	SendCommand(&w);
@@ -1134,7 +1226,9 @@ int CmdHFiClassCloneTag(const char *Cmd) {
 	return 1;
 }
 
+
 static int ReadBlock(uint8_t *KEY, uint8_t blockno, uint8_t keyType, bool elite, bool rawkey, bool verbose, bool auth) {
+
 	uint8_t MAC[4]={0x00,0x00,0x00,0x00};
 	uint8_t div_key[8]={0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00};
 
@@ -1142,9 +1236,8 @@ static int ReadBlock(uint8_t *KEY, uint8_t blockno, uint8_t keyType, bool elite,
 		if (!select_and_auth(KEY, MAC, div_key, (keyType==0x18), elite, rawkey, verbose))
 			return 0;
 	} else {
-		uint8_t CSN[8]={0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00};
-		uint8_t CCNR[12]={0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00};
-		if (!select_only(CSN, CCNR, (keyType==0x18), verbose))
+		uint8_t CSN[8];
+		if (!select_only(CSN, verbose))
 			return 0;
 	}
 
@@ -1152,8 +1245,7 @@ static int ReadBlock(uint8_t *KEY, uint8_t blockno, uint8_t keyType, bool elite,
 	UsbCommand w = {CMD_ICLASS_READBLOCK, {blockno}};
 	clearCommandBuffer();
 	SendCommand(&w);
-	if (!WaitForResponseTimeout(CMD_ACK,&resp,4500))
-	{
+	if (!WaitForResponseTimeout(CMD_ACK, &resp, 4500)) {
 		PrintAndLog("Command execute timeout");
 		return 0;
 	}
@@ -1167,22 +1259,23 @@ static int ReadBlock(uint8_t *KEY, uint8_t blockno, uint8_t keyType, bool elite,
 	return 1;
 }
 
-int usage_hf_iclass_readblock(void) {
-	PrintAndLog("Usage:  hf iclass readblk b <Block> k <Key> c e|r\n");
+
+static void usage_hf_iclass_readblock(void) {
+	PrintAndLog("Usage:  hf iclass readblk b <Block> k <Key> [c] [e|r]\n");
 	PrintAndLog("Options:");
-  PrintAndLog("  b <Block> : The block number as 2 hex symbols");
+	PrintAndLog("  b <Block> : The block number as 2 hex symbols");
 	PrintAndLog("  k <Key>   : Access Key as 16 hex symbols or 1 hex to select key from memory");
-  PrintAndLog("  c         : If 'c' is specified, the key set is assumed to be the credit key\n");
-  PrintAndLog("  e         : If 'e' is specified, elite computations applied to key");
-  PrintAndLog("  r         : If 'r' is specified, no computations applied to key");
-  PrintAndLog("Samples:");
+	PrintAndLog("  c         : If 'c' is specified, the key set is assumed to be the credit key\n");
+	PrintAndLog("  e         : If 'e' is specified, elite computations applied to key");
+	PrintAndLog("  r         : If 'r' is specified, no computations applied to key");
+	PrintAndLog("Samples:");
 	PrintAndLog("  hf iclass readblk b 06 k 0011223344556677");
 	PrintAndLog("  hf iclass readblk b 1B k 0011223344556677 c");
 	PrintAndLog("  hf iclass readblk b 0A k 0");
-	return 0;
 }
 
-int CmdHFiClass_ReadBlock(const char *Cmd) {
+
+static int CmdHFiClass_ReadBlock(const char *Cmd) {
 	uint8_t blockno=0;
 	uint8_t keyType = 0x88; //debit key
 	uint8_t KEY[8]={0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00};
@@ -1194,71 +1287,78 @@ int CmdHFiClass_ReadBlock(const char *Cmd) {
 	bool errors = false;
 	bool auth = false;
 	uint8_t cmdp = 0;
-	while(param_getchar(Cmd, cmdp) != 0x00)
-	{
-		switch(param_getchar(Cmd, cmdp))
-		{
-		case 'h':
-		case 'H':
-			return usage_hf_iclass_readblock();
-		case 'b':
-		case 'B':
-			if (param_gethex(Cmd, cmdp+1, &blockno, 2)) {
-				PrintAndLog("Block No must include 2 HEX symbols\n");
-				errors = true;
-			}
-			cmdp += 2;
-			break;
-		case 'c':
-		case 'C':
-			keyType = 0x18;
-			cmdp++;
-			break;
-		case 'e':
-		case 'E':
-			elite = true;
-			cmdp++;
-			break;
-		case 'k':
-		case 'K':
-			auth = true;
-			dataLen = param_getstr(Cmd, cmdp+1, tempStr, sizeof(tempStr));
-			if (dataLen == 16) { 
-				errors = param_gethex(tempStr, 0, KEY, dataLen);
-			} else if (dataLen == 1) {
-				keyNbr = param_get8(Cmd, cmdp+1);
-				if (keyNbr < ICLASS_KEYS_MAX) {
-					memcpy(KEY, iClass_Key_Table[keyNbr], 8);
-				} else {
-					PrintAndLog("\nERROR: Credit KeyNbr is invalid\n");
+	while (param_getchar(Cmd, cmdp) != 0x00) {
+		switch (param_getchar(Cmd, cmdp)) {
+			case 'h':
+			case 'H':
+				usage_hf_iclass_readblock();
+				return 0;
+			case 'b':
+			case 'B':
+				if (param_gethex(Cmd, cmdp+1, &blockno, 2)) {
+					PrintAndLog("Block No must include 2 HEX symbols\n");
 					errors = true;
 				}
-			} else {
-				PrintAndLog("\nERROR: Credit Key is incorrect length\n");
+				cmdp += 2;
+				break;
+			case 'c':
+			case 'C':
+				keyType = 0x18;
+				cmdp++;
+				break;
+			case 'e':
+			case 'E':
+				elite = true;
+				cmdp++;
+				break;
+			case 'k':
+			case 'K':
+				auth = true;
+				dataLen = param_getstr(Cmd, cmdp+1, tempStr, sizeof(tempStr));
+				if (dataLen == 16) {
+					errors = param_gethex(tempStr, 0, KEY, dataLen);
+				} else if (dataLen == 1) {
+					keyNbr = param_get8(Cmd, cmdp+1);
+					if (keyNbr < ICLASS_KEYS_MAX) {
+						memcpy(KEY, iClass_Key_Table[keyNbr], 8);
+					} else {
+						PrintAndLog("\nERROR: KeyNbr is invalid\n");
+						errors = true;
+					}
+				} else {
+					PrintAndLog("\nERROR: Key is incorrect length\n");
+					errors = true;
+				}
+				cmdp += 2;
+				break;
+			case 'r':
+			case 'R':
+				rawkey = true;
+				cmdp++;
+				break;
+			default:
+				PrintAndLog("Unknown parameter '%c'\n", param_getchar(Cmd, cmdp));
 				errors = true;
-			}
-			cmdp += 2;
-			break;
-		case 'r':
-		case 'R':
-			rawkey = true;
-			cmdp++;
-			break;
-		default:
-			PrintAndLog("Unknown parameter '%c'\n", param_getchar(Cmd, cmdp));
-			errors = true;
-			break;
+				break;
 		}
-		if(errors) return usage_hf_iclass_readblock();
+		if (errors) {
+			usage_hf_iclass_readblock();
+			return 0;
+		}
 	}
 
-	if (cmdp < 2) return usage_hf_iclass_readblock();
+	if (cmdp < 2) {
+		usage_hf_iclass_readblock();
+		return 0;
+	}
 	if (!auth)
 		PrintAndLog("warning: no authentication used with read, only a few specific blocks can be read accurately without authentication.");
+
 	return ReadBlock(KEY, blockno, keyType, elite, rawkey, true, auth);
 }
 
-int CmdHFiClass_loclass(const char *Cmd) {
+
+static int CmdHFiClass_loclass(const char *Cmd) {
 	char opt = param_getchar(Cmd, 0);
 
 	if (strlen(Cmd)<1 || opt == 'h') {
@@ -1297,49 +1397,22 @@ int CmdHFiClass_loclass(const char *Cmd) {
 	return 0;
 }
 
-void printIclassDumpContents(uint8_t *iclass_dump, uint8_t startblock, uint8_t endblock, size_t filesize) {
-	uint8_t mem_config;
-	memcpy(&mem_config, iclass_dump + 13,1);
-	uint8_t maxmemcount;
-	uint8_t filemaxblock = filesize / 8;
-	if (mem_config & 0x80)
-		maxmemcount = 255;
-	else
-		maxmemcount = 31;
-	//PrintAndLog	("endblock: %d, filesize: %d, maxmemcount: %d, filemaxblock: %d", endblock,filesize, maxmemcount, filemaxblock);
 
-	if (startblock == 0)
-		startblock = 6;
-	if ((endblock > maxmemcount) || (endblock == 0))
-		endblock = maxmemcount;
-
-	// remember endblock need to relate to zero-index arrays.
-	if (endblock > filemaxblock-1)
-		endblock = filemaxblock;
-	
-	int i = startblock;
-	printf("------+--+-------------------------+\n");
-	while (i <= endblock) {
-		uint8_t *blk = iclass_dump + (i * 8);
-		printf("Block |%02X| %s|\n", i, sprint_hex(blk, 8) );	
-		i++;
-	}
-	printf("------+--+-------------------------+\n");
-}
-
-int usage_hf_iclass_readtagfile() {
+static void usage_hf_iclass_readtagfile() {
 	PrintAndLog("Usage: hf iclass readtagfile <filename> [startblock] [endblock]");
-	return 1;
 }
 
-int CmdHFiClassReadTagFile(const char *Cmd) {
+
+static int CmdHFiClassReadTagFile(const char *Cmd) {
 	int startblock = 0;
 	int endblock = 0;
 	char tempnum[5];
 	FILE *f;
 	char filename[FILE_PATH_SIZE];
-	if (param_getstr(Cmd, 0, filename, sizeof(filename)) < 1)
-		return usage_hf_iclass_readtagfile();
+	if (param_getstr(Cmd, 0, filename, sizeof(filename)) < 1) {
+		usage_hf_iclass_readtagfile();
+		return 0;
+	}
 	if (param_getstr(Cmd, 1, tempnum, sizeof(tempnum)) < 1)
 		startblock = 0;
 	else
@@ -1397,24 +1470,7 @@ uint64_t hexarray_to_uint64(uint8_t *key) {
 	return uint_key;
 }
 */
-void HFiClassCalcDivKey(uint8_t	*CSN, uint8_t	*KEY, uint8_t *div_key, bool elite){
-	uint8_t keytable[128] = {0};
-	uint8_t key_index[8] = {0};
-	if (elite) {
-		uint8_t key_sel[8] = { 0 };
-		uint8_t key_sel_p[8] = { 0 };
-		hash2(KEY, keytable);
-		hash1(CSN, key_index);
-		for(uint8_t i = 0; i < 8 ; i++)
-			key_sel[i] = keytable[key_index[i]] & 0xFF;
 
-		//Permute from iclass format to standard format
-		permutekey_rev(key_sel, key_sel_p);
-		diversifyKey(CSN, key_sel_p, div_key);	
-	} else {
-		diversifyKey(CSN, KEY, div_key);
-	}		
-}
 
 //when told CSN, oldkey, newkey, if new key is elite (elite), and if old key was elite (oldElite)
 //calculate and return xor_div_key (ready for a key write command)
@@ -1426,18 +1482,19 @@ static void HFiClassCalcNewKey(uint8_t *CSN, uint8_t *OLDKEY, uint8_t *NEWKEY, u
 	HFiClassCalcDivKey(CSN, OLDKEY, old_div_key, oldElite);
 	//get new div key
 	HFiClassCalcDivKey(CSN, NEWKEY, new_div_key, elite);
-	
+
 	for (uint8_t i = 0; i < sizeof(old_div_key); i++){
 		xor_div_key[i] = old_div_key[i] ^ new_div_key[i];
 	}
 	if (verbose) {
 		printf("Old Div Key : %s\n",sprint_hex(old_div_key,8));
 		printf("New Div Key : %s\n",sprint_hex(new_div_key,8));
-		printf("Xor Div Key : %s\n",sprint_hex(xor_div_key,8));		
+		printf("Xor Div Key : %s\n",sprint_hex(xor_div_key,8));
 	}
 }
 
-int usage_hf_iclass_calc_newkey(void) {
+
+static void usage_hf_iclass_calc_newkey(void) {
 	PrintAndLog("HELP :  Manage iClass Keys in client memory:\n");
 	PrintAndLog("Usage:  hf iclass calc_newkey o <Old key> n <New key> s [csn] e");
 	PrintAndLog("  Options:");
@@ -1451,16 +1508,14 @@ int usage_hf_iclass_calc_newkey(void) {
 	PrintAndLog(" std key to e key read csn: hf iclass calcnewkey o 1122334455667788 n 2233445566778899 e");
 	PrintAndLog(" std to std read csn      : hf iclass calcnewkey o 1122334455667788 n 2233445566778899");
 	PrintAndLog("NOTE: * = required\n");
-
-	return 1;
 }
 
-int CmdHFiClassCalcNewKey(const char *Cmd) {
+
+static int CmdHFiClassCalcNewKey(const char *Cmd) {
 	uint8_t OLDKEY[8] = {0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00};
 	uint8_t NEWKEY[8] = {0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00};
 	uint8_t xor_div_key[8] = {0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00};
 	uint8_t CSN[8] = {0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00};
-	uint8_t CCNR[12] = {0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00};
 	uint8_t keyNbr = 0;
 	uint8_t dataLen = 0;
 	char tempStr[50] = {0};
@@ -1475,7 +1530,8 @@ int CmdHFiClassCalcNewKey(const char *Cmd) {
 		{
 		case 'h':
 		case 'H':
-			return usage_hf_iclass_calc_newkey();
+			usage_hf_iclass_calc_newkey();
+			return 0;
 		case 'e':
 		case 'E':
 			dataLen = param_getstr(Cmd, cmdp, tempStr, sizeof(tempStr));
@@ -1487,7 +1543,7 @@ int CmdHFiClassCalcNewKey(const char *Cmd) {
 		case 'n':
 		case 'N':
 			dataLen = param_getstr(Cmd, cmdp+1, tempStr, sizeof(tempStr));
-			if (dataLen == 16) { 
+			if (dataLen == 16) {
 				errors = param_gethex(tempStr, 0, NEWKEY, dataLen);
 			} else if (dataLen == 1) {
 				keyNbr = param_get8(Cmd, cmdp+1);
@@ -1506,7 +1562,7 @@ int CmdHFiClassCalcNewKey(const char *Cmd) {
 		case 'o':
 		case 'O':
 			dataLen = param_getstr(Cmd, cmdp+1, tempStr, sizeof(tempStr));
-			if (dataLen == 16) { 
+			if (dataLen == 16) {
 				errors = param_gethex(tempStr, 0, OLDKEY, dataLen);
 			} else if (dataLen == 1) {
 				keyNbr = param_get8(Cmd, cmdp+1);
@@ -1525,8 +1581,10 @@ int CmdHFiClassCalcNewKey(const char *Cmd) {
 		case 's':
 		case 'S':
 			givenCSN = true;
-			if (param_gethex(Cmd, cmdp+1, CSN, 16))
-				return usage_hf_iclass_calc_newkey();
+			if (param_gethex(Cmd, cmdp+1, CSN, 16)) {
+				usage_hf_iclass_calc_newkey();
+				return 0;
+			}
 			cmdp += 2;
 			break;
 		default:
@@ -1534,18 +1592,25 @@ int CmdHFiClassCalcNewKey(const char *Cmd) {
 			errors = true;
 			break;
 		}
-		if(errors) return usage_hf_iclass_calc_newkey();
+		if (errors) {
+			usage_hf_iclass_calc_newkey();
+			return 0;
+		}
 	}
 
-	if (cmdp < 4) return usage_hf_iclass_calc_newkey();
+	if (cmdp < 4) {
+		usage_hf_iclass_calc_newkey();
+		return 0;
+	}
 
 	if (!givenCSN)
-		if (!select_only(CSN, CCNR, false, true))
+		if (!select_only(CSN, true))
 			return 0;
-	
+
 	HFiClassCalcNewKey(CSN, OLDKEY, NEWKEY, xor_div_key, elite, oldElite, true);
 	return 0;
 }
+
 
 static int loadKeys(char *filename) {
 	FILE *f;
@@ -1582,6 +1647,7 @@ static int loadKeys(char *filename) {
 	return 1;
 }
 
+
 static int saveKeys(char *filename) {
 	FILE *f;
 	f = fopen(filename,"wb");
@@ -1599,16 +1665,18 @@ static int saveKeys(char *filename) {
 	return 0;
 }
 
+
 static int printKeys(void) {
 	PrintAndLog("");
 	for (uint8_t i = 0; i < ICLASS_KEYS_MAX; i++){
 		PrintAndLog("%u: %s",i,sprint_hex(iClass_Key_Table[i],8));
 	}
-	PrintAndLog("");	
+	PrintAndLog("");
 	return 0;
 }
 
-int usage_hf_iclass_managekeys(void) {
+
+static void usage_hf_iclass_managekeys(void) {
 	PrintAndLog("HELP :  Manage iClass Keys in client memory:\n");
 	PrintAndLog("Usage:  hf iclass managekeys n [keynbr] k [key] f [filename] s l p\n");
 	PrintAndLog("  Options:");
@@ -1623,10 +1691,10 @@ int usage_hf_iclass_managekeys(void) {
 	PrintAndLog(" save key file: hf iclass managekeys f mykeys.bin s");
 	PrintAndLog(" load key file: hf iclass managekeys f mykeys.bin l");
 	PrintAndLog(" print keys   : hf iclass managekeys p\n");
-	return 0;
 }
 
-int CmdHFiClassManageKeys(const char *Cmd) {
+
+static int CmdHFiClassManageKeys(const char *Cmd) {
 	uint8_t keyNbr = 0;
 	uint8_t dataLen = 0;
 	uint8_t KEY[8] = {0};
@@ -1643,10 +1711,11 @@ int CmdHFiClassManageKeys(const char *Cmd) {
 		{
 		case 'h':
 		case 'H':
-			return usage_hf_iclass_managekeys();
+			usage_hf_iclass_managekeys();
+			return 0;
 		case 'f':
 		case 'F':
-			fileNameLen = param_getstr(Cmd, cmdp+1, filename, sizeof(filename)); 
+			fileNameLen = param_getstr(Cmd, cmdp+1, filename, sizeof(filename));
 			if (fileNameLen < 1) {
 				PrintAndLog("No filename found after f");
 				errors = true;
@@ -1664,7 +1733,7 @@ int CmdHFiClassManageKeys(const char *Cmd) {
 			break;
 		case 'k':
 		case 'K':
-			operation += 3; //set key 
+			operation += 3; //set key
 			dataLen = param_getstr(Cmd, cmdp+1, tempStr, sizeof(tempStr));
 			if (dataLen == 16) { //ul-c or ev1/ntag key length
 				errors = param_gethex(tempStr, 0, KEY, dataLen);
@@ -1694,19 +1763,25 @@ int CmdHFiClassManageKeys(const char *Cmd) {
 			errors = true;
 			break;
 		}
-		if(errors) return usage_hf_iclass_managekeys();
+		if (errors) {
+			usage_hf_iclass_managekeys();
+			return 0;
+		}
 	}
 	if (operation == 0){
 		PrintAndLog("no operation specified (load, save, or print)\n");
-		return usage_hf_iclass_managekeys();
+		usage_hf_iclass_managekeys();
+		return 0;
 	}
 	if (operation > 6){
 		PrintAndLog("Too many operations specified\n");
-		return usage_hf_iclass_managekeys();
+		usage_hf_iclass_managekeys();
+		return 0;
 	}
 	if (operation > 4 && fileNameLen == 0){
 		PrintAndLog("You must enter a filename when loading or saving\n");
-		return usage_hf_iclass_managekeys();
+		usage_hf_iclass_managekeys();
+		return 0;
 	}
 
 	switch (operation){
@@ -1719,7 +1794,8 @@ int CmdHFiClassManageKeys(const char *Cmd) {
 	return 0;
 }
 
-int CmdHFiClassCheckKeys(const char *Cmd) {
+
+static int CmdHFiClassCheckKeys(const char *Cmd) {
 
 	uint8_t mac[4] = {0x00,0x00,0x00,0x00};
 	uint8_t key[8] = {0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00};
@@ -1727,9 +1803,9 @@ int CmdHFiClassCheckKeys(const char *Cmd) {
 
 	// elite key,  raw key, standard key
 	bool use_elite = false;
-	bool use_raw = false;	
+	bool use_raw = false;
 	bool found_debit = false;
-	bool found_credit = false;	
+	bool found_credit = false;
 	bool errors = false;
 	uint8_t cmdp = 0x00;
 	FILE * f;
@@ -1743,10 +1819,11 @@ int CmdHFiClassCheckKeys(const char *Cmd) {
 		switch (param_getchar(Cmd, cmdp)) {
 		case 'h':
 		case 'H':
-			return usage_hf_iclass_chk();
+			usage_hf_iclass_chk();
+			return 0;
 		case 'f':
 		case 'F':
-			fileNameLen = param_getstr(Cmd, cmdp+1, filename, sizeof(filename)); 
+			fileNameLen = param_getstr(Cmd, cmdp+1, filename, sizeof(filename));
 			if (fileNameLen < 1) {
 				PrintAndLog("No filename found after f");
 				errors = true;
@@ -1769,8 +1846,11 @@ int CmdHFiClassCheckKeys(const char *Cmd) {
 			break;
 		}
 	}
-	if (errors) return usage_hf_iclass_chk();	
-			
+	if (errors) {
+		usage_hf_iclass_chk();
+		return 0;
+	}
+
 	if ( !(f = fopen( filename , "r")) ) {
 		PrintAndLog("File: %s: not found or locked.", filename);
 		return 1;
@@ -1779,16 +1859,16 @@ int CmdHFiClassCheckKeys(const char *Cmd) {
 	while( fgets(buf, sizeof(buf), f) ){
 		if (strlen(buf) < 16 || buf[15] == '\n')
 			continue;
-	
+
 		while (fgetc(f) != '\n' && !feof(f)) ;  //goto next line
-		
-		if( buf[0]=='#' ) continue;	//The line start with # is comment, skip
+
+		if( buf[0]=='#' ) continue; //The line start with # is comment, skip
 
 		if (!isxdigit(buf[0])){
 			PrintAndLog("File content error. '%s' must include 16 HEX symbols",buf);
 			continue;
 		}
-		
+
 		buf[16] = 0;
 
 		p = realloc(keyBlock, 8 * (keyitems += 64));
@@ -1809,19 +1889,19 @@ int CmdHFiClassCheckKeys(const char *Cmd) {
 	}
 	fclose(f);
 	PrintAndLog("Loaded %2d keys from %s", keycnt, filename);
-	
+
 	// time
 	uint64_t t1 = msclock();
-				
+
 	for (uint32_t c = 0; c < keycnt; c += 1) {
-			printf("."); fflush(stdout);			
+			printf("."); fflush(stdout);
 			if (ukbhit()) {
 				int gc = getchar(); (void)gc;
 				printf("\naborted via keyboard!\n");
 				break;
 			}
-			
-			memcpy(key, keyBlock + 8 * c , 8); 
+
+			memcpy(key, keyBlock + 8 * c , 8);
 
 			// debit key. try twice
 			for (int foo = 0; foo < 2 && !found_debit; foo++) {
@@ -1833,18 +1913,18 @@ int CmdHFiClassCheckKeys(const char *Cmd) {
 			PrintAndLog("   Found AA1 debit key\t\t[%s]", sprint_hex(key, 8));
 				found_debit = true;
 			}
-			
+
 			// credit key. try twice
 			for (int foo = 0; foo < 2 && !found_credit; foo++) {
 				if (!select_and_auth(key, mac, div_key, true, use_elite, use_raw, false))
 					continue;
-				
+
 				// key found
 				PrintAndLog("\n--------------------------------------------------------");
 				PrintAndLog("   Found AA2 credit key\t\t[%s]", sprint_hex(key, 8));
 				found_credit = true;
 			}
-			
+
 			// both keys found.
 			if ( found_debit && found_credit )
 				break;
@@ -1853,45 +1933,108 @@ int CmdHFiClassCheckKeys(const char *Cmd) {
 	t1 = msclock() - t1;
 
 	PrintAndLog("\nTime in iclass checkkeys: %.0f seconds\n", (float)t1/1000.0);
-	
+
 	DropField();
 	free(keyBlock);
 	PrintAndLog("");
 	return 0;
 }
 
-static command_t CommandTable[] = 
-{
-	{"help",        CmdHelp,                    	1,	"This help"},
-	{"calcnewkey",  CmdHFiClassCalcNewKey,      	1,	"[options..] Calc Diversified keys (blocks 3 & 4) to write new keys"},
-	{"chk",         CmdHFiClassCheckKeys,        	0,	"            Check keys"},	
-	{"clone",       CmdHFiClassCloneTag,        	0,	"[options..] Authenticate and Clone from iClass bin file"},
-	{"decrypt",     CmdHFiClassDecrypt,         	1,	"[f <fname>] Decrypt tagdump" },
-	{"dump",        CmdHFiClassReader_Dump,     	0,	"[options..] Authenticate and Dump iClass tag's AA1"},
-	{"eload",       CmdHFiClassELoad,           	0,	"[f <fname>] (experimental) Load data into iClass emulator memory"},
-	{"encryptblk",  CmdHFiClassEncryptBlk,      	1,	"<BlockData> Encrypt given block data"},
-	{"list",        CmdHFiClassList,            	0,	"            (Deprecated) List iClass history"},
-	{"loclass",     CmdHFiClass_loclass,        	1,	"[options..] Use loclass to perform bruteforce of reader attack dump"},
-	{"managekeys",  CmdHFiClassManageKeys,      	1,	"[options..] Manage the keys to use with iClass"},
-	{"readblk",     CmdHFiClass_ReadBlock,      	0,	"[options..] Authenticate and Read iClass block"},
-	{"reader",      CmdHFiClassReader,          	0,	"            Look for iClass tags until a key or the pm3 button is pressed"},
-	{"readtagfile", CmdHFiClassReadTagFile,     	1,	"[options..] Display Content from tagfile"},
-	{"replay",      CmdHFiClassReader_Replay,   	0,	"<mac>       Read an iClass tag via Reply Attack"},
-	{"sim",         CmdHFiClassSim,             	0,	"[options..] Simulate iClass tag"},
-	{"snoop",       CmdHFiClassSnoop,           	0,	"            Eavesdrop iClass communication"},
-	{"writeblk",    CmdHFiClass_WriteBlock,     	0,	"[options..] Authenticate and Write iClass block"},
+
+static void usage_hf_iclass_permutekey(void) {
+	PrintAndLogEx(NORMAL, "Convert keys from standard NIST to iClass format (and vice versa)");
+	PrintAndLogEx(NORMAL, "");
+	PrintAndLogEx(NORMAL, "Usage:  hf iclass permute [h] [r] <key>");
+	PrintAndLogEx(NORMAL, "Options:");
+	PrintAndLogEx(NORMAL, "           h          This help");
+	PrintAndLogEx(NORMAL, "           r          reverse convert key from iClass to NIST format");
+	PrintAndLogEx(NORMAL, "");
+	PrintAndLogEx(NORMAL, "Examples:");
+	PrintAndLogEx(NORMAL, "      hf iclass permute r 0123456789abcdef");
+}
+
+
+static int CmdHFiClassPermuteKey(const char *Cmd) {
+
+	uint8_t key[8] = {0};
+	uint8_t data[16] = {0};
+	bool isReverse = false;
+	int len = sizeof(data);
+	char cmdp = tolower(param_getchar(Cmd, 0));
+	if (strlen(Cmd) == 0 || cmdp == 'h') {
+		usage_hf_iclass_permutekey();
+		return 0;
+	}
+
+	if (cmdp == 'r') {
+		isReverse = true;
+		param_gethex_ex(Cmd, 1, data, &len);
+	} else if (cmdp == 'f') {
+		param_gethex_ex(Cmd, 1, data, &len);
+	} else {
+		param_gethex_ex(Cmd, 0, data, &len);
+	}
+
+
+	if (len % 2) {
+		usage_hf_iclass_permutekey();
+		return 0;
+	}
+
+	len >>= 1;
+
+	memcpy(key, data, 8);
+
+	if (isReverse) {
+		// generate_rev(data, len);
+		uint8_t key_std_format[8] = {0};
+		permutekey_rev(key, key_std_format);
+		PrintAndLogEx(SUCCESS, "key in standard NIST format:     %s \n", sprint_hex(key_std_format, 8));
+		// if (mbedtls_des_key_check_key_parity(key_std_format
+	} else {
+		// generate(data, len);
+		uint8_t key_iclass_format[8] = {0};
+		permutekey(key, key_iclass_format);
+		PrintAndLogEx(SUCCESS, "key in iClass (permuted) format: %s \n", sprint_hex(key_iclass_format, 8));
+	}
+	return 0;
+}
+
+
+static int CmdHelp(const char *Cmd);
+
+static command_t CommandTable[] = {
+	{"help",        CmdHelp,                        1,  "This help"},
+	{"calcnewkey",  CmdHFiClassCalcNewKey,          1,  "[options..] Calc Diversified keys (blocks 3 & 4) to write new keys"},
+	{"chk",         CmdHFiClassCheckKeys,           0,  "            Check keys"},
+	{"clone",       CmdHFiClassCloneTag,            0,  "[options..] Authenticate and Clone from iClass bin file"},
+	{"decrypt",     CmdHFiClassDecrypt,             1,  "[f <fname>] Decrypt tagdump" },
+	{"dump",        CmdHFiClassReader_Dump,         0,  "[options..] Authenticate and Dump iClass tag's AA1"},
+	{"eload",       CmdHFiClassELoad,               0,  "[f <fname>] (experimental) Load data into iClass emulator memory"},
+	{"encryptblk",  CmdHFiClassEncryptBlk,          1,  "<BlockData> Encrypt given block data"},
+	{"list",        CmdHFiClassList,                0,  "            (Deprecated) List iClass history"},
+	{"loclass",     CmdHFiClass_loclass,            1,  "[options..] Use loclass to perform bruteforce of reader attack dump"},
+	{"managekeys",  CmdHFiClassManageKeys,          1,  "[options..] Manage the keys to use with iClass"},
+	{"permutekey",  CmdHFiClassPermuteKey,          1,  "            iClass key permutation"},
+	{"readblk",     CmdHFiClass_ReadBlock,          0,  "[options..] Authenticate and Read iClass block"},
+	{"reader",      CmdHFiClassReader,              0,  "            Look for iClass tags until a key or the pm3 button is pressed"},
+	{"readtagfile", CmdHFiClassReadTagFile,         1,  "[options..] Display Content from tagfile"},
+	{"replay",      CmdHFiClassReader_Replay,       0,  "<mac>       Read an iClass tag via Reply Attack"},
+	{"sim",         CmdHFiClassSim,                 0,  "[options..] Simulate iClass tag"},
+	{"snoop",       CmdHFiClassSnoop,               0,  "            Eavesdrop iClass communication"},
+	{"writeblk",    CmdHFiClass_WriteBlock,         0,  "[options..] Authenticate and Write iClass block"},
 	{NULL, NULL, 0, NULL}
 };
 
-int CmdHFiClass(const char *Cmd)
-{
-	clearCommandBuffer();	
+
+int CmdHFiClass(const char *Cmd) {
+	clearCommandBuffer();
 	CmdsParse(CommandTable, Cmd);
 	return 0;
 }
 
-int CmdHelp(const char *Cmd)
-{
+
+int CmdHelp(const char *Cmd) {
 	CmdsHelp(CommandTable);
 	return 0;
 }

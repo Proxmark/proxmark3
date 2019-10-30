@@ -66,7 +66,7 @@ uint32_t RAMFUNC GetDeltaCountUS();
 
 void StartCountSspClk();
 void ResetSspClk(void);
-uint32_t RAMFUNC GetCountSspClk();
+uint32_t GetCountSspClk();
 
 extern void StartTicks(void);
 extern uint32_t GetTicks(void);

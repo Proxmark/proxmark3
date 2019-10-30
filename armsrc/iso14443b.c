@@ -586,9 +586,10 @@ static RAMFUNC int Handle14443bSamplesDemod(int ci, int cq)
 					Demod.state = DEMOD_UNSYNCD;
 				} else {
 					LED_C_ON(); // Got SOF
-					Demod.state = DEMOD_AWAITING_START_BIT;
 					Demod.posCount = 0;
+					Demod.bitCount = 0;
 					Demod.len = 0;
+					Demod.state = DEMOD_AWAITING_START_BIT;
 /* this had been used to add RSSI (Received Signal Strength Indication) to traces. Currently not implemented.
 					Demod.metricN = 0;
 					Demod.metric = 0;
@@ -605,13 +606,16 @@ static RAMFUNC int Handle14443bSamplesDemod(int ci, int cq)
 		case DEMOD_AWAITING_START_BIT:
 			Demod.posCount++;
 			MAKE_SOFT_DECISION();
-			if(v > 0) {
-				if(Demod.posCount > 3*2) { 		// max 19us between characters = 16 1/fs, max 3 etu after low phase of SOF = 24 1/fs
-					Demod.state = DEMOD_UNSYNCD;
+			if (v > 0) {
+				if (Demod.posCount > 3*2) { 		// max 19us between characters = 16 1/fs, max 3 etu after low phase of SOF = 24 1/fs
 					LED_C_OFF();
+					if (Demod.bitCount == 0 && Demod.len == 0) { // received SOF only, this is valid for iClass/Picopass
+						return true;
+					} else {
+						Demod.state = DEMOD_UNSYNCD;
+					}
 				}
 			} else {							// start bit detected
-				Demod.bitCount = 0;
 				Demod.posCount = 1;				// this was the first half
 				Demod.thisBit = v;
 				Demod.shiftReg = 0;
@@ -621,7 +625,7 @@ static RAMFUNC int Handle14443bSamplesDemod(int ci, int cq)
 
 		case DEMOD_RECEIVING_DATA:
 			MAKE_SOFT_DECISION();
-			if(Demod.posCount == 0) { 			// first half of bit
+			if (Demod.posCount == 0) { 			// first half of bit
 				Demod.thisBit = v;
 				Demod.posCount = 1;
 			} else {							// second half of bit
@@ -637,22 +641,23 @@ static RAMFUNC int Handle14443bSamplesDemod(int ci, int cq)
 */
 
 				Demod.shiftReg >>= 1;
-				if(Demod.thisBit > 0) {	// logic '1'
+				if (Demod.thisBit > 0) {	// logic '1'
 					Demod.shiftReg |= 0x200;
 				}
 
 				Demod.bitCount++;
-				if(Demod.bitCount == 10) {
+				if (Demod.bitCount == 10) {
 					uint16_t s = Demod.shiftReg;
-					if((s & 0x200) && !(s & 0x001)) { // stop bit == '1', start bit == '0'
+					if ((s & 0x200) && !(s & 0x001)) { // stop bit == '1', start bit == '0'
 						uint8_t b = (s >> 1);
 						Demod.output[Demod.len] = b;
 						Demod.len++;
+						Demod.bitCount = 0;
 						Demod.state = DEMOD_AWAITING_START_BIT;
 					} else {
 						Demod.state = DEMOD_UNSYNCD;
 						LED_C_OFF();
-						if(s == 0x000) {
+						if (s == 0x000) {
 							// This is EOF (start, stop and all data bits == '0'
 							return true;
 						}
@@ -693,8 +698,8 @@ static void DemodInit(uint8_t *data)
  *  Demodulate the samples we received from the tag, also log to tracebuffer
  *  quiet: set to 'true' to disable debug output
  */
-static void GetSamplesFor14443bDemod(int timeout, bool quiet)
-{
+static int GetSamplesFor14443bDemod(int timeout, bool quiet) {
+	int ret = 0;
 	int maxBehindBy = 0;
 	bool gotFrame = false;
 	int lastRxCounter, samples = 0;
@@ -750,12 +755,14 @@ static void GetSamplesFor14443bDemod(int timeout, bool quiet)
 		}
 		samples++;
 
-		if(Handle14443bSamplesDemod(ci, cq)) {
+		if (Handle14443bSamplesDemod(ci, cq)) {
+			ret = Demod.len;
 			gotFrame = true;
 			break;
 		}
 
 		if(samples > timeout && Demod.state < DEMOD_PHASE_REF_TRAINING) {
+			ret = -1;
 			LED_C_OFF();
 			break;
 		}
@@ -764,10 +771,14 @@ static void GetSamplesFor14443bDemod(int timeout, bool quiet)
 	FpgaDisableSscDma();
 
 	if (!quiet) Dbprintf("max behindby = %d, samples = %d, gotFrame = %d, Demod.len = %d, Demod.sumI = %d, Demod.sumQ = %d", maxBehindBy, samples, gotFrame, Demod.len, Demod.sumI, Demod.sumQ);
-	//Tracing
-	if (Demod.len > 0) {
-		LogTrace(Demod.output, Demod.len, 0, 0, NULL, false);
+
+	if (ret < 0) {
+		return ret;
 	}
+ 	//Tracing
+	LogTrace(Demod.output, Demod.len, 0, 0, NULL, false);
+
+	return ret;
 }
 
 
@@ -858,8 +869,7 @@ static void CodeAndTransmit14443bAsReader(const uint8_t *cmd, int len)
 /* Sends an APDU to the tag
  * TODO: check CRC and preamble
  */
-int iso14443b_apdu(uint8_t const *message, size_t message_length, uint8_t *response)
-{
+int iso14443b_apdu(uint8_t const *message, size_t message_length, uint8_t *response) {
 	LED_A_ON();
 	uint8_t message_frame[message_length + 4];
 	// PCB
@@ -874,21 +884,19 @@ int iso14443b_apdu(uint8_t const *message, size_t message_length, uint8_t *respo
 	// send
 	CodeAndTransmit14443bAsReader(message_frame, message_length + 4);
 	// get response
-	GetSamplesFor14443bDemod(RECEIVE_SAMPLES_TIMEOUT, true);
+	int ret = GetSamplesFor14443bDemod(RECEIVE_SAMPLES_TIMEOUT, true);
 	FpgaDisableTracing();
-	if(Demod.len < 3)
-	{
+	if (ret < 3) {
 		LED_A_OFF();
 		return 0;
 	}
 	// TODO: Check CRC
 	// copy response contents
-	if(response != NULL)
-	{
+	if (response != NULL) {
 		memcpy(response, Demod.output, Demod.len);
 	}
 	LED_A_OFF();
-	return Demod.len;
+	return ret;
 }
 
 /* Perform the ISO 14443 B Card Selection procedure
@@ -907,10 +915,9 @@ int iso14443b_select_card()
 
 	// first, wake up the tag
 	CodeAndTransmit14443bAsReader(wupb, sizeof(wupb));
-	GetSamplesFor14443bDemod(RECEIVE_SAMPLES_TIMEOUT, true);
+	int ret = GetSamplesFor14443bDemod(RECEIVE_SAMPLES_TIMEOUT, true);
 	// ATQB too short?
-	if (Demod.len < 14)
-	{
+	if (ret < 14) {
 		return 2;
 	}
 
@@ -922,10 +929,9 @@ int iso14443b_select_card()
     attrib[7] = Demod.output[10] & 0x0F;
     ComputeCrc14443(CRC_14443_B, attrib, 9, attrib + 9, attrib + 10);
     CodeAndTransmit14443bAsReader(attrib, sizeof(attrib));
-    GetSamplesFor14443bDemod(RECEIVE_SAMPLES_TIMEOUT, true);
+    ret = GetSamplesFor14443bDemod(RECEIVE_SAMPLES_TIMEOUT, true);
     // Answer to ATTRIB too short?
-    if(Demod.len < 3)
-	{
+    if (ret < 3) {
 		return 2;
 	}
 	// reset PCB block number
@@ -985,9 +991,9 @@ void ReadSTMemoryIso14443b(uint32_t dwLast)
 	// First command: wake up the tag using the INITIATE command
 	uint8_t cmd1[] = {0x06, 0x00, 0x97, 0x5b};
 	CodeAndTransmit14443bAsReader(cmd1, sizeof(cmd1));
-	GetSamplesFor14443bDemod(RECEIVE_SAMPLES_TIMEOUT, true);
+	int ret = GetSamplesFor14443bDemod(RECEIVE_SAMPLES_TIMEOUT, true);
 
-	if (Demod.len == 0) {
+	if (ret < 0) {
 		FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
 		DbpString("No response from tag");
 		LEDsoff();
@@ -1003,7 +1009,7 @@ void ReadSTMemoryIso14443b(uint32_t dwLast)
 	cmd1[1] = Demod.output[0];
 	ComputeCrc14443(CRC_14443_B, cmd1, 2, &cmd1[2], &cmd1[3]);
 	CodeAndTransmit14443bAsReader(cmd1, sizeof(cmd1));
-	GetSamplesFor14443bDemod(RECEIVE_SAMPLES_TIMEOUT, true);
+	ret = GetSamplesFor14443bDemod(RECEIVE_SAMPLES_TIMEOUT, true);
 	if (Demod.len != 3) {
 		FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
 		Dbprintf("Expected 3 bytes from tag, got %d", Demod.len);
@@ -1031,8 +1037,8 @@ void ReadSTMemoryIso14443b(uint32_t dwLast)
 	cmd1[0] = 0x0B;
 	ComputeCrc14443(CRC_14443_B, cmd1, 1 , &cmd1[1], &cmd1[2]);
 	CodeAndTransmit14443bAsReader(cmd1, 3); // Only first three bytes for this one
-	GetSamplesFor14443bDemod(RECEIVE_SAMPLES_TIMEOUT, true);
-	if (Demod.len != 10) {
+	ret = GetSamplesFor14443bDemod(RECEIVE_SAMPLES_TIMEOUT, true);
+	if (ret != 10) {
 		FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
 		Dbprintf("Expected 10 bytes from tag, got %d", Demod.len);
 		LEDsoff();
@@ -1062,8 +1068,8 @@ void ReadSTMemoryIso14443b(uint32_t dwLast)
 		cmd1[1] = i;
 		ComputeCrc14443(CRC_14443_B, cmd1, 2, &cmd1[2], &cmd1[3]);
 		CodeAndTransmit14443bAsReader(cmd1, sizeof(cmd1));
-		GetSamplesFor14443bDemod(RECEIVE_SAMPLES_TIMEOUT, true);
-		if (Demod.len != 6) { // Check if we got an answer from the tag
+		ret = GetSamplesFor14443bDemod(RECEIVE_SAMPLES_TIMEOUT, true);
+		if (ret != 6) { // Check if we got an answer from the tag
 			FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
 			DbpString("Expected 6 bytes from tag, got less...");
 			LEDsoff();
@@ -1071,7 +1077,7 @@ void ReadSTMemoryIso14443b(uint32_t dwLast)
 		}
 		// The check the CRC of the answer (use cmd1 as temporary variable):
 		ComputeCrc14443(CRC_14443_B, Demod.output, 4, &cmd1[2], &cmd1[3]);
-		if(cmd1[2] != Demod.output[4] || cmd1[3] != Demod.output[5]) {
+		if (cmd1[2] != Demod.output[4] || cmd1[3] != Demod.output[5]) {
 			Dbprintf("CRC Error reading block! Expected: %04x got: %04x",
 					(cmd1[2]<<8)+cmd1[3], (Demod.output[4]<<8)+Demod.output[5]);
 			// Do not return;, let's go on... (we should retry, maybe ?)
@@ -1213,8 +1219,8 @@ void RAMFUNC SnoopIso14443b(void)
 			ReaderIsActive = (Uart.state > STATE_GOT_FALLING_EDGE_OF_SOF);
 		}
 
-		if(!ReaderIsActive && triggered) {						// no need to try decoding tag data if the reader is sending or not yet triggered
-			if(Handle14443bSamplesDemod(ci/2, cq/2)) {
+		if (!ReaderIsActive && triggered) {						// no need to try decoding tag data if the reader is sending or not yet triggered
+			if (Handle14443bSamplesDemod(ci/2, cq/2) >= 0) {
 				//Use samples as a time measurement
 				LogTrace(Demod.output, Demod.len, samples, samples, NULL, false);
 				// And ready to receive another response.
@@ -1265,17 +1271,17 @@ void SendRawCommand14443B(uint32_t datalen, uint32_t recv, uint8_t powerfield, u
 		
 		CodeAndTransmit14443bAsReader(data, datalen);
 
-		if(recv) {
-			GetSamplesFor14443bDemod(RECEIVE_SAMPLES_TIMEOUT, true);
+		if (recv) {
+			int ret = GetSamplesFor14443bDemod(5*RECEIVE_SAMPLES_TIMEOUT, true);
 			FpgaDisableTracing();
 			uint16_t iLen = MIN(Demod.len, USB_CMD_DATA_SIZE);
-			cmd_send(CMD_ACK, iLen, 0, 0, Demod.output, iLen);
+			cmd_send(CMD_ACK, ret, 0, 0, Demod.output, iLen);
 		}
 
 		FpgaDisableTracing();
 	}
 
-	if(!powerfield) {
+	if (!powerfield) {
 		FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
 		LED_D_OFF();
 	}

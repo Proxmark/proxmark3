@@ -15,6 +15,7 @@
 #include <stdbool.h>
 #include <string.h>
 #include <stdint.h>
+#include <ctype.h>
 #include "iso14443crc.h"
 #include "comms.h"
 #include "graph.h"
@@ -25,101 +26,110 @@
 #include "taginfo.h"
 
 
-static int CmdHelp(const char *Cmd);
-
-int CmdHF14BList(const char *Cmd)
-{
+int CmdHF14BList(const char *Cmd) {
 	PrintAndLog("Deprecated command, use 'hf list 14b' instead");
-
 	return 0;
 }
 
-int CmdHF14BSim(const char *Cmd)
-{
+
+int CmdHF14BSim(const char *Cmd) {
   UsbCommand c={CMD_SIMULATE_TAG_ISO_14443B};
   clearCommandBuffer();
   SendCommand(&c);
   return 0;
 }
 
-int CmdHF14BSnoop(const char *Cmd)
-{
+
+int CmdHF14BSnoop(const char *Cmd) {
   UsbCommand c = {CMD_SNOOP_ISO_14443B};
   clearCommandBuffer();
   SendCommand(&c);
   return 0;
 }
 
+
 /* New command to read the contents of a SRI512 tag
  * SRI512 tags are ISO14443-B modulated memory tags,
  * this command just dumps the contents of the memory
  */
-int CmdSri512Read(const char *Cmd)
-{
+int CmdSri512Read(const char *Cmd) {
   UsbCommand c = {CMD_READ_SRI512_TAG, {strtol(Cmd, NULL, 0), 0, 0}};
   clearCommandBuffer();
   SendCommand(&c);
   return 0;
 }
 
+
 /* New command to read the contents of a SRIX4K tag
  * SRIX4K tags are ISO14443-B modulated memory tags,
  * this command just dumps the contents of the memory/
  */
-int CmdSrix4kRead(const char *Cmd)
-{
+int CmdSrix4kRead(const char *Cmd) {
   UsbCommand c = {CMD_READ_SRIX4K_TAG, {strtol(Cmd, NULL, 0), 0, 0}};
   clearCommandBuffer();
   SendCommand(&c);
   return 0;
 }
 
-int rawClose(void){
+
+static bool switch_off_field_14b(void) {
 	UsbCommand resp;
 	UsbCommand c = {CMD_ISO_14443B_COMMAND, {0, 0, 0}};
 	clearCommandBuffer();
 	SendCommand(&c);
-	if (!WaitForResponseTimeout(CMD_ACK,&resp,1000)) {
-		return 0;
+	if (!WaitForResponseTimeout(CMD_ACK, &resp, 1000)) {
+		return false;
 	}
-	return 0;
+	return false;
 }
 
-int HF14BCmdRaw(bool reply, bool *crc, bool power, uint8_t *data, uint8_t *datalen, bool verbose){
+
+int HF14BCmdRaw(bool reply, bool *crc, bool power, uint8_t *data, uint8_t *datalen, bool verbose) {
 	UsbCommand resp;
 	UsbCommand c = {CMD_ISO_14443B_COMMAND, {0, 0, 0}}; // len,recv,power
-	if(*crc)
-	{
+	if (*crc) {
 		uint8_t first, second;
 		ComputeCrc14443(CRC_14443_B, data, *datalen, &first, &second);
 		data[*datalen] = first;
 		data[*datalen + 1] = second;
 		*datalen += 2;
 	}
-	
+
 	c.arg[0] = *datalen;
 	c.arg[1] = reply;
 	c.arg[2] = power;
-	memcpy(c.d.asBytes,data,*datalen);
+	memcpy(c.d.asBytes,data, *datalen);
 	clearCommandBuffer();
 	SendCommand(&c);
-	
-	if (!reply) return 1; 
 
-	if (!WaitForResponseTimeout(CMD_ACK,&resp,1000)) {
+	if (!reply) return 1;
+
+	if (!WaitForResponseTimeout(CMD_ACK, &resp, 1000)) {
 		if (verbose) PrintAndLog("timeout while waiting for reply.");
 		return 0;
 	}
-	*datalen = resp.arg[0];
-	if (verbose) PrintAndLog("received %u octets", *datalen);
-	if(*datalen<2) return 0;
+
+	int ret = resp.arg[0];
+	if (verbose) {
+		if (ret < 0) {
+			PrintAndLog("tag didn't respond");
+		} else if (ret == 0) {
+			PrintAndLog("received SOF only (maybe iCLASS/Picopass)");
+		} else {
+			PrintAndLog("received %u octets", ret);
+		}
+	}
+
+	*datalen = ret;
+	
+	if (ret < 2) return 0;
 
 	memcpy(data, resp.d.asBytes, *datalen);
 	if (verbose) PrintAndLog("%s", sprint_hex(data, *datalen));
 
 	uint8_t first, second;
 	ComputeCrc14443(CRC_14443_B, data, *datalen-2, &first, &second);
-	if(data[*datalen-2] == first && data[*datalen-1] == second) {
+	if (data[*datalen-2] == first && data[*datalen-1] == second) {
 		if (verbose) PrintAndLog("CRC OK");
 		*crc = true;
 	} else {
@@ -129,7 +139,8 @@ int HF14BCmdRaw(bool reply, bool *crc, bool power, uint8_t *data, uint8_t *datal
 	return 1;
 }
 
-int CmdHF14BCmdRaw (const char *Cmd) {
+
+static int CmdHF14BCmdRaw (const char *Cmd) {
 	bool reply = true;
 	bool crc = false;
 	bool power = false;
@@ -140,7 +151,7 @@ int CmdHF14BCmdRaw (const char *Cmd) {
 	uint8_t datalen = 0;
 	unsigned int temp;
 	int i = 0;
-	if (strlen(Cmd)<3) {
+	if (strlen(Cmd) < 2) {
 			PrintAndLog("Usage: hf 14b raw [-r] [-c] [-p] [-s || -ss] <0A 0B 0C ... hex>");
 			PrintAndLog("       -r    do not read response");
 			PrintAndLog("       -c    calculate and append CRC");
@@ -151,28 +162,28 @@ int CmdHF14BCmdRaw (const char *Cmd) {
 	}
 
 	// strip
-	while (*Cmd==' ' || *Cmd=='\t') Cmd++;
-	
-	while (Cmd[i]!='\0') {
-		if (Cmd[i]==' ' || Cmd[i]=='\t') { i++; continue; }
-		if (Cmd[i]=='-') {
+	while (*Cmd == ' ' || *Cmd == '\t') Cmd++;
+
+	while (Cmd[i] != '\0') {
+		if (Cmd[i] == ' ' || Cmd[i] == '\t') { i++; continue; }
+		if (Cmd[i] == '-') {
 			switch (Cmd[i+1]) {
-				case 'r': 
-				case 'R': 
+				case 'r':
+				case 'R':
 					reply = false;
 					break;
 				case 'c':
-				case 'C':                
+				case 'C':
 					crc = true;
 					break;
-				case 'p': 
-				case 'P': 
+				case 'p':
+				case 'P':
 					power = true;
 					break;
 				case 's':
 				case 'S':
 					select = true;
-					if (Cmd[i+2]=='s' || Cmd[i+2]=='S') {
+					if (Cmd[i+2] == 's' || Cmd[i+2] == 'S') {
 						SRx = true;
 						i++;
 					}
@@ -181,34 +192,33 @@ int CmdHF14BCmdRaw (const char *Cmd) {
 					PrintAndLog("Invalid option");
 					return 0;
 			}
-			i+=2;
+			i += 2;
 			continue;
 		}
-		if ((Cmd[i]>='0' && Cmd[i]<='9') ||
-		    (Cmd[i]>='a' && Cmd[i]<='f') ||
-		    (Cmd[i]>='A' && Cmd[i]<='F') ) {
-			buf[strlen(buf)+1]=0;
-			buf[strlen(buf)]=Cmd[i];
+		if ((Cmd[i] >= '0' && Cmd[i] <= '9') ||
+			(Cmd[i] >= 'a' && Cmd[i] <= 'f') ||
+			(Cmd[i] >= 'A' && Cmd[i] <= 'F') ) {
+			buf[strlen(buf)+1] = 0;
+			buf[strlen(buf)] = Cmd[i];
 			i++;
-			
-			if (strlen(buf)>=2) {
-				sscanf(buf,"%x",&temp);
-				data[datalen++]=(uint8_t)(temp & 0xff);
-				*buf=0;
+
+			if (strlen(buf) >= 2) {
+				sscanf(buf, "%x", &temp);
+				data[datalen++] = (uint8_t)(temp & 0xff);
+				*buf = 0;
 			}
 			continue;
 		}
 		PrintAndLog("Invalid char on input");
 		return 0;
 	}
-	if (datalen == 0)
-	{
+	if (datalen == 0) {
 		PrintAndLog("Missing data input");
 		return 0;
 	}
 
-	if (select){ //auto select 14b tag
-		uint8_t	cmd2[16];
+	if (select) { //auto select 14b tag
+		uint8_t cmd2[16];
 		bool crc2 = true;
 		uint8_t cmdLen;
 
@@ -225,11 +235,11 @@ int CmdHF14BCmdRaw (const char *Cmd) {
 			cmd2[2] = 0x08;
 		}
 
-		if (HF14BCmdRaw(true, &crc2, true, cmd2, &cmdLen, false)==0) return rawClose();
+		if (HF14BCmdRaw(true, &crc2, true, cmd2, &cmdLen, false) == 0) return switch_off_field_14b();
 
-		if ( SRx && (cmdLen != 3 || !crc2) ) return rawClose();
-		else if (cmd2[0] != 0x50 || cmdLen != 14 || !crc2) return rawClose();
-		
+		if (SRx && (cmdLen != 3 || !crc2) ) return switch_off_field_14b();
+		else if (cmd2[0] != 0x50 || cmdLen != 14 || !crc2) return switch_off_field_14b();
+
 		uint8_t chipID = 0;
 		if (SRx) {
 			// select
@@ -239,7 +249,7 @@ int CmdHF14BCmdRaw (const char *Cmd) {
 			cmdLen = 2;
 		} else {
 			// attrib
-			cmd2[0] = 0x1D; 
+			cmd2[0] = 0x1D;
 			// UID from cmd2[1 - 4]
 			cmd2[5] = 0x00;
 			cmd2[6] = 0x08;
@@ -248,39 +258,40 @@ int CmdHF14BCmdRaw (const char *Cmd) {
 			cmdLen = 9;
 		}
 
-		if (HF14BCmdRaw(true, &crc2, true, cmd2, &cmdLen, false)==0) return rawClose();
+		if (HF14BCmdRaw(true, &crc2, true, cmd2, &cmdLen, false) == 0) return switch_off_field_14b();
 
-		if (cmdLen != 3 || !crc2) return rawClose();
-		if (SRx && cmd2[0] != chipID) return rawClose();
+		if (cmdLen != 3 || !crc2) return switch_off_field_14b();
+		if (SRx && cmd2[0] != chipID) return switch_off_field_14b();
 	}
 	return HF14BCmdRaw(reply, &crc, power, data, &datalen, true);
 }
 
+
 // print full atqb info
-static void print_atqb_resp(uint8_t *data){
+static void print_atqb_resp(uint8_t *data) {
 	//PrintAndLog ("           UID: %s", sprint_hex(data+1,4));
-	PrintAndLog ("      App Data: %s", sprint_hex(data+5,4));
-	PrintAndLog ("      Protocol: %s", sprint_hex(data+9,3));
+	PrintAndLog("      App Data: %s", sprint_hex(data+5,4));
+	PrintAndLog("      Protocol: %s", sprint_hex(data+9,3));
 	uint8_t BitRate = data[9];
-	if (!BitRate) 
+	if (!BitRate)
 		PrintAndLog ("      Bit Rate: 106 kbit/s only PICC <-> PCD");
 	if (BitRate & 0x10)
 		PrintAndLog ("      Bit Rate: 212 kbit/s PICC -> PCD supported");
 	if (BitRate & 0x20)
-		PrintAndLog ("      Bit Rate: 424 kbit/s PICC -> PCD supported"); 
+		PrintAndLog ("      Bit Rate: 424 kbit/s PICC -> PCD supported");
 	if (BitRate & 0x40)
-		PrintAndLog ("      Bit Rate: 847 kbit/s PICC -> PCD supported"); 
+		PrintAndLog ("      Bit Rate: 847 kbit/s PICC -> PCD supported");
 	if (BitRate & 0x01)
 		PrintAndLog ("      Bit Rate: 212 kbit/s PICC <- PCD supported");
 	if (BitRate & 0x02)
-		PrintAndLog ("      Bit Rate: 424 kbit/s PICC <- PCD supported"); 
+		PrintAndLog ("      Bit Rate: 424 kbit/s PICC <- PCD supported");
 	if (BitRate & 0x04)
-		PrintAndLog ("      Bit Rate: 847 kbit/s PICC <- PCD supported"); 
-	if (BitRate & 0x80) 
+		PrintAndLog ("      Bit Rate: 847 kbit/s PICC <- PCD supported");
+	if (BitRate & 0x80)
 		PrintAndLog ("                Same bit rate <-> required");
 
-	uint16_t maxFrame = data[10]>>4;
-	if (maxFrame < 5) 
+	uint16_t maxFrame = data[10] >> 4;
+	if (maxFrame < 5)
 		maxFrame = 8*maxFrame + 16;
 	else if (maxFrame == 5)
 		maxFrame = 64;
@@ -293,7 +304,7 @@ static void print_atqb_resp(uint8_t *data){
 	else
 		maxFrame = 257;
 
-	PrintAndLog ("Max Frame Size: %u%s",maxFrame, (maxFrame == 257) ? "+ RFU" : "");
+	PrintAndLog ("Max Frame Size: %u%s", maxFrame, (maxFrame == 257) ? "+ RFU" : "");
 
 	uint8_t protocolT = data[10] & 0xF;
 	PrintAndLog (" Protocol Type: Protocol is %scompliant with ISO/IEC 14443-4",(protocolT) ? "" : "not " );
@@ -302,32 +313,32 @@ static void print_atqb_resp(uint8_t *data){
 	PrintAndLog (" Frame Options: NAD is %ssupported",(data[11]&2) ? "" : "not ");
 	PrintAndLog (" Frame Options: CID is %ssupported",(data[11]&1) ? "" : "not ");
 	PrintAndLog ("Max Buf Length: %u (MBLI) %s",data[14]>>4, (data[14] & 0xF0) ? "" : "not supported");
-	
+
 	return;
 }
 
 
-int print_ST_Lock_info(uint8_t model){
+int print_ST_Lock_info(uint8_t model) {
 	//assume connection open and tag selected...
 	uint8_t data[16] = {0x00};
 	uint8_t datalen = 2;
 	bool crc = true;
 	uint8_t resplen;
-	uint8_t	blk1;
+	uint8_t blk1;
 	data[0] = 0x08;
 
-	if (model == 0x2) { //SR176 has special command:
-		data[1] = 0xf;
-		resplen = 4;			
+	if (model == 0x02) { //SR176 has special command:
+		data[1] = 0x0f;
+		resplen = 4;
 	} else {
 		data[1] = 0xff;
 		resplen = 6;
 	}
 
 	//std read cmd
-	if (HF14BCmdRaw(true, &crc, true, data, &datalen, false)==0) return rawClose();
+	if (HF14BCmdRaw(true, &crc, true, data, &datalen, false) == 0) return switch_off_field_14b();
 
-	if (datalen != resplen || !crc) return rawClose();
+	if (datalen != resplen || !crc) return switch_off_field_14b();
 
 	PrintAndLog("Chip Write Protection Bits:");
 	// now interpret the data
@@ -339,7 +350,7 @@ int print_ST_Lock_info(uint8_t model){
 			blk1 = 9;
 			PrintAndLog("   raw: %s",printBits(1,data+3));
 			PrintAndLog(" 07/08:%slocked", (data[3] & 1) ? " not " : " " );
-			for (uint8_t i = 1; i<8; i++){
+			for (uint8_t i = 1; i < 8; i++){
 				PrintAndLog("    %02u:%slocked", blk1, (data[3] & (1 << i)) ? " not " : " " );
 				blk1++;
 			}
@@ -349,9 +360,9 @@ int print_ST_Lock_info(uint8_t model){
 		case 0xC: //             (SRT512)
 			//need data[2] and data[3]
 			blk1 = 0;
-			PrintAndLog("   raw: %s",printBits(2,data+2));
-			for (uint8_t b=2; b<4; b++){
-				for (uint8_t i=0; i<8; i++){
+			PrintAndLog("   raw: %s", printBits(2,data+2));
+			for (uint8_t b = 2; b < 4; b++) {
+				for (uint8_t i = 0; i < 8; i++) {
 					PrintAndLog("    %02u:%slocked", blk1, (data[b] & (1 << i)) ? " not " : " " );
 					blk1++;
 				}
@@ -360,29 +371,31 @@ int print_ST_Lock_info(uint8_t model){
 		case 0x2: //             (SR176)
 			//need data[2]
 			blk1 = 0;
-			PrintAndLog("   raw: %s",printBits(1,data+2));
-			for (uint8_t i = 0; i<8; i++){
+			PrintAndLog("   raw: %s",printBits(1, data+2));
+			for (uint8_t i = 0; i < 8; i++){
 				PrintAndLog(" %02u/%02u:%slocked", blk1, blk1+1, (data[2] & (1 << i)) ? " " : " not " );
-				blk1+=2;
+				blk1 += 2;
 			}
 			break;
 		default:
-			return rawClose();
+			return switch_off_field_14b();
 	}
 	return 1;
 }
 
+
 // print UID info from SRx chips (ST Microelectronics)
-static void print_st_general_info(uint8_t *data){
+static void print_st_general_info(uint8_t *data) {
 	//uid = first 8 bytes in data
-	PrintAndLog("   UID: %s", sprint_hex(SwapEndian64(data,8,8),8));
+	PrintAndLog("   UID: %s", sprint_hex(SwapEndian64(data, 8, 8), 8));
 	PrintAndLog("   MFG: %02X, %s", data[6], getManufacturerName(data[6]));
 	PrintAndLog("  Chip: %02X, %s", data[5], getChipInfo(data[6], data[5]));
 	return;
 }
 
+
 // 14b get and print UID only (general info)
-int HF14BStdReader(uint8_t *data, uint8_t *datalen){
+int HF14BStdReader(uint8_t *data, uint8_t *datalen) {
 	//05 00 00 = find one tag in field
 	//1d xx xx xx xx 00 08 01 00 = attrib xx=UID (resp 10 [f9 e0])
 	//a3 = ?  (resp 03 [e2 c2])
@@ -407,18 +420,18 @@ int HF14BStdReader(uint8_t *data, uint8_t *datalen){
 	data[1] = 0x00;
 	data[2] = 0x08;
 
-	if (HF14BCmdRaw(true, &crc, true, data, datalen, false)==0) return rawClose();
+	if (HF14BCmdRaw(true, &crc, true, data, datalen, false) == 0) return switch_off_field_14b();
 
-	if (data[0] != 0x50 || *datalen != 14 || !crc) return rawClose();
+	if (data[0] != 0x50 || *datalen != 14 || !crc) return switch_off_field_14b();
 
 	PrintAndLog ("\n14443-3b tag found:");
-	PrintAndLog ("           UID: %s", sprint_hex(data+1,4));
+	PrintAndLog ("           UID: %s", sprint_hex(data+1, 4));
 
-	uint8_t	cmd2[16];
+	uint8_t cmd2[16];
 	uint8_t cmdLen = 3;
 	bool crc2 = true;
 
-	cmd2[0] = 0x1D; 
+	cmd2[0] = 0x1D;
 	// UID from data[1 - 4]
 	cmd2[1] = data[1];
 	cmd2[2] = data[2];
@@ -431,28 +444,29 @@ int HF14BStdReader(uint8_t *data, uint8_t *datalen){
 	cmdLen = 9;
 
 	// attrib
-	if (HF14BCmdRaw(true, &crc2, true, cmd2, &cmdLen, false)==0) return rawClose();
+	if (HF14BCmdRaw(true, &crc2, true, cmd2, &cmdLen, false) == 0) return switch_off_field_14b();
 
-	if (cmdLen != 3 || !crc2) return rawClose();
+	if (cmdLen != 3 || !crc2) return switch_off_field_14b();
 	// add attrib responce to data
 	data[14] = cmd2[0];
-	rawClose();
+	switch_off_field_14b();
 	return 1;
 }
 
+
 // 14b get and print Full Info (as much as we know)
-int HF14BStdInfo(uint8_t *data, uint8_t *datalen){
-	if (!HF14BStdReader(data,datalen)) return 0;
+static bool HF14B_Std_Info(uint8_t *data, uint8_t *datalen) {
+	if (!HF14BStdReader(data, datalen)) return false;
 
 	//add more info here
 	print_atqb_resp(data);
 
-
-	return 1;
+	return true;
 }
 
+
 // SRx get and print general info about SRx chip from UID
-int HF14B_ST_Reader(uint8_t *data, uint8_t *datalen, bool closeCon){
+static bool HF14B_ST_Reader(uint8_t *data, uint8_t *datalen, bool closeCon){
 	bool crc = true;
 	*datalen = 2;
 	//wake cmd
@@ -461,9 +475,9 @@ int HF14B_ST_Reader(uint8_t *data, uint8_t *datalen, bool closeCon){
 
 	//leave power on
 	// verbose on for now for testing - turn off when functional
-	if (HF14BCmdRaw(true, &crc, true, data, datalen, false)==0) return rawClose();
+	if (HF14BCmdRaw(true, &crc, true, data, datalen, false) == 0) return switch_off_field_14b();
 
-	if (*datalen != 3 || !crc) return rawClose();
+	if (*datalen != 3 || !crc) return switch_off_field_14b();
 
 	uint8_t chipID = data[0];
 	// select
@@ -472,118 +486,143 @@ int HF14B_ST_Reader(uint8_t *data, uint8_t *datalen, bool closeCon){
 	*datalen = 2;
 
 	//leave power on
-	if (HF14BCmdRaw(true, &crc, true, data, datalen, false)==0) return rawClose();
+	if (HF14BCmdRaw(true, &crc, true, data, datalen, false) == 0) return switch_off_field_14b();
 
-	if (*datalen != 3 || !crc || data[0] != chipID) return rawClose();
+	if (*datalen != 3 || !crc || data[0] != chipID) return switch_off_field_14b();
 
 	// get uid
 	data[0] = 0x0B;
 	*datalen = 1;
 
 	//leave power on
-	if (HF14BCmdRaw(true, &crc, true, data, datalen, false)==0) return rawClose();
+	if (HF14BCmdRaw(true, &crc, true, data, datalen, false) == 0) return switch_off_field_14b();
 
-	if (*datalen != 10 || !crc) return rawClose();
+	if (*datalen != 10 || !crc) return switch_off_field_14b();
 
 	//power off ?
-	if (closeCon) rawClose();
+	if (closeCon) switch_off_field_14b();
 
 	PrintAndLog("\n14443-3b ST tag found:");
 	print_st_general_info(data);
 	return 1;
 }
 
-// SRx get and print full info (needs more info...)
-int HF14B_ST_Info(uint8_t *data, uint8_t *datalen){
-	if (!HF14B_ST_Reader(data, datalen, false)) return 0;
-	
-	//add locking bit information here.
-	if (print_ST_Lock_info(data[5]>>2)) 
-		rawClose();
 
-	return 1;
+// SRx get and print full info (needs more info...)
+static bool HF14B_ST_Info(bool verbose) {
+	uint8_t data[100];
+	uint8_t datalen;
+
+	if (!HF14B_ST_Reader(data, &datalen, false)) return false;
+
+	//add locking bit information here.
+	if (print_ST_Lock_info(data[5] >> 2))
+		switch_off_field_14b();
+
+	return true;
 }
 
+
 // test for other 14b type tags (mimic another reader - don't have tags to identify)
-int HF14B_Other_Reader(uint8_t *data, uint8_t *datalen){
+static bool HF14B_Other_Reader(bool verbose) {
+	uint8_t data[4];
+	uint8_t datalen;
+
 	bool crc = true;
-	*datalen = 4;
+	datalen = 4;
 	//std read cmd
 	data[0] = 0x00;
 	data[1] = 0x0b;
 	data[2] = 0x3f;
 	data[3] = 0x80;
 
-	if (HF14BCmdRaw(true, &crc, true, data, datalen, false)!=0) {
-		if (*datalen > 2 || !crc) {
+	if (HF14BCmdRaw(true, &crc, true, data, &datalen, false) != 0) {
+		if (datalen > 2 || !crc) {
 			PrintAndLog ("\n14443-3b tag found:");
 			PrintAndLog ("Unknown tag type answered to a 0x000b3f80 command ans:");
-			PrintAndLog ("%s",sprint_hex(data,*datalen));
-			rawClose();
-			return 1;
+			PrintAndLog ("%s", sprint_hex(data, datalen));
+			switch_off_field_14b();
+			return true;
 		}
 	}
 
 	crc = false;
-	*datalen = 1;
+	datalen = 1;
 	data[0] = 0x0a;
 
-	if (HF14BCmdRaw(true, &crc, true, data, datalen, false)!=0) {
-		if (*datalen > 0) {
+	if (HF14BCmdRaw(true, &crc, true, data, &datalen, false) != 0) {
+		if (datalen > 0) {
 			PrintAndLog ("\n14443-3b tag found:");
 			PrintAndLog ("Unknown tag type answered to a 0x0A command ans:");
-			PrintAndLog ("%s",sprint_hex(data,*datalen));
-			rawClose();
-			return 1;
+			PrintAndLog ("%s", sprint_hex(data, datalen));
+			switch_off_field_14b();
+			return true;
 		}
 	}
-	
+
 	crc = false;
-	*datalen = 1;
+	datalen = 1;
 	data[0] = 0x0c;
 
-	if (HF14BCmdRaw(true, &crc, true, data, datalen, false)!=0) {
-		if (*datalen > 0) {
+	if (HF14BCmdRaw(true, &crc, true, data, &datalen, false) != 0) {
+		if (datalen > 0) {
 			PrintAndLog ("\n14443-3b tag found:");
 			PrintAndLog ("Unknown tag type answered to a 0x0C command ans:");
-			PrintAndLog ("%s",sprint_hex(data,*datalen));
-			rawClose();
-			return 1;
+			PrintAndLog ("%s", sprint_hex(data, datalen));
+			switch_off_field_14b();
+			return true;
 		}
 	}
-	rawClose();
+	switch_off_field_14b();
+	return false;
+}
+
+
+// get and print all info known about any known 14b tag
+static int usage_hf_14b_info(void) {
+	PrintAndLogEx(NORMAL, "Usage: hf 14b info [h] [s]");
+	PrintAndLogEx(NORMAL, "Options:");
+	PrintAndLogEx(NORMAL, "       h    this help");
+	PrintAndLogEx(NORMAL, "       s    silently");
+	PrintAndLogEx(NORMAL, "Example:");
+	PrintAndLogEx(NORMAL, "       hf 14b info");
 	return 0;
 }
 
-// get and print all info known about any known 14b tag
-int HF14BInfo(bool verbose){
+int infoHF14B(bool verbose) {
 	uint8_t data[100];
-	uint8_t datalen = 5;
-	
+	uint8_t datalen;
+
 	// try std 14b (atqb)
-	if (HF14BStdInfo(data, &datalen)) return 1;
+	if (HF14B_Std_Info(data, &datalen)) return 1;
 
 	// try st 14b
-	if (HF14B_ST_Info(data, &datalen)) return 1;
+	if (HF14B_ST_Info(verbose)) return 1;
 
 	// try unknown 14b read commands (to be identified later)
 	//   could be read of calypso, CEPAS, moneo, or pico pass.
-	if (HF14B_Other_Reader(data, &datalen)) return 1;
+	if (HF14B_Other_Reader(verbose)) return 1;
 
 	if (verbose) PrintAndLog("no 14443B tag found");
 	return 0;
 }
 
+
 // menu command to get and print all info known about any known 14b tag
-int CmdHF14Binfo(const char *Cmd){
-	return HF14BInfo(true);
+static int CmdHF14Binfo(const char *Cmd){
+	char cmdp = tolower(param_getchar(Cmd, 0));
+	if (cmdp == 'h') return usage_hf_14b_info();
+
+	bool verbose = !(cmdp == 's');
+	return infoHF14B(verbose);
 }
 
+
 // get and print general info about all known 14b chips
-int HF14BReader(bool verbose){
+int readHF14B(bool verbose){
 	uint8_t data[100];
 	uint8_t datalen = 5;
-	
+
 	// try std 14b (atqb)
 	if (HF14BStdReader(data, &datalen)) return 1;
 
@@ -592,33 +631,50 @@ int HF14BReader(bool verbose){
 
 	// try unknown 14b read commands (to be identified later)
 	//   could be read of calypso, CEPAS, moneo, or pico pass.
-	if (HF14B_Other_Reader(data, &datalen)) return 1;
+	if (HF14B_Other_Reader(verbose)) return 1;
 
 	if (verbose) PrintAndLog("no 14443B tag found");
 	return 0;
 }
 
+
 // menu command to get and print general info about all known 14b chips
-int CmdHF14BReader(const char *Cmd){
-	return HF14BReader(true);
+static int usage_hf_14b_reader(void) {
+	PrintAndLogEx(NORMAL, "Usage: hf 14b reader [h] [s]");
+	PrintAndLogEx(NORMAL, "Options:");
+	PrintAndLogEx(NORMAL, "       h    this help");
+	PrintAndLogEx(NORMAL, "       s    silently");
+	PrintAndLogEx(NORMAL, "Example:");
+	PrintAndLogEx(NORMAL, "       hf 14b reader");
+	return 0;
 }
 
-int CmdSriWrite( const char *Cmd){
+
+static int CmdHF14BReader(const char *Cmd) {
+	char cmdp = tolower(param_getchar(Cmd, 0));
+	if (cmdp == 'h') return usage_hf_14b_reader();
+
+	bool verbose = !(cmdp == 's');
+	return readHF14B(verbose);
+}
+
+
+int CmdSriWrite(const char *Cmd) {
 /*
  * For SRIX4K  blocks 00 - 7F
  * hf 14b raw -c -p 09 $srix4kwblock $srix4kwdata
  *
  * For SR512  blocks 00 - 0F
  * hf 14b raw -c -p 09 $sr512wblock $sr512wdata
- * 
+ *
  * Special block FF =  otp_lock_reg block.
  * Data len 4 bytes-
  */
- 	char cmdp = param_getchar(Cmd, 0);
+	char cmdp = param_getchar(Cmd, 0);
 	uint8_t blockno = -1;
 	uint8_t data[4] = {0x00};
 	bool isSrix4k = true;
-	char str[20];	
+	char str[20];
 
 	if (strlen(Cmd) < 1 || cmdp == 'h' || cmdp == 'H') {
 		PrintAndLog("Usage:  hf 14b write <1|2> <BLOCK> <DATA>");
@@ -634,43 +690,46 @@ int CmdSriWrite( const char *Cmd){
 
 	if ( cmdp == '2' )
 		isSrix4k = false;
-	
+
 	//blockno = param_get8(Cmd, 1);
-	
-	if ( param_gethex(Cmd,1, &blockno, 2) ) {
+
+	if (param_gethex(Cmd,1, &blockno, 2) ) {
 		PrintAndLog("Block number must include 2 HEX symbols");
 		return 0;
 	}
-	
-	if ( isSrix4k ){
-		if ( blockno > 0x7f && blockno != 0xff ){
+
+	if (isSrix4k) {
+		if (blockno > 0x7f && blockno != 0xff){
 			PrintAndLog("Block number out of range");
 			return 0;
-		}		
+		}
 	} else {
-		if ( blockno > 0x0f && blockno != 0xff ){
+		if (blockno > 0x0f && blockno != 0xff){
 			PrintAndLog("Block number out of range");
 			return 0;
-		}		
+		}
 	}
-	
+
 	if (param_gethex(Cmd, 2, data, 8)) {
 		PrintAndLog("Data must include 8 HEX symbols");
 		return 0;
 	}
- 
-	if ( blockno == 0xff)
-		PrintAndLog("[%s] Write special block %02X [ %s ]", (isSrix4k)?"SRIX4K":"SRI512" , blockno,  sprint_hex(data,4) );
+
+	if (blockno == 0xff)
+		PrintAndLog("[%s] Write special block %02X [ %s ]", (isSrix4k)?"SRIX4K":"SRI512", blockno, sprint_hex(data, 4));
 	else
-		PrintAndLog("[%s] Write block %02X [ %s ]", (isSrix4k)?"SRIX4K":"SRI512", blockno,  sprint_hex(data,4) );
- 
+		PrintAndLog("[%s] Write block %02X [ %s ]", (isSrix4k)?"SRIX4K":"SRI512", blockno, sprint_hex(data, 4));
+
 	sprintf(str, "-c 09 %02x %02x%02x%02x%02x", blockno, data[0], data[1], data[2], data[3]);
 
 	CmdHF14BCmdRaw(str);
 	return 0;
 }
 
-static command_t CommandTable[] = 
+
+static int CmdHelp(const char *Cmd);
+
+static command_t CommandTable[] =
 {
   {"help",        CmdHelp,        1, "This help"},
   {"info",        CmdHF14Binfo,   0, "Find and print details about a 14443B tag"},
