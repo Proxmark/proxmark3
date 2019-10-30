@@ -13,6 +13,6 @@
 #define CMDHFICLASS_H__
 
 int CmdHFiClass(const char *Cmd);
-int HFiClassReader(const char *Cmd, bool loop, bool verbose);
+int HFiClassReader(bool loop, bool verbose);
 
 #endif
