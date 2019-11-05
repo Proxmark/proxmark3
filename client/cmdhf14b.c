@@ -237,8 +237,11 @@ static int CmdHF14BCmdRaw (const char *Cmd) {
 
 		if (HF14BCmdRaw(true, &crc2, true, cmd2, &cmdLen, false) == 0) return switch_off_field_14b();
 
-		if (SRx && (cmdLen != 3 || !crc2) ) return switch_off_field_14b();
-		else if (cmd2[0] != 0x50 || cmdLen != 14 || !crc2) return switch_off_field_14b();
+		if (SRx) {
+			if (cmdLen != 3 || !crc2) return switch_off_field_14b();
+		} else {
+			if (cmd2[0] != 0x50 || cmdLen != 14 || !crc2) return switch_off_field_14b();
+		}
 
 		uint8_t chipID = 0;
 		if (SRx) {
@@ -263,7 +266,9 @@ static int CmdHF14BCmdRaw (const char *Cmd) {
 		if (cmdLen != 3 || !crc2) return switch_off_field_14b();
 		if (SRx && cmd2[0] != chipID) return switch_off_field_14b();
 	}
+
 	return HF14BCmdRaw(reply, &crc, power, data, &datalen, true);
+
 }
 
 
@@ -720,7 +725,7 @@ int CmdSriWrite(const char *Cmd) {
 	else
 		PrintAndLog("[%s] Write block %02X [ %s ]", (isSrix4k)?"SRIX4K":"SRI512", blockno, sprint_hex(data, 4));
 
-	sprintf(str, "-c 09 %02x %02x%02x%02x%02x", blockno, data[0], data[1], data[2], data[3]);
+	sprintf(str, "-ss -c 09 %02x %02x%02x%02x%02x", blockno, data[0], data[1], data[2], data[3]);
 
 	CmdHF14BCmdRaw(str);
 	return 0;
