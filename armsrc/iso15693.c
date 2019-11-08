@@ -69,8 +69,11 @@
 #define DELAY_READER_TO_ARM               8
 #define DELAY_ARM_TO_READER               0
 //SSP_CLK runs at 13.56MHz / 4 = 3,39MHz when acting as reader. All values should be multiples of 16
-#define DELAY_TAG_TO_ARM                 32
 #define DELAY_ARM_TO_TAG                 16
+#define DELAY_TAG_TO_ARM                 32
+//SSP_CLK runs at 13.56MHz / 4 = 3,39MHz when snooping. All values should be multiples of 16
+#define DELAY_TAG_TO_ARM_SNOOP           32
+#define DELAY_READER_TO_ARM_SNOOP        32
 
 static int DEBUG = 0;
 
@@ -383,14 +386,13 @@ typedef struct DecodeTag {
 } DecodeTag_t;
 
 
-static int inline __attribute__((always_inline)) Handle15693SamplesFromTag(uint16_t amplitude, DecodeTag_t *DecodeTag)
-{
+static int inline __attribute__((always_inline)) Handle15693SamplesFromTag(uint16_t amplitude, DecodeTag_t *DecodeTag) {
 	switch(DecodeTag->state) {
 		case STATE_TAG_SOF_LOW:
 			// waiting for a rising edge
 			if (amplitude > NOISE_THRESHOLD + DecodeTag->previous_amplitude) {
 				if (DecodeTag->posCount > 10) {
-					DecodeTag->threshold_sof = amplitude - DecodeTag->previous_amplitude;
+					DecodeTag->threshold_sof = amplitude - DecodeTag->previous_amplitude; // to be divided by 2
 					DecodeTag->threshold_half = 0;
 					DecodeTag->state = STATE_TAG_SOF_RISING_EDGE;
 				} else {
@@ -403,8 +405,8 @@ static int inline __attribute__((always_inline)) Handle15693SamplesFromTag(uint1
 			break;
 
 		case STATE_TAG_SOF_RISING_EDGE:
-			if (amplitude - DecodeTag->previous_amplitude > DecodeTag->threshold_sof) { // edge still rising
-				if (amplitude - DecodeTag->threshold_sof > DecodeTag->threshold_sof) { // steeper edge, take this as time reference
+			if (amplitude > DecodeTag->threshold_sof + DecodeTag->previous_amplitude) { // edge still rising
+				if (amplitude > DecodeTag->threshold_sof + DecodeTag->threshold_sof) { // steeper edge, take this as time reference
 					DecodeTag->posCount = 1;
 				} else {
 					DecodeTag->posCount = 2;
@@ -447,7 +449,7 @@ static int inline __attribute__((always_inline)) Handle15693SamplesFromTag(uint1
 				DecodeTag->sum2 = 0;
 				DecodeTag->posCount = 2;
 				DecodeTag->state = STATE_TAG_RECEIVING_DATA;
-				FpgaDisableTracing(); // DEBUGGING
+				// FpgaDisableTracing(); // DEBUGGING
 				// Dbprintf("amplitude = %d, threshold_sof = %d, threshold_half/4 = %d, previous_amplitude = %d",
 					// amplitude,
 					// DecodeTag->threshold_sof,
@@ -466,6 +468,12 @@ static int inline __attribute__((always_inline)) Handle15693SamplesFromTag(uint1
 			break;
 
 		case STATE_TAG_RECEIVING_DATA:
+				// FpgaDisableTracing(); // DEBUGGING
+				// Dbprintf("amplitude = %d, threshold_sof = %d, threshold_half/4 = %d, previous_amplitude = %d",
+					// amplitude,
+					// DecodeTag->threshold_sof,
+					// DecodeTag->threshold_half/4,
+					// DecodeTag->previous_amplitude); // DEBUGGING
 			if (DecodeTag->posCount == 1) {
 				DecodeTag->sum1 = 0;
 				DecodeTag->sum2 = 0;
@@ -658,7 +666,7 @@ int GetIso15693AnswerFromTag(uint8_t* response, uint16_t max_len, uint16_t timeo
 
 		if(upTo >= dmaBuf + ISO15693_DMA_BUFFER_SIZE) {                // we have read all of the DMA buffer content.
 			upTo = dmaBuf;                                             // start reading the circular buffer from the beginning
-			if(behindBy > (9*ISO15693_DMA_BUFFER_SIZE/10)) {
+			if (behindBy > (9*ISO15693_DMA_BUFFER_SIZE/10)) {
 				Dbprintf("About to blow circular buffer - aborted! behindBy=%d", behindBy);
 				ret = -1;
 				break;
@@ -1126,19 +1134,17 @@ void AcquireRawAdcSamplesIso15693(void)
 }
 
 
-void SnoopIso15693(void)
-{
+void SnoopIso15693(void) {
+
 	LED_A_ON();
 	
 	FpgaDownloadAndGo(FPGA_BITSTREAM_HF);
-	BigBuf_free();
 
 	clear_trace();
 	set_tracing(true);
 
 	// The DMA buffer, used to stream samples from the FPGA
-	uint16_t* dmaBuf = (uint16_t*)BigBuf_malloc(ISO15693_DMA_BUFFER_SIZE*sizeof(uint16_t));
-	uint16_t *upTo;
+	uint16_t dmaBuf[ISO15693_DMA_BUFFER_SIZE];
 
 	// Count of samples received so far, so that we can include timing
 	// information in the trace buffer.
@@ -1163,28 +1169,35 @@ void SnoopIso15693(void)
 	Dbprintf("Snoop started. Press PM3 Button to stop.");
 
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_HF_READER | FPGA_HF_READER_MODE_SNOOP_AMPLITUDE);
+	LED_D_OFF();
 	SetAdcMuxFor(GPIO_MUXSEL_HIPKD);
-
-	// Setup for the DMA.
 	FpgaSetupSsc(FPGA_MAJOR_MODE_HF_READER);
-	upTo = dmaBuf;
+	StartCountSspClk();
 	FpgaSetupSscDma((uint8_t*) dmaBuf, ISO15693_DMA_BUFFER_SIZE);
-
+	
 	bool TagIsActive = false;
 	bool ReaderIsActive = false;
 	bool ExpectTagAnswer = false;
-
+	uint32_t dma_start_time = 0;
+	uint16_t *upTo = dmaBuf;
+	
 	// And now we loop, receiving samples.
 	for(;;) {
 		uint16_t behindBy = ((uint16_t*)AT91C_BASE_PDC_SSC->PDC_RPR - upTo) & (ISO15693_DMA_BUFFER_SIZE-1);
 
 		if (behindBy == 0) continue;
 
+		samples++;
+		if (samples == 1) {
+			// DMA has transferred the very first data
+			dma_start_time = GetCountSspClk() & 0xfffffff0;
+		}
+		
 		uint16_t snoopdata = *upTo++;
 
-		if(upTo >= dmaBuf + ISO15693_DMA_BUFFER_SIZE) {                    // we have read all of the DMA buffer content.
+		if (upTo >= dmaBuf + ISO15693_DMA_BUFFER_SIZE) {                   // we have read all of the DMA buffer content.
 			upTo = dmaBuf;                                                 // start reading the circular buffer from the beginning
-			if(behindBy > (9*ISO15693_DMA_BUFFER_SIZE/10)) {
+			if (behindBy > (9*ISO15693_DMA_BUFFER_SIZE/10)) {
 				Dbprintf("About to blow circular buffer - aborted! behindBy=%d, samples=%d", behindBy, samples);
 				break;
 			}
@@ -1192,61 +1205,90 @@ void SnoopIso15693(void)
 				AT91C_BASE_PDC_SSC->PDC_RNPR = (uint32_t) dmaBuf;          // refresh the DMA Next Buffer and
 				AT91C_BASE_PDC_SSC->PDC_RNCR = ISO15693_DMA_BUFFER_SIZE;   // DMA Next Counter registers
 				WDT_HIT();
-				if(BUTTON_PRESS()) {
+				if (BUTTON_PRESS()) {
 					DbpString("Snoop stopped.");
 					break;
 				}
 			}
 		}
-		samples++;
 
 		if (!TagIsActive) {                                            // no need to try decoding reader data if the tag is sending
 			if (Handle15693SampleFromReader(snoopdata & 0x02, &DecodeReader)) {
-				FpgaDisableSscDma();
-				ExpectTagAnswer = true;
-				LogTrace_ISO15693(DecodeReader.output, DecodeReader.byteCount, samples*64, samples*64, NULL, true);
+				// FpgaDisableSscDma();
+				uint32_t eof_time = dma_start_time + samples*16 + 8 - DELAY_READER_TO_ARM_SNOOP; // end of EOF
+				if (DecodeReader.byteCount > 0) {
+					uint32_t sof_time = eof_time
+									- DecodeReader.byteCount * (DecodeReader.Coding==CODING_1_OUT_OF_4?128*16:2048*16) // time for byte transfers
+									- 32*16  // time for SOF transfer
+									- 16*16; // time for EOF transfer
+					LogTrace_ISO15693(DecodeReader.output, DecodeReader.byteCount, sof_time*4, eof_time*4, NULL, true);
+				}
 				/* And ready to receive another command. */
 				DecodeReaderReset(&DecodeReader);
 				/* And also reset the demod code, which might have been */
 				/* false-triggered by the commands from the reader. */
 				DecodeTagReset(&DecodeTag);
-				upTo = dmaBuf;
-				FpgaSetupSscDma((uint8_t*) dmaBuf, ISO15693_DMA_BUFFER_SIZE);
-			}
-			if (Handle15693SampleFromReader(snoopdata & 0x01, &DecodeReader)) {
-				FpgaDisableSscDma();
+				ReaderIsActive = false;
 				ExpectTagAnswer = true;
-				LogTrace_ISO15693(DecodeReader.output, DecodeReader.byteCount, samples*64, samples*64, NULL, true);
+				// upTo = dmaBuf;
+				// samples = 0;
+				// FpgaSetupSscDma((uint8_t*) dmaBuf, ISO15693_DMA_BUFFER_SIZE);
+				// continue;
+			} else if (Handle15693SampleFromReader(snoopdata & 0x01, &DecodeReader)) {
+				// FpgaDisableSscDma();
+				uint32_t eof_time = dma_start_time + samples*16 + 16 - DELAY_READER_TO_ARM_SNOOP; // end of EOF
+				if (DecodeReader.byteCount > 0) {
+					uint32_t sof_time = eof_time
+									- DecodeReader.byteCount * (DecodeReader.Coding==CODING_1_OUT_OF_4?128*16:2048*16) // time for byte transfers
+									- 32*16  // time for SOF transfer
+									- 16*16; // time for EOF transfer
+					LogTrace_ISO15693(DecodeReader.output, DecodeReader.byteCount, sof_time*4, eof_time*4, NULL, true);
+				}
 				/* And ready to receive another command. */
 				DecodeReaderReset(&DecodeReader);
 				/* And also reset the demod code, which might have been */
 				/* false-triggered by the commands from the reader. */
 				DecodeTagReset(&DecodeTag);
-				upTo = dmaBuf;
-				FpgaSetupSscDma((uint8_t*) dmaBuf, ISO15693_DMA_BUFFER_SIZE);
+				ReaderIsActive = false;
+				ExpectTagAnswer = true;
+				// upTo = dmaBuf;
+				// samples = 0;
+				// FpgaSetupSscDma((uint8_t*) dmaBuf, ISO15693_DMA_BUFFER_SIZE);
+				// continue;
+			} else {
+				ReaderIsActive = (DecodeReader.state >= STATE_READER_RECEIVE_DATA_1_OUT_OF_4);
 			}
-			ReaderIsActive = (DecodeReader.state >= STATE_READER_AWAIT_2ND_RISING_EDGE_OF_SOF);
 		}
 
 		if (!ReaderIsActive && ExpectTagAnswer) {                       // no need to try decoding tag data if the reader is currently sending or no answer expected yet
 			if (Handle15693SamplesFromTag(snoopdata >> 2, &DecodeTag)) {
-				FpgaDisableSscDma();
-				//Use samples as a time measurement
-				LogTrace_ISO15693(DecodeTag.output, DecodeTag.len, samples*64, samples*64, NULL, false);
+				// FpgaDisableSscDma();
+				uint32_t eof_time = dma_start_time + samples*16 - DELAY_TAG_TO_ARM_SNOOP; // end of EOF
+				if (DecodeTag.lastBit == SOF_PART2) {
+					eof_time -= 8*16; // needed 8 additional samples to confirm single SOF (iCLASS)
+				}
+				uint32_t sof_time = eof_time
+									- DecodeTag.len * 8 * 8 * 16 // time for byte transfers
+									- 32 * 16  // time for SOF transfer
+									- (DecodeTag.lastBit != SOF_PART2?32*16:0); // time for EOF transfer
+				LogTrace_ISO15693(DecodeTag.output, DecodeTag.len, sof_time*4, eof_time*4, NULL, false);
 				// And ready to receive another response.
 				DecodeTagReset(&DecodeTag);
 				DecodeReaderReset(&DecodeReader);
 				ExpectTagAnswer = false;
-				upTo = dmaBuf;
-				FpgaSetupSscDma((uint8_t*) dmaBuf, ISO15693_DMA_BUFFER_SIZE);
+				TagIsActive = false;
+				// upTo = dmaBuf;
+				// samples = 0;
+				// FpgaSetupSscDma((uint8_t*) dmaBuf, ISO15693_DMA_BUFFER_SIZE);
+				// continue;
+			} else {
+				TagIsActive = (DecodeTag.state >= STATE_TAG_RECEIVING_DATA);
 			}
-			TagIsActive = (DecodeTag.state >= STATE_TAG_RECEIVING_DATA);
 		}
 
 	}
 
 	FpgaDisableSscDma();
-	BigBuf_free();
 
 	LEDsoff();
 
