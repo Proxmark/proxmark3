@@ -139,7 +139,7 @@ begin
     // These are the correlators: we correlate against in-phase and quadrature
     // versions of our reference signal, and keep the (signed) results or the
     // resulting amplitude to send out later over the SSP.
-    if(corr_i_cnt == 6'd0)
+    if (corr_i_cnt == 6'd0)
     begin
         if (minor_mode == `FPGA_HF_READER_MODE_SNIFF_AMPLITUDE)
         begin
@@ -213,7 +213,7 @@ begin
     end
 
 	// for each Q/I pair report two reader signal samples when sniffing. Store the 2nd.
-    if(corr_i_cnt == 6'd32)
+    if (corr_i_cnt == 6'd32)
         after_hysteresis_prev <= after_hysteresis;
 
     // Then the result from last time is serialized and send out to the ARM.
@@ -221,10 +221,10 @@ begin
     // ssp_clk should be the adc_clk divided by 64/16 = 4. 
 	// ssp_clk frequency = 13,56MHz / 4 = 3.39MHz
 
-    if(corr_i_cnt[1:0] == 2'b00)
+    if (corr_i_cnt[1:0] == 2'b00)
     begin
         // Don't shift if we just loaded new data, obviously.
-        if(corr_i_cnt != 6'd0)
+        if (corr_i_cnt != 6'd0)
         begin
             corr_i_out[7:0] <= {corr_i_out[6:0], corr_q_out[7]};
             corr_q_out[7:1] <= corr_q_out[6:0];

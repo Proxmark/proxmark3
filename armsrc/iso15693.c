@@ -78,6 +78,17 @@
 static int DEBUG = 0;
 
 
+///////////////////////////////////////////////////////////////////////
+// ISO 15693 Part 2 - Air Interface
+// This section basically contains transmission and receiving of bits
+///////////////////////////////////////////////////////////////////////
+
+// buffers
+#define ISO15693_DMA_BUFFER_SIZE        128 // must be a power of 2
+#define ISO15693_MAX_RESPONSE_LENGTH     36 // allows read single block with the maximum block size of 256bits. Read multiple blocks not supported yet
+#define ISO15693_MAX_COMMAND_LENGTH      45 // allows write single block with the maximum block size of 256bits. Write multiple blocks not supported yet
+
+
 // specific LogTrace function for ISO15693: the duration needs to be scaled because otherwise it won't fit into a uint16_t
 bool LogTrace_ISO15693(const uint8_t *btBytes, uint16_t iLen, uint32_t timestamp_start, uint32_t timestamp_end, uint8_t *parity, bool readerToTag) {
 	uint32_t duration = timestamp_end - timestamp_start;
@@ -86,16 +97,6 @@ bool LogTrace_ISO15693(const uint8_t *btBytes, uint16_t iLen, uint32_t timestamp
 	return LogTrace(btBytes, iLen, timestamp_start, timestamp_end, parity, readerToTag);
 }
 
-
-///////////////////////////////////////////////////////////////////////
-// ISO 15693 Part 2 - Air Interface
-// This section basically contains transmission and receiving of bits
-///////////////////////////////////////////////////////////////////////
-
-// buffers
-#define ISO15693_DMA_BUFFER_SIZE       2048 // must be a power of 2
-#define ISO15693_MAX_RESPONSE_LENGTH     36 // allows read single block with the maximum block size of 256bits. Read multiple blocks not supported yet
-#define ISO15693_MAX_COMMAND_LENGTH      45 // allows write single block with the maximum block size of 256bits. Write multiple blocks not supported yet
 
 // ---------------------------
 // Signal Processing
@@ -340,6 +341,11 @@ void TransmitTo15693Reader(const uint8_t *cmd, size_t len, uint32_t *start_time,
 }
 
 
+static void jam(void) {
+	// send a short burst to jam the reader signal
+}
+
+
 //=============================================================================
 // An ISO 15693 decoder for tag responses (one subcarrier only).
 // Uses cross correlation to identify each bit and EOF.
@@ -386,8 +392,8 @@ typedef struct DecodeTag {
 } DecodeTag_t;
 
 
-static int inline __attribute__((always_inline)) Handle15693SamplesFromTag(uint16_t amplitude, DecodeTag_t *DecodeTag) {
-	switch(DecodeTag->state) {
+static int inline __attribute__((always_inline)) Handle15693SamplesFromTag(uint16_t amplitude, DecodeTag_t *restrict DecodeTag) {
+	switch (DecodeTag->state) {
 		case STATE_TAG_SOF_LOW:
 			// waiting for a rising edge
 			if (amplitude > NOISE_THRESHOLD + DecodeTag->previous_amplitude) {
@@ -752,11 +758,12 @@ typedef struct DecodeReader {
 	int         posCount;
 	int         sum1, sum2;
 	uint8_t     *output;
+	uint8_t     jam_search_len;
+	uint8_t     *jam_search_string;
 } DecodeReader_t;
 
 
-static void DecodeReaderInit(DecodeReader_t* DecodeReader, uint8_t *data, uint16_t max_len)
-{
+static void DecodeReaderInit(DecodeReader_t* DecodeReader, uint8_t *data, uint16_t max_len, uint8_t jam_search_len, uint8_t *jam_search_string) {
 	DecodeReader->output = data;
 	DecodeReader->byteCountMax = max_len;
 	DecodeReader->state = STATE_READER_UNSYNCD;
@@ -764,17 +771,17 @@ static void DecodeReaderInit(DecodeReader_t* DecodeReader, uint8_t *data, uint16
 	DecodeReader->bitCount = 0;
 	DecodeReader->posCount = 1;
 	DecodeReader->shiftReg = 0;
+	DecodeReader->jam_search_len = jam_search_len;
+	DecodeReader->jam_search_string = jam_search_string;
 }
 
 
-static void DecodeReaderReset(DecodeReader_t* DecodeReader)
-{
+static void DecodeReaderReset(DecodeReader_t* DecodeReader) {
 	DecodeReader->state = STATE_READER_UNSYNCD;
 }
 
 
-static int inline __attribute__((always_inline)) Handle15693SampleFromReader(uint8_t bit, DecodeReader_t *restrict DecodeReader)
-{
+static int inline __attribute__((always_inline)) Handle15693SampleFromReader(bool bit, DecodeReader_t *restrict DecodeReader) {
 	switch (DecodeReader->state) {
 		case STATE_READER_UNSYNCD:
 			// wait for unmodulated carrier
@@ -889,16 +896,15 @@ static int inline __attribute__((always_inline)) Handle15693SampleFromReader(uin
 			break;
 
 		case STATE_READER_RECEIVE_DATA_1_OUT_OF_4:
-			bit = !!bit;
 			DecodeReader->posCount++;
 			if (DecodeReader->posCount == 1) {
-				DecodeReader->sum1 = bit;
+				DecodeReader->sum1 = bit?1:0;
 			} else if (DecodeReader->posCount <= 4) {
-				DecodeReader->sum1 += bit;
+				if (bit) DecodeReader->sum1++;
 			} else if (DecodeReader->posCount == 5) {
-				DecodeReader->sum2 = bit;
+				DecodeReader->sum2 = bit?1:0;
 			} else {
-				DecodeReader->sum2 += bit;
+				if (bit) DecodeReader->sum2++;
 			}
 			if (DecodeReader->posCount == 8) {
 				DecodeReader->posCount = 0;
@@ -908,13 +914,18 @@ static int inline __attribute__((always_inline)) Handle15693SampleFromReader(uin
 					if (DecodeReader->byteCount != 0) {
 						return true;
 					}
-				}
-				if (DecodeReader->sum1 >= 3 && DecodeReader->sum2 <= 1) { // detected a 2bit position
+				} else if (DecodeReader->sum1 >= 3 && DecodeReader->sum2 <= 1) { // detected a 2bit position
 					DecodeReader->shiftReg >>= 2;
 					DecodeReader->shiftReg |= (DecodeReader->bitCount << 6);
 				}
 				if (DecodeReader->bitCount == 15) { // we have a full byte
 					DecodeReader->output[DecodeReader->byteCount++] = DecodeReader->shiftReg;
+					if (DecodeReader->byteCount == DecodeReader->jam_search_len) {
+						if (!memcmp(DecodeReader->output, DecodeReader->jam_search_string, DecodeReader->jam_search_len)) {
+							jam(); // send a jamming signal
+							Dbprintf("JAMMING!");
+						}
+					}
 					if (DecodeReader->byteCount > DecodeReader->byteCountMax) {
 						// buffer overflow, give up
 						LED_B_OFF();
@@ -929,16 +940,15 @@ static int inline __attribute__((always_inline)) Handle15693SampleFromReader(uin
 			break;
 
 		case STATE_READER_RECEIVE_DATA_1_OUT_OF_256:
-			bit = !!bit;
 			DecodeReader->posCount++;
 			if (DecodeReader->posCount == 1) {
-				DecodeReader->sum1 = bit;
+				DecodeReader->sum1 = bit?1:0;
 			} else if (DecodeReader->posCount <= 4) {
-				DecodeReader->sum1 += bit;
+				if (bit) DecodeReader->sum1++;
 			} else if (DecodeReader->posCount == 5) {
-				DecodeReader->sum2 = bit;
-			} else {
-				DecodeReader->sum2 += bit;
+				DecodeReader->sum2 = bit?1:0;
+			} else if (bit) {
+				DecodeReader->sum2++;
 			}
 			if (DecodeReader->posCount == 8) {
 				DecodeReader->posCount = 0;
@@ -948,8 +958,7 @@ static int inline __attribute__((always_inline)) Handle15693SampleFromReader(uin
 					if (DecodeReader->byteCount != 0) {
 						return true;
 					}
-				}
-				if (DecodeReader->sum1 >= 3 && DecodeReader->sum2 <= 1) { // detected the bit position
+				} else if (DecodeReader->sum1 >= 3 && DecodeReader->sum2 <= 1) { // detected the bit position
 					DecodeReader->shiftReg = DecodeReader->bitCount;
 				}
 				if (DecodeReader->bitCount == 255) { // we have a full byte
@@ -993,7 +1002,7 @@ int GetIso15693CommandFromReader(uint8_t *received, size_t max_len, uint32_t *eo
 
 	// the decoder data structure
 	DecodeReader_t DecodeReader = {0};
-	DecodeReaderInit(&DecodeReader, received, max_len);
+	DecodeReaderInit(&DecodeReader, received, max_len, 0, NULL);
 
 	// wait for last transfer to complete
 	while (!(AT91C_BASE_SSC->SSC_SR & AT91C_SSC_TXEMPTY));
@@ -1134,10 +1143,10 @@ void AcquireRawAdcSamplesIso15693(void)
 }
 
 
-void SnoopIso15693(void) {
+void SnoopIso15693(uint8_t jam_search_len, uint8_t *jam_search_string) {
 
 	LED_A_ON();
-	
+
 	FpgaDownloadAndGo(FPGA_BITSTREAM_HF);
 
 	clear_trace();
@@ -1154,9 +1163,9 @@ void SnoopIso15693(void) {
 	uint8_t response[ISO15693_MAX_RESPONSE_LENGTH];
 	DecodeTagInit(&DecodeTag, response, sizeof(response));
 
-	DecodeReader_t DecodeReader = {0};;
+	DecodeReader_t DecodeReader = {0};
 	uint8_t cmd[ISO15693_MAX_COMMAND_LENGTH];
-	DecodeReaderInit(&DecodeReader, cmd, sizeof(cmd));
+	DecodeReaderInit(&DecodeReader, cmd, sizeof(cmd), jam_search_len, jam_search_string);
 
 	// Print some debug information about the buffer sizes
 	if (DEBUG) {
@@ -1174,17 +1183,22 @@ void SnoopIso15693(void) {
 	FpgaSetupSsc(FPGA_MAJOR_MODE_HF_READER);
 	StartCountSspClk();
 	FpgaSetupSscDma((uint8_t*) dmaBuf, ISO15693_DMA_BUFFER_SIZE);
-	
+
 	bool TagIsActive = false;
 	bool ReaderIsActive = false;
 	bool ExpectTagAnswer = false;
 	uint32_t dma_start_time = 0;
 	uint16_t *upTo = dmaBuf;
+
+	uint16_t max_behindBy = 0;
 	
 	// And now we loop, receiving samples.
 	for(;;) {
 		uint16_t behindBy = ((uint16_t*)AT91C_BASE_PDC_SSC->PDC_RPR - upTo) & (ISO15693_DMA_BUFFER_SIZE-1);
-
+		if (behindBy > max_behindBy) {
+			max_behindBy = behindBy;
+		}
+		
 		if (behindBy == 0) continue;
 
 		samples++;
@@ -1192,12 +1206,13 @@ void SnoopIso15693(void) {
 			// DMA has transferred the very first data
 			dma_start_time = GetCountSspClk() & 0xfffffff0;
 		}
-		
+
 		uint16_t snoopdata = *upTo++;
 
 		if (upTo >= dmaBuf + ISO15693_DMA_BUFFER_SIZE) {                   // we have read all of the DMA buffer content.
 			upTo = dmaBuf;                                                 // start reading the circular buffer from the beginning
 			if (behindBy > (9*ISO15693_DMA_BUFFER_SIZE/10)) {
+				FpgaDisableTracing();
 				Dbprintf("About to blow circular buffer - aborted! behindBy=%d, samples=%d", behindBy, samples);
 				break;
 			}
@@ -1212,7 +1227,7 @@ void SnoopIso15693(void) {
 			}
 		}
 
-		if (!TagIsActive) {                                            // no need to try decoding reader data if the tag is sending
+		if (!TagIsActive) {                                                // no need to try decoding reader data if the tag is sending
 			if (Handle15693SampleFromReader(snoopdata & 0x02, &DecodeReader)) {
 				// FpgaDisableSscDma();
 				uint32_t eof_time = dma_start_time + samples*16 + 8 - DELAY_READER_TO_ARM_SNOOP; // end of EOF
@@ -1293,12 +1308,15 @@ void SnoopIso15693(void) {
 	LEDsoff();
 
 	DbpString("Snoop statistics:");
-	Dbprintf("  ExpectTagAnswer: %d", ExpectTagAnswer);
+	Dbprintf("  ExpectTagAnswer: %d, TagIsActive: %d, ReaderIsActive: %d", ExpectTagAnswer, TagIsActive, ReaderIsActive);
 	Dbprintf("  DecodeTag State: %d", DecodeTag.state);
 	Dbprintf("  DecodeTag byteCnt: %d", DecodeTag.len);
+	Dbprintf("  DecodeTag posCount: %d", DecodeTag.posCount);
 	Dbprintf("  DecodeReader State: %d", DecodeReader.state);
 	Dbprintf("  DecodeReader byteCnt: %d", DecodeReader.byteCount);
+	Dbprintf("  DecodeReader posCount: %d", DecodeReader.posCount);
 	Dbprintf("  Trace length: %d", BigBuf_get_traceLen());
+	Dbprintf("  Max behindBy: %d", max_behindBy);
 }
 
 
@@ -1733,44 +1751,26 @@ void SetTag15693Uid(uint8_t *uid) {
 
 	LED_A_ON();
 
-	uint8_t cmd[4][9] = {0x00};
+	uint8_t cmd[4][9] = {
+		{0x02, 0x21, 0x3e, 0x00, 0x00, 0x00, 0x00},
+		{0x02, 0x21, 0x3f, 0x69, 0x96, 0x00, 0x00},
+		{0x02, 0x21, 0x38},
+		{0x02, 0x21, 0x39}
+	};
+
 	uint16_t crc;
 
 	int recvlen = 0;
 	uint8_t recvbuf[ISO15693_MAX_RESPONSE_LENGTH];
 	uint32_t eof_time;
 
-	// Command 1 : 02213E00000000
-	cmd[0][0] = 0x02;
-	cmd[0][1] = 0x21;
-	cmd[0][2] = 0x3e;
-	cmd[0][3] = 0x00;
-	cmd[0][4] = 0x00;
-	cmd[0][5] = 0x00;
-	cmd[0][6] = 0x00;
-
-	// Command 2 : 02213F69960000
-	cmd[1][0] = 0x02;
-	cmd[1][1] = 0x21;
-	cmd[1][2] = 0x3f;
-	cmd[1][3] = 0x69;
-	cmd[1][4] = 0x96;
-	cmd[1][5] = 0x00;
-	cmd[1][6] = 0x00;
-
 	// Command 3 : 022138u8u7u6u5 (where uX = uid byte X)
-	cmd[2][0] = 0x02;
-	cmd[2][1] = 0x21;
-	cmd[2][2] = 0x38;
 	cmd[2][3] = uid[7];
 	cmd[2][4] = uid[6];
 	cmd[2][5] = uid[5];
 	cmd[2][6] = uid[4];
 
 	// Command 4 : 022139u4u3u2u1 (where uX = uid byte X)
-	cmd[3][0] = 0x02;
-	cmd[3][1] = 0x21;
-	cmd[3][2] = 0x39;
 	cmd[3][3] = uid[3];
 	cmd[3][4] = uid[2];
 	cmd[3][5] = uid[1];

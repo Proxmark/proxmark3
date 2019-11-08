@@ -21,12 +21,12 @@ else
         SRC_LCD = 
 endif
 SRC_LF = lfops.c hitag2.c hitagS.c lfsampling.c pcf7931.c lfdemod.c protocols.c
-SRC_ISO15693 = iso15693.c iso15693tools.c
+SRC_ISO15693 = iso15693.c
 SRC_ISO14443a = epa.c iso14443a.c mifareutil.c mifarecmd.c mifaresniff.c mifaresim.c
 SRC_ISO14443b = iso14443b.c
 SRC_CRAPTO1 = crypto1.c 
 SRC_DES = platform_util_arm.c des.c
-SRC_CRC = iso14443crc.c crc.c crc16.c crc32.c parity.c
+SRC_CRC = iso14443crc.c crc.c crc16.c crc32.c parity.c iso15693tools.c
 SRC_SMARTCARD = i2c.c
 
 #the FPGA bitstream files. Note: order matters!
@@ -43,7 +43,6 @@ APP_CFLAGS += -I../zlib
 # Compile these in thumb mode (small size)
 THUMBSRC = start.c \
 	$(SRC_LCD) \
-	$(SRC_ISO15693) \
 	$(SRC_LF) \
 	$(SRC_ZLIB) \
 	$(SRC_SMARTCARD) \
@@ -53,6 +52,9 @@ THUMBSRC = start.c \
 	string.c \
 	usb_cdc.c \
 	cmd.c
+
+# Compile these in thumb mode optimized for speed (still smaller than ARM mode)
+THUMBOPTSRC = $(SRC_ISO15693)
 
 # These are to be compiled in ARM mode
 ARMSRC = fpgaloader.c \
@@ -72,7 +74,7 @@ ARMSRC = fpgaloader.c \
 VERSIONSRC = version.c \
 	fpga_version_info.c
 
-# Do not move this inclusion before the definition of {THUMB,ASM,ARM}SRC
+# Do not move this inclusion before the definition of {THUMB,THUMBOPT,ASM,ARM}SRC
 include ../common/Makefile.common
 
 OBJS = $(OBJDIR)/fullimage.s19
@@ -99,7 +101,7 @@ $(OBJDIR)/fpga_all.bit.z: $(FPGA_BITSTREAMS) $(FPGA_COMPRESSOR)
 $(FPGA_COMPRESSOR):
 		make -C ../client $(notdir $(FPGA_COMPRESSOR))
 
-$(OBJDIR)/fullimage.stage1.elf: $(VERSIONOBJ) $(OBJDIR)/fpga_all.o $(THUMBOBJ) $(ARMOBJ)
+$(OBJDIR)/fullimage.stage1.elf: $(VERSIONOBJ) $(OBJDIR)/fpga_all.o $(THUMBOBJ) $(THUMBOPTOBJ) $(ARMOBJ)
 	$(CC) $(LDFLAGS) -Wl,-T,ldscript,-Map,$(patsubst %.elf,%.map,$@) -o $@ $^ $(LIBS)
 
 $(OBJDIR)/fullimage.nodata.bin: $(OBJDIR)/fullimage.stage1.elf

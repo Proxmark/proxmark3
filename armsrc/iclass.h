@@ -16,9 +16,8 @@
 
 #include <stdint.h>
 #include <stdbool.h>
-#include "common.h" // for RAMFUNC
 
-extern void RAMFUNC SnoopIClass(void);
+extern void SnoopIClass(uint8_t jam_search_len, uint8_t *jam_search_string);
 extern void SimulateIClass(uint32_t arg0, uint32_t arg1, uint32_t arg2, uint8_t *datain);
 extern void ReaderIClass(uint8_t arg0);
 extern void ReaderIClass_Replay(uint8_t arg0, uint8_t *MAC);

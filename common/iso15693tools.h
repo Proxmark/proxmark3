@@ -5,8 +5,6 @@
 #define ISO15693TOOLS_H__
 
 // ISO15693 CRC
-#define ISO15693_CRC_PRESET  (uint16_t)0xFFFF
-#define ISO15693_CRC_POLY    (uint16_t)0x8408
 #define ISO15693_CRC_CHECK   ((uint16_t)(~0xF0B8 & 0xFFFF))  // use this for checking of a correct crc
 
 uint16_t Iso15693Crc(uint8_t *v, int n);
