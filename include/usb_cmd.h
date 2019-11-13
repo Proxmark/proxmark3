@@ -237,11 +237,14 @@ typedef struct{
 
 
 // iCLASS reader flags
-#define FLAG_ICLASS_READER_CC           0x02
-#define FLAG_ICLASS_READER_CSN          0x04
-#define FLAG_ICLASS_READER_CONF         0x08
-#define FLAG_ICLASS_READER_AA           0x10
-#define FLAG_ICLASS_READER_CREDITKEY    0x40
+#define FLAG_ICLASS_READER_INIT          (1<<0)
+#define FLAG_ICLASS_READER_CC            (1<<1)
+#define FLAG_ICLASS_READER_CSN           (1<<2)
+#define FLAG_ICLASS_READER_CONF          (1<<3)
+#define FLAG_ICLASS_READER_AA            (1<<4)
+#define FLAG_ICLASS_READER_CREDITKEY     (1<<5)
+#define FLAG_ICLASS_READER_CLEARTRACE    (1<<6)
+
 
 // iCLASS simulation modes
 #define ICLASS_SIM_MODE_CSN                   0

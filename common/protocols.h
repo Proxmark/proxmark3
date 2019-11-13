@@ -1,6 +1,9 @@
 #ifndef PROTOCOLS_H
 #define PROTOCOLS_H
 
+#include <stdint.h>
+
+
 //The following data is taken from http://www.proxmark.org/forum/viewtopic.php?pid=13501#p13501
 /*
 ISO14443A (usually NFC tags)
@@ -303,10 +306,6 @@ NXP/Philips CUSTOM COMMANDS
 //	6x xx = ERROR
 #define ISO7816_MAX_FRAME_SIZE           261
 
-
-
-void printIclassDumpInfo(uint8_t* iclass_dump);
-void getMemConfig(uint8_t mem_cfg, uint8_t chip_cfg, uint8_t *max_blk, uint8_t *app_areas, uint8_t *kb);
 
 /* T55x7 configuration register definitions */
 #define T55x7_POR_DELAY             0x00000001

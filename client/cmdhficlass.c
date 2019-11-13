@@ -54,6 +54,106 @@ typedef struct iclass_block {
 } iclass_block_t;
 
 
+// iclass / picopass chip config structures and shared routines
+typedef struct {
+	uint8_t app_limit;      //[8]
+	uint8_t otp[2];         //[9-10]
+	uint8_t block_writelock;//[11]
+	uint8_t chip_config;    //[12]
+	uint8_t mem_config;     //[13]
+	uint8_t eas;            //[14]
+	uint8_t fuses;          //[15]
+} picopass_conf_block;
+
+typedef struct {
+	uint8_t csn[8];
+	picopass_conf_block conf;
+	uint8_t epurse[8];
+	uint8_t key_d[8];
+	uint8_t key_c[8];
+	uint8_t app_issuer_area[8];
+} picopass_hdr;
+
+
+static void fuse_config(const picopass_hdr *hdr) {
+	uint8_t fuses = hdr->conf.fuses;
+
+	if (fuses & FUSE_FPERS)
+		PrintAndLog("  Mode: Personalization [Programmable]");
+	else
+		PrintAndLog("  Mode: Application [Locked]");
+
+	if (fuses & FUSE_CODING1)
+		PrintAndLog("Coding: RFU");
+	else {
+		if (fuses & FUSE_CODING0)
+			PrintAndLog("Coding: ISO 14443-2 B/ISO 15693");
+		else
+			PrintAndLog("Coding: ISO 14443B only");
+	}
+	if ((fuses & FUSE_CRYPT1) && (fuses & FUSE_CRYPT0)) PrintAndLog(" Crypt: Secured page, keys not locked");
+	if ((fuses & FUSE_CRYPT1) && !(fuses & FUSE_CRYPT0)) PrintAndLog(" Crypt: Secured page, keys locked");
+	if (!(fuses & FUSE_CRYPT1) && (fuses & FUSE_CRYPT0)) PrintAndLog(" Crypt: Non secured page");
+	if (!(fuses & FUSE_CRYPT1) && !(fuses & FUSE_CRYPT0)) PrintAndLog(" Crypt: No auth possible. Read only if RA is enabled");
+
+	if (fuses & FUSE_RA)
+		PrintAndLog("    RA: Read access enabled");
+	else
+		PrintAndLog("    RA: Read access not enabled");
+}
+
+
+static void getMemConfig(uint8_t mem_cfg, uint8_t chip_cfg, uint8_t *max_blk, uint8_t *app_areas, uint8_t *kb) {
+	// mem-bit 5, mem-bit 7, chip-bit 4: defines chip type
+	if((chip_cfg & 0x10) && !(mem_cfg & 0x80) && !(mem_cfg & 0x20)) {
+		*kb = 2;
+		*app_areas = 2;
+		*max_blk = 31;
+	} else if((chip_cfg & 0x10) && (mem_cfg & 0x80) && !(mem_cfg & 0x20)) {
+		*kb = 16;
+		*app_areas = 2;
+		*max_blk = 255; //16kb
+	} else if(!(chip_cfg & 0x10) && !(mem_cfg & 0x80) && !(mem_cfg & 0x20)) {
+		*kb = 16;
+		*app_areas = 16;
+		*max_blk = 255; //16kb
+	} else if((chip_cfg & 0x10) && (mem_cfg & 0x80) && (mem_cfg & 0x20)) {
+		*kb = 32;
+		*app_areas = 3;
+		*max_blk = 255; //16kb
+	} else if(!(chip_cfg & 0x10) && !(mem_cfg & 0x80) && (mem_cfg & 0x20)) {
+		*kb = 32;
+		*app_areas = 17;
+		*max_blk = 255; //16kb
+	} else {
+		*kb = 32;
+		*app_areas = 2;
+		*max_blk = 255;
+	}
+}
+
+
+static void mem_app_config(const picopass_hdr *hdr) {
+	uint8_t mem = hdr->conf.mem_config;
+	uint8_t chip = hdr->conf.chip_config;
+	uint8_t applimit = hdr->conf.app_limit;
+	if (applimit < 6) applimit = 26;
+	uint8_t kb = 2;
+	uint8_t app_areas = 2;
+	uint8_t max_blk = 31;
+	getMemConfig(mem, chip, &max_blk, &app_areas, &kb);
+	PrintAndLog("   Mem: %u KBits/%u App Areas (%u * 8 bytes) [%02X]", kb, app_areas, max_blk+1, mem);
+	PrintAndLog("   AA1: blocks 06-%02X", applimit);
+	PrintAndLog("   AA2: blocks %02X-%02X", applimit+1, max_blk);
+}
+
+
+static void printIclassDumpInfo(uint8_t* iclass_dump) {
+	fuse_config((picopass_hdr*)iclass_dump);
+	mem_app_config((picopass_hdr*)iclass_dump);
+}
+
+
 static void usage_hf_iclass_chk(void) {
 	PrintAndLog("Checkkeys loads a dictionary text file with 8byte hex keys to test authenticating against a iClass tag");
 	PrintAndLog("Usage: hf iclass chk [h|e|r] <f  (*.dic)>");
@@ -207,33 +307,34 @@ static int CmdHFiClassSim(const char *Cmd) {
 }
 
 
-int HFiClassReader(const char *Cmd, bool loop, bool verbose) {
+int HFiClassReader(bool loop, bool verbose) {
+
 	bool tagFound = false;
-	UsbCommand c = {CMD_READER_ICLASS, {FLAG_ICLASS_READER_CSN |
-			FLAG_ICLASS_READER_CC | FLAG_ICLASS_READER_CONF | FLAG_ICLASS_READER_AA} };
-	// loop in client not device - else on windows have a communication error
+	UsbCommand c = {CMD_READER_ICLASS, {FLAG_ICLASS_READER_INIT | FLAG_ICLASS_READER_CLEARTRACE | FLAG_ICLASS_READER_CSN | FLAG_ICLASS_READER_CONF | FLAG_ICLASS_READER_CC | FLAG_ICLASS_READER_AA} };
 	UsbCommand resp;
-	while(!ukbhit()){
+
+	while (!ukbhit()) {
 		SendCommand(&c);
 		if (WaitForResponseTimeout(CMD_ACK,&resp, 4500)) {
 			uint8_t readStatus = resp.arg[0] & 0xff;
 			uint8_t *data = resp.d.asBytes;
 
-			// no tag found or button pressed
-			if( (readStatus == 0 && !loop) || readStatus == 0xFF) {
+			// no tag found
+			if (readStatus == 0 && !loop) {
 				// abort
 				if (verbose) PrintAndLog("Quitting...");
+				DropField();
 				return 0;
 			}
 
-			if( readStatus & FLAG_ICLASS_READER_CSN) {
+			if (readStatus & FLAG_ICLASS_READER_CSN) {
 				PrintAndLog("   CSN: %s",sprint_hex(data,8));
 				tagFound = true;
 			}
-			if( readStatus & FLAG_ICLASS_READER_CC) {
+			if (readStatus & FLAG_ICLASS_READER_CC) {
 				PrintAndLog("    CC: %s",sprint_hex(data+16,8));
 			}
-			if( readStatus & FLAG_ICLASS_READER_CONF) {
+			if (readStatus & FLAG_ICLASS_READER_CONF) {
 				printIclassDumpInfo(data);
 			}
 			if (readStatus & FLAG_ICLASS_READER_AA) {
@@ -253,12 +354,31 @@ int HFiClassReader(const char *Cmd, bool loop, bool verbose) {
 		}
 		if (!loop) break;
 	}
+
+	DropField();
 	return 0;
 }
 
 
+static void usage_hf_iclass_reader(void) {
+	PrintAndLogEx(NORMAL, "Act as a Iclass reader.  Look for iClass tags until Enter or the pm3 button is pressed\n");
+	PrintAndLogEx(NORMAL, "Usage:  hf iclass reader [h] [1]\n");
+	PrintAndLogEx(NORMAL, "Options:");
+	PrintAndLogEx(NORMAL, "    h   This help text");
+	PrintAndLogEx(NORMAL, "    1   read only 1 tag");
+	PrintAndLogEx(NORMAL, "Examples:");
+	PrintAndLogEx(NORMAL, "        hf iclass reader 1");
+}
+
+
 static int CmdHFiClassReader(const char *Cmd) {
-	return HFiClassReader(Cmd, true, true);
+	char cmdp = tolower(param_getchar(Cmd, 0));
+	if (cmdp == 'h') {
+		usage_hf_iclass_reader();
+		return 0;
+	}
+	bool findone = (cmdp == '1') ? false : true;
+	return HFiClassReader(findone, true);
 }
 
 
@@ -514,17 +634,19 @@ static int CmdHFiClassEncryptBlk(const char *Cmd) {
 static void Calc_wb_mac(uint8_t blockno, uint8_t *data, uint8_t *div_key, uint8_t MAC[4]) {
 	uint8_t WB[9];
 	WB[0] = blockno;
-	memcpy(WB + 1,data,8);
-	doMAC_N(WB,sizeof(WB),div_key,MAC);
+	memcpy(WB+1, data, 8);
+	doMAC_N(WB, sizeof(WB), div_key, MAC);
 	//printf("Cal wb mac block [%02x][%02x%02x%02x%02x%02x%02x%02x%02x] : MAC [%02x%02x%02x%02x]",WB[0],WB[1],WB[2],WB[3],WB[4],WB[5],WB[6],WB[7],WB[8],MAC[0],MAC[1],MAC[2],MAC[3]);
 }
 
 
-static bool select_only(uint8_t *CSN, bool verbose) {
+static bool iClass_select(uint8_t *CSN, bool verbose, bool cleartrace, bool init) {
+
+	UsbCommand c = {CMD_READER_ICLASS, {FLAG_ICLASS_READER_CSN}};
+	if (init) c.arg[0] |= FLAG_ICLASS_READER_INIT;
+	if (cleartrace) c.arg[0] |= FLAG_ICLASS_READER_CLEARTRACE;
+
 	UsbCommand resp;
-
-	UsbCommand c = {CMD_READER_ICLASS, {0}};
-
 	clearCommandBuffer();
 	SendCommand(&c);
 	if (!WaitForResponseTimeout(CMD_ACK, &resp, 4500)) {
@@ -535,9 +657,8 @@ static bool select_only(uint8_t *CSN, bool verbose) {
 	uint8_t isOK = resp.arg[0] & 0xff;
 	uint8_t *data = resp.d.asBytes;
 
-	memcpy(CSN, data, 8);
-
-	if (isOK > 0) {
+	if (isOK & FLAG_ICLASS_READER_CSN) {
+		memcpy(CSN, data, 8);
 		if (verbose) PrintAndLog("CSN: %s", sprint_hex(CSN, 8));
 	} else {
 		PrintAndLog("Failed to select card! Aborting");
@@ -567,12 +688,7 @@ static void HFiClassCalcDivKey(uint8_t *CSN, uint8_t *KEY, uint8_t *div_key, boo
 }
 
 
-static bool select_and_auth(uint8_t *KEY, uint8_t *MAC, uint8_t *div_key, bool use_credit_key, bool elite, bool rawkey, bool verbose) {
-	uint8_t CSN[8] = {0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00};
-	uint8_t CCNR[12] = {0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00};
-
-	if (!select_only(CSN, verbose))
-		return false;
+static bool iClass_authenticate(uint8_t *CSN, uint8_t *KEY, uint8_t *MAC, uint8_t *div_key, bool use_credit_key, bool elite, bool rawkey, bool verbose) {
 
 	//get div_key
 	if (rawkey)
@@ -597,7 +713,10 @@ static bool select_and_auth(uint8_t *KEY, uint8_t *MAC, uint8_t *div_key, bool u
 		if (verbose) PrintAndLog("Couldn't get Card Challenge");
 		return false;
 	}
+
+	uint8_t CCNR[12];
 	memcpy(CCNR, resp.d.asBytes, 8);
+	memset(CCNR+8, 0x00, 4); // NR = {0, 0, 0, 0}
 
 	doMAC(CCNR, div_key, MAC);
 
@@ -673,7 +792,7 @@ static int CmdHFiClassReader_Dump(const char *Cmd) {
 	uint8_t div_key[8] = {0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00};
 	uint8_t c_div_key[8] = {0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00};
 	uint8_t blockno = 0;
-	uint8_t numblks = 0;
+	uint8_t AA1_maxBlk = 0;
 	uint8_t maxBlk = 31;
 	uint8_t app_areas = 1;
 	uint8_t kb = 2;
@@ -690,97 +809,101 @@ static int CmdHFiClassReader_Dump(const char *Cmd) {
 	bool elite = false;
 	bool rawkey = false;
 	bool errors = false;
+	bool verbose = false;
 	uint8_t cmdp = 0;
 
-	while(param_getchar(Cmd, cmdp) != 0x00)
-	{
-		switch(param_getchar(Cmd, cmdp))
-		{
-		case 'h':
-		case 'H':
-			usage_hf_iclass_dump();
-			return 0;
-		case 'c':
-		case 'C':
-			have_credit_key = true;
-			dataLen = param_getstr(Cmd, cmdp+1, tempStr, sizeof(tempStr));
-			if (dataLen == 16) {
-				errors = param_gethex(tempStr, 0, CreditKEY, dataLen);
-			} else if (dataLen == 1) {
-				keyNbr = param_get8(Cmd, cmdp+1);
-				if (keyNbr < ICLASS_KEYS_MAX) {
-					memcpy(CreditKEY, iClass_Key_Table[keyNbr], 8);
+	while (param_getchar(Cmd, cmdp) != 0x00 && !errors) {
+		switch(param_getchar(Cmd, cmdp)) {
+			case 'h':
+			case 'H':
+				usage_hf_iclass_dump();
+				return 0;
+			case 'c':
+			case 'C':
+				have_credit_key = true;
+				dataLen = param_getstr(Cmd, cmdp+1, tempStr, sizeof(tempStr));
+				if (dataLen == 16) {
+					errors = param_gethex(tempStr, 0, CreditKEY, dataLen);
+				} else if (dataLen == 1) {
+					keyNbr = param_get8(Cmd, cmdp+1);
+					if (keyNbr < ICLASS_KEYS_MAX) {
+						memcpy(CreditKEY, iClass_Key_Table[keyNbr], 8);
+					} else {
+						PrintAndLog("\nERROR: Credit KeyNbr is invalid\n");
+						errors = true;
+					}
 				} else {
-					PrintAndLog("\nERROR: Credit KeyNbr is invalid\n");
+					PrintAndLog("\nERROR: Credit Key is incorrect length\n");
 					errors = true;
 				}
-			} else {
-				PrintAndLog("\nERROR: Credit Key is incorrect length\n");
-				errors = true;
-			}
-			cmdp += 2;
-			break;
-		case 'e':
-		case 'E':
-			elite = true;
-			cmdp++;
-			break;
-		case 'f':
-		case 'F':
-			fileNameLen = param_getstr(Cmd, cmdp+1, filename, sizeof(filename));
-			if (fileNameLen < 1) {
-				PrintAndLog("No filename found after f");
-				errors = true;
-			}
-			cmdp += 2;
-			break;
-		case 'k':
-		case 'K':
-			have_debit_key = true;
-			dataLen = param_getstr(Cmd, cmdp+1, tempStr, sizeof(tempStr));
-			if (dataLen == 16) {
-				errors = param_gethex(tempStr, 0, KEY, dataLen);
-			} else if (dataLen == 1) {
-				keyNbr = param_get8(Cmd, cmdp+1);
-				if (keyNbr < ICLASS_KEYS_MAX) {
-					memcpy(KEY, iClass_Key_Table[keyNbr], 8);
-				} else {
-					PrintAndLog("\nERROR: Credit KeyNbr is invalid\n");
+				cmdp += 2;
+				break;
+			case 'e':
+			case 'E':
+				elite = true;
+				cmdp++;
+				break;
+			case 'f':
+			case 'F':
+				fileNameLen = param_getstr(Cmd, cmdp+1, filename, sizeof(filename));
+				if (fileNameLen < 1) {
+					PrintAndLog("No filename found after f");
 					errors = true;
 				}
-			} else {
-				PrintAndLog("\nERROR: Credit Key is incorrect length\n");
+				cmdp += 2;
+				break;
+			case 'k':
+			case 'K':
+				have_debit_key = true;
+				dataLen = param_getstr(Cmd, cmdp+1, tempStr, sizeof(tempStr));
+				if (dataLen == 16) {
+					errors = param_gethex(tempStr, 0, KEY, dataLen);
+				} else if (dataLen == 1) {
+					keyNbr = param_get8(Cmd, cmdp+1);
+					if (keyNbr < ICLASS_KEYS_MAX) {
+						memcpy(KEY, iClass_Key_Table[keyNbr], 8);
+					} else {
+						PrintAndLog("\nERROR: Credit KeyNbr is invalid\n");
+						errors = true;
+					}
+				} else {
+					PrintAndLog("\nERROR: Credit Key is incorrect length\n");
+					errors = true;
+				}
+				cmdp += 2;
+				break;
+			case 'r':
+			case 'R':
+				rawkey = true;
+				cmdp++;
+				break;
+			case 'v':
+			case 'V':
+				verbose = true;
+				cmdp++;
+				break;
+			default:
+				PrintAndLog("Unknown parameter '%c'\n", param_getchar(Cmd, cmdp));
 				errors = true;
-			}
-			cmdp += 2;
-			break;
-		case 'r':
-		case 'R':
-			rawkey = true;
-			cmdp++;
-			break;
-		default:
-			PrintAndLog("Unknown parameter '%c'\n", param_getchar(Cmd, cmdp));
-			errors = true;
-			break;
-		}
-		if (errors) {
-			usage_hf_iclass_dump();
-			return 0;
+				break;
 		}
 	}
 
-	if (cmdp < 2) {
+	if (errors || cmdp < 2) {
 		usage_hf_iclass_dump();
 		return 0;
 	}
-	// if no debit key given try credit key on AA1 (not for iclass but for some picopass this will work)
-	if (!have_debit_key && have_credit_key) use_credit_key = true;
 
-	//get config and first 3 blocks
-	UsbCommand c = {CMD_READER_ICLASS, {FLAG_ICLASS_READER_CSN | FLAG_ICLASS_READER_CONF}};
+	// if only credit key is given: try for AA1 as well (not for iclass but for some picopass this will work)
+	if (!have_debit_key && have_credit_key) {
+		use_credit_key = true;
+		memcpy(KEY, CreditKEY, 8);
+	}
+
+	// clear trace and get first 3 blocks
+	UsbCommand c = {CMD_READER_ICLASS, {FLAG_ICLASS_READER_INIT | FLAG_ICLASS_READER_CLEARTRACE | FLAG_ICLASS_READER_CSN | FLAG_ICLASS_READER_CONF | FLAG_ICLASS_READER_CC}};
 	UsbCommand resp;
-	uint8_t tag_data[255*8];
+	uint8_t tag_data[256*8];
 
 	clearCommandBuffer();
 	SendCommand(&c);
@@ -789,150 +912,150 @@ static int CmdHFiClassReader_Dump(const char *Cmd) {
 		DropField();
 		return 0;
 	}
+
 	uint8_t readStatus = resp.arg[0] & 0xff;
 	uint8_t *data = resp.d.asBytes;
+	uint8_t status_mask = FLAG_ICLASS_READER_CSN | FLAG_ICLASS_READER_CONF | FLAG_ICLASS_READER_CC;
 
-	if(readStatus == 0){
-		PrintAndLog("No tag found...");
+	if (readStatus != status_mask) {
+		PrintAndLog("No tag found ...");
+		return 0;
+	} else {
+		memcpy(tag_data, data, 8*3);
+		if (verbose) PrintAndLog("CSN: %s", sprint_hex(tag_data, 8));
+		AA1_maxBlk = data[8];
+		getMemConfig(data[13], data[12], &maxBlk, &app_areas, &kb);
+		// large memory - not able to dump pages currently
+		if (AA1_maxBlk > maxBlk) AA1_maxBlk = maxBlk;
+	}
+
+	// authenticate debit key (or credit key if we have no debit key) and get div_key - later store in dump block 3
+	if (!iClass_authenticate(tag_data, KEY, MAC, div_key, use_credit_key, elite, rawkey, verbose)){
 		DropField();
 		return 0;
 	}
-	if( readStatus & (FLAG_ICLASS_READER_CSN|FLAG_ICLASS_READER_CONF|FLAG_ICLASS_READER_CC)){
-		memcpy(tag_data, data, 8*3);
-		blockno+=2; // 2 to force re-read of block 2 later. (seems to respond differently..)
-		numblks = data[8];
-		getMemConfig(data[13], data[12], &maxBlk, &app_areas, &kb);
-		// large memory - not able to dump pages currently
-		if (numblks > maxBlk) numblks = maxBlk;
-	}
-	DropField();
-	// authenticate debit key and get div_key - later store in dump block 3
-	if (!select_and_auth(KEY, MAC, div_key, use_credit_key, elite, rawkey, false)){
-		//try twice - for some reason it sometimes fails the first time...
-		if (!select_and_auth(KEY, MAC, div_key, use_credit_key, elite, rawkey, false)){
+
+	// read AA1
+	UsbCommand w = {CMD_ICLASS_DUMP};
+	uint32_t blocksRead = 0;
+	for (blockno = 3; blockno <= AA1_maxBlk; blockno += blocksRead) {
+		w.arg[0] = blockno;
+		w.arg[1] = AA1_maxBlk - blockno + 1;
+		clearCommandBuffer();
+		SendCommand(&w);
+		if (!WaitForResponseTimeout(CMD_ACK, &resp, 4500)) {
+			PrintAndLog("Command execute time-out 1");
+			DropField();
+			return 1;
+		}
+		blocksRead = resp.arg[1];
+		bool isOK = resp.arg[0];
+		if (!isOK) {
+			PrintAndLog("Reading AA1 block failed");
 			DropField();
 			return 0;
 		}
+		memcpy(tag_data + blockno*8, resp.d.asBytes, blocksRead*8);
 	}
 
-	// begin dump
-	UsbCommand w = {CMD_ICLASS_DUMP, {blockno, numblks-blockno+1}};
-	clearCommandBuffer();
-	SendCommand(&w);
-	if (!WaitForResponseTimeout(CMD_ACK, &resp, 4500)) {
-		PrintAndLog("Command execute time-out 1");
-		DropField();
-		return 1;
-	}
-	uint32_t blocksRead = resp.arg[1];
-	uint8_t isOK = resp.arg[0] & 0xff;
-	if (!isOK && !blocksRead) {
-		PrintAndLog("Read Block Failed");
-		DropField();
-		return 0;
-	}
-	uint32_t startindex = resp.arg[2];
-	if (blocksRead*8 > sizeof(tag_data)-(blockno*8)) {
-		PrintAndLog("Data exceeded Buffer size!");
-		blocksRead = (sizeof(tag_data)/8) - blockno;
-	}
-	// response ok - now get bigbuf content of the dump
-	GetFromBigBuf(tag_data+(blockno*8), blocksRead*8, startindex, NULL, -1, false);
-	size_t gotBytes = blocksRead*8 + blockno*8;
-
-	// try AA2
-	if (have_credit_key) {
-		//turn off hf field before authenticating with different key
-		DropField();
-		memset(MAC,0,4);
-		// AA2 authenticate credit key and git c_div_key - later store in dump block 4
-		if (!select_and_auth(CreditKEY, MAC, c_div_key, true, false, false, false)){
-			//try twice - for some reason it sometimes fails the first time...
-			if (!select_and_auth(CreditKEY, MAC, c_div_key, true, false, false, false)){
+	// do we still need to read more blocks (AA2 enabled)?
+	if (have_credit_key && maxBlk > AA1_maxBlk) {
+		if (!use_credit_key) {
+			//turn off hf field before authenticating with different key
+			DropField();
+			// AA2 authenticate credit key and git c_div_key - later store in dump block 4
+			uint8_t CSN[8];
+			if (!iClass_select(CSN, verbose, false, true) || !iClass_authenticate(CSN, CreditKEY, MAC, c_div_key, true, false, false, verbose)){
 				DropField();
 				return 0;
 			}
 		}
-		// do we still need to read more block?  (aa2 enabled?)
-		if (maxBlk > blockno+numblks+1) {
-			// setup dump and start
-			w.arg[0] = blockno + blocksRead;
-			w.arg[1] = maxBlk - (blockno + blocksRead);
+		for ( ; blockno <= maxBlk; blockno += blocksRead) {
+			w.arg[0] = blockno;
+			w.arg[1] = maxBlk - blockno + 1;
 			clearCommandBuffer();
 			SendCommand(&w);
 			if (!WaitForResponseTimeout(CMD_ACK, &resp, 4500)) {
-				PrintAndLog("Command execute timeout 2");
+				PrintAndLog("Command execute time-out 1");
 				DropField();
-				return 0;
+				return 1;
 			}
-			uint8_t isOK = resp.arg[0] & 0xff;
 			blocksRead = resp.arg[1];
-			if (!isOK && !blocksRead) {
-				PrintAndLog("Read Block Failed 2");
+			bool isOK = resp.arg[0];
+			if (!isOK) {
+				PrintAndLog("Reading AA2 block failed");
 				DropField();
 				return 0;
 			}
-
-			startindex = resp.arg[2];
-			if (blocksRead*8 > sizeof(tag_data)-gotBytes) {
-				PrintAndLog("Data exceeded Buffer size!");
-				blocksRead = (sizeof(tag_data) - gotBytes)/8;
-			}
-			// get dumped data from bigbuf
-			GetFromBigBuf(tag_data+gotBytes, blocksRead*8, startindex, NULL, -1, false);
-
-			gotBytes += blocksRead*8;
-		} else { //field is still on - turn it off...
-			DropField();
+			memcpy(tag_data + blockno*8, resp.d.asBytes, blocksRead*8);
 		}
 	}
 
+	DropField();
+
 	// add diversified keys to dump
-	if (have_debit_key) memcpy(tag_data+(3*8),div_key,8);
-	if (have_credit_key) memcpy(tag_data+(4*8),c_div_key,8);
+	if (have_debit_key) {
+		memcpy(tag_data + 3*8, div_key, 8);
+	} else {
+		memset(tag_data + 3*8, 0xff, 8);
+	}
+	if (have_credit_key) {
+		memcpy(tag_data + 4*8, c_div_key, 8);
+	} else {
+		memset(tag_data + 4*8, 0xff, 8);
+	}
+
 	// print the dump
 	printf("------+--+-------------------------+\n");
 	printf("CSN   |00| %s|\n",sprint_hex(tag_data, 8));
-	printIclassDumpContents(tag_data, 1, (gotBytes/8), gotBytes);
+	printIclassDumpContents(tag_data, 1, blockno-1, blockno*8);
 
-	if (filename[0] == 0){
+	if (filename[0] == 0) {
 		snprintf(filename, FILE_PATH_SIZE,"iclass_tagdump-%02x%02x%02x%02x%02x%02x%02x%02x",
 			tag_data[0],tag_data[1],tag_data[2],tag_data[3],
 			tag_data[4],tag_data[5],tag_data[6],tag_data[7]);
 	}
 
 	// save the dump to .bin file
-	PrintAndLog("Saving dump file - %d blocks read", gotBytes/8);
-	saveFile(filename, "bin", tag_data, gotBytes);
+	PrintAndLog("Saving dump file - %d blocks read", blockno);
+	saveFile(filename, "bin", tag_data, blockno*8);
 	return 1;
 }
 
 
 static int WriteBlock(uint8_t blockno, uint8_t *bldata, uint8_t *KEY, bool use_credit_key, bool elite, bool rawkey, bool verbose) {
-	uint8_t MAC[4]={0x00,0x00,0x00,0x00};
-	uint8_t div_key[8]={0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00};
-	if (!select_and_auth(KEY, MAC, div_key, use_credit_key, elite, rawkey, verbose))
+
+	uint8_t MAC[4] = {0x00,0x00,0x00,0x00};
+	uint8_t div_key[8] = {0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00};
+	uint8_t CSN[8];
+
+	if (!iClass_select(CSN, verbose, true, true) || !iClass_authenticate(CSN, KEY, MAC, div_key, use_credit_key, elite, rawkey, verbose)) {
+		DropField();
 		return 0;
+	}
 
 	UsbCommand resp;
 
-	Calc_wb_mac(blockno,bldata,div_key,MAC);
+	Calc_wb_mac(blockno, bldata, div_key, MAC);
+
 	UsbCommand w = {CMD_ICLASS_WRITEBLOCK, {blockno}};
 	memcpy(w.d.asBytes, bldata, 8);
 	memcpy(w.d.asBytes + 8, MAC, 4);
 
 	clearCommandBuffer();
 	SendCommand(&w);
-	if (!WaitForResponseTimeout(CMD_ACK,&resp,4500))
-	{
+	if (!WaitForResponseTimeout(CMD_ACK, &resp, 4500)) {
 		PrintAndLog("Write Command execute timeout");
+		DropField();
 		return 0;
 	}
-	uint8_t isOK = resp.arg[0] & 0xff;
+	bool isOK = resp.arg[0];
 	if (!isOK) {
 		PrintAndLog("Write Block Failed");
+		DropField();
 		return 0;
 	}
+
 	PrintAndLog("Write Block Successful");
 	return 1;
 }
@@ -988,9 +1111,8 @@ static int CmdHFiClass_WriteBlock(const char *Cmd) {
 			break;
 		case 'd':
 		case 'D':
-			if (param_gethex(Cmd, cmdp+1, bldata, 16))
-			{
-				PrintAndLog("KEY must include 16 HEX symbols\n");
+			if (param_gethex(Cmd, cmdp+1, bldata, 16)) {
+				PrintAndLog("Data must include 16 HEX symbols\n");
 				errors = true;
 			}
 			cmdp += 2;
@@ -1029,7 +1151,7 @@ static int CmdHFiClass_WriteBlock(const char *Cmd) {
 			errors = true;
 			break;
 		}
-		if(errors) {
+		if (errors) {
 			usage_hf_iclass_writeblock();
 			return 0;
 		}
@@ -1168,7 +1290,7 @@ static int CmdHFiClassCloneTag(const char *Cmd) {
 	}
 	// file handling and reading
 	f = fopen(filename,"rb");
-	if(!f) {
+	if (!f) {
 		PrintAndLog("Failed to read from file '%s'", filename);
 		return 1;
 	}
@@ -1183,8 +1305,8 @@ static int CmdHFiClassCloneTag(const char *Cmd) {
 	// then copy to usbcommand->asbytes; the max is 32 - 6 = 24 block 12 bytes each block 288 bytes then we can only accept to clone 21 blocks at the time,
 	// else we have to create a share memory
 	int i;
-	fseek(f,startblock*8,SEEK_SET);
-	if ( fread(tag_data,sizeof(iclass_block_t),endblock - startblock + 1,f) == 0 ) {
+	fseek(f, startblock*8, SEEK_SET);
+	if (fread(tag_data, sizeof(iclass_block_t), endblock - startblock + 1, f) == 0 ) {
 		PrintAndLog("File reading error.");
 		fclose(f);
 		return 2;
@@ -1192,15 +1314,18 @@ static int CmdHFiClassCloneTag(const char *Cmd) {
 
 	uint8_t MAC[4]={0x00,0x00,0x00,0x00};
 	uint8_t div_key[8]={0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00};
+	uint8_t CSN[8];
 
-	if (!select_and_auth(KEY, MAC, div_key, use_credit_key, elite, rawkey, true))
+	if (!iClass_select(CSN, true, false, false) || !iClass_authenticate(CSN, KEY, MAC, div_key, use_credit_key, elite, rawkey, true)) {
+		DropField();
 		return 0;
+	}
 
-	UsbCommand w = {CMD_ICLASS_CLONE,{startblock,endblock}};
+	UsbCommand w = {CMD_ICLASS_CLONE, {startblock, endblock}};
 	uint8_t *ptr;
 	// calculate all mac for every the block we will write
 	for (i = startblock; i <= endblock; i++){
-		Calc_wb_mac(i,tag_data[i - startblock].d,div_key,MAC);
+		Calc_wb_mac(i, tag_data[i - startblock].d, div_key, MAC);
 		// usb command d start pointer = d + (i - 6) * 12
 		// memcpy(pointer,tag_data[i - 6],8) 8 bytes
 		// memcpy(pointer + 8,mac,sizoof(mac) 4 bytes;
@@ -1216,11 +1341,13 @@ static int CmdHFiClassCloneTag(const char *Cmd) {
 		printf(" %02x%02x%02x%02x%02x%02x%02x%02x |",p[0],p[1],p[2],p[3],p[4],p[5],p[6],p[7]);
 		printf(" MAC |%02x%02x%02x%02x|\n",p[8],p[9],p[10],p[11]);
 	}
+
 	UsbCommand resp;
 	SendCommand(&w);
 	if (!WaitForResponseTimeout(CMD_ACK,&resp,4500))
 	{
 		PrintAndLog("Command execute timeout");
+		DropField();
 		return 0;
 	}
 	return 1;
@@ -1231,14 +1358,18 @@ static int ReadBlock(uint8_t *KEY, uint8_t blockno, uint8_t keyType, bool elite,
 
 	uint8_t MAC[4]={0x00,0x00,0x00,0x00};
 	uint8_t div_key[8]={0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00};
+	uint8_t CSN[8];
+
+	if (!iClass_select(CSN, verbose, true, true)) {
+		DropField();
+		return 0;
+	}
 
 	if (auth) {
-		if (!select_and_auth(KEY, MAC, div_key, (keyType==0x18), elite, rawkey, verbose))
+		if (!iClass_authenticate(CSN, KEY, MAC, div_key, (keyType==0x18), elite, rawkey, verbose)) {
+			DropField();
 			return 0;
-	} else {
-		uint8_t CSN[8];
-		if (!select_only(CSN, verbose))
-			return 0;
+		}
 	}
 
 	UsbCommand resp;
@@ -1247,15 +1378,19 @@ static int ReadBlock(uint8_t *KEY, uint8_t blockno, uint8_t keyType, bool elite,
 	SendCommand(&w);
 	if (!WaitForResponseTimeout(CMD_ACK, &resp, 4500)) {
 		PrintAndLog("Command execute timeout");
+		DropField();
 		return 0;
 	}
-	uint8_t isOK = resp.arg[0] & 0xff;
+	bool isOK = resp.arg[0];
 	if (!isOK) {
 		PrintAndLog("Read Block Failed");
+		DropField();
 		return 0;
 	}
 	//data read is stored in: resp.d.asBytes[0-15]
-	if (verbose) PrintAndLog("Block %02X: %s\n",blockno, sprint_hex(resp.d.asBytes,8));
+	if (verbose)
+		PrintAndLog("Block %02X: %s\n",blockno, sprint_hex(resp.d.asBytes,8));
+
 	return 1;
 }
 
@@ -1604,8 +1739,11 @@ static int CmdHFiClassCalcNewKey(const char *Cmd) {
 	}
 
 	if (!givenCSN)
-		if (!select_only(CSN, true))
+		if (!iClass_select(CSN, true, true, true)) {
+			DropField();
 			return 0;
+		}
+	DropField();
 
 	HFiClassCalcNewKey(CSN, OLDKEY, NEWKEY, xor_div_key, elite, oldElite, true);
 	return 0;
@@ -1893,41 +2031,44 @@ static int CmdHFiClassCheckKeys(const char *Cmd) {
 	// time
 	uint64_t t1 = msclock();
 
-	for (uint32_t c = 0; c < keycnt; c += 1) {
-			printf("."); fflush(stdout);
-			if (ukbhit()) {
-				int gc = getchar(); (void)gc;
-				printf("\naborted via keyboard!\n");
-				break;
-			}
+	uint8_t CSN[8];
+	if (!iClass_select(CSN, false, true, true)) {
+		PrintAndLog("Couldn't select card");
+		DropField();
+		return 0;
+	}
 
-			memcpy(key, keyBlock + 8 * c , 8);
+	for (uint32_t c = 0; c < keycnt; c++) {
+		printf("."); fflush(stdout);
+		if (ukbhit()) {
+			int gc = getchar(); (void)gc;
+			printf("\naborted via keyboard!\n");
+			break;
+		}
 
-			// debit key. try twice
-			for (int foo = 0; foo < 2 && !found_debit; foo++) {
-				if (!select_and_auth(key, mac, div_key, false, use_elite, use_raw, false))
-					continue;
+		memcpy(key, keyBlock + 8 * c , 8);
 
-				// key found.
-				PrintAndLog("\n--------------------------------------------------------");
-			PrintAndLog("   Found AA1 debit key\t\t[%s]", sprint_hex(key, 8));
-				found_debit = true;
-			}
+		// debit key
+		if (!iClass_authenticate(CSN, key, mac, div_key, false, use_elite, use_raw, false))
+			continue;
 
-			// credit key. try twice
-			for (int foo = 0; foo < 2 && !found_credit; foo++) {
-				if (!select_and_auth(key, mac, div_key, true, use_elite, use_raw, false))
-					continue;
+		// key found.
+		PrintAndLog("\n--------------------------------------------------------");
+		PrintAndLog("   Found AA1 debit key\t\t[%s]", sprint_hex(key, 8));
+		found_debit = true;
 
-				// key found
-				PrintAndLog("\n--------------------------------------------------------");
-				PrintAndLog("   Found AA2 credit key\t\t[%s]", sprint_hex(key, 8));
-				found_credit = true;
-			}
+		// credit key
+		if (!iClass_authenticate(CSN, key, mac, div_key, true, use_elite, use_raw, false))
+			continue;
 
-			// both keys found.
-			if ( found_debit && found_credit )
-				break;
+		// key found
+		PrintAndLog("\n--------------------------------------------------------");
+		PrintAndLog("   Found AA2 credit key\t\t[%s]", sprint_hex(key, 8));
+		found_credit = true;
+
+		// both keys found.
+		if (found_debit && found_credit)
+			break;
 	}
 
 	t1 = msclock() - t1;

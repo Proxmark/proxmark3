@@ -256,10 +256,9 @@ void TransmitTo15693Tag(const uint8_t *cmd, int len, uint32_t *start_time) {
 
 	*start_time = (*start_time - DELAY_ARM_TO_TAG) & 0xfffffff0;
 
-	while (GetCountSspClk() > *start_time) { // we may miss the intended time
-		*start_time += 16; // next possible time
+	if (GetCountSspClk() > *start_time) { // we may miss the intended time
+		*start_time = (GetCountSspClk() + 16) & 0xfffffff0; // next possible time
 	}
-
 
 	while (GetCountSspClk() < *start_time)
 		/* wait */ ;
@@ -449,11 +448,11 @@ static int inline __attribute__((always_inline)) Handle15693SamplesFromTag(uint1
 				DecodeTag->posCount = 2;
 				DecodeTag->state = STATE_TAG_RECEIVING_DATA;
 				FpgaDisableTracing(); // DEBUGGING
-				Dbprintf("amplitude = %d, threshold_sof = %d, threshold_half/4 = %d, previous_amplitude = %d",
-					amplitude,
-					DecodeTag->threshold_sof,
-					DecodeTag->threshold_half/4,
-					DecodeTag->previous_amplitude); // DEBUGGING
+				// Dbprintf("amplitude = %d, threshold_sof = %d, threshold_half/4 = %d, previous_amplitude = %d",
+					// amplitude,
+					// DecodeTag->threshold_sof,
+					// DecodeTag->threshold_half/4,
+					// DecodeTag->previous_amplitude); // DEBUGGING
 				LED_C_ON();
 			} else {
 				DecodeTag->posCount++;
