@@ -9,9 +9,8 @@
 
 #include "iso15693tools.h"
 
-#include "proxmark3.h"
+#include <stddef.h>
 #include <stdint.h>
-#include <stdlib.h>
 #ifdef ON_DEVICE
 #include "printf.h"
 #else
@@ -90,7 +89,7 @@ uint16_t iclass_crc16(char *data_p, unsigned short length) {
 	crc = ~crc;
 	data = crc;
 	crc = (crc << 8) | (data >> 8 & 0xff);
-	crc = crc ^ 0xBC3;
+	crc = crc ^ 0x0BC3;
 	return (crc);
 }
 

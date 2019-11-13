@@ -13,8 +13,14 @@
 // iZsh <izsh at fail0verflow.com>, June 2014
 //-----------------------------------------------------------------------------
 
-// Defining modes and options. This must be aligned to the definitions in fpgaloader.h
+
+// Defining commands, modes and options. This must be aligned to the definitions in fpgaloader.h
 // Note: the definitions here are without shifts
+
+// Commands:
+`define FPGA_CMD_SET_CONFREG                        1
+`define FPGA_CMD_TRACE_ENABLE                       2
+
 // Major modes:
 `define FPGA_MAJOR_MODE_LF_ADC                      0
 `define FPGA_MAJOR_MODE_LF_EDGE_DETECT              1
@@ -35,6 +41,7 @@
 `define FPGA_HF_READER_MODE_SNIFF_IQ                5
 `define FPGA_HF_READER_MODE_SNIFF_AMPLITUDE         6
 `define FPGA_HF_READER_MODE_SNIFF_PHASE             7
+`define FPGA_HF_READER_MODE_SEND_JAM                8
 `define FPGA_HF_READER_SUBCARRIER_848_KHZ           0
 `define FPGA_HF_READER_SUBCARRIER_424_KHZ           1
 `define FPGA_HF_READER_SUBCARRIER_212_KHZ           2
@@ -79,7 +86,7 @@ module fpga_hf(
 //-----------------------------------------------------------------------------
 
 reg [15:0] shift_reg;
-reg [7:0] conf_word;
+reg [8:0] conf_word;
 reg trace_enable;
 
 // We switch modes between transmitting to the 13.56 MHz tag and receiving
@@ -88,8 +95,8 @@ reg trace_enable;
 always @(posedge ncs)
 begin
 	case(shift_reg[15:12])
-		4'b0001: conf_word <= shift_reg[7:0];       // FPGA_CMD_SET_CONFREG
-		4'b0010: trace_enable <= shift_reg[0];      // FPGA_CMD_TRACE_ENABLE
+		`FPGA_CMD_SET_CONFREG:  conf_word <= shift_reg[8:0];
+		`FPGA_CMD_TRACE_ENABLE: trace_enable <= shift_reg[0];
 	endcase
 end
 
@@ -103,11 +110,11 @@ begin
 end
 
 // select module (outputs) based on major mode
-wire [2:0] major_mode = conf_word[7:5];
+wire [2:0] major_mode = conf_word[8:6];
 
 // configuring the HF reader
-wire [1:0] subcarrier_frequency = conf_word[4:3];
-wire [2:0] minor_mode = conf_word[2:0];
+wire [1:0] subcarrier_frequency = conf_word[5:4];
+wire [3:0] minor_mode = conf_word[3:0];
 
 //-----------------------------------------------------------------------------
 // And then we instantiate the modules corresponding to each of the FPGA's

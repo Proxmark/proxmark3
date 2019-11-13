@@ -180,7 +180,7 @@ static int CmdHFiClassSnoop(const char *Cmd) {
 	CLIParserInit("hf iclass snoop", "\nSnoop a communication between an iClass Reader and an iClass Tag.", NULL);
 	void* argtable[] = {
 		arg_param_begin,
-		arg_lit0("j",  "--jam",    "Jam (prevent) e-purse Updates"),
+		arg_lit0("j",  "jam",    "Jam (prevent) e-purse Updates"),
 		arg_param_end
 	};
 	if (CLIParserParseString(Cmd, argtable, arg_getsize(argtable), true)){

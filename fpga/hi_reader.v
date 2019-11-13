@@ -19,7 +19,7 @@ module hi_reader(
     output ssp_frame, ssp_din, ssp_clk;
     output dbg;
     input [1:0] subcarrier_frequency;
-	input [2:0] minor_mode;
+	input [3:0] minor_mode;
 
 assign adc_clk = ck_1356meg;  // sample frequency is 13,56 MHz
 
@@ -257,6 +257,19 @@ end
 assign ssp_din = corr_i_out[7];
 
 
+// a jamming signal
+reg jam_signal;
+reg [3:0] jam_counter;
+
+always @(negedge adc_clk)
+begin
+	if (corr_i_cnt == 6'd0)
+	begin
+		jam_counter <= jam_counter + 1;
+		jam_signal <= jam_counter[1] ^ jam_counter[3];
+	end
+end
+
 // Antenna drivers
 reg pwr_hi, pwr_oe4;
 
@@ -272,10 +285,15 @@ begin
         pwr_hi  = ck_1356meg & ~ssp_dout;
         pwr_oe4 = 1'b0;
     end
+    else if (minor_mode == `FPGA_HF_READER_MODE_SEND_JAM)
+	begin
+        pwr_hi  = ck_1356meg & jam_signal;
+        pwr_oe4 = 1'b0;
+	end
 	else if (minor_mode == `FPGA_HF_READER_MODE_SNIFF_IQ        
 		  || minor_mode == `FPGA_HF_READER_MODE_SNIFF_AMPLITUDE
 		  || minor_mode == `FPGA_HF_READER_MODE_SNIFF_PHASE)
-	begin
+	begin // all off
 		pwr_hi  = 1'b0;
 		pwr_oe4 = 1'b0;
 	end
@@ -284,7 +302,7 @@ begin
 		pwr_hi  = ck_1356meg;
 		pwr_oe4 = 1'b0;
 	end
-end
+end 
 
 // always on
 assign pwr_oe1 = 1'b0;

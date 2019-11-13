@@ -84,7 +84,7 @@ static int DEBUG = 0;
 ///////////////////////////////////////////////////////////////////////
 
 // buffers
-#define ISO15693_DMA_BUFFER_SIZE        128 // must be a power of 2
+#define ISO15693_DMA_BUFFER_SIZE        256 // must be a power of 2
 #define ISO15693_MAX_RESPONSE_LENGTH     36 // allows read single block with the maximum block size of 256bits. Read multiple blocks not supported yet
 #define ISO15693_MAX_COMMAND_LENGTH      45 // allows write single block with the maximum block size of 256bits. Write multiple blocks not supported yet
 
@@ -341,11 +341,6 @@ void TransmitTo15693Reader(const uint8_t *cmd, size_t len, uint32_t *start_time,
 }
 
 
-static void jam(void) {
-	// send a short burst to jam the reader signal
-}
-
-
 //=============================================================================
 // An ISO 15693 decoder for tag responses (one subcarrier only).
 // Uses cross correlation to identify each bit and EOF.
@@ -392,7 +387,7 @@ typedef struct DecodeTag {
 } DecodeTag_t;
 
 
-static int inline __attribute__((always_inline)) Handle15693SamplesFromTag(uint16_t amplitude, DecodeTag_t *restrict DecodeTag) {
+static int inline __attribute__((always_inline)) Handle15693SamplesFromTag(uint16_t amplitude, DecodeTag_t *DecodeTag) {
 	switch (DecodeTag->state) {
 		case STATE_TAG_SOF_LOW:
 			// waiting for a rising edge
@@ -745,7 +740,8 @@ typedef struct DecodeReader {
 		STATE_READER_AWAIT_2ND_RISING_EDGE_OF_SOF,
 		STATE_READER_AWAIT_END_OF_SOF_1_OUT_OF_4,
 		STATE_READER_RECEIVE_DATA_1_OUT_OF_4,
-		STATE_READER_RECEIVE_DATA_1_OUT_OF_256
+		STATE_READER_RECEIVE_DATA_1_OUT_OF_256,
+		STATE_READER_RECEIVE_JAMMING
 	}           state;
 	enum {
 		CODING_1_OUT_OF_4,
@@ -781,7 +777,7 @@ static void DecodeReaderReset(DecodeReader_t* DecodeReader) {
 }
 
 
-static int inline __attribute__((always_inline)) Handle15693SampleFromReader(bool bit, DecodeReader_t *restrict DecodeReader) {
+static int inline __attribute__((always_inline)) Handle15693SampleFromReader(bool bit, DecodeReader_t *DecodeReader) {
 	switch (DecodeReader->state) {
 		case STATE_READER_UNSYNCD:
 			// wait for unmodulated carrier
@@ -920,12 +916,6 @@ static int inline __attribute__((always_inline)) Handle15693SampleFromReader(boo
 				}
 				if (DecodeReader->bitCount == 15) { // we have a full byte
 					DecodeReader->output[DecodeReader->byteCount++] = DecodeReader->shiftReg;
-					if (DecodeReader->byteCount == DecodeReader->jam_search_len) {
-						if (!memcmp(DecodeReader->output, DecodeReader->jam_search_string, DecodeReader->jam_search_len)) {
-							jam(); // send a jamming signal
-							Dbprintf("JAMMING!");
-						}
-					}
 					if (DecodeReader->byteCount > DecodeReader->byteCountMax) {
 						// buffer overflow, give up
 						LED_B_OFF();
@@ -933,6 +923,13 @@ static int inline __attribute__((always_inline)) Handle15693SampleFromReader(boo
 					}
 					DecodeReader->bitCount = 0;
 					DecodeReader->shiftReg = 0;
+					if (DecodeReader->byteCount == DecodeReader->jam_search_len) {
+						if (!memcmp(DecodeReader->output, DecodeReader->jam_search_string, DecodeReader->jam_search_len)) {
+							LED_D_ON();
+							FpgaWriteConfWord(FPGA_MAJOR_MODE_HF_READER | FPGA_HF_READER_MODE_SEND_JAM);
+							DecodeReader->state = STATE_READER_RECEIVE_JAMMING;
+						}
+					}
 				} else {
 					DecodeReader->bitCount++;
 				}
@@ -968,8 +965,39 @@ static int inline __attribute__((always_inline)) Handle15693SampleFromReader(boo
 						LED_B_OFF();
 						DecodeReaderReset(DecodeReader);
 					}
+					if (DecodeReader->byteCount == DecodeReader->jam_search_len) {
+						if (!memcmp(DecodeReader->output, DecodeReader->jam_search_string, DecodeReader->jam_search_len)) {
+							LED_D_ON();
+							FpgaWriteConfWord(FPGA_MAJOR_MODE_HF_READER | FPGA_HF_READER_MODE_SEND_JAM);
+							DecodeReader->state = STATE_READER_RECEIVE_JAMMING;
+						}
+					}
 				}
 				DecodeReader->bitCount++;
+			}
+			break;
+
+		case STATE_READER_RECEIVE_JAMMING:
+			DecodeReader->posCount++;
+			if (DecodeReader->Coding == CODING_1_OUT_OF_4) {
+				if (DecodeReader->posCount == 7*16) { // 7 bits jammed
+					FpgaWriteConfWord(FPGA_MAJOR_MODE_HF_READER | FPGA_HF_READER_MODE_SNOOP_AMPLITUDE); // stop jamming
+					// FpgaDisableTracing();
+					LED_D_OFF();
+				} else if (DecodeReader->posCount == 8*16) {
+					DecodeReader->posCount = 0;
+					DecodeReader->output[DecodeReader->byteCount++] = 0x00;
+					DecodeReader->state = STATE_READER_RECEIVE_DATA_1_OUT_OF_4;
+				}
+			} else {
+				if (DecodeReader->posCount == 7*256) { // 7 bits jammend
+					FpgaWriteConfWord(FPGA_MAJOR_MODE_HF_READER | FPGA_HF_READER_MODE_SNOOP_AMPLITUDE); // stop jamming
+					LED_D_OFF();
+				} else if (DecodeReader->posCount == 8*256) {
+					DecodeReader->posCount = 0;
+					DecodeReader->output[DecodeReader->byteCount++] = 0x00;
+					DecodeReader->state = STATE_READER_RECEIVE_DATA_1_OUT_OF_256;
+				}
 			}
 			break;
 
@@ -1212,7 +1240,7 @@ void SnoopIso15693(uint8_t jam_search_len, uint8_t *jam_search_string) {
 		if (upTo >= dmaBuf + ISO15693_DMA_BUFFER_SIZE) {                   // we have read all of the DMA buffer content.
 			upTo = dmaBuf;                                                 // start reading the circular buffer from the beginning
 			if (behindBy > (9*ISO15693_DMA_BUFFER_SIZE/10)) {
-				FpgaDisableTracing();
+				// FpgaDisableTracing();
 				Dbprintf("About to blow circular buffer - aborted! behindBy=%d, samples=%d", behindBy, samples);
 				break;
 			}
@@ -1304,8 +1332,6 @@ void SnoopIso15693(uint8_t jam_search_len, uint8_t *jam_search_string) {
 	}
 
 	FpgaDisableSscDma();
-
-	LEDsoff();
 
 	DbpString("Snoop statistics:");
 	Dbprintf("  ExpectTagAnswer: %d, TagIsActive: %d, ReaderIsActive: %d", ExpectTagAnswer, TagIsActive, ReaderIsActive);
