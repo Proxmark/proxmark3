@@ -19,7 +19,7 @@ module hi_reader(
     output ssp_frame, ssp_din, ssp_clk;
     output dbg;
     input [1:0] subcarrier_frequency;
-	input [2:0] minor_mode;
+	input [3:0] minor_mode;
 
 assign adc_clk = ck_1356meg;  // sample frequency is 13,56 MHz
 
@@ -139,7 +139,7 @@ begin
     // These are the correlators: we correlate against in-phase and quadrature
     // versions of our reference signal, and keep the (signed) results or the
     // resulting amplitude to send out later over the SSP.
-    if(corr_i_cnt == 6'd0)
+    if (corr_i_cnt == 6'd0)
     begin
         if (minor_mode == `FPGA_HF_READER_MODE_SNIFF_AMPLITUDE)
         begin
@@ -213,7 +213,7 @@ begin
     end
 
 	// for each Q/I pair report two reader signal samples when sniffing. Store the 2nd.
-    if(corr_i_cnt == 6'd32)
+    if (corr_i_cnt == 6'd32)
         after_hysteresis_prev <= after_hysteresis;
 
     // Then the result from last time is serialized and send out to the ARM.
@@ -221,10 +221,10 @@ begin
     // ssp_clk should be the adc_clk divided by 64/16 = 4. 
 	// ssp_clk frequency = 13,56MHz / 4 = 3.39MHz
 
-    if(corr_i_cnt[1:0] == 2'b00)
+    if (corr_i_cnt[1:0] == 2'b00)
     begin
         // Don't shift if we just loaded new data, obviously.
-        if(corr_i_cnt != 6'd0)
+        if (corr_i_cnt != 6'd0)
         begin
             corr_i_out[7:0] <= {corr_i_out[6:0], corr_q_out[7]};
             corr_q_out[7:1] <= corr_q_out[6:0];
@@ -257,6 +257,19 @@ end
 assign ssp_din = corr_i_out[7];
 
 
+// a jamming signal
+reg jam_signal;
+reg [3:0] jam_counter;
+
+always @(negedge adc_clk)
+begin
+	if (corr_i_cnt == 6'd0)
+	begin
+		jam_counter <= jam_counter + 1;
+		jam_signal <= jam_counter[1] ^ jam_counter[3];
+	end
+end
+
 // Antenna drivers
 reg pwr_hi, pwr_oe4;
 
@@ -272,10 +285,15 @@ begin
         pwr_hi  = ck_1356meg & ~ssp_dout;
         pwr_oe4 = 1'b0;
     end
+    else if (minor_mode == `FPGA_HF_READER_MODE_SEND_JAM)
+	begin
+        pwr_hi  = ck_1356meg & jam_signal;
+        pwr_oe4 = 1'b0;
+	end
 	else if (minor_mode == `FPGA_HF_READER_MODE_SNIFF_IQ        
 		  || minor_mode == `FPGA_HF_READER_MODE_SNIFF_AMPLITUDE
 		  || minor_mode == `FPGA_HF_READER_MODE_SNIFF_PHASE)
-	begin
+	begin // all off
 		pwr_hi  = 1'b0;
 		pwr_oe4 = 1'b0;
 	end
@@ -284,7 +302,7 @@ begin
 		pwr_hi  = ck_1356meg;
 		pwr_oe4 = 1'b0;
 	end
-end
+end 
 
 // always on
 assign pwr_oe1 = 1'b0;

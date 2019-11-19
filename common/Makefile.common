@@ -67,27 +67,31 @@ VPATH = . ../common ../common/crapto1 ../common/mbedtls ../fpga ../zlib
 
 INCLUDES = ../include/proxmark3.h ../include/at91sam7s512.h ../include/config_gpio.h ../include/usb_cmd.h $(APP_INCLUDES)
 
-CFLAGS =  -c $(INCLUDE) -Wall -Werror -pedantic -std=c99 -Os $(APP_CFLAGS)
+CFLAGS =  -c $(INCLUDE) -Wall -Werror -pedantic -std=c99 $(APP_CFLAGS)
 LDFLAGS = -nostartfiles -nodefaultlibs -Wl,-gc-sections -n
 
 LIBS = -lgcc
 
 THUMBOBJ = $(patsubst %.c,$(OBJDIR)/%.o,$(notdir $(THUMBSRC)))
+THUMBOPTOBJ = $(patsubst %.c,$(OBJDIR)/%.o,$(notdir $(THUMBOPTSRC)))
 ARMOBJ   = $(patsubst %.c,$(OBJDIR)/%.o,$(notdir $(ARMSRC)))
 ASMOBJ   = $(patsubst %.s,$(OBJDIR)/%.o,$(notdir $(ASMSRC)))
 VERSIONOBJ = $(patsubst %.c,$(OBJDIR)/%.o,$(notdir $(VERSIONSRC)))
 
 $(THUMBOBJ): $(OBJDIR)/%.o: %.c $(INCLUDES)
-	$(CC) $(CFLAGS) -mthumb -mthumb-interwork -o $@ $< 
+	$(CC) $(CFLAGS) -Os -mthumb -mthumb-interwork -o $@ $< 
+
+$(THUMBOPTOBJ): $(OBJDIR)/%.o: %.c $(INCLUDES)
+	$(CC) $(CFLAGS) -O -mthumb -mthumb-interwork -o $@ $< 
 
 $(ARMOBJ): $(OBJDIR)/%.o: %.c $(INCLUDES)
-	$(CC) $(CFLAGS) -mthumb-interwork -o $@ $< 
+	$(CC) $(CFLAGS) -Os -mthumb-interwork -o $@ $< 
 
 $(ASMOBJ): $(OBJDIR)/%.o: %.s
-	$(CC) $(CFLAGS) -mthumb-interwork -o $@ $<
+	$(CC) $(CFLAGS) -Os -mthumb-interwork -o $@ $<
 
 $(VERSIONOBJ): $(OBJDIR)/%.o: %.c $(INCLUDES)
-	$(CC) $(CFLAGS) -mthumb -mthumb-interwork -o $@ $< 
+	$(CC) $(CFLAGS) -Os -mthumb -mthumb-interwork -o $@ $< 
 
 # This objcopy call translates physical flash addresses to logical addresses
 # without touching start address or RAM addresses (.bss and .data sections)
@@ -101,12 +105,13 @@ $(OBJDIR)/%.s19: $(OBJDIR)/%.elf
 
 # Automatic dependency generation
 DEPENDENCY_FILES = $(patsubst %.c,$(OBJDIR)/%.d,$(notdir $(THUMBSRC))) \
+	$(patsubst %.c,$(OBJDIR)/%.d,$(notdir $(THUMBOPTSRC))) \
 	$(patsubst %.c,$(OBJDIR)/%.d,$(notdir $(ARMSRC))) \
 	$(patsubst %.s,$(OBJDIR)/%.d,$(notdir $(ASMSRC)))
 
 $(DEPENDENCY_FILES): Makefile ../common/Makefile.common
 
-$(patsubst %.o,%.d,$(THUMBOBJ) $(ARMOBJ)): $(OBJDIR)/%.d: %.c
+$(patsubst %.o,%.d,$(THUMBOBJ) $(THUMBOPTOBJ) $(ARMOBJ)): $(OBJDIR)/%.d: %.c
 	@$(CC) -MM -MT "$(@) $(@:.d=.o)" $(CFLAGS) $< > $@
 $(patsubst %.o,%.d,$(ASMOBJ)):$(OBJDIR)/%.d: %.s
 	@$(CC) -MM -MT "$(@) $(@:.d=.o)" $(CFLAGS) $< > $@

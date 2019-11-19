@@ -18,6 +18,7 @@
 #include "iso14443crc.h" // Can also be used for iClass, using 0xE012 as CRC-type
 #include "comms.h"
 #include "ui.h"
+#include "cliparser/cliparser.h"
 #include "cmdparser.h"
 #include "cmdhficlass.h"
 #include "common.h"
@@ -175,8 +176,29 @@ static int CmdHFiClassList(const char *Cmd) {
 
 
 static int CmdHFiClassSnoop(const char *Cmd) {
-	UsbCommand c = {CMD_SNOOP_ICLASS};
+
+	CLIParserInit("hf iclass snoop", "\nSnoop a communication between an iClass Reader and an iClass Tag.", NULL);
+	void* argtable[] = {
+		arg_param_begin,
+		arg_lit0("j",  "jam",    "Jam (prevent) e-purse Updates"),
+		arg_param_end
+	};
+	if (CLIParserParseString(Cmd, argtable, arg_getsize(argtable), true)){
+		CLIParserFree();
+		return 0;
+	}
+
+	bool jam_epurse_update = arg_get_lit(1);
+
+	const uint8_t update_epurse_sequence[2] = {0x87, 0x02};
+		
+	UsbCommand c = {CMD_SNOOP_ICLASS, {0}};
+	if (jam_epurse_update) {
+		c.arg[0] = sizeof(update_epurse_sequence);
+		memcpy(c.d.asBytes, update_epurse_sequence, sizeof(update_epurse_sequence));
+	}
 	SendCommand(&c);
+
 	return 0;
 }
 

@@ -115,8 +115,7 @@ void SetupSpi(int mode)
 // Set up the synchronous serial port with the set of options that fits
 // the FPGA mode. Both RX and TX are always enabled.
 //-----------------------------------------------------------------------------
-void FpgaSetupSsc(uint8_t FPGA_mode)
-{
+void FpgaSetupSsc(uint16_t FPGA_mode) {
 	// First configure the GPIOs, and get ourselves a clock.
 	AT91C_BASE_PIOA->PIO_ASR =
 		GPIO_SSC_FRAME	|
@@ -136,7 +135,7 @@ void FpgaSetupSsc(uint8_t FPGA_mode)
 
 	// 8, 16 or 32 bits per transfer, no loopback, MSB first, 1 transfer per sync
 	// pulse, no output sync
-	if ((FPGA_mode & 0xe0) == FPGA_MAJOR_MODE_HF_READER && FpgaGetCurrent() == FPGA_BITSTREAM_HF) {
+	if ((FPGA_mode & 0x1c0) == FPGA_MAJOR_MODE_HF_READER && FpgaGetCurrent() == FPGA_BITSTREAM_HF) {
 		AT91C_BASE_SSC->SSC_RFMR = SSC_FRAME_MODE_BITS_IN_WORD(16) | AT91C_SSC_MSBF | SSC_FRAME_MODE_WORDS_PER_TRANSFER(0);
 	} else {
 		AT91C_BASE_SSC->SSC_RFMR = SSC_FRAME_MODE_BITS_IN_WORD(8) | AT91C_SSC_MSBF | SSC_FRAME_MODE_WORDS_PER_TRANSFER(0);
@@ -450,10 +449,9 @@ void FpgaDownloadAndGo(int bitstream_version)
 // The bit format is:  C3 C2 C1 C0 D11 D10 D9 D8 D7 D6 D5 D4 D3 D2 D1 D0
 // where C is the 4 bit command and D is the 12 bit data
 //-----------------------------------------------------------------------------
-void FpgaSendCommand(uint16_t cmd, uint16_t v)
-{
+void FpgaSendCommand(uint16_t cmd, uint16_t v) {
 	SetupSpi(SPI_FPGA_MODE);
-	while ((AT91C_BASE_SPI->SPI_SR & AT91C_SPI_TXEMPTY) == 0);		// wait for the transfer to complete
+	while ((AT91C_BASE_SPI->SPI_SR & AT91C_SPI_TXEMPTY) == 0);	// wait for the transfer to complete
 	AT91C_BASE_SPI->SPI_TDR = AT91C_SPI_LASTXFER | cmd | v;		// send the data
 }
 
@@ -462,21 +460,18 @@ void FpgaSendCommand(uint16_t cmd, uint16_t v)
 // vs. clone vs. etc.). This is now a special case of FpgaSendCommand() to
 // avoid changing this function's occurence everywhere in the source code.
 //-----------------------------------------------------------------------------
-void FpgaWriteConfWord(uint16_t v)
-{
+void FpgaWriteConfWord(uint16_t v) {
 	FpgaSendCommand(FPGA_CMD_SET_CONFREG, v);
 }
 
 //-----------------------------------------------------------------------------
 // enable/disable FPGA internal tracing
 //-----------------------------------------------------------------------------
-void FpgaEnableTracing(void)
-{
+void FpgaEnableTracing(void) {
 	FpgaSendCommand(FPGA_CMD_TRACE_ENABLE, 1);
 }
 
-void FpgaDisableTracing(void)
-{
+void FpgaDisableTracing(void) {
 	FpgaSendCommand(FPGA_CMD_TRACE_ENABLE, 0);
 }
 

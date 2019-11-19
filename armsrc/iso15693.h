@@ -31,7 +31,7 @@ void TransmitTo15693Reader(const uint8_t *cmd, size_t len, uint32_t *start_time,
 int GetIso15693CommandFromReader(uint8_t *received, size_t max_len, uint32_t *eof_time);
 void TransmitTo15693Tag(const uint8_t *cmd, int len, uint32_t *start_time);
 int GetIso15693AnswerFromTag(uint8_t* response, uint16_t max_len, uint16_t timeout, uint32_t *eof_time);
-void SnoopIso15693(void);
+void SnoopIso15693(uint8_t jam_search_len, uint8_t *jam_search_string);
 void AcquireRawAdcSamplesIso15693(void);
 void ReaderIso15693(uint32_t parameter);
 void SimTagIso15693(uint32_t parameter, uint8_t *uid);

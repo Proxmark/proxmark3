@@ -29,17 +29,18 @@ module fpga_lf(
 
 reg [15:0] shift_reg;
 reg [7:0] divisor;
-reg [7:0] conf_word;
+reg [8:0] conf_word;
 reg [7:0] user_byte1;
 
 always @(posedge ncs)
 begin
-	case(shift_reg[15:12])
-		4'b0001:
+	case (shift_reg[15:12])
+		4'b0001:                                    // FPGA_CMD_SET_CONFREG
 			begin
-				conf_word <= shift_reg[7:0];
-				if (shift_reg[7:0] == 8'b00000001) begin // LF edge detect
-					user_byte1 <= 127; // default threshold
+				conf_word <= shift_reg[8:0];
+				if (shift_reg[8:0] == 9'b000000001) 
+				begin                               // LF edge detect
+					user_byte1 <= 127;              // default threshold
 				end
 			end
 		4'b0010: divisor <= shift_reg[7:0];			// FPGA_CMD_SET_DIVISOR
@@ -49,14 +50,14 @@ end
 
 always @(posedge spck)
 begin
-	if(~ncs)
+	if (~ncs)
 	begin
 		shift_reg[15:1] <= shift_reg[14:0];
 		shift_reg[0] <= mosi;
 	end
 end
 
-wire [2:0] major_mode = conf_word[7:5];
+wire [2:0] major_mode = conf_word[8:6];
 
 // For the low-frequency configuration:
 wire lf_field = conf_word[0];

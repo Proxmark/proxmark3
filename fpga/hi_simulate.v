@@ -31,7 +31,7 @@ module hi_simulate(
     input ssp_dout;
     output ssp_frame, ssp_din, ssp_clk;
     output dbg;
-    input [2:0] mod_type;
+    input [3:0] mod_type;
 
 assign adc_clk = ck_1356meg;
 

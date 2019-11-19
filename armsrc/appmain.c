@@ -1142,7 +1142,7 @@ void UsbPacketReceived(uint8_t *packet, int len)
 			break;
 			
 		case CMD_SNOOP_ISO_15693:
-			SnoopIso15693();
+			SnoopIso15693(0, NULL);
 			break;
 			
 		case CMD_ISO_15693_COMMAND:
@@ -1307,7 +1307,7 @@ void UsbPacketReceived(uint8_t *packet, int len)
 #ifdef WITH_ICLASS
 		// Makes use of ISO14443a FPGA Firmware
 		case CMD_SNOOP_ICLASS:
-			SnoopIClass();
+			SnoopIClass(c->arg[0], c->d.asBytes);
 			break;
 		case CMD_SIMULATE_TAG_ICLASS:
 			SimulateIClass(c->arg[0], c->arg[1], c->arg[2], c->d.asBytes);
