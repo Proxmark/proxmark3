@@ -11,7 +11,11 @@
 #ifndef CMDLFHITAG_H__
 #define CMDLFHITAG_H__
 
+#include <stdint.h>
+#include <stdbool.h>
+
 extern int CmdLFHitag(const char *Cmd);
 extern int CmdLFHitagReader(const char *Cmd);
+extern bool getHitagUid(uint32_t *uid, bool quiet);
 
 #endif

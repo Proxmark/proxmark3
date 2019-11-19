@@ -943,12 +943,12 @@ int CmdLFfind(const char *Cmd)
 				PrintAndLog("\nValid EM4x05/EM4x69 Chip Found\nUse lf em 4x05readword/dump commands to read\n");
 				return 1;
 			}
-			ans=CmdLFHitagReader("26"); // 26 = RHT2F_UID_ONLY
-			if (ans==0) {
+            if (getHitagUid(NULL, true)) {
+				PrintAndLog("\nValid Hitag2 tag Found!");
 				return 1;
-			}
-			ans=CmdCOTAGRead("");
-			if (ans>0) {
+            }
+ 			ans = CmdCOTAGRead("");
+			if (ans > 0) {
 				PrintAndLog("\nValid COTAG ID Found!");
 				return 1;
 			}
