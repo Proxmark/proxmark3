@@ -39,7 +39,8 @@ void SetAdcMuxFor(uint32_t whichGpio);
 #define FPGA_CMD_SET_CONFREG                        (1<<12)
 // LF
 #define FPGA_CMD_SET_DIVISOR                        (2<<12)
-#define FPGA_CMD_SET_USER_BYTE1                     (3<<12)
+#define FPGA_CMD_SET_EDGE_DETECT_THRESHOLD          (3<<12)
+
 // HF
 #define FPGA_CMD_TRACE_ENABLE                       (2<<12)
 
@@ -61,9 +62,8 @@ void SetAdcMuxFor(uint32_t whichGpio);
 #define FPGA_LF_ADC_READER_FIELD                    (1<<0)
 
 // Options for LF_EDGE_DETECT
-#define FPGA_CMD_SET_EDGE_DETECT_THRESHOLD          FPGA_CMD_SET_USER_BYTE1
 #define FPGA_LF_EDGE_DETECT_READER_FIELD            (1<<0)
-#define FPGA_LF_EDGE_DETECT_TOGGLE_MODE             (1<<1)
+#define FPGA_LF_EDGE_DETECT_TOGGLE_MODE             (2<<0)
 
 // Options for the HF reader
 #define FPGA_HF_READER_MODE_RECEIVE_IQ              (0<<0)

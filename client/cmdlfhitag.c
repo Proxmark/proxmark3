@@ -70,7 +70,7 @@ static int CmdLFHitagList(const char *Cmd) {
 
 	for (;;) {
 
-		if(i > traceLen) { break; }
+		if(i >= traceLen) { break; }
 
 		bool isResponse;
 		int timestamp = *((uint32_t *)(got+i));
@@ -208,7 +208,7 @@ static int CmdLFHitagSim(const char *Cmd) {
 }
 
 
-static bool getHitagUid(uint32_t *uid) {
+bool getHitagUid(uint32_t *uid, bool quiet) {
 	// ToDo: this is for Hitag2 only (??)
 	
 	UsbCommand c = {CMD_READER_HITAG, {RHT2F_UID_ONLY}};
@@ -217,12 +217,12 @@ static bool getHitagUid(uint32_t *uid) {
 
 	UsbCommand resp;
 	if (!WaitForResponseTimeout(CMD_ACK, &resp, 2500)) {
-		PrintAndLogEx(WARNING, "timeout while waiting for reply.");
+		if (!quiet) PrintAndLogEx(WARNING, "timeout while waiting for reply.");
 		return false;
 	}
 
 	if (resp.arg[0] == false) {
-		PrintAndLogEx(DEBUG, "DEBUG: Error - failed getting UID");
+		if (!quiet) PrintAndLogEx(DEBUG, "DEBUG: Error - failed getting UID");
 		return false;
 	}
 
@@ -246,7 +246,7 @@ static int CmdLFHitagInfo(const char *Cmd) {
 
 	// read UID
 	uint32_t uid = 0;
-	if (getHitagUid(&uid) == false)
+	if (getHitagUid(&uid, false) == false)
 		return 1;
 
 	PrintAndLogEx(SUCCESS, "UID: %08X", uid);
@@ -271,28 +271,15 @@ int CmdLFHitagReader(const char *Cmd) {
 	hitag_function htf = param_get32ex(Cmd, 0, 0, 10);
 
 	switch (htf) {
-		case 01: { //RHTSF_CHALLENGE
+		case RHTSF_CHALLENGE: {
 			c = (UsbCommand){ CMD_READ_HITAG_S };
 			num_to_bytes(param_get32ex(Cmd, 1, 0, 16), 4, htd->auth.NrAr);
 			num_to_bytes(param_get32ex(Cmd, 2, 0, 16), 4, htd->auth.NrAr+4);
 			c.arg[1] = param_get64ex(Cmd, 3, 0, 0); //firstpage
 			c.arg[2] = param_get64ex(Cmd, 4, 0, 0); //tag mode
 		} break;
-		case 02: { //RHTSF_KEY
+		case RHTSF_KEY: {
 			c = (UsbCommand){ CMD_READ_HITAG_S };
-			num_to_bytes(param_get64ex(Cmd, 1, 0, 16), 6, htd->crypto.key);
-			c.arg[1] = param_get64ex(Cmd, 2, 0, 0); //firstpage
-			c.arg[2] = param_get64ex(Cmd, 3, 0, 0); //tag mode
-		} break;
-		case 03: { //RHTSF_CHALLENGE BLOCK
-			c = (UsbCommand){ CMD_READ_HITAG_S_BLK };
-			num_to_bytes(param_get32ex(Cmd, 1, 0, 16), 4, htd->auth.NrAr);
-			num_to_bytes(param_get32ex(Cmd, 2, 0, 16), 4, htd->auth.NrAr+4);
-			c.arg[1] = param_get64ex(Cmd, 3, 0, 0); //firstpage
-			c.arg[2] = param_get64ex(Cmd, 4, 0, 0); //tag mode
-		} break;
-		case 04: { //RHTSF_KEY BLOCK
-			c = (UsbCommand){ CMD_READ_HITAG_S_BLK };
 			num_to_bytes(param_get64ex(Cmd, 1, 0, 16), 6, htd->crypto.key);
 			c.arg[1] = param_get64ex(Cmd, 2, 0, 0); //firstpage
 			c.arg[2] = param_get64ex(Cmd, 3, 0, 0); //tag mode
@@ -322,8 +309,6 @@ int CmdLFHitagReader(const char *Cmd) {
 			PrintAndLog("  HitagS (0*):");
 			PrintAndLog("    01 <nr> <ar> (Challenge) <firstPage> <tagmode> read all pages from a Hitag S tag");
 			PrintAndLog("    02 <key> (set to 0 if no authentication is needed) <firstPage> <tagmode> read all pages from a Hitag S tag");
-			PrintAndLog("    03 <nr> <ar> (Challenge) <firstPage> <tagmode> read all blocks from a Hitag S tag");
-			PrintAndLog("    04 <key> (set to 0 if no authentication is needed) <firstPage> <tagmode> read all blocks from a Hitag S tag");
 			PrintAndLog("    Valid tagmodes are 0=STANDARD, 1=ADVANCED, 2=FAST_ADVANCED (default is ADVANCED)");
 			PrintAndLog("  Hitag1 (1*):");
 			PrintAndLog("    (not yet implemented)");
@@ -356,11 +341,11 @@ int CmdLFHitagReader(const char *Cmd) {
 		return 1;
 	}
 
-	uint32_t id = bytes_to_num(resp.d.asBytes,4);
+	uint32_t id = bytes_to_num(resp.d.asBytes, 4);
 
-	if (htf == RHT2F_UID_ONLY){
-		PrintAndLog("Valid Hitag2 tag found - UID: %08x",id);
-	} else {
+	PrintAndLog("Valid Hitag2 tag found - UID: %08x", id);
+	if (htf != RHT2F_UID_ONLY) {
+        PrintAndLogEx(SUCCESS, "Dumping tag memory...");
 		char filename[256];
 		FILE* pf = NULL;
 
