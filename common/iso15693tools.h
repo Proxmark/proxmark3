@@ -11,6 +11,6 @@
 uint16_t Iso15693Crc(uint8_t *v, int n);
 int Iso15693AddCrc(uint8_t *req, int n);
 char* Iso15693sprintUID(char *target, uint8_t *uid);
-unsigned short iclass_crc16(char *data_p, unsigned short length);
+unsigned short iclass_crc16(uint8_t *data_p, unsigned short length);
 
 #endif

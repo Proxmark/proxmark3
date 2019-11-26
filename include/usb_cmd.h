@@ -161,7 +161,6 @@ typedef struct{
 #define CMD_SNOOP_ICLASS                                                  0x0392
 #define CMD_SIMULATE_TAG_ICLASS                                           0x0393
 #define CMD_READER_ICLASS                                                 0x0394
-#define CMD_READER_ICLASS_REPLAY                                          0x0395
 #define CMD_ICLASS_READBLOCK                                              0x0396
 #define CMD_ICLASS_WRITEBLOCK                                             0x0397
 #define CMD_ICLASS_EML_MEMSET                                             0x0398

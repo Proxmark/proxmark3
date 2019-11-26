@@ -3,6 +3,7 @@
 // Hagen Fritsch - June 2010
 // Gerhard de Koning Gans - May 2011
 // Gerhard de Koning Gans - June 2012 - Added iClass card and reader emulation
+// piwi - 2019
 //
 // This code is licensed to you under the terms of the GNU GPL, version 2 or,
 // at your option, any later version. See the LICENSE.txt file for the text of
@@ -10,30 +11,9 @@
 //-----------------------------------------------------------------------------
 // Routines to support iClass.
 //-----------------------------------------------------------------------------
-// Based on ISO14443a implementation. Still in experimental phase.
 // Contribution made during a security research at Radboud University Nijmegen
 //
 // Please feel free to contribute and extend iClass support!!
-//-----------------------------------------------------------------------------
-//
-// FIX:
-// ====
-// We still have sometimes a demodulation error when snooping iClass communication.
-// The resulting trace of a read-block-03 command may look something like this:
-//
-//  +  22279:    :     0c  03  e8  01
-//
-//    ...with an incorrect answer...
-//
-//  +     85:   0: TAG ff! ff! ff! ff! ff! ff! ff! ff! bb  33  bb  00  01! 0e! 04! bb     !crc
-//
-// We still left the error signalling bytes in the traces like 0xbb
-//
-// A correct trace should look like this:
-//
-// +  21112:    :     0c  03  e8  01
-// +     85:   0: TAG ff  ff  ff  ff  ff  ff  ff  ff  ea  f5
-//
 //-----------------------------------------------------------------------------
 
 #include "iclass.h"
@@ -676,6 +656,7 @@ static bool sendCmdGetResponseWithRetries(uint8_t* command, size_t cmdsize, uint
 	return false;//Error
 }
 
+
 /**
  * @brief Selects an iclass tag
  * @param card_data where the CSN is stored for return
@@ -795,164 +776,10 @@ void ReaderIClass(uint8_t flags) {
 }
 
 
-void ReaderIClass_Replay(uint8_t arg0, uint8_t *MAC) {
-
-	LED_A_ON();
-
-	bool use_credit_key = false;
-	uint8_t card_data[USB_CMD_DATA_SIZE]={0};
-	uint16_t block_crc_LUT[255] = {0};
-
-	//Generate a lookup table for block crc
-	for (int block = 0; block < 255; block++){
-		char bl = block;
-		block_crc_LUT[block] = iclass_crc16(&bl ,1);
-	}
-	//Dbprintf("Lookup table: %02x %02x %02x" ,block_crc_LUT[0],block_crc_LUT[1],block_crc_LUT[2]);
-
-	uint8_t readcheck_cc[] = { ICLASS_CMD_READCHECK_KD, 0x02 };
-	if (use_credit_key)
-		readcheck_cc[0] = ICLASS_CMD_READCHECK_KC;
-	uint8_t check[]       = { 0x05, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
-	uint8_t read[]        = { 0x0c, 0x00, 0x00, 0x00 };
-
-	uint16_t crc = 0;
-	uint8_t cardsize = 0;
-	uint8_t mem = 0;
-
-	static struct memory_t {
-		int k16;
-		int book;
-		int k2;
-		int lockauth;
-		int keyaccess;
-	} memory;
-
-	uint8_t resp[ICLASS_BUFFER_SIZE];
-
-	set_tracing(true);
-	clear_trace();
-	Iso15693InitReader();
-
-	StartCountSspClk();
-	uint32_t start_time = 0;
-	uint32_t eof_time = 0;
-
-	while (!BUTTON_PRESS()) {
-
-		WDT_HIT();
-
-		if (!get_tracing()) {
-			DbpString("Trace full");
-			break;
-		}
-
-		if (!selectIclassTag(card_data, &eof_time)) continue;
-
-		start_time = eof_time + DELAY_ICLASS_VICC_TO_VCD_READER;
-		if (!sendCmdGetResponseWithRetries(readcheck_cc, sizeof(readcheck_cc), resp, sizeof(resp), 8, 3, start_time, ICLASS_READER_TIMEOUT_OTHERS, &eof_time)) continue;
-
-		// replay captured auth (cc must not have been updated)
-		memcpy(check+5, MAC, 4);
-
-		start_time = eof_time + DELAY_ICLASS_VICC_TO_VCD_READER;
-		if (!sendCmdGetResponseWithRetries(check, sizeof(check), resp, sizeof(resp), 4, 5, start_time, ICLASS_READER_TIMEOUT_OTHERS, &eof_time)) {
-			Dbprintf("Error: Authentication Fail!");
-			continue;
-		}
-
-		//first get configuration block (block 1)
-		crc = block_crc_LUT[1];
-		read[1] = 1;
-		read[2] = crc >> 8;
-		read[3] = crc & 0xff;
-
-		start_time = eof_time + DELAY_ICLASS_VICC_TO_VCD_READER;
-		if (!sendCmdGetResponseWithRetries(read, sizeof(read), resp, sizeof(resp), 10, 10, start_time, ICLASS_READER_TIMEOUT_OTHERS, &eof_time)) {
-			start_time = eof_time + DELAY_ICLASS_VICC_TO_VCD_READER;
-			Dbprintf("Dump config (block 1) failed");
-			continue;
-		}
-
-		mem = resp[5];
-		memory.k16 = (mem & 0x80);
-		memory.book = (mem & 0x20);
-		memory.k2 = (mem & 0x8);
-		memory.lockauth = (mem & 0x2);
-		memory.keyaccess = (mem & 0x1);
-
-		cardsize = memory.k16 ? 255 : 32;
-		WDT_HIT();
-		//Set card_data to all zeroes, we'll fill it with data
-		memset(card_data, 0x0, USB_CMD_DATA_SIZE);
-		uint8_t failedRead = 0;
-		uint32_t stored_data_length = 0;
-		//then loop around remaining blocks
-		for (int block = 0; block < cardsize; block++) {
-			read[1] = block;
-			crc = block_crc_LUT[block];
-			read[2] = crc >> 8;
-			read[3] = crc & 0xff;
-
-			start_time = eof_time + DELAY_ICLASS_VICC_TO_VCD_READER;
-			if (sendCmdGetResponseWithRetries(read, sizeof(read), resp, sizeof(resp), 10, 10, start_time, ICLASS_READER_TIMEOUT_OTHERS, &eof_time)) {
-				Dbprintf("     %02x: %02x %02x %02x %02x %02x %02x %02x %02x",
-						block, resp[0], resp[1], resp[2],
-						resp[3], resp[4], resp[5],
-						resp[6], resp[7]);
-
-				//Fill up the buffer
-				memcpy(card_data+stored_data_length, resp, 8);
-				stored_data_length += 8;
-				if (stored_data_length +8 > USB_CMD_DATA_SIZE) {
-					//Time to send this off and start afresh
-					cmd_send(CMD_ACK,
-							 stored_data_length,//data length
-							 failedRead,//Failed blocks?
-							 0,//Not used ATM
-							 card_data, stored_data_length);
-					//reset
-					stored_data_length = 0;
-					failedRead = 0;
-				}
-
-			} else {
-				failedRead = 1;
-				stored_data_length += 8;//Otherwise, data becomes misaligned
-				Dbprintf("Failed to dump block %d", block);
-			}
-		}
-
-		//Send off any remaining data
-		if (stored_data_length > 0) {
-			cmd_send(CMD_ACK,
-					 stored_data_length,//data length
-					 failedRead,//Failed blocks?
-					 0,//Not used ATM
-					 card_data,
-					 stored_data_length);
-		}
-		//If we got here, let's break
-		break;
-	}
-	//Signal end of transmission
-	cmd_send(CMD_ACK,
-			 0,//data length
-			 0,//Failed blocks?
-			 0,//Not used ATM
-			 card_data,
-			 0);
-
-	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
-	LED_D_OFF();
-	LED_A_OFF();
-}
-
-
-void iClass_Check(uint8_t *MAC) {
+void iClass_Check(uint8_t *NRMAC) {
 	uint8_t check[9] = {ICLASS_CMD_CHECK_KD, 0x00};
 	uint8_t resp[4];
-	memcpy(check+5, MAC, 4);
+	memcpy(check+1, NRMAC, 8);
 	uint32_t eof_time;
 	bool isOK = sendCmdGetResponseWithRetries(check, sizeof(check), resp, sizeof(resp), 4, 6, 0, ICLASS_READER_TIMEOUT_OTHERS, &eof_time);
 	cmd_send(CMD_ACK, isOK, 0, 0, resp, sizeof(resp));
@@ -973,7 +800,7 @@ void iClass_Readcheck(uint8_t block, bool use_credit_key) {
 
 static bool iClass_ReadBlock(uint8_t blockNo, uint8_t *readdata) {
 	uint8_t readcmd[] = {ICLASS_CMD_READ_OR_IDENTIFY, blockNo, 0x00, 0x00}; //0x88, 0x00 // can i use 0C?
-	char bl = blockNo;
+	uint8_t bl = blockNo;
 	uint16_t rdCrc = iclass_crc16(&bl, 1);
 	readcmd[2] = rdCrc >> 8;
 	readcmd[3] = rdCrc & 0xff;
@@ -991,7 +818,7 @@ void iClass_ReadBlk(uint8_t blockno) {
 
 	LED_A_ON();
 
-	uint8_t readblockdata[] = {0,0,0,0,0,0,0,0,0,0};
+	uint8_t readblockdata[10];
 	bool isOK = iClass_ReadBlock(blockno, readblockdata);
 	cmd_send(CMD_ACK, isOK, 0, 0, readblockdata, 8);
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
