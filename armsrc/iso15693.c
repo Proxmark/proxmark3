@@ -1581,17 +1581,15 @@ void ReaderIso15693(uint32_t parameter) {
 	answerLen = GetIso15693AnswerFromTag(answer, sizeof(answer), DELAY_ISO15693_VCD_TO_VICC_READER * 2, &eof_time) ;
 	start_time = eof_time + DELAY_ISO15693_VICC_TO_VCD_READER;
 
-	if (answerLen >=12) // we should do a better check than this
-	{
+	if (answerLen >= 12) { // we should do a better check than this
 		TagUID[0] = answer[2];
 		TagUID[1] = answer[3];
 		TagUID[2] = answer[4];
 		TagUID[3] = answer[5];
 		TagUID[4] = answer[6];
 		TagUID[5] = answer[7];
-		TagUID[6] = answer[8]; // IC Manufacturer code
-		TagUID[7] = answer[9]; // always E0
-
+		TagUID[6] = answer[8];
+		TagUID[7] = answer[9]; // IC Manufacturer code always E0
 	}
 
 	Dbprintf("%d octets read from IDENTIFY request:", answerLen);
@@ -1603,15 +1601,6 @@ void ReaderIso15693(uint32_t parameter) {
 		Dbprintf("UID = %02hX%02hX%02hX%02hX%02hX%02hX%02hX%02hX",
 			TagUID[7],TagUID[6],TagUID[5],TagUID[4],
 			TagUID[3],TagUID[2],TagUID[1],TagUID[0]);
-
-
-	// Dbprintf("%d octets read from SELECT request:", answerLen2);
-	// DbdecodeIso15693Answer(answerLen2,answer2);
-	// Dbhexdump(answerLen2,answer2,true);
-
-	// Dbprintf("%d octets read from XXX request:", answerLen3);
-	// DbdecodeIso15693Answer(answerLen3,answer3);
-	// Dbhexdump(answerLen3,answer3,true);
 
 	// read all pages
 	if (answerLen >= 12 && DEBUG) {
@@ -1629,7 +1618,7 @@ void ReaderIso15693(uint32_t parameter) {
 		}
 	}
 
-	// for the time being, switch field off to protect rdv4.0
+	// for the time being, switch field off to protect RDV4
 	// note: this prevents using hf 15 cmd with s option - which isn't implemented yet anyway
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
 	LED_D_OFF();
@@ -1808,12 +1797,12 @@ void SetTag15693Uid(uint8_t *uid) {
 		cmd[i][7] = crc & 0xff;
 		cmd[i][8] = crc >> 8;
 
+		recvlen = SendDataTag(cmd[i], sizeof(cmd[i]), true, 1, recvbuf, sizeof(recvbuf), 0, &eof_time);
+
 		if (DEBUG) {
 			Dbprintf("SEND:");
 			Dbhexdump(sizeof(cmd[i]), cmd[i], false);
 		}
-
-		recvlen = SendDataTag(cmd[i], sizeof(cmd[i]), true, 1, recvbuf, sizeof(recvbuf), 0, &eof_time);
 
 		if (DEBUG) {
 			Dbprintf("RECV:");
