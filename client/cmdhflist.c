@@ -243,32 +243,33 @@ void annotateIclass(char *exp, size_t size, uint8_t* cmd, uint8_t cmdsize) {
 }
 
 
-void annotateIso15693(char *exp, size_t size, uint8_t* cmd, uint8_t cmdsize)
-{
-	switch(cmd[1]){
-		// Mandatory Commands, all Tags must support them:
-		case ISO15693_INVENTORY             :snprintf(exp, size, "INVENTORY");return;
-		case ISO15693_STAYQUIET             :snprintf(exp, size, "STAY_QUIET");return;
-		// Optional Commands, Tags may support them:
-		case ISO15693_READBLOCK             :snprintf(exp, size, "READBLOCK");return;
-		case ISO15693_WRITEBLOCK            :snprintf(exp, size, "WRITEBLOCK");return;
-		case ISO15693_LOCKBLOCK             :snprintf(exp, size, "LOCKBLOCK");return;
-		case ISO15693_READ_MULTI_BLOCK      :snprintf(exp, size, "READ_MULTI_BLOCK");return;
-		case ISO15693_SELECT                :snprintf(exp, size, "SELECT");return;
-		case ISO15693_RESET_TO_READY        :snprintf(exp, size, "RESET_TO_READY");return;
-		case ISO15693_WRITE_AFI             :snprintf(exp, size, "WRITE_AFI");return;
-		case ISO15693_LOCK_AFI              :snprintf(exp, size, "LOCK_AFI");return;
-		case ISO15693_WRITE_DSFID           :snprintf(exp, size, "WRITE_DSFID");return;
-		case ISO15693_LOCK_DSFID            :snprintf(exp, size, "LOCK_DSFID");return;
-		case ISO15693_GET_SYSTEM_INFO       :snprintf(exp, size, "GET_SYSTEM_INFO");return;
-		case ISO15693_READ_MULTI_SECSTATUS  :snprintf(exp, size, "READ_MULTI_SECSTATUS");return;
-		default: break;
-	}
+void annotateIso15693(char *exp, size_t size, uint8_t* cmd, uint8_t cmdsize) {
+	if (cmdsize >= 2) {
+		switch (cmd[1]) {
+			// Mandatory Commands, all Tags must support them:
+			case ISO15693_INVENTORY             :snprintf(exp, size, "INVENTORY");return;
+			case ISO15693_STAYQUIET             :snprintf(exp, size, "STAY_QUIET");return;
+			// Optional Commands, Tags may support them:
+			case ISO15693_READBLOCK             :snprintf(exp, size, "READBLOCK");return;
+			case ISO15693_WRITEBLOCK            :snprintf(exp, size, "WRITEBLOCK");return;
+			case ISO15693_LOCKBLOCK             :snprintf(exp, size, "LOCKBLOCK");return;
+			case ISO15693_READ_MULTI_BLOCK      :snprintf(exp, size, "READ_MULTI_BLOCK");return;
+			case ISO15693_SELECT                :snprintf(exp, size, "SELECT");return;
+			case ISO15693_RESET_TO_READY        :snprintf(exp, size, "RESET_TO_READY");return;
+			case ISO15693_WRITE_AFI             :snprintf(exp, size, "WRITE_AFI");return;
+			case ISO15693_LOCK_AFI              :snprintf(exp, size, "LOCK_AFI");return;
+			case ISO15693_WRITE_DSFID           :snprintf(exp, size, "WRITE_DSFID");return;
+			case ISO15693_LOCK_DSFID            :snprintf(exp, size, "LOCK_DSFID");return;
+			case ISO15693_GET_SYSTEM_INFO       :snprintf(exp, size, "GET_SYSTEM_INFO");return;
+			case ISO15693_READ_MULTI_SECSTATUS  :snprintf(exp, size, "READ_MULTI_SECSTATUS");return;
+			default: break;
+		}
 
-	if (cmd[1] > ISO15693_STAYQUIET && cmd[1] < ISO15693_READBLOCK) snprintf(exp, size, "Mandatory RFU");
-	else if (cmd[1] > ISO15693_READ_MULTI_SECSTATUS && cmd[1] <= 0x9F) snprintf(exp, size, "Optional RFU");
-	else if ( cmd[1] >= 0xA0 && cmd[1] <= 0xDF ) snprintf(exp, size, "Custom command");
-	else if ( cmd[1] >= 0xE0 && cmd[1] <= 0xFF ) snprintf(exp, size, "Proprietary command");
+		if (cmd[1] > ISO15693_STAYQUIET && cmd[1] < ISO15693_READBLOCK) snprintf(exp, size, "Mandatory RFU");
+		else if (cmd[1] > ISO15693_READ_MULTI_SECSTATUS && cmd[1] <= 0x9F) snprintf(exp, size, "Optional RFU");
+		else if ( cmd[1] >= 0xA0 && cmd[1] <= 0xDF ) snprintf(exp, size, "Custom command");
+		else if ( cmd[1] >= 0xE0 && cmd[1] <= 0xFF ) snprintf(exp, size, "Proprietary command");
+	}
 }
 
 
@@ -969,6 +970,8 @@ uint16_t printTraceLine(uint16_t tracepos, uint16_t traceLen, uint8_t *trace, ui
 	if (data_len == 0) {
 		if (protocol == ICLASS && duration == 2048) {
 			sprintf(line[0], " <SOF>");
+		} else if (protocol == ISO_15693 && duration == 512) {
+			sprintf(line[0], " <EOF>");
 		} else {
 			sprintf(line[0], " <empty trace - possible error>");
 		}

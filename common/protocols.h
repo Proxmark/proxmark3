@@ -187,6 +187,7 @@ NXP/Philips CUSTOM COMMANDS
 #define ISO15693_WRITEBLOCK                  0x21
 #define ISO15693_LOCKBLOCK                   0x22
 #define ISO15693_READ_MULTI_BLOCK            0x23
+#define ISO15693_WRITE_MULTI_BLOCK           0x23
 #define ISO15693_SELECT                      0x25
 #define ISO15693_RESET_TO_READY              0x26
 #define ISO15693_WRITE_AFI                   0x27
