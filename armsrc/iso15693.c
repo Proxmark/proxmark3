@@ -1854,10 +1854,10 @@ void SetTag15693Uid(uint8_t *uid) {
 				DbdecodeIso15693Answer(recvlen, recvbuf);
 			}
 		}
-	
-		if (recvlen <= 0) {
-			break;
-		}
+		// Note: need to know if we expect an answer from one of the magic commands
+		// if (recvlen < 0) {
+			// break;
+		// }
 	}
 
 	cmd_send(CMD_ACK, recvlen, 0, 0, NULL, 0);

@@ -984,17 +984,24 @@ static int CmdHF15CSetUID(const char *Cmd) {
 	SendCommand(&c);
 	
 	UsbCommand resp;
-	if (WaitForResponseTimeout(CMD_ACK, &resp, 1000)) {
+	if (WaitForResponseTimeout(CMD_ACK, &resp, 2000)) {
 		int recv_len = resp.arg[0];
+		uint8_t *recv = resp.d.asBytes;
 		if (recv_len == 0) {
-			PrintAndLog("received SOF only. Maybe Picopass/iCLASS?");
+			PrintAndLog("Received SOF only. Maybe Picopass/iCLASS?");
 		} else if (recv_len == -1) {
-			PrintAndLog("card didn't respond");
+			PrintAndLog("Tag didn't respond");
 		} else if (recv_len == -2) {
-			PrintAndLog("receive buffer overflow");
+			PrintAndLog("Receive buffer overflow");
+		} else if (ISO15693_CRC_CHECK != Crc(recv, recv_len)) {
+			PrintAndLog("CRC check failed on Tag response");
+		} else if (!(recv[0] & ISO15693_RES_ERROR)) {
+			PrintAndLog("Tag returned OK");	
+		} else {
+			PrintAndLog("Tag returned Error %i: %s", recv[1], TagErrorStr(recv[1])); 
 		}
 	} else {
-		PrintAndLog("timeout while waiting for reply.");
+		PrintAndLog("No answer from Proxmark");
 	}
 	
 	if (!getUID(newUid)) {
