@@ -2,6 +2,7 @@
 // Copyright (C) 2010 iZsh <izsh at fail0verflow.com>, Hagen Fritsch
 // Copyright (C) 2011 Gerhard de Koning Gans
 // Copyright (C) 2014 Midnitesnake & Andy Davies & Martin Holst Swende
+// Copyright (C) 2019 piwi
 //
 // This code is licensed to you under the terms of the GNU GPL, version 2 or,
 // at your option, any later version. See the LICENSE.txt file for the text of
@@ -404,29 +405,6 @@ static int CmdHFiClassReader(const char *Cmd) {
 }
 
 
-static int CmdHFiClassReader_Replay(const char *Cmd) {
-	uint8_t readerType = 0;
-	uint8_t MAC[4]={0x00, 0x00, 0x00, 0x00};
-
-	if (strlen(Cmd)<1) {
-		PrintAndLog("Usage:  hf iclass replay <MAC>");
-		PrintAndLog("        sample: hf iclass replay 00112233");
-		return 0;
-	}
-
-	if (param_gethex(Cmd, 0, MAC, 8)) {
-		PrintAndLog("MAC must include 8 HEX symbols");
-		return 1;
-	}
-
-	UsbCommand c = {CMD_READER_ICLASS_REPLAY, {readerType}};
-	memcpy(c.d.asBytes, MAC, 4);
-	SendCommand(&c);
-
-	return 0;
-}
-
-
 static void usage_hf_iclass_eload(void) {
 	PrintAndLog("Loads iclass tag-dump into emulator memory on device");
 	PrintAndLog("Usage:  hf iclass eload f <filename>");
@@ -710,15 +688,24 @@ static void HFiClassCalcDivKey(uint8_t *CSN, uint8_t *KEY, uint8_t *div_key, boo
 }
 
 
-static bool iClass_authenticate(uint8_t *CSN, uint8_t *KEY, uint8_t *MAC, uint8_t *div_key, bool use_credit_key, bool elite, bool rawkey, bool verbose) {
+static bool iClass_authenticate(uint8_t *CSN, uint8_t *KEY, uint8_t *MAC, uint8_t *div_key, bool use_credit_key, bool elite, bool rawkey, bool replay, bool verbose) {
 
 	//get div_key
-	if (rawkey)
+	if (rawkey || replay)
 		memcpy(div_key, KEY, 8);
 	else
 		HFiClassCalcDivKey(CSN, KEY, div_key, elite);
 
-	if (verbose) PrintAndLog("Authenticating with %s: %s", rawkey ? "raw key" : "diversified key", sprint_hex(div_key, 8));
+	char keytypetext[23] = "legacy diversified key";
+	if (rawkey) {
+		strcpy(keytypetext, "raw key");
+	} else if (replay) {
+		strcpy(keytypetext, "replayed NR/MAC");
+	} else if (elite) {
+		strcpy(keytypetext, "Elite diversified key");
+	}
+	
+	if (verbose) PrintAndLog("Authenticating with %s: %s", keytypetext, sprint_hex(div_key, 8));
 
 	UsbCommand resp;
 	UsbCommand d = {CMD_ICLASS_READCHECK, {2, use_credit_key, 0}};
@@ -736,14 +723,22 @@ static bool iClass_authenticate(uint8_t *CSN, uint8_t *KEY, uint8_t *MAC, uint8_
 		return false;
 	}
 
-	uint8_t CCNR[12];
-	memcpy(CCNR, resp.d.asBytes, 8);
-	memset(CCNR+8, 0x00, 4); // NR = {0, 0, 0, 0}
-
-	doMAC(CCNR, div_key, MAC);
+	if (replay) {
+		memcpy(MAC, KEY+4, 4);
+	} else {
+		uint8_t CCNR[12];
+		memcpy(CCNR, resp.d.asBytes, 8);
+		memset(CCNR+8, 0x00, 4); // default NR = {0, 0, 0, 0}
+		doMAC(CCNR, div_key, MAC);
+	}
 
 	d.cmd = CMD_ICLASS_CHECK;
-	memcpy(d.d.asBytes, MAC, 4);
+	if (replay) {
+		memcpy(d.d.asBytes, KEY, 8);
+	} else {
+		memset(d.d.asBytes, 0x00, 4); // default NR = {0, 0, 0, 0}
+		memcpy(d.d.asBytes+4, MAC, 4);
+	}
 	clearCommandBuffer();
 	SendCommand(&d);
 	if (!WaitForResponseTimeout(CMD_ACK, &resp, 4500)) {
@@ -760,15 +755,16 @@ static bool iClass_authenticate(uint8_t *CSN, uint8_t *KEY, uint8_t *MAC, uint8_
 
 
 static void usage_hf_iclass_dump(void) {
-	PrintAndLog("Usage:  hf iclass dump f <fileName> k <Key> c <CreditKey> e|r\n");
+	PrintAndLog("Usage:  hf iclass dump f <fileName> k <Key> c <CreditKey> e|r|n\n");
 	PrintAndLog("Options:");
 	PrintAndLog("  f <filename> : specify a filename to save dump to");
-	PrintAndLog("  k <Key>      : *Access Key as 16 hex symbols or 1 hex to select key from memory");
-	PrintAndLog("  c <CreditKey>: Credit Key as 16 hex symbols or 1 hex to select key from memory");
-	PrintAndLog("  e            : If 'e' is specified, the key is interpreted as the 16 byte");
-	PrintAndLog("                 Custom Key (KCus), which can be obtained via reader-attack");
+	PrintAndLog("  k <Key>      : *Debit Key (AA1) as 16 hex symbols (8 bytes) or 1 hex to select key from memory");
+	PrintAndLog("  c <CreditKey>: Credit Key (AA2) as 16 hex symbols (8 bytes) or 1 hex to select key from memory");
+	PrintAndLog("  e            : If 'e' is specified, the keys are interpreted as Elite");
+	PrintAndLog("                 Custom Keys (KCus), which can be obtained via reader-attack");
 	PrintAndLog("                 See 'hf iclass sim 2'. This key should be on iclass-format");
-	PrintAndLog("  r            : If 'r' is specified, the key is interpreted as raw block 3/4");
+	PrintAndLog("  r            : If 'r' is specified, keys are interpreted as raw blocks 3/4");
+	PrintAndLog("  n            : If 'n' is specified, keys are interpreted as NR/MAC pairs which can be obtained by 'hf iclass snoop'");
 	PrintAndLog("  NOTE: * = required");
 	PrintAndLog("Samples:");
 	PrintAndLog("  hf iclass dump k 001122334455667B");
@@ -830,6 +826,7 @@ static int CmdHFiClassReader_Dump(const char *Cmd) {
 	bool use_credit_key = false;
 	bool elite = false;
 	bool rawkey = false;
+	bool NRMAC_replay = false;
 	bool errors = false;
 	bool verbose = false;
 	uint8_t cmdp = 0;
@@ -899,6 +896,11 @@ static int CmdHFiClassReader_Dump(const char *Cmd) {
 				rawkey = true;
 				cmdp++;
 				break;
+			case 'n':
+			case 'N':
+				NRMAC_replay = true;
+				cmdp++;
+				break;
 			case 'v':
 			case 'V':
 				verbose = true;
@@ -911,6 +913,11 @@ static int CmdHFiClassReader_Dump(const char *Cmd) {
 		}
 	}
 
+	if (elite + rawkey + NRMAC_replay > 1) {
+		PrintAndLog("You cannot combine the 'e', 'r', and 'n' options\n");
+		errors = true;
+	}
+	
 	if (errors || cmdp < 2) {
 		usage_hf_iclass_dump();
 		return 0;
@@ -951,8 +958,8 @@ static int CmdHFiClassReader_Dump(const char *Cmd) {
 		if (AA1_maxBlk > maxBlk) AA1_maxBlk = maxBlk;
 	}
 
-	// authenticate debit key (or credit key if we have no debit key) and get div_key - later store in dump block 3
-	if (!iClass_authenticate(tag_data, KEY, MAC, div_key, use_credit_key, elite, rawkey, verbose)){
+	// authenticate with debit key (or credit key if we have no debit key) and get div_key - later store in dump block 3
+	if (!iClass_authenticate(tag_data, KEY, MAC, div_key, use_credit_key, elite, rawkey, NRMAC_replay, verbose)){
 		DropField();
 		return 0;
 	}
@@ -987,7 +994,7 @@ static int CmdHFiClassReader_Dump(const char *Cmd) {
 			DropField();
 			// AA2 authenticate credit key and git c_div_key - later store in dump block 4
 			uint8_t CSN[8];
-			if (!iClass_select(CSN, verbose, false, true) || !iClass_authenticate(CSN, CreditKEY, MAC, c_div_key, true, false, false, verbose)){
+			if (!iClass_select(CSN, verbose, false, true) || !iClass_authenticate(CSN, CreditKEY, MAC, c_div_key, true, false, false, NRMAC_replay, verbose)){
 				DropField();
 				return 0;
 			}
@@ -1045,13 +1052,13 @@ static int CmdHFiClassReader_Dump(const char *Cmd) {
 }
 
 
-static int WriteBlock(uint8_t blockno, uint8_t *bldata, uint8_t *KEY, bool use_credit_key, bool elite, bool rawkey, bool verbose) {
+static int WriteBlock(uint8_t blockno, uint8_t *bldata, uint8_t *KEY, bool use_credit_key, bool elite, bool rawkey, bool NRMAC_replay, bool verbose) {
 
 	uint8_t MAC[4] = {0x00,0x00,0x00,0x00};
 	uint8_t div_key[8] = {0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00};
 	uint8_t CSN[8];
 
-	if (!iClass_select(CSN, verbose, true, true) || !iClass_authenticate(CSN, KEY, MAC, div_key, use_credit_key, elite, rawkey, verbose)) {
+	if (!iClass_select(CSN, verbose, true, true) || !iClass_authenticate(CSN, KEY, MAC, div_key, use_credit_key, elite, rawkey, NRMAC_replay, verbose)) {
 		DropField();
 		return 0;
 	}
@@ -1107,13 +1114,12 @@ static int CmdHFiClass_WriteBlock(const char *Cmd) {
 	char tempStr[50] = {0};
 	bool use_credit_key = false;
 	bool elite = false;
-	bool rawkey= false;
+	bool rawkey = false;
 	bool errors = false;
 	uint8_t cmdp = 0;
-	while(param_getchar(Cmd, cmdp) != 0x00)
-	{
-		switch(param_getchar(Cmd, cmdp))
-		{
+
+	while (param_getchar(Cmd, cmdp) != 0x00 && !errors)	{
+		switch(param_getchar(Cmd, cmdp)) {
 		case 'h':
 		case 'H':
 			usage_hf_iclass_writeblock();
@@ -1179,11 +1185,16 @@ static int CmdHFiClass_WriteBlock(const char *Cmd) {
 		}
 	}
 
+	if (elite && rawkey) {
+		PrintAndLog("You cannot combine the 'e' and 'r' options\n");
+		errors = true;
+	}
+		
 	if (cmdp < 6) {
 		usage_hf_iclass_writeblock();
 		return 0;
 	}
-	int ans = WriteBlock(blockno, bldata, KEY, use_credit_key, elite, rawkey, true);
+	int ans = WriteBlock(blockno, bldata, KEY, use_credit_key, elite, rawkey, false, true);
 	DropField();
 	return ans;
 }
@@ -1220,10 +1231,9 @@ static int CmdHFiClassCloneTag(const char *Cmd) {
 	bool rawkey = false;
 	bool errors = false;
 	uint8_t cmdp = 0;
-	while(param_getchar(Cmd, cmdp) != 0x00)
-	{
-		switch(param_getchar(Cmd, cmdp))
-		{
+	
+	while (param_getchar(Cmd, cmdp) != 0x00 && !errors) {
+		switch(param_getchar(Cmd, cmdp)) {
 		case 'h':
 		case 'H':
 			usage_hf_iclass_clone();
@@ -1338,7 +1348,7 @@ static int CmdHFiClassCloneTag(const char *Cmd) {
 	uint8_t div_key[8]={0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00};
 	uint8_t CSN[8];
 
-	if (!iClass_select(CSN, true, false, false) || !iClass_authenticate(CSN, KEY, MAC, div_key, use_credit_key, elite, rawkey, true)) {
+	if (!iClass_select(CSN, true, false, false) || !iClass_authenticate(CSN, KEY, MAC, div_key, use_credit_key, elite, rawkey, false, true)) {
 		DropField();
 		return 0;
 	}
@@ -1376,7 +1386,7 @@ static int CmdHFiClassCloneTag(const char *Cmd) {
 }
 
 
-static int ReadBlock(uint8_t *KEY, uint8_t blockno, uint8_t keyType, bool elite, bool rawkey, bool verbose, bool auth) {
+static int ReadBlock(uint8_t *KEY, uint8_t blockno, uint8_t keyType, bool elite, bool rawkey, bool NRMAC_replay, bool verbose, bool auth) {
 
 	uint8_t MAC[4]={0x00,0x00,0x00,0x00};
 	uint8_t div_key[8]={0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00};
@@ -1388,7 +1398,7 @@ static int ReadBlock(uint8_t *KEY, uint8_t blockno, uint8_t keyType, bool elite,
 	}
 
 	if (auth) {
-		if (!iClass_authenticate(CSN, KEY, MAC, div_key, (keyType==0x18), elite, rawkey, verbose)) {
+		if (!iClass_authenticate(CSN, KEY, MAC, div_key, (keyType==0x18), elite, rawkey, NRMAC_replay, verbose)) {
 			DropField();
 			return 0;
 		}
@@ -1418,13 +1428,14 @@ static int ReadBlock(uint8_t *KEY, uint8_t blockno, uint8_t keyType, bool elite,
 
 
 static void usage_hf_iclass_readblock(void) {
-	PrintAndLog("Usage:  hf iclass readblk b <Block> k <Key> [c] [e|r]\n");
+	PrintAndLog("Usage:  hf iclass readblk b <Block> k <Key> [c] [e|r|n]\n");
 	PrintAndLog("Options:");
 	PrintAndLog("  b <Block> : The block number as 2 hex symbols");
 	PrintAndLog("  k <Key>   : Access Key as 16 hex symbols or 1 hex to select key from memory");
 	PrintAndLog("  c         : If 'c' is specified, the key set is assumed to be the credit key\n");
 	PrintAndLog("  e         : If 'e' is specified, elite computations applied to key");
 	PrintAndLog("  r         : If 'r' is specified, no computations applied to key");
+	PrintAndLog("  n         : If 'n' is specified, <Key> specifies a NR/MAC pair which can be obtained by 'hf iclass snoop'");
 	PrintAndLog("Samples:");
 	PrintAndLog("  hf iclass readblk b 06 k 0011223344556677");
 	PrintAndLog("  hf iclass readblk b 1B k 0011223344556677 c");
@@ -1441,10 +1452,12 @@ static int CmdHFiClass_ReadBlock(const char *Cmd) {
 	char tempStr[50] = {0};
 	bool elite = false;
 	bool rawkey = false;
+	bool NRMAC_replay = false;
 	bool errors = false;
 	bool auth = false;
 	uint8_t cmdp = 0;
-	while (param_getchar(Cmd, cmdp) != 0x00) {
+
+	while (param_getchar(Cmd, cmdp) != 0x00 && !errors) {
 		switch (param_getchar(Cmd, cmdp)) {
 			case 'h':
 			case 'H':
@@ -1493,15 +1506,26 @@ static int CmdHFiClass_ReadBlock(const char *Cmd) {
 				rawkey = true;
 				cmdp++;
 				break;
+			case 'n':
+			case 'N':
+				NRMAC_replay = true;
+				cmdp++;
+				break;
 			default:
 				PrintAndLog("Unknown parameter '%c'\n", param_getchar(Cmd, cmdp));
 				errors = true;
 				break;
 		}
-		if (errors) {
-			usage_hf_iclass_readblock();
-			return 0;
-		}
+	}
+	
+	if (elite + rawkey + NRMAC_replay > 1) {
+		PrintAndLog("You cannot combine the 'e', 'r', and 'n' options\n");
+		errors = true;
+	}
+
+	if (errors) {
+		usage_hf_iclass_readblock();
+		return 0;
 	}
 
 	if (cmdp < 2) {
@@ -1511,7 +1535,7 @@ static int CmdHFiClass_ReadBlock(const char *Cmd) {
 	if (!auth)
 		PrintAndLog("warning: no authentication used with read, only a few specific blocks can be read accurately without authentication.");
 
-	return ReadBlock(KEY, blockno, keyType, elite, rawkey, true, auth);
+	return ReadBlock(KEY, blockno, keyType, elite, rawkey, NRMAC_replay, true, auth);
 }
 
 
@@ -1681,10 +1705,9 @@ static int CmdHFiClassCalcNewKey(const char *Cmd) {
 	bool elite = false;
 	bool errors = false;
 	uint8_t cmdp = 0;
-	while(param_getchar(Cmd, cmdp) != 0x00)
-	{
-		switch(param_getchar(Cmd, cmdp))
-		{
+	
+	while (param_getchar(Cmd, cmdp) != 0x00 && !errors) {
+		switch(param_getchar(Cmd, cmdp)) {
 		case 'h':
 		case 'H':
 			usage_hf_iclass_calc_newkey();
@@ -1865,10 +1888,8 @@ static int CmdHFiClassManageKeys(const char *Cmd) {
 	char tempStr[20];
 	uint8_t cmdp = 0;
 
-	while(param_getchar(Cmd, cmdp) != 0x00)
-	{
-		switch(param_getchar(Cmd, cmdp))
-		{
+	while(param_getchar(Cmd, cmdp) != 0x00) {
+		switch(param_getchar(Cmd, cmdp)) {
 		case 'h':
 		case 'H':
 			usage_hf_iclass_managekeys();
@@ -1928,11 +1949,13 @@ static int CmdHFiClassManageKeys(const char *Cmd) {
 			return 0;
 		}
 	}
+
 	if (operation == 0){
 		PrintAndLog("no operation specified (load, save, or print)\n");
 		usage_hf_iclass_managekeys();
 		return 0;
 	}
+
 	if (operation > 6){
 		PrintAndLog("Too many operations specified\n");
 		usage_hf_iclass_managekeys();
@@ -2006,6 +2029,7 @@ static int CmdHFiClassCheckKeys(const char *Cmd) {
 			break;
 		}
 	}
+
 	if (errors) {
 		usage_hf_iclass_chk();
 		return 0;
@@ -2071,7 +2095,7 @@ static int CmdHFiClassCheckKeys(const char *Cmd) {
 		memcpy(key, keyBlock + 8 * c , 8);
 
 		// debit key
-		if (!iClass_authenticate(CSN, key, mac, div_key, false, use_elite, use_raw, false))
+		if (!iClass_authenticate(CSN, key, mac, div_key, false, use_elite, use_raw, false, false))
 			continue;
 
 		// key found.
@@ -2080,7 +2104,7 @@ static int CmdHFiClassCheckKeys(const char *Cmd) {
 		found_debit = true;
 
 		// credit key
-		if (!iClass_authenticate(CSN, key, mac, div_key, true, use_elite, use_raw, false))
+		if (!iClass_authenticate(CSN, key, mac, div_key, true, use_elite, use_raw, false, false))
 			continue;
 
 		// key found
@@ -2172,7 +2196,7 @@ static command_t CommandTable[] = {
 	{"chk",         CmdHFiClassCheckKeys,           0,  "            Check keys"},
 	{"clone",       CmdHFiClassCloneTag,            0,  "[options..] Authenticate and Clone from iClass bin file"},
 	{"decrypt",     CmdHFiClassDecrypt,             1,  "[f <fname>] Decrypt tagdump" },
-	{"dump",        CmdHFiClassReader_Dump,         0,  "[options..] Authenticate and Dump iClass tag's AA1"},
+	{"dump",        CmdHFiClassReader_Dump,         0,  "[options..] Authenticate and Dump iClass tag's AA1 and/or AA2"},
 	{"eload",       CmdHFiClassELoad,               0,  "[f <fname>] (experimental) Load data into iClass emulator memory"},
 	{"encryptblk",  CmdHFiClassEncryptBlk,          1,  "<BlockData> Encrypt given block data"},
 	{"list",        CmdHFiClassList,                0,  "            (Deprecated) List iClass history"},
@@ -2182,7 +2206,6 @@ static command_t CommandTable[] = {
 	{"readblk",     CmdHFiClass_ReadBlock,          0,  "[options..] Authenticate and Read iClass block"},
 	{"reader",      CmdHFiClassReader,              0,  "            Look for iClass tags until a key or the pm3 button is pressed"},
 	{"readtagfile", CmdHFiClassReadTagFile,         1,  "[options..] Display Content from tagfile"},
-	{"replay",      CmdHFiClassReader_Replay,       0,  "<mac>       Read an iClass tag via Reply Attack"},
 	{"sim",         CmdHFiClassSim,                 0,  "[options..] Simulate iClass tag"},
 	{"snoop",       CmdHFiClassSnoop,               0,  "            Eavesdrop iClass communication"},
 	{"writeblk",    CmdHFiClass_WriteBlock,         0,  "[options..] Authenticate and Write iClass block"},
