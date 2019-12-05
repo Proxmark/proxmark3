@@ -1860,7 +1860,10 @@ void SetTag15693Uid(uint8_t *uid) {
 		// }
 	}
 
-	cmd_send(CMD_ACK, recvlen, 0, 0, NULL, 0);
+	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
+	LED_D_OFF();
+
+	cmd_send(CMD_ACK, recvlen, 0, 0, recvbuf, recvlen);
 	LED_A_OFF();
 }
 
