@@ -574,13 +574,13 @@ bool HIDPack(/* in */int FormatIndex, /* in */hidproxcard_t* card, /* out */hidp
 void HIDDisplayUnpackedCard(hidproxcard_t* card, const hidcardformat_t format){
   PrintAndLog("       Format: %s (%s)", format.Name, format.Descrp);
   if (format.Fields.hasFacilityCode)
-    PrintAndLog("Facility Code: %u",card->FacilityCode);
+    PrintAndLog("Facility Code: %" PRIu32,card->FacilityCode);
   if (format.Fields.hasCardNumber)
-    PrintAndLog("  Card Number: %lu",card->CardNumber);
+    PrintAndLog("  Card Number: %" PRIu64,card->CardNumber);
   if (format.Fields.hasIssueLevel)
-    PrintAndLog("  Issue Level: %u",card->IssueLevel);
+    PrintAndLog("  Issue Level: %" PRIu32,card->IssueLevel);
   if (format.Fields.hasOEMCode)
-    PrintAndLog("     OEM Code: %u",card->OEM);
+    PrintAndLog("     OEM Code: %" PRIu32,card->OEM);
   if (format.Fields.hasParity)
     PrintAndLog("       Parity: %s",card->ParityValid ? "Valid" : "Invalid");
 }
