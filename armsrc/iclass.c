@@ -863,12 +863,27 @@ static bool iClass_WriteBlock_ext(uint8_t blockNo, uint8_t *data) {
 	bool isOK = false;
 	uint32_t eof_time = 0;
 
-	isOK = sendCmdGetResponseWithRetries(write, sizeof(write), resp, sizeof(resp), 10, 10, 0, ICLASS_READER_TIMEOUT_UPDATE, &eof_time);
-	if (isOK && blockNo != 3 && blockNo != 4 && memcmp(write+2, resp, 8)) { // check response
-		isOK = false;
+	isOK = sendCmdGetResponseWithRetries(write, sizeof(write), resp, sizeof(resp), 10, 3, 0, ICLASS_READER_TIMEOUT_UPDATE, &eof_time);
+	if (!isOK) {
+		return false;
+	}
+	
+	uint8_t all_ff[8] = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
+	if (blockNo == 2) {
+		if (memcmp(data+4, resp, 4) || memcmp(data, resp+4, 4)) { // check response. e-purse update swaps first and second half
+			return false;
+		}
+	} else if (blockNo == 3 || blockNo == 4) {
+		if (memcmp(all_ff, resp, 8)) { // check response. Key updates always return 0xffffffffffffffff
+			return false;
+		}
+	} else {
+		if (memcmp(data, resp, 8)) { // check response. All other updates return unchanged data
+			return false;
+		}
 	}
 
-	return isOK;
+	return true;
 }
 
 
@@ -895,17 +910,16 @@ void iClass_Clone(uint8_t startblock, uint8_t endblock, uint8_t *data) {
 
 	LED_A_ON();
 
-	int i;
 	int written = 0;
 	int total_blocks = (endblock - startblock) + 1;
 
-	for (i = 0; i < total_blocks; i++) {
+	for (uint8_t block = startblock; block <= endblock; block++) {
 		// block number
-		if (iClass_WriteBlock_ext(i+startblock, data + (i*12))){
-			Dbprintf("Write block [%02x] successful", i + startblock);
+		if (iClass_WriteBlock_ext(block, data + (block-startblock)*12)) {
+			Dbprintf("Write block [%02x] successful", block);
 			written++;
 		} else {
-			Dbprintf("Write block [%02x] failed", i + startblock);
+			Dbprintf("Write block [%02x] failed", block);
 		}
 	}
 

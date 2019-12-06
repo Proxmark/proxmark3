@@ -51,11 +51,6 @@ static uint8_t iClass_Key_Table[ICLASS_KEYS_MAX][8] = {
 };
 
 
-typedef struct iclass_block {
-	uint8_t d[8];
-} iclass_block_t;
-
-
 // iclass / picopass chip config structures and shared routines
 typedef struct {
 	uint8_t app_limit;      //[8]
@@ -1098,23 +1093,25 @@ static void usage_hf_iclass_writeblock(void) {
 	PrintAndLog("  c         : If 'c' is specified, the key set is assumed to be the credit key\n");
 	PrintAndLog("  e         : If 'e' is specified, elite computations applied to key");
 	PrintAndLog("  r         : If 'r' is specified, no computations applied to key");
+	PrintAndLog("  o         : override protection and allow modification of blocks 0...4");
 	PrintAndLog("Samples:");
 	PrintAndLog("  hf iclass writeblk b 0A d AAAAAAAAAAAAAAAA k 001122334455667B");
 	PrintAndLog("  hf iclass writeblk b 1B d AAAAAAAAAAAAAAAA k 001122334455667B c");
-	PrintAndLog("  hf iclass writeblk b 0A d AAAAAAAAAAAAAAAA n 0");
+	PrintAndLog("  hf iclass writeblk b 03 d AAAAAAAAAAAAAAAA k 001122334455667B c o");
 }
 
 
 static int CmdHFiClass_WriteBlock(const char *Cmd) {
-	uint8_t blockno=0;
-	uint8_t bldata[8]={0,0,0,0,0,0,0,0};
-	uint8_t KEY[8]={0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00};
+	uint8_t blockno = 0;
+	uint8_t bldata[8] = {0};
+	uint8_t KEY[8] = {0};
 	uint8_t keyNbr = 0;
 	uint8_t dataLen = 0;
 	char tempStr[50] = {0};
 	bool use_credit_key = false;
 	bool elite = false;
 	bool rawkey = false;
+	bool override_protection = false;
 	bool errors = false;
 	uint8_t cmdp = 0;
 
@@ -1174,6 +1171,11 @@ static int CmdHFiClass_WriteBlock(const char *Cmd) {
 			rawkey = true;
 			cmdp++;
 			break;
+		case 'o':
+		case 'O':
+			override_protection = true;
+			cmdp++;
+			break;
 		default:
 			PrintAndLog("Unknown parameter '%c'\n", param_getchar(Cmd, cmdp));
 			errors = true;
@@ -1194,14 +1196,26 @@ static int CmdHFiClass_WriteBlock(const char *Cmd) {
 		usage_hf_iclass_writeblock();
 		return 0;
 	}
+
+	if (blockno < 5) {
+		if (override_protection) {
+			PrintAndLog("Info: modifying keys, e-purse or configuration block.");
+		} else {
+			PrintAndLog("You are going to modify keys, e-purse or configuration block.");
+			PrintAndLog("You must add the 'o' (override) option to confirm that you know what you are doing");
+			return 0;
+		}
+	}
+
 	int ans = WriteBlock(blockno, bldata, KEY, use_credit_key, elite, rawkey, false, true);
+
 	DropField();
 	return ans;
 }
 
 
 static void usage_hf_iclass_clone(void) {
-	PrintAndLog("Usage:  hf iclass clone f <tagfile.bin> b <first block> l <last block> k <KEY> c e|r");
+	PrintAndLog("Usage:  hf iclass clone f <tagfile.bin> b <first block> l <last block> k <KEY> c e|r o");
 	PrintAndLog("Options:");
 	PrintAndLog("  f <filename>: specify a filename to clone from");
 	PrintAndLog("  b <Block>   : The first block to clone as 2 hex symbols");
@@ -1210,10 +1224,13 @@ static void usage_hf_iclass_clone(void) {
 	PrintAndLog("  c           : If 'c' is specified, the key set is assumed to be the credit key\n");
 	PrintAndLog("  e           : If 'e' is specified, elite computations applied to key");
 	PrintAndLog("  r           : If 'r' is specified, no computations applied to key");
+	PrintAndLog("  o           : override protection and allow modification of target blocks 0...4");
 	PrintAndLog("Samples:");
 	PrintAndLog("  hf iclass clone f iclass_tagdump-121345.bin b 06 l 1A k 1122334455667788 e");
 	PrintAndLog("  hf iclass clone f iclass_tagdump-121345.bin b 05 l 19 k 0");
 	PrintAndLog("  hf iclass clone f iclass_tagdump-121345.bin b 06 l 19 k 0 e");
+	PrintAndLog("  hf iclass clone f iclass_tagdump-121345.bin b 06 l 19 k 0 e");
+	PrintAndLog("  hf iclass clone f iclass_tagdump-121345.bin b 03 l 19 k 0 e o");
 }
 
 
@@ -1229,6 +1246,7 @@ static int CmdHFiClassCloneTag(const char *Cmd) {
 	bool use_credit_key = false;
 	bool elite = false;
 	bool rawkey = false;
+	bool override_protection = false;
 	bool errors = false;
 	uint8_t cmdp = 0;
 
@@ -1297,6 +1315,11 @@ static int CmdHFiClassCloneTag(const char *Cmd) {
 			rawkey = true;
 			cmdp++;
 			break;
+		case 'o':
+		case 'O':
+			override_protection = true;
+			cmdp++;
+			break;
 		default:
 			PrintAndLog("Unknown parameter '%c'\n", param_getchar(Cmd, cmdp));
 			errors = true;
@@ -1313,39 +1336,40 @@ static int CmdHFiClassCloneTag(const char *Cmd) {
 		return 0;
 	}
 
-	FILE *f;
-
-	iclass_block_t tag_data[USB_CMD_DATA_SIZE/12];
-
-	if ((endblock-startblock+1)*12 > USB_CMD_DATA_SIZE) {
-		PrintAndLog("Trying to write too many blocks at once.  Max: %d", USB_CMD_DATA_SIZE/8);
+	if (startblock < 5) {
+		if (override_protection) {
+			PrintAndLog("Info: modifying keys, e-purse or configuration block.");
+		} else {
+			PrintAndLog("You are going to modify keys, e-purse or configuration block.");
+			PrintAndLog("You must add the 'o' (override) option to confirm that you know what you are doing");
+			return 0;
+		}
 	}
+	
+	if ((endblock - startblock + 1) * 12 > USB_CMD_DATA_SIZE) {
+		PrintAndLog("Trying to write too many blocks at once.  Max: %d", USB_CMD_DATA_SIZE/12);
+	}
+
 	// file handling and reading
+	FILE *f;
 	f = fopen(filename,"rb");
 	if (!f) {
 		PrintAndLog("Failed to read from file '%s'", filename);
 		return 1;
 	}
 
-	if (startblock<5) {
-		PrintAndLog("You cannot write key blocks this way. yet... make your start block > 4");
-		fclose(f);
-		return 0;
-	}
-	// now read data from the file from block 6 --- 19
-	// ok we will use this struct [data 8 bytes][MAC 4 bytes] for each block calculate all mac number for each data
-	// then copy to usbcommand->asbytes; the max is 32 - 6 = 24 block 12 bytes each block 288 bytes then we can only accept to clone 21 blocks at the time,
-	// else we have to create a share memory
-	int i;
+	uint8_t tag_data[USB_CMD_DATA_SIZE/12][8];
 	fseek(f, startblock*8, SEEK_SET);
-	if (fread(tag_data, sizeof(iclass_block_t), endblock - startblock + 1, f) == 0 ) {
-		PrintAndLog("File reading error.");
-		fclose(f);
-		return 2;
+	for (int i = 0; i < endblock - startblock + 1; i++) {
+		if (fread(tag_data, 1, 8, f) == 0 ) {
+			PrintAndLog("File reading error.");
+			fclose(f);
+			return 2;
+		}
 	}
 
-	uint8_t MAC[4]={0x00,0x00,0x00,0x00};
-	uint8_t div_key[8]={0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00};
+	uint8_t MAC[4] = {0x00, 0x00, 0x00, 0x00};
+	uint8_t div_key[8] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
 	uint8_t CSN[8];
 
 	if (!iClass_select(CSN, true, false, false) || !iClass_authenticate(CSN, KEY, MAC, div_key, use_credit_key, elite, rawkey, false, true)) {
@@ -1355,28 +1379,25 @@ static int CmdHFiClassCloneTag(const char *Cmd) {
 
 	UsbCommand w = {CMD_ICLASS_CLONE, {startblock, endblock}};
 	uint8_t *ptr;
-	// calculate all mac for every the block we will write
-	for (i = startblock; i <= endblock; i++) {
-		Calc_wb_mac(i, tag_data[i - startblock].d, div_key, MAC);
-		// usb command d start pointer = d + (i - 6) * 12
-		// memcpy(pointer,tag_data[i - 6],8) 8 bytes
-		// memcpy(pointer + 8,mac,sizoof(mac) 4 bytes;
-		// next one
-		ptr = w.d.asBytes + (i - startblock) * 12;
-		memcpy(ptr, &(tag_data[i - startblock].d[0]), 8);
-		memcpy(ptr + 8,MAC, 4);
+	// calculate MAC for every block we will write
+	for (int i = 0; i < endblock - startblock + 1; i++) {
+		Calc_wb_mac(startblock + i, tag_data[i], div_key, MAC);
+		ptr = w.d.asBytes + i * 12;
+		memcpy(ptr, tag_data[i], 8);
+		memcpy(ptr + 8, MAC, 4);
 	}
+
 	uint8_t p[12];
-	for (i = 0; i <= endblock - startblock;i++){
-		memcpy(p,w.d.asBytes + (i * 12),12);
-		printf("Block |%02x|",i + startblock);
-		printf(" %02x%02x%02x%02x%02x%02x%02x%02x |",p[0],p[1],p[2],p[3],p[4],p[5],p[6],p[7]);
-		printf(" MAC |%02x%02x%02x%02x|\n",p[8],p[9],p[10],p[11]);
+	PrintAndLog("Cloning");
+	for (int i = 0; i < endblock - startblock + 1; i++){
+		memcpy(p, w.d.asBytes + (i * 12), 12);
+		PrintAndLog("Block |%02x| %02x%02x%02x%02x%02x%02x%02x%02x | MAC |%02x%02x%02x%02x|",
+			i + startblock, p[0], p[1], p[2], p[3], p[4], p[5], p[6], p[7], p[8], p[9], p[10], p[11]);
 	}
 
 	UsbCommand resp;
 	SendCommand(&w);
-	if (!WaitForResponseTimeout(CMD_ACK,&resp,4500)) {
+	if (!WaitForResponseTimeout(CMD_ACK, &resp, 4500)) {
 		PrintAndLog("Command execute timeout");
 		DropField();
 		return 0;
