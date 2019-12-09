@@ -646,8 +646,8 @@ static void ReaderTransmitIClass(uint8_t *frame, int len, uint32_t *start_time) 
 
 
 static bool sendCmdGetResponseWithRetries(uint8_t* command, size_t cmdsize, uint8_t* resp, size_t max_resp_size,
-										  uint8_t expected_size, uint8_t retries, uint32_t start_time, uint32_t timeout, uint32_t *eof_time) {
-	while (retries-- > 0) {
+										  uint8_t expected_size, uint8_t tries, uint32_t start_time, uint32_t timeout, uint32_t *eof_time) {
+	while (tries-- > 0) {
 		ReaderTransmitIClass(command, cmdsize, &start_time);
 		if (expected_size == GetIso15693AnswerFromTag(resp, max_resp_size, timeout, eof_time)) {
 			return true;
@@ -781,7 +781,7 @@ void iClass_Check(uint8_t *NRMAC) {
 	uint8_t resp[4];
 	memcpy(check+1, NRMAC, 8);
 	uint32_t eof_time;
-	bool isOK = sendCmdGetResponseWithRetries(check, sizeof(check), resp, sizeof(resp), 4, 6, 0, ICLASS_READER_TIMEOUT_OTHERS, &eof_time);
+	bool isOK = sendCmdGetResponseWithRetries(check, sizeof(check), resp, sizeof(resp), 4, 3, 0, ICLASS_READER_TIMEOUT_OTHERS, &eof_time);
 	cmd_send(CMD_ACK, isOK, 0, 0, resp, sizeof(resp));
 }
 
@@ -793,7 +793,7 @@ void iClass_Readcheck(uint8_t block, bool use_credit_key) {
 	}
 	uint8_t resp[8];
 	uint32_t eof_time;
-	bool isOK = sendCmdGetResponseWithRetries(readcheck, sizeof(readcheck), resp, sizeof(resp), 8, 6, 0, ICLASS_READER_TIMEOUT_OTHERS, &eof_time);
+	bool isOK = sendCmdGetResponseWithRetries(readcheck, sizeof(readcheck), resp, sizeof(resp), 8, 3, 0, ICLASS_READER_TIMEOUT_OTHERS, &eof_time);
 	cmd_send(CMD_ACK, isOK, 0, 0, resp, sizeof(resp));
 }
 
@@ -892,24 +892,24 @@ void iClass_WriteBlock(uint8_t blockNo, uint8_t *data) {
 
 
 void iClass_Clone(uint8_t startblock, uint8_t endblock, uint8_t *data) {
+
+	LED_A_ON();
+
 	int i;
 	int written = 0;
-	int total_block = (endblock - startblock) + 1;
-	for (i = 0; i < total_block; i++) {
+	int total_blocks = (endblock - startblock) + 1;
+
+	for (i = 0; i < total_blocks; i++) {
 		// block number
 		if (iClass_WriteBlock_ext(i+startblock, data + (i*12))){
 			Dbprintf("Write block [%02x] successful", i + startblock);
 			written++;
 		} else {
-			if (iClass_WriteBlock_ext(i+startblock, data + (i*12))){
-				Dbprintf("Write block [%02x] successful", i + startblock);
-				written++;
-			} else {
-				Dbprintf("Write block [%02x] failed", i + startblock);
-			}
+			Dbprintf("Write block [%02x] failed", i + startblock);
 		}
 	}
-	if (written == total_block)
+
+	if (written == total_blocks)
 		Dbprintf("Clone complete");
 	else
 		Dbprintf("Clone incomplete");
@@ -917,5 +917,6 @@ void iClass_Clone(uint8_t startblock, uint8_t endblock, uint8_t *data) {
 	cmd_send(CMD_ACK, 1, 0, 0, 0, 0);
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
 	LED_D_OFF();
+
 	LED_A_OFF();
 }

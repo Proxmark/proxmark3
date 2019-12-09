@@ -169,23 +169,22 @@ void hex_to_buffer(const uint8_t *buf, const uint8_t *hex_data, const size_t hex
 	const size_t min_str_len, const size_t spaces_between, bool uppercase) {
 
 	char *tmp = (char *)buf;
-	size_t i;
-	memset(tmp, 0x00, hex_max_len);
 
-	int maxLen = ( hex_len > hex_max_len) ? hex_max_len : hex_len;
+	int maxLen = (hex_len > hex_max_len) ? hex_max_len : hex_len;
 
-	for (i = 0; i < maxLen; ++i, tmp += 2 + spaces_between) {
+	for (int i = 0; i < maxLen; ++i, tmp += 2 + spaces_between) {
 		sprintf(tmp, (uppercase) ? "%02X" : "%02x", (unsigned int) hex_data[i]);
 
-		for (int j = 0; j < spaces_between; j++)
-			sprintf(tmp + 2 + j, " ");
+		if (i != maxLen - 1)
+			for (int j = 0; j < spaces_between; j++)
+				sprintf(tmp + 2 + j, " ");
 	}
 
-	i *= (2 + spaces_between);
-	int minStrLen = min_str_len > i ? min_str_len : 0;
+	size_t len = strlen(tmp);
+	int minStrLen = min_str_len > len ? min_str_len : 0;
 	if (minStrLen > hex_max_len)
 		minStrLen = hex_max_len;
-	for(; i < minStrLen; i++, tmp += 1)
+	for (int i = len; i < minStrLen; i++, tmp += 1)
 		sprintf(tmp, " ");
 
 	return;
