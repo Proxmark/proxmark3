@@ -848,6 +848,9 @@ void iClass_Dump(uint8_t startblock, uint8_t numblks) {
 		}
 	}
 
+	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
+	LED_D_OFF();
+
 	cmd_send(CMD_ACK, isOK, blkCnt, 0, readblockdata, blkCnt*8);
 
 	LED_A_OFF();
@@ -928,9 +931,10 @@ void iClass_Clone(uint8_t startblock, uint8_t endblock, uint8_t *data) {
 	else
 		Dbprintf("Clone incomplete");
 
-	cmd_send(CMD_ACK, 1, 0, 0, 0, 0);
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
 	LED_D_OFF();
+
+	cmd_send(CMD_ACK, 1, 0, 0, 0, 0);
 
 	LED_A_OFF();
 }

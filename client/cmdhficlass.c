@@ -877,11 +877,11 @@ static int CmdHFiClassReader_Dump(const char *Cmd) {
 					if (keyNbr < ICLASS_KEYS_MAX) {
 						memcpy(KEY, iClass_Key_Table[keyNbr], 8);
 					} else {
-						PrintAndLog("\nERROR: Credit KeyNbr is invalid\n");
+						PrintAndLog("\nERROR: Debit KeyNbr is invalid\n");
 						errors = true;
 					}
 				} else {
-					PrintAndLog("\nERROR: Credit Key is incorrect length\n");
+					PrintAndLog("\nERROR: Debit Key is incorrect length\n");
 					errors = true;
 				}
 				cmdp += 2;
@@ -920,7 +920,6 @@ static int CmdHFiClassReader_Dump(const char *Cmd) {
 
 	// if only credit key is given: try for AA1 as well (not for iclass but for some picopass this will work)
 	if (!have_debit_key && have_credit_key) {
-		use_credit_key = true;
 		memcpy(KEY, CreditKEY, 8);
 	}
 
@@ -954,7 +953,7 @@ static int CmdHFiClassReader_Dump(const char *Cmd) {
 	}
 
 	// authenticate with debit key (or credit key if we have no debit key) and get div_key - later store in dump block 3
-	if (!iClass_authenticate(tag_data, KEY, MAC, div_key, use_credit_key, elite, rawkey, NRMAC_replay, verbose)){
+	if (!iClass_authenticate(tag_data, KEY, MAC, div_key, false, elite, rawkey, NRMAC_replay, verbose)) {
 		DropField();
 		return 0;
 	}
@@ -1361,7 +1360,7 @@ static int CmdHFiClassCloneTag(const char *Cmd) {
 	uint8_t tag_data[USB_CMD_DATA_SIZE/12][8];
 	fseek(f, startblock*8, SEEK_SET);
 	for (int i = 0; i < endblock - startblock + 1; i++) {
-		if (fread(tag_data, 1, 8, f) == 0 ) {
+		if (fread(&tag_data[i], 1, 8, f) == 0 ) {
 			PrintAndLog("File reading error.");
 			fclose(f);
 			return 2;
@@ -1372,7 +1371,7 @@ static int CmdHFiClassCloneTag(const char *Cmd) {
 	uint8_t div_key[8] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
 	uint8_t CSN[8];
 
-	if (!iClass_select(CSN, true, false, false) || !iClass_authenticate(CSN, KEY, MAC, div_key, use_credit_key, elite, rawkey, false, true)) {
+	if (!iClass_select(CSN, true, true, true) || !iClass_authenticate(CSN, KEY, MAC, div_key, use_credit_key, elite, rawkey, false, true)) {
 		DropField();
 		return 0;
 	}
@@ -1403,6 +1402,7 @@ static int CmdHFiClassCloneTag(const char *Cmd) {
 		return 0;
 	}
 
+	DropField();
 	return 1;
 }
 
