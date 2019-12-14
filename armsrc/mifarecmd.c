@@ -895,6 +895,13 @@ void MifareNested(uint32_t arg0, uint32_t arg1, uint32_t calibrate, uint8_t *dat
 		target_nt[i] = 0;
 		while(target_nt[i] == 0) { // continue until we have an unambiguous nonce
 
+			// break out of the loop on button press or new usb data as
+			// cards that do not NACK bad keys will get stuck here
+			if(BUTTON_PRESS() || usb_poll_validate_length()) {
+				isOK = -2;
+				break;
+			}
+
 			// prepare next select. No need to power down the card.
 			if(mifare_classic_halt(pcs, cuid)) {
 				if (MF_DBGLEVEL >= 1)   Dbprintf("Nested: Halt error");

@@ -335,7 +335,11 @@ int mfnested(uint8_t blockNo, uint8_t keyType, uint8_t *key, uint8_t trgBlockNo,
 	memcpy(c.d.asBytes, key, 6);
 	SendCommand(&c);
 
-	if (!WaitForResponseTimeout(CMD_ACK, &resp, 1500)) {
+	if (!WaitForResponseTimeout(CMD_ACK, &resp, 2500)) {
+		// cards that do not NACK bad keys cause it to get stuck in a loop, so break it out
+		UsbCommand c = {CMD_PING};
+		SendCommand(&c);
+		(void)WaitForResponseTimeout(CMD_ACK,NULL,500);
 		return -1;
 	}
 
