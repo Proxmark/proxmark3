@@ -679,7 +679,7 @@ int CmdSriWrite(const char *Cmd) {
 	uint8_t blockno = -1;
 	uint8_t data[4] = {0x00};
 	bool isSrix4k = true;
-	char str[22];
+	char str[20];
 
 	if (strlen(Cmd) < 1 || cmdp == 'h' || cmdp == 'H') {
 		PrintAndLog("Usage:  hf 14b write <1|2> <BLOCK> <DATA>");
