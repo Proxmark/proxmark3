@@ -951,15 +951,12 @@ void MifareNested(uint32_t arg0, uint32_t arg1, uint32_t calibrate, uint8_t *dat
 					target_ks[i] = ks1;
 					ncount++;
 					if (i == 1 && target_nt[1] == target_nt[0]) { // we need two different nonces
-						target_nt[1] = 0;
-						if (MF_DBGLEVEL >= 3) Dbprintf("Nonce#2: dismissed (= nonce#1), ntdist=%d", j);
-
-						if( ++target_nt_duplicate_count == 50 ) { // unable to get a 2nd nonce after 50 tries, probably a fixed nonce
-							isOK = -4;
-							target_nt[1] = nt1;
+						if( ++target_nt_duplicate_count >= 10 ) { // unable to get a 2nd nonce after 10 tries, probably a fixed nonce
 							break;
 						}
 
+						target_nt[1] = 0;
+						if (MF_DBGLEVEL >= 3) Dbprintf("Nonce#2: dismissed (= nonce#1), ntdist=%d", j);
 						break;
 					}
 					if (MF_DBGLEVEL >= 3) Dbprintf("Nonce#%d: valid, ntdist=%d", i+1, j);
@@ -1027,17 +1024,17 @@ void MifareChkKeys(uint16_t arg0, uint16_t arg1, uint8_t arg2, uint8_t *datain)
 		int res = MifareMultisectorChk(datain, keyCount, sectorCnt, keyType, OLD_MF_DBGLEVEL, &keyIndex);
 
 		if (res >= 0) {
-			cmd_send(CMD_ACK, 1, 0, 0, keyIndex, 80);
+			cmd_send(CMD_ACK, 1, res, 0, keyIndex, 80);
 		} else {
-			cmd_send(CMD_ACK, 0, 0, 0, NULL, 0);
+			cmd_send(CMD_ACK, 0, res, 0, NULL, 0);
 		}
 	} else {	
 		int res = MifareChkBlockKeys(datain, keyCount, blockNo, keyType, OLD_MF_DBGLEVEL);
 		
 		if (res > 0) {
-			cmd_send(CMD_ACK, 1, 0, 0, datain + (res - 1) * 6, 6);
+			cmd_send(CMD_ACK, 1, res, 0, datain + (res - 1) * 6, 6);
 		} else {
-			cmd_send(CMD_ACK, 0, 0, 0, NULL, 0);
+			cmd_send(CMD_ACK, 0, res, 0, NULL, 0);
 		}
 	}
 
