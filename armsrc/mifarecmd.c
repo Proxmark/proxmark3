@@ -779,6 +779,7 @@ void MifareNested(uint32_t arg0, uint32_t arg1, uint32_t calibrate, uint8_t *dat
 	uint32_t cuid, nt1, nt2, nttmp, nttest, ks1;
 	uint8_t par[1];
 	uint32_t target_nt[2], target_ks[2];
+	uint8_t target_nt_duplicate_count = 0;
 
 	uint8_t par_array[4];
 	uint16_t ncount = 0;
@@ -893,10 +894,9 @@ void MifareNested(uint32_t arg0, uint32_t arg1, uint32_t calibrate, uint8_t *dat
 	for(i=0; i < 2 && !isOK; i++) { // look for exactly two different nonces
 
 		target_nt[i] = 0;
-		while(target_nt[i] == 0) { // continue until we have an unambiguous nonce
+		while(target_nt[i] == 0 && !isOK) { // continue until we have an unambiguous nonce
 
-			// break out of the loop on button press or new usb data as
-			// cards that do not NACK bad keys will get stuck here
+			// break out of the loop on button press or new usb data
 			if(BUTTON_PRESS() || usb_poll_validate_length()) {
 				isOK = -2;
 				break;
@@ -953,6 +953,12 @@ void MifareNested(uint32_t arg0, uint32_t arg1, uint32_t calibrate, uint8_t *dat
 					if (i == 1 && target_nt[1] == target_nt[0]) { // we need two different nonces
 						target_nt[i] = 0;
 						if (MF_DBGLEVEL >= 3) Dbprintf("Nonce#2: dismissed (= nonce#1), ntdist=%d", j);
+
+						if( ++target_nt_duplicate_count == 50 ) { // unable to get a 2nd nonce after 50 tries, probably a fixed nonce
+							isOK = -4;
+							break;
+						}
+
 						break;
 					}
 					if (MF_DBGLEVEL >= 3) Dbprintf("Nonce#%d: valid, ntdist=%d", i+1, j);
