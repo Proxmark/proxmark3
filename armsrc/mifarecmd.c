@@ -951,11 +951,12 @@ void MifareNested(uint32_t arg0, uint32_t arg1, uint32_t calibrate, uint8_t *dat
 					target_ks[i] = ks1;
 					ncount++;
 					if (i == 1 && target_nt[1] == target_nt[0]) { // we need two different nonces
-						target_nt[i] = 0;
+						target_nt[1] = 0;
 						if (MF_DBGLEVEL >= 3) Dbprintf("Nonce#2: dismissed (= nonce#1), ntdist=%d", j);
 
 						if( ++target_nt_duplicate_count == 50 ) { // unable to get a 2nd nonce after 50 tries, probably a fixed nonce
 							isOK = -4;
+							target_nt[1] = nt1;
 							break;
 						}
 

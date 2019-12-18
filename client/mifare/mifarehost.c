@@ -344,6 +344,8 @@ int mfnested(uint8_t blockNo, uint8_t keyType, uint8_t *key, uint8_t trgBlockNo,
 	}
 
 	if (resp.arg[0]) {
+		memcpy(&statelists[0].nt,  (void *)(resp.d.asBytes + 4 + 1 * 8 + 0), 4);
+		num_to_bytes(statelists[0].nt, 4, resultKey);
 		return resp.arg[0];  // error during nested
 	}
 

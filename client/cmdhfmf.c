@@ -712,7 +712,7 @@ int CmdHF14AMfNested(const char *Cmd)
 				case -1 : PrintAndLog("Error: No response from Proxmark.\n"); break;
 				case -2 : PrintAndLog("Button pressed. Aborted.\n"); break;
 				case -3 : PrintAndLog("Tag isn't vulnerable to Nested Attack (random numbers are not predictable).\n"); break;
-				case -4 : PrintAndLog("Tag isn't vulnerable to Nested Attack (tag nonce is static).\n"); break;
+				case -4 : key64 = bytes_to_num(keyBlock, 4); PrintAndLog("Tag isn't vulnerable to Nested Attack (tag nonce:%08X is static).\n", key64); break;
 				default : PrintAndLog("Unknown Error.\n");
 			}
 			return 2;
@@ -798,7 +798,7 @@ int CmdHF14AMfNested(const char *Cmd)
 							case -1 : PrintAndLog("Error: No response from Proxmark.\n"); break;
 							case -2 : PrintAndLog("Button pressed. Aborted.\n"); break;
 							case -3 : PrintAndLog("Tag isn't vulnerable to Nested Attack (random numbers are not predictable).\n"); break;
-							case -4 : PrintAndLog("Tag isn't vulnerable to Nested Attack (tag nonce is static).\n"); break;
+							case -4 : key64 = bytes_to_num(keyBlock, 4); PrintAndLog("Tag isn't vulnerable to Nested Attack (tag nonce:%08X is static).\n", key64); break;
 							default : PrintAndLog("Unknown Error.\n");
 						}
 						free(e_sector);
