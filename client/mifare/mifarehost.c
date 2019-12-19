@@ -23,6 +23,7 @@
 #include "parity.h"
 #include "util.h"
 #include "iso14443crc.h"
+#include "util_posix.h"
 
 #include "mifare.h"
 #include "mifare4.h"
@@ -343,6 +344,11 @@ int mfnested(uint8_t blockNo, uint8_t keyType, uint8_t *key, uint8_t trgBlockNo,
 
 	int isOK = 1;
 
+	uint64_t next_print_time = 0;
+	uint64_t start_time;
+	float brute_force_time;
+	float brute_force_per_second;
+
 	// flush queue
 	(void)WaitForResponseTimeout(CMD_ACK,NULL,100);
 
@@ -465,9 +471,17 @@ int mfnested(uint8_t blockNo, uint8_t keyType, uint8_t *key, uint8_t trgBlockNo,
 	}
 
 	memset(resultKey, 0, 6);
+	start_time = msclock();
+	next_print_time = start_time + 1 * 1000;
 	// The list may still contain several key candidates. Test each of them with mfCheckKeys
 	for (i = 0; i < statelists[0].len; i+=max_keys) {
-		if (statelists[0].len > 1) PrintAndLog("Keys left to check: %d", statelists[0].len - i);
+		if (next_print_time <= msclock()) {
+			brute_force_per_second = ((float)i) / (((float)(msclock() - start_time)) / 1000.0);
+			brute_force_time = ((float)(statelists[0].len - i)) / brute_force_per_second;
+			next_print_time = msclock() + 10 * 1000;
+			PrintAndLog("| %d keys left | % 3.3f keys/sec | worst case % 4.1f seconds remaining |", statelists[0].len - i, brute_force_per_second, brute_force_time);
+		}
+
 		if ((i+max_keys) >= statelists[0].len)
 			max_keys = statelists[0].len - i;
 
@@ -493,7 +507,7 @@ int mfnested(uint8_t blockNo, uint8_t keyType, uint8_t *key, uint8_t trgBlockNo,
 	}
 
 	if (!isOK && statelists[0].len != 1)
-		PrintAndLog("Key found after checking %d keys\n", i+max_keys);
+		PrintAndLog("Key found in %0.2f seconds after checking %d keys\n", ((float)(msclock() - start_time)) / 1000.0, i+max_keys);
 
 	free(statelists[0].head.slhead);
 	free(statelists[1].head.slhead);
