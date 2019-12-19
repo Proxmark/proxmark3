@@ -341,7 +341,7 @@ int mfnested(uint8_t blockNo, uint8_t keyType, uint8_t *key, uint8_t trgBlockNo,
 	uint8_t *keyBlock = NULL;
 	uint64_t key64;
 
-	int isOK = -4;
+	int isOK = 1;
 
 	// flush queue
 	(void)WaitForResponseTimeout(CMD_ACK,NULL,100);
@@ -371,8 +371,6 @@ int mfnested(uint8_t blockNo, uint8_t keyType, uint8_t *key, uint8_t trgBlockNo,
 		statelists[i].uid = uid;
 		memcpy(&statelists[i].nt,  (void *)(resp.d.asBytes + 4 + i * 8 + 0), 4);
 		memcpy(&statelists[i].ks1, (void *)(resp.d.asBytes + 4 + i * 8 + 4), 4);
-
-		PrintAndLog("statelist %d: %02X %x %08X %08X", i, statelists[i].blockNo, statelists[i].keyType, statelists[i].nt, statelists[i].ks1);
 	}
 
 	if (statelists[0].nt == statelists[1].nt && statelists[0].ks1 == statelists[1].ks1)
@@ -430,6 +428,10 @@ int mfnested(uint8_t blockNo, uint8_t keyType, uint8_t *key, uint8_t trgBlockNo,
 	statelists[0].tail.sltail=--p3;
 	statelists[1].tail.sltail=--p4;
 
+	for (i = 0; i < 2; i++) {
+		PrintAndLog("statelist %d: length:%d block:%02d keytype:%d nt:%08X ks1:%08X", i, statelists[i].len, statelists[i].blockNo, statelists[i].keyType, statelists[i].nt, statelists[i].ks1);
+	}
+
 	// the statelists now contain possible keys. The key we are searching for must be in the
 	// intersection of both lists. Create the intersection:
 	qsort(statelists[0].head.keyhead, statelists[0].len, sizeof(uint64_t), compare_uint64);
@@ -446,6 +448,12 @@ int mfnested(uint8_t blockNo, uint8_t keyType, uint8_t *key, uint8_t trgBlockNo,
 		PrintAndLog("We have %d keys to check. This will take a very long time!", statelists[0].len);
 		PrintAndLog("Press button to abort.");
 	}
+	else if (statelists[0].len < 1) {
+		PrintAndLog("No candidate keys to check!");
+	}
+	else {
+		PrintAndLog("We have %d key(s) to check.", statelists[0].len);
+	}
 
 	uint32_t max_keys  = (statelists[0].len > (USB_CMD_DATA_SIZE / 6)) ? (USB_CMD_DATA_SIZE / 6) : statelists[0].len;
 	keyBlock = calloc(max_keys, 6);
@@ -454,7 +462,7 @@ int mfnested(uint8_t blockNo, uint8_t keyType, uint8_t *key, uint8_t trgBlockNo,
 	memset(resultKey, 0, 6);
 	// The list may still contain several key candidates. Test each of them with mfCheckKeys
 	for (i = 0; i < statelists[0].len; i+=max_keys) {
-		PrintAndLog("Keys left to check: %d", statelists[0].len - i);
+		if (statelists[0].len > 1) PrintAndLog("Keys left to check: %d", statelists[0].len - i);
 		if ((i+max_keys) >= statelists[0].len)
 			max_keys = statelists[0].len - i;
 
@@ -480,10 +488,11 @@ int mfnested(uint8_t blockNo, uint8_t keyType, uint8_t *key, uint8_t trgBlockNo,
 	}
 
 	if (!isOK)
-		PrintAndLog("Key found after checking %d keys\n", i+max_keys);
+		PrintAndLog("Key found after checking %d key(s)\n", i+max_keys);
 
 	free(statelists[0].head.slhead);
 	free(statelists[1].head.slhead);
+	free(keyBlock);
 
 	return isOK;
 }
