@@ -9,8 +9,8 @@
 // code for work with mifare cards.
 //-----------------------------------------------------------------------------
 
-#ifndef __MIFAREUTIL_H
-#define __MIFAREUTIL_H
+#ifndef MIFAREUTIL_H__
+#define MIFAREUTIL_H__
 
 #include <stdint.h>
 #include <stdbool.h>
@@ -19,11 +19,11 @@
 #include "usb_cdc.h"
 
 // mifare authentication
-#define CRYPT_NONE    0
-#define CRYPT_ALL     1
-#define CRYPT_REQUEST 2
-#define AUTH_FIRST    0	
-#define AUTH_NESTED   2
+#define CRYPT_NONE           0
+#define CRYPT_ALL            1
+#define CRYPT_REQUEST        2
+#define AUTH_FIRST           0
+#define AUTH_NESTED          2
 
 // reader voltage field detector
 #define MF_MINFIELDV      4000
@@ -42,10 +42,10 @@ int mifare_sendcmd(uint8_t cmd, uint8_t *data, uint8_t data_size, uint8_t* answe
 int mifare_sendcmd_short(struct Crypto1State *pcs, uint8_t crypted, uint8_t cmd, uint8_t data, uint8_t* answer, uint8_t *answer_parity, uint32_t *timing);
 
 // mifare classic
-int mifare_classic_auth(struct Crypto1State *pcs, uint32_t uid, uint8_t blockNo, uint8_t keyType, uint64_t ui64Key, uint8_t isNested);
-int mifare_classic_authex(struct Crypto1State *pcs, uint32_t uid, uint8_t blockNo, uint8_t keyType, uint64_t ui64Key, uint8_t isNested, uint32_t * ntptr, uint32_t *timing);
+int mifare_classic_auth(struct Crypto1State *pcs, uint32_t uid, uint8_t blockNo, uint8_t keyType, uint64_t ui64Key, uint8_t isNested, uint32_t *auth_timeout);
+int mifare_classic_authex(struct Crypto1State *pcs, uint32_t uid, uint8_t blockNo, uint8_t keyType, uint64_t ui64Key, uint8_t isNested, uint32_t * ntptr, uint32_t *timing, uint32_t *auth_timeout);
 int mifare_classic_readblock(struct Crypto1State *pcs, uint32_t uid, uint8_t blockNo, uint8_t *blockData);
-int mifare_classic_halt(struct Crypto1State *pcs, uint32_t uid); 
+int mifare_classic_halt(struct Crypto1State *pcs, uint32_t uid);
 int mifare_classic_writeblock(struct Crypto1State *pcs, uint32_t uid, uint8_t blockNo, uint8_t *blockData);
 
 // Ultralight/NTAG...
@@ -87,8 +87,8 @@ int emlCheckValBl(int blockNum);
 
 // mifare check keys
 typedef uint8_t TKeyIndex[2][40];
-int MifareChkBlockKey(uint8_t *uid, uint32_t *cuid, uint8_t *cascade_levels, uint64_t ui64Key, uint8_t blockNo, uint8_t keyType, uint8_t debugLevel);
-int MifareChkBlockKeys(uint8_t *keys, uint8_t keyCount, uint8_t blockNo, uint8_t keyType, uint8_t debugLevel);
-int MifareMultisectorChk(uint8_t *keys, uint8_t keyCount, uint8_t SectorCount, uint8_t keyType, uint8_t debugLevel, TKeyIndex *keyIndex);
+int MifareChkBlockKey(uint8_t *uid, uint32_t *cuid, uint8_t *cascade_levels, uint64_t ui64Key, uint8_t blockNo, uint8_t keyType, uint32_t *auth_timeout, uint8_t debugLevel);
+int MifareChkBlockKeys(uint8_t *keys, uint8_t keyCount, uint8_t blockNo, uint8_t keyType, uint32_t *auth_timeout, uint8_t debugLevel);
+int MifareMultisectorChk(uint8_t *keys, uint8_t keyCount, uint8_t SectorCount, uint8_t keyType, uint32_t *auth_timeout, uint8_t debugLevel, TKeyIndex *keyIndex);
 
 #endif

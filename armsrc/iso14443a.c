@@ -1270,12 +1270,12 @@ static void TransmitFor14443a(const uint8_t *cmd, uint16_t len, uint32_t *timing
 	uint32_t ThisTransferTime = 0;
 
 	if (timing) {
-		if(*timing == 0) {                                      // Measure time
+		if (*timing == 0) {                                      // Measure time
 			*timing = (GetCountSspClk() + 8) & 0xfffffff8;
 		} else {
 			PrepareDelayedTransfer(*timing & 0x00000007);       // Delay transfer (fine tuning - up to 7 MF clock ticks)
 		}
-		if(MF_DBGLEVEL >= 4 && GetCountSspClk() >= (*timing & 0xfffffff8)) Dbprintf("TransmitFor14443a: Missed timing");
+		if (MF_DBGLEVEL >= 4 && GetCountSspClk() >= (*timing & 0xfffffff8)) Dbprintf("TransmitFor14443a: Missed timing");
 		while (GetCountSspClk() < (*timing & 0xfffffff8));      // Delay transfer (multiple of 8 MF clock ticks)
 		LastTimeProxToAirStart = *timing;
 	} else {
@@ -1289,7 +1289,7 @@ static void TransmitFor14443a(const uint8_t *cmd, uint16_t len, uint32_t *timing
 
 	uint16_t c = 0;
 	for (;;) {
-		if(AT91C_BASE_SSC->SSC_SR & (AT91C_SSC_TXRDY)) {
+		if (AT91C_BASE_SSC->SSC_SR & (AT91C_SSC_TXRDY)) {
 			AT91C_BASE_SSC->SSC_THR = cmd[c];
 			c++;
 			if(c >= len) {
@@ -1600,7 +1600,7 @@ static int GetIso14443aAnswerFromTag(uint8_t *receivedResponse, uint8_t *receive
 
 		if(AT91C_BASE_SSC->SSC_SR & (AT91C_SSC_RXRDY)) {
 			b = (uint8_t)AT91C_BASE_SSC->SSC_RHR;
-			if(ManchesterDecoding(b, offset, 0)) {
+			if (ManchesterDecoding(b, offset, 0)) {
 				NextTransferTime = MAX(NextTransferTime, Demod.endTime - (DELAY_AIR2ARM_AS_READER + DELAY_ARM2AIR_AS_READER)/16 + FRAME_DELAY_TIME_PICC_TO_PCD);
 				return true;
 			} else if (c++ > iso14a_timeout && Demod.state == DEMOD_UNSYNCD) {
@@ -1617,7 +1617,7 @@ void ReaderTransmitBitsPar(uint8_t* frame, uint16_t bits, uint8_t *par, uint32_t
 
 	// Send command to tag
 	TransmitFor14443a(ToSend, ToSendMax, timing);
-	if(trigger)
+	if (trigger)
 		LED_A_ON();
 
 	// Log reader command in trace buffer
@@ -1660,6 +1660,7 @@ static int ReaderReceiveOffset(uint8_t* receivedAnswer, uint16_t offset, uint8_t
 int ReaderReceive(uint8_t *receivedAnswer, uint8_t *parity)
 {
 	if (!GetIso14443aAnswerFromTag(receivedAnswer, parity, 0)) return false;
+
 	LogTrace(receivedAnswer, Demod.len, Demod.startTime*16 - DELAY_AIR2ARM_AS_READER, Demod.endTime*16 - DELAY_AIR2ARM_AS_READER, parity, false);
 	return Demod.len;
 }
@@ -1737,7 +1738,7 @@ int iso14443a_select_card(byte_t *uid_ptr, iso14a_card_select_t *p_hi14a_card, u
 	int len;
 
 	// init card struct
-	if(p_hi14a_card) {
+	if (p_hi14a_card) {
 		p_hi14a_card->uidlen = 0;
 		memset(p_hi14a_card->uid, 0, 10);
 		p_hi14a_card->ats_len = 0;
@@ -1747,7 +1748,7 @@ int iso14443a_select_card(byte_t *uid_ptr, iso14a_card_select_t *p_hi14a_card, u
 		return 0;
 	}
 
-	if(p_hi14a_card) {
+	if (p_hi14a_card) {
 		memcpy(p_hi14a_card->atqa, resp, 2);
 	}
 

@@ -10,6 +10,7 @@
 
 #include "mifarehost.h"
 
+#include <inttypes.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -115,8 +116,7 @@ static uint32_t nonce2key(uint32_t uid, uint32_t nt, uint32_t nr, uint32_t ar, u
 }
 
 
-int mfDarkside(uint64_t *key)
-{
+int mfDarkside(uint64_t *key) {
 	uint32_t uid = 0;
 	uint32_t nt = 0, nr = 0, ar = 0;
 	uint64_t par_list = 0, ks_list = 0;
@@ -208,7 +208,9 @@ int mfDarkside(uint64_t *key)
 					num_to_bytes(keylist[i*max_keys + j], 6, keyBlock+(j*6));
 				}
 			}
-			if (!mfCheckKeys(0, 0, false, size, keyBlock, key)) {
+			bool init = (i == 0);
+			bool drop_field = (i + size == keycount);
+			if (!mfCheckKeys(0, 0, 0, false, init, drop_field, size, keyBlock, key)) {
 				break;
 			}
 		}
@@ -228,11 +230,13 @@ int mfDarkside(uint64_t *key)
 }
 
 
-int mfCheckKeys (uint8_t blockNo, uint8_t keyType, bool clear_trace, uint8_t keycnt, uint8_t * keyBlock, uint64_t * key){
+int mfCheckKeys(uint8_t blockNo, uint8_t keyType, uint16_t timeout14a, bool clear_trace, bool init, bool drop_field, uint8_t keycnt, uint8_t * keyBlock, uint64_t * key) {
 
 	*key = -1;
+	bool multisectorCheck = false;
+	uint8_t flags = clear_trace | multisectorCheck << 1 | init << 2 | drop_field << 3;
 
-	UsbCommand c = {CMD_MIFARE_CHKKEYS, {((blockNo & 0xff) | ((keyType & 0xff) << 8)), clear_trace, keycnt}}; 
+	UsbCommand c = {CMD_MIFARE_CHKKEYS, {((blockNo & 0xff) | ((keyType & 0xff) << 8)), flags | timeout14a << 16, keycnt}}; 
 	memcpy(c.d.asBytes, keyBlock, 6 * keycnt);
 	SendCommand(&c);
 
@@ -251,14 +255,18 @@ int mfCheckKeys (uint8_t blockNo, uint8_t keyType, bool clear_trace, uint8_t key
 	return 0;
 }
 
-int mfCheckKeysSec(uint8_t sectorCnt, uint8_t keyType, uint8_t timeout14a, bool clear_trace, uint8_t keycnt, uint8_t * keyBlock, sector_t * e_sector){
+
+int mfCheckKeysSec(uint8_t sectorCnt, uint8_t keyType, uint16_t timeout14a, bool clear_trace, bool init, bool drop_field, uint8_t keycnt, uint8_t * keyBlock, sector_t * e_sector){
 
 	uint8_t keyPtr = 0;
 
 	if (e_sector == NULL)
 		return -1;
 
-	UsbCommand c = {CMD_MIFARE_CHKKEYS, {((sectorCnt & 0xff) | ((keyType & 0xff) << 8)), (clear_trace | 0x02)|((timeout14a & 0xff) << 8), keycnt}}; 
+	bool multisectorCheck = true;
+	uint8_t flags = clear_trace | multisectorCheck << 1 | init << 2 | drop_field << 3;
+
+	UsbCommand c = {CMD_MIFARE_CHKKEYS, {((sectorCnt & 0xff) | ((keyType & 0xff) << 8)), flags | timeout14a << 16, keycnt}}; 
 	memcpy(c.d.asBytes, keyBlock, 6 * keycnt);
 	SendCommand(&c);
 
@@ -328,8 +336,7 @@ __attribute__((force_align_arg_pointer))
 }
 
 
-int mfnested(uint8_t blockNo, uint8_t keyType, uint8_t *key, uint8_t trgBlockNo, uint8_t trgKeyType, uint8_t *resultKey, bool calibrate)
-{
+int mfnested(uint8_t blockNo, uint8_t keyType, uint16_t timeout14a, uint8_t *key, uint8_t trgBlockNo, uint8_t trgKeyType, uint8_t *resultKey, bool calibrate) {
 	uint32_t i, j;
 	uint32_t uid;
 	UsbCommand resp;
@@ -379,6 +386,10 @@ int mfnested(uint8_t blockNo, uint8_t keyType, uint8_t *key, uint8_t trgBlockNo,
 		memcpy(&statelists[i].ks1, (void *)(resp.d.asBytes + 4 + i * 8 + 4), 4);
 	}
 
+	uint32_t authentication_timeout;
+	memcpy(&authentication_timeout, resp.d.asBytes + 20, 4);
+	PrintAndLog("Setting authentication timeout to %" PRIu32 "us", authentication_timeout * 1000 / 106);
+	
 	if (statelists[0].nt == statelists[1].nt && statelists[0].ks1 == statelists[1].ks1)
 		num_unique_nonces = 1;
 	else
@@ -474,7 +485,7 @@ int mfnested(uint8_t blockNo, uint8_t keyType, uint8_t *key, uint8_t trgBlockNo,
 	start_time = msclock();
 	next_print_time = start_time + 1 * 1000;
 	// The list may still contain several key candidates. Test each of them with mfCheckKeys
-	for (i = 0; i < statelists[0].len; i+=max_keys) {
+	for (i = 0; i < statelists[0].len; i += max_keys) {
 		if (next_print_time <= msclock()) {
 			brute_force_per_second = ((float)i) / (((float)(msclock() - start_time)) / 1000.0);
 			brute_force_time = ((float)(statelists[0].len - i)) / brute_force_per_second;
@@ -491,7 +502,10 @@ int mfnested(uint8_t blockNo, uint8_t keyType, uint8_t *key, uint8_t trgBlockNo,
 		}
 
 		key64 = 0;
-		isOK = mfCheckKeys(statelists[0].blockNo, statelists[0].keyType, true, max_keys, keyBlock, &key64);
+
+		bool init = (i == 0);
+		bool drop_field = (i + max_keys == statelists[0].len);
+		isOK = mfCheckKeys(statelists[0].blockNo, statelists[0].keyType, authentication_timeout, true, init, drop_field, max_keys, keyBlock, &key64);
 
 		if (isOK == 1) { // timeout
 			isOK = -1;
