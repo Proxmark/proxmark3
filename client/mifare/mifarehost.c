@@ -479,7 +479,7 @@ int mfnested(uint8_t blockNo, uint8_t keyType, uint8_t *key, uint8_t trgBlockNo,
 			brute_force_per_second = ((float)i) / (((float)(msclock() - start_time)) / 1000.0);
 			brute_force_time = ((float)(statelists[0].len - i)) / brute_force_per_second;
 			next_print_time = msclock() + 10 * 1000;
-			PrintAndLog("| %d keys left | % 3.3f keys/sec | worst case % 4.1f seconds remaining |", statelists[0].len - i, brute_force_per_second, brute_force_time);
+			PrintAndLog("| % 6d keys left | % 3.3f keys/sec | worst case % 4.1f seconds remaining |", statelists[0].len - i, brute_force_per_second, brute_force_time);
 		}
 
 		if ((i+max_keys) >= statelists[0].len)
