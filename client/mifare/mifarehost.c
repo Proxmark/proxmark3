@@ -457,7 +457,12 @@ int mfnested(uint8_t blockNo, uint8_t keyType, uint8_t *key, uint8_t trgBlockNo,
 
 	uint32_t max_keys  = (statelists[0].len > (USB_CMD_DATA_SIZE / 6)) ? (USB_CMD_DATA_SIZE / 6) : statelists[0].len;
 	keyBlock = calloc(max_keys, 6);
-	if (keyBlock == NULL) return -5;
+
+	if (keyBlock == NULL) {
+		free(statelists[0].head.slhead);
+		free(statelists[1].head.slhead);
+		return -4;
+	}
 
 	memset(resultKey, 0, 6);
 	// The list may still contain several key candidates. Test each of them with mfCheckKeys
@@ -487,8 +492,8 @@ int mfnested(uint8_t blockNo, uint8_t keyType, uint8_t *key, uint8_t trgBlockNo,
 		}
 	}
 
-	if (!isOK)
-		PrintAndLog("Key found after checking %d key(s)\n", i+max_keys);
+	if (!isOK && statelists[0].len != 1)
+		PrintAndLog("Key found after checking %d keys\n", i+max_keys);
 
 	free(statelists[0].head.slhead);
 	free(statelists[1].head.slhead);
