@@ -75,6 +75,12 @@
 #define DELAY_TAG_TO_ARM_SNOOP           32
 #define DELAY_READER_TO_ARM_SNOOP        32
 
+// times in samples @ 212kHz when acting as reader
+//#define ISO15693_READER_TIMEOUT              80 // 80/212kHz = 378us, nominal t1_max=313,9us
+#define ISO15693_READER_TIMEOUT             330 // 330/212kHz = 1558us, should be even enough for iClass tags responding to ACTALL
+#define ISO15693_READER_TIMEOUT_WRITE      4700 // 4700/212kHz = 22ms, nominal 20ms
+
+
 static int DEBUG = 0;
 
 
@@ -139,6 +145,15 @@ void CodeIso15693AsReader(uint8_t *cmd, int n) {
 
 	ToSendMax++;
 }
+
+
+// Encode EOF only
+static void CodeIso15693AsReaderEOF() {
+	ToSendReset();
+	ToSend[++ToSendMax] = 0x20;
+	ToSendMax++;
+}
+
 
 // encode data using "1 out of 256" scheme
 // data rate is 1,66 kbit/s (fc/8192)
@@ -1105,16 +1120,12 @@ int GetIso15693CommandFromReader(uint8_t *received, size_t max_len, uint32_t *eo
 }
 
 
-// Encode (into the ToSend buffers) an identify request, which is the first
+// Construct an identify (Inventory) request, which is the first
 // thing that you must send to a tag to get a response.
-static void BuildIdentifyRequest(void)
-{
-	uint8_t cmd[5];
-
+static void BuildIdentifyRequest(uint8_t *cmd) {
 	uint16_t crc;
 	// one sub-carrier, inventory, 1 slot, fast rate
-	// AFI is at bit 5 (1<<4) when doing an INVENTORY
-	cmd[0] = (1 << 2) | (1 << 5) | (1 << 1);
+	cmd[0] = ISO15693_REQ_INVENTORY | ISO15693_REQINV_SLOT1 | ISO15693_REQ_DATARATE_HIGH;
 	// inventory command code
 	cmd[1] = 0x01;
 	// no mask
@@ -1123,8 +1134,6 @@ static void BuildIdentifyRequest(void)
 	crc = Iso15693Crc(cmd, 3);
 	cmd[3] = crc & 0xff;
 	cmd[4] = crc >> 8;
-
-	CodeIso15693AsReader(cmd, sizeof(cmd));
 }
 
 
@@ -1133,8 +1142,7 @@ static void BuildIdentifyRequest(void)
 // for the response. The response is not demodulated, just left in the buffer
 // so that it can be downloaded to a PC and processed there.
 //-----------------------------------------------------------------------------
-void AcquireRawAdcSamplesIso15693(void)
-{
+void AcquireRawAdcSamplesIso15693(void) {
 	LED_A_ON();
 
 	uint8_t *dest = BigBuf_get_addr();
@@ -1145,7 +1153,9 @@ void AcquireRawAdcSamplesIso15693(void)
 	FpgaSetupSsc(FPGA_MAJOR_MODE_HF_READER);
 	SetAdcMuxFor(GPIO_MUXSEL_HIPKD);
 
-	BuildIdentifyRequest();
+	uint8_t cmd[5];
+	BuildIdentifyRequest(cmd);
+	CodeIso15693AsReader(cmd, sizeof(cmd));
 
 	// Give the tags time to energize
 	SpinDelay(100);
@@ -1371,10 +1381,7 @@ void Iso15693InitReader() {
 
 
 // uid is in transmission order (which is reverse of display order)
-static void BuildReadBlockRequest(uint8_t *uid, uint8_t blockNumber )
-{
-	uint8_t cmd[13];
-
+static void BuildReadBlockRequest(uint8_t *uid, uint8_t blockNumber, uint8_t *cmd) {
 	uint16_t crc;
 	// If we set the Option_Flag in this request, the VICC will respond with the security status of the block
 	// followed by the block data
@@ -1398,13 +1405,11 @@ static void BuildReadBlockRequest(uint8_t *uid, uint8_t blockNumber )
 	cmd[11] = crc & 0xff;
 	cmd[12] = crc >> 8;
 
-	CodeIso15693AsReader(cmd, sizeof(cmd));
 }
 
 
 // Now the VICC>VCD responses when we are simulating a tag
-static void BuildInventoryResponse(uint8_t *uid)
-{
+static void BuildInventoryResponse(uint8_t *uid) {
 	uint8_t cmd[12];
 
 	uint16_t crc;
@@ -1433,7 +1438,7 @@ static void BuildInventoryResponse(uint8_t *uid)
 //  speed ... 0 low speed, 1 hi speed
 //  *recv will contain the tag's answer
 //  return: length of received data, or -1 for timeout
-int SendDataTag(uint8_t *send, int sendlen, bool init, int speed, uint8_t *recv, uint16_t max_recv_len, uint32_t start_time, uint32_t *eof_time) {
+int SendDataTag(uint8_t *send, int sendlen, bool init, bool speed_fast, uint8_t *recv, uint16_t max_recv_len, uint32_t start_time, uint16_t timeout, uint32_t *eof_time) {
 
 	if (init) {
 		Iso15693InitReader();
@@ -1442,19 +1447,40 @@ int SendDataTag(uint8_t *send, int sendlen, bool init, int speed, uint8_t *recv,
 
 	int answerLen = 0;
 
-	if (!speed) {
-		// low speed (1 out of 256)
-		CodeIso15693AsReader256(send, sendlen);
-	} else {
+	if (speed_fast) {
 		// high speed (1 out of 4)
 		CodeIso15693AsReader(send, sendlen);
+	} else {
+		// low speed (1 out of 256)
+		CodeIso15693AsReader256(send, sendlen);
 	}
 
 	TransmitTo15693Tag(ToSend, ToSendMax, &start_time);
+	uint32_t end_time = start_time + 32*(8*ToSendMax-4); // substract the 4 padding bits after EOF
+	LogTrace_ISO15693(send, sendlen, start_time*4, end_time*4, NULL, true);
 
 	// Now wait for a response
 	if (recv != NULL) {
-		answerLen = GetIso15693AnswerFromTag(recv, max_recv_len, ISO15693_READER_TIMEOUT, eof_time);
+		answerLen = GetIso15693AnswerFromTag(recv, max_recv_len, timeout, eof_time);
+	}
+
+	return answerLen;
+}
+
+
+int SendDataTagEOF(uint8_t *recv, uint16_t max_recv_len, uint32_t start_time, uint16_t timeout, uint32_t *eof_time) {
+
+	int answerLen = 0;
+
+	CodeIso15693AsReaderEOF();
+
+	TransmitTo15693Tag(ToSend, ToSendMax, &start_time);
+	uint32_t end_time = start_time + 32*(8*ToSendMax-4); // substract the 4 padding bits after EOF
+	LogTrace_ISO15693(NULL, 0, start_time*4, end_time*4, NULL, true);
+
+	// Now wait for a response
+	if (recv != NULL) {
+		answerLen = GetIso15693AnswerFromTag(recv, max_recv_len, timeout, eof_time);
 	}
 
 	return answerLen;
@@ -1546,7 +1572,6 @@ void ReaderIso15693(uint32_t parameter) {
 
 	set_tracing(true);
 
-	int answerLen = 0;
 	uint8_t TagUID[8] = {0x00};
 
 	FpgaDownloadAndGo(FPGA_BITSTREAM_HF);
@@ -1572,17 +1597,14 @@ void ReaderIso15693(uint32_t parameter) {
 	// THIS MEANS WE CAN PRE-BUILD REQUESTS TO SAVE CPU TIME
 
 	// Now send the IDENTIFY command
-	BuildIdentifyRequest();
+	uint8_t cmd[5];
+	BuildIdentifyRequest(cmd);
 	uint32_t start_time = 0;
-	TransmitTo15693Tag(ToSend, ToSendMax, &start_time);
-
-	// Now wait for a response
 	uint32_t eof_time;
-	answerLen = GetIso15693AnswerFromTag(answer, sizeof(answer), DELAY_ISO15693_VCD_TO_VICC_READER * 2, &eof_time) ;
+	int answerLen = SendDataTag(cmd, sizeof(cmd), true, true, answer, sizeof(answer), start_time, ISO15693_READER_TIMEOUT, &eof_time);
 	start_time = eof_time + DELAY_ISO15693_VICC_TO_VCD_READER;
 
-	if (answerLen >=12) // we should do a better check than this
-	{
+	if (answerLen >= 12) { // we should do a better check than this
 		TagUID[0] = answer[2];
 		TagUID[1] = answer[3];
 		TagUID[2] = answer[4];
@@ -1591,7 +1613,6 @@ void ReaderIso15693(uint32_t parameter) {
 		TagUID[5] = answer[7];
 		TagUID[6] = answer[8]; // IC Manufacturer code
 		TagUID[7] = answer[9]; // always E0
-
 	}
 
 	Dbprintf("%d octets read from IDENTIFY request:", answerLen);
@@ -1604,21 +1625,12 @@ void ReaderIso15693(uint32_t parameter) {
 			TagUID[7],TagUID[6],TagUID[5],TagUID[4],
 			TagUID[3],TagUID[2],TagUID[1],TagUID[0]);
 
-
-	// Dbprintf("%d octets read from SELECT request:", answerLen2);
-	// DbdecodeIso15693Answer(answerLen2,answer2);
-	// Dbhexdump(answerLen2,answer2,true);
-
-	// Dbprintf("%d octets read from XXX request:", answerLen3);
-	// DbdecodeIso15693Answer(answerLen3,answer3);
-	// Dbhexdump(answerLen3,answer3,true);
-
 	// read all pages
 	if (answerLen >= 12 && DEBUG) {
 		for (int i = 0; i < 32; i++) {  // sanity check, assume max 32 pages
-			BuildReadBlockRequest(TagUID, i);
-			TransmitTo15693Tag(ToSend, ToSendMax, &start_time);
-			int answerLen = GetIso15693AnswerFromTag(answer, sizeof(answer), DELAY_ISO15693_VCD_TO_VICC_READER * 2, &eof_time);
+			uint8_t cmd[13];
+			BuildReadBlockRequest(TagUID, i, cmd);
+			answerLen = SendDataTag(cmd, sizeof(cmd), false, true, answer, sizeof(answer), start_time, ISO15693_READER_TIMEOUT, &eof_time);
 			start_time = eof_time + DELAY_ISO15693_VICC_TO_VCD_READER;
 			if (answerLen > 0) {
 				Dbprintf("READ SINGLE BLOCK %d returned %d octets:", i, answerLen);
@@ -1629,7 +1641,7 @@ void ReaderIso15693(uint32_t parameter) {
 		}
 	}
 
-	// for the time being, switch field off to protect rdv4.0
+	// for the time being, switch field off to protect RDV4
 	// note: this prevents using hf 15 cmd with s option - which isn't implemented yet anyway
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
 	LED_D_OFF();
@@ -1680,8 +1692,7 @@ void SimTagIso15693(uint32_t parameter, uint8_t *uid) {
 
 // Since there is no standardized way of reading the AFI out of a tag, we will brute force it
 // (some manufactures offer a way to read the AFI, though)
-void BruteforceIso15693Afi(uint32_t speed)
-{
+void BruteforceIso15693Afi(uint32_t speed) {
 	LED_A_ON();
 
 	uint8_t data[6];
@@ -1697,7 +1708,7 @@ void BruteforceIso15693Afi(uint32_t speed)
 	data[2] = 0; // mask length
 	datalen = Iso15693AddCrc(data,3);
 	uint32_t start_time = GetCountSspClk();
-	recvlen = SendDataTag(data, datalen, true, speed, recv, sizeof(recv), 0, &eof_time);
+	recvlen = SendDataTag(data, datalen, true, speed, recv, sizeof(recv), 0, ISO15693_READER_TIMEOUT, &eof_time);
 	start_time = eof_time + DELAY_ISO15693_VICC_TO_VCD_READER;
 	WDT_HIT();
 	if (recvlen>=12) {
@@ -1714,7 +1725,7 @@ void BruteforceIso15693Afi(uint32_t speed)
 	for (int i = 0; i < 256; i++) {
 		data[2] = i & 0xFF;
 		datalen = Iso15693AddCrc(data,4);
-		recvlen = SendDataTag(data, datalen, false, speed, recv, sizeof(recv), start_time, &eof_time);
+		recvlen = SendDataTag(data, datalen, false, speed, recv, sizeof(recv), start_time, ISO15693_READER_TIMEOUT, &eof_time);
 		start_time = eof_time + DELAY_ISO15693_VICC_TO_VCD_READER;
 		WDT_HIT();
 		if (recvlen >= 12) {
@@ -1738,13 +1749,35 @@ void DirectTag15693Command(uint32_t datalen, uint32_t speed, uint32_t recv, uint
 	uint8_t recvbuf[ISO15693_MAX_RESPONSE_LENGTH];
 	uint32_t eof_time;
 
+	uint16_t timeout;
+    bool request_answer = false;
+	
+	switch (data[1]) {
+		case ISO15693_WRITEBLOCK:
+		case ISO15693_LOCKBLOCK:
+		case ISO15693_WRITE_MULTI_BLOCK:
+		case ISO15693_WRITE_AFI:
+		case ISO15693_LOCK_AFI:
+		case ISO15693_WRITE_DSFID:
+		case ISO15693_LOCK_DSFID:
+			timeout = ISO15693_READER_TIMEOUT_WRITE;
+			request_answer = data[0] & ISO15693_REQ_OPTION;
+			break;
+		default:
+			timeout = ISO15693_READER_TIMEOUT;
+	}		
+
 	if (DEBUG) {
 		Dbprintf("SEND:");
 		Dbhexdump(datalen, data, false);
 	}
 
-	recvlen = SendDataTag(data, datalen, true, speed, (recv?recvbuf:NULL), sizeof(recvbuf), 0, &eof_time);
+	recvlen = SendDataTag(data, datalen, true, speed, (recv?recvbuf:NULL), sizeof(recvbuf), 0, timeout, &eof_time);
 
+	if (request_answer) { // send a single EOF to get the tag response
+		recvlen = SendDataTagEOF((recv?recvbuf:NULL), sizeof(recvbuf), 0, ISO15693_READER_TIMEOUT, &eof_time);
+	}
+	
 	// for the time being, switch field off to protect rdv4.0
 	// note: this prevents using hf 15 cmd with s option - which isn't implemented yet anyway
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
@@ -1772,16 +1805,16 @@ void DirectTag15693Command(uint32_t datalen, uint32_t speed, uint32_t recv, uint
 //
 //-----------------------------------------------------------------------------
 
-// Set the UID to the tag (based on Iceman work).
+// Set the UID on Magic ISO15693 tag (based on Iceman's LUA-script).
 void SetTag15693Uid(uint8_t *uid) {
 
 	LED_A_ON();
 
 	uint8_t cmd[4][9] = {
-		{0x02, 0x21, 0x3e, 0x00, 0x00, 0x00, 0x00},
-		{0x02, 0x21, 0x3f, 0x69, 0x96, 0x00, 0x00},
-		{0x02, 0x21, 0x38},
-		{0x02, 0x21, 0x39}
+		{ISO15693_REQ_DATARATE_HIGH, ISO15693_WRITEBLOCK, 0x3e, 0x00, 0x00, 0x00, 0x00},
+		{ISO15693_REQ_DATARATE_HIGH, ISO15693_WRITEBLOCK, 0x3f, 0x69, 0x96, 0x00, 0x00},
+		{ISO15693_REQ_DATARATE_HIGH, ISO15693_WRITEBLOCK, 0x38},
+		{ISO15693_REQ_DATARATE_HIGH, ISO15693_WRITEBLOCK, 0x39}
 	};
 
 	uint16_t crc;
@@ -1802,30 +1835,35 @@ void SetTag15693Uid(uint8_t *uid) {
 	cmd[3][5] = uid[1];
 	cmd[3][6] = uid[0];
 
+	uint32_t start_time = 0;
+	
 	for (int i = 0; i < 4; i++) {
 		// Add the CRC
 		crc = Iso15693Crc(cmd[i], 7);
 		cmd[i][7] = crc & 0xff;
 		cmd[i][8] = crc >> 8;
 
+		recvlen = SendDataTag(cmd[i], sizeof(cmd[i]), i==0?true:false, true, recvbuf, sizeof(recvbuf), start_time, ISO15693_READER_TIMEOUT_WRITE, &eof_time);
+		start_time = eof_time + DELAY_ISO15693_VICC_TO_VCD_READER;
 		if (DEBUG) {
 			Dbprintf("SEND:");
 			Dbhexdump(sizeof(cmd[i]), cmd[i], false);
-		}
-
-		recvlen = SendDataTag(cmd[i], sizeof(cmd[i]), true, 1, recvbuf, sizeof(recvbuf), 0, &eof_time);
-
-		if (DEBUG) {
 			Dbprintf("RECV:");
 			if (recvlen > 0) {
 				Dbhexdump(recvlen, recvbuf, false);
 				DbdecodeIso15693Answer(recvlen, recvbuf);
 			}
 		}
-
-		cmd_send(CMD_ACK, recvlen>ISO15693_MAX_RESPONSE_LENGTH?ISO15693_MAX_RESPONSE_LENGTH:recvlen, 0, 0, recvbuf, ISO15693_MAX_RESPONSE_LENGTH);
+		// Note: need to know if we expect an answer from one of the magic commands
+		// if (recvlen < 0) {
+			// break;
+		// }
 	}
 
+	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
+	LED_D_OFF();
+
+	cmd_send(CMD_ACK, recvlen, 0, 0, recvbuf, recvlen);
 	LED_A_OFF();
 }
 

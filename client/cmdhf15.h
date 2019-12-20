@@ -13,17 +13,7 @@
 
 #include <stdbool.h>
 
-int CmdHF15(const char *Cmd);
-
-int CmdHF15Demod(const char *Cmd);
-int CmdHF15Read(const char *Cmd);
-int HF15Reader(const char *Cmd, bool verbose);
-int CmdHF15Reader(const char *Cmd);
-int CmdHF15Sim(const char *Cmd);
-int CmdHF15Record(const char *Cmd);
-int CmdHF15Cmd(const char*Cmd);
-int CmdHF15CSetUID(const char *Cmd);
-int CmdHF15CmdHelp(const char*Cmd);
-int CmdHF15Help(const char*Cmd);
+extern int CmdHF15(const char *Cmd);
+extern int HF15Reader(const char *Cmd, bool verbose);
 
 #endif
