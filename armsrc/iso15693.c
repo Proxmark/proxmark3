@@ -1611,8 +1611,8 @@ void ReaderIso15693(uint32_t parameter) {
 		TagUID[3] = answer[5];
 		TagUID[4] = answer[6];
 		TagUID[5] = answer[7];
-		TagUID[6] = answer[8];
-		TagUID[7] = answer[9]; // IC Manufacturer code always E0
+		TagUID[6] = answer[8]; // IC Manufacturer code
+		TagUID[7] = answer[9]; // always E0
 	}
 
 	Dbprintf("%d octets read from IDENTIFY request:", answerLen);

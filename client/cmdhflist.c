@@ -254,6 +254,7 @@ void annotateIso15693(char *exp, size_t size, uint8_t* cmd, uint8_t cmdsize) {
 			case ISO15693_WRITEBLOCK            :snprintf(exp, size, "WRITEBLOCK");return;
 			case ISO15693_LOCKBLOCK             :snprintf(exp, size, "LOCKBLOCK");return;
 			case ISO15693_READ_MULTI_BLOCK      :snprintf(exp, size, "READ_MULTI_BLOCK");return;
+			case ISO15693_WRITE_MULTI_BLOCK     :snprintf(exp, size, "WRITE_MULTI_BLOCK");return;
 			case ISO15693_SELECT                :snprintf(exp, size, "SELECT");return;
 			case ISO15693_RESET_TO_READY        :snprintf(exp, size, "RESET_TO_READY");return;
 			case ISO15693_WRITE_AFI             :snprintf(exp, size, "WRITE_AFI");return;
