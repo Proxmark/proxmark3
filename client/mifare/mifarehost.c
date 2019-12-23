@@ -479,7 +479,7 @@ int mfnested(uint8_t blockNo, uint8_t keyType, uint8_t *key, uint8_t trgBlockNo,
 			brute_force_per_second = ((float)i) / (((float)(msclock() - start_time)) / 1000.0);
 			brute_force_time = ((float)(statelists[0].len - i)) / brute_force_per_second;
 			next_print_time = msclock() + 10 * 1000;
-			PrintAndLog("| %6d keys left | %5.1f keys/sec | worst case %6.1f seconds remaining |", statelists[0].len - i, brute_force_per_second, brute_force_time);
+			PrintAndLog(" %8d keys left | %5.1f keys/sec | worst case %6.1f seconds remaining", statelists[0].len - i, brute_force_per_second, brute_force_time);
 		}
 
 		if ((i+max_keys) >= statelists[0].len)
@@ -506,7 +506,7 @@ int mfnested(uint8_t blockNo, uint8_t keyType, uint8_t *key, uint8_t trgBlockNo,
 		}
 	}
 
-	if (!isOK && statelists[0].len != 1)
+	if (isOK == 0 && statelists[0].len != 1)
 		PrintAndLog("Key found in %0.2f seconds after checking %d keys\n", ((float)(msclock() - start_time)) / 1000.0, i+max_keys);
 
 	free(statelists[0].head.slhead);
