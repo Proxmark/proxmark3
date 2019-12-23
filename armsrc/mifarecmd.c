@@ -779,6 +779,7 @@ void MifareNested(uint32_t arg0, uint32_t arg1, uint32_t calibrate, uint8_t *dat
 	uint32_t cuid, nt1, nt2, nttmp, nttest, ks1;
 	uint8_t par[1];
 	uint32_t target_nt[2], target_ks[2];
+	uint8_t target_nt_duplicate_count = 0;
 
 	uint8_t par_array[4];
 	uint16_t ncount = 0;
@@ -814,17 +815,17 @@ void MifareNested(uint32_t arg0, uint32_t arg1, uint32_t calibrate, uint8_t *dat
 
 		for (rtr = 0; rtr < 17; rtr++) {
 
-			// Test if the action was cancelled
-			if(BUTTON_PRESS()) {
-				isOK = -2;
-				break;
-			}
-
 			// prepare next select. No need to power down the card.
 			if(mifare_classic_halt(pcs, cuid)) {
 				if (MF_DBGLEVEL >= 1)   Dbprintf("Nested: Halt error");
 				rtr--;
 				continue;
+			}
+
+			// Test if the action was cancelled
+			if(BUTTON_PRESS()) {
+				isOK = -2;
+				break;
 			}
 
 			if(!iso14443a_select_card(uid, NULL, &cuid, true, 0, true)) {
@@ -893,7 +894,7 @@ void MifareNested(uint32_t arg0, uint32_t arg1, uint32_t calibrate, uint8_t *dat
 	for(i=0; i < 2 && !isOK; i++) { // look for exactly two different nonces
 
 		target_nt[i] = 0;
-		while(target_nt[i] == 0) { // continue until we have an unambiguous nonce
+		while(target_nt[i] == 0 && !isOK) { // continue until we have an unambiguous nonce
 
 			// prepare next select. No need to power down the card.
 			if(mifare_classic_halt(pcs, cuid)) {
@@ -901,16 +902,22 @@ void MifareNested(uint32_t arg0, uint32_t arg1, uint32_t calibrate, uint8_t *dat
 				continue;
 			}
 
+			// break out of the loop on button press
+			if(BUTTON_PRESS()) {
+				isOK = -2;
+				break;
+			}
+
 			if(!iso14443a_select_card(uid, NULL, &cuid, true, 0, true)) {
 				if (MF_DBGLEVEL >= 1)   Dbprintf("Nested: Can't select card");
 				continue;
-			};
+			}
 
 			auth1_time = 0;
 			if(mifare_classic_authex(pcs, cuid, blockNo, keyType, ui64Key, AUTH_FIRST, &nt1, &auth1_time)) {
 				if (MF_DBGLEVEL >= 1)   Dbprintf("Nested: Auth1 error");
 				continue;
-			};
+			}
 
 			// nested authentication
 			auth2_time = auth1_time + delta_time;
@@ -918,7 +925,7 @@ void MifareNested(uint32_t arg0, uint32_t arg1, uint32_t calibrate, uint8_t *dat
 			if (len != 4) {
 				if (MF_DBGLEVEL >= 1)   Dbprintf("Nested: Auth2 error len=%d", len);
 				continue;
-			};
+			}
 
 			nt2 = bytes_to_num(receivedAnswer, 4);
 			if (MF_DBGLEVEL >= 3) Dbprintf("Nonce#%d: Testing nt1=%08x nt2enc=%08x nt2par=%02x", i+1, nt1, nt2, par[0]);
@@ -944,7 +951,12 @@ void MifareNested(uint32_t arg0, uint32_t arg1, uint32_t calibrate, uint8_t *dat
 					target_ks[i] = ks1;
 					ncount++;
 					if (i == 1 && target_nt[1] == target_nt[0]) { // we need two different nonces
-						target_nt[i] = 0;
+						if( ++target_nt_duplicate_count >= NESTED_MAX_TRIES ) { // unable to get a 2nd nonce after NESTED_MAX_TRIES tries, probably a fixed nonce
+							if (MF_DBGLEVEL >= 2) Dbprintf("Nonce#2: cannot get nonce that != nonce#1, continuing anyway with single nonce! ntdist=%d", j);
+							break;
+						}
+
+						target_nt[1] = 0;
 						if (MF_DBGLEVEL >= 3) Dbprintf("Nonce#2: dismissed (= nonce#1), ntdist=%d", j);
 						break;
 					}
@@ -1013,17 +1025,17 @@ void MifareChkKeys(uint16_t arg0, uint16_t arg1, uint8_t arg2, uint8_t *datain)
 		int res = MifareMultisectorChk(datain, keyCount, sectorCnt, keyType, OLD_MF_DBGLEVEL, &keyIndex);
 
 		if (res >= 0) {
-			cmd_send(CMD_ACK, 1, 0, 0, keyIndex, 80);
+			cmd_send(CMD_ACK, 1, res, 0, keyIndex, 80);
 		} else {
-			cmd_send(CMD_ACK, 0, 0, 0, NULL, 0);
+			cmd_send(CMD_ACK, 0, res, 0, NULL, 0);
 		}
 	} else {	
 		int res = MifareChkBlockKeys(datain, keyCount, blockNo, keyType, OLD_MF_DBGLEVEL);
 		
 		if (res > 0) {
-			cmd_send(CMD_ACK, 1, 0, 0, datain + (res - 1) * 6, 6);
+			cmd_send(CMD_ACK, 1, res, 0, datain + (res - 1) * 6, 6);
 		} else {
-			cmd_send(CMD_ACK, 0, 0, 0, NULL, 0);
+			cmd_send(CMD_ACK, 0, res, 0, NULL, 0);
 		}
 	}
 

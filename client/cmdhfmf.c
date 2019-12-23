@@ -707,17 +707,17 @@ int CmdHF14AMfNested(const char *Cmd)
 	if (cmdp == 'o') { // ------------------------------------  one sector working
 		PrintAndLog("--target block no:%3d, target key type:%c ", trgBlockNo, trgKeyType?'B':'A');
 		int16_t isOK = mfnested(blockNo, keyType, key, trgBlockNo, trgKeyType, keyBlock, true);
-		if (isOK) {
+		if (isOK < 0) {
 			switch (isOK) {
 				case -1 : PrintAndLog("Error: No response from Proxmark.\n"); break;
 				case -2 : PrintAndLog("Button pressed. Aborted.\n"); break;
 				case -3 : PrintAndLog("Tag isn't vulnerable to Nested Attack (random numbers are not predictable).\n"); break;
-				default : PrintAndLog("Unknown Error.\n");
+				default : PrintAndLog("Unknown Error (%d)\n", isOK);
 			}
 			return 2;
 		}
 		key64 = bytes_to_num(keyBlock, 6);
-		if (key64) {
+		if (!isOK) {
 			PrintAndLog("Found valid key:%012" PRIx64, key64);
 
 			// transfer key to the emulator
@@ -792,12 +792,12 @@ int CmdHF14AMfNested(const char *Cmd)
 					if (e_sector[sectorNo].foundKey[trgKeyType]) continue;
 					PrintAndLog("-----------------------------------------------");
 					int16_t isOK = mfnested(blockNo, keyType, key, FirstBlockOfSector(sectorNo), trgKeyType, keyBlock, calibrate);
-					if(isOK) {
+					if(isOK < 0) {
 						switch (isOK) {
 							case -1 : PrintAndLog("Error: No response from Proxmark.\n"); break;
 							case -2 : PrintAndLog("Button pressed. Aborted.\n"); break;
 							case -3 : PrintAndLog("Tag isn't vulnerable to Nested Attack (random numbers are not predictable).\n"); break;
-							default : PrintAndLog("Unknown Error.\n");
+							default : PrintAndLog("Unknown Error (%d)\n", isOK);
 						}
 						free(e_sector);
 						return 2;
@@ -808,7 +808,7 @@ int CmdHF14AMfNested(const char *Cmd)
 					iterations++;
 
 					key64 = bytes_to_num(keyBlock, 6);
-					if (key64) {
+					if (!isOK) {
 						PrintAndLog("Found valid key:%012" PRIx64, key64);
 						e_sector[sectorNo].foundKey[trgKeyType] = 1;
 						e_sector[sectorNo].Key[trgKeyType] = key64;

@@ -23,6 +23,7 @@
 #include "parity.h"
 #include "util.h"
 #include "iso14443crc.h"
+#include "util_posix.h"
 
 #include "mifare.h"
 #include "mifare4.h"
@@ -236,8 +237,16 @@ int mfCheckKeys (uint8_t blockNo, uint8_t keyType, bool clear_trace, uint8_t key
 	SendCommand(&c);
 
 	UsbCommand resp;
-	if (!WaitForResponseTimeout(CMD_ACK,&resp,3000)) return 1; 
-	if ((resp.arg[0] & 0xff) != 0x01) return 2;
+	if (!WaitForResponseTimeout(CMD_ACK,&resp,3000))
+		return 1;
+
+	if ((resp.arg[0] & 0xff) != 0x01) {
+		if (((int)resp.arg[1]) < 0)
+			return (int)resp.arg[1];
+
+		return 2;
+	}
+
 	*key = bytes_to_num(resp.d.asBytes, 6);
 	return 0;
 }
@@ -321,12 +330,24 @@ __attribute__((force_align_arg_pointer))
 
 int mfnested(uint8_t blockNo, uint8_t keyType, uint8_t *key, uint8_t trgBlockNo, uint8_t trgKeyType, uint8_t *resultKey, bool calibrate)
 {
-	uint16_t i;
+	uint32_t i, j;
 	uint32_t uid;
 	UsbCommand resp;
 
+	int num_unique_nonces;
+
 	StateList_t statelists[2];
 	struct Crypto1State *p1, *p2, *p3, *p4;
+
+	uint8_t *keyBlock = NULL;
+	uint64_t key64;
+
+	int isOK = 1;
+
+	uint64_t next_print_time = 0;
+	uint64_t start_time;
+	float brute_force_time;
+	float brute_force_per_second;
 
 	// flush queue
 	(void)WaitForResponseTimeout(CMD_ACK,NULL,100);
@@ -335,7 +356,11 @@ int mfnested(uint8_t blockNo, uint8_t keyType, uint8_t *key, uint8_t trgBlockNo,
 	memcpy(c.d.asBytes, key, 6);
 	SendCommand(&c);
 
-	if (!WaitForResponseTimeout(CMD_ACK, &resp, 1500)) {
+	if (!WaitForResponseTimeout(CMD_ACK, &resp, 2500)) {
+		// some cards can cause it to get stuck in a loop, so break out of it
+		UsbCommand c = {CMD_PING};
+		SendCommand(&c);
+		(void)WaitForResponseTimeout(CMD_ACK,NULL,500);
 		return -1;
 	}
 
@@ -353,6 +378,11 @@ int mfnested(uint8_t blockNo, uint8_t keyType, uint8_t *key, uint8_t trgBlockNo,
 		memcpy(&statelists[i].nt,  (void *)(resp.d.asBytes + 4 + i * 8 + 0), 4);
 		memcpy(&statelists[i].ks1, (void *)(resp.d.asBytes + 4 + i * 8 + 4), 4);
 	}
+
+	if (statelists[0].nt == statelists[1].nt && statelists[0].ks1 == statelists[1].ks1)
+		num_unique_nonces = 1;
+	else
+		num_unique_nonces = 2;
 
 	// calc keys
 
@@ -404,30 +434,86 @@ int mfnested(uint8_t blockNo, uint8_t keyType, uint8_t *key, uint8_t trgBlockNo,
 	statelists[0].tail.sltail=--p3;
 	statelists[1].tail.sltail=--p4;
 
+	for (i = 0; i < 2; i++) {
+		PrintAndLog("statelist %d: length:%d block:%02d keytype:%d nt:%08X ks1:%08X", i, statelists[i].len, statelists[i].blockNo, statelists[i].keyType, statelists[i].nt, statelists[i].ks1);
+	}
+
 	// the statelists now contain possible keys. The key we are searching for must be in the
 	// intersection of both lists. Create the intersection:
 	qsort(statelists[0].head.keyhead, statelists[0].len, sizeof(uint64_t), compare_uint64);
-	qsort(statelists[1].head.keyhead, statelists[1].len, sizeof(uint64_t), compare_uint64);
-	statelists[0].len = intersection(statelists[0].head.keyhead, statelists[1].head.keyhead);
+
+	if (num_unique_nonces > 1) {
+		qsort(statelists[1].head.keyhead, statelists[1].len, sizeof(uint64_t), compare_uint64);
+		statelists[0].len = intersection(statelists[0].head.keyhead, statelists[1].head.keyhead);
+	}
+	else {
+		PrintAndLog("Nonce 1 and 2 are the same!");
+	}
+
+	if (statelists[0].len > 100) {
+		PrintAndLog("We have %d keys to check. This will take a very long time!", statelists[0].len);
+		PrintAndLog("Press button to abort.");
+	}
+	else if (statelists[0].len < 1) {
+		PrintAndLog("No candidate keys to check!");
+	}
+	else {
+		PrintAndLog("We have %d key(s) to check.", statelists[0].len);
+	}
+
+	uint32_t max_keys  = (statelists[0].len > (USB_CMD_DATA_SIZE / 6)) ? (USB_CMD_DATA_SIZE / 6) : statelists[0].len;
+	keyBlock = calloc(max_keys, 6);
+
+	if (keyBlock == NULL) {
+		free(statelists[0].head.slhead);
+		free(statelists[1].head.slhead);
+		return -4;
+	}
 
 	memset(resultKey, 0, 6);
+	start_time = msclock();
+	next_print_time = start_time + 1 * 1000;
 	// The list may still contain several key candidates. Test each of them with mfCheckKeys
-	for (i = 0; i < statelists[0].len; i++) {
-		uint8_t keyBlock[6];
-		uint64_t key64;
-		crypto1_get_lfsr(statelists[0].head.slhead + i, &key64);
-		num_to_bytes(key64, 6, keyBlock);
+	for (i = 0; i < statelists[0].len; i+=max_keys) {
+		if (next_print_time <= msclock()) {
+			brute_force_per_second = ((float)i) / (((float)(msclock() - start_time)) / 1000.0);
+			brute_force_time = ((float)(statelists[0].len - i)) / brute_force_per_second;
+			next_print_time = msclock() + 10 * 1000;
+			PrintAndLog(" %8d keys left | %5.1f keys/sec | worst case %6.1f seconds remaining", statelists[0].len - i, brute_force_per_second, brute_force_time);
+		}
+
+		if ((i+max_keys) >= statelists[0].len)
+			max_keys = statelists[0].len - i;
+
+		for (j = 0; j < max_keys; j++) {
+			crypto1_get_lfsr(statelists[0].head.slhead + i + j, &key64);
+			num_to_bytes(key64, 6, keyBlock+(j*6));
+		}
+
 		key64 = 0;
-		if (!mfCheckKeys(statelists[0].blockNo, statelists[0].keyType, false, 1, keyBlock, &key64)) {
+		isOK = mfCheckKeys(statelists[0].blockNo, statelists[0].keyType, true, max_keys, keyBlock, &key64);
+
+		if (isOK == 1) { // timeout
+			isOK = -1;
+			break;
+		}
+		else if (isOK < 0) { // -2 is button pressed
+            break;
+		}
+		else if (!isOK) {
 			num_to_bytes(key64, 6, resultKey);
 			break;
 		}
 	}
 
+	if (isOK == 0 && statelists[0].len != 1)
+		PrintAndLog("Key found in %0.2f seconds after checking %d keys\n", ((float)(msclock() - start_time)) / 1000.0, i+max_keys);
+
 	free(statelists[0].head.slhead);
 	free(statelists[1].head.slhead);
+	free(keyBlock);
 
-	return 0;
+	return isOK;
 }
 
 // MIFARE
