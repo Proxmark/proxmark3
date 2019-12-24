@@ -270,8 +270,7 @@ const bool Mod_Miller_LUT[] = {
 #define IsMillerModulationNibble1(b) (Mod_Miller_LUT[(b & 0x000000F0) >> 4])
 #define IsMillerModulationNibble2(b) (Mod_Miller_LUT[(b & 0x0000000F)])
 
-static void UartReset()
-{
+static void UartReset() {
 	Uart.state = STATE_UNSYNCD;
 	Uart.bitCount = 0;
 	Uart.len = 0;                       // number of decoded data bytes
@@ -280,8 +279,7 @@ static void UartReset()
 	Uart.parityBits = 0;                // holds 8 parity bits
 }
 
-static void UartInit(uint8_t *data, uint8_t *parity)
-{
+static void UartInit(uint8_t *data, uint8_t *parity) {
 	Uart.output = data;
 	Uart.parity = parity;
 	Uart.fourBits = 0x00000000;         // clear the buffer for 4 Bits
@@ -291,8 +289,7 @@ static void UartInit(uint8_t *data, uint8_t *parity)
 }
 
 // use parameter non_real_time to provide a timestamp. Set to 0 if the decoder should measure real time
-static RAMFUNC bool MillerDecoding(uint8_t bit, uint32_t non_real_time)
-{
+static RAMFUNC bool MillerDecoding(uint8_t bit, uint32_t non_real_time) {
 
 	Uart.fourBits = (Uart.fourBits << 8) | bit;
 
@@ -447,8 +444,7 @@ const bool Mod_Manchester_LUT[] = {
 #define IsManchesterModulationNibble2(b) (Mod_Manchester_LUT[(b & 0x000F)])
 
 
-static void DemodReset()
-{
+static void DemodReset() {
 	Demod.state = DEMOD_UNSYNCD;
 	Demod.len = 0;                      // number of decoded data bytes
 	Demod.parityLen = 0;
@@ -461,16 +457,14 @@ static void DemodReset()
 	Demod.endTime = 0;
 }
 
-static void DemodInit(uint8_t *data, uint8_t *parity)
-{
+static void DemodInit(uint8_t *data, uint8_t *parity) {
 	Demod.output = data;
 	Demod.parity = parity;
 	DemodReset();
 }
 
 // use parameter non_real_time to provide a timestamp. Set to 0 if the decoder should measure real time
-static RAMFUNC int ManchesterDecoding(uint8_t bit, uint16_t offset, uint32_t non_real_time)
-{
+static RAMFUNC int ManchesterDecoding(uint8_t bit, uint16_t offset, uint32_t non_real_time) {
 
 	Demod.twoBits = (Demod.twoBits << 8) | bit;
 
@@ -729,8 +723,7 @@ void RAMFUNC SnoopIso14443a(uint8_t param) {
 //-----------------------------------------------------------------------------
 // Prepare tag messages
 //-----------------------------------------------------------------------------
-static void CodeIso14443aAsTagPar(const uint8_t *cmd, uint16_t len, uint8_t *parity)
-{
+static void CodeIso14443aAsTagPar(const uint8_t *cmd, uint16_t len, uint8_t *parity) {
 	ToSendReset();
 
 	// Correction bit, might be removed when not needed
@@ -778,8 +771,7 @@ static void CodeIso14443aAsTagPar(const uint8_t *cmd, uint16_t len, uint8_t *par
 }
 
 
-static void Code4bitAnswerAsTag(uint8_t cmd)
-{
+static void Code4bitAnswerAsTag(uint8_t cmd) {
 	int i;
 
 	ToSendReset();
@@ -853,8 +845,7 @@ static void EmLogTraceTag(uint8_t *tag_data, uint16_t tag_len, uint8_t *tag_Pari
 // Stop when button is pressed
 // Or return true when command is captured
 //-----------------------------------------------------------------------------
-static int GetIso14443aCommandFromReader(uint8_t *received, uint8_t *parity, int *len)
-{
+static int GetIso14443aCommandFromReader(uint8_t *received, uint8_t *parity, int *len) {
 	// Set FPGA mode to "simulated ISO 14443 tag", no modulation (listen
 	// only, since we are receiving, not transmitting).
 	// Signal field is off with the appropriate LED
@@ -951,8 +942,8 @@ bool prepare_allocated_tag_modulation(tag_response_info_t* response_info, uint8_
 // Main loop of simulated tag: receive commands from reader, decide what
 // response to send, and send it.
 //-----------------------------------------------------------------------------
-void SimulateIso14443aTag(int tagType, int uid_1st, int uid_2nd, byte_t* data)
-{
+void SimulateIso14443aTag(int tagType, int uid_1st, int uid_2nd, byte_t* data) {
+
 	uint8_t sak;
 
 	// The first response contains the ATQA (note: bytes are transmitted in reverse order).
@@ -1231,8 +1222,7 @@ void SimulateIso14443aTag(int tagType, int uid_1st, int uid_2nd, byte_t* data)
 
 // prepare a delayed transfer. This simply shifts ToSend[] by a number
 // of bits specified in the delay parameter.
-static void PrepareDelayedTransfer(uint16_t delay)
-{
+static void PrepareDelayedTransfer(uint16_t delay) {
 	uint8_t bitmask = 0;
 	uint8_t bits_to_shift = 0;
 	uint8_t bits_shifted = 0;
@@ -1261,8 +1251,7 @@ static void PrepareDelayedTransfer(uint16_t delay)
 // if == 0: transfer immediately and return time of transfer
 // if != 0: delay transfer until time specified
 //-------------------------------------------------------------------------------------
-static void TransmitFor14443a(const uint8_t *cmd, uint16_t len, uint32_t *timing)
-{
+static void TransmitFor14443a(const uint8_t *cmd, uint16_t len, uint32_t *timing) {
 	LED_B_ON();
 	LED_D_ON();
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_HF_ISO14443A | FPGA_HF_ISO14443A_READER_MOD);
@@ -1284,9 +1273,6 @@ static void TransmitFor14443a(const uint8_t *cmd, uint16_t len, uint32_t *timing
 		LastTimeProxToAirStart = ThisTransferTime;
 	}
 
-	// clear TXRDY
-	AT91C_BASE_SSC->SSC_THR = SEC_Y;
-
 	uint16_t c = 0;
 	for (;;) {
 		if (AT91C_BASE_SSC->SSC_SR & (AT91C_SSC_TXRDY)) {
@@ -1306,8 +1292,7 @@ static void TransmitFor14443a(const uint8_t *cmd, uint16_t len, uint32_t *timing
 //-----------------------------------------------------------------------------
 // Prepare reader command (in bits, support short frames) to send to FPGA
 //-----------------------------------------------------------------------------
-static void CodeIso14443aBitsAsReaderPar(const uint8_t *cmd, uint16_t bits, const uint8_t *parity)
-{
+static void CodeIso14443aBitsAsReaderPar(const uint8_t *cmd, uint16_t bits, const uint8_t *parity) {
 	int i, j;
 	int last;
 	uint8_t b;
@@ -1390,8 +1375,7 @@ static void CodeIso14443aBitsAsReaderPar(const uint8_t *cmd, uint16_t bits, cons
 // Stop when button is pressed (return 1) or field was gone (return 2)
 // Or return 0 when command is captured
 //-----------------------------------------------------------------------------
-int EmGetCmd(uint8_t *received, uint16_t *len, uint8_t *parity)
-{
+int EmGetCmd(uint8_t *received, uint16_t *len, uint8_t *parity) {
 	uint32_t field_off_time = -1;
 	uint32_t samples = 0;
 	int ret = 0;
@@ -1475,8 +1459,7 @@ int EmGetCmd(uint8_t *received, uint16_t *len, uint8_t *parity)
 }
 
 
-static int EmSendCmd14443aRaw(uint8_t *resp, uint16_t respLen)
-{
+static int EmSendCmd14443aRaw(uint8_t *resp, uint16_t respLen) {
 	LED_C_ON();
 
 	uint8_t b;
@@ -1578,8 +1561,7 @@ int EmSendPrecompiledCmd(tag_response_info_t *response_info) {
 //  If a response is captured return true
 //  If it takes too long return false
 //-----------------------------------------------------------------------------
-static int GetIso14443aAnswerFromTag(uint8_t *receivedResponse, uint8_t *receivedResponsePar, uint16_t offset)
-{
+static int GetIso14443aAnswerFromTag(uint8_t *receivedResponse, uint8_t *receivedResponsePar, uint16_t offset) {
 	uint32_t c;
 
 	// Set FPGA mode to "reader listen mode", no modulation (listen
@@ -1598,7 +1580,7 @@ static int GetIso14443aAnswerFromTag(uint8_t *receivedResponse, uint8_t *receive
 	for (;;) {
 		WDT_HIT();
 
-		if(AT91C_BASE_SSC->SSC_SR & (AT91C_SSC_RXRDY)) {
+		if (AT91C_BASE_SSC->SSC_SR & (AT91C_SSC_RXRDY)) {
 			b = (uint8_t)AT91C_BASE_SSC->SSC_RHR;
 			if (ManchesterDecoding(b, offset, 0)) {
 				NextTransferTime = MAX(NextTransferTime, Demod.endTime - (DELAY_AIR2ARM_AS_READER + DELAY_ARM2AIR_AS_READER)/16 + FRAME_DELAY_TIME_PICC_TO_PCD);
@@ -1611,8 +1593,8 @@ static int GetIso14443aAnswerFromTag(uint8_t *receivedResponse, uint8_t *receive
 }
 
 
-void ReaderTransmitBitsPar(uint8_t* frame, uint16_t bits, uint8_t *par, uint32_t *timing)
-{
+void ReaderTransmitBitsPar(uint8_t* frame, uint16_t bits, uint8_t *par, uint32_t *timing) {
+
 	CodeIso14443aBitsAsReaderPar(frame, bits, par);
 
 	// Send command to tag
@@ -1625,14 +1607,12 @@ void ReaderTransmitBitsPar(uint8_t* frame, uint16_t bits, uint8_t *par, uint32_t
 }
 
 
-void ReaderTransmitPar(uint8_t* frame, uint16_t len, uint8_t *par, uint32_t *timing)
-{
-  ReaderTransmitBitsPar(frame, len*8, par, timing);
+void ReaderTransmitPar(uint8_t* frame, uint16_t len, uint8_t *par, uint32_t *timing) {
+	ReaderTransmitBitsPar(frame, len*8, par, timing);
 }
 
 
-static void ReaderTransmitBits(uint8_t* frame, uint16_t len, uint32_t *timing)
-{
+static void ReaderTransmitBits(uint8_t* frame, uint16_t len, uint32_t *timing) {
   // Generate parity and redirect
   uint8_t par[MAX_PARITY_SIZE];
   GetParity(frame, len/8, par);
@@ -1640,8 +1620,7 @@ static void ReaderTransmitBits(uint8_t* frame, uint16_t len, uint32_t *timing)
 }
 
 
-void ReaderTransmit(uint8_t* frame, uint16_t len, uint32_t *timing)
-{
+void ReaderTransmit(uint8_t* frame, uint16_t len, uint32_t *timing) {
   // Generate parity and redirect
   uint8_t par[MAX_PARITY_SIZE];
   GetParity(frame, len, par);
@@ -1649,16 +1628,14 @@ void ReaderTransmit(uint8_t* frame, uint16_t len, uint32_t *timing)
 }
 
 
-static int ReaderReceiveOffset(uint8_t* receivedAnswer, uint16_t offset, uint8_t *parity)
-{
+static int ReaderReceiveOffset(uint8_t* receivedAnswer, uint16_t offset, uint8_t *parity) {
 	if (!GetIso14443aAnswerFromTag(receivedAnswer, parity, offset)) return false;
 	LogTrace(receivedAnswer, Demod.len, Demod.startTime*16 - DELAY_AIR2ARM_AS_READER, Demod.endTime*16 - DELAY_AIR2ARM_AS_READER, parity, false);
 	return Demod.len;
 }
 
 
-int ReaderReceive(uint8_t *receivedAnswer, uint8_t *parity)
-{
+int ReaderReceive(uint8_t *receivedAnswer, uint8_t *parity) {
 	if (!GetIso14443aAnswerFromTag(receivedAnswer, parity, 0)) return false;
 
 	LogTrace(receivedAnswer, Demod.len, Demod.startTime*16 - DELAY_AIR2ARM_AS_READER, Demod.endTime*16 - DELAY_AIR2ARM_AS_READER, parity, false);
@@ -1697,7 +1674,7 @@ static void iso14a_set_ATS_times(uint8_t *ats) {
 static int GetATQA(uint8_t *resp, uint8_t *resp_par) {
 
 #define WUPA_RETRY_TIMEOUT  10  // 10ms
-	uint8_t wupa[]       = { 0x52 };  // 0x26 - REQA  0x52 - WAKE-UP
+	uint8_t wupa[]       = {ISO14443A_CMD_WUPA};  // 0x26 - REQA  0x52 - WAKE-UP
 
 	uint32_t save_iso14a_timeout = iso14a_get_timeout();
 	iso14a_set_timeout(1236/(16*8)+1);      // response to WUPA is expected at exactly 1236/fc. No need to wait longer.
@@ -2035,8 +2012,8 @@ int iso14_apdu(uint8_t *cmd, uint16_t cmd_len, bool send_chaining, void *data, u
 // Read an ISO 14443a tag. Send out commands and store answers.
 //
 //-----------------------------------------------------------------------------
-void ReaderIso14443a(UsbCommand *c)
-{
+void ReaderIso14443a(UsbCommand *c) {
+
 	iso14a_command_t param = c->arg[0];
 	uint8_t *cmd = c->d.asBytes;
 	size_t len = c->arg[1] & 0xffff;
