@@ -2060,7 +2060,7 @@ int CmdHF14AMfEKeyPrn(const char *Cmd)
 				PrintAndLog("error get block %d", FirstBlockOfSector(i) + NumBlocksPerSector(i) - 1);
 				break;
 			}
-			fwrite(data+6, 1, 6, fkeys);
+			fwrite(data, 1, 6, fkeys);
 		}
 		for(i = 0; i < numSectors; i++) {
 			if (mfEmlGetMem(data, FirstBlockOfSector(i) + NumBlocksPerSector(i) - 1, 1)) {
