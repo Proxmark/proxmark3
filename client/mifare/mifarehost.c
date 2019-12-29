@@ -210,7 +210,7 @@ int mfDarkside(uint64_t *key) {
 			}
 			bool init = (i == 0);
 			bool drop_field = (i + size == keycount);
-			if (!mfCheckKeys(0, 0, 0, false, init, drop_field, size, keyBlock, key)) {
+			if (!mfCheckKeys(0, 0, 0, false, init, drop_field, false, size, keyBlock, key)) {
 				break;
 			}
 		}
@@ -229,8 +229,7 @@ int mfDarkside(uint64_t *key) {
 	return 0;
 }
 
-
-int mfCheckKeys(uint8_t blockNo, uint8_t keyType, uint16_t timeout14a, bool clear_trace, bool init, bool drop_field, uint8_t keycnt, uint8_t * keyBlock, uint64_t * key) {
+int mfCheckKeys(uint8_t blockNo, uint8_t keyType, uint16_t timeout14a, bool clear_trace, bool init, bool drop_field, bool dont_wait, uint8_t keycnt, uint8_t * keyBlock, uint64_t * key) {
 
 	*key = -1;
 	bool multisectorCheck = false;
@@ -240,6 +239,13 @@ int mfCheckKeys(uint8_t blockNo, uint8_t keyType, uint16_t timeout14a, bool clea
 	memcpy(c.d.asBytes, keyBlock, 6 * keycnt);
 	SendCommand(&c);
 
+	if (dont_wait)
+		return 3;
+
+	return mfCheckKeysGetResponse(key);
+}
+
+int mfCheckKeysGetResponse(uint64_t *key) {
 	UsbCommand resp;
 	if (!WaitForResponseTimeout(CMD_ACK,&resp,3000))
 		return 1;
@@ -251,7 +257,9 @@ int mfCheckKeys(uint8_t blockNo, uint8_t keyType, uint16_t timeout14a, bool clea
 		return 2;
 	}
 
-	*key = bytes_to_num(resp.d.asBytes, 6);
+	if (key)
+		*key = bytes_to_num(resp.d.asBytes, 6);
+
 	return 0;
 }
 
@@ -337,7 +345,7 @@ __attribute__((force_align_arg_pointer))
 
 
 int mfnested(uint8_t blockNo, uint8_t keyType, uint16_t timeout14a, uint8_t *key, uint8_t trgBlockNo, uint8_t trgKeyType, uint8_t *resultKey, bool calibrate) {
-	uint32_t i, j;
+	uint32_t i, j, last_count;
 	uint32_t uid;
 	UsbCommand resp;
 
@@ -484,6 +492,8 @@ int mfnested(uint8_t blockNo, uint8_t keyType, uint16_t timeout14a, uint8_t *key
 	memset(resultKey, 0, 6);
 	start_time = msclock();
 	next_print_time = start_time + 1 * 1000;
+	bool want_queue = (max_keys < statelists[0].len);
+	bool queued_next_set = false;
 	// The list may still contain several key candidates. Test each of them with mfCheckKeys
 	for (i = 0; i < statelists[0].len; i += max_keys) {
 		if (next_print_time <= msclock()) {
@@ -505,7 +515,13 @@ int mfnested(uint8_t blockNo, uint8_t keyType, uint16_t timeout14a, uint8_t *key
 
 		bool init = (i == 0);
 		bool drop_field = (i + max_keys == statelists[0].len);
-		isOK = mfCheckKeys(statelists[0].blockNo, statelists[0].keyType, authentication_timeout, true, init, drop_field, max_keys, keyBlock, &key64);
+		bool dont_wait = want_queue && !queued_next_set;
+		isOK = mfCheckKeys(statelists[0].blockNo, statelists[0].keyType, authentication_timeout, true, init, drop_field, dont_wait, max_keys, keyBlock, &key64);
+
+		if (dont_wait && isOK == 3) {
+			queued_next_set = true;
+			continue;
+		}
 
 		if (isOK == 1) { // timeout
 			isOK = -1;
@@ -517,6 +533,22 @@ int mfnested(uint8_t blockNo, uint8_t keyType, uint16_t timeout14a, uint8_t *key
 		else if (!isOK) {
 			num_to_bytes(key64, 6, resultKey);
 			break;
+		}
+	}
+
+	if (queued_next_set) {
+		i -= max_keys; // fix the count from the last trip through the for() loop
+
+		if (!isOK) {
+			mfCheckKeysGetResponse(NULL); // we already have what we want, just consume the queued response
+		}
+		else {
+			isOK = mfCheckKeysGetResponse(&key64);
+
+			if (isOK == 1) // timeout
+				isOK = -1;
+			else if (!isOK)
+				num_to_bytes(key64, 6, resultKey);
 		}
 	}
 

@@ -858,14 +858,16 @@ int MifareChkBlockKeys(uint8_t *keys, uint8_t keyCount, uint8_t blockNo, uint8_t
 	uint8_t cascade_levels = 0;
 	uint64_t ui64Key = 0;
 
+	// Allow button press to interrupt device
+	if (BUTTON_PRESS()) {
+		Dbprintf("ChkKeys: Cancel operation. Exit...");
+		return -2;
+	}
+
 	int retryCount = 0;
 	for (uint8_t i = 0; i < keyCount; i++) {
 
 		// Allow button press / usb cmd to interrupt device
-		if (BUTTON_PRESS() && !usb_poll_validate_length()) {
-			Dbprintf("ChkKeys: Cancel operation. Exit...");
-			return -2;
-		}
 
 		ui64Key = bytes_to_num(keys + i * 6, 6);
 		int res = MifareChkBlockKey(uid, &cuid, &cascade_levels, ui64Key, blockNo, keyType, auth_timeout, debugLevel);
@@ -921,7 +923,7 @@ int MifareMultisectorChk(uint8_t *keys, uint8_t keyCount, uint8_t SectorCount, u
 
 //  Dbprintf("%d %d", GetCountSspClk() - clk, (GetCountSspClk() - clk)/(SectorCount*keyCount*(keyType==2?2:1)));
 
-	return 0;
+	return 1;
 }
 
 

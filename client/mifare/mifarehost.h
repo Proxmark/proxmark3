@@ -40,7 +40,8 @@ extern char logHexFileName[FILE_PATH_SIZE];
 
 extern int mfDarkside(uint64_t *key);
 extern int mfnested(uint8_t blockNo, uint8_t keyType, uint16_t timeout14a, uint8_t *key, uint8_t trgBlockNo, uint8_t trgKeyType, uint8_t *ResultKeys, bool calibrate);
-extern int mfCheckKeys (uint8_t blockNo, uint8_t keyType, uint16_t timeout14a, bool clear_trace, bool init, bool drop_field, uint8_t keycnt, uint8_t *keyBlock, uint64_t *key);
+extern int mfCheckKeys(uint8_t blockNo, uint8_t keyType, uint16_t timeout14a, bool clear_trace, bool init, bool drop_field, bool dont_wait, uint8_t keycnt, uint8_t *keyBlock, uint64_t *key);
+extern int mfCheckKeysGetResponse(uint64_t *key);
 extern int mfCheckKeysSec(uint8_t sectorCnt, uint8_t keyType, uint16_t timeout14a, bool clear_trace, bool init, bool drop_field, uint8_t keycnt, uint8_t * keyBlock, sector_t * e_sector);
 
 extern int mfReadSector(uint8_t sectorNo, uint8_t keyType, uint8_t *key, uint8_t *data);

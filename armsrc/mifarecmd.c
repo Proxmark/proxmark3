@@ -1001,8 +1001,17 @@ void MifareChkKeys(uint16_t arg0, uint32_t arg1, uint8_t arg2, uint8_t *datain) 
 	bool multisectorCheck = arg1 & 0x02;
 	bool init = arg1 & 0x04;
 	bool drop_field = arg1 & 0x08;
+	static bool reject_next = false;
 	uint32_t auth_timeout = arg1 >> 16;
 	uint8_t keyCount = arg2;
+
+	if (reject_next) {
+		reject_next = false;
+		FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
+		LED_D_OFF();
+		cmd_send(CMD_ACK, 0, -3, 0, NULL, 0);
+		return;
+	}
 
 	LED_A_ON();
 
@@ -1024,18 +1033,24 @@ void MifareChkKeys(uint16_t arg0, uint32_t arg1, uint8_t arg2, uint8_t *datain) 
 		TKeyIndex keyIndex = {{0}};
 		uint8_t sectorCnt = blockNo;
 		res = MifareMultisectorChk(datain, keyCount, sectorCnt, keyType, &auth_timeout, OLD_MF_DBGLEVEL, &keyIndex);
-		if (res >= 0) {
+
+		if (res >= 0)
 			cmd_send(CMD_ACK, 1, res, 0, keyIndex, 80);
-		} else {
+		else
 			cmd_send(CMD_ACK, 0, res, 0, NULL, 0);
-		}
+
+		if (res < 0 && usb_poll_validate_length()) // we want to exit but another set of keys has been queued!
+			reject_next = true;
 	} else {	
 		res = MifareChkBlockKeys(datain, keyCount, blockNo, keyType, &auth_timeout, OLD_MF_DBGLEVEL);
-		if (res > 0) {
+
+		if (res != 0 && usb_poll_validate_length()) // we want to exit but another set of keys has been queued!
+			reject_next = true;
+
+		if (res > 0)
 			cmd_send(CMD_ACK, 1, res, 0, datain + (res - 1) * 6, 6);
-		} else {
+		else
 			cmd_send(CMD_ACK, 0, res, 0, NULL, 0);
-		}
 	}
 
 	if (drop_field || res != 0) {
