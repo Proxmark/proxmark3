@@ -1119,11 +1119,11 @@ int CmdHFList(const char *Cmd) {
 		prev_EOT = &previous_EOT;
 	}
 	
-	char load_filename[FILE_PATH_SIZE] = {0};
+	char load_filename[FILE_PATH_SIZE+1] = {0};
 	if (loadFromFile) {
 		strncpy(load_filename, arg_get_str(5)->sval[0], FILE_PATH_SIZE);
 	}
-	char save_filename[FILE_PATH_SIZE] = {0};
+	char save_filename[FILE_PATH_SIZE+1] = {0};
 	if (saveToFile) {
 		strncpy(save_filename, arg_get_str(6)->sval[0], FILE_PATH_SIZE);
 	}
