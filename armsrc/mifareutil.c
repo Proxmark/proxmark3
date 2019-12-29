@@ -910,10 +910,10 @@ int MifareMultisectorChk(uint8_t *keys, uint8_t keyCount, uint8_t SectorCount, u
 		int keyAB = keyType;
 		do {
 			res = MifareChkBlockKeys(keys, keyCount, FirstBlockOfSector(sc), keyAB & 0x01, auth_timeout, debugLevel);
-			if (res < 0){
+			if (res < 0) {
 				return res;
 			}
-			if (res > 0){
+			if (res > 0) {
 				(*keyIndex)[keyAB & 0x01][sc] = res;
 			}
 		} while(--keyAB > 0);

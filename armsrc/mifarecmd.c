@@ -1019,29 +1019,26 @@ void MifareChkKeys(uint16_t arg0, uint32_t arg1, uint8_t arg2, uint8_t *datain) 
 	int OLD_MF_DBGLEVEL = MF_DBGLEVEL;
 	MF_DBGLEVEL = MF_DBG_NONE;
 
+	int res = 0;
 	if (multisectorCheck) {
 		TKeyIndex keyIndex = {{0}};
 		uint8_t sectorCnt = blockNo;
-		int res = MifareMultisectorChk(datain, keyCount, sectorCnt, keyType, &auth_timeout, OLD_MF_DBGLEVEL, &keyIndex);
-
+		res = MifareMultisectorChk(datain, keyCount, sectorCnt, keyType, &auth_timeout, OLD_MF_DBGLEVEL, &keyIndex);
 		if (res >= 0) {
 			cmd_send(CMD_ACK, 1, res, 0, keyIndex, 80);
 		} else {
 			cmd_send(CMD_ACK, 0, res, 0, NULL, 0);
-			drop_field = true;
 		}
 	} else {	
-		int res = MifareChkBlockKeys(datain, keyCount, blockNo, keyType, &auth_timeout, OLD_MF_DBGLEVEL);
-		
+		res = MifareChkBlockKeys(datain, keyCount, blockNo, keyType, &auth_timeout, OLD_MF_DBGLEVEL);
 		if (res > 0) {
 			cmd_send(CMD_ACK, 1, res, 0, datain + (res - 1) * 6, 6);
 		} else {
 			cmd_send(CMD_ACK, 0, res, 0, NULL, 0);
-			drop_field = true;
 		}
 	}
 
-	if (drop_field) {
+	if (drop_field || res != 0) {
 		FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
 		LED_D_OFF();
 	}
