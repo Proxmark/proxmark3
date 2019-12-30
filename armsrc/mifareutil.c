@@ -867,8 +867,6 @@ int MifareChkBlockKeys(uint8_t *keys, uint8_t keyCount, uint8_t blockNo, uint8_t
 	int retryCount = 0;
 	for (uint8_t i = 0; i < keyCount; i++) {
 
-		// Allow button press / usb cmd to interrupt device
-
 		ui64Key = bytes_to_num(keys + i * 6, 6);
 		int res = MifareChkBlockKey(uid, &cuid, &cascade_levels, ui64Key, blockNo, keyType, auth_timeout, debugLevel);
 

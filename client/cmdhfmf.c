@@ -675,7 +675,7 @@ int CmdHF14AMfNested(const char *Cmd) {
 		}
 
 		// check if we can authenticate to sector
-		res = mfCheckKeys(blockNo, keyType, timeout14a, true, true, true, false, 1, key, &key64);
+		res = mfCheckKeys(blockNo, keyType, timeout14a, true, 1, key, &key64);
 		if (res) {
 			PrintAndLog("Can't authenticate to block:%3d key type:%c key:%s", blockNo, keyType?'B':'A', sprint_hex(key, 6));
 			return 3;
@@ -1270,29 +1270,23 @@ int CmdHF14AMfChk(const char *Cmd) {
 	} else {
 		int keyAB = keyType;
 		do {
-			for (uint32_t c = 0; c < keycnt; c += max_keys) {
+			res = mfCheckKeys(blockNo, keyAB & 0x01, timeout14a, true, keycnt, keyBlock, &key64);
+			clearTraceLog = false;
 
-				uint32_t size = keycnt-c > max_keys ? max_keys : keycnt-c;
-				bool init = (c == 0);
-				bool drop_field = (c + size == keycnt);
-				res = mfCheckKeys(blockNo, keyAB & 0x01, timeout14a, true, init, drop_field, false, size, &keyBlock[6 * c], &key64);
-				clearTraceLog = false;
+			if (res != 1) {
+				if (!res) {
+					// Use the common format below
+					// PrintAndLog("Found valid key:[%d:%c]%012" PRIx64, blockNo, (keyAB & 0x01)?'B':'A', key64);
+					foundAKey = true;
 
-				if (res != 1) {
-					if (!res) {
-						// Use the common format below
-						// PrintAndLog("Found valid key:[%d:%c]%012" PRIx64, blockNo, (keyAB & 0x01)?'B':'A', key64);
-						foundAKey = true;
+					// Store the Single Key for display list
+					// For a single block check, SectorsCnt = Sector that contains the block
+					e_sector[SectorsCnt-1].foundKey[(keyAB & 0x01)] = true;  // flag key found
+					e_sector[SectorsCnt-1].Key[(keyAB & 0x01)]      = key64; // Save key data
 
-						// Store the Single Key for display list
-						// For a single block check, SectorsCnt = Sector that contains the block
-						e_sector[SectorsCnt-1].foundKey[(keyAB & 0x01)] = true;  // flag key found
-						e_sector[SectorsCnt-1].Key[(keyAB & 0x01)]      = key64; // Save key data
-
-					}
-				} else {
-					PrintAndLog("Command execute timeout");
 				}
+			} else {
+				PrintAndLog("Command execute timeout");
 			}
 		} while(--keyAB > 0);
 	}
