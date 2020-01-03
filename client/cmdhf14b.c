@@ -679,7 +679,6 @@ int CmdSriWrite(const char *Cmd) {
 	uint8_t blockno = -1;
 	uint8_t data[4] = {0x00};
 	bool isSrix4k = true;
-	char str[20];
 
 	if (strlen(Cmd) < 1 || cmdp == 'h' || cmdp == 'H') {
 		PrintAndLog("Usage:  hf 14b write <1|2> <BLOCK> <DATA>");
@@ -725,6 +724,7 @@ int CmdSriWrite(const char *Cmd) {
 	else
 		PrintAndLog("[%s] Write block %02X [ %s ]", (isSrix4k)?"SRIX4K":"SRI512", blockno, sprint_hex(data, 4));
 
+	char str[22];
 	sprintf(str, "-ss -c 09 %02x %02x%02x%02x%02x", blockno, data[0], data[1], data[2], data[3]);
 
 	CmdHF14BCmdRaw(str);
