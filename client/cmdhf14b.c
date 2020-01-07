@@ -121,7 +121,7 @@ int HF14BCmdRaw(bool reply, bool *crc, bool power, uint8_t *data, uint8_t *datal
 	}
 
 	*datalen = ret;
-	
+
 	if (ret < 2) return 0;
 
 	memcpy(data, resp.d.asBytes, *datalen);
@@ -529,22 +529,21 @@ static bool HF14B_ST_Info(bool verbose) {
 
 
 // test for other 14b type tags (mimic another reader - don't have tags to identify)
-static bool HF14B_Other_Reader(bool verbose) {
-	uint8_t data[4];
+static bool HF14B_Other_Reader(uint8_t *data, bool verbose) {
 	uint8_t datalen;
-
 	bool crc = true;
-	datalen = 4;
+
 	//std read cmd
 	data[0] = 0x00;
 	data[1] = 0x0b;
 	data[2] = 0x3f;
 	data[3] = 0x80;
+	datalen = 4;
 
 	if (HF14BCmdRaw(true, &crc, true, data, &datalen, false) != 0) {
 		if (datalen > 2 || !crc) {
 			PrintAndLog ("\n14443-3b tag found:");
-			PrintAndLog ("Unknown tag type answered to a 0x000b3f80 command ans:");
+			PrintAndLog ("Unknown tag type answered to a 0x000b3f80 command:");
 			PrintAndLog ("%s", sprint_hex(data, datalen));
 			switch_off_field_14b();
 			return true;
@@ -558,7 +557,7 @@ static bool HF14B_Other_Reader(bool verbose) {
 	if (HF14BCmdRaw(true, &crc, true, data, &datalen, false) != 0) {
 		if (datalen > 0) {
 			PrintAndLog ("\n14443-3b tag found:");
-			PrintAndLog ("Unknown tag type answered to a 0x0A command ans:");
+			PrintAndLog ("Unknown tag type answered to a 0x0A command:");
 			PrintAndLog ("%s", sprint_hex(data, datalen));
 			switch_off_field_14b();
 			return true;
@@ -572,7 +571,7 @@ static bool HF14B_Other_Reader(bool verbose) {
 	if (HF14BCmdRaw(true, &crc, true, data, &datalen, false) != 0) {
 		if (datalen > 0) {
 			PrintAndLog ("\n14443-3b tag found:");
-			PrintAndLog ("Unknown tag type answered to a 0x0C command ans:");
+			PrintAndLog ("Unknown tag type answered to a 0x0C command:");
 			PrintAndLog ("%s", sprint_hex(data, datalen));
 			switch_off_field_14b();
 			return true;
@@ -606,7 +605,7 @@ int infoHF14B(bool verbose) {
 
 	// try unknown 14b read commands (to be identified later)
 	//   could be read of calypso, CEPAS, moneo, or pico pass.
-	if (HF14B_Other_Reader(verbose)) return 1;
+	if (HF14B_Other_Reader(data, verbose)) return 1;
 
 	if (verbose) PrintAndLog("no 14443B tag found");
 	return 0;
@@ -636,7 +635,7 @@ int readHF14B(bool verbose){
 
 	// try unknown 14b read commands (to be identified later)
 	//   could be read of calypso, CEPAS, moneo, or pico pass.
-	if (HF14B_Other_Reader(verbose)) return 1;
+	if (HF14B_Other_Reader(data, verbose)) return 1;
 
 	if (verbose) PrintAndLog("no 14443B tag found");
 	return 0;
