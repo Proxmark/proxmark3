@@ -8,8 +8,8 @@
 // High frequency ISO14443A commands
 //-----------------------------------------------------------------------------
 
-#ifndef MIFAREHOST_H
-#define MIFAREHOST_H
+#ifndef MIFAREHOST_H__
+#define MIFAREHOST_H__
 
 #include <stdint.h>
 #include <stdbool.h>
@@ -17,18 +17,19 @@
 #include "util.h"
 
 // defaults
-// timeout in units. (ms * 106)/10 or us*0.0106
-// 5 == 500us
-#define MF_CHKKEYS_DEFTIMEOUT		5
+// timeout in units. ms * 106 or us * 0.106
+#define MF_CHKKEYS_DEFTIMEOUT         50 // 0.47ms
+#define MF_CHKKEYS_SLOWTIMEOUT       106 // 1ms
+#define MF_CHKKEYS_VERYSLOWTIMEOUT   530 // 5ms
 
 // mfCSetBlock work flags
-#define CSETBLOCK_UID 				0x01
-#define CSETBLOCK_WUPC				0x02
-#define CSETBLOCK_HALT				0x04
-#define CSETBLOCK_INIT_FIELD			0x08
-#define CSETBLOCK_RESET_FIELD			0x10
-#define CSETBLOCK_SINGLE_OPER			0x1F
-#define CSETBLOCK_MAGIC_1B 			0x40
+#define CSETBLOCK_UID               0x01
+#define CSETBLOCK_WUPC              0x02
+#define CSETBLOCK_HALT              0x04
+#define CSETBLOCK_INIT_FIELD        0x08
+#define CSETBLOCK_RESET_FIELD       0x10
+#define CSETBLOCK_SINGLE_OPER       0x1F
+#define CSETBLOCK_MAGIC_1B          0x40
 
 typedef struct {
 	uint64_t Key[2];
@@ -38,9 +39,9 @@ typedef struct {
 extern char logHexFileName[FILE_PATH_SIZE];
 
 extern int mfDarkside(uint64_t *key);
-extern int mfnested(uint8_t blockNo, uint8_t keyType, uint8_t *key, uint8_t trgBlockNo, uint8_t trgKeyType, uint8_t *ResultKeys, bool calibrate);
-extern int mfCheckKeys (uint8_t blockNo, uint8_t keyType, bool clear_trace, uint8_t keycnt, uint8_t *keyBlock, uint64_t *key);
-extern int mfCheckKeysSec(uint8_t sectorCnt, uint8_t keyType, uint8_t timeout14a, bool clear_trace, uint8_t keycnt, uint8_t * keyBlock, sector_t * e_sector);
+extern int mfnested(uint8_t blockNo, uint8_t keyType, uint16_t timeout14a, uint8_t *key, uint8_t trgBlockNo, uint8_t trgKeyType, uint8_t *ResultKeys, bool calibrate);
+extern int mfCheckKeys(uint8_t blockNo, uint8_t keyType, uint16_t timeout14a, bool clear_trace, uint32_t keycnt, uint8_t *keyBlock, uint64_t *key);
+extern int mfCheckKeysSec(uint8_t sectorCnt, uint8_t keyType, uint16_t timeout14a, bool clear_trace, bool init, bool drop_field, uint8_t keycnt, uint8_t * keyBlock, sector_t * e_sector);
 
 extern int mfReadSector(uint8_t sectorNo, uint8_t keyType, uint8_t *key, uint8_t *data);
 

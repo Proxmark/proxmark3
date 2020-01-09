@@ -570,7 +570,7 @@ int CmdHF14AMfRestore(const char *Cmd)
 //   Nested
 //----------------------------------------------
 
-static void parseParamTDS(const char *Cmd, const uint8_t indx, bool *paramT, bool *paramD, uint8_t *timeout) {
+static void parseParamTDS(const char *Cmd, const uint8_t indx, bool *paramT, bool *paramD, uint16_t *timeout) {
 	char ctmp3[4] = {0};
 	int len = param_getlength(Cmd, indx);
 	if (len > 0 && len < 4){
@@ -582,20 +582,19 @@ static void parseParamTDS(const char *Cmd, const uint8_t indx, bool *paramT, boo
 
 		// slow and very slow
 		if (ctmp3[0] == 's' || ctmp3[0] == 'S' || ctmp3[1] == 's' || ctmp3[1] == 'S') {
-			*timeout = 11; // slow
+			*timeout = MF_CHKKEYS_SLOWTIMEOUT; // slow
 
 			if (!paramS1 && (ctmp3[1] == 's' || ctmp3[1] == 'S')) {
-				*timeout = 53; // very slow
+				*timeout = MF_CHKKEYS_VERYSLOWTIMEOUT; // very slow
 			}
 			if (paramS1 && (ctmp3[2] == 's' || ctmp3[2] == 'S')) {
-				*timeout = 53; // very slow
+				*timeout = MF_CHKKEYS_VERYSLOWTIMEOUT; // very slow
 			}
 		}
 	}
 }
 
-int CmdHF14AMfNested(const char *Cmd)
-{
+int CmdHF14AMfNested(const char *Cmd) {
 	int i, j, res, iterations;
 	sector_t *e_sector = NULL;
 	uint8_t blockNo = 0;
@@ -606,8 +605,8 @@ int CmdHF14AMfNested(const char *Cmd)
 	uint8_t key[6] = {0, 0, 0, 0, 0, 0};
 	uint8_t keyBlock[MifareDefaultKeysSize * 6];
 	uint64_t key64 = 0;
-	// timeout in units. (ms * 106)/10 or us*0.0106
-	uint8_t btimeout14a = MF_CHKKEYS_DEFTIMEOUT; // fast by default
+	// timeout in units. (ms * 106) or us*0.106
+	uint16_t timeout14a = MF_CHKKEYS_DEFTIMEOUT; // fast by default
 
 	bool autosearchKey = false;
 
@@ -654,10 +653,10 @@ int CmdHF14AMfNested(const char *Cmd)
 	if (param_getchar(Cmd, 1) == '*') {
 		autosearchKey = true;
 
-		parseParamTDS(Cmd, 2, &transferToEml, &createDumpFile, &btimeout14a);
+		parseParamTDS(Cmd, 2, &transferToEml, &createDumpFile, &timeout14a);
 
 		PrintAndLog("--nested. sectors:%2d, block no:*, eml:%c, dmp=%c checktimeout=%d us",
-			SectorsCnt, transferToEml?'y':'n', createDumpFile?'y':'n', ((int)btimeout14a * 10000) / 106);
+			SectorsCnt, transferToEml?'y':'n', createDumpFile?'y':'n', ((uint32_t)timeout14a * 1000) / 106);
 	} else {
 		blockNo = param_get8(Cmd, 1);
 
@@ -676,7 +675,7 @@ int CmdHF14AMfNested(const char *Cmd)
 		}
 
 		// check if we can authenticate to sector
-		res = mfCheckKeys(blockNo, keyType, true, 1, key, &key64);
+		res = mfCheckKeys(blockNo, keyType, timeout14a, true, 1, key, &key64);
 		if (res) {
 			PrintAndLog("Can't authenticate to block:%3d key type:%c key:%s", blockNo, keyType?'B':'A', sprint_hex(key, 6));
 			return 3;
@@ -694,19 +693,19 @@ int CmdHF14AMfNested(const char *Cmd)
 			if (ctmp != 'A' && ctmp != 'a')
 				trgKeyType = 1;
 
-			parseParamTDS(Cmd, 6, &transferToEml, &createDumpFile, &btimeout14a);
+			parseParamTDS(Cmd, 6, &transferToEml, &createDumpFile, &timeout14a);
 		} else {
-			parseParamTDS(Cmd, 4, &transferToEml, &createDumpFile, &btimeout14a);
+			parseParamTDS(Cmd, 4, &transferToEml, &createDumpFile, &timeout14a);
 		}
 
 		PrintAndLog("--nested. sectors:%2d, block no:%3d, key type:%c, eml:%c, dmp=%c checktimeout=%d us",
-			SectorsCnt, blockNo, keyType?'B':'A', transferToEml?'y':'n', createDumpFile?'y':'n', ((int)btimeout14a * 10000) / 106);
+			SectorsCnt, blockNo, keyType?'B':'A', transferToEml?'y':'n', createDumpFile?'y':'n', ((uint32_t)timeout14a * 1000) / 106);
 	}
 
 	// one-sector nested
 	if (cmdp == 'o') { // ------------------------------------  one sector working
 		PrintAndLog("--target block no:%3d, target key type:%c ", trgBlockNo, trgKeyType?'B':'A');
-		int16_t isOK = mfnested(blockNo, keyType, key, trgBlockNo, trgKeyType, keyBlock, true);
+		int16_t isOK = mfnested(blockNo, keyType, timeout14a, key, trgBlockNo, trgKeyType, keyBlock, true);
 		if (isOK < 0) {
 			switch (isOK) {
 				case -1 : PrintAndLog("Error: No response from Proxmark.\n"); break;
@@ -754,7 +753,7 @@ int CmdHF14AMfNested(const char *Cmd)
 		}
 
 		PrintAndLog("Testing known keys. Sector count=%d", SectorsCnt);
-		mfCheckKeysSec(SectorsCnt, 2, btimeout14a, true, MifareDefaultKeysSize, keyBlock, e_sector);
+		mfCheckKeysSec(SectorsCnt, 2, timeout14a, true, true, true, MifareDefaultKeysSize, keyBlock, e_sector);
 
 		// get known key from array
 		bool keyFound = false;
@@ -791,7 +790,7 @@ int CmdHF14AMfNested(const char *Cmd)
 				for (trgKeyType = 0; trgKeyType < 2; trgKeyType++) {
 					if (e_sector[sectorNo].foundKey[trgKeyType]) continue;
 					PrintAndLog("-----------------------------------------------");
-					int16_t isOK = mfnested(blockNo, keyType, key, FirstBlockOfSector(sectorNo), trgKeyType, keyBlock, calibrate);
+					int16_t isOK = mfnested(blockNo, keyType, timeout14a, key, FirstBlockOfSector(sectorNo), trgKeyType, keyBlock, calibrate);
 					if(isOK < 0) {
 						switch (isOK) {
 							case -1 : PrintAndLog("Error: No response from Proxmark.\n"); break;
@@ -814,7 +813,7 @@ int CmdHF14AMfNested(const char *Cmd)
 						e_sector[sectorNo].Key[trgKeyType] = key64;
 
 						// try to check this key as a key to the other sectors
-						mfCheckKeysSec(SectorsCnt, 2, btimeout14a, true, 1, keyBlock, e_sector);
+						mfCheckKeysSec(SectorsCnt, 2, timeout14a, true, true, true, 1, keyBlock, e_sector);
 					}
 				}
 			}
@@ -1049,8 +1048,8 @@ int CmdHF14AMfNestedHard(const char *Cmd)
 }
 
 
-int CmdHF14AMfChk(const char *Cmd)
-{
+int CmdHF14AMfChk(const char *Cmd) {
+
 	if (strlen(Cmd)<3) {
 		PrintAndLog("Usage:  hf mf chk <block number>|<*card memory> <key type (A/B/?)> [t|d|s|ss] [<key (12 hex symbols)>] [<dic (*.dic)>]");
 		PrintAndLog("          * - all sectors");
@@ -1081,7 +1080,7 @@ int CmdHF14AMfChk(const char *Cmd)
 	uint8_t  keyType        = 0;
 	uint64_t key64          = 0;
 	// timeout in units. (ms * 106)/10 or us*0.0106
-	uint8_t  btimeout14a    = MF_CHKKEYS_DEFTIMEOUT; // fast by default
+	uint16_t  timeout14a    = MF_CHKKEYS_DEFTIMEOUT; // fast by default
 	bool     param3InUse    = false;
 	bool     transferToEml  = 0;
 	bool     createDumpFile = 0;
@@ -1134,7 +1133,7 @@ int CmdHF14AMfChk(const char *Cmd)
 		};
 	}
 
-	parseParamTDS(Cmd, 2, &transferToEml, &createDumpFile, &btimeout14a);
+	parseParamTDS(Cmd, 2, &transferToEml, &createDumpFile, &timeout14a);
 
 	if (singleBlock & createDumpFile) {
 		PrintAndLog (" block key check (<block no>) and write to dump file (d) combination is not supported ");
@@ -1142,10 +1141,10 @@ int CmdHF14AMfChk(const char *Cmd)
 		return 1;
 	}
 
-	param3InUse = transferToEml | createDumpFile | (btimeout14a != MF_CHKKEYS_DEFTIMEOUT);
+	param3InUse = transferToEml | createDumpFile | (timeout14a != MF_CHKKEYS_DEFTIMEOUT);
 
 	PrintAndLog("--chk keys. sectors:%2d, block no:%3d, key type:%c, eml:%c, dmp=%c checktimeout=%d us",
-			SectorsCnt, blockNo, keyType==0?'A':keyType==1?'B':'?', transferToEml?'y':'n', createDumpFile?'y':'n', ((int)btimeout14a * 10000) / 106);
+			SectorsCnt, blockNo, keyType==0?'A':keyType==1?'B':'?', transferToEml?'y':'n', createDumpFile?'y':'n', ((uint32_t)timeout14a * 1000) / 106);
 
 	for (i = param3InUse; param_getchar(Cmd, 2 + i); i++) {
 		if (!param_gethex(Cmd, 2 + i, keyBlock + 6 * keycnt, 12)) {
@@ -1251,7 +1250,9 @@ int CmdHF14AMfChk(const char *Cmd)
 		for (uint32_t c = 0; c < keycnt; c += max_keys) {
 
 			uint32_t size = keycnt-c > max_keys ? max_keys : keycnt-c;
-			res = mfCheckKeysSec(SectorsCnt, keyType, btimeout14a, clearTraceLog, size, &keyBlock[6 * c], e_sector); // timeout is (ms * 106)/10 or us*0.0106
+			bool init = (c == 0);
+			bool drop_field = (c + size == keycnt);
+			res = mfCheckKeysSec(SectorsCnt, keyType, timeout14a, clearTraceLog, init, drop_field, size, &keyBlock[6 * c], e_sector); // timeout is (ms * 106)/10 or us*0.0106
 			clearTraceLog = false;
 
 			if (res != 1) {
@@ -1269,27 +1270,23 @@ int CmdHF14AMfChk(const char *Cmd)
 	} else {
 		int keyAB = keyType;
 		do {
-			for (uint32_t c = 0; c < keycnt; c += max_keys) {
+			res = mfCheckKeys(blockNo, keyAB & 0x01, timeout14a, true, keycnt, keyBlock, &key64);
+			clearTraceLog = false;
 
-				uint32_t size = keycnt-c > max_keys ? max_keys : keycnt-c;
-				res = mfCheckKeys(blockNo, keyAB & 0x01, true, size, &keyBlock[6 * c], &key64);
-				clearTraceLog = false;
+			if (res != 1) {
+				if (!res) {
+					// Use the common format below
+					// PrintAndLog("Found valid key:[%d:%c]%012" PRIx64, blockNo, (keyAB & 0x01)?'B':'A', key64);
+					foundAKey = true;
 
-				if (res != 1) {
-					if (!res) {
-						// Use the common format below
-						// PrintAndLog("Found valid key:[%d:%c]%012" PRIx64, blockNo, (keyAB & 0x01)?'B':'A', key64);
-						foundAKey = true;
+					// Store the Single Key for display list
+					// For a single block check, SectorsCnt = Sector that contains the block
+					e_sector[SectorsCnt-1].foundKey[(keyAB & 0x01)] = true;  // flag key found
+					e_sector[SectorsCnt-1].Key[(keyAB & 0x01)]      = key64; // Save key data
 
-						// Store the Single Key for display list
-						// For a single block check, SectorsCnt = Sector that contains the block
-						e_sector[SectorsCnt-1].foundKey[(keyAB & 0x01)] = true;  // flag key found
-						e_sector[SectorsCnt-1].Key[(keyAB & 0x01)]      = key64; // Save key data
-
-					}
-				} else {
-					PrintAndLog("Command execute timeout");
 				}
+			} else {
+				PrintAndLog("Command execute timeout");
 			}
 		} while(--keyAB > 0);
 	}

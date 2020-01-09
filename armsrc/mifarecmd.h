@@ -25,7 +25,7 @@ extern void MifareWriteBlock(uint8_t arg0, uint8_t arg1, uint8_t arg2, uint8_t *
 extern void MifareUWriteBlock(uint8_t arg0, uint8_t arg1, uint8_t *datain);
 extern void MifareNested(uint32_t arg0, uint32_t arg1, uint32_t arg2, uint8_t *datain);
 extern void MifareAcquireEncryptedNonces(uint32_t arg0, uint32_t arg1, uint32_t flags, uint8_t *datain);
-extern void MifareChkKeys(uint16_t arg0, uint16_t arg1, uint8_t arg2, uint8_t *datain);
+extern void MifareChkKeys(uint16_t arg0, uint32_t arg1, uint8_t arg2, uint8_t *datain);
 extern void MifareSetDbgLvl(uint32_t arg0, uint32_t arg1, uint32_t arg2, uint8_t *datain);
 extern void MifareEMemClr(uint32_t arg0, uint32_t arg1, uint32_t arg2, uint8_t *datain);
 extern void MifareEMemSet(uint32_t arg0, uint32_t arg1, uint32_t arg2, uint8_t *datain);
