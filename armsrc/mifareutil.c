@@ -144,7 +144,7 @@ int mifare_sendcmd_short(struct Crypto1State *pcs, uint8_t crypted, uint8_t cmd,
 
 // mifare classic commands
 int mifare_classic_auth(struct Crypto1State *pcs, uint32_t uid, uint8_t blockNo, uint8_t keyType, uint64_t ui64Key, uint8_t isNested, uint32_t *auth_timeout) {
-	
+
 	return mifare_classic_authex(pcs, uid, blockNo, keyType, ui64Key, isNested, NULL, NULL, auth_timeout);
 }
 
@@ -858,12 +858,6 @@ int MifareChkBlockKeys(uint8_t *keys, uint8_t keyCount, uint8_t blockNo, uint8_t
 	uint8_t cascade_levels = 0;
 	uint64_t ui64Key = 0;
 
-	// Allow button press to interrupt device
-	if (BUTTON_PRESS()) {
-		Dbprintf("ChkKeys: Cancel operation. Exit...");
-		return -2;
-	}
-
 	int retryCount = 0;
 	for (uint8_t i = 0; i < keyCount; i++) {
 
@@ -892,6 +886,10 @@ int MifareChkBlockKeys(uint8_t *keys, uint8_t keyCount, uint8_t blockNo, uint8_t
 
 		// successful authentication
 		return i + 1;
+	}
+
+	if (BUTTON_PRESS()) {
+		return -2;
 	}
 
 	return 0;
