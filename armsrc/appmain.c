@@ -1483,25 +1483,18 @@ void  __attribute__((noreturn)) AppMain(void) {
 	size_t rx_len;
 
 	for(;;) {
-		if (usb_poll()) {
-			rx_len = usb_read(rx, sizeof(UsbCommand));
-			if (rx_len) {
-				UsbPacketReceived(rx, rx_len);
-			}
-		}
 		WDT_HIT();
-
-#ifdef WITH_LF_StandAlone
-#ifndef WITH_ISO14443a_StandAlone
-		if (BUTTON_HELD(1000) > 0)
-			SamyRun();
+		if (usb_poll() && (rx_len = usb_read(rx, sizeof(rx)))) {
+			UsbPacketReceived(rx, rx_len);
+		} else {
+#if defined(WITH_LF_StandAlone) && !defined(WITH_ISO14443a_StandAlone)
+			if (BUTTON_HELD(1000) > 0)
+				SamyRun();
 #endif
+#if defined(WITH_ISO14443a) && defined(WITH_ISO14443a_StandAlone)
+			if (BUTTON_HELD(1000) > 0)
+				StandAloneMode14a();
 #endif
-#ifdef WITH_ISO14443a
-#ifdef WITH_ISO14443a_StandAlone
-		if (BUTTON_HELD(1000) > 0)
-			StandAloneMode14a();
-#endif
-#endif
+		}
 	}
 }
