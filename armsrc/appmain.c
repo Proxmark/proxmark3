@@ -13,7 +13,6 @@
 #include <stdarg.h>
 
 #include "usb_cdc.h"
-#include "cmd.h"
 #include "proxmark3.h"
 #include "apps.h"
 #include "fpga.h"
@@ -936,9 +935,7 @@ void ListenReaderField(int limit) {
 }
 
 
-void UsbPacketReceived(uint8_t *packet, int len) {
-
-	UsbCommand *c = (UsbCommand *)packet;
+void UsbPacketReceived(UsbCommand *c) {
 
 //  Dbprintf("received %d bytes, with command: 0x%04x and args: %d %d %d",len,c->cmd,c->arg[0],c->arg[1],c->arg[2]);
 
@@ -1479,10 +1476,13 @@ void  __attribute__((noreturn)) AppMain(void) {
 	LCDInit();
 #endif
 
-	uint8_t rx[sizeof(UsbCommand)];
-	size_t rx_len;
-
+	UsbCommand rx;
+  
 	for(;;) {
+		if (cmd_receive(&rx)) {
+			UsbPacketReceived(&rx);
+		}
+
 		WDT_HIT();
 		if (usb_poll() && (rx_len = usb_read(rx, sizeof(rx)))) {
 			UsbPacketReceived(rx, rx_len);

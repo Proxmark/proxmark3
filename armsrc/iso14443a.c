@@ -17,7 +17,7 @@
 #include "proxmark3.h"
 #include "apps.h"
 #include "util.h"
-#include "cmd.h"
+#include "usb_cdc.h"
 #include "iso14443crc.h"
 #include "crapto1/crapto1.h"
 #include "mifareutil.h"

@@ -207,7 +207,7 @@ static const char StrDescProduct[] = {
 };
 
 
-const char* getStringDescriptor(uint8_t idx) {
+static const char* getStringDescriptor(uint8_t idx) {
 	switch (idx) {
 		case STR_LANGUAGE_CODES:
 			return StrDescLanguageCodes;
@@ -290,7 +290,7 @@ AT91S_CDC_LINE_CODING line = {
 	8};     // 8 Data bits
 
 
-void AT91F_CDC_Enumerate();
+static void AT91F_CDC_Enumerate();
 
 AT91PS_UDP pUdp = AT91C_BASE_UDP;
 uint8_t btConfiguration = 0;
@@ -350,7 +350,7 @@ void usb_enable() {
 //* \fn    usb_check
 //* \brief Test if the device is configured and handle enumeration
 //*----------------------------------------------------------------------------
-bool usb_check() {
+static bool usb_check() {
 	AT91_REG isr = pUdp->UDP_ISR;
 
 	if (isr & AT91C_UDP_ENDBUSRES) {
@@ -395,7 +395,7 @@ bool usb_poll_validate_length() {
 //* \fn    usb_read
 //* \brief Read available data from Endpoint OUT
 //*----------------------------------------------------------------------------
-uint32_t usb_read(uint8_t* data, size_t len) {
+static uint32_t usb_read(uint8_t* data, size_t len) {
 	uint8_t bank = btReceiveBank;
 	uint32_t packetSize, nbBytesRcv = 0;
 	uint32_t time_out = 0;
@@ -427,7 +427,7 @@ uint32_t usb_read(uint8_t* data, size_t len) {
 //* \fn    usb_write
 //* \brief Send through endpoint 2
 //*----------------------------------------------------------------------------
-uint32_t usb_write(const uint8_t* data, const size_t len) {
+static uint32_t usb_write(const uint8_t* data, const size_t len) {
 	size_t length = len;
 	uint32_t cpt = 0;
 
@@ -476,9 +476,6 @@ uint32_t usb_write(const uint8_t* data, const size_t len) {
 //* \fn    AT91F_USB_SendData
 //* \brief Send Data through the control endpoint
 //*----------------------------------------------------------------------------
-unsigned int csrTab[100] = {0x00};
-unsigned char csrIdx = 0;
-
 static void AT91F_USB_SendData(AT91PS_UDP pUdp, const char *pData, uint32_t length) {
 	uint32_t cpt = 0;
 	AT91_REG csr;
@@ -521,7 +518,7 @@ static void AT91F_USB_SendData(AT91PS_UDP pUdp, const char *pData, uint32_t leng
 //* \fn    AT91F_USB_SendZlp
 //* \brief Send zero length packet through the control endpoint
 //*----------------------------------------------------------------------------
-void AT91F_USB_SendZlp(AT91PS_UDP pUdp) {
+static void AT91F_USB_SendZlp(AT91PS_UDP pUdp) {
 	UDP_SET_EP_FLAGS(AT91C_EP_CONTROL, AT91C_UDP_TXPKTRDY);
 	while (!(pUdp->UDP_CSR[AT91C_EP_CONTROL] & AT91C_UDP_TXCOMP))
 		/* wait */;
@@ -535,7 +532,7 @@ void AT91F_USB_SendZlp(AT91PS_UDP pUdp) {
 //* \fn    AT91F_USB_SendStall
 //* \brief Stall the control endpoint
 //*----------------------------------------------------------------------------
-void AT91F_USB_SendStall(AT91PS_UDP pUdp) {
+static void AT91F_USB_SendStall(AT91PS_UDP pUdp) {
 	UDP_SET_EP_FLAGS(AT91C_EP_CONTROL, AT91C_UDP_FORCESTALL);
 	while (!(pUdp->UDP_CSR[AT91C_EP_CONTROL] & AT91C_UDP_ISOERROR))
 		/* wait */;
@@ -549,7 +546,7 @@ void AT91F_USB_SendStall(AT91PS_UDP pUdp) {
 //* \fn    AT91F_CDC_Enumerate
 //* \brief This function is a callback invoked when a SETUP packet is received
 //*----------------------------------------------------------------------------
-void AT91F_CDC_Enumerate() {
+static void AT91F_CDC_Enumerate() {
 	uint8_t bmRequestType, bRequest;
 	uint16_t wValue, wIndex, wLength, wStatus;
 
@@ -665,7 +662,7 @@ void AT91F_CDC_Enumerate() {
 
 	// handle CDC class requests
 	case SET_LINE_CODING:
-		while ( (pUdp->UDP_CSR[AT91C_EP_CONTROL] & AT91C_UDP_RX_DATA_BK0))
+		while (!(pUdp->UDP_CSR[AT91C_EP_CONTROL] & AT91C_UDP_RX_DATA_BK0))
 			/* wait */;
 		UDP_CLEAR_EP_FLAGS(AT91C_EP_CONTROL, AT91C_UDP_RX_DATA_BK0);
 		AT91F_USB_SendZlp(pUdp);
@@ -681,4 +678,56 @@ void AT91F_CDC_Enumerate() {
 		AT91F_USB_SendStall(pUdp);
 		break;
 	}
+}
+
+
+//***************************************************************************
+// Interface to the main program
+//***************************************************************************
+
+// The function to receive a command from the client via USB
+bool cmd_receive(UsbCommand* cmd) {
+
+	// Check if there is a usb packet available
+	if (!usb_poll())
+		return false;
+
+	// Try to retrieve the available command frame
+	size_t rxlen = usb_read((uint8_t*)cmd, sizeof(UsbCommand));
+
+	// Check if the transfer was complete
+	if (rxlen != sizeof(UsbCommand))
+		return false;
+
+	// Received command successfully
+	return true;
+}
+
+
+// The function to send a response to the client via USB
+bool cmd_send(uint32_t cmd, uint32_t arg0, uint32_t arg1, uint32_t arg2, void* data, size_t len) {
+	UsbCommand txcmd;
+
+	for (size_t i = 0; i < sizeof(UsbCommand); i++) {
+		((uint8_t*)&txcmd)[i] = 0x00;
+	}
+
+	// Compose the outgoing command frame
+	txcmd.cmd = cmd;
+	txcmd.arg[0] = arg0;
+	txcmd.arg[1] = arg1;
+	txcmd.arg[2] = arg2;
+
+	// Add the (optional) content to the frame, with a maximum size of USB_CMD_DATA_SIZE
+	if (data && len) {
+		len = MIN(len, USB_CMD_DATA_SIZE);
+		for (size_t i = 0; i < len; i++) {
+			txcmd.d.asBytes[i] = ((uint8_t*)data)[i];
+		}
+	}
+
+	// Send frame and make sure all bytes are transmitted
+	if (usb_write((uint8_t*)&txcmd, sizeof(UsbCommand)) != 0) return false;
+
+	return true;
 }

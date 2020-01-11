@@ -15,7 +15,7 @@
 #include "iso14443a.h"
 #include "iso14443b.h"
 #include "epa.h"
-#include "cmd.h"
+#include "usb_cdc.h"
 #include "fpgaloader.h"
 #include "string.h"
 #include "util.h"

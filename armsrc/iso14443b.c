@@ -14,7 +14,7 @@
 
 #include "proxmark3.h"
 #include "apps.h"
-#include "cmd.h"
+#include "usb_cdc.h"
 #include "util.h"
 #include "string.h"
 #include "iso14443crc.h"

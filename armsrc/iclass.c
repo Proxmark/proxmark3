@@ -24,7 +24,7 @@
 #include "string.h"
 #include "printf.h"
 #include "common.h"
-#include "cmd.h"
+#include "usb_cdc.h"
 #include "iso14443a.h"
 #include "iso15693.h"
 // Needed for CRC in emulation mode;
@@ -34,7 +34,6 @@
 #include "iso15693tools.h"
 #include "protocols.h"
 #include "optimized_cipher.h"
-#include "usb_cdc.h" // for usb_poll_validate_length
 #include "fpgaloader.h"
 
 // iCLASS has a slightly different timing compared to ISO15693. According to the picopass data sheet the tag response is expected 330us after

@@ -58,7 +58,7 @@
 #include "string.h"
 #include "iso15693tools.h"
 #include "protocols.h"
-#include "cmd.h"
+#include "usb_cdc.h"
 #include "BigBuf.h"
 #include "fpgaloader.h"
 

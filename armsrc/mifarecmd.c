@@ -18,7 +18,7 @@
 #include <stdint.h>
 
 #include "proxmark3.h"
-#include "cmd.h"
+#include "usb_cdc.h"
 #include "crapto1/crapto1.h"
 #include "iso14443a.h"
 #include "BigBuf.h"

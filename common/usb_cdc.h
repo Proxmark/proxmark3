@@ -38,13 +38,13 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include "usb_cmd.h"
 
 extern void usb_disable();
 extern void usb_enable();
-extern bool usb_check();
 extern bool usb_poll();
 extern bool usb_poll_validate_length();
-extern uint32_t usb_read(uint8_t* data, size_t len);
-extern uint32_t usb_write(const uint8_t* data, const size_t len);
+extern bool cmd_receive(UsbCommand* cmd);
+extern bool cmd_send(uint32_t cmd, uint32_t arg0, uint32_t arg1, uint32_t arg2, void* data, size_t len);
 
-#endif // _USB_CDC_H__
+#endif // USB_CDC_H__
