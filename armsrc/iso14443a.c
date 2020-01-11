@@ -942,7 +942,7 @@ bool prepare_allocated_tag_modulation(tag_response_info_t* response_info, uint8_
 // Main loop of simulated tag: receive commands from reader, decide what
 // response to send, and send it.
 //-----------------------------------------------------------------------------
-void SimulateIso14443aTag(int tagType, int uid_1st, int uid_2nd, byte_t* data) {
+void SimulateIso14443aTag(int tagType, int uid_1st, int uid_2nd, uint8_t* data) {
 
 	uint8_t sak;
 
@@ -1701,13 +1701,13 @@ static int GetATQA(uint8_t *resp, uint8_t *resp_par) {
 // if anticollision is false, then the UID must be provided in uid_ptr[]
 // and num_cascades must be set (1: 4 Byte UID, 2: 7 Byte UID, 3: 10 Byte UID)
 // requests ATS unless no_rats is true
-int iso14443a_select_card(byte_t *uid_ptr, iso14a_card_select_t *p_hi14a_card, uint32_t *cuid_ptr, bool anticollision, uint8_t num_cascades, bool no_rats) {
+int iso14443a_select_card(uint8_t *uid_ptr, iso14a_card_select_t *p_hi14a_card, uint32_t *cuid_ptr, bool anticollision, uint8_t num_cascades, bool no_rats) {
 	uint8_t sel_all[]    = { 0x93,0x20 };
 	uint8_t sel_uid[]    = { 0x93,0x70,0x00,0x00,0x00,0x00,0x00,0x00,0x00};
 	uint8_t rats[]       = { 0xE0,0x80,0x00,0x00 }; // FSD=256, FSDI=8, CID=0
 	uint8_t resp[MAX_FRAME_SIZE]; // theoretically. A usual RATS will be much smaller
 	uint8_t resp_par[MAX_PARITY_SIZE];
-	byte_t uid_resp[4];
+	uint8_t uid_resp[4];
 	size_t uid_resp_len;
 
 	uint8_t sak = 0x04; // cascade uid
@@ -2020,7 +2020,7 @@ void ReaderIso14443a(UsbCommand *c) {
 	size_t lenbits = c->arg[1] >> 16;
 	uint32_t timeout = c->arg[2];
 	uint32_t arg0 = 0;
-	byte_t buf[USB_CMD_DATA_SIZE] = {0};
+	uint8_t buf[USB_CMD_DATA_SIZE] = {0};
 	uint8_t par[MAX_PARITY_SIZE];
 	bool cantSELECT = false;
 

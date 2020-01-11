@@ -14,6 +14,7 @@
 
 #include "proxmark3.h"
 #include "apps.h"
+#include "cmd.h"
 #include "util.h"
 #include "string.h"
 #include "legic_prng.h"

@@ -112,8 +112,4 @@ void    ReaderMifareDES(uint32_t param, uint32_t param2, uint8_t * datain);
 int     DesfireAPDU(uint8_t *cmd, size_t cmd_len, uint8_t *dataout);
 size_t  CreateAPDU( uint8_t *datain, size_t len, uint8_t *dataout);
 
-// cmd.h
-bool cmd_receive(UsbCommand* cmd);
-bool cmd_send(uint32_t cmd, uint32_t arg0, uint32_t arg1, uint32_t arg2, void* data, size_t len);
-
 #endif

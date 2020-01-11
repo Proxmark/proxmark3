@@ -1,5 +1,6 @@
 #include "proxmark3.h"
 #include "apps.h"
+#include "cmd.h"
 #include "lfsampling.h"
 #include "pcf7931.h"
 #include "util.h"

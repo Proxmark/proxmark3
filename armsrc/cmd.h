@@ -1,7 +1,7 @@
 /*
- * at91sam7s USB CDC device implementation
+ * Proxmark send and receive commands
  *
- * Copyright (c) 2012, Roel Verdult
+ * Copyright (c) 2010, Roel Verdult
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -26,24 +26,19 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * based on the "Basic USB Example" from ATMEL (doc6123.pdf)
- *
- * @file usb_cdc.c
+ * @file cmd.h
  * @brief
  */
 
-#ifndef _USB_CDC_H_
-#define _USB_CDC_H_
+#ifndef PROXMARK_CMD_H__
+#define PROXMARK_CMD_H__
 
-#include "common.h"
+#include <stddef.h>
+#include <stdint.h>
+#include <stdbool.h>
+#include "usb_cmd.h"
 
-void usb_disable();
-void usb_enable();
-bool usb_check();
-bool usb_poll();
-bool usb_poll_validate_length();
-uint32_t usb_read(byte_t* data, size_t len);
-uint32_t usb_write(const byte_t* data, const size_t len);
+extern bool cmd_receive(UsbCommand* cmd);
+extern bool cmd_send(uint32_t cmd, uint32_t arg0, uint32_t arg1, uint32_t arg2, void* data, size_t len);
 
-#endif // _USB_CDC_H_
-
+#endif // PROXMARK_CMD_H__

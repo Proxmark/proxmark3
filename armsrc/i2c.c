@@ -18,6 +18,7 @@
 #include "mifareutil.h" // for MF_DBGLEVEL
 #include "BigBuf.h"
 #include "apps.h"
+#include "cmd.h"
 
 #ifdef WITH_SMARTCARD
 #include "smartcard.h"

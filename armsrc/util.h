@@ -8,12 +8,13 @@
 // Utility functions used in many places, not specific to any piece of code.
 //-----------------------------------------------------------------------------
 
-#ifndef __UTIL_H
-#define __UTIL_H
+#ifndef UTIL_H__
+#define UTIL_H__
 
 #include <stddef.h>
 #include <stdint.h>
 #include "common.h"
+#include "at91sam7s512.h"
 
 #define BYTEx(x, n) (((x) >> (n * 8)) & 0xff )
 
@@ -33,40 +34,40 @@
 #define REV32(x) (REV16(x) | (REV16(x >> 16) << 16))
 #define REV64(x) (REV32(x) | (REV32(x >> 32) << 32))
 
-void print_result(char *name, uint8_t *buf, size_t len);
-size_t nbytes(size_t nbits);
-uint32_t SwapBits(uint32_t value, int nrbits);
-void num_to_bytes(uint64_t n, size_t len, uint8_t* dest);
-uint64_t bytes_to_num(uint8_t* src, size_t len);
-void rol(uint8_t *data, const size_t len);
-void lsl (uint8_t *data, size_t len);
+extern void print_result(char *name, uint8_t *buf, size_t len);
+extern size_t nbytes(size_t nbits);
+extern uint32_t SwapBits(uint32_t value, int nrbits);
+extern void num_to_bytes(uint64_t n, size_t len, uint8_t* dest);
+extern uint64_t bytes_to_num(uint8_t* src, size_t len);
+extern void rol(uint8_t *data, const size_t len);
+extern void lsl (uint8_t *data, size_t len);
 
-void LED(int led, int ms);
-void LEDsoff();
-void LEDson();
-void LEDsinvert();
-int BUTTON_CLICKED(int ms);
-int BUTTON_HELD(int ms);
-void FormatVersionInformation(char *dst, int len, const char *prefix, void *version_information);
+extern void LED(int led, int ms);
+extern void LEDsoff();
+extern void LEDson();
+extern void LEDsinvert();
+extern int BUTTON_CLICKED(int ms);
+extern int BUTTON_HELD(int ms);
+extern void FormatVersionInformation(char *dst, int len, const char *prefix, void *version_information);
 
 //iceman's ticks.h
 #ifndef GET_TICKS
 # define GET_TICKS GetTicks()
 #endif
 
-void SpinDelay(int ms);
-void SpinDelayUs(int us);
+extern void SpinDelay(int ms);
+extern void SpinDelayUs(int us);
 
-void StartTickCount();
-uint32_t RAMFUNC GetTickCount();
+extern void StartTickCount();
+extern uint32_t RAMFUNC GetTickCount();
 
-void StartCountUS();
-uint32_t RAMFUNC GetCountUS();
-uint32_t RAMFUNC GetDeltaCountUS();
+extern void StartCountUS();
+extern uint32_t RAMFUNC GetCountUS();
+extern uint32_t RAMFUNC GetDeltaCountUS();
 
-void StartCountSspClk();
-void ResetSspClk(void);
-uint32_t GetCountSspClk();
+extern void StartCountSspClk();
+extern void ResetSspClk(void);
+extern uint32_t GetCountSspClk();
 
 extern void StartTicks(void);
 extern uint32_t GetTicks(void);
@@ -78,6 +79,6 @@ extern void ResetTimer(AT91PS_TC timer);
 extern void StopTicks(void);
 // end iceman's ticks.h
 
-uint32_t prand();
+extern uint32_t prand();
 
 #endif

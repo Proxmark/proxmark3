@@ -17,6 +17,7 @@
 #include "lfdemod.h"
 #include "lfsampling.h"
 #include "protocols.h"
+#include "cmd.h"
 #include "usb_cdc.h" // for usb_poll_validate_length
 #include "fpgaloader.h"
 

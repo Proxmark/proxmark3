@@ -1,5 +1,5 @@
 /*
- * Proxmark send and receive commands
+ * at91sam7s USB CDC device implementation
  *
  * Copyright (c) 2012, Roel Verdult
  * All rights reserved.
@@ -26,54 +26,25 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * @file cmd.c
+ * based on the "Basic USB Example" from ATMEL (doc6123.pdf)
+ *
+ * @file usb_cdc.c
  * @brief
  */
 
-#include "cmd.h"
-#include "string.h"
-#include "proxmark3.h"
+#ifndef USB_CDC_H__
+#define USB_CDC_H__
 
-bool cmd_receive(UsbCommand* cmd) {
- 
-  // Check if there is a usb packet available
-  if (!usb_poll()) return false;
-  
-  // Try to retrieve the available command frame
-  size_t rxlen = usb_read((byte_t*)cmd,sizeof(UsbCommand));
+#include <stddef.h>
+#include <stdint.h>
+#include <stdbool.h>
 
-  // Check if the transfer was complete
-  if (rxlen != sizeof(UsbCommand)) return false;
-  
-  // Received command successfully
-  return true;
-}
+extern void usb_disable();
+extern void usb_enable();
+extern bool usb_check();
+extern bool usb_poll();
+extern bool usb_poll_validate_length();
+extern uint32_t usb_read(uint8_t* data, size_t len);
+extern uint32_t usb_write(const uint8_t* data, const size_t len);
 
-bool cmd_send(uint32_t cmd, uint32_t arg0, uint32_t arg1, uint32_t arg2, void* data, size_t len) {
-  UsbCommand txcmd;
-
-  for (size_t i=0; i<sizeof(UsbCommand); i++) {
-    ((byte_t*)&txcmd)[i] = 0x00;
-  }
-  
-  // Compose the outgoing command frame
-  txcmd.cmd = cmd;
-  txcmd.arg[0] = arg0;
-  txcmd.arg[1] = arg1;	
-  txcmd.arg[2] = arg2;
-
-  // Add the (optional) content to the frame, with a maximum size of USB_CMD_DATA_SIZE
-  if (data && len) {
-    len = MIN(len,USB_CMD_DATA_SIZE);
-    for (size_t i=0; i<len; i++) {
-      txcmd.d.asBytes[i] = ((byte_t*)data)[i];
-    }
-  }
-  
-  // Send frame and make sure all bytes are transmitted
-  if (usb_write((byte_t*)&txcmd,sizeof(UsbCommand)) != 0) return false;
-  
-  return true;
-}
-
-
+#endif // _USB_CDC_H__
