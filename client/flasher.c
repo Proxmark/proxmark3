@@ -17,7 +17,7 @@
 #include "flash.h"
 #include "comms.h"
 #include "usb_cmd.h"
-
+#include "uart.h"
 
 void cmd_debug(UsbCommand* UC) {
   //  Debug

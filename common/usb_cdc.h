@@ -45,6 +45,7 @@ extern void usb_enable();
 extern bool usb_poll();
 extern bool usb_poll_validate_length();
 extern bool cmd_receive(UsbCommand* cmd);
-extern bool cmd_send(uint32_t cmd, uint32_t arg0, uint32_t arg1, uint32_t arg2, void* data, size_t len);
+extern bool cmd_send(uint16_t cmd, uint32_t arg0, uint32_t arg1, uint32_t arg2, void* data, uint16_t datalen); // new variable sized response
+extern bool cmd_send_old(uint16_t cmd, uint32_t arg0, uint32_t arg1, uint32_t arg2, void* data, uint16_t datalen); // old fixed size response
 
 #endif // USB_CDC_H__

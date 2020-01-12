@@ -14,7 +14,7 @@ void DbpString(char *str) {
   while (str[len] != 0x00) {
     len++;
   }
-  cmd_send(CMD_DEBUG_PRINT_STRING,len,0,0,(uint8_t*)str,len);
+  cmd_send_old(CMD_DEBUG_PRINT_STRING,len,0,0,(uint8_t*)str,len);
 }
 
 struct common_area common_area __attribute__((section(".commonarea")));
@@ -96,12 +96,13 @@ void UsbPacketReceived(UsbCommand *c) {
   switch(c->cmd) {
     case CMD_DEVICE_INFO: {
       dont_ack = 1;
-      arg0 = DEVICE_INFO_FLAG_BOOTROM_PRESENT | DEVICE_INFO_FLAG_CURRENT_MODE_BOOTROM |
-      DEVICE_INFO_FLAG_UNDERSTANDS_START_FLASH;
+      arg0 = DEVICE_INFO_FLAG_BOOTROM_PRESENT 
+		| DEVICE_INFO_FLAG_CURRENT_MODE_BOOTROM
+		| DEVICE_INFO_FLAG_UNDERSTANDS_START_FLASH;
       if(common_area.flags.osimage_present) {
         arg0 |= DEVICE_INFO_FLAG_OSIMAGE_PRESENT;
       }
-      cmd_send(CMD_DEVICE_INFO,arg0,1,2,0,0);
+      cmd_send_old(CMD_DEVICE_INFO,arg0,1,2,0,0);
     } break;
       
     case CMD_SETUP_WRITE: {
@@ -127,7 +128,7 @@ void UsbPacketReceived(UsbCommand *c) {
         if( ((flash_address+AT91C_IFLASH_PAGE_SIZE-1) >= end_addr) || (flash_address < start_addr) ) {
           /* Disallow write */
           dont_ack = 1;
-          cmd_send(CMD_NACK,0,0,0,0,0);
+          cmd_send_old(CMD_NACK,0,0,0,0,0);
         } else {
           uint32_t page_n = (flash_address - ((uint32_t)flash_mem)) / AT91C_IFLASH_PAGE_SIZE;
           /* Translate address to flash page and do flash, update here for the 512k part */
@@ -141,7 +142,7 @@ void UsbPacketReceived(UsbCommand *c) {
         while(!((sr = AT91C_BASE_EFC0->EFC_FSR) & AT91C_MC_FRDY));
         if(sr & (AT91C_MC_LOCKE | AT91C_MC_PROGE)) {
           dont_ack = 1;
-          cmd_send(CMD_NACK,0,0,0,0,0);
+          cmd_send_old(CMD_NACK,0,0,0,0,0);
         }
       }
     } break;
@@ -172,7 +173,7 @@ void UsbPacketReceived(UsbCommand *c) {
         } else {
           start_addr = end_addr = 0;
           dont_ack = 1;
-          cmd_send(CMD_NACK,0,0,0,0,0);
+          cmd_send_old(CMD_NACK,0,0,0,0,0);
         }
       }
     } break;
@@ -183,7 +184,7 @@ void UsbPacketReceived(UsbCommand *c) {
   }
   
   if(!dont_ack) {
-    cmd_send(CMD_ACK,arg0,0,0,0,0);
+    cmd_send_old(CMD_ACK,arg0,0,0,0,0);
   }
 }
 

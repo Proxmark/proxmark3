@@ -12,6 +12,8 @@
 #include "comms.h"
 
 #include <pthread.h>
+#include <inttypes.h>
+
 #if defined(__linux__) && !defined(NO_UNLINK)
 #include <unistd.h>		// for unlink()
 #endif
@@ -45,6 +47,7 @@ static pthread_cond_t txBufferSig = PTHREAD_COND_INITIALIZER;
 
 // Used by UsbReceiveCommand as a ring buffer for messages that are yet to be
 // processed by a command handler (WaitForResponse{,Timeout})
+#define CMD_BUFFER_SIZE 50
 static UsbCommand rxBuffer[CMD_BUFFER_SIZE];
 
 // Points to the next empty position to write to
@@ -187,6 +190,22 @@ static void UsbCommandReceived(UsbCommand *UC)
 }
 
 
+static bool receive_from_serial(serial_port sp, uint8_t *rx_buf, size_t len, size_t *received_len) {
+	size_t bytes_read = 0;
+	*received_len = 0;
+	// we eventually need to call uart_receive several times if it times out in the middle of a transfer
+	while (uart_receive(sp, rx_buf + *received_len, len - *received_len, &bytes_read) && bytes_read && *received_len < len) {
+		if (bytes_read != len - *received_len) {
+			printf("uart_receive() returned true but not enough bytes could be received. received: %d, wanted to receive: %d, already received before: %d\n",
+				bytes_read, len - *received_len, *received_len);
+		}
+		*received_len += bytes_read;
+		bytes_read = 0;
+	}
+	return (*received_len == len);
+}
+	
+
 static void
 #ifdef __has_attribute
 #if __has_attribute(force_align_arg_pointer)
@@ -195,29 +214,49 @@ __attribute__((force_align_arg_pointer))
 #endif
 *uart_communication(void *targ) {
 	communication_arg_t *conn = (communication_arg_t*)targ;
-	size_t rxlen;
-	UsbCommand rx;
-	UsbCommand *prx = &rx;
+	uint8_t rx[sizeof(UsbCommand)];
+	size_t rxlen = 0;
+	uint8_t *prx = rx;
+	UsbCommand *command = (UsbCommand*)rx;
+	UsbResponse *response = (UsbResponse*)rx;
 
 #if defined(__MACH__) && defined(__APPLE__)
 	disableAppNap("Proxmark3 polling UART");
 #endif
 
 	while (conn->run) {
-		rxlen = 0;
 		bool ACK_received = false;
-		if (uart_receive(sp, (uint8_t *)prx, sizeof(UsbCommand) - (prx-&rx), &rxlen) && rxlen) {
+		prx = rx;
+		size_t bytes_to_read = offsetof(UsbResponse, d);  // the fixed part of a new style UsbResponse. Otherwise this will be cmd and arg[0] (64 bit each)
+		if (receive_from_serial(sp, prx, bytes_to_read, &rxlen)) {
 			prx += rxlen;
-			if (prx-&rx < sizeof(UsbCommand)) {
-				continue;
-			}
-			UsbCommandReceived(&rx);
-			if (rx.cmd == CMD_ACK) {
-				ACK_received = true;
+			if (response->cmd & CMD_VARIABLE_SIZE_FLAG) { // new style response with variable size
+				// printf("received new style response %04" PRIx16 ", datalen = %d, arg[0] = %08" PRIx32 ", arg[1] = %08" PRIx32 ", arg[2] = %08" PRIx32 "\n",
+					// response->cmd, response->datalen, response->arg[0], response->arg[1], response->arg[2]);
+				bytes_to_read = response->datalen;
+				if (receive_from_serial(sp, prx, bytes_to_read, &rxlen)) {
+					UsbCommand resp;
+					resp.cmd = response->cmd & ~CMD_VARIABLE_SIZE_FLAG;
+					resp.arg[0] = response->arg[0];
+					resp.arg[1] = response->arg[1];
+					resp.arg[2] = response->arg[2];
+					memcpy(&resp.d.asBytes, &response->d.asBytes, response->datalen);
+					UsbCommandReceived(&resp);
+					if (resp.cmd == CMD_ACK) {
+						ACK_received = true;
+					}
+				}
+			} else { // old style response uses same data structure as commands. Fixed size.
+				// printf("received old style response %016" PRIx64 ", arg[0] = %016" PRIx64 "\n", command->cmd, command->arg[0]);
+				bytes_to_read = sizeof(UsbCommand) - bytes_to_read;
+				if (receive_from_serial(sp, prx, bytes_to_read, &rxlen)) { 
+					UsbCommandReceived(command);
+					if (command->cmd == CMD_ACK) {
+						ACK_received = true;
+					}
+				}
 			}
 		}
-		prx = &rx;
-
 		
 		pthread_mutex_lock(&txBufferMutex);
 

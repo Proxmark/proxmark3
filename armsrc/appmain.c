@@ -346,7 +346,7 @@ void SendVersion(void) {
 	// Send Chip ID and used flash memory
 	uint32_t text_and_rodata_section_size = (uint32_t)&__data_src_start__ - (uint32_t)&_flash_start;
 	uint32_t compressed_data_section_size = common_area.arg1;
-	cmd_send(CMD_ACK, *(AT91C_DBGU_CIDR), text_and_rodata_section_size + compressed_data_section_size, hw_capabilities, VersionString, strlen(VersionString));
+	cmd_send(CMD_ACK, *(AT91C_DBGU_CIDR), text_and_rodata_section_size + compressed_data_section_size, hw_capabilities, VersionString, strlen(VersionString) + 1);
 }
 
 // measure the USB Speed by sending SpeedTestBufferSize bytes to client and measuring the elapsed time.
@@ -1425,7 +1425,7 @@ void UsbPacketReceived(UsbCommand *c) {
 		case CMD_DEVICE_INFO: {
 			uint32_t dev_info = DEVICE_INFO_FLAG_OSIMAGE_PRESENT | DEVICE_INFO_FLAG_CURRENT_MODE_OS;
 			if(common_area.flags.bootrom_present) dev_info |= DEVICE_INFO_FLAG_BOOTROM_PRESENT;
-			cmd_send(CMD_DEVICE_INFO,dev_info,0,0,0,0);
+			cmd_send_old(CMD_DEVICE_INFO,dev_info,0,0,0,0);
 			break;
 		}
 		default:
@@ -1479,13 +1479,9 @@ void  __attribute__((noreturn)) AppMain(void) {
 	UsbCommand rx;
   
 	for(;;) {
+		WDT_HIT();
 		if (cmd_receive(&rx)) {
 			UsbPacketReceived(&rx);
-		}
-
-		WDT_HIT();
-		if (usb_poll() && (rx_len = usb_read(rx, sizeof(rx)))) {
-			UsbPacketReceived(rx, rx_len);
 		} else {
 #if defined(WITH_LF_StandAlone) && !defined(WITH_ISO14443a_StandAlone)
 			if (BUTTON_HELD(1000) > 0)

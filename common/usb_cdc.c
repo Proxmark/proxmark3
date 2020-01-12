@@ -705,29 +705,57 @@ bool cmd_receive(UsbCommand* cmd) {
 
 
 // The function to send a response to the client via USB
-bool cmd_send(uint32_t cmd, uint32_t arg0, uint32_t arg1, uint32_t arg2, void* data, size_t len) {
-	UsbCommand txcmd;
+bool cmd_send(uint16_t cmd, uint32_t arg0, uint32_t arg1, uint32_t arg2, void* data, uint16_t datalen) {
 
-	for (size_t i = 0; i < sizeof(UsbCommand); i++) {
-		((uint8_t*)&txcmd)[i] = 0x00;
+	UsbResponse txcmd;
+
+	// Compose the outgoing response frame
+	txcmd.cmd = cmd | CMD_VARIABLE_SIZE_FLAG;
+	txcmd.arg[0] = arg0;
+	txcmd.arg[1] = arg1;
+	txcmd.arg[2] = arg2;
+
+	// Add the (optional) content to the frame, with a maximum size of USB_CMD_DATA_SIZE
+	if (data) {
+		datalen = MIN(datalen, USB_CMD_DATA_SIZE);
+		for (uint16_t i = 0; i < datalen; i++) {
+			txcmd.d.asBytes[i] = ((uint8_t*)data)[i];
+		}
+		txcmd.datalen = datalen;
+	} else {
+		txcmd.datalen = 0;
 	}
 
-	// Compose the outgoing command frame
+	// Send frame and make sure all bytes are transmitted
+	size_t tx_size = offsetof(UsbResponse, d) + datalen;
+	if (usb_write((uint8_t*)&txcmd, tx_size) != 0) return false;
+
+	return true;
+}
+
+
+// For compatibility only: legacy function to send a response with fixed size to the client via USB
+bool cmd_send_old(uint16_t cmd, uint32_t arg0, uint32_t arg1, uint32_t arg2, void* data, uint16_t datalen) {
+
+	UsbCommand txcmd;
+
+	// Compose the outgoing response frame
 	txcmd.cmd = cmd;
 	txcmd.arg[0] = arg0;
 	txcmd.arg[1] = arg1;
 	txcmd.arg[2] = arg2;
 
 	// Add the (optional) content to the frame, with a maximum size of USB_CMD_DATA_SIZE
-	if (data && len) {
-		len = MIN(len, USB_CMD_DATA_SIZE);
-		for (size_t i = 0; i < len; i++) {
+	if (data) {
+		datalen = MIN(datalen, USB_CMD_DATA_SIZE);
+		for (uint16_t i = 0; i < datalen; i++) {
 			txcmd.d.asBytes[i] = ((uint8_t*)data)[i];
 		}
 	}
-
+	
 	// Send frame and make sure all bytes are transmitted
 	if (usb_write((uint8_t*)&txcmd, sizeof(UsbCommand)) != 0) return false;
 
 	return true;
 }
+

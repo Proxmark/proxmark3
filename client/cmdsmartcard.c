@@ -10,6 +10,7 @@
 #include "cmdsmartcard.h"
 
 #include <ctype.h>
+#include <string.h>
 
 #include "ui.h"
 #include "cmdparser.h"

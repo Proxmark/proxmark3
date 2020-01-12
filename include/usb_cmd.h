@@ -25,6 +25,7 @@ typedef BYTE uint8_t;
 
 #define USB_CMD_DATA_SIZE 512
 
+// the packets sent from client to PM3
 typedef struct {
 	uint64_t cmd;
 	uint64_t arg[3];
@@ -34,6 +35,16 @@ typedef struct {
 	} d;
 } PACKED UsbCommand;
 
+// the packets sent from PM3 to client (a smaller version of UsbCommand)
+typedef struct {
+	uint16_t cmd;
+	uint16_t datalen;
+	uint32_t arg[3];
+	union {
+		uint8_t  asBytes[USB_CMD_DATA_SIZE];
+		uint32_t asDwords[USB_CMD_DATA_SIZE/4];
+	} d;
+} PACKED UsbResponse;
 
 // A struct used to send sample-configs over USB
 typedef struct {
@@ -226,6 +237,7 @@ typedef struct {
 #define CMD_HF_SNIFFER                                                    0x0800
 #define CMD_HF_PLOT                                                       0x0801
 
+#define CMD_VARIABLE_SIZE_FLAG                                            0x8000
 #define CMD_UNKNOWN                                                       0xFFFF
 
 

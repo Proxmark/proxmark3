@@ -28,7 +28,7 @@
 #include "cmdhw.h"
 #include "whereami.h"
 #include "comms.h"
-
+#include "uart.h"
 
 void
 #ifdef __has_attribute
