@@ -12,6 +12,8 @@
 #include "comms.h"
 
 #include <stdio.h>
+#include <stddef.h>
+#include <string.h>
 #include <pthread.h>
 #include <inttypes.h>
 

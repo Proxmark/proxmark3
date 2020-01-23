@@ -12,6 +12,8 @@
 #ifndef COMMS_H__
 #define COMMS_H__
 
+#include <stddef.h>
+#include <stdint.h>
 #include <stdbool.h>
 #include "usb_cmd.h"
 
