@@ -1164,7 +1164,7 @@ int DetectClassicPrng(void){
 
 	clearCommandBuffer();
 	SendCommand(&c);
-	if (!WaitForResponseTimeout(CMD_ACK, &resp, 2000)) {
+	if (!WaitForResponseTimeout(CMD_NACK, &resp, 2000)) {
         PrintAndLog("PRNG UID: Reply timeout.");
 		return -1;
 	}

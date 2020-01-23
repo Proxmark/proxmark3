@@ -2672,7 +2672,7 @@ int CmdHF14AMfSniff(const char *Cmd){
 		}
 
 		UsbCommand resp;
-		if (WaitForResponseTimeoutW(CMD_ACK, &resp, 2000, false)) {
+		if (WaitForResponseTimeoutW(CMD_UNKNOWN, &resp, 2000, false)) {
 			res = resp.arg[0] & 0xff;
 			uint16_t traceLen = resp.arg[1];
 			len = resp.arg[2];

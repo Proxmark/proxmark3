@@ -17,7 +17,7 @@
 
 extern void SetOffline(bool new_offline);
 extern bool IsOffline();
-extern bool OpenProxmark(void *port, bool wait_for_port, int timeout, bool flash_mode);
+extern bool OpenProxmark(void *port, bool wait_for_port, int timeout);
 extern void CloseProxmark(void);
 extern void SendCommand(UsbCommand *c);
 extern void clearCommandBuffer();

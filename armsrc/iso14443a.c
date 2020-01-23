@@ -2026,15 +2026,15 @@ void ReaderIso14443a(UsbCommand *c) {
 
 	set_tracing(true);
 
-	if(param & ISO14A_CLEAR_TRACE) {
+	if (param & ISO14A_CLEAR_TRACE) {
 		clear_trace();
 	}
 
-	if(param & ISO14A_REQUEST_TRIGGER) {
+	if (param & ISO14A_REQUEST_TRIGGER) {
 		iso14a_set_trigger(true);
 	}
 
-	if(param & ISO14A_CONNECT) {
+	if (param & ISO14A_CONNECT) {
 		LED_A_ON();
 		iso14443a_setup(FPGA_HF_ISO14443A_READER_LISTEN);
 		if(!(param & ISO14A_NO_SELECT)) {
@@ -2048,16 +2048,16 @@ void ReaderIso14443a(UsbCommand *c) {
 			}
 			FpgaDisableTracing();
 			LED_B_ON();
-			cmd_send(CMD_ACK,arg0,card->uidlen,0,buf,sizeof(iso14a_card_select_t));
+			cmd_send(CMD_NACK,arg0,card->uidlen,0,buf,sizeof(iso14a_card_select_t));
 			LED_B_OFF();
 		}
 	}
 
-	if(param & ISO14A_SET_TIMEOUT) {
+	if (param & ISO14A_SET_TIMEOUT) {
 		iso14a_set_timeout(timeout);
 	}
 
-	if(param & ISO14A_APDU && !cantSELECT) {
+	if (param & ISO14A_APDU && !cantSELECT) {
 		uint8_t res;
 		arg0 = iso14_apdu(cmd, len, (param & ISO14A_SEND_CHAINING), buf, &res);
 		FpgaDisableTracing();
@@ -2066,8 +2066,8 @@ void ReaderIso14443a(UsbCommand *c) {
 		LED_B_OFF();
 	}
 
-	if(param & ISO14A_RAW && !cantSELECT) {
-		if(param & ISO14A_APPEND_CRC) {
+	if (param & ISO14A_RAW && !cantSELECT) {
+		if (param & ISO14A_APPEND_CRC) {
 			if(param & ISO14A_TOPAZMODE) {
 				AppendCrc14443b(cmd,len);
 			} else {
@@ -2076,8 +2076,8 @@ void ReaderIso14443a(UsbCommand *c) {
 			len += 2;
 			if (lenbits) lenbits += 16;
 		}
-		if(lenbits>0) {             // want to send a specific number of bits (e.g. short commands)
-			if(param & ISO14A_TOPAZMODE) {
+		if (lenbits > 0) {             // want to send a specific number of bits (e.g. short commands)
+			if (param & ISO14A_TOPAZMODE) {
 				int bits_to_send = lenbits;
 				uint16_t i = 0;
 				ReaderTransmitBitsPar(&cmd[i++], MIN(bits_to_send, 7), NULL, NULL);     // first byte is always short (7bits) and no parity
@@ -2091,7 +2091,7 @@ void ReaderIso14443a(UsbCommand *c) {
 				ReaderTransmitBitsPar(cmd, lenbits, par, NULL);                         // bytes are 8 bit with odd parity
 			}
 		} else {                    // want to send complete bytes only
-			if(param & ISO14A_TOPAZMODE) {
+			if (param & ISO14A_TOPAZMODE) {
 				uint16_t i = 0;
 				ReaderTransmitBitsPar(&cmd[i++], 7, NULL, NULL);                        // first byte: 7 bits, no paritiy
 				while (i < len) {
@@ -2105,15 +2105,15 @@ void ReaderIso14443a(UsbCommand *c) {
 		FpgaDisableTracing();
 
 		LED_B_ON();
-		cmd_send(CMD_ACK,arg0,0,0,buf,sizeof(buf));
+		cmd_send(CMD_ACK, arg0, 0, 0, buf, sizeof(buf));
 		LED_B_OFF();
 	}
 
-	if(param & ISO14A_REQUEST_TRIGGER) {
+	if (param & ISO14A_REQUEST_TRIGGER) {
 		iso14a_set_trigger(false);
 	}
 
-	if(param & ISO14A_NO_DISCONNECT) {
+	if (param & ISO14A_NO_DISCONNECT) {
 		return;
 	}
 

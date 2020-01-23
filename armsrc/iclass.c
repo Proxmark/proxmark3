@@ -674,14 +674,14 @@ static bool selectIclassTag(uint8_t *card_data, uint32_t *eof_time) {
 	// Send act_all
 	ReaderTransmitIClass(act_all, 1, &start_time);
 	// Card present?
-	if (GetIso15693AnswerFromTag(resp, sizeof(resp), ICLASS_READER_TIMEOUT_ACTALL, eof_time) < 0) return false;//Fail
+	if (GetIso15693AnswerFromTag(resp, sizeof(resp), ICLASS_READER_TIMEOUT_ACTALL, eof_time) < 0) return false; //Fail
 
 	//Send Identify
 	start_time = *eof_time + DELAY_ICLASS_VICC_TO_VCD_READER;
 	ReaderTransmitIClass(identify, 1, &start_time);
 	//We expect a 10-byte response here, 8 byte anticollision-CSN and 2 byte CRC
 	uint8_t len = GetIso15693AnswerFromTag(resp, sizeof(resp), ICLASS_READER_TIMEOUT_OTHERS, eof_time);
-	if (len != 10) return false;//Fail
+	if (len != 10) return false; //Fail
 
 	//Copy the Anti-collision CSN to our select-packet
 	memcpy(&select[1], resp, 8);
@@ -690,7 +690,7 @@ static bool selectIclassTag(uint8_t *card_data, uint32_t *eof_time) {
 	ReaderTransmitIClass(select, sizeof(select), &start_time);
 	//We expect a 10-byte response here, 8 byte CSN and 2 byte CRC
 	len = GetIso15693AnswerFromTag(resp, sizeof(resp), ICLASS_READER_TIMEOUT_OTHERS, eof_time);
-	if (len != 10) return false;//Fail
+	if (len != 10) return false; //Fail
 
 	//Success - we got CSN
 	//Save CSN in response data
@@ -733,42 +733,42 @@ void ReaderIClass(uint8_t flags) {
 	if (selectIclassTag(resp, &eof_time)) {
 		result_status = FLAG_ICLASS_READER_CSN;
 		memcpy(card_data, resp, 8);
-	}
 
-	start_time = eof_time + DELAY_ICLASS_VICC_TO_VCD_READER;
-
-	//Read block 1, config
-	if (flags & FLAG_ICLASS_READER_CONF) {
-		if (sendCmdGetResponseWithRetries(readConf, sizeof(readConf), resp, sizeof(resp), 10, 10, start_time, ICLASS_READER_TIMEOUT_OTHERS, &eof_time)) {
-			result_status |= FLAG_ICLASS_READER_CONF;
-			memcpy(card_data+8, resp, 8);
-		} else {
-			Dbprintf("Failed to read config block");
-		}
 		start_time = eof_time + DELAY_ICLASS_VICC_TO_VCD_READER;
-	}
 
-	//Read block 2, e-purse
-	if (flags & FLAG_ICLASS_READER_CC) {
-		if (sendCmdGetResponseWithRetries(readEpurse, sizeof(readEpurse), resp, sizeof(resp), 10, 10, start_time, ICLASS_READER_TIMEOUT_OTHERS, &eof_time)) {
-			result_status |= FLAG_ICLASS_READER_CC;
-			memcpy(card_data + (8*2), resp, 8);
-		} else {
-			Dbprintf("Failed to read e-purse");
+		//Read block 1, config
+		if (flags & FLAG_ICLASS_READER_CONF) {
+			if (sendCmdGetResponseWithRetries(readConf, sizeof(readConf), resp, sizeof(resp), 10, 10, start_time, ICLASS_READER_TIMEOUT_OTHERS, &eof_time)) {
+				result_status |= FLAG_ICLASS_READER_CONF;
+				memcpy(card_data+8, resp, 8);
+			} else {
+				Dbprintf("Failed to read config block");
+			}
+			start_time = eof_time + DELAY_ICLASS_VICC_TO_VCD_READER;
 		}
-		start_time = eof_time + DELAY_ICLASS_VICC_TO_VCD_READER;
-	}
 
-	//Read block 5, AA
-	if (flags & FLAG_ICLASS_READER_AA) {
-		if (sendCmdGetResponseWithRetries(readAA, sizeof(readAA), resp, sizeof(resp), 10, 10, start_time, ICLASS_READER_TIMEOUT_OTHERS, &eof_time)) {
-			result_status |= FLAG_ICLASS_READER_AA;
-			memcpy(card_data + (8*5), resp, 8);
-		} else {
-			Dbprintf("Failed to read AA block");
+		//Read block 2, e-purse
+		if (flags & FLAG_ICLASS_READER_CC) {
+			if (sendCmdGetResponseWithRetries(readEpurse, sizeof(readEpurse), resp, sizeof(resp), 10, 10, start_time, ICLASS_READER_TIMEOUT_OTHERS, &eof_time)) {
+				result_status |= FLAG_ICLASS_READER_CC;
+				memcpy(card_data + (8*2), resp, 8);
+			} else {
+				Dbprintf("Failed to read e-purse");
+			}
+			start_time = eof_time + DELAY_ICLASS_VICC_TO_VCD_READER;
+		}
+
+		//Read block 5, AA
+		if (flags & FLAG_ICLASS_READER_AA) {
+			if (sendCmdGetResponseWithRetries(readAA, sizeof(readAA), resp, sizeof(resp), 10, 10, start_time, ICLASS_READER_TIMEOUT_OTHERS, &eof_time)) {
+				result_status |= FLAG_ICLASS_READER_AA;
+				memcpy(card_data + (8*5), resp, 8);
+			} else {
+				Dbprintf("Failed to read AA block");
+			}
 		}
 	}
-
+	
 	cmd_send(CMD_ACK, result_status, 0, 0, card_data, sizeof(card_data));
 
 	LED_A_OFF();
@@ -819,9 +819,9 @@ void iClass_ReadBlk(uint8_t blockno) {
 
 	uint8_t readblockdata[10];
 	bool isOK = iClass_ReadBlock(blockno, readblockdata);
-	cmd_send(CMD_ACK, isOK, 0, 0, readblockdata, 8);
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
 	LED_D_OFF();
+	cmd_send(CMD_ACK, isOK, 0, 0, readblockdata, 8);
 
 	LED_A_OFF();
 }
@@ -899,11 +899,10 @@ void iClass_WriteBlock(uint8_t blockNo, uint8_t *data) {
 	} else {
 		Dbprintf("Write block [%02x] failed", blockNo);
 	}
-	cmd_send(CMD_ACK, isOK, 0, 0, 0, 0);
-
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
 	LED_D_OFF();
 
+	cmd_send(CMD_ACK, isOK, 0, 0, 0, 0);
 	LED_A_OFF();
 }
 
@@ -934,6 +933,5 @@ void iClass_Clone(uint8_t startblock, uint8_t endblock, uint8_t *data) {
 	LED_D_OFF();
 
 	cmd_send(CMD_ACK, 1, 0, 0, 0, 0);
-
 	LED_A_OFF();
 }

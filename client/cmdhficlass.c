@@ -333,7 +333,7 @@ int HFiClassReader(bool loop, bool verbose) {
 
 	while (!ukbhit()) {
 		SendCommand(&c);
-		if (WaitForResponseTimeout(CMD_ACK,&resp, 4500)) {
+		if (WaitForResponseTimeout(CMD_ACK, &resp, 1000)) {
 			uint8_t readStatus = resp.arg[0] & 0xff;
 			uint8_t *data = resp.d.asBytes;
 
@@ -368,7 +368,8 @@ int HFiClassReader(bool loop, bool verbose) {
 
 			if (tagFound && !loop) return 1;
 		} else {
-			if (verbose) PrintAndLog("Command execute timeout");
+			if (verbose) PrintAndLog("Error: No response from Proxmark.");
+			break;
 		}
 		if (!loop) break;
 	}

@@ -336,7 +336,7 @@ static int enter_bootloader(char *serial_port_name)
 		msleep(100);
 		CloseProxmark();
 
-		bool opened = OpenProxmark(serial_port_name, true, 120, true);   // wait for 2 minutes
+		bool opened = OpenProxmark(serial_port_name, true, 120);   // wait for 2 minutes
 		if (opened) {
 			fprintf(stderr," Found.\n");
 			return 0;

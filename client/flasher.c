@@ -83,7 +83,7 @@ int main(int argc, char **argv)
 
 	char* serial_port_name = argv[1];
 
-	if (!OpenProxmark(serial_port_name, true, 120, true)) {   // wait for 2 minutes
+	if (!OpenProxmark(serial_port_name, true, 120)) {   // wait for 2 minutes
 		fprintf(stderr, "Could not find Proxmark on %s.\n\n", serial_port_name);
 		return -1;
 	} else {

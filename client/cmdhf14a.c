@@ -46,28 +46,28 @@ int CmdHF14AList(const char *Cmd)
 	return 0;
 }
 
-int Hf14443_4aGetCardData(iso14a_card_select_t * card) {
+int Hf14443_4aGetCardData(iso14a_card_select_t *card) {
 	UsbCommand c = {CMD_READER_ISO_14443a, {ISO14A_CONNECT, 0, 0}};
 	SendCommand(&c);
 
 	UsbCommand resp;
-	WaitForResponse(CMD_ACK,&resp);
+	WaitForResponse(CMD_NACK, &resp);
 
 	memcpy(card, (iso14a_card_select_t *)resp.d.asBytes, sizeof(iso14a_card_select_t));
 
 	uint64_t select_status = resp.arg[0];       // 0: couldn't read, 1: OK, with ATS, 2: OK, no ATS, 3: proprietary Anticollision
 
-	if(select_status == 0) {
+	if (select_status == 0) {
 		PrintAndLog("E->iso14443a card select failed");
 		return 1;
 	}
 
-	if(select_status == 2) {
+	if (select_status == 2) {
 		PrintAndLog("E->Card doesn't support iso14443-4 mode");
 		return 1;
 	}
 
-	if(select_status == 3) {
+	if (select_status == 3) {
 		PrintAndLog("E->Card doesn't support standard iso14443-3 anticollision");
 		PrintAndLog("\tATQA : %02x %02x", card->atqa[1], card->atqa[0]);
 		return 1;
@@ -156,20 +156,24 @@ int CmdHF14AReader(const char *Cmd) {
 	return 0;
 }
 
-int CmdHF14AInfo(const char *Cmd)
-{
+
+int CmdHF14AInfo(const char *Cmd) {
+
 	UsbCommand c = {CMD_READER_ISO_14443a, {ISO14A_CONNECT | ISO14A_NO_DISCONNECT, 0, 0}};
 	SendCommand(&c);
 
 	UsbCommand resp;
-	WaitForResponse(CMD_ACK,&resp);
-
+	if (!WaitForResponseTimeout(CMD_NACK, &resp, 500)) {
+		if (Cmd[0] != 's') PrintAndLog("Error: No response from Proxmark.\n");
+		return 0;
+	}
+	
 	iso14a_card_select_t card;
 	memcpy(&card, (iso14a_card_select_t *)resp.d.asBytes, sizeof(iso14a_card_select_t));
 
 	uint64_t select_status = resp.arg[0];       // 0: couldn't read, 1: OK, with ATS, 2: OK, no ATS, 3: proprietary Anticollision
 
-	if(select_status == 0) {
+	if (select_status == 0) {
 		if (Cmd[0] != 's') PrintAndLog("iso14443a card select failed");
 		// disconnect
 		c.arg[0] = 0;
@@ -217,13 +221,13 @@ int CmdHF14AInfo(const char *Cmd)
 			SendCommand(&c);
 
 			UsbCommand resp;
-			WaitForResponse(CMD_ACK,&resp);
+			WaitForResponse(CMD_NACK,&resp);
 
 			memcpy(&card, (iso14a_card_select_t *)resp.d.asBytes, sizeof(iso14a_card_select_t));
 
 			select_status = resp.arg[0];        // 0: couldn't read, 1: OK, with ATS, 2: OK, no ATS
 
-			if(select_status == 0) {
+			if (select_status == 0) {
 				//PrintAndLog("iso14443a card select failed");
 				// disconnect
 				c.arg[0] = 0;
@@ -272,7 +276,7 @@ int CmdHF14AInfo(const char *Cmd)
 
 	// Double & triple sized UID, can be mapped to a manufacturer.
 	// HACK: does this apply for Ultralight cards?
-	if ( card.uidlen > 4 ) {
+	if (card.uidlen > 4) {
 		PrintAndLog("MANUFACTURER : %s", getManufacturerName(card.uid[0]));
 	}
 
@@ -430,7 +434,7 @@ int CmdHF14AInfo(const char *Cmd)
 	(void)mfCIdentify();
 
 	if (isMifareClassic) {
-		switch(DetectClassicPrng()) {
+		switch (DetectClassicPrng()) {
 		case 0:
 			PrintAndLog("Prng detection: HARDENED (hardnested)");
 			break;
@@ -462,7 +466,7 @@ int CmdHF14ACUIDs(const char *Cmd)
 		SendCommand(&c);
 
 		UsbCommand resp;
-		WaitForResponse(CMD_ACK,&resp);
+		WaitForResponse(CMD_NACK,&resp);
 
 		iso14a_card_select_t *card = (iso14a_card_select_t *) resp.d.asBytes;
 
