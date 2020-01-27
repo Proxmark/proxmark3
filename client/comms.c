@@ -17,9 +17,6 @@
 #include <pthread.h>
 #include <inttypes.h>
 
-#if defined(__linux__) && !defined(NO_UNLINK)
-#include <unistd.h>     // for unlink()
-#endif
 #include "uart.h"
 #include "ui.h"
 #include "common.h"
@@ -74,7 +71,7 @@ bool IsOffline() {
 
 void SendCommand(UsbCommand *c) {
 	#ifdef COMMS_DEBUG
-	printf("Sending %04x cmd\n", c->cmd);
+	printf("Sending %04" PRIx64 " cmd\n", c->cmd);
 	#endif
 
 	if (offline) {
@@ -106,8 +103,7 @@ void SendCommand(UsbCommand *c) {
  *  A better method could have been to have explicit command-ACKS, so we can know which ACK goes to which
  *  operation. Right now we'll just have to live with this.
  */
-void clearCommandBuffer()
-{
+void clearCommandBuffer() {
 	//This is a very simple operation
 	pthread_mutex_lock(&rxBufferMutex);
 	cmd_tail = cmd_head;
@@ -118,11 +114,9 @@ void clearCommandBuffer()
  * @brief storeCommand stores a USB command in a circular buffer
  * @param UC
  */
-static void storeCommand(UsbCommand *command)
-{
+static void storeCommand(UsbCommand *command) {
 	pthread_mutex_lock(&rxBufferMutex);
-	if( (cmd_head+1) % CMD_BUFFER_SIZE == cmd_tail)
-	{
+	if ((cmd_head + 1) % CMD_BUFFER_SIZE == cmd_tail) {
 		// If these two are equal, we're about to overwrite in the
 		// circular buffer.
 		PrintAndLog("WARNING: Command buffer about to overwrite command! This needs to be fixed!");
@@ -132,7 +126,7 @@ static void storeCommand(UsbCommand *command)
 	UsbCommand* destination = &rxBuffer[cmd_head];
 	memcpy(destination, command, sizeof(UsbCommand));
 
-	cmd_head = (cmd_head +1) % CMD_BUFFER_SIZE; //increment head and wrap
+	cmd_head = (cmd_head + 1) % CMD_BUFFER_SIZE; //increment head and wrap
 	pthread_mutex_unlock(&rxBufferMutex);
 }
 
@@ -142,19 +136,18 @@ static void storeCommand(UsbCommand *command)
  * @param response location to write command
  * @return 1 if response was returned, 0 if nothing has been received
  */
-static int getCommand(UsbCommand* response)
-{
+static int getCommand(UsbCommand* response) {
 	pthread_mutex_lock(&rxBufferMutex);
-	//If head == tail, there's nothing to read, or if we just got initialized
-	if (cmd_head == cmd_tail){
+	// If head == tail, there's nothing to read
+	if (cmd_head == cmd_tail) {
 		pthread_mutex_unlock(&rxBufferMutex);
 		return 0;
 	}
 
-	//Pick out the next unread command
+	// Pick out the next unread command
 	UsbCommand* last_unread = &rxBuffer[cmd_tail];
 	memcpy(response, last_unread, sizeof(UsbCommand));
-	//Increment tail - this is a circular buffer, so modulo buffer size
+	// Increment tail - this is a circular buffer, so modulo buffer size
 	cmd_tail = (cmd_tail + 1) % CMD_BUFFER_SIZE;
 
 	pthread_mutex_unlock(&rxBufferMutex);
@@ -166,15 +159,14 @@ static int getCommand(UsbCommand* response)
 // Entry point into our code: called whenever we received a packet over USB.
 // Handle debug commands directly, store all other commands in circular buffer.
 //----------------------------------------------------------------------------------
-static void UsbCommandReceived(UsbCommand *UC)
-{
-	switch(UC->cmd) {
+static void UsbCommandReceived(UsbCommand *UC) {
+	switch (UC->cmd) {
 		// First check if we are handling a debug message
 		case CMD_DEBUG_PRINT_STRING: {
 			char s[USB_CMD_DATA_SIZE+1];
 			memset(s, 0x00, sizeof(s));
-			size_t len = MIN(UC->arg[0],USB_CMD_DATA_SIZE);
-			memcpy(s,UC->d.asBytes,len);
+			size_t len = MIN(UC->arg[0], USB_CMD_DATA_SIZE);
+			memcpy(s, UC->d.asBytes,len);
 			PrintAndLog("#db# %s", s);
 			return;
 		} break;
@@ -199,7 +191,7 @@ static bool receive_from_serial(serial_port sp, uint8_t *rx_buf, size_t len, siz
 	while (uart_receive(sp, rx_buf + *received_len, len - *received_len, &bytes_read) && bytes_read && *received_len < len) {
 		#ifdef COMMS_DEBUG
 		if (bytes_read != len - *received_len) {
-			printf("uart_receive() returned true but not enough bytes could be received. received: %d, wanted to receive: %d, already received before: %d\n",
+			printf("uart_receive() returned true but not enough bytes could be received. received: %zd, wanted to receive: %zd, already received before: %zd\n",
 				bytes_read, len - *received_len, *received_len);
 		}
 		#endif
@@ -235,8 +227,10 @@ __attribute__((force_align_arg_pointer))
 		if (receive_from_serial(sp, prx, bytes_to_read, &rxlen)) {
 			prx += rxlen;
 			if (response->cmd & CMD_VARIABLE_SIZE_FLAG) { // new style response with variable size
-				// PrintAndLog("received new style response %04" PRIx16 ", datalen = %d, arg[0] = %08" PRIx32 ", arg[1] = %08" PRIx32 ", arg[2] = %08" PRIx32 "\n",
-					// response->cmd, response->datalen, response->arg[0], response->arg[1], response->arg[2]);
+#ifdef COMMS_DEBUG
+				PrintAndLog("received new style response %04" PRIx16 ", datalen = %zd, arg[0] = %08" PRIx32 ", arg[1] = %08" PRIx32 ", arg[2] = %08" PRIx32,
+					response->cmd, response->datalen, response->arg[0], response->arg[1], response->arg[2]);
+#endif
 				bytes_to_read = response->datalen;
 				if (receive_from_serial(sp, prx, bytes_to_read, &rxlen)) {
 					UsbCommand resp;
@@ -251,7 +245,9 @@ __attribute__((force_align_arg_pointer))
 					}
 				}
 			} else { // old style response uses same data structure as commands. Fixed size.
-				// PrintAndLog("received old style response %016" PRIx64 ", arg[0] = %016" PRIx64 "\n", command->cmd, command->arg[0]);
+#ifdef COMMS_DEBUG
+				PrintAndLog("received old style response %016" PRIx64 ", arg[0] = %016" PRIx64, command->cmd, command->arg[0]);
+#endif
 				bytes_to_read = sizeof(UsbCommand) - bytes_to_read;
 				if (receive_from_serial(sp, prx, bytes_to_read, &rxlen)) {
 					UsbCommandReceived(command);
@@ -302,8 +298,7 @@ __attribute__((force_align_arg_pointer))
  * @param show_warning display message after 2 seconds
  * @return true if command was returned, otherwise false
  */
-bool GetFromBigBuf(uint8_t *dest, int bytes, int start_index, UsbCommand *response, size_t ms_timeout, bool show_warning)
-{
+bool GetFromBigBuf(uint8_t *dest, int bytes, int start_index, UsbCommand *response, size_t ms_timeout, bool show_warning) {
 	UsbCommand c = {CMD_DOWNLOAD_RAW_ADC_SAMPLES_125K, {start_index, bytes, 0}};
 	SendCommand(&c);
 
@@ -315,7 +310,7 @@ bool GetFromBigBuf(uint8_t *dest, int bytes, int start_index, UsbCommand *respon
 	}
 
 	int bytes_completed = 0;
-	while(true) {
+	while (true) {
 		if (getCommand(response)) {
 			if (response->cmd == CMD_DOWNLOADED_RAW_ADC_SAMPLES_125K) {
 				int copy_bytes = MIN(bytes - bytes_completed, response->arg[1]);
@@ -341,8 +336,7 @@ bool GetFromBigBuf(uint8_t *dest, int bytes, int start_index, UsbCommand *respon
 }
 
 
-bool GetFromFpgaRAM(uint8_t *dest, int bytes)
-{
+bool GetFromFpgaRAM(uint8_t *dest, int bytes) {
 	UsbCommand c = {CMD_HF_PLOT, {0, 0, 0}};
 	SendCommand(&c);
 
@@ -352,7 +346,7 @@ bool GetFromFpgaRAM(uint8_t *dest, int bytes)
 
 	int bytes_completed = 0;
 	bool show_warning = true;
-	while(true) {
+	while (true) {
 		if (getCommand(&response)) {
 			if (response.cmd == CMD_DOWNLOADED_RAW_ADC_SAMPLES_125K) {
 				int copy_bytes = MIN(bytes - bytes_completed, response.arg[1]);
@@ -387,7 +381,7 @@ bool OpenProxmark(void *port, bool wait_for_port, int timeout) {
 			msleep(1000);
 			printf(".");
 			fflush(stdout);
-		} while(++openCount < timeout && (sp == INVALID_SERIAL_PORT || sp == CLAIMED_SERIAL_PORT));
+		} while (++openCount < timeout && (sp == INVALID_SERIAL_PORT || sp == CLAIMED_SERIAL_PORT));
 		printf("\n");
 	}
 
@@ -432,15 +426,6 @@ void CloseProxmark(void) {
 	if (sp) {
 		uart_close(sp);
 	}
-
-#if defined(__linux__) && !defined(NO_UNLINK)
-	// Fix for linux, it seems that it is extremely slow to release the serial port file descriptor /dev/*
-	//
-	// This may be disabled at compile-time with -DNO_UNLINK (used for a JNI-based serial port on Android).
-	if (serial_port_name) {
-		unlink(serial_port_name);
-	}
-#endif
 
 	// Clean up our state
 	sp = NULL;
@@ -493,6 +478,7 @@ bool WaitForResponseTimeoutW(uint32_t cmd, UsbCommand* response, size_t ms_timeo
 			PrintAndLog("You can cancel this operation by pressing the pm3 button");
 			show_warning = false;
 		}
+		msleep(1);
 	}
 	return false;
 }

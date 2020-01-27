@@ -88,6 +88,8 @@ extern bool uart_receive(const serial_port sp, uint8_t* pbtRx, size_t pszMaxRxLe
 /* Sends a buffer to a given serial port.
  *   pbtTx: A pointer to a buffer containing the data to send.
  *   szTxLen: The amount of data to be sent.
+ *
+ * Returns TRUE if all data could be sent within 30ms.
  */
 extern bool uart_send(const serial_port sp, const uint8_t* pbtTx, const size_t szTxLen);
 
@@ -99,5 +101,5 @@ bool uart_set_speed(serial_port sp, const uint32_t uiPortSpeed);
  */
 extern uint32_t uart_get_speed(const serial_port sp);
 
-#endif // _PM3_UART_H_
+#endif // PM3_UART_H__
 

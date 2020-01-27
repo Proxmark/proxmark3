@@ -52,6 +52,8 @@
 #include <sys/socket.h>
 #include <netinet/tcp.h>
 #include <netdb.h>
+#include <sys/time.h>
+#include <errno.h>
 
 // Fix missing definition on OS X.
 // Taken from https://github.com/unbit/uwsgi/commit/b608eb1772641d525bfde268fe9d6d8d0d5efde7
@@ -75,8 +77,8 @@ static struct timeval timeout = {
 
 void uart_close(const serial_port sp) {
 	serial_port_unix* spu = (serial_port_unix*)sp;
-	tcflush(spu->fd,TCIOFLUSH);
-	tcsetattr(spu->fd,TCSANOW,&(spu->tiOld));
+	tcflush(spu->fd, TCIOFLUSH);
+	tcsetattr(spu->fd, TCSANOW, &(spu->tiOld));
 	struct flock fl;
 	fl.l_type   = F_UNLCK;
 	fl.l_whence = SEEK_SET;
@@ -174,7 +176,7 @@ serial_port uart_open(const char* pcPortName) {
 	}
 
 	// Try to retrieve the old (current) terminal info struct
-	if(tcgetattr(sp->fd,&sp->tiOld) == -1) {
+	if (tcgetattr(sp->fd,&sp->tiOld) == -1) {
 		uart_close(sp);
 		return INVALID_SERIAL_PORT;
 	}
@@ -183,18 +185,16 @@ serial_port uart_open(const char* pcPortName) {
 	sp->tiNew = sp->tiOld;
 
 	// Configure the serial port
-	sp->tiNew.c_cflag = CS8 | CLOCAL | CREAD;
-	sp->tiNew.c_iflag = IGNPAR;
-	sp->tiNew.c_oflag = 0;
-	sp->tiNew.c_lflag = 0;
+	sp->tiNew.c_cflag &= ~(CSIZE | PARENB);
+	sp->tiNew.c_cflag |= (CS8 | CLOCAL | CREAD);
+	sp->tiNew.c_iflag &= ~(IGNBRK | BRKINT | PARMRK | ISTRIP | INLCR | IGNCR | ICRNL | IXON);
+	sp->tiNew.c_iflag |= IGNPAR;
+	sp->tiNew.c_oflag &= ~OPOST;
+	sp->tiNew.c_lflag &= ~(ECHO | ECHONL | ICANON | ISIG | IEXTEN);
 
-	// Block until n bytes are received
-	sp->tiNew.c_cc[VMIN] = 0;
-	// Block until a timer expires (n * 100 mSec.)
-	sp->tiNew.c_cc[VTIME] = 0;
 
 	// Try to set the new terminal info struct
-	if(tcsetattr(sp->fd,TCSANOW,&sp->tiNew) == -1) {
+	if (tcsetattr(sp->fd, TCSANOW, &sp->tiNew) == -1) {
 		uart_close(sp);
 		return INVALID_SERIAL_PORT;
 	}
@@ -206,94 +206,75 @@ serial_port uart_open(const char* pcPortName) {
 }
 
 
-bool uart_receive(const serial_port sp, uint8_t* pbtRx, size_t pszMaxRxLen, size_t* pszRxLen) {
-	int byteCount;
-	fd_set rfds;
-	struct timeval tv;
+bool uart_receive(const serial_port sp, uint8_t* pbtRx, size_t szMaxRxLen, size_t* pszRxLen) {
 
-	// Reset the output count
 	*pszRxLen = 0;
 
-	do {
-		// Reset file descriptor
+	if (szMaxRxLen == 0) return true;
+
+	struct timeval t_current;
+	gettimeofday(&t_current, NULL);
+	struct timeval t_end;
+	timeradd(&t_current, &timeout, &t_end);
+
+	while (true) {
+		int res = read(((serial_port_unix*)sp)->fd, pbtRx, szMaxRxLen - *pszRxLen);
+		if (res < 0 && errno != EAGAIN && errno != EWOULDBLOCK) return false;
+		if (res > 0) {
+			*pszRxLen += res;
+			pbtRx += res;
+		}
+		if (*pszRxLen == szMaxRxLen) return true; // we could read all requested bytes in time
+		gettimeofday(&t_current, NULL);
+		if (timercmp(&t_current, &t_end, >)) return true; // timeout
+		// set next select timeout
+		struct timeval t_remains;
+		timersub(&t_end, &t_current, &t_remains);
+		// Set the file descriptor set
+		fd_set rfds;
 		FD_ZERO(&rfds);
-		FD_SET(((serial_port_unix*)sp)->fd,&rfds);
-		tv = timeout;
-		int res = select(((serial_port_unix*)sp)->fd+1, &rfds, NULL, NULL, &tv);
-
-		// Read error
-		if (res < 0) {
-			return false;
-		}
-
-		// Read time-out
-		if (res == 0) {
-			if (*pszRxLen == 0) {
-				// Error, we received no data
-				return false;
-			} else {
-				// We received some data, but nothing more is available
-				return true;
-			}
-		}
-
-		// Retrieve the count of the incoming bytes
-		res = ioctl(((serial_port_unix*)sp)->fd, FIONREAD, &byteCount);
+		FD_SET(((serial_port_unix*)sp)->fd, &rfds);
+		// wait for more bytes available
+		res = select(((serial_port_unix*)sp)->fd+1, &rfds, NULL, NULL, &t_remains);
 		if (res < 0) return false;
-
-		// Cap the number of bytes, so we don't overrun the buffer
-		if (pszMaxRxLen - (*pszRxLen) < byteCount) {
-			byteCount = pszMaxRxLen - (*pszRxLen);
-		}
-
-		// There is something available, read the data
-		res = read(((serial_port_unix*)sp)->fd, pbtRx+(*pszRxLen), byteCount);
-
-		// Stop if the OS has some troubles reading the data
-		if (res <= 0) return false;
-
-		*pszRxLen += res;
-
-		if (*pszRxLen == pszMaxRxLen) {
-			// We have all the data we wanted.
-			return true;
-		}
-
-	} while (byteCount);
-
-	return true;
+		if (res == 0) return true; // timeout
+	}
+	return true; // should never come here
 }
 
 
 bool uart_send(const serial_port sp, const uint8_t* pbtTx, const size_t szTxLen) {
-	size_t szPos = 0;
-	fd_set rfds;
-	struct timeval tv;
 
-	while (szPos < szTxLen) {
-		// Reset file descriptor
-		FD_ZERO(&rfds);
-		FD_SET(((serial_port_unix*)sp)->fd,&rfds);
-		tv = timeout;
-		int res = select(((serial_port_unix*)sp)->fd+1, NULL, &rfds, NULL, &tv);
+	if (szTxLen == 0) return true;
 
-		// Write error
-		if (res < 0) {
-			return false;
+	size_t bytes_written = 0;
+
+	struct timeval t_current;
+	gettimeofday(&t_current, NULL);
+	struct timeval t_end;
+	timeradd(&t_current, &timeout, &t_end);
+
+	while (true) {
+		int res = write(((serial_port_unix*)sp)->fd, pbtTx, szTxLen - bytes_written);
+		if (res < 0 && res != EAGAIN && res != EWOULDBLOCK) return false;
+		if (res > 0) {
+			pbtTx += res;
+			bytes_written += res;
 		}
-
-		// Write time-out
-		if (res == 0) {
-			return false;
-		}
-
-		// Send away the bytes
-		res = write(((serial_port_unix*)sp)->fd, pbtTx+szPos, szTxLen-szPos);
-
-		// Stop if the OS has some troubles sending the data
-		if (res <= 0) return false;
-
-		szPos += res;
+		if (bytes_written == szTxLen) return true; // we could write all bytes
+		gettimeofday(&t_current, NULL);
+		if (timercmp(&t_current, &t_end, >)) return false; // timeout
+		// set next select timeout
+		struct timeval t_remains;
+		timersub(&t_end, &t_current, &t_remains);
+		// Set the file descriptor set
+		fd_set wfds;
+		FD_ZERO(&wfds);
+		FD_SET(((serial_port_unix*)sp)->fd, &wfds);
+		// wait until more bytes can be written
+		res = select(((serial_port_unix*)sp)->fd+1, NULL, &wfds, NULL, &t_remains);
+		if (res < 0) return false;  // error
+		if (res == 0) return false; // timeout
 	}
 	return true;
 }

@@ -311,6 +311,7 @@ void set_hw_capabilities(void) {
 
 
 void SendVersion(void) {
+	LED_A_ON();
 	set_hw_capabilities();
 
 	char temp[USB_CMD_DATA_SIZE]; /* Limited data payload in USB packets */
@@ -347,6 +348,7 @@ void SendVersion(void) {
 	uint32_t text_and_rodata_section_size = (uint32_t)&__data_src_start__ - (uint32_t)&_flash_start;
 	uint32_t compressed_data_section_size = common_area.arg1;
 	cmd_send(CMD_ACK, *(AT91C_DBGU_CIDR), text_and_rodata_section_size + compressed_data_section_size, hw_capabilities, VersionString, strlen(VersionString) + 1);
+	LED_A_OFF();
 }
 
 // measure the USB Speed by sending SpeedTestBufferSize bytes to client and measuring the elapsed time.
@@ -362,13 +364,11 @@ void printUSBSpeed(void) {
 	uint32_t start_time = end_time = GetTickCount();
 	uint32_t bytes_transferred = 0;
 
-	LED_B_ON();
-	while(end_time < start_time + USB_SPEED_TEST_MIN_TIME) {
+	while (end_time < start_time + USB_SPEED_TEST_MIN_TIME) {
 		cmd_send(CMD_DOWNLOADED_RAW_ADC_SAMPLES_125K, 0, USB_CMD_DATA_SIZE, 0, test_data, USB_CMD_DATA_SIZE);
 		end_time = GetTickCount();
 		bytes_transferred += USB_CMD_DATA_SIZE;
 	}
-	LED_B_OFF();
 
 	Dbprintf("  Time elapsed:      %dms", end_time - start_time);
 	Dbprintf("  Bytes transferred: %d", bytes_transferred);
@@ -381,6 +381,7 @@ void printUSBSpeed(void) {
   * Prints runtime information about the PM3.
 **/
 void SendStatus(void) {
+	LED_A_ON();
 	BigBuf_print_status();
 	Fpga_print_status();
 #ifdef WITH_SMARTCARD
@@ -393,7 +394,8 @@ void SendStatus(void) {
 	Dbprintf("  ToSendMax..........%d", ToSendMax);
 	Dbprintf("  ToSendBit..........%d", ToSendBit);
 
-	cmd_send(CMD_ACK,1,0,0,0,0);
+	cmd_send(CMD_ACK, 1, 0, 0, 0, 0);
+	LED_A_OFF();
 }
 
 #if defined(WITH_ISO14443a_StandAlone) || defined(WITH_LF_StandAlone)
@@ -1334,9 +1336,11 @@ void UsbPacketReceived(UsbCommand *c) {
 			break;
 
 		case CMD_FPGA_MAJOR_MODE_OFF:       // ## FPGA Control
+			LED_A_ON();
 			FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
 			SpinDelay(200);
 			LED_D_OFF(); // LED D indicates field ON or OFF
+			LED_A_OFF();
 			break;
 
 		case CMD_DOWNLOAD_RAW_ADC_SAMPLES_125K:
