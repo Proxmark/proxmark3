@@ -16,6 +16,7 @@
 #include <string.h>
 #include <pthread.h>
 #include <inttypes.h>
+#include <time.h>
 
 #include "uart.h"
 #include "ui.h"
@@ -57,6 +58,7 @@ static int cmd_tail = 0;
 
 // to lock rxBuffer operations from different threads
 static pthread_mutex_t rxBufferMutex = PTHREAD_MUTEX_INITIALIZER;
+static pthread_cond_t rxBufferSig = PTHREAD_COND_INITIALIZER;
 
 // These wrappers are required because it is not possible to access a static
 // global variable outside of the context of a single file.
@@ -127,6 +129,7 @@ static void storeCommand(UsbCommand *command) {
 	memcpy(destination, command, sizeof(UsbCommand));
 
 	cmd_head = (cmd_head + 1) % CMD_BUFFER_SIZE; //increment head and wrap
+	pthread_cond_signal(&rxBufferSig); // tell main thread that a new command can be retreived
 	pthread_mutex_unlock(&rxBufferMutex);
 }
 
@@ -134,12 +137,24 @@ static void storeCommand(UsbCommand *command) {
 /**
  * @brief getCommand gets a command from an internal circular buffer.
  * @param response location to write command
- * @return 1 if response was returned, 0 if nothing has been received
+ * @return 1 if response was returned, 0 if nothing has been received in time
  */
-static int getCommand(UsbCommand* response) {
+static int getCommand(UsbCommand* response, uint32_t ms_timeout) {
+
+	struct timespec end_time;
+	clock_gettime(CLOCK_REALTIME, &end_time);
+	end_time.tv_sec += ms_timeout / 1000;
+	end_time.tv_nsec += (ms_timeout % 1000) * 1000000;
+	if (end_time.tv_nsec > 1000000000) {
+		end_time.tv_nsec -= 1000000000;
+		end_time.tv_sec += 1;
+	}
 	pthread_mutex_lock(&rxBufferMutex);
-	// If head == tail, there's nothing to read
-	if (cmd_head == cmd_tail) {
+	int res = 0;
+	while (cmd_head == cmd_tail && !res) {
+		res = pthread_cond_timedwait(&rxBufferSig, &rxBufferMutex, &end_time);
+	}
+	if (res) { // timeout
 		pthread_mutex_unlock(&rxBufferMutex);
 		return 0;
 	}
@@ -187,7 +202,7 @@ static void UsbCommandReceived(UsbCommand *UC) {
 static bool receive_from_serial(serial_port sp, uint8_t *rx_buf, size_t len, size_t *received_len) {
 	size_t bytes_read = 0;
 	*received_len = 0;
-	// we eventually need to call uart_receive several times if it times out in the middle of a transfer
+	// we eventually need to call uart_receive several times because it may timeout in the middle of a transfer
 	while (uart_receive(sp, rx_buf + *received_len, len - *received_len, &bytes_read) && bytes_read && *received_len < len) {
 		#ifdef COMMS_DEBUG
 		if (bytes_read != len - *received_len) {
@@ -299,10 +314,12 @@ __attribute__((force_align_arg_pointer))
  * @return true if command was returned, otherwise false
  */
 bool GetFromBigBuf(uint8_t *dest, int bytes, int start_index, UsbCommand *response, size_t ms_timeout, bool show_warning) {
-	UsbCommand c = {CMD_DOWNLOAD_RAW_ADC_SAMPLES_125K, {start_index, bytes, 0}};
-	SendCommand(&c);
 
 	uint64_t start_time = msclock();
+	uint32_t poll_time = 100; // loop every 100ms
+
+	UsbCommand c = {CMD_DOWNLOAD_RAW_ADC_SAMPLES_125K, {start_index, bytes, 0}};
+	SendCommand(&c);
 
 	UsbCommand resp;
 	if (response == NULL) {
@@ -311,7 +328,16 @@ bool GetFromBigBuf(uint8_t *dest, int bytes, int start_index, UsbCommand *respon
 
 	int bytes_completed = 0;
 	while (true) {
-		if (getCommand(response)) {
+		if (msclock() - start_time > ms_timeout) {
+			break; // timeout
+		}
+		if (msclock() - start_time > 2000 && show_warning) {
+			// 2 seconds elapsed (but this doesn't mean the timeout was exceeded)
+			PrintAndLog("Waiting for a response from the proxmark...");
+			PrintAndLog("You can cancel this operation by pressing the pm3 button");
+			show_warning = false;
+		}
+		if (getCommand(response, poll_time)) {
 			if (response->cmd == CMD_DOWNLOADED_RAW_ADC_SAMPLES_125K) {
 				int copy_bytes = MIN(bytes - bytes_completed, response->arg[1]);
 				memcpy(dest + response->arg[0], response->d.asBytes, copy_bytes);
@@ -320,16 +346,6 @@ bool GetFromBigBuf(uint8_t *dest, int bytes, int start_index, UsbCommand *respon
 				return true;
 			}
 		}
-
-		if (msclock() - start_time > ms_timeout) {
-			break;
-		}
-
-		if (msclock() - start_time > 2000 && show_warning) {
-			PrintAndLog("Waiting for a response from the proxmark...");
-			PrintAndLog("You can cancel this operation by pressing the pm3 button");
-			show_warning = false;
-		}
 	}
 
 	return false;
@@ -337,17 +353,24 @@ bool GetFromBigBuf(uint8_t *dest, int bytes, int start_index, UsbCommand *respon
 
 
 bool GetFromFpgaRAM(uint8_t *dest, int bytes) {
-	UsbCommand c = {CMD_HF_PLOT, {0, 0, 0}};
-	SendCommand(&c);
 
 	uint64_t start_time = msclock();
+	uint32_t poll_time = 100; // loop every 100ms
+
+	UsbCommand c = {CMD_HF_PLOT, {0, 0, 0}};
+	SendCommand(&c);
 
 	UsbCommand response;
 
 	int bytes_completed = 0;
 	bool show_warning = true;
 	while (true) {
-		if (getCommand(&response)) {
+		if (msclock() - start_time > 2000 && show_warning) {
+			PrintAndLog("Waiting for a response from the proxmark...");
+			PrintAndLog("You can cancel this operation by pressing the pm3 button");
+			show_warning = false;
+		}
+		if (getCommand(&response, poll_time)) {
 			if (response.cmd == CMD_DOWNLOADED_RAW_ADC_SAMPLES_125K) {
 				int copy_bytes = MIN(bytes - bytes_completed, response.arg[1]);
 				memcpy(dest + response.arg[0], response.d.asBytes, copy_bytes);
@@ -355,12 +378,6 @@ bool GetFromFpgaRAM(uint8_t *dest, int bytes) {
 			} else if (response.cmd == CMD_ACK) {
 				return true;
 			}
-		}
-
-		if (msclock() - start_time > 2000 && show_warning) {
-			PrintAndLog("Waiting for a response from the proxmark...");
-			PrintAndLog("You can cancel this operation by pressing the pm3 button");
-			show_warning = false;
 		}
 	}
 
@@ -454,31 +471,30 @@ bool WaitForResponseTimeoutW(uint32_t cmd, UsbCommand* response, size_t ms_timeo
 	printf("Waiting for %04x cmd\n", cmd);
 	#endif
 
+	uint64_t start_time = msclock();
+	uint64_t end_time = start_time + ms_timeout;
+
 	if (response == NULL) {
 		response = &resp;
 	}
 
-	uint64_t start_time = msclock();
-
 	// Wait until the command is received
 	while (true) {
-		while (getCommand(response)) {
-			if (cmd == CMD_UNKNOWN || response->cmd == cmd) {
-				return true;
-			}
+		int32_t remaining_time = end_time - msclock();
+		if (remaining_time <= 0) {
+			break; // timeout
 		}
-
-		if (msclock() - start_time > ms_timeout) {
-			break;
-		}
-
 		if (msclock() - start_time > 2000 && show_warning) {
 			// 2 seconds elapsed (but this doesn't mean the timeout was exceeded)
 			PrintAndLog("Waiting for a response from the proxmark...");
 			PrintAndLog("You can cancel this operation by pressing the pm3 button");
 			show_warning = false;
 		}
-		msleep(1);
+		if (getCommand(response, remaining_time)) {
+			if (cmd == CMD_UNKNOWN || response->cmd == cmd) {
+				return true;
+			}
+		}
 	}
 	return false;
 }
