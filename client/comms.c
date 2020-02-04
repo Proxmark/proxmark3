@@ -48,6 +48,8 @@ static pthread_cond_t txBufferSig = PTHREAD_COND_INITIALIZER;
 // Used by UsbReceiveCommand as a ring buffer for messages that are yet to be
 // processed by a command handler (WaitForResponse{,Timeout})
 #define CMD_BUFFER_SIZE 50
+#define CMD_BUFFER_CHECK_TIME 10 // maximum time (in ms) to wait in getCommand()
+
 static UsbCommand rxBuffer[CMD_BUFFER_SIZE];
 
 // Points to the next empty position to write to
@@ -316,7 +318,6 @@ __attribute__((force_align_arg_pointer))
 bool GetFromBigBuf(uint8_t *dest, int bytes, int start_index, UsbCommand *response, size_t ms_timeout, bool show_warning) {
 
 	uint64_t start_time = msclock();
-	uint32_t poll_time = 100; // loop every 100ms
 
 	UsbCommand c = {CMD_DOWNLOAD_RAW_ADC_SAMPLES_125K, {start_index, bytes, 0}};
 	SendCommand(&c);
@@ -337,7 +338,7 @@ bool GetFromBigBuf(uint8_t *dest, int bytes, int start_index, UsbCommand *respon
 			PrintAndLog("You can cancel this operation by pressing the pm3 button");
 			show_warning = false;
 		}
-		if (getCommand(response, poll_time)) {
+		if (getCommand(response, CMD_BUFFER_CHECK_TIME)) {
 			if (response->cmd == CMD_DOWNLOADED_RAW_ADC_SAMPLES_125K) {
 				int copy_bytes = MIN(bytes - bytes_completed, response->arg[1]);
 				memcpy(dest + response->arg[0], response->d.asBytes, copy_bytes);
@@ -355,7 +356,6 @@ bool GetFromBigBuf(uint8_t *dest, int bytes, int start_index, UsbCommand *respon
 bool GetFromFpgaRAM(uint8_t *dest, int bytes) {
 
 	uint64_t start_time = msclock();
-	uint32_t poll_time = 100; // loop every 100ms
 
 	UsbCommand c = {CMD_HF_PLOT, {0, 0, 0}};
 	SendCommand(&c);
@@ -370,7 +370,7 @@ bool GetFromFpgaRAM(uint8_t *dest, int bytes) {
 			PrintAndLog("You can cancel this operation by pressing the pm3 button");
 			show_warning = false;
 		}
-		if (getCommand(&response, poll_time)) {
+		if (getCommand(&response, CMD_BUFFER_CHECK_TIME)) {
 			if (response.cmd == CMD_DOWNLOADED_RAW_ADC_SAMPLES_125K) {
 				int copy_bytes = MIN(bytes - bytes_completed, response.arg[1]);
 				memcpy(dest + response.arg[0], response.d.asBytes, copy_bytes);
@@ -480,8 +480,7 @@ bool WaitForResponseTimeoutW(uint32_t cmd, UsbCommand* response, size_t ms_timeo
 
 	// Wait until the command is received
 	while (true) {
-		int32_t remaining_time = end_time - msclock();
-		if (remaining_time <= 0) {
+		if (msclock() > end_time) {
 			break; // timeout
 		}
 		if (msclock() - start_time > 2000 && show_warning) {
@@ -490,7 +489,7 @@ bool WaitForResponseTimeoutW(uint32_t cmd, UsbCommand* response, size_t ms_timeo
 			PrintAndLog("You can cancel this operation by pressing the pm3 button");
 			show_warning = false;
 		}
-		if (getCommand(response, remaining_time)) {
+		if (getCommand(response, CMD_BUFFER_CHECK_TIME)) {
 			if (cmd == CMD_UNKNOWN || response->cmd == cmd) {
 				return true;
 			}
