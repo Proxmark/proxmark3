@@ -14,7 +14,7 @@
 #include "BigBuf.h"
 #include "util.h"
 #include "apps.h"
-#include "usb_cdc.h"	// for usb_poll_validate_length
+#include "usb_cdc.h"
 #include "fpga.h"
 #include "fpgaloader.h"
 

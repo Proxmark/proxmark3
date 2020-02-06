@@ -18,7 +18,7 @@
 #include <stdint.h>
 
 #include "proxmark3.h"
-#include "cmd.h"
+#include "usb_cdc.h"
 #include "crapto1/crapto1.h"
 #include "iso14443a.h"
 #include "BigBuf.h"
@@ -111,11 +111,12 @@ void MifareReadBlock(uint8_t arg0, uint8_t arg1, uint8_t arg2, uint8_t *datain)
 
 	if (MF_DBGLEVEL >= 2)   DbpString("READ BLOCK FINISHED");
 
+	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
+
 	LED_B_ON();
 	cmd_send(CMD_ACK,isOK,0,0,dataoutbuf,16);
 	LED_B_OFF();
 
-	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
 	LEDsoff();
 }
 
@@ -202,9 +203,10 @@ void MifareUReadBlock(uint8_t arg0, uint8_t arg1, uint8_t *datain)
 		return;
 	}
 
-	cmd_send(CMD_ACK,1,0,0,dataout,16);
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
 	LED_D_OFF();
+
+	cmd_send(CMD_ACK,1,0,0,dataout,16);
 	LED_A_OFF();
 }
 
@@ -266,12 +268,13 @@ void MifareReadSector(uint8_t arg0, uint8_t arg1, uint8_t arg2, uint8_t *datain)
 
 	if (MF_DBGLEVEL >= 2) DbpString("READ SECTOR FINISHED");
 
+	// Thats it...
+	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
+
 	LED_B_ON();
 	cmd_send(CMD_ACK,isOK,0,0,dataoutbuf,16*NumBlocksPerSector(sectorNo));
 	LED_B_OFF();
 
-	// Thats it...
-	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
 	LEDsoff();
 }
 
@@ -362,10 +365,11 @@ void MifareUReadCard(uint8_t arg0, uint16_t arg1, uint8_t arg2, uint8_t *datain)
 
 	if (MF_DBGLEVEL >= MF_DBG_DEBUG) Dbprintf("Blocks read %d", countblocks);
 
-	cmd_send(CMD_ACK, 1, countblocks*4, BigBuf_max_traceLen(), 0, 0);
-
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
 	LED_D_OFF();
+
+	cmd_send(CMD_ACK, 1, countblocks*4, BigBuf_max_traceLen(), 0, 0);
+
 	BigBuf_free();
 	LED_A_OFF();
 }
@@ -431,13 +435,14 @@ void MifareWriteBlock(uint8_t arg0, uint8_t arg1, uint8_t arg2, uint8_t *datain)
 
 	if (MF_DBGLEVEL >= 2)   DbpString("WRITE BLOCK FINISHED");
 
+	// Thats it...
+	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
+
 	LED_B_ON();
 	cmd_send(CMD_ACK,isOK,0,0,0,0);
 	LED_B_OFF();
 
 
-	// Thats it...
-	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
 	LEDsoff();
 }
 
@@ -475,8 +480,9 @@ void MifareUWriteBlockCompat(uint8_t arg0, uint8_t *datain)
 
 	if (MF_DBGLEVEL >= 2)   DbpString("WRITE BLOCK FINISHED");
 
-	cmd_send(CMD_ACK,1,0,0,0,0);
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
+
+	cmd_send(CMD_ACK,1,0,0,0,0);
 	LEDsoff();
 }
 */
@@ -544,8 +550,9 @@ void MifareUWriteBlock(uint8_t arg0, uint8_t arg1, uint8_t *datain)
 
 	if (MF_DBGLEVEL >= 2) DbpString("WRITE BLOCK FINISHED");
 
-	cmd_send(CMD_ACK,1,0,0,0,0);
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
+
+	cmd_send(CMD_ACK,1,0,0,0,0);
 	LEDsoff();
 }
 
@@ -613,8 +620,9 @@ void MifareUSetPwd(uint8_t arg0, uint8_t *datain){
 		return;
 	};
 
-	cmd_send(CMD_ACK,1,0,0,0,0);
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
+
+	cmd_send(CMD_ACK,1,0,0,0,0);
 	LEDsoff();
 }
 
@@ -743,16 +751,17 @@ void MifareAcquireEncryptedNonces(uint32_t arg0, uint32_t arg1, uint32_t flags, 
 
 	crypto1_destroy(pcs);
 
+	if (field_off) {
+		FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
+		LEDsoff();
+	}
+
 	LED_B_ON();
 	cmd_send(CMD_ACK, isOK, cuid, num_nonces, buf, sizeof(buf));
 	LED_B_OFF();
 
 	if (MF_DBGLEVEL >= 3)   DbpString("AcquireEncryptedNonces finished");
 
-	if (field_off) {
-		FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
-		LEDsoff();
-	}
 }
 
 
@@ -978,13 +987,14 @@ void MifareNested(uint32_t arg0, uint32_t arg1, uint32_t calibrate, uint8_t *dat
 	memcpy(buf+16, &target_ks[1], 4);
 	memcpy(buf+20, &authentication_timeout, 4);
 
+	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
+
+	if (MF_DBGLEVEL >= 3)   DbpString("NESTED FINISHED");
+
 	LED_B_ON();
 	cmd_send(CMD_ACK, isOK, 0, targetBlockNo + (targetKeyType * 0x100), buf, sizeof(buf));
 	LED_B_OFF();
 
-	if (MF_DBGLEVEL >= 3)   DbpString("NESTED FINISHED");
-
-	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
 	LEDsoff();
 }
 
@@ -1352,13 +1362,14 @@ void MifareCWipe(uint32_t arg0, uint32_t arg1, uint32_t arg2, uint8_t *datain){
 		break;
 	}
 
+	// reset fpga
+	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
+
 	// send USB response
 	LED_B_ON();
 	cmd_send(CMD_ACK,isOK,0,0,NULL,0);
 	LED_B_OFF();
 
-	// reset fpga
-	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
 	LEDsoff();
 
 	return;
@@ -1490,14 +1501,15 @@ void MifareCSetBlock(uint32_t arg0, uint32_t arg1, uint32_t arg2, uint8_t *datai
 		break;
 	}
 
+	if ((workFlags & 0x10) || (!isOK)) {
+		FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
+	}
+
 	LED_B_ON();
 	cmd_send(CMD_ACK,isOK,0,0,uid,4);
 	LED_B_OFF();
 
-	if ((workFlags & 0x10) || (!isOK)) {
-		FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
-		LEDsoff();
-	}
+	LEDsoff();
 }
 
 
@@ -1574,6 +1586,10 @@ void MifareCGetBlock(uint32_t arg0, uint32_t arg1, uint32_t arg2, uint8_t *datai
 		break;
 	}
 
+	if ((workFlags & 0x10) || (!isOK)) {
+		FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
+	}
+
 	LED_B_ON();
 	if (workFlags & 0x20) {
 		if (isOK)
@@ -1583,10 +1599,7 @@ void MifareCGetBlock(uint32_t arg0, uint32_t arg1, uint32_t arg2, uint8_t *datai
 		cmd_send(CMD_ACK,isOK,0,0,data,18);
 	LED_B_OFF();
 
-	if ((workFlags & 0x10) || (!isOK)) {
-		FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
-		LEDsoff();
-	}
+	LEDsoff();
 }
 
 void MifareCIdent(){
@@ -1622,11 +1635,12 @@ void MifareCIdent(){
 	// From iceman1001: removed the if,  since some magic tags misbehavies and send an answer to it.
 	mifare_classic_halt(NULL, 0);
 
+	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
+
 	LED_B_ON();
 	cmd_send(CMD_ACK,isOK,0,0,0,0);
 	LED_B_OFF();
 
-	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
 	LEDsoff();
 }
 
@@ -1657,7 +1671,8 @@ void Mifare_DES_Auth1(uint8_t arg0, uint8_t *datain){
 	}
 
 	if (MF_DBGLEVEL >= MF_DBG_EXTENDED) DbpString("AUTH 1 FINISHED");
-	cmd_send(CMD_ACK,1,cuid,0,dataout, sizeof(dataout));
+
+	cmd_send(CMD_ACK, 1, cuid, 0, dataout, sizeof(dataout));
 }
 
 void Mifare_DES_Auth2(uint32_t arg0, uint8_t *datain){
@@ -1671,16 +1686,17 @@ void Mifare_DES_Auth2(uint32_t arg0, uint8_t *datain){
 
 	isOK = mifare_desfire_des_auth2(cuid, key, dataout);
 
-	if( isOK) {
+	if (isOK) {
 		if (MF_DBGLEVEL >= MF_DBG_EXTENDED) Dbprintf("Authentication part2: Failed");
 		OnError(4);
 		return;
 	}
 
+	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
+
 	if (MF_DBGLEVEL >= MF_DBG_EXTENDED) DbpString("AUTH 2 FINISHED");
 
 	cmd_send(CMD_ACK, isOK, 0, 0, dataout, sizeof(dataout));
-	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
 	LEDsoff();
 }
 

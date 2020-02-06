@@ -19,7 +19,7 @@
 #include "hitag2.h"
 
 #include "proxmark3.h"
-#include "cmd.h"
+#include "usb_cdc.h"
 #include "apps.h"
 #include "util.h"
 #include "hitag.h"

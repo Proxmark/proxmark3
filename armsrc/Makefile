@@ -50,8 +50,7 @@ THUMBSRC = start.c \
 	printf.c \
 	util.c \
 	string.c \
-	usb_cdc.c \
-	cmd.c
+	usb_cdc.c
 
 # Compile these in thumb mode optimized for speed (still smaller than ARM mode)
 THUMBOPTSRC = $(SRC_ISO15693)

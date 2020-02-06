@@ -29,24 +29,21 @@
  * @file uart.h
  */
 
-#ifndef _PM3_UART_H_
-#define _PM3_UART_H_
+#ifndef PM3_UART_H__
+#define PM3_UART_H__
 
-#include <stdio.h>
-#include <string.h>
 #include <stdlib.h>
-
 #include <stdint.h>
 #include <stdbool.h>
 
 /* Used to substitute for an example serial port path on each platform.
  */
 #ifdef _WIN32
-#define SERIAL_PORT_H	"com3"
+#define SERIAL_PORT_H   "com3"
 #elif __APPLE__
-#define SERIAL_PORT_H	"/dev/tty.usbmodem*"
+#define SERIAL_PORT_H   "/dev/tty.usbmodem*"
 #else
-#define SERIAL_PORT_H	"/dev/ttyACM0"
+#define SERIAL_PORT_H   "/dev/ttyACM0"
 #endif
 
 /* serial_port is declared as a void*, which you should cast to whatever type
@@ -69,11 +66,11 @@ typedef void* serial_port;
  *
  * On errors, this method returns INVALID_SERIAL_PORT or CLAIMED_SERIAL_PORT.
  */
-serial_port uart_open(const char* pcPortName);
+extern serial_port uart_open(const char* pcPortName);
 
 /* Closes the given port.
  */
-void uart_close(const serial_port sp);
+extern void uart_close(const serial_port sp);
 
 /* Reads from the given serial port for up to 30ms.
  *   pbtRx: A pointer to a buffer for the returned data to be written to.
@@ -84,15 +81,17 @@ void uart_close(const serial_port sp);
  *
  * Returns FALSE if there was an error reading from the device. Note that a
  * partial read may have completed into the buffer by the corresponding
- * implementation, so pszRxLen should be checked to see if any data was written. 
+ * implementation, so pszRxLen should be checked to see if any data was written.
  */
-bool uart_receive(const serial_port sp, uint8_t* pbtRx, size_t pszMaxRxLen, size_t* pszRxLen);
+extern bool uart_receive(const serial_port sp, uint8_t* pbtRx, size_t pszMaxRxLen, size_t* pszRxLen);
 
 /* Sends a buffer to a given serial port.
  *   pbtTx: A pointer to a buffer containing the data to send.
  *   szTxLen: The amount of data to be sent.
+ *
+ * Returns TRUE if all data could be sent within 30ms.
  */
-bool uart_send(const serial_port sp, const uint8_t* pbtTx, const size_t szTxLen);
+extern bool uart_send(const serial_port sp, const uint8_t* pbtTx, const size_t szTxLen);
 
 /* Sets the current speed of the serial port, in baud.
  */
@@ -100,7 +99,7 @@ bool uart_set_speed(serial_port sp, const uint32_t uiPortSpeed);
 
 /* Gets the current speed of the serial port, in baud.
  */
-uint32_t uart_get_speed(const serial_port sp);
+extern uint32_t uart_get_speed(const serial_port sp);
 
-#endif // _PM3_UART_H_
+#endif // PM3_UART_H__
 

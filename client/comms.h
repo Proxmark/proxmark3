@@ -9,32 +9,24 @@
 // Code for communicating with the proxmark3 hardware.
 //-----------------------------------------------------------------------------
 
-#ifndef COMMS_H_
-#define COMMS_H_
+#ifndef COMMS_H__
+#define COMMS_H__
 
+#include <stddef.h>
+#include <stdint.h>
 #include <stdbool.h>
-#include <pthread.h>
-
 #include "usb_cmd.h"
-#include "uart.h"
 
-#ifndef CMD_BUFFER_SIZE
-#define CMD_BUFFER_SIZE 50
-#endif
+extern void SetOffline(bool new_offline);
+extern bool IsOffline();
+extern bool OpenProxmark(void *port, bool wait_for_port, int timeout);
+extern void CloseProxmark(void);
+extern void SendCommand(UsbCommand *c);
+extern void clearCommandBuffer();
+extern bool WaitForResponseTimeoutW(uint32_t cmd, UsbCommand* response, size_t ms_timeout, bool show_warning);
+extern bool WaitForResponseTimeout(uint32_t cmd, UsbCommand* response, size_t ms_timeout);
+extern bool WaitForResponse(uint32_t cmd, UsbCommand* response);
+extern bool GetFromBigBuf(uint8_t *dest, int bytes, int start_index, UsbCommand *response, size_t ms_timeout, bool show_warning);
+extern bool GetFromFpgaRAM(uint8_t *dest, int bytes);
 
-void SetOffline(bool new_offline);
-bool IsOffline();
-
-bool OpenProxmark(void *port, bool wait_for_port, int timeout, bool flash_mode);
-void CloseProxmark(void);
-
-void SendCommand(UsbCommand *c);
-
-void clearCommandBuffer();
-bool WaitForResponseTimeoutW(uint32_t cmd, UsbCommand* response, size_t ms_timeout, bool show_warning);
-bool WaitForResponseTimeout(uint32_t cmd, UsbCommand* response, size_t ms_timeout);
-bool WaitForResponse(uint32_t cmd, UsbCommand* response);
-bool GetFromBigBuf(uint8_t *dest, int bytes, int start_index, UsbCommand *response, size_t ms_timeout, bool show_warning);
-bool GetFromFpgaRAM(uint8_t *dest, int bytes);
-
-#endif // COMMS_H_
+#endif // COMMS_H__

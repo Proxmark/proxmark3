@@ -9,13 +9,9 @@
 // Interlib Definitions
 //-----------------------------------------------------------------------------
 
-#ifndef __COMMON_H
-#define __COMMON_H
+#ifndef COMMON_H__
+#define COMMON_H__
 
-#include <stddef.h>
-#include <stdint.h>
-#include <stdbool.h>
-#include <at91sam7s512.h>
 typedef unsigned char byte_t;
 
 #ifndef MIN
@@ -25,9 +21,8 @@ typedef unsigned char byte_t;
 # define MAX(a, b) (((a) > (b)) ? (a) : (b))
 #endif
 #ifndef ABS
-# define ABS(a) ( ((a)<0) ? -(a) : (a) )
+# define ABS(a) (((a) < 0) ? -(a) : (a))
 #endif
-
 
 #define RAMFUNC __attribute((long_call, section(".ramfunc")))
 

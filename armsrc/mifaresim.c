@@ -20,7 +20,6 @@
 #include "fpgaloader.h"
 #include "proxmark3.h"
 #include "usb_cdc.h"
-#include "cmd.h"
 #include "protocols.h"
 #include "apps.h"
 
