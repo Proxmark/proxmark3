@@ -472,7 +472,6 @@ bool WaitForResponseTimeoutW(uint32_t cmd, UsbCommand* response, size_t ms_timeo
 	#endif
 
 	uint64_t start_time = msclock();
-	uint64_t end_time = start_time + ms_timeout;
 
 	if (response == NULL) {
 		response = &resp;
@@ -480,7 +479,7 @@ bool WaitForResponseTimeoutW(uint32_t cmd, UsbCommand* response, size_t ms_timeo
 
 	// Wait until the command is received
 	while (true) {
-		if (msclock() > end_time) {
+		if (ms_timeout != -1 && msclock() > start_time + ms_timeout) {
 			break; // timeout
 		}
 		if (msclock() - start_time > 2000 && show_warning) {
