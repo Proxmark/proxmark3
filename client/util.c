@@ -49,7 +49,7 @@ int ukbhit(void)
 	error += tcsetattr(STDIN_FILENO, TCSANOW, &Otty);             // reset attributes
   }
 
-  return ( error == 0 ? cnt : -1 );
+  return cnt;
 }
 
 char getch(void)
