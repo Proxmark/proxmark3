@@ -18,7 +18,7 @@
 #include "crapto1/crapto1.h"
 #include "mifareutil.h"
 #include "common.h"
-#include "cmd.h"
+#include "usb_cdc.h"
 #include "BigBuf.h"
 #include "fpgaloader.h"
 
@@ -152,7 +152,7 @@ bool intMfSniffSend() {
 	while (pckLen > 0) {
 		pckSize = MIN(USB_CMD_DATA_SIZE, pckLen);
 		LED_B_ON();
-		cmd_send(CMD_ACK, 1, BigBuf_get_traceLen(), pckSize, trace + BigBuf_get_traceLen() - pckLen, pckSize);
+		cmd_send(CMD_DOWNLOADED_RAW_ADC_SAMPLES_125K, 1, BigBuf_get_traceLen(), pckSize, trace + BigBuf_get_traceLen() - pckLen, pckSize);
 		LED_B_OFF();
 
 		pckLen -= pckSize;
@@ -160,7 +160,7 @@ bool intMfSniffSend() {
 	}
 
 	LED_B_ON();
-	cmd_send(CMD_ACK,2,0,0,0,0);
+	cmd_send(CMD_DOWNLOADED_RAW_ADC_SAMPLES_125K,2,0,0,0,0);
 	LED_B_OFF();
 
 	clear_trace();

@@ -6,17 +6,15 @@
 // Main code for the bootloader
 //-----------------------------------------------------------------------------
 
-#include <proxmark3.h>
+#include "proxmark3.h"
 #include "usb_cdc.h"
-#include "cmd.h"
-//#include "usb_hid.h"
 
 void DbpString(char *str) {
-  byte_t len = 0;
+  uint8_t len = 0;
   while (str[len] != 0x00) {
     len++;
   }
-  cmd_send(CMD_DEBUG_PRINT_STRING,len,0,0,(byte_t*)str,len);
+  cmd_send_old(CMD_DEBUG_PRINT_STRING,len,0,0,(uint8_t*)str,len);
 }
 
 struct common_area common_area __attribute__((section(".commonarea")));
@@ -89,26 +87,22 @@ static void Fatal(void)
   for(;;);
 }
 
-void UsbPacketReceived(uint8_t *packet, int len) {
+void UsbPacketReceived(UsbCommand *c) {
   int i, dont_ack=0;
-  UsbCommand* c = (UsbCommand *)packet;
   volatile uint32_t *p;
-  
-  if(len != sizeof(UsbCommand)) {
-    Fatal();
-  }
   
   uint32_t arg0 = (uint32_t)c->arg[0];
   
   switch(c->cmd) {
     case CMD_DEVICE_INFO: {
       dont_ack = 1;
-      arg0 = DEVICE_INFO_FLAG_BOOTROM_PRESENT | DEVICE_INFO_FLAG_CURRENT_MODE_BOOTROM |
-      DEVICE_INFO_FLAG_UNDERSTANDS_START_FLASH;
+      arg0 = DEVICE_INFO_FLAG_BOOTROM_PRESENT 
+		| DEVICE_INFO_FLAG_CURRENT_MODE_BOOTROM
+		| DEVICE_INFO_FLAG_UNDERSTANDS_START_FLASH;
       if(common_area.flags.osimage_present) {
         arg0 |= DEVICE_INFO_FLAG_OSIMAGE_PRESENT;
       }
-      cmd_send(CMD_DEVICE_INFO,arg0,1,2,0,0);
+      cmd_send_old(CMD_DEVICE_INFO,arg0,1,2,0,0);
     } break;
       
     case CMD_SETUP_WRITE: {
@@ -134,7 +128,7 @@ void UsbPacketReceived(uint8_t *packet, int len) {
         if( ((flash_address+AT91C_IFLASH_PAGE_SIZE-1) >= end_addr) || (flash_address < start_addr) ) {
           /* Disallow write */
           dont_ack = 1;
-          cmd_send(CMD_NACK,0,0,0,0,0);
+          cmd_send_old(CMD_NACK,0,0,0,0,0);
         } else {
           uint32_t page_n = (flash_address - ((uint32_t)flash_mem)) / AT91C_IFLASH_PAGE_SIZE;
           /* Translate address to flash page and do flash, update here for the 512k part */
@@ -148,7 +142,7 @@ void UsbPacketReceived(uint8_t *packet, int len) {
         while(!((sr = AT91C_BASE_EFC0->EFC_FSR) & AT91C_MC_FRDY));
         if(sr & (AT91C_MC_LOCKE | AT91C_MC_PROGE)) {
           dont_ack = 1;
-          cmd_send(CMD_NACK,0,0,0,0,0);
+          cmd_send_old(CMD_NACK,0,0,0,0,0);
         }
       }
     } break;
@@ -179,7 +173,7 @@ void UsbPacketReceived(uint8_t *packet, int len) {
         } else {
           start_addr = end_addr = 0;
           dont_ack = 1;
-          cmd_send(CMD_NACK,0,0,0,0,0);
+          cmd_send_old(CMD_NACK,0,0,0,0,0);
         }
       }
     } break;
@@ -190,7 +184,7 @@ void UsbPacketReceived(uint8_t *packet, int len) {
   }
   
   if(!dont_ack) {
-    cmd_send(CMD_ACK,arg0,0,0,0,0);
+    cmd_send_old(CMD_ACK,arg0,0,0,0,0);
   }
 }
 
@@ -199,21 +193,17 @@ static void flash_mode(int externally_entered)
 	start_addr = 0;
 	end_addr = 0;
 	bootrom_unlocked = 0;
-  byte_t rx[sizeof(UsbCommand)];
-	size_t rx_len;
+    UsbCommand rx;
 
-  usb_enable();
-  for (volatile size_t i=0; i<0x100000; i++) {};
+	usb_enable();
+	for (volatile size_t i=0; i<0x100000; i++) {};
 
 	for(;;) {
 		WDT_HIT();
 
-    if (usb_poll()) {
-      rx_len = usb_read(rx,sizeof(UsbCommand));
-      if (rx_len) {
-        UsbPacketReceived(rx,rx_len);
-      }
-    }
+		if (cmd_receive(&rx)) {
+			UsbPacketReceived(&rx);
+		}
 
 		if(!externally_entered && !BUTTON_PRESS()) {
 			/* Perform a reset to leave flash mode */

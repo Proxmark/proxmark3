@@ -185,9 +185,9 @@ static int check_segs(flash_file_t *ctx, int can_write_bl) {
 	return 0;
 }
 
+
 // Load an ELF file and prepare it for flashing
-int flash_load(flash_file_t *ctx, const char *name, bool can_write_bl)
-{
+int flash_load(flash_file_t *ctx, const char *name, bool can_write_bl) {
 	FILE *fd = NULL;
 	Elf32_Ehdr ehdr;
 	Elf32_Phdr *phdrs = NULL;
@@ -267,9 +267,9 @@ fail:
 	return -1;
 }
 
+
 // Get the state of the proxmark, backwards compatible
-static int get_proxmark_state(uint32_t *state)
-{
+static int get_proxmark_state(uint32_t *state) {
 	UsbCommand c = {0};
 	c.cmd = CMD_DEVICE_INFO;
 	SendCommand(&c);
@@ -300,9 +300,9 @@ static int get_proxmark_state(uint32_t *state)
 	return 0;
 }
 
+
 // Enter the bootloader to be able to start flashing
-static int enter_bootloader(char *serial_port_name)
-{
+static int enter_bootloader(char *serial_port_name) {
 	uint32_t state;
 
 	if (get_proxmark_state(&state) < 0)
@@ -314,7 +314,7 @@ static int enter_bootloader(char *serial_port_name)
 	}
 
 	if (state & DEVICE_INFO_FLAG_CURRENT_MODE_OS) {
-		fprintf(stderr,"Entering bootloader...\n");
+		fprintf(stderr, "Entering bootloader...\n");
 		UsbCommand c;
 		memset(&c, 0, sizeof (c));
 
@@ -336,7 +336,9 @@ static int enter_bootloader(char *serial_port_name)
 		msleep(100);
 		CloseProxmark();
 
-		bool opened = OpenProxmark(serial_port_name, true, 120, true);   // wait for 2 minutes
+		msleep(1000); // wait for OS to detect device disconnect.
+
+		bool opened = OpenProxmark(serial_port_name, true, 120);   // wait for 2 minutes
 		if (opened) {
 			fprintf(stderr," Found.\n");
 			return 0;
@@ -350,6 +352,7 @@ static int enter_bootloader(char *serial_port_name)
 	return -1;
 }
 
+
 static int wait_for_ack(void)
 {
 	UsbCommand ack;
@@ -361,11 +364,11 @@ static int wait_for_ack(void)
 	return 0;
 }
 
+
 // Go into flashing mode
 int flash_start_flashing(int enable_bl_writes,char *serial_port_name)
 {
 	uint32_t state;
-
 	if (enter_bootloader(serial_port_name) < 0)
 		return -1;
 

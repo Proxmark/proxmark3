@@ -28,7 +28,7 @@
 #include "cmdhw.h"
 #include "whereami.h"
 #include "comms.h"
-
+#include "uart.h"
 
 void
 #ifdef __has_attribute
@@ -286,7 +286,7 @@ int main(int argc, char* argv[]) {
 	set_my_executable_path();
 
 	// try to open USB connection to Proxmark
-	usb_present = OpenProxmark(argv[1], waitCOMPort, 20, false);
+	usb_present = OpenProxmark(argv[1], waitCOMPort, 20);
 
 #ifdef HAVE_GUI
 #ifdef _WIN32
@@ -309,8 +309,10 @@ int main(int argc, char* argv[]) {
 	main_loop(script_cmds_file, script_cmd, usb_present);
 #endif	
 
-	// Clean up the port
+	// Switch off field and clean up the port
 	if (usb_present) {
+		UsbCommand c = {CMD_FPGA_MAJOR_MODE_OFF};
+		SendCommand(&c);
 		CloseProxmark();
 	}
 

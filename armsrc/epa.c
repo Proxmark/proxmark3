@@ -15,7 +15,7 @@
 #include "iso14443a.h"
 #include "iso14443b.h"
 #include "epa.h"
-#include "cmd.h"
+#include "usb_cdc.h"
 #include "fpgaloader.h"
 #include "string.h"
 #include "util.h"
@@ -453,20 +453,17 @@ int EPA_PACE_MSE_Set_AT(pace_version_info_t pace_version_info, uint8_t password)
 //-----------------------------------------------------------------------------
 // Perform the PACE protocol by replaying given APDUs
 //-----------------------------------------------------------------------------
-void EPA_PACE_Replay(UsbCommand *c)
-{
+void EPA_PACE_Replay(UsbCommand *c) {
 	uint32_t timings[sizeof(apdu_lengths_replay) / sizeof(apdu_lengths_replay[0])] = {0};
 
-	// if an APDU has been passed, save it
+	// if an APDU has been passed, just save it
 	if (c->arg[0] != 0) {
 		// make sure it's not too big
-		if(c->arg[2] > apdus_replay[c->arg[0] - 1].len)
-		{
+		if(c->arg[2] > apdus_replay[c->arg[0] - 1].len) {
 			cmd_send(CMD_ACK, 1, 0, 0, NULL, 0);
+			return;
 		}
-		memcpy(apdus_replay[c->arg[0] - 1].data + c->arg[1],
-	           c->d.asBytes,
-	           c->arg[2]);
+		memcpy(apdus_replay[c->arg[0] - 1].data + c->arg[1], c->d.asBytes, c->arg[2]);
 		// save/update APDU length
 		if (c->arg[1] == 0) {
 			apdu_lengths_replay[c->arg[0] - 1] = c->arg[2];

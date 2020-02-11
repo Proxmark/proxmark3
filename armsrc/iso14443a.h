@@ -13,6 +13,7 @@
 #ifndef __ISO14443A_H
 #define __ISO14443A_H
 
+#include <stddef.h>
 #include <stdint.h>
 #include <stdbool.h>
 #include "usb_cmd.h"
@@ -31,7 +32,7 @@ extern void GetParity(const uint8_t *pbtCmd, uint16_t len, uint8_t *par);
 extern void AppendCrc14443a(uint8_t *data, int len);
 
 extern void RAMFUNC SnoopIso14443a(uint8_t param);
-extern void SimulateIso14443aTag(int tagType, int uid_1st, int uid_2nd, byte_t *data);
+extern void SimulateIso14443aTag(int tagType, int uid_1st, int uid_2nd, uint8_t *data);
 extern void ReaderIso14443a(UsbCommand *c);
 extern void ReaderTransmit(uint8_t *frame, uint16_t len, uint32_t *timing);
 extern void ReaderTransmitBitsPar(uint8_t *frame, uint16_t bits, uint8_t *par, uint32_t *timing);

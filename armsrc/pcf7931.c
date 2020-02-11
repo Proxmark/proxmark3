@@ -1,5 +1,6 @@
 #include "proxmark3.h"
 #include "apps.h"
+#include "usb_cdc.h"
 #include "lfsampling.h"
 #include "pcf7931.h"
 #include "util.h"

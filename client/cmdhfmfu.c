@@ -12,6 +12,7 @@
 
 #include <stdint.h>
 #include <stdio.h>
+#include <string.h>
 #include "comms.h"
 #include "usb_cmd.h"
 #include "cmdmain.h"

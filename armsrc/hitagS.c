@@ -17,6 +17,7 @@
 #include <stdlib.h>
 #include "proxmark3.h"
 #include "apps.h"
+#include "usb_cdc.h"
 #include "util.h"
 #include "hitag.h"
 #include "string.h"
