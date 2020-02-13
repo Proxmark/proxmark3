@@ -542,7 +542,7 @@ int mfnested(uint8_t blockNo, uint8_t keyType, uint16_t timeout14a, uint8_t *key
 	if (statelists[0].nt == statelists[1].nt && statelists[0].ks1 == statelists[1].ks1) {
 		num_unique_nonces = 1;
 		memcpy(&fixed_nt, resp.d.asBytes + 24, 4);
-		PrintAndLog("Fixed nt detected: %08" PRIx32, fixed_nt);
+		PrintAndLog("Fixed nt detected: %08" PRIx32 " on first authentication, %08" PRIx32 " on nested authentication", fixed_nt, statelists[0].nt);
 	} else {
 		num_unique_nonces = 2;
 	}
