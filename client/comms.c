@@ -9,6 +9,8 @@
 // Code for communicating with the proxmark3 hardware.
 //-----------------------------------------------------------------------------
 
+#define _POSIX_C_SOURCE 199309L // need clock_gettime()
+
 #include "comms.h"
 
 #include <stdio.h>
@@ -145,14 +147,7 @@ static void storeCommand(UsbCommand *command) {
 static int getCommand(UsbCommand* response, uint32_t ms_timeout) {
 
 	struct timespec end_time;
-#if (_POSIX_TIMERS > 0)
 	clock_gettime(CLOCK_REALTIME, &end_time);
-#else
-	struct timeval tv;
-	gettimeofday(&tv, NULL);
-	end_time.tv_sec = tv.tv_sec;
-	end_time.tv_nsec = tv.tv_usec * 1000;
-#endif
 	end_time.tv_sec += ms_timeout / 1000;
 	end_time.tv_nsec += (ms_timeout % 1000) * 1000000;
 	if (end_time.tv_nsec > 1000000000) {
