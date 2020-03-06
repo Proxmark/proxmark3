@@ -538,7 +538,7 @@ int doIClassSimulation(int simulationMode, uint8_t *reader_mac_buf) {
 		if (modulated_response_size > 0) {
 			uint32_t response_time = reader_eof_time + DELAY_ICLASS_VCD_TO_VICC_SIM;
 			TransmitTo15693Reader(modulated_response, modulated_response_size, &response_time, 0, false);
-			LogTrace_ISO15693(trace_data, trace_data_size, response_time*32, response_time*32 + modulated_response_size/2, NULL, false);
+			LogTrace_ISO15693(trace_data, trace_data_size, response_time*32, response_time*32 + modulated_response_size*32*64, NULL, false);
 		}
 
 	}
@@ -566,16 +566,10 @@ void SimulateIClass(uint32_t arg0, uint32_t arg1, uint32_t arg2, uint8_t *datain
 
 	LED_A_ON();
 
+	Iso15693InitTag();
+	
 	uint32_t simType = arg0;
 	uint32_t numberOfCSNS = arg1;
-
-	// setup hardware for simulation:
-	FpgaDownloadAndGo(FPGA_BITSTREAM_HF);
-	SetAdcMuxFor(GPIO_MUXSEL_HIPKD);
-	FpgaWriteConfWord(FPGA_MAJOR_MODE_HF_SIMULATOR | FPGA_HF_SIMULATOR_NO_MODULATION);
-	LED_D_OFF();
-	FpgaSetupSsc(FPGA_MAJOR_MODE_HF_SIMULATOR);
-	StartCountSspClk();
 
 	// Enable and clear the trace
 	set_tracing(true);
@@ -589,9 +583,8 @@ void SimulateIClass(uint32_t arg0, uint32_t arg1, uint32_t arg2, uint8_t *datain
 		doIClassSimulation(ICLASS_SIM_MODE_CSN, NULL);
 	} else if (simType == ICLASS_SIM_MODE_CSN_DEFAULT) {
 		//Default CSN
-		uint8_t csn_crc[] = { 0x03, 0x1f, 0xec, 0x8a, 0xf7, 0xff, 0x12, 0xe0, 0x00, 0x00 };
-		// Use the CSN from commandline
-		memcpy(emulator, csn_crc, 8);
+		uint8_t csn[] = {0x03, 0x1f, 0xec, 0x8a, 0xf7, 0xff, 0x12, 0xe0};
+		memcpy(emulator, csn, 8);
 		doIClassSimulation(ICLASS_SIM_MODE_CSN, NULL);
 	} else if (simType == ICLASS_SIM_MODE_READER_ATTACK) {
 		uint8_t mac_responses[USB_CMD_DATA_SIZE] = { 0 };
@@ -636,9 +629,7 @@ void SimulateIClass(uint32_t arg0, uint32_t arg1, uint32_t arg2, uint8_t *datain
 static void ReaderTransmitIClass(uint8_t *frame, int len, uint32_t *start_time) {
 
 	CodeIso15693AsReader(frame, len);
-
 	TransmitTo15693Tag(ToSend, ToSendMax, start_time);
-
 	uint32_t end_time = *start_time + 32*(8*ToSendMax-4); // substract the 4 padding bits after EOF
 	LogTrace_ISO15693(frame, len, *start_time*4, end_time*4, NULL, true);
 }

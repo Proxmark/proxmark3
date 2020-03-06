@@ -1467,13 +1467,13 @@ void  __attribute__((noreturn)) AppMain(void) {
 
 	// Reset SPI
 	AT91C_BASE_SPI->SPI_CR = AT91C_SPI_SWRST;
+	AT91C_BASE_SPI->SPI_CR = AT91C_SPI_SWRST; // required twice on some AT91SAM Revisions (see Errata in AT91SAM datasheet)
 	// Reset SSC
 	AT91C_BASE_SSC->SSC_CR = AT91C_SSC_SWRST;
 
-	// Load the FPGA image, which we have stored in our flash.
-	// (the HF version by default)
+	// Load the FPGA image, which we have stored in our flash (HF version by default)
 	FpgaDownloadAndGo(FPGA_BITSTREAM_HF);
-
+	
 	StartTickCount();
 
 #ifdef WITH_LCD

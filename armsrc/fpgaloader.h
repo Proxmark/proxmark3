@@ -35,16 +35,17 @@ void SetAdcMuxFor(uint32_t whichGpio);
 #define FPGA_BITSTREAM_HF 2
 
 // Definitions for the FPGA commands.
+#define FPGA_CMD_MASK                               0xF000
 // BOTH
-#define FPGA_CMD_SET_CONFREG                        (1<<12)
+#define FPGA_CMD_SET_CONFREG                       (1<<12)
 // LF
-#define FPGA_CMD_SET_DIVISOR                        (2<<12)
-#define FPGA_CMD_SET_EDGE_DETECT_THRESHOLD          (3<<12)
-
+#define FPGA_CMD_SET_DIVISOR                       (2<<12)
+#define FPGA_CMD_SET_EDGE_DETECT_THRESHOLD         (3<<12)
 // HF
-#define FPGA_CMD_TRACE_ENABLE                       (2<<12)
+#define FPGA_CMD_TRACE_ENABLE                      (2<<12)
 
 // Definitions for the FPGA configuration word.
+#define FPGA_MAJOR_MODE_MASK                        0x01C0
 // LF
 #define FPGA_MAJOR_MODE_LF_ADC                      (0<<6)
 #define FPGA_MAJOR_MODE_LF_EDGE_DETECT              (1<<6)
@@ -58,6 +59,7 @@ void SetAdcMuxFor(uint32_t whichGpio);
 // BOTH
 #define FPGA_MAJOR_MODE_OFF                         (7<<6)
 
+#define FPGA_MINOR_MODE_MASK                        0x003F
 // Options for LF_ADC
 #define FPGA_LF_ADC_READER_FIELD                    (1<<0)
 

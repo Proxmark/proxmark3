@@ -83,8 +83,9 @@ all: $(OBJS)
 
 .DELETE_ON_ERROR:
 
-# version.c should be remade on every compilation
-.PHONY: version.c
+# version.c and fpga_version_info.c to be remade on every compilation
+.PHONY: version.c fpga_version_info.c
+
 version.c: default_version.c
 	perl ../tools/mkversion.pl .. > $@ || $(COPY) $^ $@ 
 
@@ -132,7 +133,7 @@ clean:
 	$(DELETE) $(OBJDIR)$(PATHSEP)*.d
 	$(DELETE) $(OBJDIR)$(PATHSEP)*.z
 	$(DELETE) $(OBJDIR)$(PATHSEP)*.bin
-	$(DELETE) version.c
+	$(DELETE) version.c fpga_version_info.c
 
 .PHONY: all clean help
 help:

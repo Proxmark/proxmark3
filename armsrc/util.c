@@ -137,8 +137,7 @@ void LED(int led, int ms)
 // not clicked, or held down (for ms || 1sec)
 // In general, don't use this function unless you expect a
 // double click, otherwise it will waste 500ms -- use BUTTON_HELD instead
-int BUTTON_CLICKED(int ms)
-{
+int BUTTON_CLICKED(int ms) {
 	// Up to 500ms in between clicks to mean a double click
 	int ticks = (48000 * (ms ? ms : 1000)) >> 10;
 
@@ -200,8 +199,7 @@ int BUTTON_CLICKED(int ms)
 }
 
 // Determine if a button is held down
-int BUTTON_HELD(int ms)
-{
+int BUTTON_HELD(int ms) {
 	// If button is held for one second
 	int ticks = (48000 * (ms ? ms : 1000)) >> 10;
 
@@ -218,8 +216,7 @@ int BUTTON_HELD(int ms)
 
 	uint16_t start = AT91C_BASE_PWMC_CH0->PWMC_CCNTR;
 
-	for(;;)
-	{
+	for(;;) {
 		uint16_t now = AT91C_BASE_PWMC_CH0->PWMC_CCNTR;
 
 		// As soon as our button let go, we didn't hold long enough
@@ -227,8 +224,7 @@ int BUTTON_HELD(int ms)
 			return BUTTON_SINGLE_CLICK;
 
 		// Have we waited the full second?
-		else
-			if (now == (uint16_t)(start + ticks))
+		else if (now == (uint16_t)(start + ticks))
 				return BUTTON_HOLD;
 
 		WDT_HIT();
@@ -240,8 +236,7 @@ int BUTTON_HELD(int ms)
 
 // attempt at high resolution microsecond timer
 // beware: timer counts in 21.3uS increments (1024/48Mhz)
-void SpinDelayUs(int us)
-{
+void SpinDelayUs(int us) {
 	int ticks = (48*us) >> 10;
 
 	// Borrow a PWM unit for my real-time clock
@@ -262,8 +257,7 @@ void SpinDelayUs(int us)
 	}
 }
 
-void SpinDelay(int ms)
-{
+void SpinDelay(int ms) {
   // convert to uS and call microsecond delay function
 	SpinDelayUs(ms*1000);
 }
@@ -314,8 +308,7 @@ void FormatVersionInformation(char *dst, int len, const char *prefix, void *vers
 //  ti = GetTickCount() - ti;
 //  Dbprintf("timer(1s): %d t=%d", ti, GetTickCount());
 
-void StartTickCount()
-{
+void StartTickCount() {
 	// This timer is based on the slow clock. The slow clock frequency is between 22kHz and 40kHz.
 	// We can determine the actual slow clock frequency by looking at the Main Clock Frequency Register.
 	uint16_t mainf = AT91C_BASE_PMC->PMC_MCFR & 0xffff;     // = 16 * main clock frequency (16MHz) / slow clock frequency
@@ -328,7 +321,7 @@ void StartTickCount()
 /*
 * Get the current count.
 */
-uint32_t RAMFUNC GetTickCount(){
+uint32_t RAMFUNC GetTickCount(void) {
 	return AT91C_BASE_RTTC->RTTC_RTVR;// was * 2;
 }
 
@@ -336,8 +329,7 @@ uint32_t RAMFUNC GetTickCount(){
 //  -------------------------------------------------------------------------
 //  microseconds timer
 //  -------------------------------------------------------------------------
-void StartCountUS()
-{
+void StartCountUS(void) {
 	AT91C_BASE_PMC->PMC_PCER |= (0x1 << 12) | (0x1 << 13) | (0x1 << 14);
 //  AT91C_BASE_TCB->TCB_BMR = AT91C_TCB_TC1XC1S_TIOA0;
 	AT91C_BASE_TCB->TCB_BMR = AT91C_TCB_TC0XC0S_NONE | AT91C_TCB_TC1XC1S_TIOA0 | AT91C_TCB_TC2XC2S_NONE;
@@ -359,14 +351,14 @@ void StartCountUS()
 	}
 
 
-uint32_t RAMFUNC GetCountUS(){
+uint32_t RAMFUNC GetCountUS(void) {
 	return (AT91C_BASE_TC1->TC_CV * 0x8000) + ((AT91C_BASE_TC0->TC_CV * 2) / 3); //was  /15) * 10);
 }
 
 
 static uint32_t GlobalUsCounter = 0;
 
-uint32_t RAMFUNC GetDeltaCountUS(){
+uint32_t RAMFUNC GetDeltaCountUS(void) {
 	uint32_t g_cnt = GetCountUS();
 	uint32_t g_res = g_cnt - GlobalUsCounter;
 	GlobalUsCounter = g_cnt;
@@ -377,8 +369,7 @@ uint32_t RAMFUNC GetDeltaCountUS(){
 //  -------------------------------------------------------------------------
 //  Timer for iso14443 commands. Uses ssp_clk from FPGA
 //  -------------------------------------------------------------------------
-void StartCountSspClk()
-{
+void StartCountSspClk(void) {
 	AT91C_BASE_PMC->PMC_PCER = (1 << AT91C_ID_TC0) | (1 << AT91C_ID_TC1) | (1 << AT91C_ID_TC2);  // Enable Clock to all timers
 	AT91C_BASE_TCB->TCB_BMR = AT91C_TCB_TC0XC0S_TIOA1       // XC0 Clock = TIOA1
 							| AT91C_TCB_TC1XC1S_NONE        // XC1 Clock = none
@@ -395,7 +386,7 @@ void StartCountSspClk()
 							| AT91C_TC_WAVE                 // Waveform Mode
 							| AT91C_TC_AEEVT_SET            // Set TIOA1 on external event
 							| AT91C_TC_ACPC_CLEAR;          // Clear TIOA1 on RC Compare
-	AT91C_BASE_TC1->TC_RC = 0x02;                           // RC Compare value = 0x02
+	AT91C_BASE_TC1->TC_RC = 1;                              // RC Compare value = 1; pulse width to TC0
 
 	// use TC0 to count TIOA1 pulses
 	AT91C_BASE_TC0->TC_CCR = AT91C_TC_CLKDIS;               // disable TC0
@@ -425,7 +416,7 @@ void StartCountSspClk()
 	while(!(AT91C_BASE_PIOA->PIO_PDSR & GPIO_SSC_CLK));     // wait for ssp_clk to go high; 1st ssp_clk after start of frame
 	while(AT91C_BASE_PIOA->PIO_PDSR & GPIO_SSC_CLK);        // wait for ssp_clk to go low;
 	while(!(AT91C_BASE_PIOA->PIO_PDSR & GPIO_SSC_CLK));     // wait for ssp_clk to go high; 2nd ssp_clk after start of frame
-	if ((AT91C_BASE_SSC->SSC_RFMR & SSC_FRAME_MODE_BITS_IN_WORD(32)) == SSC_FRAME_MODE_BITS_IN_WORD(16)) {
+	if ((AT91C_BASE_SSC->SSC_RFMR & SSC_FRAME_MODE_BITS_IN_WORD(32)) == SSC_FRAME_MODE_BITS_IN_WORD(16)) { // 16bit frame
 		while(AT91C_BASE_PIOA->PIO_PDSR & GPIO_SSC_CLK);    // wait for ssp_clk to go low;
 		while(!(AT91C_BASE_PIOA->PIO_PDSR & GPIO_SSC_CLK)); // wait for ssp_clk to go high; 3rd ssp_clk after start of frame
 		while(AT91C_BASE_PIOA->PIO_PDSR & GPIO_SSC_CLK);    // wait for ssp_clk to go low;
@@ -439,8 +430,8 @@ void StartCountSspClk()
 	AT91C_BASE_TCB->TCB_BCR = 1;                            // assert Sync (set all timers to 0 on next active clock edge)
 	// at the next (3rd/7th) ssp_clk rising edge, TC1 will be reset (and not generate a clock signal to TC0)
 	// at the next (4th/8th) ssp_clk rising edge, TC0 (the low word of our counter) will be reset. From now on,
-	// whenever the last three bits of our counter go 0, we can be sure to be in the middle of a frame transfer.
-	// (just started with the transfer of the 3rd Bit).
+	// whenever the last three/four bits of our counter go 0, we can be sure to be in the middle of a frame transfer.
+
 	// The high word of the counter (TC2) will not reset until the low word (TC0) overflows. Therefore need to wait quite some time before
 	// we can use the counter.
 	while (AT91C_BASE_TC0->TC_CV < 0xFFFF);

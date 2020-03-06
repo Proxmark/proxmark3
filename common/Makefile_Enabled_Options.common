@@ -4,7 +4,7 @@
 #  
 #BEGIN
 APP_CFLAGS += -DWITH_ISO14443a_StandAlone \
-        -DWITH_LF\
+        -DWITH_LF \
         -DWITH_ISO15693 \
         -DWITH_ISO14443a \
         -DWITH_ISO14443b \

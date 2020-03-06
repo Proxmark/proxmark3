@@ -291,7 +291,6 @@ void TransmitTo15693Tag(const uint8_t *cmd, int len, uint32_t *start_time) {
 			AT91C_BASE_SSC->SSC_THR = send_word;
 			while (!(AT91C_BASE_SSC->SSC_SR & (AT91C_SSC_TXRDY))) ;
 			AT91C_BASE_SSC->SSC_THR = send_word;
-
 			data <<= 1;
 		}
 		WDT_HIT();
@@ -299,7 +298,6 @@ void TransmitTo15693Tag(const uint8_t *cmd, int len, uint32_t *start_time) {
 	LED_B_OFF();
 
 	*start_time = *start_time + DELAY_ARM_TO_TAG;
-
 }
 
 
@@ -1357,20 +1355,23 @@ void SnoopIso15693(uint8_t jam_search_len, uint8_t *jam_search_string) {
 
 
 // Initialize the proxmark as iso15k reader
-void Iso15693InitReader() {
+void Iso15693InitReader(void) {
 	FpgaDownloadAndGo(FPGA_BITSTREAM_HF);
 
-	// Start from off (no field generated)
-	LED_D_OFF();
+	// switch field off and wait until tag resets
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
+	LED_D_OFF();
 	SpinDelay(10);
 
-	SetAdcMuxFor(GPIO_MUXSEL_HIPKD);
-	FpgaSetupSsc(FPGA_MAJOR_MODE_HF_READER);
-
-	// Give the tags time to energize
-	LED_D_ON();
+	// switch field on
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_HF_READER);
+	LED_D_ON();
+	
+	// initialize SSC and select proper AD input
+	FpgaSetupSsc(FPGA_MAJOR_MODE_HF_READER);
+	SetAdcMuxFor(GPIO_MUXSEL_HIPKD);
+
+	// give tags some time to energize
 	SpinDelay(250);
 }
 
@@ -1570,28 +1571,13 @@ void ReaderIso15693(uint32_t parameter) {
 
 	LED_A_ON();
 
+	Iso15693InitReader();
+
+	StartCountSspClk();
 	set_tracing(true);
 
 	uint8_t TagUID[8] = {0x00};
-
-	FpgaDownloadAndGo(FPGA_BITSTREAM_HF);
-
 	uint8_t answer[ISO15693_MAX_RESPONSE_LENGTH];
-
-	SetAdcMuxFor(GPIO_MUXSEL_HIPKD);
-	// Setup SSC
-	FpgaSetupSsc(FPGA_MAJOR_MODE_HF_READER);
-
-	// Start from off (no field generated)
-	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
-	SpinDelay(200);
-
-	// Give the tags time to energize
-	LED_D_ON();
-	FpgaWriteConfWord(FPGA_MAJOR_MODE_HF_READER);
-	SpinDelay(200);
-	StartCountSspClk();
-
 
 	// FIRST WE RUN AN INVENTORY TO GET THE TAG UID
 	// THIS MEANS WE CAN PRE-BUILD REQUESTS TO SAVE CPU TIME
@@ -1650,6 +1636,17 @@ void ReaderIso15693(uint32_t parameter) {
 }
 
 
+// Initialize the proxmark as iso15k tag
+void Iso15693InitTag(void) {
+	FpgaDownloadAndGo(FPGA_BITSTREAM_HF);
+	SetAdcMuxFor(GPIO_MUXSEL_HIPKD);
+	FpgaWriteConfWord(FPGA_MAJOR_MODE_HF_SIMULATOR | FPGA_HF_SIMULATOR_NO_MODULATION);
+	LED_D_OFF();
+	FpgaSetupSsc(FPGA_MAJOR_MODE_HF_SIMULATOR);
+	StartCountSspClk();
+}
+
+
 // Simulate an ISO15693 TAG.
 // For Inventory command: print command and send Inventory Response with given UID
 // TODO: interpret other reader commands and send appropriate response
@@ -1657,20 +1654,14 @@ void SimTagIso15693(uint32_t parameter, uint8_t *uid) {
 
 	LED_A_ON();
 
-	FpgaDownloadAndGo(FPGA_BITSTREAM_HF);
-	SetAdcMuxFor(GPIO_MUXSEL_HIPKD);
-	FpgaWriteConfWord(FPGA_MAJOR_MODE_HF_SIMULATOR | FPGA_HF_SIMULATOR_NO_MODULATION);
-	FpgaSetupSsc(FPGA_MAJOR_MODE_HF_SIMULATOR);
-
-	StartCountSspClk();
-
-	uint8_t cmd[ISO15693_MAX_COMMAND_LENGTH];
+	Iso15693InitTag();
 
 	// Build a suitable response to the reader INVENTORY command
 	BuildInventoryResponse(uid);
 
 	// Listen to reader
 	while (!BUTTON_PRESS()) {
+		uint8_t cmd[ISO15693_MAX_COMMAND_LENGTH];
 		uint32_t eof_time = 0, start_time = 0;
 		int cmd_len = GetIso15693CommandFromReader(cmd, sizeof(cmd), &eof_time);
 
