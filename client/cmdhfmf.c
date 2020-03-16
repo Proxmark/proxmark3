@@ -3076,8 +3076,8 @@ int CmdHFMFPersonalize(const char *cmd) {
 
 	UsbCommand resp;
 	if (WaitForResponseTimeout(CMD_ACK, &resp, 1500)) {
-		uint8_t isOK  = resp.arg[0] & 0xff;
-		PrintAndLog("Personalization %s", isOK ? "FAILED" : "SUCCEEDED");
+		bool isOK  = resp.arg[0];
+		PrintAndLog("Personalization %s", isOK ? "SUCCEEDED" : "FAILED");
 	} else {
 		PrintAndLog("Command execute timeout");
 	}
