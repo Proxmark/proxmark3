@@ -36,6 +36,9 @@ clean:
 
 # must be run as root
 install_kext: Info.plist
+	spctl --master-disable
+	mount -uw
+	killall Finder
 	mkdir -p /System/Library/Extensions/Proxmark3.kext/Contents
 	cp Info.plist /System/Library/Extensions/Proxmark3.kext/Contents
 	chown -R root:wheel /System/Library/Extensions/Proxmark3.kext
