@@ -677,7 +677,7 @@ int CmdHF14AMfNested(const char *Cmd) {
 		// check if we can authenticate to sector
 		res = mfCheckKeys(blockNo, keyType, timeout14a, true, 1, key, &key64);
 		if (res) {
-			PrintAndLog("Can't authenticate to block:%3d key type:%c key:%s", blockNo, keyType?'B':'A', sprint_hex(key, 6));
+			PrintAndLog("Can't authenticate to block %d, key type %c, key %s", blockNo, keyType?'B':'A', sprint_hex(key, 6));
 			return 3;
 		}
 
@@ -3076,8 +3076,8 @@ int CmdHFMFPersonalize(const char *cmd) {
 
 	UsbCommand resp;
 	if (WaitForResponseTimeout(CMD_ACK, &resp, 1500)) {
-		uint8_t isOK  = resp.arg[0] & 0xff;
-		PrintAndLog("Personalization %s", isOK ? "FAILED" : "SUCCEEDED");
+		bool isOK  = resp.arg[0];
+		PrintAndLog("Personalization %s", isOK ? "SUCCEEDED" : "FAILED");
 	} else {
 		PrintAndLog("Command execute timeout");
 	}

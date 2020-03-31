@@ -17,6 +17,7 @@ This project uses the changelog in accordance with [keepchangelog](http://keepac
 - `hf mf chk t` save to emulator memory now works as expected (mwalker)
 - Fix `hf mf sim` - wrong access rights to write key B in trailer (@McEloff)
 - allow files > 512Bytes in 'hf iclass eload' (@Sherhannn79)
+- `hf mf nested` now works with fixed nonce tags too (uzlonewolf, piwi)
  
 ### Added
 - Added to `hf 14a apdu` print apdu and compose apdu (@merlokk)

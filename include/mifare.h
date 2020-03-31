@@ -19,6 +19,9 @@
 #define MF_MAD1_SECTOR 0x00
 #define MF_MAD2_SECTOR 0x10
 
+// Fixed encrypted nonce used for nested attack with fixed nonce tags
+#define NESTED_FIXED_NR_ENC   {0x70, 0x69, 0x77, 0x69}
+
 //-----------------------------------------------------------------------------
 // ISO 14443A
 //-----------------------------------------------------------------------------

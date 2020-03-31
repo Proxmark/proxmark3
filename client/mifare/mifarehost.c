@@ -30,14 +30,14 @@
 #include "mifare4.h"
 
 // mifare tracer flags used in mfTraceDecode()
-#define TRACE_IDLE		 				0x00
-#define TRACE_AUTH1		 				0x01
-#define TRACE_AUTH2		 				0x02
-#define TRACE_AUTH_OK	 				0x03
-#define TRACE_READ_DATA 				0x04
-#define TRACE_WRITE_OK					0x05
-#define TRACE_WRITE_DATA				0x06
-#define TRACE_ERROR		 				0xFF
+#define TRACE_IDLE                      0x00
+#define TRACE_AUTH1                     0x01
+#define TRACE_AUTH2                     0x02
+#define TRACE_AUTH_OK                   0x03
+#define TRACE_READ_DATA                 0x04
+#define TRACE_WRITE_OK                  0x05
+#define TRACE_WRITE_DATA                0x06
+#define TRACE_ERROR                     0xFF
 
 
 static int compare_uint64(const void *a, const void *b) {
@@ -90,7 +90,7 @@ static uint32_t nonce2key(uint32_t uid, uint32_t nt, uint32_t nr, uint32_t ar, u
 	for (pos=0; pos<8; pos++) {
 		ks3x[7-pos] = (ks_info >> (pos*8)) & 0x0f;
 		bt = (par_info >> (pos*8)) & 0xff;
-		for (i=0; i<8; i++)	{
+		for (i=0; i<8; i++) {
 				par[7-pos][i] = (bt >> i) & 0x01;
 		}
 	}
@@ -200,7 +200,7 @@ int mfDarkside(uint64_t *key) {
 		for (int i = 0; i < keycount; i++) {
 			num_to_bytes(keylist[i], 6, keys_to_chk+i);
 		}
- 
+
 		*key = -1;
 		mfCheckKeys(0, 0, 0, false, keycount, keys_to_chk, key);
 
@@ -221,19 +221,20 @@ int mfDarkside(uint64_t *key) {
 }
 
 
-int mfCheckKeys(uint8_t blockNo, uint8_t keyType, uint16_t timeout14a, bool clear_trace, uint32_t keycnt, uint8_t *keys, uint64_t *found_key) {
+static int mfCheckKeysEx(uint8_t blockNo, uint8_t keyType, uint16_t timeout14a, bool clear_trace, uint32_t keycnt, uint8_t *keys, uint64_t *found_key, bool fixed_nonce) {
 
 	bool display_progress = false;
 	uint64_t start_time = msclock();
 	uint64_t next_print_time = start_time + 5 * 1000;
 
 	if (keycnt > 1000) {
-		PrintAndLog("We have %d keys to check. This will take some time!", keycnt);
+		PrintAndLog("We have %d keys to check. This can take some time!", keycnt);
 		PrintAndLog("Press button to abort.");
 		display_progress = true;
 	}
 
-	uint32_t max_keys  = (keycnt > (USB_CMD_DATA_SIZE / 6)) ? (USB_CMD_DATA_SIZE / 6) : keycnt;
+	uint8_t bytes_per_key = fixed_nonce ? 5 : 6;
+	uint32_t max_keys = keycnt > USB_CMD_DATA_SIZE/bytes_per_key ? USB_CMD_DATA_SIZE/bytes_per_key : keycnt;
 	*found_key = -1;
 	bool multisectorCheck = false;
 
@@ -245,10 +246,10 @@ int mfCheckKeys(uint8_t blockNo, uint8_t keyType, uint16_t timeout14a, bool clea
 
 		bool init = (i == 0);
 		bool drop_field = (max_keys == keycnt);
-		uint8_t flags = clear_trace | multisectorCheck << 1 | init << 2 | drop_field << 3;
+		uint8_t flags = clear_trace | multisectorCheck << 1 | init << 2 | drop_field << 3 | fixed_nonce << 4;
 
-		UsbCommand c = {CMD_MIFARE_CHKKEYS, {((blockNo & 0xff) | ((keyType & 0xff) << 8)), flags | timeout14a << 16, max_keys}}; 
-		memcpy(c.d.asBytes, keys + i * 6, max_keys * 6);
+		UsbCommand c = {CMD_MIFARE_CHKKEYS, {((blockNo & 0xff) | ((keyType & 0xff) << 8)), flags | timeout14a << 16, max_keys}};
+		memcpy(c.d.asBytes, keys + i * bytes_per_key, max_keys * bytes_per_key);
 		SendCommand(&c);
 
 		UsbCommand resp;
@@ -256,7 +257,7 @@ int mfCheckKeys(uint8_t blockNo, uint8_t keyType, uint16_t timeout14a, bool clea
 			return 1;
 
 		if ((resp.arg[0] & 0xff) != 0x01) {
-			if (((int)resp.arg[1]) < 0) {   // error
+			if ((int)resp.arg[1] < 0) {   // error or user aborted
 				return (int)resp.arg[1];
 			} else {                        // nothing found yet
 				if (display_progress && msclock() >= next_print_time) {
@@ -267,17 +268,31 @@ int mfCheckKeys(uint8_t blockNo, uint8_t keyType, uint16_t timeout14a, bool clea
 					PrintAndLog(" %8d keys left | %5.1f keys/sec | worst case %6.1f seconds remaining", keycnt - i, brute_force_per_second, (keycnt-i)/brute_force_per_second);
 				}
 			}
-		} else {							// success
-			*found_key = bytes_to_num(resp.d.asBytes, 6);
+		} else {                            // success
+			if (fixed_nonce) {
+				*found_key = i + resp.arg[1] - 1;
+			} else {
+				*found_key = bytes_to_num(resp.d.asBytes, 6);
+			}
 			return 0;
 		}
 	}
 
-	return 2;	// nothing found
+	return 2;   // nothing found
 }
 
 
-int mfCheckKeysSec(uint8_t sectorCnt, uint8_t keyType, uint16_t timeout14a, bool clear_trace, bool init, bool drop_field, uint8_t keycnt, uint8_t * keyBlock, sector_t * e_sector) {
+int mfCheckKeys(uint8_t blockNo, uint8_t keyType, uint16_t timeout14a, bool clear_trace, uint32_t keycnt, uint8_t *keys, uint64_t *found_key) {
+	return mfCheckKeysEx(blockNo, keyType, timeout14a, clear_trace, keycnt, keys, found_key, false);
+}
+
+
+static int mfCheckKeysFixedNonce(uint8_t blockNo, uint8_t keyType, uint16_t timeout14a, bool clear_trace, uint32_t keycnt, uint8_t *keys, uint32_t *key_index) {
+	return mfCheckKeysEx(blockNo, keyType, timeout14a, clear_trace, keycnt, keys, (uint64_t*)key_index, true);
+}
+
+
+int mfCheckKeysSec(uint8_t sectorCnt, uint8_t keyType, uint16_t timeout14a, bool clear_trace, bool init, bool drop_field, uint8_t keycnt, uint8_t *keyBlock, sector_t *e_sector) {
 
 	uint8_t keyPtr = 0;
 
@@ -287,14 +302,14 @@ int mfCheckKeysSec(uint8_t sectorCnt, uint8_t keyType, uint16_t timeout14a, bool
 	bool multisectorCheck = true;
 	uint8_t flags = clear_trace | multisectorCheck << 1 | init << 2 | drop_field << 3;
 
-	UsbCommand c = {CMD_MIFARE_CHKKEYS, {((sectorCnt & 0xff) | ((keyType & 0xff) << 8)), flags | timeout14a << 16, keycnt}}; 
+	UsbCommand c = {CMD_MIFARE_CHKKEYS, {((sectorCnt & 0xff) | ((keyType & 0xff) << 8)), flags | timeout14a << 16, keycnt}};
 	memcpy(c.d.asBytes, keyBlock, 6 * keycnt);
 	SendCommand(&c);
 
 	UsbCommand resp;
 	if (!WaitForResponseTimeoutW(CMD_ACK, &resp, MAX(3000, 1000 + 13 * sectorCnt * keycnt * (keyType == 2 ? 2 : 1)), false)) return 1; // timeout: 13 ms / fail auth
 	if ((resp.arg[0] & 0xff) != 0x01) return 2;
-	
+
 	bool foundAKey = false;
 	for(int sec = 0; sec < sectorCnt; sec++){
 		for(int keyAB = 0; keyAB < 2; keyAB++){
@@ -330,7 +345,7 @@ typedef
 		uint32_t uid;
 		uint32_t blockNo;
 		uint32_t keyType;
-		uint32_t nt_enc;
+		uint32_t nt;
 		uint32_t ks1;
 	} StateList_t;
 
@@ -339,14 +354,14 @@ typedef
 void
 #ifdef __has_attribute
 #if __has_attribute(force_align_arg_pointer)
-__attribute__((force_align_arg_pointer)) 
+__attribute__((force_align_arg_pointer))
 #endif
 #endif
 *nested_worker_thread(void *arg) {
 	struct Crypto1State *p1;
 	StateList_t *statelist = arg;
 
-	statelist->head.slhead = lfsr_recovery32(statelist->ks1, statelist->nt_enc ^ statelist->uid);
+	statelist->head.slhead = lfsr_recovery32(statelist->ks1, statelist->nt ^ statelist->uid);
 	for (p1 = statelist->head.slhead; *(uint64_t *)p1 != 0; p1++);
 	statelist->len = p1 - statelist->head.slhead;
 	statelist->tail.sltail = --p1;
@@ -356,94 +371,84 @@ __attribute__((force_align_arg_pointer))
 }
 
 
-int mfnested(uint8_t blockNo, uint8_t keyType, uint16_t timeout14a, uint8_t *key, uint8_t trgBlockNo, uint8_t trgKeyType, uint8_t *resultKey, bool calibrate) {
-	uint32_t i;
-	uint32_t uid;
-	UsbCommand resp;
+static int nested_fixed_nonce(StateList_t statelist, uint32_t fixed_nt, uint32_t authentication_timeout, uint8_t *resultKey) {
+	// We have a tag with a fixed nonce (nt) and therefore only one (usually long) list of possible crypto states.
+	// Instead of testing all those keys on the device with a complete authentication cycle, we do all of the crypto operations here.
+	uint8_t nr_enc[4] = NESTED_FIXED_NR_ENC;             // we use a fixed {nr}
+	uint8_t ar[4];
+	num_to_bytes(prng_successor(fixed_nt, 64), 4, ar);   // ... and ar is fixed too
 
-	int num_unique_nonces;
-
-	StateList_t statelists[2];
-	struct Crypto1State *p1, *p2, *p3, *p4;
-
-	uint8_t *keyBlock = NULL;
-	uint64_t key64;
-
-	int isOK = 1;
-
-	// flush queue
-	(void)WaitForResponseTimeout(CMD_ACK,NULL,100);
-
-	UsbCommand c = {CMD_MIFARE_NESTED, {blockNo + keyType * 0x100, trgBlockNo + trgKeyType * 0x100, calibrate}};
-	memcpy(c.d.asBytes, key, 6);
-	SendCommand(&c);
-
-	if (!WaitForResponseTimeout(CMD_ACK, &resp, 2500)) {
-		// some cards can cause it to get stuck in a loop, so break out of it
-		UsbCommand c = {CMD_PING};
-		SendCommand(&c);
-		(void)WaitForResponseTimeout(CMD_ACK,NULL,500);
-		return -1;
+	// create an array of possible {ar} and parity bits
+	uint32_t num_ar_par = statelist.len;
+	uint8_t *ar_par = calloc(num_ar_par, 5);
+	if (ar_par == NULL) {
+		free(statelist.head.slhead);
+		return -4;
 	}
 
-	if (resp.arg[0]) {
-		return resp.arg[0];  // error during nested
+	for (int i = 0; i < num_ar_par; i++) {
+		// roll back to initial state using the nt observed with the nested authentication
+		lfsr_rollback_word(statelist.head.slhead + i, statelist.nt ^ statelist.uid, 0);
+		// instead feed in the fixed_nt for the first authentication
+		struct Crypto1State cs = *(statelist.head.slhead + i);
+		crypto1_word(&cs, fixed_nt ^ statelist.uid, 0);
+		// determine nr such that the resulting {nr} is constant and feed it into the cypher. Calculate the encrypted parity bits
+		uint8_t par_enc = 0;
+		for (int j = 0; j < 4; j++) {
+			uint8_t nr_byte = crypto1_byte(&cs, nr_enc[j], 1) ^ nr_enc[j];
+			par_enc |= (((filter(cs.odd) ^ oddparity8(nr_byte)) & 0x01) << (7-j));
+		}
+		// calculate the encrypted reader response {ar} and its parity bits
+		for (int j = 0; j < 4; j++) {
+			ar_par[5*i + j] = crypto1_byte(&cs, 0, 0) ^ ar[j];
+			par_enc |= ((filter(cs.odd) ^ oddparity8(ar[j])) & 0x01) << (3-j);
+		}
+		ar_par[5*i + 4] = par_enc;
 	}
 
-	memcpy(&uid, resp.d.asBytes, 4);
-	PrintAndLog("uid:%08x trgbl=%d trgkey=%x", uid, (uint16_t)resp.arg[2] & 0xff, (uint16_t)resp.arg[2] >> 8);
+	// test each {ar} response
+	uint32_t key_index;
 
-	for (i = 0; i < 2; i++) {
-		statelists[i].blockNo = resp.arg[2] & 0xff;
-		statelists[i].keyType = (resp.arg[2] >> 8) & 0xff;
-		statelists[i].uid = uid;
-		memcpy(&statelists[i].nt_enc,  (void *)(resp.d.asBytes + 4 + i * 8 + 0), 4);
-		memcpy(&statelists[i].ks1, (void *)(resp.d.asBytes + 4 + i * 8 + 4), 4);
+	int isOK = mfCheckKeysFixedNonce(statelist.blockNo, statelist.keyType, authentication_timeout, true, num_ar_par, ar_par, &key_index);
+
+	if (isOK == 0) {     // success, key found
+		// key_index contains the index into the cypher state list
+		struct Crypto1State *p1 = statelist.head.slhead + key_index;
+		uint64_t key64;
+		crypto1_get_lfsr(p1, &key64);
+		num_to_bytes(key64, 6, resultKey);
 	}
-
-	uint32_t authentication_timeout;
-	memcpy(&authentication_timeout, resp.d.asBytes + 20, 4);
-	PrintAndLog("Setting authentication timeout to %" PRIu32 "us", authentication_timeout * 1000 / 106);
-	
-	if (statelists[0].nt_enc == statelists[1].nt_enc && statelists[0].ks1 == statelists[1].ks1)
-		num_unique_nonces = 1;
-	else
-		num_unique_nonces = 2;
-
-	// calc keys
-
-	pthread_t thread_id[2];
-
-	// create and run worker threads
-	for (i = 0; i < 2; i++) {
-		pthread_create(thread_id + i, NULL, nested_worker_thread, &statelists[i]);
+	if (isOK == 1) {     // timeout
+		isOK = -1;
 	}
+	free(statelist.head.slhead);
+	free(ar_par);
+	return isOK;
+}
 
-	// wait for threads to terminate:
-	for (i = 0; i < 2; i++) {
-		pthread_join(thread_id[i], (void*)&statelists[i].head.slhead);
-	}
 
+static int nested_standard(StateList_t statelists[2], uint32_t authentication_timeout, uint8_t *resultKey) {
 
-	// the first 16 Bits of the cryptostate already contain part of our key.
+	// the first 16 Bits of the crypto states already contain part of our key.
 	// Create the intersection of the two lists based on these 16 Bits and
-	// roll back the cryptostate
+	// roll back the crypto state for the remaining states
+	struct Crypto1State *p1, *p2, *p3, *p4;
 	p1 = p3 = statelists[0].head.slhead;
 	p2 = p4 = statelists[1].head.slhead;
 	while (p1 <= statelists[0].tail.sltail && p2 <= statelists[1].tail.sltail) {
 		if (Compare16Bits(p1, p2) == 0) {
 			struct Crypto1State savestate, *savep = &savestate;
 			savestate = *p1;
-			while(Compare16Bits(p1, savep) == 0 && p1 <= statelists[0].tail.sltail) {
+			while (Compare16Bits(p1, savep) == 0 && p1 <= statelists[0].tail.sltail) {
 				*p3 = *p1;
-				lfsr_rollback_word(p3, statelists[0].nt_enc ^ statelists[0].uid, 0);
+				lfsr_rollback_word(p3, statelists[0].nt ^ statelists[0].uid, 0);
 				p3++;
 				p1++;
 			}
 			savestate = *p2;
-			while(Compare16Bits(p2, savep) == 0 && p2 <= statelists[1].tail.sltail) {
+			while (Compare16Bits(p2, savep) == 0 && p2 <= statelists[1].tail.sltail) {
 				*p4 = *p2;
-				lfsr_rollback_word(p4, statelists[1].nt_enc ^ statelists[1].uid, 0);
+				lfsr_rollback_word(p4, statelists[1].nt ^ statelists[1].uid, 0);
 				p4++;
 				p2++;
 			}
@@ -460,84 +465,137 @@ int mfnested(uint8_t blockNo, uint8_t keyType, uint16_t timeout14a, uint8_t *key
 	statelists[0].tail.sltail=--p3;
 	statelists[1].tail.sltail=--p4;
 
-	for (i = 0; i < 2; i++) {
-		PrintAndLog("statelist %d: length:%d block:%02d keytype:%d nt_enc:%08X ks1:%08X", i, statelists[i].len, statelists[i].blockNo, statelists[i].keyType, statelists[i].nt_enc, statelists[i].ks1);
-	}
-
-	// the statelists now contain possible keys. The key we are searching for must be in the
-	// intersection of both lists. Create the intersection:
+	// the statelists now contain possible crypto states initialized with the key. The key we are searching for
+	// must be in the intersection of both lists. Sort the lists and create the intersection:
 	qsort(statelists[0].head.keyhead, statelists[0].len, sizeof(uint64_t), compare_uint64);
+	qsort(statelists[1].head.keyhead, statelists[1].len, sizeof(uint64_t), compare_uint64);
+	statelists[0].len = intersection(statelists[0].head.keyhead, statelists[1].head.keyhead);
 
-	if (num_unique_nonces > 1) {
-		qsort(statelists[1].head.keyhead, statelists[1].len, sizeof(uint64_t), compare_uint64);
-		statelists[0].len = intersection(statelists[0].head.keyhead, statelists[1].head.keyhead);
-	}
-	else {
-		PrintAndLog("Nonce 1 and 2 are the same!");
-	}
-
+	// create an array of the possible keys
 	uint32_t num_keys = statelists[0].len;
-	keyBlock = calloc(num_keys, 6);
-	if (keyBlock == NULL) {
+	uint8_t *keys = calloc(num_keys, 6);
+	if (keys == NULL) {
 		free(statelists[0].head.slhead);
 		free(statelists[1].head.slhead);
 		return -4;
 	}
 
-	for (i = 0; i < num_keys; i++) {
+	uint64_t key64 = 0;
+	for (int i = 0; i < num_keys; i++) {
 		crypto1_get_lfsr(statelists[0].head.slhead + i, &key64);
-		num_to_bytes(key64, 6, keyBlock + i*6);
+		num_to_bytes(key64, 6, keys + i*6);
 	}
 
-	// The list may still contain several key candidates. Test each of them with mfCheckKeys
-	isOK = mfCheckKeys(statelists[0].blockNo, statelists[0].keyType, authentication_timeout, true, num_keys, keyBlock, &key64);
+	// and test each key with mfCheckKeys
+	int isOK = mfCheckKeys(statelists[0].blockNo, statelists[0].keyType, authentication_timeout, true, num_keys, keys, &key64);
 
 	if (isOK == 0) {     // success, key found
 		num_to_bytes(key64, 6, resultKey);
 	}
-
 	if (isOK == 1) {     // timeout
 		isOK = -1;
 	}
-
 	free(statelists[0].head.slhead);
 	free(statelists[1].head.slhead);
-	free(keyBlock);
-
+	free(keys);
 	return isOK;
 }
+
+
+int mfnested(uint8_t blockNo, uint8_t keyType, uint16_t timeout14a, uint8_t *key, uint8_t trgBlockNo, uint8_t trgKeyType, uint8_t *resultKey, bool calibrate) {
+
+	// flush queue
+	clearCommandBuffer();
+
+	UsbCommand c = {CMD_MIFARE_NESTED, {blockNo + keyType * 0x100, trgBlockNo + trgKeyType * 0x100, calibrate}};
+	memcpy(c.d.asBytes, key, 6);
+	SendCommand(&c);
+
+	UsbCommand resp;
+	if (!WaitForResponseTimeout(CMD_ACK, &resp, 1500)) {
+		return -1;
+	}
+
+	if ((int)resp.arg[0]) {
+		return (int)resp.arg[0];  // error during nested
+	}
+
+	uint32_t uid;
+	memcpy(&uid, resp.d.asBytes, 4);
+	PrintAndLog("uid:%08x trgbl=%d trgkey=%x", uid, (uint16_t)resp.arg[2] & 0xff, (uint16_t)resp.arg[2] >> 8);
+
+	StateList_t statelists[2];
+	for (int i = 0; i < 2; i++) {
+		statelists[i].blockNo = resp.arg[2] & 0xff;
+		statelists[i].keyType = (resp.arg[2] >> 8) & 0xff;
+		statelists[i].uid = uid;
+		memcpy(&statelists[i].nt,  (void *)(resp.d.asBytes + 4 + i * 8 + 0), 4);
+		memcpy(&statelists[i].ks1, (void *)(resp.d.asBytes + 4 + i * 8 + 4), 4);
+	}
+
+	uint32_t authentication_timeout;
+	memcpy(&authentication_timeout, resp.d.asBytes + 20, 4);
+	PrintAndLog("Setting authentication timeout to %" PRIu32 "us", authentication_timeout * 1000 / 106);
+
+	uint8_t num_unique_nonces;
+	uint32_t fixed_nt = 0;
+	if (statelists[0].nt == statelists[1].nt && statelists[0].ks1 == statelists[1].ks1) {
+		num_unique_nonces = 1;
+		memcpy(&fixed_nt, resp.d.asBytes + 24, 4);
+		PrintAndLog("Fixed nt detected: %08" PRIx32 " on first authentication, %08" PRIx32 " on nested authentication", fixed_nt, statelists[0].nt);
+	} else {
+		num_unique_nonces = 2;
+	}
+
+	// create and run worker threads to calculate possible crypto states
+	pthread_t thread_id[2];
+	for (int i = 0; i < num_unique_nonces; i++) {
+		pthread_create(thread_id + i, NULL, nested_worker_thread, &statelists[i]);
+	}
+	// wait for threads to terminate:
+	for (int i = 0; i < num_unique_nonces; i++) {
+		pthread_join(thread_id[i], (void*)&statelists[i].head.slhead);
+	}
+
+	if (num_unique_nonces == 2) {
+		return nested_standard(statelists, authentication_timeout, resultKey);
+	} else {
+		return nested_fixed_nonce(statelists[0], fixed_nt, authentication_timeout, resultKey);
+	}
+}
+
 
 // MIFARE
 int mfReadSector(uint8_t sectorNo, uint8_t keyType, uint8_t *key, uint8_t *data) {
 
-    UsbCommand c = {CMD_MIFARE_READSC, {sectorNo, keyType, 0}};
-    memcpy(c.d.asBytes, key, 6);
-    clearCommandBuffer();
-    SendCommand(&c);
+	UsbCommand c = {CMD_MIFARE_READSC, {sectorNo, keyType, 0}};
+	memcpy(c.d.asBytes, key, 6);
+	clearCommandBuffer();
+	SendCommand(&c);
 
-    UsbCommand resp;
-    if (WaitForResponseTimeout(CMD_ACK, &resp, 1500)) {
-        uint8_t isOK  = resp.arg[0] & 0xff;
+	UsbCommand resp;
+	if (WaitForResponseTimeout(CMD_ACK, &resp, 1500)) {
+		uint8_t isOK  = resp.arg[0] & 0xff;
 
-        if (isOK) {
-            memcpy(data, resp.d.asBytes, mfNumBlocksPerSector(sectorNo) * 16);
-            return 0;
-        } else {
-            return 1;
-        }
-    } else {
-        PrintAndLogEx(ERR, "Command execute timeout");
-        return 2;
-    }
+		if (isOK) {
+			memcpy(data, resp.d.asBytes, mfNumBlocksPerSector(sectorNo) * 16);
+			return 0;
+		} else {
+			return 1;
+		}
+	} else {
+		PrintAndLogEx(ERR, "Command execute timeout");
+		return 2;
+	}
 
-    return 0;
+	return 0;
 }
 
 // EMULATOR
 
 int mfEmlGetMem(uint8_t *data, int blockNum, int blocksCount) {
 	UsbCommand c = {CMD_MIFARE_EML_MEMGET, {blockNum, blocksCount, 0}};
- 	SendCommand(&c);
+	SendCommand(&c);
 
   UsbCommand resp;
 	if (!WaitForResponseTimeout(CMD_ACK,&resp,1500)) return 1;
@@ -603,7 +661,7 @@ int mfCWipe(uint32_t numSectors, bool gen1b, bool wantWipe, bool wantFill) {
 	UsbCommand resp;
 	WaitForResponse(CMD_ACK,&resp);
 	isOK  = resp.arg[0] & 0xff;
-	
+
 	return isOK;
 }
 
@@ -620,7 +678,7 @@ int mfCSetUID(uint8_t *uid, uint8_t *atqa, uint8_t *sak, uint8_t *oldUID) {
 		/* generation 1b magic card */
 		cmdParams = CSETBLOCK_SINGLE_OPER | CSETBLOCK_MAGIC_1B;
 	}
-	
+
 	res = mfCGetBlock(0, oldblock0, cmdParams);
 
 	if (res == 0) {
@@ -649,7 +707,7 @@ int mfCSetUID(uint8_t *uid, uint8_t *atqa, uint8_t *sak, uint8_t *oldUID) {
 		PrintAndLog("Can't set block 0. Error: %d", res);
 		return res;
 	}
-	
+
 	return 0;
 }
 
@@ -760,7 +818,7 @@ int loadTraceCard(uint8_t *tuid) {
 			PrintAndLog("File reading error.");
 			fclose(f);
 			return 2;
-    	}
+		}
 
 		if (strlen(buf) < 32){
 			if (feof(f)) break;
@@ -802,7 +860,7 @@ int mfTraceInit(uint8_t *tuid, uint8_t *atqa, uint8_t sak, bool wantSaveToEmlFil
 }
 
 void mf_crypto1_decrypt(struct Crypto1State *pcs, uint8_t *data, int len, bool isEncrypted){
-	uint8_t	bt = 0;
+	uint8_t bt = 0;
 	int i;
 
 	if (len != 1) {
@@ -825,7 +883,7 @@ bool NTParityCheck(uint32_t ntx) {
 		(oddparity8(ntx >> 24 & 0xff) ^ (ntx >> 16 & 0x01) ^ ((nt_enc_par >> 7) & 0x01) ^ (nt_enc >> 16 & 0x01))
 		)
 		return false;
-	
+
 	uint32_t ar = prng_successor(ntx, 64);
 	if (
 		(oddparity8(ar >> 8 & 0xff) ^ (ar & 0x01) ^ ((ar_enc_par >> 5) & 0x01) ^ (ar_enc & 0x01)) ||
@@ -842,7 +900,7 @@ bool NTParityCheck(uint32_t ntx) {
 		(oddparity8(at >> 24 & 0xff) ^ (at >> 16 & 0x01) ^ ((at_enc_par >> 7) & 0x01) ^ (at_enc >> 16 & 0x01))
 		)
 		return false;
-		
+
 	return true;
 }
 
@@ -997,8 +1055,8 @@ int mfTraceDecode(uint8_t *data_src, int len, uint8_t parity, bool wantSaveToEml
 				crypto1_get_lfsr(revstate, &lfsr);
 				crypto1_destroy(revstate);
 				ui64Key = lfsr;
-				printf("key> probable key:%x%x Prng:%s ks2:%08x ks3:%08x\n", 
-					(unsigned int)((lfsr & 0xFFFFFFFF00000000) >> 32), (unsigned int)(lfsr & 0xFFFFFFFF), 
+				printf("key> probable key:%x%x Prng:%s ks2:%08x ks3:%08x\n",
+					(unsigned int)((lfsr & 0xFFFFFFFF00000000) >> 32), (unsigned int)(lfsr & 0xFFFFFFFF),
 					validate_prng_nonce(nt) ? "WEAK": "HARDEND",
 					ks2,
 					ks3);
@@ -1021,7 +1079,7 @@ int mfTraceDecode(uint8_t *data_src, int len, uint8_t parity, bool wantSaveToEml
 						printf("key> the same key test OK. key=%x%x\n", (unsigned int)((ui64Key & 0xFFFFFFFF00000000) >> 32), (unsigned int)(ui64Key & 0xFFFFFFFF));
 					else
 						printf("key> the same key test. check nt parity error.\n");
-					
+
 					uint32_t ntc = prng_successor(nt, 90);
 					uint32_t ntx = 0;
 					int ntcnt = 0;
@@ -1031,7 +1089,7 @@ int mfTraceDecode(uint8_t *data_src, int len, uint8_t parity, bool wantSaveToEml
 							if (!ntcnt)
 								ntx = ntc;
 							ntcnt++;
-						}						
+						}
 					}
 					if (ntcnt)
 						printf("key> nt candidate=%08x nonce distance=%d candidates count=%d\n", ntx, nonce_distance(nt, ntx), ntcnt);
@@ -1052,14 +1110,14 @@ int mfTraceDecode(uint8_t *data_src, int len, uint8_t parity, bool wantSaveToEml
 					crypto1_get_lfsr(revstate, &lfsr);
 					crypto1_destroy(revstate);
 					ui64Key = lfsr;
-					printf("key> probable key:%x%x  ks2:%08x ks3:%08x\n", 
+					printf("key> probable key:%x%x  ks2:%08x ks3:%08x\n",
 						(unsigned int)((lfsr & 0xFFFFFFFF00000000) >> 32), (unsigned int)(lfsr & 0xFFFFFFFF),
 						ks2,
 						ks3);
 					AddLogUint64(logHexFileName, "key> ", lfsr);
-				} else {				
+				} else {
 					printf("key> hardnested not implemented!\n");
-				
+
 					crypto1_destroy(traceCrypto1);
 
 					// not implemented
@@ -1139,44 +1197,44 @@ bool validate_prng_nonce(uint32_t nonce) {
 		dist[(x & 0xff) << 8 | x >> 8] = i;
 		x = x >> 1 | (x ^ x >> 2 ^ x >> 3 ^ x >> 5) << 15;
 	}
-	
+
 	uint32_t res = (65535 - dist[nonce >> 16] + dist[nonce & 0xffff]) % 65535;
-	
-	free(dist);	
+
+	free(dist);
 	return (res == 16);
 }
 
-/* Detect Tag Prng, 
+/* Detect Tag Prng,
 * function performs a partial AUTH,  where it tries to authenticate against block0, key A, but only collects tag nonce.
 * the tag nonce is check to see if it has a predictable PRNG.
-* @returns 
-*	TRUE if tag uses WEAK prng (ie Now the NACK bug also needs to be present for Darkside attack)
+* @returns
+*   TRUE if tag uses WEAK prng (ie Now the NACK bug also needs to be present for Darkside attack)
 *   FALSE is tag uses HARDEND prng (ie hardnested attack possible, with known key)
 */
 int DetectClassicPrng(void){
 
-	UsbCommand resp, respA;	
+	UsbCommand resp, respA;
 	uint8_t cmd[] = {0x60, 0x00}; // MIFARE_AUTH_KEYA
 	uint32_t flags = ISO14A_CONNECT | ISO14A_RAW | ISO14A_APPEND_CRC | ISO14A_NO_RATS;
-	
+
 	UsbCommand c = {CMD_READER_ISO_14443a, {flags, sizeof(cmd), 0}};
 	memcpy(c.d.asBytes, cmd, sizeof(cmd));
 
 	clearCommandBuffer();
 	SendCommand(&c);
 	if (!WaitForResponseTimeout(CMD_NACK, &resp, 2000)) {
-        PrintAndLog("PRNG UID: Reply timeout.");
+		PrintAndLog("PRNG UID: Reply timeout.");
 		return -1;
 	}
-	
+
 	// if select tag failed.
 	if (resp.arg[0] == 0) {
 		PrintAndLog("PRNG error: selecting tag failed, can't detect prng.");
 		return -1;
 	}
-	
+
 	if (!WaitForResponseTimeout(CMD_ACK, &respA, 5000)) {
-        PrintAndLog("PRNG data: Reply timeout.");
+		PrintAndLog("PRNG data: Reply timeout.");
 		return -1;
 	}
 

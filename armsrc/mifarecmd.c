@@ -640,8 +640,7 @@ int valid_nonce(uint32_t Nt, uint32_t NtEnc, uint32_t Ks1, uint8_t *parity) {
 // Mifare Classic Cards" in Proceedings of the 22nd ACM SIGSAC Conference on
 // Computer and Communications Security, 2015
 //-----------------------------------------------------------------------------
-void MifareAcquireEncryptedNonces(uint32_t arg0, uint32_t arg1, uint32_t flags, uint8_t *datain)
-{
+void MifareAcquireEncryptedNonces(uint32_t arg0, uint32_t arg1, uint32_t flags, uint8_t *datain) {
 	uint64_t ui64Key = 0;
 	uint8_t uid[10];
 	uint32_t cuid;
@@ -666,15 +665,12 @@ void MifareAcquireEncryptedNonces(uint32_t arg0, uint32_t arg1, uint32_t flags, 
 	bool field_off = flags & 0x0004;
 
 	LED_A_ON();
-	LED_C_OFF();
 
 	if (initialize) {
 		iso14443a_setup(FPGA_HF_ISO14443A_READER_LISTEN);
 		clear_trace();
 		set_tracing(true);
 	}
-
-	LED_C_ON();
 
 	uint16_t num_nonces = 0;
 	bool have_uid = false;
@@ -747,21 +743,18 @@ void MifareAcquireEncryptedNonces(uint32_t arg0, uint32_t arg1, uint32_t flags, 
 
 	}
 
-	LED_C_OFF();
-
 	crypto1_destroy(pcs);
 
 	if (field_off) {
 		FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
-		LEDsoff();
+		LED_D_OFF();
 	}
-
-	LED_B_ON();
-	cmd_send(CMD_ACK, isOK, cuid, num_nonces, buf, sizeof(buf));
-	LED_B_OFF();
 
 	if (MF_DBGLEVEL >= 3)   DbpString("AcquireEncryptedNonces finished");
 
+	cmd_send(CMD_ACK, isOK, cuid, num_nonces, buf, sizeof(buf));
+
+	LED_A_OFF();
 }
 
 
@@ -783,9 +776,10 @@ void MifareNested(uint32_t arg0, uint32_t arg1, uint32_t calibrate, uint8_t *dat
 	uint16_t davg;
 	static uint16_t dmin, dmax;
 	uint8_t uid[10];
-	uint32_t cuid, nt1, nt2, nttmp, nttest, ks1;
+	uint32_t cuid, nt1, nt2_enc, nttmp, nttest, ks1;
 	uint8_t par[1];
 	uint32_t target_nt[2], target_ks[2];
+	uint32_t fixed_nt = 0;
 	uint8_t target_nt_duplicate_count = 0;
 
 	uint8_t par_array[4];
@@ -812,7 +806,6 @@ void MifareNested(uint32_t arg0, uint32_t arg1, uint32_t calibrate, uint8_t *dat
 	#define NESTED_MAX_TRIES 12
 	uint16_t unsuccessfull_tries = 0;
 	if (calibrate) {    // for first call only. Otherwise reuse previous calibration
-		LED_B_ON();
 		WDT_HIT();
 
 		davg = dmax = 0;
@@ -846,13 +839,14 @@ void MifareNested(uint32_t arg0, uint32_t arg1, uint32_t calibrate, uint8_t *dat
 				rtr--;
 				continue;
 			};
+			fixed_nt = nt1;
 
 			if (delta_time) {
 				auth2_time = auth1_time + delta_time;
 			} else {
 				auth2_time = 0;
 			}
-			if (mifare_classic_authex(pcs, cuid, blockNo, keyType, ui64Key, AUTH_NESTED, &nt2, &auth2_time, NULL)) {
+			if (mifare_classic_authex(pcs, cuid, blockNo, keyType, ui64Key, AUTH_NESTED, &nt2_enc, &auth2_time, NULL)) {
 				if (MF_DBGLEVEL >= 1)   Dbprintf("Nested: Auth2 error");
 				rtr--;
 				continue;
@@ -861,7 +855,7 @@ void MifareNested(uint32_t arg0, uint32_t arg1, uint32_t calibrate, uint8_t *dat
 			nttmp = prng_successor(nt1, 100);               //NXP Mifare is typical around 840,but for some unlicensed/compatible mifare card this can be 160
 			for (i = 101; i < 1200; i++) {
 				nttmp = prng_successor(nttmp, 1);
-				if (nttmp == nt2) break;
+				if (nttmp == nt2_enc) break;
 			}
 
 			if (i != 1200) {
@@ -889,21 +883,17 @@ void MifareNested(uint32_t arg0, uint32_t arg1, uint32_t calibrate, uint8_t *dat
 		dmin = davg - 2;
 		dmax = davg + 2;
 
-		LED_B_OFF();
-
 	}
 	//  -------------------------------------------------------------------------------------------------
 
-	LED_C_ON();
-
 	//  get crypted nonces for target sector
-	for (i=0; i < 2 && !isOK; i++) { // look for exactly two different nonces
+	for (i = 0; i < 2 && !isOK; i++) { // look for exactly two different nonces
 
 		target_nt[i] = 0;
 		while (target_nt[i] == 0 && !isOK) { // continue until we have an unambiguous nonce
 
 			// prepare next select. No need to power down the card.
-			if(mifare_classic_halt(pcs, cuid)) {
+			if (mifare_classic_halt(pcs, cuid)) {
 				if (MF_DBGLEVEL >= 1)   Dbprintf("Nested: Halt error");
 				continue;
 			}
@@ -934,8 +924,8 @@ void MifareNested(uint32_t arg0, uint32_t arg1, uint32_t calibrate, uint8_t *dat
 				continue;
 			}
 
-			nt2 = bytes_to_num(receivedAnswer, 4);
-			if (MF_DBGLEVEL >= 3) Dbprintf("Nonce#%d: Testing nt1=%08x nt2enc=%08x nt2par=%02x", i+1, nt1, nt2, par[0]);
+			nt2_enc = bytes_to_num(receivedAnswer, 4);
+			if (MF_DBGLEVEL >= 3) Dbprintf("Nonce#%d: Testing nt1=%08x nt2enc=%08x nt2par=%02x", i+1, nt1, nt2_enc, par[0]);
 
 			// Parity validity check
 			for (j = 0; j < 4; j++) {
@@ -946,9 +936,9 @@ void MifareNested(uint32_t arg0, uint32_t arg1, uint32_t calibrate, uint8_t *dat
 			nttest = prng_successor(nt1, dmin - 1);
 			for (j = dmin; j < dmax + 1; j++) {
 				nttest = prng_successor(nttest, 1);
-				ks1 = nt2 ^ nttest;
+				ks1 = nt2_enc ^ nttest;
 
-				if (valid_nonce(nttest, nt2, ks1, par_array)){
+				if (valid_nonce(nttest, nt2_enc, ks1, par_array)){
 					if (ncount > 0) {       // we are only interested in disambiguous nonces, try again
 						if (MF_DBGLEVEL >= 3) Dbprintf("Nonce#%d: dismissed (ambigous), ntdist=%d", i+1, j);
 						target_nt[i] = 0;
@@ -974,28 +964,25 @@ void MifareNested(uint32_t arg0, uint32_t arg1, uint32_t calibrate, uint8_t *dat
 		}
 	}
 
-	LED_C_OFF();
+	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
+	LED_D_OFF();
 
-	//  ----------------------------- crypto1 destroy
 	crypto1_destroy(pcs);
 
-	uint8_t buf[4 + 4 * 4 + 4];
+	uint8_t buf[4 + 4 * 4 + 4 + 4];
 	memcpy(buf, &cuid, 4);
 	memcpy(buf+4, &target_nt[0], 4);
 	memcpy(buf+8, &target_ks[0], 4);
 	memcpy(buf+12, &target_nt[1], 4);
 	memcpy(buf+16, &target_ks[1], 4);
 	memcpy(buf+20, &authentication_timeout, 4);
-
-	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
+	memcpy(buf+24, &fixed_nt, 4);
 
 	if (MF_DBGLEVEL >= 3)   DbpString("NESTED FINISHED");
 
-	LED_B_ON();
 	cmd_send(CMD_ACK, isOK, 0, targetBlockNo + (targetKeyType * 0x100), buf, sizeof(buf));
-	LED_B_OFF();
 
-	LEDsoff();
+	LED_A_OFF();
 }
 
 
@@ -1011,6 +998,7 @@ void MifareChkKeys(uint16_t arg0, uint32_t arg1, uint8_t arg2, uint8_t *datain) 
 	bool multisectorCheck = arg1 & 0x02;
 	bool init = arg1 & 0x04;
 	bool drop_field = arg1 & 0x08;
+	bool fixed_nonce = arg1 & 0x10;
 	uint32_t auth_timeout = arg1 >> 16;
 	uint8_t keyCount = arg2;
 
@@ -1039,7 +1027,14 @@ void MifareChkKeys(uint16_t arg0, uint32_t arg1, uint8_t arg2, uint8_t *datain) 
 		} else {
 			cmd_send(CMD_ACK, 0, res, 0, NULL, 0);
 		}
-	} else {	
+	} else if (fixed_nonce) {
+		res = MifareChkBlockKeysFixedNonce(datain, keyCount, blockNo, keyType, &auth_timeout, OLD_MF_DBGLEVEL);
+		if (res > 0) {
+			cmd_send(CMD_ACK, 1, res, 0, NULL, 0); // key found
+		} else {
+			cmd_send(CMD_ACK, 0, res, 0, NULL, 0); // no key found or aborted
+		}
+	} else {
 		res = MifareChkBlockKeys(datain, keyCount, blockNo, keyType, &auth_timeout, OLD_MF_DBGLEVEL);
 		if (res > 0) {
 			cmd_send(CMD_ACK, 1, res, 0, datain + (res - 1) * 6, 6);
