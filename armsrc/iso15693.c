@@ -368,7 +368,7 @@ void TransmitTo15693Reader(const uint8_t *cmd, size_t len, uint32_t *start_time,
 //          false if we are still waiting for some more
 //=============================================================================
 
-#define NOISE_THRESHOLD          160                   // don't try to correlate noise
+#define NOISE_THRESHOLD          80                   // don't try to correlate noise
 #define MAX_PREVIOUS_AMPLITUDE   (-1 - NOISE_THRESHOLD)
 
 typedef struct DecodeTag {
@@ -1571,9 +1571,6 @@ void ReaderIso15693(uint32_t parameter) {
 
 	LED_A_ON();
 
-	Iso15693InitReader();
-
-	StartCountSspClk();
 	set_tracing(true);
 
 	uint8_t TagUID[8] = {0x00};
