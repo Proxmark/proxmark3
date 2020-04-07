@@ -9,6 +9,8 @@
 // Code for communicating with the proxmark3 hardware.
 //-----------------------------------------------------------------------------
 
+#define _POSIX_C_SOURCE 199309L // need clock_gettime()
+
 #include "comms.h"
 
 #include <stdio.h>
@@ -17,6 +19,7 @@
 #include <pthread.h>
 #include <inttypes.h>
 #include <time.h>
+#include <sys/time.h>
 
 #include "uart.h"
 #include "ui.h"
