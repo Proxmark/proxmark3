@@ -30,16 +30,16 @@ reg after_hysteresis, after_hysteresis_prev, after_hysteresis_prev_prev;
 reg [11:0] has_been_low_for;
 always @(negedge adc_clk)
 begin
-    if(& adc_d[7:0]) after_hysteresis <= 1'b1;
-    else if(~(| adc_d[7:0])) after_hysteresis <= 1'b0;
+    if (& adc_d[7:0]) after_hysteresis <= 1'b1;
+    else if (~(| adc_d[7:0])) after_hysteresis <= 1'b0;
 
-    if(after_hysteresis)
+    if (after_hysteresis)
     begin
-        has_been_low_for <= 7'b0;
+        has_been_low_for <= 12'd0;
     end
     else
     begin
-        if(has_been_low_for == 12'd4095)
+        if (has_been_low_for == 12'd4095)
         begin
             has_been_low_for <= 12'd0;
             after_hysteresis <= 1'b1;
@@ -235,6 +235,16 @@ end
 
 
 // ssp clock and frame signal for communication to and from ARM
+//                _____       _____       _____       _
+// ssp_clk       |     |_____|     |_____|     |_____|
+//                   _____
+// ssp_frame     ___|     |____________________________
+//                ___________ ___________ ___________ _
+// ssp_d_in      X___________X___________X___________X_
+//
+// corr_i_cnt    0  1  2  3  4  5  6  7  8  9 10 11 12 ...
+//
+
 reg ssp_clk;
 reg ssp_frame;
 
@@ -249,7 +259,7 @@ begin
 	// (send one frame with 16 Bits)
     if (corr_i_cnt == 6'd1)
         ssp_frame <= 1'b1;
-    if (corr_i_cnt == 6'd5)
+    if (corr_i_cnt == 6'd3)
         ssp_frame <= 1'b0;
 end
 

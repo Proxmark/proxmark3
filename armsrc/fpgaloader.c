@@ -32,7 +32,7 @@ extern uint8_t _binary_obj_fpga_all_bit_z_start, _binary_obj_fpga_all_bit_z_end;
 static uint8_t *fpga_image_ptr = NULL;
 static uint32_t uncompressed_bytes_cnt;
 
-#define OUTPUT_BUFFER_LEN 		80
+#define OUTPUT_BUFFER_LEN       80
 
 //-----------------------------------------------------------------------------
 // Set up the Serial Peripheral Interface as master
@@ -49,16 +49,16 @@ void SetupSpi(int mode)
 
 	// Disable PIO control of the following pins, allows use by the SPI peripheral
 	AT91C_BASE_PIOA->PIO_PDR =
-		GPIO_NCS0	|
-		GPIO_NCS2 	|
-		GPIO_MISO	|
-		GPIO_MOSI	|
+		GPIO_NCS0   |
+		GPIO_NCS2   |
+		GPIO_MISO   |
+		GPIO_MOSI   |
 		GPIO_SPCK;
 
 	AT91C_BASE_PIOA->PIO_ASR =
-		GPIO_NCS0	|
-		GPIO_MISO	|
-		GPIO_MOSI	|
+		GPIO_NCS0   |
+		GPIO_MISO   |
+		GPIO_MOSI   |
 		GPIO_SPCK;
 
 	AT91C_BASE_PIOA->PIO_BSR = GPIO_NCS2;
@@ -71,41 +71,41 @@ void SetupSpi(int mode)
 	switch (mode) {
 		case SPI_FPGA_MODE:
 			AT91C_BASE_SPI->SPI_MR =
-				( 0 << 24)	|	// Delay between chip selects (take default: 6 MCK periods)
-				(14 << 16)	|	// Peripheral Chip Select (selects FPGA SPI_NCS0 or PA11)
-				( 0 << 7)	|	// Local Loopback Disabled
-				( 1 << 4)	|	// Mode Fault Detection disabled
-				( 0 << 2)	|	// Chip selects connected directly to peripheral
-				( 0 << 1) 	|	// Fixed Peripheral Select
-				( 1 << 0);		// Master Mode
+				( 0 << 24)  |   // Delay between chip selects (take default: 6 MCK periods)
+				(14 << 16)  |   // Peripheral Chip Select (selects FPGA SPI_NCS0 or PA11)
+				( 0 << 7)   |   // Local Loopback Disabled
+				( 1 << 4)   |   // Mode Fault Detection disabled
+				( 0 << 2)   |   // Chip selects connected directly to peripheral
+				( 0 << 1)   |   // Fixed Peripheral Select
+				( 1 << 0);      // Master Mode
 			AT91C_BASE_SPI->SPI_CSR[0] =
-				( 1 << 24)	|	// Delay between Consecutive Transfers (32 MCK periods)
-				( 1 << 16)	|	// Delay Before SPCK (1 MCK period)
-				( 6 << 8)	|	// Serial Clock Baud Rate (baudrate = MCK/6 = 24Mhz/6 = 4M baud
-				( 8 << 4)	|	// Bits per Transfer (16 bits)
-				( 0 << 3)	|	// Chip Select inactive after transfer
-				( 1 << 1)	|	// Clock Phase data captured on leading edge, changes on following edge
-				( 0 << 0);		// Clock Polarity inactive state is logic 0
+				( 1 << 24)  |   // Delay between Consecutive Transfers (32 MCK periods)
+				( 1 << 16)  |   // Delay Before SPCK (1 MCK period)
+				( 6 << 8)   |   // Serial Clock Baud Rate (baudrate = MCK/6 = 24Mhz/6 = 4M baud
+				( 8 << 4)   |   // Bits per Transfer (16 bits)
+				( 0 << 3)   |   // Chip Select inactive after transfer
+				( 1 << 1)   |   // Clock Phase data captured on leading edge, changes on following edge
+				( 0 << 0);      // Clock Polarity inactive state is logic 0
 			break;
 		case SPI_LCD_MODE:
 			AT91C_BASE_SPI->SPI_MR =
-				( 0 << 24)	|	// Delay between chip selects (take default: 6 MCK periods)
-				(11 << 16)	|	// Peripheral Chip Select (selects LCD SPI_NCS2 or PA10)
-				( 0 << 7)	|	// Local Loopback Disabled
-				( 1 << 4)	|	// Mode Fault Detection disabled
-				( 0 << 2)	|	// Chip selects connected directly to peripheral
-				( 0 << 1) 	|	// Fixed Peripheral Select
-				( 1 << 0);		// Master Mode
+				( 0 << 24)  |   // Delay between chip selects (take default: 6 MCK periods)
+				(11 << 16)  |   // Peripheral Chip Select (selects LCD SPI_NCS2 or PA10)
+				( 0 << 7)   |   // Local Loopback Disabled
+				( 1 << 4)   |   // Mode Fault Detection disabled
+				( 0 << 2)   |   // Chip selects connected directly to peripheral
+				( 0 << 1)   |   // Fixed Peripheral Select
+				( 1 << 0);      // Master Mode
 			AT91C_BASE_SPI->SPI_CSR[2] =
-				( 1 << 24)	|	// Delay between Consecutive Transfers (32 MCK periods)
-				( 1 << 16)	|	// Delay Before SPCK (1 MCK period)
-				( 6 << 8)	|	// Serial Clock Baud Rate (baudrate = MCK/6 = 24Mhz/6 = 4M baud
-				( 1 << 4)	|	// Bits per Transfer (9 bits)
-				( 0 << 3)	|	// Chip Select inactive after transfer
-				( 1 << 1)	|	// Clock Phase data captured on leading edge, changes on following edge
-				( 0 << 0);		// Clock Polarity inactive state is logic 0
+				( 1 << 24)  |   // Delay between Consecutive Transfers (32 MCK periods)
+				( 1 << 16)  |   // Delay Before SPCK (1 MCK period)
+				( 6 << 8)   |   // Serial Clock Baud Rate (baudrate = MCK/6 = 24Mhz/6 = 4M baud
+				( 1 << 4)   |   // Bits per Transfer (9 bits)
+				( 0 << 3)   |   // Chip Select inactive after transfer
+				( 1 << 1)   |   // Clock Phase data captured on leading edge, changes on following edge
+				( 0 << 0);      // Clock Polarity inactive state is logic 0
 			break;
-		default:				// Disable SPI
+		default:                // Disable SPI
 			AT91C_BASE_SPI->SPI_CR = AT91C_SPI_SPIDIS;
 			break;
 	}
@@ -118,9 +118,9 @@ void SetupSpi(int mode)
 void FpgaSetupSsc(uint16_t FPGA_mode) {
 	// First configure the GPIOs, and get ourselves a clock.
 	AT91C_BASE_PIOA->PIO_ASR =
-		GPIO_SSC_FRAME	|
-		GPIO_SSC_DIN	|
-		GPIO_SSC_DOUT	|
+		GPIO_SSC_FRAME  |
+		GPIO_SSC_DIN    |
+		GPIO_SSC_DOUT   |
 		GPIO_SSC_CLK;
 	AT91C_BASE_PIOA->PIO_PDR = GPIO_SSC_DOUT;
 
@@ -135,14 +135,14 @@ void FpgaSetupSsc(uint16_t FPGA_mode) {
 
 	// 8, 16 or 32 bits per transfer, no loopback, MSB first, 1 transfer per sync
 	// pulse, no output sync
-	if ((FPGA_mode & 0x1c0) == FPGA_MAJOR_MODE_HF_READER && FpgaGetCurrent() == FPGA_BITSTREAM_HF) {
+	if ((FPGA_mode & FPGA_MAJOR_MODE_MASK) == FPGA_MAJOR_MODE_HF_READER && FpgaGetCurrent() == FPGA_BITSTREAM_HF) {
 		AT91C_BASE_SSC->SSC_RFMR = SSC_FRAME_MODE_BITS_IN_WORD(16) | AT91C_SSC_MSBF | SSC_FRAME_MODE_WORDS_PER_TRANSFER(0);
 	} else {
 		AT91C_BASE_SSC->SSC_RFMR = SSC_FRAME_MODE_BITS_IN_WORD(8) | AT91C_SSC_MSBF | SSC_FRAME_MODE_WORDS_PER_TRANSFER(0);
-	}		
+	}
 
-	// TX clock comes from TK pin, no clock output, outputs change on falling
-	// edge of TK, frame sync is sampled on rising edge of TK, start TX on rising edge of TF
+	// TX clock comes from TK pin, no clock output, outputs change on rising edge of TK, 
+	// TF (frame sync) is sampled on falling edge of TK, start TX on rising edge of TF
 	AT91C_BASE_SSC->SSC_TCMR = SSC_CLOCK_MODE_SELECT(2) | SSC_CLOCK_MODE_START(5);
 
 	// tx framing is the same as the rx framing
@@ -157,8 +157,7 @@ void FpgaSetupSsc(uint16_t FPGA_mode) {
 // ourselves, not to another buffer). The stuff to manipulate those buffers
 // is in apps.h, because it should be inlined, for speed.
 //-----------------------------------------------------------------------------
-bool FpgaSetupSscDma(uint8_t *buf, uint16_t sample_count)
-{
+bool FpgaSetupSscDma(uint8_t *buf, uint16_t sample_count) {
 	if (buf == NULL) return false;
 
 	AT91C_BASE_PDC_SSC->PDC_PTCR = AT91C_PDC_RXTDIS;        // Disable DMA Transfer
@@ -173,11 +172,11 @@ bool FpgaSetupSscDma(uint8_t *buf, uint16_t sample_count)
 
 //----------------------------------------------------------------------------
 // Uncompress (inflate) the FPGA data. Returns one decompressed byte with
-// each call. 
+// each call.
 //----------------------------------------------------------------------------
 static int get_from_fpga_combined_stream(z_streamp compressed_fpga_stream, uint8_t *output_buffer)
 {
-	if (fpga_image_ptr == compressed_fpga_stream->next_out) {	// need more data
+	if (fpga_image_ptr == compressed_fpga_stream->next_out) {   // need more data
 		compressed_fpga_stream->next_out = output_buffer;
 		compressed_fpga_stream->avail_out = OUTPUT_BUFFER_LEN;
 		fpga_image_ptr = output_buffer;
@@ -190,7 +189,7 @@ static int get_from_fpga_combined_stream(z_streamp compressed_fpga_stream, uint8
 	}
 
 	uncompressed_bytes_cnt++;
-	
+
 	return *fpga_image_ptr++;
 }
 
@@ -207,7 +206,7 @@ static int get_from_fpga_stream(int bitstream_version, z_streamp compressed_fpga
 	}
 
 	return get_from_fpga_combined_stream(compressed_fpga_stream, output_buffer);
-	
+
 }
 
 
@@ -224,14 +223,14 @@ static void fpga_inflate_free(voidpf opaque, voidpf address)
 
 
 //----------------------------------------------------------------------------
-// Initialize decompression of the respective (HF or LF) FPGA stream 
+// Initialize decompression of the respective (HF or LF) FPGA stream
 //----------------------------------------------------------------------------
 static bool reset_fpga_stream(int bitstream_version, z_streamp compressed_fpga_stream, uint8_t *output_buffer)
 {
 	uint8_t header[FPGA_BITSTREAM_FIXED_HEADER_SIZE];
-	
+
 	uncompressed_bytes_cnt = 0;
-	
+
 	// initialize z_stream structure for inflate:
 	compressed_fpga_stream->next_in = &_binary_obj_fpga_all_bit_z_start;
 	compressed_fpga_stream->avail_in = &_binary_obj_fpga_all_bit_z_end - &_binary_obj_fpga_all_bit_z_start;
@@ -247,7 +246,7 @@ static bool reset_fpga_stream(int bitstream_version, z_streamp compressed_fpga_s
 	for (uint16_t i = 0; i < FPGA_BITSTREAM_FIXED_HEADER_SIZE; i++) {
 		header[i] = get_from_fpga_stream(bitstream_version, compressed_fpga_stream, output_buffer);
 	}
-	
+
 	// Check for a valid .bit file (starts with bitparse_fixed_header)
 	if(memcmp(bitparse_fixed_header, header, FPGA_BITSTREAM_FIXED_HEADER_SIZE) == 0) {
 		return true;
@@ -275,25 +274,25 @@ static void DownloadFPGA(int bitstream_version, int FpgaImageLen, z_streamp comp
 {
 
 	//Dbprintf("DownloadFPGA(len: %d)", FpgaImageLen);
-	
+
 	int i=0;
 
 	AT91C_BASE_PIOA->PIO_OER = GPIO_FPGA_ON;
 	AT91C_BASE_PIOA->PIO_PER = GPIO_FPGA_ON;
-	HIGH(GPIO_FPGA_ON);		// ensure everything is powered on
+	HIGH(GPIO_FPGA_ON);     // ensure everything is powered on
 
 	SpinDelay(50);
 
 	LED_D_ON();
 
 	// These pins are inputs
-    AT91C_BASE_PIOA->PIO_ODR =
-    	GPIO_FPGA_NINIT |
-    	GPIO_FPGA_DONE;
+	AT91C_BASE_PIOA->PIO_ODR =
+		GPIO_FPGA_NINIT |
+		GPIO_FPGA_DONE;
 	// PIO controls the following pins
-    AT91C_BASE_PIOA->PIO_PER =
-    	GPIO_FPGA_NINIT |
-    	GPIO_FPGA_DONE;
+	AT91C_BASE_PIOA->PIO_PER =
+		GPIO_FPGA_NINIT |
+		GPIO_FPGA_DONE;
 	// Enable pull-ups
 	AT91C_BASE_PIOA->PIO_PPUER =
 		GPIO_FPGA_NINIT |
@@ -305,8 +304,8 @@ static void DownloadFPGA(int bitstream_version, int FpgaImageLen, z_streamp comp
 	LOW(GPIO_FPGA_DIN);
 	// These pins are outputs
 	AT91C_BASE_PIOA->PIO_OER =
-		GPIO_FPGA_NPROGRAM	|
-		GPIO_FPGA_CCLK		|
+		GPIO_FPGA_NPROGRAM  |
+		GPIO_FPGA_CCLK      |
 		GPIO_FPGA_DIN;
 
 	// enter FPGA configuration mode
@@ -335,7 +334,7 @@ static void DownloadFPGA(int bitstream_version, int FpgaImageLen, z_streamp comp
 		}
 		DownloadFPGA_byte(b);
 	}
-	
+
 	// continue to clock FPGA until ready signal goes high
 	i=100000;
 	while ( (i--) && ( !(AT91C_BASE_PIOA->PIO_PDSR & GPIO_FPGA_DONE ) ) ) {
@@ -407,14 +406,14 @@ static int bitparse_find_section(int bitstream_version, char section_name, unsig
 
 
 //----------------------------------------------------------------------------
-// Check which FPGA image is currently loaded (if any). If necessary 
+// Check which FPGA image is currently loaded (if any). If necessary
 // decompress and load the correct (HF or LF) image to the FPGA
 //----------------------------------------------------------------------------
 void FpgaDownloadAndGo(int bitstream_version)
 {
 	z_stream compressed_fpga_stream;
 	uint8_t output_buffer[OUTPUT_BUFFER_LEN] = {0x00};
-	
+
 	// check whether or not the bitstream is already loaded
 	if (downloaded_bitstream == bitstream_version) {
 		FpgaEnableTracing();
@@ -422,8 +421,8 @@ void FpgaDownloadAndGo(int bitstream_version)
 	}
 
 	// make sure that we have enough memory to decompress
-	BigBuf_free(); BigBuf_Clear_ext(false);	
-	
+	BigBuf_free(); BigBuf_Clear_ext(false);
+
 	if (!reset_fpga_stream(bitstream_version, &compressed_fpga_stream, output_buffer)) {
 		return;
 	}
@@ -435,13 +434,13 @@ void FpgaDownloadAndGo(int bitstream_version)
 	}
 
 	inflateEnd(&compressed_fpga_stream);
-	
+
 	// turn off antenna
 	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
-	
+
 	// free eventually allocated BigBuf memory
-	BigBuf_free(); BigBuf_Clear_ext(false);	
-}	
+	BigBuf_free(); BigBuf_Clear_ext(false);
+}
 
 
 //-----------------------------------------------------------------------------
@@ -451,8 +450,8 @@ void FpgaDownloadAndGo(int bitstream_version)
 //-----------------------------------------------------------------------------
 void FpgaSendCommand(uint16_t cmd, uint16_t v) {
 	SetupSpi(SPI_FPGA_MODE);
-	while ((AT91C_BASE_SPI->SPI_SR & AT91C_SPI_TXEMPTY) == 0);	// wait for the transfer to complete
-	AT91C_BASE_SPI->SPI_TDR = AT91C_SPI_LASTXFER | cmd | v;		// send the data
+	AT91C_BASE_SPI->SPI_TDR = AT91C_SPI_LASTXFER | cmd | v;     // write the data to be sent
+	while ((AT91C_BASE_SPI->SPI_SR & AT91C_SPI_TXEMPTY) == 0);  // wait for the transfer to complete
 }
 
 //-----------------------------------------------------------------------------
