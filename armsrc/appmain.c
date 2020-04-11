@@ -398,7 +398,7 @@ void SendStatus(void) {
 	LED_A_OFF();
 }
 
-#if defined(WITH_ISO14443a_StandAlone) || defined(WITH_LF_StandAlone)
+#if defined(WITH_ISO14443a_StandAlone) || defined(WITH_ISO15693_StandAlone) || defined(WITH_LF_StandAlone)
 
 #define OPTS 2
 
@@ -778,6 +778,101 @@ void SamyRun() {
 	}
 }
 
+#elif WITH_ISO15693_StandAlone
+
+void StandAloneMode15() {
+	StandAloneMode();
+	FpgaDownloadAndGo(FPGA_BITSTREAM_HF);
+
+	int mode = 0;
+	bool done = false;
+	const char *modes[] = { "Set password", "Reveal tag", "Lock password", "Stresstest", "Bruteforce", "Quit standalone" };
+
+	Dbprintf("Starting standalone mode: Menu");
+	LED(0x0F, 0);
+
+	/* wait for button being released before preoceeding evaluation */
+	while(BUTTON_PRESS()) {
+		WDT_HIT();
+	}
+
+	while(!done) {
+		SpinDelay(50);
+		usb_poll();
+		WDT_HIT();
+
+		LEDsoff();
+		switch(mode) {
+			case 0:
+				LED_A_ON();
+				break;
+			case 1:
+				LED_B_ON();
+				break;
+			case 2:
+				LED_C_ON();
+				break;
+			case 3:
+				LED_D_ON();
+				break;
+			case 4:
+				LED_D_ON();
+				LED_A_ON();
+				break;
+			case 5:
+				LED_A_ON();
+				LED_B_ON();
+				LED_C_ON();
+				LED_D_ON();
+				break;
+		}
+
+		switch(BUTTON_HELD(1000)) {
+			case BUTTON_SINGLE_CLICK:
+				mode++;
+				mode %= 6;
+				Dbprintf(" Menu #%d: %s", mode, modes[mode]);
+				break;
+			case BUTTON_HOLD:
+				Dbprintf(" Execute #%d", mode);
+				LEDsoff();
+				while(BUTTON_PRESS()) {
+					WDT_HIT();
+				}
+
+				switch(mode) {
+					case 0:
+						ChangePassSlixLIso15693(4, 0, 0x7FFD6E5B);
+						break;
+					case 1:
+						DisablePrivacySlixLIso15693(0x7FFD6E5B);
+						DisablePrivacySlixLIso15693(0x0F0F0F0F);
+						break;
+					case 2:
+						LockPassSlixLIso15693(4, 0x7FFD6E5B);
+						break;
+					case 3:
+						StressSlixLIso15693(0x0F0F0F0F, 7);
+						break;
+					case 4:
+						BruteforceIso15693(0x40, 0xFF);
+						break;
+					case 5:
+						done = true;
+						break;
+				}
+				LEDsoff();
+				while(BUTTON_PRESS()) {
+					WDT_HIT();
+				}
+				break;
+			default:
+				SpinDelay(50);
+				continue;
+		}
+	}
+}
+
 #endif
 
 /*
@@ -1095,6 +1190,22 @@ void UsbPacketReceived(UsbCommand *c) {
 			DirectTag15693Command(c->arg[0],c->arg[1],c->arg[2],c->d.asBytes);
 			break;
 
+		case CMD_ISO_15693_SLIX_L_CHANGE_PASS:
+			ChangePassSlixLIso15693(c->arg[0], c->arg[1], c->arg[2]);
+			break;
+
+		case CMD_ISO_15693_SLIX_L_DISABLE_PRIVACY:
+			DisablePrivacySlixLIso15693(c->arg[0]);
+			break;
+
+		case CMD_ISO_15693_SLIX_L_LOCK_PASS:
+			LockPassSlixLIso15693(c->arg[0], c->arg[1]);
+			break;
+
+		case CMD_ISO_15693_BRUTE_FORCE:
+			BruteforceIso15693(c->arg[0], c->arg[1]);
+			break;
+					
 		case CMD_ISO_15693_FIND_AFI:
 			BruteforceIso15693Afi(c->arg[0]);
 			break;
@@ -1494,6 +1605,10 @@ void  __attribute__((noreturn)) AppMain(void) {
 #if defined(WITH_ISO14443a) && defined(WITH_ISO14443a_StandAlone)
 			if (BUTTON_HELD(1000) > 0)
 				StandAloneMode14a();
+#endif
+#if defined(WITH_ISO15693) && defined(WITH_ISO15693_StandAlone)
+			if (BUTTON_HELD(1000) > 0)
+				StandAloneMode15();
 #endif
 		}
 	}

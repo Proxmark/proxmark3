@@ -39,5 +39,10 @@ extern void DirectTag15693Command(uint32_t datalen, uint32_t speed, uint32_t rec
 extern void SetTag15693Uid(uint8_t *uid);
 extern void SetDebugIso15693(uint32_t flag);
 extern bool LogTrace_ISO15693(const uint8_t *btBytes, uint16_t iLen, uint32_t timestamp_start, uint32_t timestamp_end, uint8_t *parity, bool readerToTag);
+extern void BruteforceIso15693(uint32_t start_cmd, uint32_t end_cmd);
+extern void StressSlixLIso15693(uint32_t password, uint32_t flags);
+extern void ChangePassSlixLIso15693(uint32_t pass_id, uint32_t old_password, uint32_t password);
+extern void LockPassSlixLIso15693(uint32_t pass_id, uint32_t password);
+extern void DisablePrivacySlixLIso15693(uint32_t password);
 
 #endif
