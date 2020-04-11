@@ -1094,6 +1094,12 @@ int GetIso15693CommandFromReader(uint8_t *received, size_t max_len, uint32_t *eo
 			break;
 		}
 
+		/* cancel receive operation when there is USB activity */
+		if (usb_poll_validate_length()) {
+			DecodeReader.byteCount = -2;
+			break;
+		}
+
 		if (BUTTON_PRESS()) {
 			DecodeReader.byteCount = -1;
 			break;
@@ -1838,14 +1844,15 @@ void ChangePassSlixLIso15693(uint32_t pass_id, uint32_t old_password, uint32_t p
 			case BUTTON_HOLD:
 				Dbprintf("ChangePass: Terminating");
 				done = true;
-				break;
+				continue;
 			default:
 				SpinDelay(50);
 				continue;
 		}
 
-		if(done) {
-			break;
+		if(usb_poll_validate_length()) {
+			done = true;
+			continue;
 		}
 
 		/* check if a tag is available */
@@ -1936,9 +1943,13 @@ void StressSlixLIso15693(uint32_t password, uint32_t flags) {
 				Dbprintf("Stress SLIX-L: Terminating");
 				done = true;
 				continue;
-
 			default:
 				break;
+		}
+
+		if(usb_poll_validate_length()) {
+			done = true;
+			continue;
 		}
 
 		if(!GetRandomSlixLIso15693(start_time, &eof_time, NULL)) {	
@@ -2116,15 +2127,15 @@ void LockPassSlixLIso15693(uint32_t pass_id, uint32_t password) {
 			case BUTTON_HOLD:
 				Dbprintf("LockPass: Terminating");
 				done = true;
-				break;
+				continue;
 			default:
 				SpinDelay(50);
 				continue;
 		}
 
-		if(done)
-		{
-			break;
+		if(usb_poll_validate_length()) {
+			done = true;
+			continue;
 		}
 
 		recvlen = SendDataTag(cmd_get_rnd, sizeof(cmd_get_rnd), true, true, recvbuf, sizeof(recvbuf), start_time, ISO15693_READER_TIMEOUT_WRITE, &eof_time);
@@ -2280,7 +2291,7 @@ void BruteforceIso15693(uint32_t start_cmd, uint32_t end_cmd) {
 			for(uint16_t magic = 0; magic <= 0x100; magic++) {
 				int extra = (magic < 0x100) ? 1 : 0;
 
-				if (BUTTON_PRESS()) {
+				if (BUTTON_PRESS() || usb_poll_validate_length()) {
 					Dbprintf(" [i] Terminating");
 					done = true;
 					break;
@@ -2416,8 +2427,18 @@ void SimTagIso15693(uint32_t parameter, uint8_t *uid) {
 		uint32_t eof_time = 0, start_time = 0;
 		int cmd_len = GetIso15693CommandFromReader(cmd, sizeof(cmd), &eof_time);
 
-		if(cmd_len < 0) {
-			continue;
+		switch(cmd_len) {
+			case -1:
+				/* button pressed */
+				continue;
+			case -2:
+				/* USB activity */
+				Dbprintf("SimTag: Terminating due to USB activity");
+				done = true;
+				continue;
+			default:
+				/* data received */
+				break;
 		}
 
 		uint8_t flags = cmd[0];

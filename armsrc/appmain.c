@@ -797,6 +797,11 @@ void StandAloneMode15() {
 	}
 
 	while(!done) {
+		if(usb_poll_validate_length()) {
+			done = true;
+			continue;
+		}
+		
 		SpinDelay(50);
 		usb_poll();
 		WDT_HIT();
