@@ -2375,6 +2375,15 @@ void Iso15693InitTag(void) {
 	StartCountSspClk();
 }
 
+bool RevUidMatch(uint8_t *uid, uint8_t *pkt) {
+	for(int pos = 0; pos < 8; pos++) {
+		if(uid[pos] != pkt[7-pos]) {
+			return false;
+		}
+	}
+	return true;
+}
+
 // Simulate an ISO15693 TAG.
 // For Inventory command: print command and send Inventory Response with given UID
 // TODO: interpret other reader commands and send appropriate response
@@ -2442,11 +2451,19 @@ void SimTagIso15693(uint32_t parameter, uint8_t *uid) {
 		}
 
 		uint8_t flags = cmd[0];
-		bool slow = !(flags & ISO15693_REQ_DATARATE_HIGH);
-		bool addressed = (flags & ISO15693_REQ_ADDRESS);
 		uint8_t command = cmd[1];
+		bool slow = !(flags & ISO15693_REQ_DATARATE_HIGH);
+		bool addressed = !(flags & ISO15693_REQ_INVENTORY) && (flags & ISO15693_REQ_ADDRESS);
+		/* when commands above 0xA0 are sent, its most likely a manufacturer code. for SLIX-L it contains an extra byte 0x04 right after the command */
+		bool advanced = addressed && (command >= 0xA0);
+		uint8_t *address = &cmd[2 + (advanced?1:0)];
 
 		start_time = eof_time + DELAY_ISO15693_VCD_TO_VICC_SIM;
+
+		if(addressed && !RevUidMatch(address, uid)) {
+			Dbprintf("(addressed packet, but not for us)");
+			continue;
+		}
 
 		if(debug || passive) {
 			Dbprintf("%d bytes read from reader:", cmd_len);
