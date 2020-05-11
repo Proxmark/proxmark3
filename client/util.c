@@ -11,6 +11,7 @@
 #include "util.h"
 
 #include <stdint.h>
+#include <inttypes.h>
 #include <string.h>
 #include <ctype.h>
 #include <stdlib.h>
@@ -572,7 +573,7 @@ int param_gethex_to_eol(const char *line, int paramnum, uint8_t * data, int maxd
 		}
 
 		if (strlen(buf) >= 2) {
-			sscanf(buf, "%x", &temp);
+			sscanf(buf, "%" SCNx32, &temp);
 			data[*datalen] = (uint8_t)(temp & 0xff);
 			*buf = 0;
 			(*datalen)++;

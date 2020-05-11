@@ -335,10 +335,10 @@ int CmdFPGAOff(const char *Cmd)
 
 int CmdLCD(const char *Cmd)
 {
-  int i, j;
+  unsigned int i, j;
 
   UsbCommand c={CMD_LCD};
-  sscanf(Cmd, "%x %d", &i, &j);
+  sscanf(Cmd, "%x %u", &i, &j);
   while (j--) {
     c.arg[0] = i & 0x1ff;
     SendCommand(&c);

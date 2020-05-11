@@ -14,6 +14,8 @@
 
 #include <stdio.h>
 #include <string.h>
+#include <inttypes.h>
+
 #include "proxmark3.h"
 #include "apps.h"
 #include "util.h"
@@ -192,7 +194,7 @@ void iso14a_set_trigger(bool enable) {
 void iso14a_set_timeout(uint32_t timeout) {
 	// adjust timeout by FPGA delays and 2 additional ssp_frames to detect SOF
 	iso14a_timeout = timeout + (DELAY_AIR2ARM_AS_READER + DELAY_ARM2AIR_AS_READER)/(16*8) + 2;
-	if(MF_DBGLEVEL >= 3) Dbprintf("ISO14443A Timeout set to %ld (%dms)", timeout, timeout / 106);
+	if (MF_DBGLEVEL >= 3) Dbprintf("ISO14443A Timeout set to %" PRIu32 " (%dms)", timeout, timeout / 106);
 }
 
 

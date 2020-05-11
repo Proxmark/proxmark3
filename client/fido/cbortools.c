@@ -40,7 +40,7 @@ static CborError dumpelm(CborValue *it, bool *got_next, int nestingLevel) {
 	case CborIntegerType: {
 		int64_t val;
 		cbor_value_get_int64(it, &val);     // can't fail
-		printf("%lld", (long long)val);
+		printf("%" PRIi64, val);
 		break;
 	}
 
@@ -71,7 +71,7 @@ static CborError dumpelm(CborValue *it, bool *got_next, int nestingLevel) {
 	case CborTagType: {
 		CborTag tag;
 		cbor_value_get_tag(it, &tag);     
-		printf("Tag(%lld)", (long long)tag);
+		printf("Tag(%" PRIu64, tag);
 		break;
 	}
 
@@ -206,13 +206,7 @@ int TinyCborPrintFIDOPackage(uint8_t cmdCode, bool isResponse, uint8_t *data, si
     CborError err = dumprecursive(cmdCode, isResponse, &cb, false, 0);
 
 	if (err) {
-		fprintf(stderr,
-#if __WORDSIZE == 64		
-		"CBOR parsing failure at offset %" PRId64 " : %s\n",
-#else
-		"CBOR parsing failure at offset %" PRId32 " : %s\n",	
-#endif
-		cb.ptr - data, cbor_error_string(err));
+		fprintf(stderr,	"CBOR parsing failure at offset %td : %s\n", cb.ptr - data, cbor_error_string(err));
 		return 1;
 	}	
 	
