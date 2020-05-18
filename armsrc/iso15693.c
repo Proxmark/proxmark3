@@ -1834,13 +1834,13 @@ void DisablePrivacySlixLIso15693(uint32_t password) {
 	switch(SetPassSlixLIso15693(start_time, &eof_time, 4, password)) {
 		case SLIX_ERR_NORESP:
 			Dbprintf("   [i] No tag found");
-			cmd_send(CMD_NACK, 0, 0, 0, NULL, ISO15693_MAX_RESPONSE_LENGTH);
+			cmd_send(CMD_NACK, 0, 0, 0, NULL, 0);
 			LED_C_ON();
 			return;
 
 		case SLIX_ERR_INVPASS:
 			Dbprintf("   [E] Password was not accepted");
-			cmd_send(CMD_NACK, 1, 0, 0, NULL, ISO15693_MAX_RESPONSE_LENGTH);
+			cmd_send(CMD_NACK, 1, 0, 0, NULL, 0);
 			LED_B_ON();
 			return;
 	}
