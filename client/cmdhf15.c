@@ -306,112 +306,6 @@ static int CmdHF15Afi(const char *Cmd) {
 	return 0;
 }
 
-
-
-static int CmdHF15SlixChangePass(const char *Cmd)
-{
-	char cmdp = param_getchar(Cmd, 0);
-	uint8_t old_pass[4] = {0x00};
-	uint8_t new_pass[4] = {0x00};
-	uint8_t pass_id[1] = {0x00};
-
-	if (cmdp == 'h' || cmdp == 'H') {
-		PrintAndLog("Usage:  hf 15 slix_change_pass <pass_id> <old_pass> <new_pass>");
-		PrintAndLog("");
-		PrintAndLog("     pass_id 04: privacy, 08: destroy, 10: EAS/AFI");
-		PrintAndLog("");
-		PrintAndLog("     example: hf 15 slix_change_pass 04 00000000 0F0F0F0F");
-		return 0;
-	}
-
-	if (param_gethex(Cmd, 0, pass_id, 2)) {
-		PrintAndLog("pass_id must have 2 HEX symbols");
-		return 0;
-	}
-	if (param_gethex(Cmd, 1, old_pass, 8)) {
-		PrintAndLog("pass must have 8 HEX symbols");
-		return 0;
-	}
-	if (param_gethex(Cmd, 2, new_pass, 8)) {
-		PrintAndLog("pass must have 8 HEX symbols");
-		return 0;
-	}
-	
-	PrintAndLog("Setting new password %02X%02X%02X%02X for ID 0x%02X", new_pass[0], new_pass[1], new_pass[2], new_pass[3], *pass_id);
-	
-	UsbCommand c = {CMD_ISO_15693_SLIX_L_CHANGE_PASS, {*pass_id, 0, 0}};
-	
-	memcpy(&c.arg[1],old_pass,4);
-	memcpy(&c.arg[2],new_pass,4);
-
-	SendCommand(&c);
-	return 0;
-}
-
-static int CmdHF15SlixLockPass(const char *Cmd)
-{
-	char cmdp = param_getchar(Cmd, 0);
-	uint8_t pass[4] = {0x00};
-	uint8_t pass_id[1] = {0x00};
-
-	if (cmdp == 'h' || cmdp == 'H') {
-		PrintAndLog("Usage:  hf 15 slix_lock_pass <pass_id> <password>");
-		PrintAndLog("");
-		PrintAndLog("     pass_id 04: privacy, 08: destroy, 10: EAS/AFI");
-		PrintAndLog("");
-		PrintAndLog("     example: hf 15 slix_lock_pass 04 0F0F0F0F");
-		return 0;
-	}
-
-	if (param_gethex(Cmd, 0, pass_id, 2)) {
-		PrintAndLog("pass_id must have 2 HEX symbols");
-		return 0;
-	}
-	if (param_gethex(Cmd, 1, pass, 8)) {
-		PrintAndLog("pass must have 8 HEX symbols");
-		return 0;
-	}
-	
-	PrintAndLog("Locking password %02X%02X%02X%02X for ID 0x%02X", pass[0], pass[1], pass[2], pass[3], *pass_id);
-	
-	UsbCommand c = {CMD_ISO_15693_SLIX_L_LOCK_PASS, {*pass_id, 0, 0}};
-	
-	memcpy(&c.arg[1],pass,4);
-
-	SendCommand(&c);
-	return 0;
-}
-
-static int CmdHF15Bruteforce(const char *Cmd)
-{
-	char cmdp = param_getchar(Cmd, 0);
-	uint8_t start_cmd = 0x00;
-	uint8_t end_cmd = 0x00;
-
-	if (cmdp == 'h' || cmdp == 'H') {
-		PrintAndLog("Usage:  hf 15 brute <start_cmd> <end_cmd>");
-		PrintAndLog("");
-		PrintAndLog("     example: hf 15 brute 40 A0");
-		return 0;
-	}
-
-	if (param_gethex(Cmd, 0, &start_cmd, 2)) {
-		PrintAndLog("start_cmd must have 2 HEX symbols");
-		return 0;
-	}
-	if (param_gethex(Cmd, 1, &end_cmd, 2)) {
-		PrintAndLog("end_cmd must have 2 HEX symbols");
-		return 0;
-	}
-	
-	PrintAndLog("Scanning commands 0x%02X - 0x%02X", start_cmd, end_cmd);
-	
-	UsbCommand c = {CMD_ISO_15693_BRUTE_FORCE, {start_cmd, end_cmd, 0}};
-	
-	SendCommand(&c);
-	return 0;
-}
-
 static int CmdHF15SlixDisablePrivacy(const char *Cmd)
 {
 	char cmdp = param_getchar(Cmd, 0);
@@ -1201,10 +1095,7 @@ static command_t CommandTable15[] = {
 	{"reader",     CmdHF15Reader,  0, "Act like an ISO15693 reader"},
 	{"sim",        CmdHF15Sim,     0, "Fake an ISO15693 tag"},
 	{"cmd",        CmdHF15Cmd,     0, "Send direct commands to ISO15693 tag"},
-	{"brute",      CmdHF15Bruteforce,     0, "Brute force ISO15693 commands"},
 	{"slix_disable_privacy",     CmdHF15SlixDisablePrivacy,     0, "Disable privacy mode on SLIX ISO15693 tag"},
-	{"slix_change_pass",     CmdHF15SlixChangePass,     0, "Change password of SLIX ISO15693 tag"},
-	{"slix_lock_pass",     CmdHF15SlixLockPass,     0, "Lock password on SLIX ISO15693 tag"},
 	{"findafi",    CmdHF15Afi,     0, "Brute force AFI of an ISO15693 tag"},
 	{"dumpmemory", CmdHF15DumpMem, 0, "Read all memory pages of an ISO15693 tag"},
 	{"csetuid",	   CmdHF15CSetUID, 0, "Set UID for magic Chinese card"},

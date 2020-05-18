@@ -1821,6 +1821,42 @@ int ReadMemoryIso15693(uint32_t start_time, uint32_t *eof_time, uint8_t bank, ui
 	return SLIX_ERR_OK;
 }
 
+void DisablePrivacySlixLIso15693(uint32_t password) {
+	uint32_t start_time = 0;
+	uint32_t eof_time = 0;
+	
+	Dbprintf(" [x] Set password");
+
+	LED_D_ON();
+	Iso15693InitReader();
+	StartCountSspClk();
+
+	switch(SetPassSlixLIso15693(start_time, &eof_time, 4, password)) {
+		case SLIX_ERR_NORESP:
+			Dbprintf("   [i] No tag found");
+			cmd_send(CMD_NACK, 0, 0, 0, NULL, ISO15693_MAX_RESPONSE_LENGTH);
+			LED_C_ON();
+			return;
+
+		case SLIX_ERR_INVPASS:
+			Dbprintf("   [E] Password was not accepted");
+			cmd_send(CMD_NACK, 1, 0, 0, NULL, ISO15693_MAX_RESPONSE_LENGTH);
+			LED_B_ON();
+			return;
+	}
+	Dbprintf(" [x] Success");
+
+	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
+	
+	cmd_send(CMD_ACK,1,0,0,0,0);
+	LED_A_OFF();
+	LED_B_OFF();
+	LED_C_OFF();
+	LED_D_OFF();
+}
+
+#if defined(WITH_ISO15693_StandAlone)
+
 void ChangePassSlixLIso15693(uint32_t pass_id, uint32_t old_password, uint32_t password) {
 	uint8_t uid[8];
 	bool done = false;
@@ -2209,38 +2245,6 @@ void LockPassSlixLIso15693(uint32_t pass_id, uint32_t password) {
 	LED_D_OFF();
 }
 
-void DisablePrivacySlixLIso15693(uint32_t password) {
-	uint32_t start_time = 0;
-	uint32_t eof_time = 0;
-	
-	Dbprintf(" [x] Set password");
-
-	LED_D_ON();
-	Iso15693InitReader();
-	StartCountSspClk();
-
-	switch(SetPassSlixLIso15693(start_time, &eof_time, 4, password)) {
-		case SLIX_ERR_NORESP:
-			Dbprintf("   [i] No tag found");
-			LED_C_ON();
-			return;
-
-		case SLIX_ERR_INVPASS:
-			Dbprintf("   [E] Password was not accepted");
-			LED_B_ON();
-			return;
-	}
-	Dbprintf(" [x] Success");
-
-	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
-	
-	cmd_send(CMD_ACK,1,0,0,0,0);
-	LED_A_OFF();
-	LED_B_OFF();
-	LED_C_OFF();
-	LED_D_OFF();
-}
-
 
 void BruteforceIso15693(uint32_t start_cmd, uint32_t end_cmd) {
 	uint8_t cmd_buffer[64];
@@ -2363,7 +2367,7 @@ void BruteforceIso15693(uint32_t start_cmd, uint32_t end_cmd) {
 	LED_C_OFF();
 	LED_D_OFF();
 }
-
+#endif
 
 // Initialize the proxmark as iso15k tag
 void Iso15693InitTag(void) {

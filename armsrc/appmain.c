@@ -1195,20 +1195,8 @@ void UsbPacketReceived(UsbCommand *c) {
 			DirectTag15693Command(c->arg[0],c->arg[1],c->arg[2],c->d.asBytes);
 			break;
 
-		case CMD_ISO_15693_SLIX_L_CHANGE_PASS:
-			ChangePassSlixLIso15693(c->arg[0], c->arg[1], c->arg[2]);
-			break;
-
 		case CMD_ISO_15693_SLIX_L_DISABLE_PRIVACY:
 			DisablePrivacySlixLIso15693(c->arg[0]);
-			break;
-
-		case CMD_ISO_15693_SLIX_L_LOCK_PASS:
-			LockPassSlixLIso15693(c->arg[0], c->arg[1]);
-			break;
-
-		case CMD_ISO_15693_BRUTE_FORCE:
-			BruteforceIso15693(c->arg[0], c->arg[1]);
 			break;
 					
 		case CMD_ISO_15693_FIND_AFI:
