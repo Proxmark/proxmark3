@@ -2696,6 +2696,7 @@ void SimTagIso15693(uint32_t parameter, uint8_t *uid) {
 		}
 	}
 
+	cmd_send(CMD_ACK,1,0,0,0,0);
    	FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
 	LEDsoff();
 }
