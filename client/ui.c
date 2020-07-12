@@ -13,6 +13,7 @@
 #ifndef EXTERNAL_PRINTANDLOG
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 #include <stdarg.h>
 #include <readline/readline.h>
 #include <pthread.h>
