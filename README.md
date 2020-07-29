@@ -16,6 +16,7 @@ do something useful with a proxmark3.
 * [The Forum](http://www.proxmark.org/forum)
 * The IRC channel: irc.freenode.org #proxmark3 ([chat in your browser](http://webchat.freenode.net/?channels=#proxmark3))
 * [The Homebrew formula repository](https://github.com/Proxmark/homebrew-proxmark3)
+* [Proxmark3 community discord server](https://discord.gg/86VcRtS)
    
 ## Development
 
