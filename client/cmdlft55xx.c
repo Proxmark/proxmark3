@@ -124,6 +124,8 @@ int usage_t55xx_dump(){
 	PrintAndLog("Options:");
 	PrintAndLog("     <password>  - OPTIONAL password 4bytes (8 hex symbols)");
 	PrintAndLog("     o           - OPTIONAL override, force pwd read despite danger to card");
+	PrintAndLog("     r <mode>      - OPTIONAL downlink encoding '0' fixed bit length (default), '1' long leading reference");
+	PrintAndLog("                                                '2' leading zero,               '3' 1 of 4 coding reference"); 
 	PrintAndLog("");
 	PrintAndLog("Examples:");
 	PrintAndLog("      lf t55xx dump");
@@ -1256,24 +1258,53 @@ int CmdT55xxInfo(const char *Cmd){
 int CmdT55xxDump(const char *Cmd){
 
 	uint32_t password = 0;
-	char cmdp = param_getchar(Cmd, 0);
+	uint8_t cmdp = 0;
+	uint8_t downlink_mode = 0;
+	char param_first[10];
+	int param_first_len;
 	bool override = false;
-	if ( cmdp == 'h' || cmdp == 'H') return usage_t55xx_dump();
+	bool usepwd = false;
 
-	bool usepwd = ( strlen(Cmd) > 0);
-	if ( usepwd ){
-		password = param_get32ex(Cmd, 0, 0, 16);
-		if (param_getchar(Cmd, 1) =='o' )
-			override = true;
+	param_getstr(Cmd, 0, param_first, 10);
+	param_first_len = strlen(param_first);
+	usepwd = (param_first_len > 1);
+
+	if(usepwd) {
+		password = param_get32ex(Cmd, cmdp, 0, 16);
+		cmdp++;
 	}
+
+	while(param_getchar(Cmd, cmdp) != 0x00 && !errors) {
+		switch(param_getchar(Cmd, cmdp)) {
+		case 'h':
+		case 'H':
+			return usage_t55xx_dump();
+		case 'o':
+		case 'O':
+			override = true;
+			cmdp++;
+			break;
+		case 'r':
+		case 'R':
+			downlink_mode = param_getchar(Cmd, cmdp+1) - '0';
+			if (downlink_mode > 3) downlink_mode = 0;
+			cmdp +=2;
+			break;
+		default:
+			PrintAndLog("Unknown parameter '%c'", param_getchar(Cmd, cmdp));
+			errors = true;
+			break;
+		}
+	}
+	if (errors) return usage_t55xx_dump();
 	
 	printT5xxHeader(0);
 	for ( uint8_t i = 0; i <8; ++i)
-		T55xxReadBlock(i, 0, usepwd, override, password,0);
+		T55xxReadBlock(i, 0, usepwd, override, password, downlink_mode);
 
 	printT5xxHeader(1);
 	for ( uint8_t	i = 0; i<4; i++)
-		T55xxReadBlock(i, 1, usepwd, override, password,0);		
+		T55xxReadBlock(i, 1, usepwd, override, password, downlink_mode);		
 
 	return 1;
 }
