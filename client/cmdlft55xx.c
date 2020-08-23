@@ -124,8 +124,8 @@ int usage_t55xx_dump(){
 	PrintAndLog("Options:");
 	PrintAndLog("     <password>  - OPTIONAL password 4bytes (8 hex symbols)");
 	PrintAndLog("     o           - OPTIONAL override, force pwd read despite danger to card");
-	PrintAndLog("     r <mode>      - OPTIONAL downlink encoding '0' fixed bit length (default), '1' long leading reference");
-	PrintAndLog("                                                '2' leading zero,               '3' 1 of 4 coding reference"); 
+	PrintAndLog("     r <mode>    - OPTIONAL downlink encoding '0' fixed bit length (default), '1' long leading reference");
+	PrintAndLog("                                              '2' leading zero,               '3' 1 of 4 coding reference"); 
 	PrintAndLog("");
 	PrintAndLog("Examples:");
 	PrintAndLog("      lf t55xx dump");
