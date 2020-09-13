@@ -2520,23 +2520,31 @@ void SimTagIso15693(uint32_t parameter, uint8_t *uid) {
 				uint8_t block = cmd[2 + (addressed ? 8 : 0)];
 
 				if(!private) {
-					resp[0] = ISO15693_NOERROR;
 					if(block < 8)
 					{
 						Dbprintf("READBLOCK %d", block);
-					}
-					else
-					{
-						Dbprintf("READBLOCK %d (beyond size)", block);
-					}
-					memcpy(&resp[1], &memory[4 * (block%8)], 4);
-					
-					crc = Iso15693Crc(resp, 5);
-					resp[5] = crc & 0xff;
-					resp[6] = crc >> 8;
+						
+						resp[0] = ISO15693_NOERROR;
+						memcpy(&resp[1], &memory[4 * (block%8)], 4);
+						
+						crc = Iso15693Crc(resp, 5);
+						resp[5] = crc & 0xff;
+						resp[6] = crc >> 8;
 
-					CodeIso15693AsTag(resp, sizeof(resp));
-					TransmitTo15693Reader(ToSend, ToSendMax, &start_time, 0, slow);
+						CodeIso15693AsTag(resp, sizeof(resp));
+						TransmitTo15693Reader(ToSend, ToSendMax, &start_time, 0, slow);
+					} else {
+						Dbprintf("READBLOCK %d (error, beyond size)", block);
+
+						resp[0] = ISO15693_RES_ERROR;
+						resp[1] = ISO15693_ERROR_GENERIC;
+						crc = Iso15693Crc(resp, 2);
+						resp[2] = crc & 0xff;
+						resp[3] = crc >> 8;
+
+						CodeIso15693AsTag(resp, 4);
+						TransmitTo15693Reader(ToSend, ToSendMax, &start_time, 0, slow);
+					}
 				} else {
 					Dbprintf("READBLOCK %d (won't answer, privacy mode)", block);
 				}
