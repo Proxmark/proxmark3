@@ -714,7 +714,7 @@ static int SelectCard14443_4(bool disconnect, iso14a_card_select_t *card) {
 	// Anticollision + SELECT card
 	UsbCommand ca = {CMD_READER_ISO_14443a, {ISO14A_CONNECT | ISO14A_NO_DISCONNECT, 0, 0}};
 	SendCommand(&ca);
-	if (!WaitForResponseTimeout(CMD_ACK, &resp, 1500)) {
+	if (!WaitForResponseTimeout(CMD_NACK, &resp, 500)) {
 		PrintAndLogEx(ERR, "Proxmark connection timeout.");
 		return 1;
 	}
