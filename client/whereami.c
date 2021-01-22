@@ -261,7 +261,7 @@ int WAI_PREFIX(getModulePath)(char* out, int capacity, int* dirname_length)
       if (!fgets(buffer, sizeof(buffer), maps))
         break;
 
-      if (sscanf(buffer, "%" SCNx64 "-%" SCNx64 " %s %" SCNx64 " %x:%x %u %s\n", &low, &high, perms, &offset, &major, &minor, &inode, path) == 8)
+      if (sscanf(buffer, "%" SCNx64 "-%" SCNx64 " %s %" SCNx64 " %" SCNx32 ":%" SCNx32 " %" SCNu32 " %s\n", &low, &high, perms, &offset, &major, &minor, &inode, path) == 8)
       {
         uint64_t addr = (uint64_t)(uintptr_t)WAI_RETURN_ADDRESS();
         if (low <= addr && addr <= high)

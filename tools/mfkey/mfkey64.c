@@ -28,11 +28,11 @@ int main (int argc, char *argv[])
 	int enclen[encc];
 	uint8_t enc[encc][120]; 
 
-	sscanf(argv[1], "%x", &uid);
-	sscanf(argv[2], "%x", &nt);
-	sscanf(argv[3], "%x", &nr_enc);
-	sscanf(argv[4], "%x", &ar_enc);
-	sscanf(argv[5], "%x", &at_enc);
+	sscanf(argv[1], "%" SCNx32, &uid);
+	sscanf(argv[2], "%" SCNx32, &nt);
+	sscanf(argv[3], "%" SCNx32, &nr_enc);
+	sscanf(argv[4], "%" SCNx32, &ar_enc);
+	sscanf(argv[5], "%" SCNx32, &at_enc);
 	for (int i = 0; i < encc; i++) {
 		enclen[i] = strlen(argv[i + 6]) / 2;
 		for (int i2 = 0; i2 < enclen[i]; i2++) {

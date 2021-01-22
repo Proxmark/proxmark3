@@ -25,18 +25,18 @@ int main (int argc, char *argv[]) {
 
   bool moebius_attack = (argc == 8);
   
-  sscanf(argv[1],"%x",&data.cuid);
-  sscanf(argv[2],"%x",&data.nonce);
+  sscanf(argv[1],"%" SCNx32, &data.cuid);
+  sscanf(argv[2],"%" SCNx32, &data.nonce);
   data.nonce2 = data.nonce;
-  sscanf(argv[3],"%x",&data.nr);
-  sscanf(argv[4],"%x",&data.ar);
+  sscanf(argv[3],"%" SCNx32, &data.nr);
+  sscanf(argv[4],"%" SCNx32, &data.ar);
   if (moebius_attack) {
-	  sscanf(argv[5],"%x",&data.nonce2);
-	  sscanf(argv[6],"%x",&data.nr2);
-	  sscanf(argv[7],"%x",&data.ar2);
+	  sscanf(argv[5],"%" SCNx32, &data.nonce2);
+	  sscanf(argv[6],"%" SCNx32, &data.nr2);
+	  sscanf(argv[7],"%" SCNx32, &data.ar2);
   } else {
-	  sscanf(argv[5],"%x",&data.nr2);
-	  sscanf(argv[6],"%x",&data.ar2);
+	  sscanf(argv[5],"%" SCNx32, &data.nr2);
+	  sscanf(argv[6],"%" SCNx32, &data.ar2);
   }	  
 
   printf("Recovering key for:\n");
