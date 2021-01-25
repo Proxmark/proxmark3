@@ -11,8 +11,7 @@
 #include "string.h"
 #include <stdint.h>
 
-void *memcpy(void *dest, const void *src, int len)
-{
+void *memcpy(void *dest, const void *src, size_t len) {
 	uint8_t *d = dest;
 	const uint8_t *s = src;
 	while((len--) > 0) {
@@ -23,8 +22,8 @@ void *memcpy(void *dest, const void *src, int len)
 	return dest;
 }
 
-void *memset(void *dest, int c, int len)
-{
+
+void *memset(void *dest, int c, size_t len) {
 	uint8_t *d = dest;
 	while((len--) > 0) {
 		*d = c;
@@ -33,8 +32,30 @@ void *memset(void *dest, int c, int len)
 	return dest;
 }
 
-int memcmp(const void *av, const void *bv, int len)
-{
+
+void *memmove(void *dest, const void *src, size_t len) {
+	uint8_t *d = dest;
+	const uint8_t *s = src;
+	if (dest <= src) {
+		while((len--) > 0) {
+			*d = *s;
+			d++;
+			s++;
+		} 
+	} else {
+		d = d + len - 1;
+		s = s + len - 1;
+		while((len--) > 0) {
+			*d = *s;
+			d--;
+			s--;
+		}
+	}
+	return dest;
+}
+
+
+int memcmp(const void *av, const void *bv, size_t len) {
 	const uint8_t *a = av;
 	const uint8_t *b = bv;
 
@@ -48,13 +69,8 @@ int memcmp(const void *av, const void *bv, int len)
 	return 0;
 }
 
-void memxor(uint8_t * dest, uint8_t * src, size_t len) {
-   for( ; len > 0; len--,dest++,src++)
-       *dest ^= *src;
-}
 
-int strlen(const char *str)
-{
+size_t strlen(const char *str) {
 	int l = 0;
 	while(*str) {
 		l++;
@@ -63,8 +79,8 @@ int strlen(const char *str)
 	return l;
 }
 
-char* strncat(char *dest, const char *src, unsigned int n)
-{
+
+char* strncat(char *dest, const char *src, size_t n) {
 	unsigned int dest_len = strlen(dest);
 	unsigned int i;
 
@@ -75,8 +91,8 @@ char* strncat(char *dest, const char *src, unsigned int n)
 	return dest;
 }
 
-char* strcat(char *dest, const char *src)
-{
+
+char* strcat(char *dest, const char *src) {
 	unsigned int dest_len = strlen(dest);
 	unsigned int i;
 
@@ -86,35 +102,3 @@ char* strcat(char *dest, const char *src)
 
 	return dest;
 }
-////////////////////////////////////////// code to do 'itoa'
-
-/* reverse:  reverse string s in place */
-void strreverse(char s[])
-{
-    int c, i, j;
-
-    for (i = 0, j = strlen(s)-1; i<j; i++, j--) {
-        c = s[i];
-        s[i] = s[j];
-        s[j] = c;
-    }
-}
-
-/* itoa:  convert n to characters in s */
-void itoa(int n, char s[])
-{
-    int i, sign;
-
-    if ((sign = n) < 0)  /* record sign */
-        n = -n;          /* make n positive */
-    i = 0;
-    do {       /* generate digits in reverse order */
-        s[i++] = n % 10 + '0';   /* get next digit */
-    } while ((n /= 10) > 0);     /* delete it */
-    if (sign < 0)
-        s[i++] = '-';
-    s[i] = '\0';
-    strreverse(s);
-}
-
-//////////////////////////////////////// END 'itoa' CODE
