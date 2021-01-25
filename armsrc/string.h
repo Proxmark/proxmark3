@@ -15,15 +15,12 @@
 #include <stdint.h>
 #include "util.h"
 
-int strlen(const char *str);
-RAMFUNC void *memcpy(void *dest, const void *src, int len);
-void *memset(void *dest, int c, int len);
-RAMFUNC int memcmp(const void *av, const void *bv, int len);
-void memxor(uint8_t * dest, uint8_t * src, size_t len);
-char *strncat(char *dest, const char *src, unsigned int n);
+RAMFUNC void *memcpy(void *dest, const void *src, size_t len);
+void *memset(void *dest, int c, size_t len);
+void *memmove(void *dest, const void *src, size_t len);
+RAMFUNC int memcmp(const void *av, const void *bv, size_t len);
+size_t strlen(const char *str);
+char *strncat(char *dest, const char *src, size_t n);
 char *strcat(char *dest, const char *src);
-void strreverse(char s[]);
-void itoa(int n, char s[]);
-
 
 #endif /* __STRING_H */
