@@ -42,7 +42,6 @@ static int sof_bits;            //number of start-of-frame bits
 static byte_t pwdh0, pwdl0, pwdl1;  //password bytes
 static uint32_t rnd = 0x74124485;   //randomnumber
 static int test = 0;
-size_t blocknr;
 bool end=false;
 
 // Single bit Hitag2 functions:
