@@ -7,7 +7,7 @@
 #-----------------------------------------------------------------------------
 
 # DO NOT use thumb mode in the phase 1 bootloader since that generates a section with glue code
-ARMSRC = 
+ARMSRC = string.c
 THUMBSRC = usb_cdc.c bootrom.c
 ASMSRC = ram-reset.s flash-reset.s
 VERSIONSRC = version.c
@@ -19,7 +19,6 @@ VERSIONSRC = version.c
 # ARMSRC := $(ARMSRC) $(THUMBSRC)
 # THUMBSRC := 
 
-# stdint.h provided locally until GCC 4.5 becomes C99 compliant
 APP_CFLAGS = -I.
 
 # version.c should be remade on every compilation

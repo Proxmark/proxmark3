@@ -22,6 +22,8 @@
 #include "usb_cdc.h"
 #include "protocols.h"
 #include "apps.h"
+#include "util.h"
+
 
 //mifare emulator states
 #define MFEMUL_NOFIELD           0
