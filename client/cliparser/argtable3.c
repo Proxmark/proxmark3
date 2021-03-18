@@ -1705,7 +1705,7 @@ getopt_internal(int nargc, char * const *nargv, const char *options,
 	 * string begins with a '+'.
 	 */
 	if (posixly_correct == -1 || optreset) {
-#ifdef _WIN32
+#if (defined(__STDC_LIB_EXT1__) && defined(__STDC_WANT_LIB_EXT1__)) || (defined(__STDC_SECURE_LIB__) && defined(__STDC_WANT_SECURE_LIB__))
 		size_t requiredSize;
 		getenv_s(&requiredSize, NULL, 0, "POSIXLY_CORRECT");
 		posixly_correct = requiredSize != 0;
