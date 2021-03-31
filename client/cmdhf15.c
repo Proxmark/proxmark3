@@ -263,18 +263,26 @@ static int CmdHF15Reader(const char *Cmd) {
 static int CmdHF15Sim(const char *Cmd) {
 	char cmdp = param_getchar(Cmd, 0);
 	uint8_t uid[8] = {0x00};
+	uint8_t memory[32] = {0x00};
 
-	//E0 16 24 00 00 00 00 00
 	if (cmdp == 'h' || cmdp == 'H') {
-		PrintAndLog("Usage:  hf 15 sim <UID>");
+		PrintAndLog("Usage:  hf 15 sim <UID> [<memory>]");
 		PrintAndLog("");
-		PrintAndLog("     sample: hf 15 sim E016240000000000");
+		PrintAndLog("     example: hf 15 sim E016240000000000");
+		PrintAndLog("              hf 15 sim E016240000000000 0001020304..1D1E1F");
+		PrintAndLog("              ");
+		PrintAndLog("     sniff/decode mode: (live snooping reader commands)");
+		PrintAndLog("              hf 15 sim 0000000000000000");
 		return 0;
 	}
 
 	if (param_gethex(Cmd, 0, uid, 16)) {
-		PrintAndLog("UID must include 16 HEX symbols");
+		PrintAndLog("UID must have 16 HEX symbols");
 		return 0;
+	}
+	
+	if (param_gethex(Cmd, 1, memory, 64)) {
+		PrintAndLog("you should include 32 hex bytes for the tag memory");
 	}
 	
 	PrintAndLog("Starting simulating UID %02X %02X %02X %02X %02X %02X %02X %02X",
@@ -283,6 +291,7 @@ static int CmdHF15Sim(const char *Cmd) {
 
 	UsbCommand c = {CMD_SIMTAG_ISO_15693, {0, 0, 0}};
 	memcpy(c.d.asBytes,uid,8);
+	memcpy(&c.d.asBytes[8],memory,32);
 	
 	SendCommand(&c);
 	return 0;
@@ -297,6 +306,31 @@ static int CmdHF15Afi(const char *Cmd) {
 	return 0;
 }
 
+static int CmdHF15SlixDisablePrivacy(const char *Cmd)
+{
+	char cmdp = param_getchar(Cmd, 0);
+	uint8_t pass[4] = {0x00};
+
+	if (cmdp == 'h' || cmdp == 'H') {
+		PrintAndLog("Usage:  hf 15 slix_disable_privacy <pass>");
+		PrintAndLog("");
+		PrintAndLog("     example: hf 15 slix_disable_privacy 0F0F0F0F");
+		return 0;
+	}
+
+	if (param_gethex(Cmd, 0, pass, 8)) {
+		PrintAndLog("password must have 8 HEX symbols");
+		return 0;
+	}
+	
+	PrintAndLog("Disabling privacy mode using password %02X%02X%02X%02X", pass[0], pass[1], pass[2], pass[3]);
+	
+	UsbCommand c = {CMD_ISO_15693_SLIX_L_DISABLE_PRIVACY, {0, 0, 0}};
+	memcpy(&c.arg[0],pass,4);
+
+	SendCommand(&c);
+	return 0;
+}
 
 // Reads all memory pages
 static int CmdHF15DumpMem(const char*Cmd) {
@@ -1061,6 +1095,7 @@ static command_t CommandTable15[] = {
 	{"reader",     CmdHF15Reader,  0, "Act like an ISO15693 reader"},
 	{"sim",        CmdHF15Sim,     0, "Fake an ISO15693 tag"},
 	{"cmd",        CmdHF15Cmd,     0, "Send direct commands to ISO15693 tag"},
+	{"slix_disable_privacy",     CmdHF15SlixDisablePrivacy,     0, "Disable privacy mode on SLIX ISO15693 tag"},
 	{"findafi",    CmdHF15Afi,     0, "Brute force AFI of an ISO15693 tag"},
 	{"dumpmemory", CmdHF15DumpMem, 0, "Read all memory pages of an ISO15693 tag"},
 	{"csetuid",	   CmdHF15CSetUID, 0, "Set UID for magic Chinese card"},
