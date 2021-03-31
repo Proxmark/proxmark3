@@ -28,8 +28,8 @@ CBORLIB = $(CBORLIBPATH)/tinycbor.a
 LIBINCLUDES = -I../zlib -I../uart -I../liblua -I$(MBEDTLSLIBPATH) -I$(JANSSONLIBPATH) -I$(CBORLIBPATH)
 INCLUDES_CLIENT = -I. -I../include -I../common -I/opt/local/include $(LIBINCLUDES)
 LDFLAGS = $(ENV_LDFLAGS)
-CFLAGS = $(ENV_CFLAGS) -std=c99 -D_ISOC99_SOURCE $(INCLUDES_CLIENT) -Wall -g -O3
-CXXFLAGS = -I../include -Wall -O3
+CFLAGS = $(ENV_CFLAGS) -std=c99 -D_ISOC99_SOURCE $(INCLUDES_CLIENT) -Wall -g -O3 -fPIC
+CXXFLAGS = -I../include -Wall -O3 -fPIC
 
 APP_CFLAGS =
 include ../common/Makefile_Enabled_Options.common
