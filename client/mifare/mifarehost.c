@@ -407,9 +407,9 @@ static int nested_fixed_nonce(StateList_t statelist, uint32_t fixed_nt, uint32_t
 	}
 
 	// test each {ar} response
-	uint32_t key_index;
+	size_t key_index;
 
-	int isOK = mfCheckKeysFixedNonce(statelist.blockNo, statelist.keyType, authentication_timeout, true, num_ar_par, ar_par, &key_index);
+	int isOK = mfCheckKeysFixedNonce(statelist.blockNo, statelist.keyType, authentication_timeout, true, num_ar_par, ar_par, (uint32_t*)&key_index);
 
 	if (isOK == 0) {     // success, key found
 		// key_index contains the index into the cypher state list
