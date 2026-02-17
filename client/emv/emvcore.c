@@ -132,6 +132,7 @@ static const TAIDList AIDlist [] = {
 	{ CV_OTHER, "A0000006723020" },             // TROY - Turkey - TROY chip debit card - Turkey's Payment Method
 	{ CV_OTHER, "A0000007705850" },             // Indian Oil Corporation Limited - India - XTRAPOWER Fleet Card Program - Indian Oil’s Pre Paid Program
 	{ CV_OTHER, "D27600002545500100" },         // ZKA - Germany - Girocard - ZKA Girocard (Geldkarte) (Germany)
+	{ CV_OTHER, "D4100000030001" },             // KS X 6924 (T-Money, South Korea and Snapper+, Wellington, New Zealand)
 	{ CV_OTHER, "D5280050218002" },             // The Netherlands - ? - (Netherlands)
 	{ CV_OTHER, "D5780000021010" },             // Bankaxept    Norway  Bankaxept   Norwegian domestic debit card
 	{ CV_OTHER, "F0000000030001" },             // BRADESCO - Brazilian Bank Banco Bradesco
