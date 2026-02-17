@@ -146,6 +146,7 @@ typedef struct {
 #define CMD_ISO_15693_DEBUG                                               0x0316
 #define CMD_LF_SNOOP_RAW_ADC_SAMPLES                                      0x0317
 #define CMD_CSETUID_ISO_15693                                             0x0318
+#define CMD_ISO_15693_SLIX_L_DISABLE_PRIVACY                              0x0319
 
 // For Hitag2 transponders
 #define CMD_SNOOP_HITAG                                                   0x0370
